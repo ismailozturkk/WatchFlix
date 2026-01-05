@@ -1,0 +1,277 @@
+Lists (Collection)
+ └── userId (Document)
+     └── watchedTv (Array)
+         ├── tvShowId (Document)
+         │   ├── name
+         │   ├── genres (Array)
+         │   │   ├── ...
+         │   │   ├── ...
+         │   │   ├── ...
+         │   ├── addedShowDate
+         │   ├── id
+         │   ├── episodeCount
+         │   ├── seasonCount
+         │   ├── imagePath
+         │   ├── type
+         │   ├── seasons (Array)
+         │   │   ├── seasonNumber
+         │   │   ├── addedSeasonDate
+         │   │   ├── seasonEpisodeCount
+         │   │   ├── episodes (Array)
+         │   │   │   ├── episodeNumber
+         │   │   │   ├── episodeWatchTime
+         │   │   │   ├── episodeName
+         │   │   │   ├── episodeWatchTime
+         │   │   │   ├── episodeRatings
+         │   │   │   ├── episodeMinutes
+
+
+
+
+
+
+
+
+
+const userRef = doc(db, "Lists", user.uid);
+const docSnap = await getDoc(docRef);
+data = docSnap.data();
+data={
+  watchedTv:
+  [
+  { id:diziId,
+    episodeCount:bölümSayısı,
+    SeasonCount:sezonSayısı,
+    tvShowImagePath:diziresimyolu,
+    tvSeriesName:diziismi,
+    tvEklenmeZamanı:1212,
+    seasons:[
+      {
+        seasonNumber:1,
+        seasonEpisodeCount:10,
+        episodes:
+        [
+          {
+            episodeNumber:1,
+            episodeName:kis,
+            episodeDate:2002,
+            episodeRatings:9.0,
+            episodeMinutes:120,
+          }
+        ]
+
+      },
+      {
+        seasonNumber:1,
+        
+      }
+    ]
+  }
+]
+}
+await setDoc(docRef, data);
+
+
+
+
+
+
+
+
+                  showId,
+                  showName,
+                  seasonNumber,
+                  seasonEpisodes: details.episodes.length,
+                  episodeNumber: episode.episode_number,
+                  showEpisodeCount,
+                  showSeasonCount,
+                  showPosterPath
+
+
+filmler 
+
+starwars 
+harry potter
+marvels
+yüzüklerin efendisi
+karayip korsanmalrı
+dc evrenifilmleri batman ayrı olabilir
+hızlı ve öfkeli
+görevimiz tehlike
+james bond 
+matrix
+jhon wick
+
+
+transformers
+açlık oyunları
+x-man 
+buz devri 
+labirent 
+jurasic park
+
+
+| Seri İsmi                | Collection ID |
+| ------------------------ | ------------- |
+| Star Wars                | 10            |
+| Harry Potter             | 1241          |
+| Fast & Furious           | 9485          |
+| The Avengers             | 86311         |
+| The Dark Knight (Batman) | 263           |
+| X-Men                    | 748           |
+| Spider-Man (Raimi)       | 556           |
+| Hobbit + LOTR            | 119           |
+| Mission: Impossible      | 87359         |
+| Despicable Me + Minions  | 86066         |
+
+
+
+
+main dizi bölümSayısı
+[
+  "Game of Thrones",
+  "The Walking Dead",
+  "The Big Bang Theory",
+  "Çernobil",
+  "La casa de papel",
+  "Squid Game",
+  "Breaking Bad",
+  "Silo",
+  "WandaVision",
+  "Loki",
+  "Brooklyn Nine-Nine",
+  "The Boys",
+  "The Flash",
+  "The Mandalorian",
+  "Marvel's The Punisher",
+  "Succession",
+  "Obi-Wan Kenobi",
+ 			 "MINDHUNTER",
+  "How I Met Your Mother",
+  "Dexter",
+  "Prison Break",
+  "The Witcher",
+  "The Last of Us",
+  "Narcos",
+  "Narcos: Mexico",
+  "Those About to Die",
+  "DAHMER - Canavar: Jeffrey Dahmer’ın Hikâyesi",
+  			"Snowpiercer",
+  "Ezel",
+  "Kurtlar Vadisi",
+  "Kardeş Payı",
+  			"Shōgun",
+  "Prens",
+ 			 "Leyla ile Mecnun",
+  "Yüzüklerin Efendisi: Güç Yüzükleri",
+  "House of the Dragon",
+  			"The Walking Dead: The Ones Who Live",
+  "Vikingler",
+ 		 "Behzat Ç.: Bir Ankara Polisiyesi",
+  "The Blacklist",
+  "Reacher",
+  "Canavarlar: Lyle ve Erik Menendez'in Hikâyesi",
+ 		 "Sense8",
+  		"Taboo",
+  "Alef",
+ 		 "Spartacus",
+  		"The 100",
+		"Better Call Saul",
+  "Star Wars: Andor",
+ 		"Dexter: New Blood",
+  "Friends",
+  		"Çekiç ve Gül: Bir Behzat Ç. Hikayesi",
+  "Şahsiyet",
+  "The Book of Boba Fett",
+  		"Altered Carbon",
+  "Dark",
+  		"Modern Family",
+  		"Control Z",
+  "True Detective",
+ 		 "Outer Banks",
+ 		 "Mr. Robot",
+ 		 "Sherlock",
+  		"Westworld",
+  		"Black Mirror",
+ 		 "Yaratılan",
+ 		 "The Billion Dollar Code",
+  		"Hakan: Muhafız",
+  		"Atiye",
+  		"‎Ofis‎",
+  		"The Last Kingdom",
+  "Kardeşler Takımı",
+  		"The Walking Dead: Daryl Dixon",
+  		"Fear the Walking Dead"
+]
+
+main filmler 
+ ["Yıldızlararası", "Kara Şövalye", "Extraction", "Extraction", "Galaksinin Koruyucuları", "Fight Club", "Başlangıç", "Star Wars: Güç Uyanıyor", "Star Wars: Son Jedi", "Star Wars: Skywalker'ın Yükselişi", "Rogue One: Bir Star Wars Hikayesi", "Yıldız Savaşları: Bölüm I - Gizli Tehlike", "Yıldız Savaşları: Yeni Umut", "Marslı", "Yıldız Savaşları: Bölüm III - Sith'in İntikamı", "Star Wars: Klon Savaşları", "Matrix", "Avengers: Endgame", "Titanik", "Yüzüklerin Efendisi: Yüzük Kardeşliği", "Ucuz Roman", "Harry Potter ve Felsefe Taşı", "Forrest Gump", "Esaretin Bedeli", "Yenilmezler", "Avatar", "Matrix Reloaded", "Matrix Resurrections", "Matrix Revolutions", "Baba", "Baba: Bölüm 2", "Baba, Sonsöz: Michael Corleone'nin Ölümü", "The Godfather Legacy", "Harry Potter ve Sırlar Odası", "Harry Potter ve Azkaban Tutsağı", "Harry Potter ve Ateş Kadehi", "Harry Potter ve Zümrüdüanka Yoldaşlığı", "Harry Potter ve Melez Prens", "Harry Potter ve Ölüm Yadigârları: Bölüm 1", "Fantastik Canavarlar Nelerdir, Nerede Bulunurlar?", "Dayı: Bir Adamın Hikâyesi", "Deadpool", "Cambaz", "Venom: Zehirli Öfke", "Venom: Son Dans", "Venom: Zehirli Öfke 2", "Gladyatör II", "Son Ültimatom", "Meedusa Darbesi", "Geçmişi Olmayan Adam", "Bourne'un Mirası", "Jason Bourne", "Ben Robot", "Örümcek Adam 2", "Örümcek Adam 3", "Örümcek Adam", "İnanılmaz Örümcek-Adam 2", "İnanılmaz Örümcek-Adam", "Çelik Yumruklar", "Melekler ve Şeytanlar", "Maymunlar Cehennemi: Şafak Vakti", "Maymunlar Cehennemi: Savaş", "Maymunlar Cehennemi: Başlangıç", "İlk Yenilmez: Kaptan Amerika", "Kaptan Amerika: Kış Askeri", "Galaksinin Koruyucuları 2", "Örümcek-Adam: Eve Dönüş", "Thor: Ragnarok", "Thor: Karanlık Dünya", "Thor", "Uzay Oyunları", "Iron Man 3", "Iron Man 2", "Iron Man", "The Incredible Hulk", "Hulk", "Fantastik Dörtlü", "Fantastik Dörtlü: Gümüş Sörfçü'nün Yükselişi", "Cevher", "Sıkıysa Yakala", "Kanlı Elmas", "Köstebek", "Zindan Adası", "Prestij", "Muhteşem Gatsby", "Yaralı Yüz", "Rezervuar Köpekleri", "Kill Bill: Vol. 1", "Kill Bill: Vol. 2", "Kill Bill: The Whole Bloody Affair", "Soysuzlar Çetesi", "Pi'nin Yaşamı", "Skyfall", "Spectre", "Ölmek İçin Zaman Yok", "Casino Royale", "Quantum of Solace", "Yıldız Savaşları: İmparator'un Dönüşü", "Yıldız Savaşları: Jedi'nin Dönüşü", "Yıldız Savaşları: Bölüm II - Klonlar'ın Saldırısı", "Han Solo: Bir Star Wars Hikayesi", "Dune: Çöl Gezegeni", "Dune: Çöl Gezegeni Bölüm İki", "Mad Max: Fury Road", "Furiosa: Bir Mad Max Destanı", "Hayalet Sürücü", "Hayalet Sürücü 2: İntikam Ateşi", "Deadpool 2", "Deadpool & Wolverine", "Görevimiz Tehlike", "Görevimiz Tehlike III", "Görevimiz Tehlike II", "Mission: Impossible - Ölümcül Hesaplaşma Birinci Bölüm", "Mission: Impossible - Rogue Nation", "Mission: Impossible - Yansımalar", "Mission: Impossible - Ghost Protocol", "Kung Fu Panda", "Kung Fu Panda 3", "Kung Fu Panda 2", "Ip Man", "Ip Man 3", "Usta Z: Ip Man'in Mirası", "Ip Man 2", "Ip Man: Uyanış", "Ip Man: Kung Fu Ustası", "Ip Man ve Dört Kral", "Kurtlar Vadisi: Irak", "Kurtlar Vadisi: Filistin", "Kurtlar Vadisi: Vatan", "Kurtlar Vadisi: Gladio", "Nefes: Vatan Sağolsun", "Dağ", "Dağ II", "Batman Başlıyor", "Kara Şövalye Yükseliyor", "Batman ve Superman: Adaletin Şafağı", "Çelik Adam", "Hızlı ve Öfkeli 6", "Hızlı ve Öfkeli 7", "Hızlı ve Öfkeli 8", "Hızlı ve Öfkeli: Hobbs ve Shaw", "Hızlı ve Öfkeli 9", "Hızlı ve Öfkeli 10", "Extraction 2", "John Wick 4", "Galaksinin Koruyucuları 3", "John Wick 3: Parabellum", "John Wick 2", "John Wick", "Fury", "Adalet", "Dünya Savaşı Z", "Para Avcısı", "Diriliş", "Avatar: Suyun Yolu", "Creed III: Efsane Devam Ediyor", "Creed II: Efsane Yükseliyor", "Creed: Efsanenin Doğuşu", "Arınma Gecesi: Sonsuza Dek", "Arınma Gecesi", "Arınma Gecesi: Anarşi", "Arınma Gecesi: Seçim Yılı", "İlk Arınma Gecesi", "Hannibal", "Hannibal Doğuyor", "Kuzuların Sessizliği", "Yedi", "Süper Hızlı ve Çok Öfkeli", "Hızlı ve Öfkeli 3: Tokyo Yarışı", "Hızlı ve Öfkeli", "Hızlı ve Öfkeli 4", "Hızlı ve Öfkeli 5: Rio Soygunu", "Daha Hızlı Daha Öfkeli", "Transformers", "Transformers: Canavarların Yükselişi", "Transformers: Kayıp Çağ", "Transformers 5: Son Şövalye", "Transformers: Yenilenlerin İntikamı", "Transformers: Ay'ın Karanlık Yüzü", "Transformers: Beginnings", "Terminatör: Genisys", "Terminatör", "Terminatör 2: Mahşer Günü", "Terminatör: Kara Kader", "Terminatör: Kurtuluş", "Terminatör 3: Makinelerin Yükselişi", "The Terminators", "The Making of 'Terminator 2: Judgment Day'", "Ölümcül Makineler", "Ex Machina", "Lucy", "X-Men: Geçmiş Günler Gelecek", "X-Men: Apocalypse", "X-Men: Dark Phoenix", "Siyah Giyen Adamlar: Global Tehdit", "Siyah Giyen Adamlar", "Siyah Giyen Adamlar 2", "Gladyatör", "Cennetin Krallığı", "Truva", "Polar", "Triple Frontier", "Örümcek-Adam: Eve Dönüş Yok", "Red Notice", "Don't Look Up", "Rebel Moon - Part Two: The Scargiver", "Rebel Moon - Part One: A Child of Fire", "Aquaman ve Kayıp Krallık", "Wonka", "Geliş", "Uzay Yolcuları", "Sicario", "Doktor Strange", "Blade Runner 2049: Bıçak Sırtı", "Fantastik Canavarlar: Grindelwald'ın Suçları", "Fantastik Canavarlar: Dumbledore'un Sırları", "Bohemian Rhapsody", "Oblivion", "G.I. Joe: Misilleme", "G.I. Joe: Kobranın Yükselişi", "Piyanist", "Whiplash", "Oyun / Game", "Oppenheimer", "Parasite", "The Shape of Water", "Yüzüklerin Efendisi: Kralın Dönüşü", "Yüzüklerin Efendisi: İki Kule", "Hobbit: Beş Ordunun Savaşı", "Hobbit: Beklenmedik Yolculuk", "Hobbit: Smaug'un Çorak Toprakları", "Jurassic World", "Jurassic World: Yıkılmış Krallık", "Jurassic World: Hâkimiyet", "Yarının Sınırında", "Godzilla II: Canavarlar Kralı", "Godzilla vs. Kong", "Zack Snyder's Justice League", "Justice League: Adalet Birliği", "Wonder Woman", "Mumya", "Karayip Korsanları: Salazar'ın İntikamı", "Karayip Korsanları: Gizemli Denizlerde", "Karayip Korsanları: Dünyanın Sonu", "Karayip Korsanları: Ölü Adam'ın Sandığı", "Karayip Korsanları: Siyah İnci'nin Laneti", "Arabalar", "Arabalar 2", "Arabalar 3", "Asfaltın Kralları", "Madagaskar", "Madagaskar 2", "Madagaskar 3: Avrupa'nın En Çok Arananları", "Madagaskar Penguenleri", "Buz Devri", "Buz Devri 2: Erime Başlıyor", "Buz Devri 3: Dinozorların Şafağı", "Buz Devri 4: Kıtalar Ayrılıyor", "Buz Devri: Büyük Çarpışma", "Sevimli Canavarlar", "Vol.i", "1917", "Pan'ın Labirenti", "Batı Cephesinde Yeni Bir Şey Yok", "300: Bir İmparatorluğun Yükselişi", "300 Spartalı", "Sherlock Holmes: Gölge Oyunları", "Sherlock Holmes", "Sherlock: The Abominable Bride", "Ben Efsaneyim", "Joker", "Meg: Derinlerdeki Dehşet", "Meg 2: Çukur", "Kaptan Amerika: Kahramanların Savaşı", "Sessiz Bir Yer", "Kung Fu Panda 4", "Yenilmezler: Ultron Çağı", "Captain Marvel", "PK", "Dangal", "3 Aptal", "Ghajini", "Testere Yeniden Doğuş", "Testere 2", "Testere 3", "Testere 4", "Testere V", "Testere VI", "Testere: Jigsaw Efsanesi", "Testere X", "Senden Önce Ben", "Zor Ölüm", "Zor Ölüm 2", "Zor Ölüm 3", "Amerikan Sapığı", "V for Vendetta", "Çin Seddi", "Kolonya Cumhuriyeti", "G.O.R.A.", "A.R.O.G", "Arif V 216", "Son Samuray", "Diktatör", "Zohan'a Bulaşma", "Kingsman: Gizli Servis", "Kingsman: Altın Çember", "Valerian ve Bin Gezegen İmparatorluğu", "Tam Gaz", "O", "O: Bölüm 2", "Başlat: Ready Player One", "Kapan", "Tenet", "Sarışın Bomba", "Anora", "Yok Oluş", "Sihirbazlar Çetesi", "Sihirbazlar Çetesi 2", "The Karate Kid", "Bıçaklar Çekildi", "Bıçaklar Çekildi: Gizemli Bir Serüven", "Sümela'nın Şifresi: Temel", "Düğün Dernek", "Düğün Dernek 2: Sünnet", "Maskeli Beşler: İntikam Peşinde", "Maskeli Beşler: Irak", "Maskeli Beşler: Kıbrıs", "Hababam Sınıfı", "Hababam Sınıfı Üç Buçuk", "Hababam Sınıfı Uyanıyor", "Hababam Sınıfı Sınıfta Kaldı", "Hababam Sınıfı Tatilde", "Hababam Sınıfı Güle Güle", "Hababam Sınıfı Dokuz Doğuruyor", "Hababam Sınıfı Merhaba", "Hababam Sınıfı Askerde", "Altıncı His", "Zombi Ekspresi", "Zootropolis: Hayvanlar Şehri", "Suicide Squad: Gerçek Kötüler", "Logan: Wolverine", "Cesur Yürek", "Yedi Kral Ölmeli", "Açlık Oyunları", "Açlık Oyunları: Ateşi Yakalamak", "Açlık Oyunları: Alaycı Kuş Bölüm 1", "Açlık Oyunları: Alaycı Kuş Bölüm 2", "Napolyon", "Dolunay Katilleri", "The Killer", "Assassin's Creed", "Rampage: Büyük Yıkım", "Black Panther", "Ejderhanı Nasıl Eğitirsin", "Ejderhanı Nasıl Eğitirsin 2", "Ejderhanı Nasıl Eğitirsin 3: Gizli Dünya", "Shazam! 6 Güç", "Malefiz", "X-Men: Birinci Sınıf", "X-Men Başlangıç: Wolverine", "Dev Avcısı Jack", "Bay ve Bayan Smith", "Ocean's Twelve", "Ocean's Thirteen", "Ocean's Eleven", "Ocean's 8", "Gökdelen", "Pelé", "Örümcek Adam: Örümcek Evreninde", "Örümcek-Adam: Evden Uzakta", "Kabuktaki Hayalet", "Son Durak", "Son Durak 2", "Son Durak 3", "Son Durak 5", "Son Durak 4", "Ölümcül Deney", "Ölümcül Deney: Kıyamet", "Ölümcül Deney 3: İnsanlığın Sonu", "Resident Evil 5: İntikam", "Resident Evil: Ölümden Sonra", "Resident Evil: Son Bölüm", "Resident Evil: Raccoon Şehri", "Alvin ve Sincaplar", "Alvin ve Sincaplar 2", "Alvin ve Sincaplar: Eğlence Adası", "Alvin ve Sincaplar: Yol Macerası", "Fındık İşi", "Fındık İşi 2", "Benjamin Button'ın Tuhaf Hikayesi", "Bird Box", "Yeşil Yol", "Jumanji: Vahşi Orman", "Jumanji: Yeni Seviye", "Parçalanmış", "Glass", "Uyumsuz", "Yandaş", "Labirent: Ölümcül Kaçış", "Labirent: Alev Deneyleri", "Labirent: Son İsyan", "Percy Jackson & Olimposlular: Şimşek Hırsızı", "Percy Jackson: Canavarlar Denizi", "Van Helsing", "El Camino: Bir Breaking Bad Filmi", "Godzilla x Kong: Supernova", "Avengers: Sonsuzluk Savaşı", "Nefesini Tut", "Sessiz", "Akıl Defteri", "Constantine", "Barbie", "Babil", "Fokus", "Bir Zamanlar… Hollywood'da", "Wanted", "Kartal Göz", "Kara Şimşek"]
+
+ fav 
+  ["Kara Şövalye", "Yıldızlararası", "Avatar", "Deadpool", "Yenilmezler", "Dövüş Kulübü", "Ucuz Roman", "Galaksinin Koruyucuları", "Iron Man", "Matrix", "Avengers: Endgame", "Yüzüklerin Efendisi: Yüzük Kardeşliği", "La casa de papel", "Başlangıç", "Kurtlar Vadisi", "Game of Thrones", "The Sopranos", "Diriliş", "Marvel's The Punisher", "The Last Kingdom", "The Walking Dead", "Yedi", "Star Wars: Andor", "Prestij", "How I Met Your Mother", "G.O.R.A.", "A.R.O.G", "Breaking Bad", "Köstebek", "Yüzüklerin Efendisi: Kralın Dönüşü", "Gladyatör"]
+
+  watchlist
+   ["Konsey", "Ahsoka", "The Wire", "The Sopranos", "Attack on Titan", "Suits", "Dexter: Original Sin", "Gibi", "İşler Güçler", "Maymunlar Cehennemi: Yeni Krallık", "Er Ryan'ı Kurtarmak", "Transformers: Başlangıç", "Knightfall", "Mickey 17", "Ozark", "Southpaw", "Daredevil: Born Again", "Alice in Borderland", "Aşk", "Schindler'in Listesi", "Kusursuz Arkadaş", "Supernatural", "Veep", "Everything Everywhere All at Once", "Kayıp Kız", "Jurassic World: Yeniden Doğuş", "Zincirsiz", "The Gorge", "Star Wars: Andor", "Amerikan Güzeli", "Avengers: Doomsday", "Avengers: Secret Wars", "Fargo", "Sıkı Dostlar", "Roman Empire", "Rise of Empires: Ottoman", "The Acolyte", "Joker: İkili Delilik", "Paralel Evren", "Son Durak: Kan Bağı", "Mission: Impossible - Son Hesaplaşma", "The Mentalist", "Karate Kid: Efsane Dövüşçüler", "The Walking Dead: Dead City", "Seinfeld", "Açlık Oyunları: Kuşların ve Yılanların Şarkısı", "Avatar the Last Airbender", "Thunderbolts*", "Buz Devri 6", "Operasyon: Argo", "Bad Boys: Ya Hep Ya Hiç", "John Wick Dünyasından: Ballerina", "Babil", "Vizontele", "Vizontele Tuuba", "Affeksjonsverdi"]
+   
+
+
+
+
+
+
+
+    <View
+                      style={{
+                        flexDirection: "row",
+                        gap: 2,
+                      }}
+                    >
+                      {[0, 1, 2].map((index) => {
+                        const item = items && items[index];
+                        if (item && item.imagePath) {
+                          return (
+                            <Image
+                              key={index}
+                              source={{
+                                uri: `https://image.tmdb.org/t/p/w500${item.imagePath}`,
+                              }}
+                              style={[
+                                styles.image,
+                                index === 0
+                                  ? {
+                                      borderTopLeftRadius: 10,
+                                      borderBottomLeftRadius: 10,
+                                    }
+                                  : index === 1
+                                    ? {}
+                                    : {
+                                        borderTopRightRadius: 10,
+                                        borderBottomRightRadius: 10,
+                                      },
+                              ]}
+                            />
+                          );
+                        } else {
+                          return (
+                            <View
+                              key={index}
+                              style={[
+                                styles.placeholder,
+                                index === 0
+                                  ? {
+                                      borderTopLeftRadius: 10,
+                                      borderBottomLeftRadius: 10,
+                                    }
+                                  : index === 1
+                                    ? {}
+                                    : {
+                                        borderTopRightRadius: 10,
+                                        borderBottomRightRadius: 10,
+                                      },
+                                { backgroundColor: theme.primary },
+                              ]}
+                            />
+                          );
+                        }
+                      })}
+                    </View>
