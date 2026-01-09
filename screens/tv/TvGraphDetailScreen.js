@@ -174,41 +174,23 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
       </View>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{
+          paddingBottom: 40,
+          paddingVertical: 15,
+        }}
         showsVerticalScrollIndicator={false}
       >
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: 15,
+          }}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+        >
           <View style={{ minWidth: tvShows.length * 45 }}>
-            {/* Sezon Başlıkları */}
-            <View style={styles.row}>
-              <Text style={[styles.cell, styles.header]}></Text>
-              {tvShows.map((season, index) => (
-                <Text
-                  key={index}
-                  style={[
-                    styles.cell,
-                    styles.header,
-                    { color: theme.text.primary },
-                  ]}
-                >
-                  S-{season.season_number}
-                </Text>
-              ))}
-            </View>
-
             {/* Bölüm Puanları */}
             {[...Array(maxEpisodes)].map((_, episodeIndex) => (
               <View key={episodeIndex} style={styles.row}>
-                <Text
-                  style={[
-                    styles.cell,
-                    styles.header,
-                    { color: theme.text.primary },
-                  ]}
-                >
-                  {t.e}
-                  {episodeIndex + 1}
-                </Text>
                 {tvShows.map((season) => (
                   <View key={season.season_number} style={styles.cell}>
                     {season.episodes[episodeIndex] ? (
@@ -218,13 +200,13 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                           <View
                             style={[
                               styles.seasonEpisodeInfo,
-                              episodeIndex < 5 ? { top: 25 } : { bottom: 25 },
+                              episodeIndex < 5 ? { top: 50 } : { bottom: 50 },
                               tvShows.length == season.season_number &&
                               season.season_number > 5
                                 ? { left: -70 }
                                 : season.season_number === 1
-                                ? { left: 0 }
-                                : { left: -35 },
+                                  ? { left: 0 }
+                                  : { left: -35 },
                             ]}
                           >
                             <Text
@@ -288,30 +270,67 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                           style={[
                             getRatingStyle(
                               season.episodes[episodeIndex].vote_average
-                            ),
+                            ).backgroundColor,
+
+                            selectedEpisode ===
+                            `${season.season_number}-${episodeIndex}`
+                              ? {
+                                  borderColor: "white",
+                                  borderWidth: 1,
+                                }
+                              : { borderColor: theme.primary },
+
                             {
                               justifyContent: "center",
                               alignItems: "center",
-
+                              borderWidth: 1,
                               borderRadius: 6,
+                              width: 50,
+                              height: 50,
+                              overflow: "hidden",
                             },
                           ]}
                           activeOpacity={0.8}
                         >
                           <Text
                             style={[
+                              styles.EpisodeInfo,
+                              selectedEpisode ===
+                                `${season.season_number}-${episodeIndex}` && {
+                                fontSize: 9,
+                              },
                               getRatingStyle(
                                 season.episodes[episodeIndex].vote_average
-                              ),
+                              ).color,
+                            ]}
+                          >
+                            {t.e}
+                            {episodeIndex + 1}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.seasonInfo,
+                              selectedEpisode ===
+                                `${season.season_number}-${episodeIndex}` && {
+                                fontSize: 9,
+                              },
+                              getRatingStyle(
+                                season.episodes[episodeIndex].vote_average
+                              ).color,
+                            ]}
+                          >
+                            S-{season.season_number}
+                          </Text>
+                          <Text
+                            style={[
                               styles.rating,
                               selectedEpisode ===
                                 `${season.season_number}-${episodeIndex}` && {
-                                width: 49.5,
-                                height: 24.5,
-                                borderColor: "white",
-                                fontSize: 12,
-                                borderWidth: 1.5,
+                                fontSize: 14,
                               },
+                              getRatingStyle(
+                                season.episodes[episodeIndex].vote_average
+                              ).color,
                             ]}
                           >
                             {season.episodes[episodeIndex].vote_average
@@ -323,7 +342,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                         </TouchableOpacity>
                       </View>
                     ) : (
-                      <Text style={styles.noData}>●</Text>
+                      <Text style={styles.noData.color}>●</Text>
                     )}
                   </View>
                 ))}
@@ -338,19 +357,17 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
 
 const getRatingStyle = (rating) => {
   if (rating >= 9) return styles.awesome;
-  if (rating >= 8) return styles.great;
-  if (rating >= 7) return styles.good;
-  if (rating >= 6) return styles.regular;
-  if (rating >= 5) return styles.bad;
+  if (rating >= 8) return styles.fantastic;
+  if (rating >= 7) return styles.great;
+  if (rating >= 6) return styles.good;
+  if (rating >= 5) return styles.regular;
+  if (rating >= 4) return styles.bad;
   return styles.poor;
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    marginTop: 0,
-    padding: 10,
-    paddingTop: 30,
   },
   lottie: {
     position: "absolute",
@@ -364,13 +381,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   item: {
-    width: "100%",
+    width: "95%",
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#222",
     borderRadius: 15,
     padding: 10,
-    marginVertical: 10,
+    marginTop: 10,
+    marginHorizontal: 10,
   },
   seriesInfo: { flex: 1 },
 
@@ -441,16 +459,39 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   rating: {
-    width: 50,
-    height: 25,
     borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
     fontSize: 16,
     textAlign: "center",
     justifyContent: "center",
     alignItems: "center",
-    fontWeight: "600",
+    fontWeight: "bold",
+    transform: [{ scale: 1.5 }],
+  },
+  seasonInfo: {
+    position: "absolute",
+    top: -1,
+    left: 5,
+    fontSize: 12,
+    textAlign: "center",
+    justifyContent: "center",
+    alignItems: "center",
+    fontWeight: "bold",
+    transform: [{ scale: 1.5 }],
+    opacity: 0.5,
+  },
+  EpisodeInfo: {
+    position: "absolute",
+    bottom: -0,
+    right: 5,
+    fontSize: 12,
+    textAlign: "center",
+    justifyContent: "center",
+    alignItems: "center",
+    fontWeight: "bold",
+    opacity: 0.5,
+    transform: [{ scale: 1.5 }],
   },
   header: {
     fontWeight: "bold",
@@ -465,31 +506,42 @@ const styles = StyleSheet.create({
   },
   loading: {},
   awesome: {
-    backgroundColor: "rgb(0, 88, 74)",
-    color: "#fff",
+    backgroundColor: { backgroundColor: "rgb(0, 88, 74)" },
+    color: { color: "#fff" },
+    borderColor: { borderColor: "rgb(0, 88, 74)" },
   },
-  great: {
-    backgroundColor: "rgb(41, 184, 100)",
-    color: "#000",
+  fantastic: {
+    backgroundColor: { backgroundColor: "rgb(41, 184, 100)" },
+    color: { color: "#000" },
+    borderColor: { borderColor: "rgb(41, 184, 100)" },
   },
   good: {
-    backgroundColor: "rgb(255, 255, 0)",
-    color: "#000",
+    backgroundColor: { backgroundColor: "rgb(255, 255, 0)" },
+    color: { color: "#000" },
+    borderColor: { borderColor: "rgb(255, 255, 0)" },
+  },
+  great: {
+    backgroundColor: { backgroundColor: "rgba(119, 255, 171, 1)" },
+    color: { color: "#000000ff" },
+    borderColor: { borderColor: "rgba(119, 255, 171, 1)" },
   },
   regular: {
-    backgroundColor: "rgb(255, 100, 0)",
-    color: "#000",
+    backgroundColor: { backgroundColor: "rgb(255, 100, 0)" },
+    color: { color: "#000" },
+    borderColor: { borderColor: "rgb(255, 100, 0)" },
   },
   bad: {
-    backgroundColor: "rgb(255, 0, 0)",
-    color: "#fff",
+    backgroundColor: { backgroundColor: "rgb(255, 0, 0)" },
+    color: { color: "#fff" },
+    borderColor: { borderColor: "rgb(255, 0, 0)" },
   },
   poor: {
-    backgroundColor: "rgb(99, 0, 204)",
-    color: "#fff",
+    backgroundColor: { backgroundColor: "rgb(99, 0, 204)" },
+    color: { color: "#fff" },
+    borderColor: { borderColor: "rgb(99, 0, 204)" },
   },
   noData: {
-    color: "#888",
+    color: { color: "#888" },
   },
 });
 

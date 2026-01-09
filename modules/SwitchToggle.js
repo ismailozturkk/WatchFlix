@@ -14,9 +14,9 @@ export default function SwitchToggle({
   onValueChange = () => {},
   size = 36,
   onColor = "#93ffaae0",
-  offColor = "#ff9090ff",
+  offColor = "#cacacaad",
   knobColor = "#FFF",
-  disabledColor = "#cacacaad",
+  disabledColor = "#757575ad",
   disabled = false,
 }) {
   const { theme } = useTheme();

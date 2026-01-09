@@ -219,6 +219,7 @@ export default function ChatScreen({ route, navigation }) {
 
   const sendMessage = async () => {
     if (text.trim() === "") return;
+    console.log("sendMessage", text);
 
     try {
       let messageRef;

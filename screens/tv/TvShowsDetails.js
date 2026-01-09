@@ -50,6 +50,8 @@ import { useAppSettings } from "../../context/AppSettingsContext";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import ListViewTv from "../../components/ListViewTv";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { BlurView } from "expo-blur";
+
 export default function TvShowsDetails({ route, navigation }) {
   const { id } = route.params;
   const [details, setDetails] = useState(null);
@@ -831,7 +833,14 @@ export default function TvShowsDetails({ route, navigation }) {
                   navigation.navigate("TvGraphDetailScreen", { id })
                 }
               >
-                <View style={styles.headerGraph}>
+                
+                <View style={styles.headerGraph}> 
+                  <BlurView
+                   tint="dark"
+                   intensity={5}
+                   experimentalBlurMethod="dimezisBlurView" // Android için sihirli kod
+                   style={StyleSheet.absoluteFill}
+                  />
                   {details.backdrop_path ? (
                     <Image
                       source={{
@@ -883,6 +892,7 @@ export default function TvShowsDetails({ route, navigation }) {
                     )}
                   </View>
                   <View style={styles.headerInfo}>
+                    
                     <Text style={[styles.title, { color: theme.text.primary }]}>
                       {details.name}
                     </Text>
@@ -1512,7 +1522,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderRadius: 15,
-    opacity: 0.5,
+    zIndex:-1,
     resizeMode: "cover",
     shadowColor: "#000",
     shadowOffset: {
@@ -1573,6 +1583,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     padding: 5,
     borderRadius: 15,
+    overflow:"hidden"
   },
   posterView: {
     width: 120,

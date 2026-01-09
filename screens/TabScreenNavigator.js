@@ -236,6 +236,8 @@ function TabScreenNavigator({ navigation }) {
           style={{
             borderRadius: 40,
             overflow: "hidden",
+            borderWidth: 1,
+            borderColor: theme.border,
           }}
         >
           <BlurView

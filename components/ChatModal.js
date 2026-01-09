@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   FlatList,
   Animated,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useLanguage } from "../context/LanguageContext";
 import { useTheme } from "../context/ThemeContext";
@@ -70,14 +72,18 @@ export const ChatModal = () => {
     }
   };
   const FetchData = async () => {
-    if (genres?.length <= 0 && genresTv?.length <= 0 && message.trim() === "")
+    console.log("🚀 FetchData called with message:", message);
+    if (genres?.length <= 0 && genresTv?.length <= 0 && message.trim() === "") {
+      console.log("❌ Empty message, returning");
       return; // Boş mesaj gönderme
+    }
 
+    console.log("✅ Starting API request...");
     setLoading(true);
     try {
-      const apiKey = "AIzaSyCzAbcBtUz7eSmYkHSli-U4vWpcVnBlGFY"; // API anahtarınızı buraya ekleyin
+      const geminiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
       // Eğer modelin tam adı 'gemini-3.0-flash' ise:
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`; //!----------------------------------------------------------------
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`; //!----------------------------------------------------------------
 
       // Kullanıcının mesajını önce geçmişe ekleyelim
       const updatedHistory = [
@@ -90,19 +96,22 @@ export const ChatModal = () => {
         .join("\n");
       //!----------------------------------------------------------------
 
+      const requestText =
+        genres.length > 0
+          ? `${genres} Recommend Movie According to These Types` + message
+          : genresTv.length > 0
+            ? `${genresTv} Recommended Tv series According to These Types` +
+              message
+            : message;
+
+      console.log("📤 Request text:", requestText);
+
       const data = {
         contents: [
           {
             parts: [
               {
-                text:
-                  genres.length > 0
-                    ? `${genres} Recommend Movie According to These Types` +
-                      message
-                    : genresTv.length > 0
-                    ? `${genresTv} Recommended Tv series According to These Types` +
-                      message
-                    : message,
+                text: requestText,
               },
             ],
           },
@@ -125,13 +134,18 @@ export const ChatModal = () => {
         },
       };
 
+      console.log("📡 Sending request to Gemini API...");
       const result = await axios.post(url, data, {
         headers: { "Content-Type": "application/json" },
       });
+
+      console.log("📥 API Response received:", result.data);
       //!----------------------------------------------------------------
       const botResponse = JSON.stringify(
         FormatMessage(result.data.candidates[0].content.parts[0].text)
       );
+
+      console.log("💬 Bot response:", botResponse);
 
       // Bot yanıtını geçmişe ekleyelim
       setConversationHistory((prevHistory) => [
@@ -149,7 +163,10 @@ export const ChatModal = () => {
       setSendMessage(message);
       setMessage("");
       setLoading(false);
+      console.log("✅ FetchData completed successfully");
     } catch (err) {
+      console.error("❌ API Error:", err);
+      console.error("❌ Error details:", err.response?.data || err.message);
       setError(err);
       setLoading(false);
     }
@@ -286,14 +303,18 @@ export const ChatModal = () => {
             zIndex: 4,
           }}
         />
-        <View style={styles.modalContainer}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalContainer}
+          keyboardVerticalOffset={0}
+        >
           <View style={{ flex: 1, width: "100%" }}></View>
 
           <TouchableOpacity
             onPress={() => {
-              setModalVisible(false),
+              (setModalVisible(false),
                 setSettingsVisible(false),
-                setThemeVisible(false);
+                setThemeVisible(false));
             }}
             style={{
               position: "absolute",
@@ -487,7 +508,7 @@ export const ChatModal = () => {
 
                         <TouchableOpacity
                           onPress={() => {
-                            setMovies([]), setTv([]), setResponse(null);
+                            (setMovies([]), setTv([]), setResponse(null));
                           }}
                         >
                           <MaterialIcons
@@ -845,8 +866,8 @@ export const ChatModal = () => {
                   >
                     <TouchableOpacity
                       onPress={() => {
-                        setSettingsVisible(!settingsVisible),
-                          setThemeVisible(false);
+                        (setSettingsVisible(!settingsVisible),
+                          setThemeVisible(false));
                       }}
                       style={{
                         marginRight:
@@ -923,8 +944,8 @@ export const ChatModal = () => {
                         genres?.length > 0
                           ? t.ChatModal.placeholderGenresMovies
                           : genresTv?.length > 0
-                          ? t.ChatModal.placeholderGenresTv
-                          : t.ChatModal.placeholder
+                            ? t.ChatModal.placeholderGenresTv
+                            : t.ChatModal.placeholder
                       }
                       placeholderTextColor={theme.text.muted}
                       value={message}
@@ -936,6 +957,15 @@ export const ChatModal = () => {
                         { backgroundColor: theme.border },
                       ]}
                       onPress={() => {
+                        console.log("ChatModal send message:", message);
+                        if (
+                          message.trim() === "" &&
+                          genres?.length <= 0 &&
+                          genresTv?.length <= 0
+                        ) {
+                          console.log("Empty message, not sending");
+                          return;
+                        }
                         FetchData();
                         AddToArray(message);
                       }}
@@ -1032,7 +1062,7 @@ export const ChatModal = () => {
               </>
             )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

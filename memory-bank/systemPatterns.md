@@ -2,29 +2,166 @@
 
 Bu doküman, Watch Flix uygulamasında kullanılan ve hedeflenen temel yazılım tasarım desenlerini açıklar.
 
-## Mevcut Desenler
+## ✅ Mevcut Desenler
 
-### Modüler Context API
+### 1. Modüler Context API (9 Context Provider)
 
-- **Açıklama:** `LanguageContext`, `ThemeContext`, `AuthContext` gibi her biri tek bir sorumluluğa odaklanmış context'ler kullanılır. Bu, uygulamanın farklı bölümlerinin (dil, tema, kimlik doğrulama) birbirinden bağımsız yönetilmesini sağlar.
-- **Avantaj:** Kodun okunabilirliği ve bakım kolaylığı yüksektir.
+- **Açıklama:** Her context tek bir sorumluluğa odaklanır:
+  - `LanguageContext`: Çoklu dil yönetimi (TR/EN)
+  - `ThemeContext`: Tema sistemi
+  - `AuthContext`: Firebase Auth wrapper
+  - `MovieContext`: Film verileri
+  - `TvShowContext`: Dizi verileri
+  - `ProfileScreenContext`: Profil, istatistik, notlar
+  - `AppSettingsContext`: Uygulama ayarları
+  - `ListStatusContext`: Liste durumu
+  - `SnowContext`: Dekoratif efektler
+- **Avantaj:** Her context bağımsız yönetilebilir
+- **⚠️ Sorun:** Bazı context'ler çok büyüdü ve God Object anti-desenine dönüştü
 
-## Hedeflenen ve İyileştirilecek Desenler
+### 2. AsyncStorage Persistence
+
+- **Açıklama:** Kullanıcı tercihlerini (avatar, tema, dil) AsyncStorage'de saklama
+- **Avantaj:** Uygulama kapatılıp açıldığında ayarlar korunur
+- **⚠️ Kısıt:** 6MB limit, büyük veri setleri için uygun değil
+
+### 3. Firestore Real-time Listeners (onSnapshot)
+
+- **Açıklama:** İzleme listeleri, notlar ve hatırlatıcılar için gerçek zamanlı senkronizasyon
+- **Avantaj:** Kullanıcı verileri anlık güncellenir
+- **⚠️ Sorun:** Her context'te ayrı listener → performans ve maliyet sorunu
+
+### 4. Provider Composition Pattern
+
+- **Açıklama:** App.js içinde 9 context provider iç içe sarmalanmış
+- **Avantaj:** Merkezi state yönetimi
+- **⚠️ Sorun:** Provider ağacı derinleşti, karmaşıklık arttı
+
+## 🚨 Tespit Edilen Anti-Desenler
+
+### 1. God Object Pattern (MovieContext & TvShowContext)
+
+- **Problem:** 
+  - `MovieContext.js` (570 satır, 18KB): Trends, Bests, Oscar, Collections, Genres, Providers, Upcoming, NowPlaying → 8 farklı özellik tek context'te
+  - `TvShowContext.js` (400+ satır): Benzer şekilde çok amaçlı
+  - Bir özellik güncellendiğinde tüm consumer'lar re-render oluyor
+- **Etki:** Performans düşüşü, kodun okunabilirliği zorlaşıyor, test etmek zor
+- **Örnek:**
+  ```javascript
+  // MovieContext - 8 farklı fetch fonksiyonu, 40+ state
+  fetchMoviesBests(), fetchSeriesTrends(), fetchMoviesOscar(), 
+  fetchMoviesCollection(), fetchProviders(), fetchMoviesByProvider(),
+  fetchMoviNowPlaying(), fetchMovieUpcoming(), fetchMoviesByGenres()
+  ```
+
+### 2. Oversized Context (ProfileScreenContext)
+
+- **Problem:** 918 satır, 28KB tek dosya
+  - Avatar yönetimi
+  - İstatistik hesaplamaları
+  - Not sistemi
+  - Hatırlatıcı yönetimi
+  - Liste görünüm ayarları
+  - Rank sistemi
+- **Etki:** Bakımı zorlaştırıyor, bir özellik için tüm context'i import etmek gerekiyor
+
+### 3. Hardcoded API Key
+
+- **Problem:** `AppSettingsContext.js` içinde TMDB API_KEY hardcoded
+  ```javascript
+  API_KEY: "Bearer eyJhbGci..."  // 117. satır
+  ```
+- **Risk:** Güvenlik açığı, source control'de açık key
+- **Çözüm:** Environment variables (.env) kullanmalı
+
+### 4. Distributed Axios Usage
+
+- **Problem:** Her context'te ayrı `axios.request()` veya `axios.get()` çağrısı
+  - `MovieContext.js`: 9 farklı yerde axios kullanımı
+  - `TvShowContext.js`: 7 farklı yerde
+  - `ProfileScreenContext.js`: 5 farklı yerde
+  - Header, error handling her yerde tekrarlanıyor
+- **Etki:** Kod tekrarı, tek bir değişiklik için 20+ yerde düzenleme gerekiyor
+
+### 5. No Error Boundary
+
+- **Problem:** Hata yönetimi sadece try-catch ile Toast mesajları
+- **Risk:** Uygulama çökmelerine karşı korumasız
+- **Çözüm:** React Error Boundary pattern uygulamalı
+
+## 🎯 Hedeflenen ve İyileştirilecek Desenler
 
 ### 1. Custom Hooks ile Özellik Odaklı State Yönetimi
 
-- **Problem:** `MovieContex.js` gibi tek bir context dosyasının birden çok ilgisiz state'i (Trendler, En İyiler, Oscar'lılar vb.) yönetmesi, "God Object" anti-desenine yol açar. Bu durum, bir state güncellendiğinde ilgili olmayan tüm bileşenlerin de yeniden render olmasına neden olarak performans sorunları yaratır.
-- **Çözüm:** `MovieContex.js` kaldırılacak ve her bir özellik (örn: trend filmler, popüler filmler) kendi verisini, yüklenme durumunu ve hata yönetimini içeren `useTrendingMovies`, `usePopularMovies` gibi custom hook'lar aracılığıyla yönetilecektir.
-- **Fayda:** Bileşenler yalnızca ihtiyaç duydukları veriyi çeker ve yalnızca o veri değiştiğinde yeniden render olur. Bu, performansı artırır ve kodun sorumluluklarını net bir şekilde ayırır.
+- **Çözüm:** 
+  - `MovieContext.js` → `useTrendingMovies()`, `usePopularMovies()`, `useMovieGenres()`, vb.
+  - `ProfileScreenContext.js` → `useProfileStats()`, `useProfileNotes()`, `useProfileReminders()`
+  - Her hook kendi state, loading, error yönetimini yapacak
+  
+- **Örnek Dönüşüm:**
+  ```javascript
+  // Önce:
+  const { movieTrends, loadingTrends } = useMovie();
+  
+  // Sonra:
+  const { trends, loading, error } = useTrendingMovies({ timeWindow: 'week' });
+  ```
+
+- **Fayda:** 
+  - Bileşenler sadece ihtiyaç duyduğu veriyi çeker
+  - Re-render optimizasyonu
+  - Test edilebilirlik artar
+  - Kod okunabilirliği yükselir
 
 ### 2. Merkezi API Servis Katmanı
 
-- **Problem:** API istekleri (özellikle `axios` kullanımı) farklı context ve bileşenlere dağılmış durumda. Bu, `API_KEY` yönetimi, `baseURL`, hata yakalama ve header'ların tekrar tekrar yazılmasına neden olur.
-- **Çözüm:** `services/tmdb.js` gibi merkezi bir API servis dosyası oluşturulacaktır. Bu dosya, `axios.create()` ile ortak bir `instance` yaratarak `baseURL`, `Authorization` header'ı gibi ayarları tek bir yerden yönetecek.
-- **Fayda:** Kod tekrarını önler, API ile ilgili tüm mantığı tek bir yerde toplayarak bakımı kolaylaştırır ve hata yönetimini standartlaştırır.
+- **Çözüm:** 
+  ```
+  services/
+    ├── tmdb/
+    │   ├── axios-instance.js   # Merkezi axios config
+    │   ├── movies.api.js        # Film API'leri
+    │   ├── tv.api.js            # Dizi API'leri
+    │   └── search.api.js        # Arama API'leri
+    └── firebase/
+        ├── auth.service.js
+        └── firestore.service.js
+  ```
+
+- **Fayda:** 
+  - Tek yerden API yönetimi
+  - Interceptor'lar (request/response)
+  - Retry mekanizması
+  - Rate limiting kontrolü
 
 ### 3. Offline-First Cache Stratejisi
 
-- **Problem:** Uygulama şu anda tamamen internet bağlantısına bağımlı. Veriler her açılışta yeniden çekiliyor.
-- **Çözüm:** API'den gelen verilerin (film listeleri, detaylar vb.) `AsyncStorage` veya daha gelişmiş bir çözüm (örn: WatermelonDB, MMKV) kullanılarak lokalde cache'lenmesi hedeflenmektedir. API istekleri önce cache'i kontrol edecek, veri yoksa veya süresi dolmuşsa ağ isteği yapacaktır.
-- **Fayda:** Çevrimdışı kullanım imkanı sunar, uygulama açılış hızını artırır ve API kullanımını azaltır.
+- **Çözüm:** 
+  - Cache layer: AsyncStorage (küçük) veya MMKV (hızlı, büyük)
+  - Stale-while-revalidate pattern
+  - TTL (Time To Live) stratejisi
+  
+- **Fayda:** 
+  - Çevrimdışı kullanım
+  - Hız artışı
+  - API kullanımı azalır
+
+### 4. Environment Configuration
+
+- **Çözüm:**
+  - `.env` dosyası (react-native-dotenv zaten yüklü)
+  - `TMDB_API_KEY`, `FIREBASE_CONFIG` environment variables
+  - `.env.example` template
+
+### 5. Error Boundary Implementation
+
+- **Çözüm:**
+  - React Error Boundary component
+  - Fallback UI
+  - Error logging/reporting (Sentry gibi)
+
+### 6. State Management Upgrade (İsteğe Bağlı)
+
+- **Seçenek:** Zustand veya Jotai ile global state
+- **Neden:** Context API'nin performans sınırlamaları aşılabilir
+- **Karar:** Önce custom hooks refactor'u, gerekirse state management library

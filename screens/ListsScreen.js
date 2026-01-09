@@ -23,6 +23,7 @@ import SkeletonPlaceholder from "react-native-skeleton-placeholder";
 import { LinearGradient } from "expo-linear-gradient";
 import Toast from "react-native-toast-message";
 import SwipeCard from "../modules/SwipeCard";
+import { BlurView } from "expo-blur";
 const { width, height } = Dimensions.get("window");
 export default function ListsScreen({ route, navigation }) {
   const { theme } = useTheme();
@@ -792,6 +793,12 @@ export default function ListsScreen({ route, navigation }) {
         visible={reorderModalVisible}
         onRequestClose={() => setReorderModalVisible(false)}
       >
+        <BlurView
+        tint="dark"
+        intensity={50}
+        experimentalBlurMethod="dimezisBlurView"
+        style={StyleSheet.absoluteFill}
+        />
         <TouchableOpacity
           style={{
             position: "absolute",
@@ -802,17 +809,7 @@ export default function ListsScreen({ route, navigation }) {
           }}
           onPress={() => setReorderModalVisible(false)}
         />
-        <LinearGradient
-          colors={["transparent", theme.shadow, theme.shadow, "transparent"]}
-          style={{
-            position: "absolute",
-            top: 0,
-            right: 0,
-            left: 0,
-            bottom: 0,
-            zIndex: -1,
-          }}
-        />
+        
         <View
           style={{
             flex: 1,
@@ -827,7 +824,7 @@ export default function ListsScreen({ route, navigation }) {
               borderRadius: 30,
               justifyContent: "center",
               alignItems: "center",
-              backgroundColor: theme.secondary,
+              //backgroundColor: theme.secondary,
               gap: 10,
             }}
           >
@@ -846,7 +843,7 @@ export default function ListsScreen({ route, navigation }) {
                     }
                   : require("../assets/image/no_image.png")
               }
-              style={styles.image}
+              style={styles.imageReorder}
             />
             <Text
               style={{
@@ -1015,6 +1012,16 @@ const styles = StyleSheet.create({
   image: {
     width: width * 0.3,
     height: height * 0.22,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.94,
+    shadowRadius: 10.32,
+    elevation: 5,
+  },
+  imageReorder: {
+    width: width * 0.40,
+    height: height * 0.3,
     borderRadius: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },

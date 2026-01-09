@@ -114,10 +114,8 @@ export const AppSettingsProvider = ({ children }) => {
     changeAvatar,
     adultContent,
     chaneAdultContent,
-    API_KEY:
-      "Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJhOGQ3NjQ0YzNjMjVjMDQzMDgzODgyMTRkOTJjY2UyOSIsIm5iZiI6MTcwMzU0MzE2Ny4wMDgsInN1YiI6IjY1OGEwMTdlNjg4Y2QwNTdlYjg1NzA2NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.LYAmyTf12pDD4vXizwYzLEp2HqpB6r7BurY1_A4eLqE",
+    API_KEY: process.env.EXPO_PUBLIC_API_KEY,
   };
-
   return (
     <AppSettingsContext.Provider value={value}>
       {children}

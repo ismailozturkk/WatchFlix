@@ -5,7 +5,7 @@ import { View, Image, TouchableOpacity, StyleSheet, Text } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { UploadToCloudinary } from "./UploadToCloudinary";
 
-const defaultAvatar = require("../../../assets/avatar/woman_1.jpg");
+const defaultAvatar = require("../../../assets/avatar/1.png");
 
 const Avatar = () => {
   const [avatarUri, setAvatarUri] = useState(null);

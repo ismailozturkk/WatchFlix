@@ -23,9 +23,7 @@ export default function UserAvatar() {
       <TouchableOpacity onPress={pickImage}>
         <Image
           source={
-            avatar
-              ? { uri: avatar }
-              : require("../../../assets/avatar/woman_1.jpg") // varsayılan avatar resmi
+            avatar ? { uri: avatar } : require("../../../assets/avatar/1.png") // varsayılan avatar resmi
           }
           style={styles.avatar}
         />

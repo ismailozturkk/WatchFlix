@@ -21,6 +21,7 @@ import { useAppSettings } from "../../context/AppSettingsContext";
 import SwitchToggle from "../../modules/SwitchToggle";
 import SwipeCard from "../../modules/SwipeCard";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 
 export default function SettingsScreen() {
   const [enabled, setEnabled] = useState(false);
@@ -349,17 +350,13 @@ export default function SettingsScreen() {
             }}
             onPress={() => setModalVisible(false)}
           />
-          <LinearGradient
-            colors={["transparent", theme.shadow, "transparent"]}
-            style={{
-              position: "absolute",
-              top: 0,
-              right: 0,
-              left: 0,
-              bottom: 0,
-              zIndex: -1,
-            }}
+          <BlurView
+            tint="dark"
+            intensity={50}
+            experimentalBlurMethod="dimezisBlurView"
+            style={StyleSheet.absoluteFill}
           />
+
           <View style={[styles.modalView, { backgroundColor: theme.primary }]}>
             <Text style={[styles.modalText, { color: theme.text.primary }]}>
               {t.clearCacheMessage}

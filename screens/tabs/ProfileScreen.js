@@ -36,6 +36,7 @@ import { auth, db } from "../../firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 import UserAvatar from "./profile/UserAvatar";
 import Avatar from "./profile/Avatar";
+import { BlurView } from "expo-blur";
 const ProfileScreen = ({ navigation }) => {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
@@ -235,10 +236,23 @@ const ProfileScreen = ({ navigation }) => {
                     </CircularProgressBase>
                   )}
                 </View>
-                <Image
-                  source={avatar || require("../../assets/avatar/man_6.jpg")}
-                  style={[styles.profilImage, { backgroundColor: borderColor }]}
-                />
+                <View
+                  style={{
+                    overflow: "hidden",
+                    borderRadius: 100,
+                    padding: 10,
+                    margin: 10,
+                    backgroundColor: theme.primary,
+                  }}
+                >
+                  <Image
+                    source={avatar || require("../../assets/avatar/3.png")}
+                    style={[
+                      styles.profilImage,
+                      { backgroundColor: borderColor },
+                    ]}
+                  />
+                </View>
               </View>
             )}
           </TouchableOpacity>
@@ -845,12 +859,13 @@ const ProfileScreen = ({ navigation }) => {
           }}
         >
           <View style={styles.modalContainer}>
-            <View
-              style={[
-                styles.modalContent,
-                { backgroundColor: theme.secondary },
-              ]}
-            >
+            <BlurView
+              tint="dark"
+              intensity={50}
+              experimentalBlurMethod="dimezisBlurView"
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={[styles.modalContent, { marginVertical: 80 }]}>
               <Text style={[styles.modalTitle, { color: theme.text.primary }]}>
                 {t.profileScreen.selectAvatar}
               </Text>
@@ -894,10 +909,13 @@ const ProfileScreen = ({ navigation }) => {
               style={styles.positionStyle}
               onPress={() => setModalVisibleLogout(false)}
             />
-            <LinearGradient
-              colors={["transparent", theme.shadow, "transparent"]}
-              style={[styles.positionStyle, { zIndex: -1 }]}
+            <BlurView
+              tint="dark"
+              intensity={50}
+              experimentalBlurMethod="dimezisBlurView"
+              style={StyleSheet.absoluteFill}
             />
+
             <View
               style={[styles.modalView, { backgroundColor: theme.primary }]}
             >
@@ -979,10 +997,9 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   profilImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    margin: 10,
+    width: 100,
+    height: 100,
+    borderRadius: 0,
   },
   profilImageTouch: {
     borderRadius: 100,
@@ -997,10 +1014,6 @@ const styles = StyleSheet.create({
     elevation: 25,
   },
   modalContent: {
-    width: "80%",
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 20,
     alignItems: "center",
   },
   modalTitle: {
