@@ -114,7 +114,7 @@ export const AppSettingsProvider = ({ children }) => {
     changeAvatar,
     adultContent,
     chaneAdultContent,
-    API_KEY: process.env.EXPO_PUBLIC_API_KEY,
+    API_KEY: "Bearer " + process.env.EXPO_PUBLIC_API_KEY,
   };
   return (
     <AppSettingsContext.Provider value={value}>

@@ -203,7 +203,7 @@ export default function MovieOscar({ navigation }) {
     );
   };
 
-  const renderMovieItem = ({ item, index, navigation }) => {
+  const renderMovieItem = ({ item, index }) => {
     if (!item.poster_path) return null;
     return <MovieItem item={item} index={index} navigation={navigation} />;
   };

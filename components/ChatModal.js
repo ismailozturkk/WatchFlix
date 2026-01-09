@@ -165,6 +165,7 @@ export const ChatModal = () => {
       setLoading(false);
       console.log("✅ FetchData completed successfully");
     } catch (err) {
+      console.log(geminiKey);
       console.error("❌ API Error:", err);
       console.error("❌ Error details:", err.response?.data || err.message);
       setError(err);
