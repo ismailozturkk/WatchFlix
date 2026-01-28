@@ -299,7 +299,7 @@ export default function MovieTrends({ navigation }) {
         </View>
         <Animated.FlatList
           data={[1, 2, 3, 4, 5]}
-          renderItem={() => <MovieCardSkeleton />}
+          renderItem={(index) => <MovieCardSkeleton index={index} />}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: EMPTY_ITEM_SIZE }}
@@ -332,7 +332,7 @@ export default function MovieTrends({ navigation }) {
         bounces={false}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-          { useNativeDriver: true }
+          { useNativeDriver: true },
         )}
         scrollEventThrottle={16}
       />

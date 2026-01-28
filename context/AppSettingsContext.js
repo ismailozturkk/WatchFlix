@@ -114,7 +114,7 @@ export const AppSettingsProvider = ({ children }) => {
     changeAvatar,
     adultContent,
     chaneAdultContent,
-    API_KEY: "Bearer " + process.env.EXPO_PUBLIC_API_KEY,
+    API_KEY: "***",
   };
   return (
     <AppSettingsContext.Provider value={value}>
@@ -127,7 +127,7 @@ export const useAppSettings = () => {
   const context = useContext(AppSettingsContext);
   if (context === undefined) {
     throw new Error(
-      "useAppSettings must be used within an AppSettingsProvider"
+      "useAppSettings must be used within an AppSettingsProvider",
     );
   }
   return context;

@@ -7,10 +7,12 @@
 - **İstatistik & Rank Sistemi**: Film/dizi izleme istatistikleri, dinamik rank renkleri
 - **Not Sistemi**: Kullanıcı notları (Notes collection) Firestore'da aktif
 - **Hatırlatıcı Sistemi**: Film/dizi yayın tarihi hatırlatmaları (Reminders collection)
+- **Performans Optimizasyonu**: Firebase okuma maliyetleri düşürüldü, gereksiz dinleyiciler temizlendi.
 
 ## ⚙️ Mevcut Mimari
 
 ### Context Yapısı (9 Context)
+
 - **AuthContext**: Firebase Auth yönetimi
 - **LanguageContext**: Çoklu dil desteği (TR/EN) - JSON tabanlı
 - **ThemeContext**: Tema sistemi
@@ -22,6 +24,7 @@
 - **SnowContext**: Dekoratif kar efekti
 
 ### Firestore Collections
+
 - **Lists**: Kullanıcı izleme listeleri (watchedMovies, watchedTv, favorites, watchList)
 - **Notes**: Kullanıcı notları (renkli, editable)
 - **Reminders**: Film/dizi hatırlatıcıları
@@ -29,13 +32,14 @@
 - **Comments**: Film/dizi yorumları
 
 ### Screens & Features
+
 - **54 Screen**: Movie (9), TV (12), Tabs (16), Search (6), Auth (3), Actor (1) + yardımcı ekranlar
 - **10 Component**: ChatModal, Comment, ListView, Skeleton, RatingStars, Reminder, vb.
 - **4 Custom Module**: SwipeCard, SwitchToggle, UseListStatus, UseNetworkStatus
 
 ## 🧠 Öğrenilenler
 
-- `onSnapshot` her context'te yaygın kullanılıyor, ancak performans için dikkatli olmak gerekiyor
+- `onSnapshot` her context'te yaygın kullanılıyor, ancak performans için dikkatli olmak gerekiyor (Optimize edildi: Global tek dinleyici kuralı)
 - `ProfileScreenContext` 28KB (918 satır) → çok büyük, refactor edilmeli
 - `MovieContext` & `TvShowContext` "God Object" anti-deseni → custom hooks'a bölünmeli
 - AsyncStorage avatar yönetimi için kullanılıyor

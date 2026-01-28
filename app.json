@@ -1,33 +1,33 @@
 {
   "expo": {
     "name": "Watch Flix",
-    //"slug": "WatchFlix",
-    "slug": "SeriesTry",
-    "version": "1.0.1",
+    "slug": "WatchFlix",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "cover",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#00000000"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#00000000",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "splash": {
         "image": "./assets/splash-icon.png",
         "resizeMode": "cover",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#00000000"
       },
-      "package": "com.smlztrkk.SeriesTry",
-      //"package": "com.smlztrk.WatchFlix",
+      "package": "com.smlztrk.WatchFlix",
       "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
@@ -35,9 +35,17 @@
     },
     "extra": {
       "eas": {
-        //"projectId": "3bbd3b81-8382-4788-bfc9-dbde13043eaf"
-        "projectId": "5c638af2-4c0c-47db-a724-1f9048bf8441"
+        "projectId": "3bbd3b81-8382-4788-bfc9-dbde13043eaf"
       }
-    }
+    },
+    "plugins": [
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": true,
+          "supportsPictureInPicture": true
+        }
+      ]
+    ]
   }
 }

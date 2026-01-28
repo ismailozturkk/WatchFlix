@@ -29,7 +29,6 @@ import {
   collection,
   getDoc,
   doc,
-  onSnapshot,
   updateDoc,
   arrayUnion,
   setDoc,
@@ -51,7 +50,9 @@ import DateTimePickerModal from "react-native-modal-datetime-picker";
 import ListViewTv from "../../components/ListViewTv";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { BlurView } from "expo-blur";
-
+import { useListStatus } from "../../modules/UseListStatus";
+import YoutubePlayer from "react-native-youtube-iframe";
+import { useListStatusContext } from "../../context/ListStatusContext";
 export default function TvShowsDetails({ route, navigation }) {
   const { id } = route.params;
   const [details, setDetails] = useState(null);
@@ -118,32 +119,24 @@ export default function TvShowsDetails({ route, navigation }) {
       useNativeDriver: true,
     }).start();
   };
+  const { allLists } = useListStatusContext();
   const [listStates, setListStates] = useState({});
 
   useEffect(() => {
-    if (!user.uid || !id) return;
+    if (!allLists) {
+      setListStates({});
+      return;
+    }
 
-    const docRef = doc(db, "Lists", user.uid);
-
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const newStates = {};
-
-        Object.entries(data).forEach(([listName, listItems]) => {
-          newStates[listName] = Array.isArray(listItems)
-            ? listItems.some((item) => item.id === id && item.type === "tv")
-            : false;
-        });
-
-        setListStates(newStates);
-      } else {
-        setListStates({});
-      }
+    const newStates = {};
+    Object.entries(allLists).forEach(([listName, listItems]) => {
+      newStates[listName] = Array.isArray(listItems)
+        ? listItems.some((item) => item.id === id && item.type === "tv")
+        : false;
     });
 
-    return () => unsubscribe();
-  }, [user.uid, id]);
+    setListStates(newStates);
+  }, [allLists, id]);
 
   const updateTvSeriesList = async (listType, type) => {
     if (!user.uid || !details) {
@@ -178,7 +171,7 @@ export default function TvShowsDetails({ route, navigation }) {
 
       // **Type'a göre filtreleme**: Aynı ID'li ancak farklı türdeki içerikler karışmasın
       const movieIndex = selectedList.findIndex(
-        (item) => item.id === details.id && item.type === type
+        (item) => item.id === details.id && item.type === type,
       );
       const getListTypeName = (list) => {
         switch (list) {
@@ -269,56 +262,42 @@ export default function TvShowsDetails({ route, navigation }) {
   const [reviewTextLenght, setReviewTextLenght] = useState(null);
   const [selectedVideo, setSelectedVideo] = useState(null);
   const checkIfWatched = () => {
-    if (!user || !id) return; // 🛑 Hatalı durumları engelle
+    if (!allLists) {
+      setShowEpisodeCount();
+      setShowEpisodes();
+      setIsSeasonWatched(0);
+      return;
+    }
 
-    const userRef = doc(db, "Lists", user.uid);
+    const watchedTv = allLists.watchedTv || [];
+    const tvShow = watchedTv.find((show) => show.id === id);
 
-    const unsubscribe = onSnapshot(
-      userRef,
-      (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const watchedTv = data.watchedTv || [];
-          const tvShow = watchedTv.find((show) => show.id === id);
-
-          if (tvShow) {
-            const showEpisodeCount = tvShow.showEpisodeCount;
-            // const showEpisodes = tvShow.episodeCount;
-            const showEpisodes = Array.isArray(tvShow.seasons)
-              ? tvShow.seasons.reduce(
-                  (acc, season) =>
-                    acc + (season.episodes ? season.episodes.length : 0),
-                  0
-                )
-              : 0;
-            setShowEpisodeCount(showEpisodeCount);
-            setShowEpisodes(showEpisodes);
-            if (showEpisodeCount && showEpisodes) {
-              setIsSeasonWatched(showEpisodes / showEpisodeCount);
-            } else {
-              setIsSeasonWatched(0);
-            }
-          } else {
-            setShowEpisodeCount();
-            setShowEpisodes();
-            setIsSeasonWatched(0);
-          }
-        } else {
-          console.error("docSnap.exists() false");
-        }
-      },
-      (error) => {
-        console.error("Hata:", error);
+    if (tvShow) {
+      const showEpisodeCount = tvShow.showEpisodeCount;
+      const showEpisodes = Array.isArray(tvShow.seasons)
+        ? tvShow.seasons.reduce(
+            (acc, season) =>
+              acc + (season.episodes ? season.episodes.length : 0),
+            0,
+          )
+        : 0;
+      setShowEpisodeCount(showEpisodeCount);
+      setShowEpisodes(showEpisodes);
+      if (showEpisodeCount && showEpisodes) {
+        setIsSeasonWatched(showEpisodes / showEpisodeCount);
+      } else {
+        setIsSeasonWatched(0);
       }
-    );
-
-    return unsubscribe;
+    } else {
+      setShowEpisodeCount();
+      setShowEpisodes();
+      setIsSeasonWatched(0);
+    }
   };
 
   useEffect(() => {
-    const unsubscribe = checkIfWatched();
-    return () => unsubscribe && unsubscribe();
-  }, [user, id]);
+    checkIfWatched();
+  }, [allLists, id]);
   //?--------------------------------------------------------------------------------------------
   //?--------------------------------------------------------------------------------------------
   //?--------------------------------------------------------------------------------------------
@@ -397,7 +376,7 @@ export default function TvShowsDetails({ route, navigation }) {
               accept: "application/json",
               Authorization: API_KEY,
             },
-          }
+          },
         );
 
         const seasonData = {
@@ -472,41 +451,88 @@ export default function TvShowsDetails({ route, navigation }) {
 
   //?--------------------------------------------------------------------------------------------
   //?--------------------------------------------------------------------------------------------
-  const renderSimilarTvShow = ({ item }) => (
-    <Animated.View
-      style={{ transform: [{ scale: scaleValues[item.id] || 1 }] }}
-    >
-      <TouchableOpacity
-        onPressIn={() => onPressIn(item.id)}
-        onPressOut={() => onPressOut(item.id)}
-        activeOpacity={0.8}
-        style={styles.similarItem}
-        onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
+  const SimilarTvShow = ({ item, navigation }) => {
+    const { inWatchList, inFavorites, isWatched, isInOtherLists } =
+      useListStatus(item.id, "tv");
+    const isInAnyList =
+      inWatchList || isWatched || inFavorites || isInOtherLists;
+
+    return (
+      <Animated.View
+        style={{ transform: [{ scale: scaleValues[item.id] || 1 }] }}
       >
-        <Image
-          source={
-            item.poster_path
-              ? { uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }
-              : require("../../assets/image/no_image.png")
-          }
-          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
-        />
-        <Text
-          style={[styles.similarTitle, { color: theme.text.primary }]}
-          numberOfLines={2}
+        <TouchableOpacity
+          onPressIn={() => onPressIn(item.id)}
+          onPressOut={() => onPressOut(item.id)}
+          activeOpacity={0.8}
+          style={styles.similarItem}
+          onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
         >
-          {item.name}
-        </Text>
-        <View
-          style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}
-        >
-          <Text style={styles.similarRatingText}>
-            {item.vote_average.toFixed(1)}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
-  );
+          <Image
+            source={
+              item.poster_path
+                ? { uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }
+                : require("../../assets/image/no_image.png")
+            }
+            style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+          />
+
+          <View
+            style={[
+              styles.similarRating,
+              { backgroundColor: theme.secondaryt },
+            ]}
+          >
+            <Text style={styles.similarRatingText}>
+              {item.vote_average.toFixed(1)}
+            </Text>
+          </View>
+          {isInAnyList && (
+            <View style={[styles.stats1]}>
+              <View
+                style={{
+                  gap: 3,
+                  backgroundColor: theme.secondaryt,
+                  paddingVertical: 4,
+                  paddingHorizontal: 2,
+                  borderRadius: 10,
+                }}
+              >
+                {inWatchList && (
+                  <View>
+                    <Ionicons
+                      name="bookmark"
+                      size={12}
+                      color={theme.colors.blue}
+                    />
+                  </View>
+                )}
+                {isWatched && (
+                  <View>
+                    <Ionicons name="eye" size={12} color={theme.colors.green} />
+                  </View>
+                )}
+                {inFavorites && (
+                  <View>
+                    <Ionicons name="heart" size={12} color={theme.colors.red} />
+                  </View>
+                )}
+                {isInOtherLists && (
+                  <View>
+                    <Ionicons
+                      name="grid"
+                      size={12}
+                      color={theme.colors.orange}
+                    />
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
   const renderVideo = ({ item }) => (
     <TouchableOpacity
       style={styles.videoItem}
@@ -523,7 +549,7 @@ export default function TvShowsDetails({ route, navigation }) {
           <LottieView
             style={{ width: 80, height: 80 }}
             source={require("../../LottieJson/play")}
-            opacity={0.4}
+            opacity={0.3}
             autoPlay
             loop
           />
@@ -709,7 +735,7 @@ export default function TvShowsDetails({ route, navigation }) {
             </View>
           </View>
         </View>
-        <View style={{ top: -90 }}>
+        <View style={{ marginTop: 10, marginBottom: 30 }}>
           <View>
             <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
               {t.tvShowsDetails?.lists}
@@ -833,13 +859,12 @@ export default function TvShowsDetails({ route, navigation }) {
                   navigation.navigate("TvGraphDetailScreen", { id })
                 }
               >
-                
-                <View style={styles.headerGraph}> 
+                <View style={styles.headerGraph}>
                   <BlurView
-                   tint="dark"
-                   intensity={5}
-                   experimentalBlurMethod="dimezisBlurView" // Android için sihirli kod
-                   style={StyleSheet.absoluteFill}
+                    tint="dark"
+                    intensity={5}
+                    experimentalBlurMethod="dimezisBlurView" // Android için sihirli kod
+                    style={StyleSheet.absoluteFill}
                   />
                   {details.backdrop_path ? (
                     <Image
@@ -892,7 +917,6 @@ export default function TvShowsDetails({ route, navigation }) {
                     )}
                   </View>
                   <View style={styles.headerInfo}>
-                    
                     <Text style={[styles.title, { color: theme.text.primary }]}>
                       {details.name}
                     </Text>
@@ -1052,7 +1076,7 @@ export default function TvShowsDetails({ route, navigation }) {
 
               <FlatList
                 data={details.videos.results.filter(
-                  (video) => video.site === "YouTube"
+                  (video) => video.site === "YouTube",
                 )}
                 renderItem={renderVideo}
                 keyExtractor={(item) => item.id}
@@ -1105,7 +1129,9 @@ export default function TvShowsDetails({ route, navigation }) {
               </Text>
               <FlatList
                 data={details.recommendations.results.slice(0, 20)}
-                renderItem={renderSimilarTvShow}
+                renderItem={({ item }) => (
+                  <SimilarTvShow item={item} navigation={navigation} />
+                )}
                 keyExtractor={(item) => item.id.toString()}
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -1122,7 +1148,9 @@ export default function TvShowsDetails({ route, navigation }) {
               </Text>
               <FlatList
                 data={details.similar.results.slice(0, 20)}
-                renderItem={renderSimilarTvShow}
+                renderItem={({ item }) => (
+                  <SimilarTvShow item={item} navigation={navigation} />
+                )}
                 keyExtractor={(item) => item.id.toString()}
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -1152,7 +1180,7 @@ export default function TvShowsDetails({ route, navigation }) {
                     activeOpacity={0.8}
                     onPress={() =>
                       setReviewTextLenght(
-                        review.id == reviewTextLenght ? null : review.id
+                        review.id == reviewTextLenght ? null : review.id,
                       )
                     }
                   >
@@ -1192,7 +1220,7 @@ export default function TvShowsDetails({ route, navigation }) {
                     setReviewLenght(
                       details.reviews?.results.length === reviewLenght
                         ? 5
-                        : details.reviews?.results.length
+                        : details.reviews?.results.length,
                     )
                   }
                   style={{
@@ -1238,23 +1266,11 @@ export default function TvShowsDetails({ route, navigation }) {
         transparent={true}
       >
         <View style={styles.modalContainerVideo}>
-          <LinearGradient
-            colors={[
-              "rgba(0,0,0,0)",
-              "rgba(0,0,0,0.7)",
-              "rgba(0,0,0,0.9)",
-              "rgba(0,0,0,0.9)",
-              "rgba(0,0,0,0.9)",
-              "rgba(0,0,0,0.7)",
-              "rgba(0,0,0,0)",
-            ]}
-            style={{
-              position: "absolute",
-              top: 0,
-              right: 0,
-              left: 0,
-              bottom: 0,
-            }}
+          <BlurView
+            tint="dark"
+            intensity={50}
+            experimentalBlurMethod="dimezisBlurView" // Android için sihirli kod
+            style={StyleSheet.absoluteFill}
           />
           <TouchableOpacity
             style={{
@@ -1274,17 +1290,7 @@ export default function TvShowsDetails({ route, navigation }) {
               <FontAwesome5 name="times" size={24} color="#fff" />
             </TouchableOpacity>
             {selectedVideo && (
-              <WebView
-                style={styles.webview}
-                javaScriptEnabled={true}
-                domStorageEnabled={true}
-                allowsFullscreenVideo={true}
-                source={{
-                  uri: `https://www.youtube.com/embed/${selectedVideo}?rel=0&autoplay=1`,
-                }}
-                mediaPlaybackRequiresUserAction={false}
-                allowsInlineMediaPlayback={true}
-              />
+              <YoutubePlayer height={250} videoId={selectedVideo} play={true} />
             )}
           </View>
         </View>
@@ -1368,7 +1374,7 @@ export default function TvShowsDetails({ route, navigation }) {
               <TouchableOpacity
                 style={[styles.input, { backgroundColor: theme.primary }]}
                 onPress={() => {
-                  setSelectedDate(new Date()), addShowToFirestore(new Date());
+                  (setSelectedDate(new Date()), addShowToFirestore(new Date()));
                 }}
               >
                 <Entypo name="stopwatch" size={48} color={theme.text.primary} />
@@ -1387,8 +1393,8 @@ export default function TvShowsDetails({ route, navigation }) {
               <TouchableOpacity
                 style={[styles.input, { backgroundColor: theme.primary }]}
                 onPress={() => {
-                  setSelectedDate(showReleaseDateTime),
-                    addShowToFirestore(showReleaseDateTime);
+                  (setSelectedDate(showReleaseDateTime),
+                    addShowToFirestore(showReleaseDateTime));
                 }}
               >
                 <MaterialCommunityIcons
@@ -1425,29 +1431,16 @@ export default function TvShowsDetails({ route, navigation }) {
       <Modal
         visible={PosterModalVisible || backdropModalVisible} // artık state'e bağlı
         onRequestClose={() => {
-          setPosterModalVisible(false), setBacdropModalVisible(false);
+          (setPosterModalVisible(false), setBacdropModalVisible(false));
         }}
         animationType="fade"
         transparent={true}
       >
-        <LinearGradient
-          colors={[
-            "transparent",
-            "rgba(0,0,0,0.8)",
-            "rgba(0,0,0,0.8)",
-            "rgba(0,0,0,0.8)",
-            "rgba(0,0,0,0.8)",
-            "rgba(0,0,0,0.8)",
-            "rgba(0,0,0,0.8)",
-            "transparent",
-          ]}
-          style={{
-            position: "absolute",
-            top: 0,
-            right: 0,
-            left: 0,
-            bottom: 0,
-          }}
+        <BlurView
+          tint="dark"
+          intensity={50}
+          experimentalBlurMethod="dimezisBlurView" // Android için sihirli kod
+          style={StyleSheet.absoluteFill}
         />
         <TouchableOpacity
           style={{
@@ -1458,7 +1451,7 @@ export default function TvShowsDetails({ route, navigation }) {
             bottom: 0,
           }}
           onPress={() => {
-            setPosterModalVisible(false), setBacdropModalVisible(false);
+            (setPosterModalVisible(false), setBacdropModalVisible(false));
           }}
         />
         <View
@@ -1522,7 +1515,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderRadius: 15,
-    zIndex:-1,
+    zIndex: -1,
     resizeMode: "cover",
     shadowColor: "#000",
     shadowOffset: {
@@ -1571,9 +1564,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   header: {
-    top: -100,
-    left: 0,
-    right: 0,
+    marginTop: -100,
     flexDirection: "row",
   },
   headerGraph: {
@@ -1583,7 +1574,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     padding: 5,
     borderRadius: 15,
-    overflow:"hidden"
+    overflow: "hidden",
   },
   posterView: {
     width: 120,
@@ -1721,12 +1712,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   similarItem: {
-    width: width * 0.3,
+    width: width * 0.4,
     marginRight: 10,
   },
   similarPoster: {
-    width: width * 0.3,
-    height: width * 0.45,
+    width: width * 0.4,
+    height: width * 0.6,
     borderRadius: 10,
     marginBottom: 5,
     shadowColor: "#000",
@@ -1746,8 +1737,8 @@ const styles = StyleSheet.create({
   },
   similarRating: {
     position: "absolute",
-    bottom: 45,
-    right: 5,
+    bottom: 6,
+    right: 3,
     width: 30,
     borderRadius: 10,
     justifyContent: "center",
@@ -1757,6 +1748,13 @@ const styles = StyleSheet.create({
     color: "#ffd700",
     fontSize: 12,
     marginBottom: 2,
+  },
+  stats1: {
+    alignItems: "center",
+    position: "absolute",
+    left: 3,
+    bottom: 6,
+    justifyContent: "center",
   },
   reviewItem: {
     backgroundColor: "#2a2a2a",

@@ -12,7 +12,7 @@ import {
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 const { width, height } = Dimensions.get("window");
-import { MovieUpComingSkeleton } from "../../components/Skeleton";
+import { MovieBestsSkeleton } from "../../components/Skeleton";
 import { useMovie } from "../../context/MovieContex";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -101,18 +101,28 @@ export default function MovieBests({ navigation }) {
   if (loadingBests) {
     return (
       <View style={{ flex: 1, paddingVertical: 10 }}>
-        <FlatList
-          data={categorieBests}
-          renderItem={renderCategory}
-          keyExtractor={(item) => item}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesList}
-        />
+        <View
+          style={{
+            paddingLeft: 15,
+            justifyContent: "center",
+          }}
+        >
+          <FlatList
+            data={categorieBests}
+            renderItem={renderCategory}
+            keyExtractor={(item) => item}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={[
+              styles.categoriesList,
+              { backgroundColor: theme.secondary },
+            ]}
+          />
+        </View>
 
         <FlatList
           data={[1, 2, 3, 4, 5, 6, 7, 8, 9]}
-          renderItem={() => <MovieUpComingSkeleton />}
+          renderItem={() => <MovieBestsSkeleton />}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 15 }}
@@ -120,6 +130,7 @@ export default function MovieBests({ navigation }) {
         <View
           style={{
             flexDirection: "row",
+            marginTop: 5,
             gap: 5,
             justifyContent: "center",
             alignItems: "center",
@@ -391,6 +402,7 @@ export default function MovieBests({ navigation }) {
         style={{
           flexDirection: "row",
           gap: 5,
+          marginTop: 5,
           justifyContent: "center",
           alignItems: "center",
         }}
@@ -596,7 +608,7 @@ const styles = StyleSheet.create({
   },
   similarItem: {
     width: width * 0.4,
-    height: width * 0.62,
+    height: width * 0.6,
     marginRight: 10,
     marginBottom: 5,
   },

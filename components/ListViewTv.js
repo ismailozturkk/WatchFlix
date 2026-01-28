@@ -19,6 +19,7 @@ import Entypo from "@expo/vector-icons/Entypo";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useLanguage } from "../context/LanguageContext";
 import LottieView from "lottie-react-native";
+import { useListStatusContext } from "../context/ListStatusContext";
 
 const ListViewTv = ({
   updateList,
@@ -68,40 +69,28 @@ const ListViewTv = ({
     }).start();
   };
 
-  const OtherLists = () => {
-    const docRef = doc(db, "Lists", user.uid);
-
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-
-        // 4 özel liste
-        const predefinedLists = [
-          "watchedTv",
-          "favorites",
-          "watchList",
-          "watchedMovies",
-        ];
-        setFullLists(Object.keys(data));
-        // Dinamik olarak diğer listeleri bul
-        const otherLists = Object.keys(data).filter(
-          (list) => !predefinedLists.includes(list)
-        );
-
-        setOtherLists(otherLists);
-      } else {
-        console.log("Belge bulunamadı.");
-        setModalVisible(false); // Eğer belge bulunmazsa modal'ı kapat
-      }
-    });
-
-    return () => unsubscribe(); // Cleanup subscription on unmount
-  };
+  const { allLists } = useListStatusContext();
 
   useEffect(() => {
-    const unsubscribe = OtherLists();
-    return () => unsubscribe(); // Cleanup on unmount
-  }, [user]);
+    if (!allLists) {
+      setFullLists([]);
+      setOtherLists([]);
+      return;
+    }
+    const predefinedLists = [
+      "watchedTv",
+      "favorites",
+      "watchList",
+      "watchedMovies",
+    ];
+    setFullLists(Object.keys(allLists));
+    // Dinamik olarak diğer listeleri bul
+    const otherLists = Object.keys(allLists).filter(
+      (list) => !predefinedLists.includes(list),
+    );
+
+    setOtherLists(otherLists);
+  }, [allLists]);
   return (
     <View
       style={[
@@ -203,7 +192,7 @@ const ListViewTv = ({
       <TouchableOpacity
         onPress={() => {
           {
-            setModalVisible(true), OtherLists();
+            (setModalVisible(true), OtherLists());
           }
         }}
         style={{ justifyContent: "center", alignItems: "center" }}
@@ -417,8 +406,8 @@ const ListViewTv = ({
                 <TouchableOpacity
                   style={[styles.button, { backgroundColor: theme.accent }]}
                   onPress={() => {
-                    setModalVisible(false),
-                      navigation.navigate("ListsViewScreen");
+                    (setModalVisible(false),
+                      navigation.navigate("ListsViewScreen"));
                   }}
                 >
                   <Text style={styles.buttonTextList}>Listeler</Text>

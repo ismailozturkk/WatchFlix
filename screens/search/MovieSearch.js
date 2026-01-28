@@ -85,7 +85,8 @@ export default function MovieSearch({ navigation, route }) {
     const { user } = useAuth();
     const { inWatchList, inFavorites, isWatched, isInOtherLists } =
       useListStatus(item.id, "movie");
-
+    const isInAnyList =
+      inWatchList || isWatched || inFavorites || isInOtherLists;
     const updateMovieList = async (listType, type) => {
       if (!user.uid || !item) {
         Toast.show({
@@ -233,62 +234,68 @@ export default function MovieSearch({ navigation, route }) {
               </Text>
             </View>
           </View>
-          <View style={[styles.stats]}>
-            <View
-              style={{
-                gap: 5,
-                backgroundColor: theme.secondaryt,
-                paddingVertical: 5,
-                paddingHorizontal: 2,
-                borderRadius: 10,
-              }}
-            >
-              {inWatchList && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateMovieList("watchList", "movie");
-                  }}
-                >
-                  <Ionicons
-                    name="bookmark"
-                    size={16}
-                    color={theme.colors.blue}
-                  />
-                </TouchableOpacity>
-              )}
-              {isWatched && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateMovieList("watchedMovies", "movie");
-                  }}
-                >
-                  <Ionicons
-                    name="eye-off"
-                    size={16}
-                    color={theme.colors.green}
-                  />
-                </TouchableOpacity>
-              )}
-              {inFavorites && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateMovieList("favorites", "movie");
-                  }}
-                >
-                  <Ionicons name="heart" size={16} color={theme.colors.red} />
-                </TouchableOpacity>
-              )}
-              {isInOtherLists && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateMovieList("favorites", "movie");
-                  }}
-                >
-                  <Ionicons name="grid" size={16} color={theme.colors.orange} />
-                </TouchableOpacity>
-              )}
+          {isInAnyList && (
+            <View style={[styles.stats]}>
+              <View
+                style={{
+                  gap: 5,
+                  backgroundColor: theme.secondaryt,
+                  paddingVertical: 5,
+                  paddingHorizontal: 2,
+                  borderRadius: 10,
+                }}
+              >
+                {inWatchList && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      //updateMovieList("watchList", "movie");
+                    }}
+                  >
+                    <Ionicons
+                      name="bookmark"
+                      size={16}
+                      color={theme.colors.blue}
+                    />
+                  </TouchableOpacity>
+                )}
+                {isWatched && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      //updateMovieList("watchedMovies", "movie");
+                    }}
+                  >
+                    <Ionicons
+                      name="eye-off"
+                      size={16}
+                      color={theme.colors.green}
+                    />
+                  </TouchableOpacity>
+                )}
+                {inFavorites && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      //updateMovieList("favorites", "movie");
+                    }}
+                  >
+                    <Ionicons name="heart" size={16} color={theme.colors.red} />
+                  </TouchableOpacity>
+                )}
+                {isInOtherLists && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      //updateMovieList("favorites", "movie");
+                    }}
+                  >
+                    <Ionicons
+                      name="grid"
+                      size={16}
+                      color={theme.colors.orange}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
-          </View>
+          )}
         </Animated.View>
       </TouchableOpacity>
     );

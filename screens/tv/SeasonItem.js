@@ -12,7 +12,7 @@ import {
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
-import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import axios from "axios";
 import LottieView from "lottie-react-native";
@@ -27,6 +27,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import Entypo from "@expo/vector-icons/Entypo";
+import { useListStatusContext } from "../../context/ListStatusContext";
 const { width } = Dimensions.get("window");
 const SeasonItem = ({ season, details, navigation }) => {
   const { theme } = useTheme();
@@ -96,60 +97,55 @@ const SeasonItem = ({ season, details, navigation }) => {
     return `${year}-${month}-${day}`;
   };
   const [watchStatus, setWatchStatus] = useState("none"); // "none", "full", "partial"
+
+  const { allLists } = useListStatusContext(); // Global context kullanımı
+
   useEffect(() => {
-    const userRef = doc(db, "Lists", user.uid);
-    const unsubscribe = onSnapshot(userRef, (docSnap) => {
-      if (!docSnap.exists()) {
-        setIsWatched(false);
-        setWatchStatus("none"); // özel durum
-        setSeasonEpisodeWatch(0);
-        return;
-      }
+    if (!allLists) {
+      setIsWatched(false);
+      setWatchStatus("none");
+      setSeasonEpisodeWatch(0);
+      return;
+    }
 
-      const data = docSnap.data();
-      const watchedTv = data.watchedTv || [];
-      const tvShow = watchedTv.find((show) => show.id === details.id);
+    const watchedTv = allLists.watchedTv || [];
+    const tvShow = watchedTv.find((show) => show.id === details.id);
 
-      if (!tvShow) {
-        setIsWatched(false);
-        setWatchStatus("none");
-        setSeasonEpisodeWatch(0);
+    if (!tvShow) {
+      setIsWatched(false);
+      setWatchStatus("none");
+      setSeasonEpisodeWatch(0);
+      return;
+    }
 
-        return;
-      }
+    const seasonWatched = tvShow.seasons.find(
+      (s) => s.seasonNumber === season.season_number,
+    );
 
-      const seasonWatched = tvShow.seasons.find(
-        (s) => s.seasonNumber === season.season_number
-      );
+    if (!seasonWatched) {
+      setIsWatched(false);
+      setWatchStatus("none");
+      setSeasonEpisodeWatch(0);
+      return;
+    }
 
-      if (!seasonWatched) {
-        setIsWatched(false);
-        setWatchStatus("none");
-        setSeasonEpisodeWatch(0);
+    const watchedCount = seasonWatched.episodes.length;
+    const totalCount = season.episode_count;
 
-        return;
-      }
+    if (watchedCount === totalCount) {
+      setIsWatched(true);
+      setWatchStatus("full"); // tamamı izlenmiş
+    } else if (watchedCount > 0) {
+      setIsWatched(true);
+      setWatchStatus("partial"); // kısmen izlenmiş
+    } else {
+      setIsWatched(false);
+      setWatchStatus("none");
+      setSeasonEpisodeWatch(0);
+    }
 
-      const watchedCount = seasonWatched.episodes.length;
-      const totalCount = season.episode_count;
-
-      if (watchedCount === totalCount) {
-        setIsWatched(true);
-        setWatchStatus("full"); // tamamı izlenmiş
-      } else if (watchedCount > 0) {
-        setIsWatched(true);
-        setWatchStatus("partial"); // kısmen izlenmiş
-      } else {
-        setIsWatched(false);
-        setWatchStatus("none");
-        setSeasonEpisodeWatch(0);
-      }
-
-      setSeasonEpisodeWatch(watchedCount / totalCount);
-    });
-
-    return () => unsubscribe();
-  }, []);
+    setSeasonEpisodeWatch(watchedCount / totalCount);
+  }, [allLists, details.id, season.season_number, season.episode_count]);
 
   const markEpisodeAsWatched = async ({
     showId,
@@ -206,7 +202,7 @@ const SeasonItem = ({ season, details, navigation }) => {
         let show = watchedTv[tvShowIndex];
         let seasons = show.seasons || [];
         let seasonIndex = seasons.findIndex(
-          (s) => s.seasonNumber === seasonNumber
+          (s) => s.seasonNumber === seasonNumber,
         );
 
         if (seasonIndex === -1) {
@@ -224,18 +220,18 @@ const SeasonItem = ({ season, details, navigation }) => {
             ...newEpisodes.filter(
               (ne) =>
                 !existingEpisodes.some(
-                  (ee) => ee.episodeNumber === ne.episodeNumber
-                )
+                  (ee) => ee.episodeNumber === ne.episodeNumber,
+                ),
             ),
           ];
 
           seasons[seasonIndex].episodes = mergedEpisodes.sort(
-            (a, b) => a.episodeNumber - b.episodeNumber
+            (a, b) => a.episodeNumber - b.episodeNumber,
           );
         }
 
         watchedTv[tvShowIndex].seasons = seasons.sort(
-          (a, b) => a.seasonNumber - b.seasonNumber
+          (a, b) => a.seasonNumber - b.seasonNumber,
         );
       }
 
@@ -247,7 +243,7 @@ const SeasonItem = ({ season, details, navigation }) => {
 
   const addSeasonToFirestore = async (
     isDelete = false,
-    selectedDate = null
+    selectedDate = null,
   ) => {
     if (!user) return;
 
@@ -267,7 +263,7 @@ const SeasonItem = ({ season, details, navigation }) => {
           let show = watchedTv[tvShowIndex];
           let seasons = show.seasons || [];
           let seasonIndex = seasons.findIndex(
-            (s) => s.seasonNumber === season.season_number
+            (s) => s.seasonNumber === season.season_number,
           );
           if (seasonIndex !== -1) {
             seasons.splice(seasonIndex, 1);
@@ -291,7 +287,7 @@ const SeasonItem = ({ season, details, navigation }) => {
             accept: "application/json",
             Authorization: API_KEY,
           },
-        }
+        },
       );
 
       const episodeDate = formatDateSave(selectedDate);

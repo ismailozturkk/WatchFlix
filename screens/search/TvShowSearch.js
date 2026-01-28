@@ -84,7 +84,8 @@ export default function TvShowSearch({ navigation, route }) {
     const { user } = useAuth();
     const { inWatchList, inFavorites, isWatched, isInOtherLists } =
       useListStatus(item.id, "tv");
-
+    const isInAnyList =
+      inWatchList || isWatched || inFavorites || isInOtherLists;
     const updateTvSeriesList = async (listType, type) => {
       if (!user.uid || !item.id) {
         Toast.show({
@@ -227,59 +228,65 @@ export default function TvShowSearch({ navigation, route }) {
               </Text>
             </View>
           </View>
-          <View style={[styles.stats]}>
-            <View
-              style={{
-                gap: 5,
-                backgroundColor: theme.secondaryt,
-                paddingVertical: 5,
-                paddingHorizontal: 2,
+          {isInAnyList && (
+            <View style={[styles.stats]}>
+              <View
+                style={{
+                  gap: 5,
+                  backgroundColor: theme.secondaryt,
+                  paddingVertical: 5,
+                  paddingHorizontal: 2,
 
-                borderRadius: 7,
-              }}
-            >
-              {inWatchList && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("watchList", "tv");
-                  }}
-                >
-                  <Ionicons
-                    name="bookmark"
-                    size={16}
-                    color={theme.colors.blue}
-                  />
-                </TouchableOpacity>
-              )}
-              {isWatched && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("watchedTv", "tv");
-                  }}
-                >
-                  <Ionicons name="eye" size={16} color={theme.colors.green} />
-                </TouchableOpacity>
-              )}
-              {inFavorites && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("favorites", "tv");
-                  }}
-                >
-                  <Ionicons name="heart" size={16} color={theme.colors.red} />
-                </TouchableOpacity>
-              )}
-              {isInOtherLists && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateMovieList("favorites", "movie");
-                  }}
-                >
-                  <Ionicons name="grid" size={16} color={theme.colors.orange} />
-                </TouchableOpacity>
-              )}
+                  borderRadius: 7,
+                }}
+              >
+                {inWatchList && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      //updateTvSeriesList("watchList", "tv");
+                    }}
+                  >
+                    <Ionicons
+                      name="bookmark"
+                      size={16}
+                      color={theme.colors.blue}
+                    />
+                  </TouchableOpacity>
+                )}
+                {isWatched && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      //updateTvSeriesList("watchedTv", "tv");
+                    }}
+                  >
+                    <Ionicons name="eye" size={16} color={theme.colors.green} />
+                  </TouchableOpacity>
+                )}
+                {inFavorites && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      //updateTvSeriesList("favorites", "tv");
+                    }}
+                  >
+                    <Ionicons name="heart" size={16} color={theme.colors.red} />
+                  </TouchableOpacity>
+                )}
+                {isInOtherLists && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      //updateMovieList("favorites", "movie");
+                    }}
+                  >
+                    <Ionicons
+                      name="grid"
+                      size={16}
+                      color={theme.colors.orange}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
-          </View>
+          )}
         </Animated.View>
       </TouchableOpacity>
     );

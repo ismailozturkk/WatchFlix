@@ -225,7 +225,7 @@ export default function SeasonDetails({ route, navigation }) {
           style={styles.gradient}
         />
       </View>
-      <View style={[styles.content, { backgroundColor: theme.primary }]}>
+      <View style={styles.content}>
         <View style={styles.header}>
           {details.episodes.map((ep, index) => {
             if ((index + 7) % 7 === 0 || index < 4) {
@@ -613,7 +613,8 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   headerContainer: {
-    height: 300,
+    position: "static",
+    height: 600,
     position: "relative",
   },
   poster: {
@@ -629,6 +630,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    marginTop: -300,
     paddingHorizontal: 15,
     paddingTop: 20,
   },
@@ -717,7 +719,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: 100,
+    height: 400,
   },
   noEpisodeImage: {
     width: 160,

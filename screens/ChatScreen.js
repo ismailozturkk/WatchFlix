@@ -32,6 +32,7 @@ import {
   updateDoc,
   deleteDoc,
   setDoc,
+  limit,
 } from "firebase/firestore";
 import { useTheme } from "../context/ThemeContext";
 import LottieView from "lottie-react-native";
@@ -62,6 +63,9 @@ export default function ChatScreen({ route, navigation }) {
   const [text, setText] = useState("");
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [textLink, setTextLink] = useState(false);
+  const [messageLimit, setMessageLimit] = useState(20);
+  const [refreshing, setRefreshing] = useState(false); // Kept for safety or other refresh logic if needed, though mostly unused now
+  const isPaginationLoading = useRef(false); // Kept for safety
 
   const [searchChoise, setSearchChoise] = useState(null);
   const [searchOption, setSearchOption] = useState(false);
@@ -97,7 +101,7 @@ export default function ChatScreen({ route, navigation }) {
             inChat: { [currentUser.uid]: true },
           },
         },
-        { merge: true }
+        { merge: true },
       );
     };
 
@@ -116,7 +120,7 @@ export default function ChatScreen({ route, navigation }) {
             typing: { [currentUser.uid]: false },
           },
         },
-        { merge: true }
+        { merge: true },
       );
     };
 
@@ -126,7 +130,11 @@ export default function ChatScreen({ route, navigation }) {
 
   // Mesajları dinle ve durum güncelle
   useEffect(() => {
-    const q = query(messagesRef, orderBy("timestamp", "asc"));
+    const q = query(
+      messagesRef,
+      orderBy("timestamp", "desc"),
+      limit(messageLimit),
+    );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       snapshot.docs.forEach(async (docSnap) => {
         const msg = docSnap.data();
@@ -149,19 +157,19 @@ export default function ChatScreen({ route, navigation }) {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [messageLimit]);
 
   // Arkadaş durumu dinle (chat içindeki bilgi ve user doc'u ayrı ayrı)
   useEffect(() => {
     const unsubscribeMessages = onSnapshot(
-      query(messagesRef, orderBy("timestamp", "asc")),
+      query(messagesRef, orderBy("timestamp", "desc"), limit(messageLimit)),
       (snapshot) => {
         const msgs = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
         setChatData((prev) => ({ ...prev, messages: msgs }));
-      }
+      },
     );
 
     const unsubscribeChat = onSnapshot(chatRef, (docSnap) => {
@@ -186,7 +194,7 @@ export default function ChatScreen({ route, navigation }) {
       unsubscribeChat();
       unsubscribeFriend();
     };
-  }, [chatId]);
+  }, [chatId, messageLimit]);
 
   const isLink = (value) => {
     const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
@@ -213,7 +221,7 @@ export default function ChatScreen({ route, navigation }) {
           typing: { [currentUser.uid]: value.length > 0 },
         },
       },
-      { merge: true }
+      { merge: true },
     );
   };
 
@@ -254,7 +262,7 @@ export default function ChatScreen({ route, navigation }) {
             typing: { [currentUser.uid]: false },
           },
         },
-        { merge: true }
+        { merge: true },
       );
 
       setText("");
@@ -269,7 +277,7 @@ export default function ChatScreen({ route, navigation }) {
             typing: { [currentUser.uid]: false },
           },
         },
-        { merge: true }
+        { merge: true },
       );
     } catch (error) {
       console.error("Mesaj gönderme hatası:", error);
@@ -329,7 +337,7 @@ export default function ChatScreen({ route, navigation }) {
       const response = await axios.get(url, { params, headers });
 
       let results = response.data.results.filter(
-        (item) => item.media_type !== "unknown"
+        (item) => item.media_type !== "unknown",
       );
 
       // if (type) {
@@ -344,7 +352,7 @@ export default function ChatScreen({ route, navigation }) {
       setSearchResults(
         results
           .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
-          .sort((a, b) => b.vote_average - a.vote_average)
+          .sort((a, b) => b.vote_average - a.vote_average),
       );
     } catch (err) {
       console.error("Search error:", err.message);
@@ -384,7 +392,7 @@ export default function ChatScreen({ route, navigation }) {
         );
       });
     },
-    [theme]
+    [theme],
   );
 
   const renderItem = useCallback(
@@ -420,7 +428,7 @@ export default function ChatScreen({ route, navigation }) {
                       : "ActorViewScreen",
                   item.media?.media_type === "person"
                     ? { personId: item.media?.id }
-                    : { id: item.media?.id }
+                    : { id: item.media?.id },
                 )
               : null
           }
@@ -520,16 +528,11 @@ export default function ChatScreen({ route, navigation }) {
         </TouchableOpacity>
       );
     },
-    [theme, navigation, currentUser, renderMessageText]
+    [theme, navigation, currentUser, renderMessageText],
   );
 
-  const handleContentSizeChange = (contentWidth, contentHeight) => {
-    if (!flatListRef.current) return;
-
-    flatListRef.current.scrollToOffset({
-      offset: contentHeight, // scroll tamamen alta
-      animated: true,
-    });
+  const loadMoreMessages = () => {
+    setMessageLimit((prev) => prev + 20);
   };
 
   // Mesajlar veya typing değiştiğinde tetikleme
@@ -575,7 +578,7 @@ export default function ChatScreen({ route, navigation }) {
             participants: [currentUser.uid, friendUid],
           },
         },
-        { merge: true }
+        { merge: true },
       );
 
       // Arama sonuçları panelini kapat
@@ -641,9 +644,17 @@ export default function ChatScreen({ route, navigation }) {
               paddingBottom: 60,
               paddingTop: 80,
             }}
+            inverted
+            onEndReached={loadMoreMessages}
+            onEndReachedThreshold={0.5}
             keyboardShouldPersistTaps="handled"
-            onContentSizeChange={handleContentSizeChange}
             ListFooterComponent={
+              // Inverted list olduğu için Footer aslında listenin en başı (en eski mesajların üstü) olur.
+              // Loading indicator buraya konabilir.
+              // Chat typing ise en altta (inverted'ın Header'ında) olmalı
+              null
+            }
+            ListHeaderComponent={
               chatData.friendTyping ? (
                 <View
                   style={{

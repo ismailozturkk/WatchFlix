@@ -29,7 +29,7 @@ Bu doküman, Watch Flix uygulamasında kullanılan ve hedeflenen temel yazılım
 
 - **Açıklama:** İzleme listeleri, notlar ve hatırlatıcılar için gerçek zamanlı senkronizasyon
 - **Avantaj:** Kullanıcı verileri anlık güncellenir
-- **⚠️ Sorun:** Her context'te ayrı listener → performans ve maliyet sorunu
+- **✅ Optimize Edildi:** Eskiden her bileşen kendi dinleyicisini açıyordu, şimdi `ListStatusContext` veya `ProfileScreenContext` üzerinden tek bir global dinleyici kullanılıyor.
 
 ### 4. Provider Composition Pattern
 
@@ -41,7 +41,7 @@ Bu doküman, Watch Flix uygulamasında kullanılan ve hedeflenen temel yazılım
 
 ### 1. God Object Pattern (MovieContext & TvShowContext)
 
-- **Problem:** 
+- **Problem:**
   - `MovieContext.js` (570 satır, 18KB): Trends, Bests, Oscar, Collections, Genres, Providers, Upcoming, NowPlaying → 8 farklı özellik tek context'te
   - `TvShowContext.js` (400+ satır): Benzer şekilde çok amaçlı
   - Bir özellik güncellendiğinde tüm consumer'lar re-render oluyor
@@ -49,9 +49,15 @@ Bu doküman, Watch Flix uygulamasında kullanılan ve hedeflenen temel yazılım
 - **Örnek:**
   ```javascript
   // MovieContext - 8 farklı fetch fonksiyonu, 40+ state
-  fetchMoviesBests(), fetchSeriesTrends(), fetchMoviesOscar(), 
-  fetchMoviesCollection(), fetchProviders(), fetchMoviesByProvider(),
-  fetchMoviNowPlaying(), fetchMovieUpcoming(), fetchMoviesByGenres()
+  (fetchMoviesBests(),
+    fetchSeriesTrends(),
+    fetchMoviesOscar(),
+    fetchMoviesCollection(),
+    fetchProviders(),
+    fetchMoviesByProvider(),
+    fetchMoviNowPlaying(),
+    fetchMovieUpcoming(),
+    fetchMoviesByGenres());
   ```
 
 ### 2. Oversized Context (ProfileScreenContext)
@@ -69,7 +75,7 @@ Bu doküman, Watch Flix uygulamasında kullanılan ve hedeflenen temel yazılım
 
 - **Problem:** `AppSettingsContext.js` içinde TMDB API_KEY hardcoded
   ```javascript
-  API_KEY: "Bearer eyJhbGci..."  // 117. satır
+  API_KEY: "Bearer eyJhbGci..."; // 117. satır
   ```
 - **Risk:** Güvenlik açığı, source control'de açık key
 - **Çözüm:** Environment variables (.env) kullanmalı
@@ -93,21 +99,21 @@ Bu doküman, Watch Flix uygulamasında kullanılan ve hedeflenen temel yazılım
 
 ### 1. Custom Hooks ile Özellik Odaklı State Yönetimi
 
-- **Çözüm:** 
+- **Çözüm:**
   - `MovieContext.js` → `useTrendingMovies()`, `usePopularMovies()`, `useMovieGenres()`, vb.
   - `ProfileScreenContext.js` → `useProfileStats()`, `useProfileNotes()`, `useProfileReminders()`
   - Her hook kendi state, loading, error yönetimini yapacak
-  
 - **Örnek Dönüşüm:**
+
   ```javascript
   // Önce:
   const { movieTrends, loadingTrends } = useMovie();
-  
+
   // Sonra:
-  const { trends, loading, error } = useTrendingMovies({ timeWindow: 'week' });
+  const { trends, loading, error } = useTrendingMovies({ timeWindow: "week" });
   ```
 
-- **Fayda:** 
+- **Fayda:**
   - Bileşenler sadece ihtiyaç duyduğu veriyi çeker
   - Re-render optimizasyonu
   - Test edilebilirlik artar
@@ -115,7 +121,8 @@ Bu doküman, Watch Flix uygulamasında kullanılan ve hedeflenen temel yazılım
 
 ### 2. Merkezi API Servis Katmanı
 
-- **Çözüm:** 
+- **Çözüm:**
+
   ```
   services/
     ├── tmdb/
@@ -128,7 +135,7 @@ Bu doküman, Watch Flix uygulamasında kullanılan ve hedeflenen temel yazılım
         └── firestore.service.js
   ```
 
-- **Fayda:** 
+- **Fayda:**
   - Tek yerden API yönetimi
   - Interceptor'lar (request/response)
   - Retry mekanizması
@@ -136,12 +143,11 @@ Bu doküman, Watch Flix uygulamasında kullanılan ve hedeflenen temel yazılım
 
 ### 3. Offline-First Cache Stratejisi
 
-- **Çözüm:** 
+- **Çözüm:**
   - Cache layer: AsyncStorage (küçük) veya MMKV (hızlı, büyük)
   - Stale-while-revalidate pattern
   - TTL (Time To Live) stratejisi
-  
-- **Fayda:** 
+- **Fayda:**
   - Çevrimdışı kullanım
   - Hız artışı
   - API kullanımı azalır

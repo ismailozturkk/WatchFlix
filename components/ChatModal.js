@@ -12,6 +12,7 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from "react-native";
 import { useLanguage } from "../context/LanguageContext";
 import { useTheme } from "../context/ThemeContext";
@@ -41,6 +42,7 @@ export const ChatModal = () => {
   const { t, language, toggleLanguage } = useLanguage();
   const [conversationHistory, setConversationHistory] = useState([]);
   const { selectedTheme, changeTheme, theme } = useTheme();
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const {
     mostWatchedGenre,
     secondWatchedGenre,
@@ -71,6 +73,21 @@ export const ChatModal = () => {
       ]);
     }
   };
+  useEffect(() => {
+    // Dinleyicileri oluştur
+    const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
+      setKeyboardVisible(true);
+    });
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardVisible(false);
+    });
+
+    // Temizlik (Cleanup): Bileşen kapandığında dinleyicileri kaldır
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
   const FetchData = async () => {
     console.log("🚀 FetchData called with message:", message);
     if (genres?.length <= 0 && genresTv?.length <= 0 && message.trim() === "") {
@@ -81,7 +98,7 @@ export const ChatModal = () => {
     console.log("✅ Starting API request...");
     setLoading(true);
     try {
-      const geminiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+      const geminiKey = "***";
       // Eğer modelin tam adı 'gemini-3.0-flash' ise:
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`; //!----------------------------------------------------------------
 
@@ -142,7 +159,7 @@ export const ChatModal = () => {
       console.log("📥 API Response received:", result.data);
       //!----------------------------------------------------------------
       const botResponse = JSON.stringify(
-        FormatMessage(result.data.candidates[0].content.parts[0].text)
+        FormatMessage(result.data.candidates[0].content.parts[0].text),
       );
 
       console.log("💬 Bot response:", botResponse);
@@ -155,10 +172,10 @@ export const ChatModal = () => {
       //!----------------------------------------------------------------
 
       setResponse(
-        JSON.stringify(result.data.candidates[0].content.parts[0].text)
+        JSON.stringify(result.data.candidates[0].content.parts[0].text),
       );
       FormatMatchMessage(
-        JSON.stringify(result.data.candidates[0].content.parts[0].text)
+        JSON.stringify(result.data.candidates[0].content.parts[0].text),
       );
       setSendMessage(message);
       setMessage("");
@@ -209,7 +226,7 @@ export const ChatModal = () => {
     // Önceki filmlerle birleştirip tekrar edenleri yine kaldır
     setTv((prevMovies) => Array.from(new Set([...prevMovies, ...uniqueTv])));
     setMovies((prevMovies) =>
-      Array.from(new Set([...prevMovies, ...uniqueMovies]))
+      Array.from(new Set([...prevMovies, ...uniqueMovies])),
     );
   }
 
@@ -228,9 +245,9 @@ export const ChatModal = () => {
       loop = Animated.loop(
         Animated.timing(animation, {
           toValue: 1,
-          duration: 4000,
+          duration: 5000,
           useNativeDriver: false,
-        })
+        }),
       );
       loop.start();
     }
@@ -242,14 +259,14 @@ export const ChatModal = () => {
   const interpolateColor = animation.interpolate({
     inputRange: [0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1],
     outputRange: [
-      "#00FF00",
-      "#0000FF",
-      "#4B0082",
-      "#EE82EE",
-      "#FF0000",
-      "#FFA500",
-      "#FFFF00",
-      "#00FF00",
+      "#00FF0030",
+      "#0000FF30",
+      "#4B008230",
+      "#EE82EE30",
+      "#FF000030",
+      "#FFA50030",
+      "#FFFF0030",
+      "#00FF0030",
     ],
   });
 
@@ -350,7 +367,7 @@ export const ChatModal = () => {
                   <View
                     style={{
                       width: "100%",
-                      maxHeight: 460,
+                      maxHeight: isKeyboardVisible ? 460 : 800,
                       gap: 10,
                       paddingHorizontal: 15,
                       paddingVertical: 10,
@@ -385,7 +402,7 @@ export const ChatModal = () => {
                     <View
                       style={{
                         //height: "100%",
-                        maxHeight: 360,
+                        maxHeight: isKeyboardVisible ? 360 : 700,
                         flexDirection: "row",
                         maxWidth: "100%",
                         justifyContent: "space-between",
@@ -611,8 +628,7 @@ export const ChatModal = () => {
                       paddingHorizontal: 15,
                       width: "100%",
                       flexDirection: "row",
-                      gap: 10,
-                      //justifyContent: "space-around",
+                      justifyContent: "space-around",
                       alignItems: "center",
                       //backgroundColor: "red",
                     }}
@@ -690,28 +706,7 @@ export const ChatModal = () => {
                         mavi
                       </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.themeBlue,
-                        {
-                          backgroundColor: "rgb(255, 204, 183)",
-                          borderColor: "rgb(242, 151, 63)",
-                          borderWidth: 1,
-                        },
-                      ]}
-                      onPress={() => {
-                        changeTheme("orange");
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.themeText,
-                          { color: "rgb(240, 85, 13)" },
-                        ]}
-                      >
-                        turuncu
-                      </Text>
-                    </TouchableOpacity>
+
                     <TouchableOpacity
                       style={[
                         styles.themeBlue,
@@ -755,6 +750,24 @@ export const ChatModal = () => {
                         toggleLanguage(language === "tr" ? "en" : "tr");
                       }}
                     >
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          backgroundColor: theme.notesColor.greenBackground,
+                          borderRadius: 20,
+                          paddingVertical: 2,
+                          paddingHorizontal: 4,
+                        }}
+                      >
+                        <MaterialIcons
+                          name="translate"
+                          size={12}
+                          color={theme.notesColor.green}
+                        />
+                      </View>
+
                       <Text
                         style={[
                           styles.languageButtonText,
@@ -812,13 +825,18 @@ export const ChatModal = () => {
                       ]}
                       onPress={chooseGenres}
                     >
+                      <MaterialCommunityIcons
+                        name="movie-outline"
+                        size={18}
+                        color={theme.primary}
+                      />
                       <Text
                         style={[
                           styles.themeText,
                           { color: theme.text.primary },
                         ]}
                       >
-                        İzlediğin En Çok Film Türleri
+                        İzlediğin türler
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -832,13 +850,18 @@ export const ChatModal = () => {
                       ]}
                       onPress={chooseGenresTv}
                     >
+                      <Ionicons
+                        name="tv-outline"
+                        size={18}
+                        color={theme.primary}
+                      />
                       <Text
                         style={[
                           styles.themeText,
                           { color: theme.text.primary },
                         ]}
                       >
-                        İzlediğin En Çok Dizi Türleri
+                        İzlediğin türler
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -846,10 +869,9 @@ export const ChatModal = () => {
                 <Animated.View
                   style={[
                     {
-                      borderRadius: 18,
+                      borderRadius: 20,
                       zIndex: -1,
-                      borderWidth: 2,
-                      borderColor: interpolateColor,
+                      backgroundColor: interpolateColor,
                     },
                   ]}
                 >
@@ -1119,34 +1141,41 @@ const styles = StyleSheet.create({
     margin: 5,
   },
   languageButton: {
-    width: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: 70,
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 20,
     zIndex: 1,
   },
   themeBlue: {
-    width: 40,
+    width: 60,
     height: 35,
     paddingHorizontal: 4,
     paddingVertical: 2,
-    borderRadius: 10,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1,
   },
   genresStyle: {
-    width: 60,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    //width: 80,
     height: 35,
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 10,
+    borderRadius: 25,
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1,
+    gap: 5,
   },
   languageButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "bold",
   },
   themeText: {

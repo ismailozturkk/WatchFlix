@@ -396,7 +396,7 @@ export const MovieProvider = ({ children }) => {
       (prev) =>
         prev.includes(genreId)
           ? prev.filter((id) => id !== genreId) // Seçiliyse kaldır
-          : [...prev, genreId] // Seçili değilse ekle
+          : [...prev, genreId], // Seçili değilse ekle
     );
   };
 

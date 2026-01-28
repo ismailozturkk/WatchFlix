@@ -17,6 +17,7 @@ import { useAuth } from "../context/AuthContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLanguage } from "../context/LanguageContext";
 import LottieView from "lottie-react-native";
+import { useListStatusContext } from "../context/ListStatusContext";
 
 const ListView = ({
   updateList,
@@ -78,7 +79,7 @@ const ListView = ({
       useNativeDriver: true,
     }).start();
   };
-  const OtherLists = () => {
+  /*   const OtherLists = () => {
     const docRef = doc(db, "Lists", user.uid);
 
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
@@ -112,7 +113,30 @@ const ListView = ({
   useEffect(() => {
     const unsubscribe = OtherLists();
     return () => unsubscribe(); // Cleanup on unmount
-  }, [user]);
+  }, [user]); */
+  const { allLists } = useListStatusContext();
+
+  useEffect(() => {
+    if (!allLists) {
+      setFullLists([]);
+      setOtherLists([]);
+      return;
+    }
+    const predefinedLists = [
+      "watchedTv",
+      "favorites",
+      "watchList",
+      "watchedMovies",
+    ];
+    setFullLists(Object.keys(allLists));
+
+    // Dinamik olarak diğer listeleri bul
+    const otherLists = Object.keys(allLists).filter(
+      (list) => !predefinedLists.includes(list),
+    );
+
+    setOtherLists(otherLists);
+  }, [allLists]);
 
   return (
     <View
@@ -225,7 +249,7 @@ const ListView = ({
       <TouchableOpacity
         onPress={() => {
           {
-            setModalVisible(true), OtherLists();
+            (setModalVisible(true), OtherLists());
           }
         }}
         style={{ justifyContent: "center", alignItems: "center" }}
@@ -439,8 +463,8 @@ const ListView = ({
                 <TouchableOpacity
                   style={[styles.button, { backgroundColor: theme.accent }]}
                   onPress={() => {
-                    setModalVisible(false),
-                      navigation.navigate("ListsViewScreen");
+                    (setModalVisible(false),
+                      navigation.navigate("ListsViewScreen"));
                   }}
                 >
                   <Text style={styles.buttonTextList}>Listeler</Text>

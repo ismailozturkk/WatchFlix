@@ -39,12 +39,39 @@ const avatars = [
   require("../assets/avatar/20.png"),
   require("../assets/avatar/21.png"),
   require("../assets/avatar/22.png"),
-  // require("../assets/avatar/23.png"),
-  // require("../assets/avatar/24.png"),
-  // require("../assets/avatar/25.png"),
-  // require("../assets/avatar/26.png"),
-  // require("../assets/avatar/27.png"),
-  // require("../assets/avatar/28.png"),
+  require("../assets/avatar/23.png"),
+  require("../assets/avatar/24.png"),
+  require("../assets/avatar/25.png"),
+  require("../assets/avatar/26.png"),
+  require("../assets/avatar/27.png"),
+  require("../assets/avatar/28.png"),
+  require("../assets/avatar/29.png"),
+  require("../assets/avatar/30.png"),
+  require("../assets/avatar/31.png"),
+  require("../assets/avatar/32.png"),
+  require("../assets/avatar/33.png"),
+  require("../assets/avatar/34.png"),
+  require("../assets/avatar/35.png"),
+  require("../assets/avatar/36.png"),
+  require("../assets/avatar/37.png"),
+  require("../assets/avatar/38.png"),
+  require("../assets/avatar/39.png"),
+  require("../assets/avatar/40.png"),
+  require("../assets/avatar/41.png"),
+  require("../assets/avatar/42.png"),
+  require("../assets/avatar/43.png"),
+  require("../assets/avatar/44.png"),
+  require("../assets/avatar/45.png"),
+  require("../assets/avatar/46.png"),
+  require("../assets/avatar/47.png"),
+  require("../assets/avatar/48.png"),
+  require("../assets/avatar/49.png"),
+  require("../assets/avatar/50.png"),
+  require("../assets/avatar/51.png"),
+  require("../assets/avatar/52.png"),
+  require("../assets/avatar/53.png"),
+  require("../assets/avatar/54.png"),
+  require("../assets/avatar/55.png"),
 ];
 const ProfileScreenContext = createContext();
 export const useProfileScreen = () => useContext(ProfileScreenContext);
@@ -134,7 +161,7 @@ export const ProfileScreenProvider = ({ children }) => {
       try {
         await AsyncStorage.setItem(
           `avatar_${uid}`,
-          selectAvatarIndex.toString()
+          selectAvatarIndex.toString(),
         );
         setAvatar(avatars[selectAvatarIndex]);
         setIsLoadingAvatar(false);
@@ -149,78 +176,95 @@ export const ProfileScreenProvider = ({ children }) => {
     saveAvatar();
   }, [selectAvatarIndex]);
 
-  //!-------------------------------  🎬 İzlenen filmleri dinle
+  //!-------------------------------  🔥 Consolidated Listener (Movies, TV, Lists, Stats)
   useEffect(() => {
     if (!uid) return;
+
+    // Set all loading states
     setIsLoadingMovieInfo(true);
-    const unsub = onSnapshot(doc(db, "Lists", uid), (docSnap) => {
-      const data = docSnap.data();
-      const movies =
-        data?.watchedMovies?.filter((m) => m.type === "movie") || [];
-
-      setWatchedMovieCount(movies.length);
-      const totalMinutes = movies.reduce((acc, m) => acc + (m.minutes || 0), 0);
-      setTotalMinutesTime(totalMinutes);
-      setTotalWatchedTime(formatTime(totalMinutes));
-      setIsLoadingMovieInfo(false);
-    });
-
-    return () => unsub();
-  }, [uid]);
-
-  //!-------------------------------  📺 İzlenen dizileri dinle
-
-  useEffect(() => {
-    if (!uid) return;
     setIsLoadingShowInfo(true);
-    const unsub = onSnapshot(doc(db, "Lists", uid), (docSnap) => {
-      const data = docSnap.data();
-      const shows = data?.watchedTv || [];
+    setIsLoading(true);
+    setLoadingTv(true);
 
-      setWatchedTvCount(shows.length);
-      setTotalSeasonsCount(
-        shows.reduce((totalSeasonCount, show) => {
-          return totalSeasonCount + (show.seasons?.length || 0);
-        }, 0)
-      );
-      setTotalEpisodesCount(
-        shows.reduce((total, show) => {
+    const unsub = onSnapshot(doc(db, "Lists", uid), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+
+        // 1. General Lists
+        setLists(Object.entries(data));
+
+        // 2. Movie Data Logic
+        const movies =
+          data?.watchedMovies?.filter((m) => m.type === "movie") || [];
+        setWatchedMovieCount(movies.length);
+        const totalMinutes = movies.reduce(
+          (acc, m) => acc + (m.minutes || 0),
+          0,
+        );
+        setTotalMinutesTime(totalMinutes);
+        setTotalWatchedTime(formatTime(totalMinutes));
+
+        // 3. TV Data Logic
+        const shows = data?.watchedTv || [];
+        setWatchedTvCount(shows.length);
+        setTotalSeasonsCount(
+          shows.reduce((totalSeasonCount, show) => {
+            return totalSeasonCount + (show.seasons?.length || 0);
+          }, 0),
+        );
+        setTotalEpisodesCount(
+          shows.reduce((total, show) => {
+            return (
+              total +
+              (show.seasons?.reduce((seasonTotal, season) => {
+                return seasonTotal + (season.episodes?.length || 0);
+              }, 0) || 0)
+            );
+          }, 0),
+        );
+
+        const totalMinutesTv = shows.reduce((acc, show) => {
           return (
-            total +
-            (show.seasons?.reduce((seasonTotal, season) => {
-              return seasonTotal + (season.episodes?.length || 0);
+            acc +
+            (show.seasons?.reduce((sAcc, season) => {
+              return (
+                sAcc +
+                (season.episodes?.reduce(
+                  (eAcc, e) => eAcc + (e.episodeMinutes || 0),
+                  0,
+                ) || 0)
+              );
             }, 0) || 0)
           );
-        }, 0)
-      );
+        }, 0);
+        setTotalMinutesTimeTv(totalMinutesTv);
+        setTotalWatchedTimeTv(formatTime(totalMinutesTv));
 
-      const totalMinutes = shows.reduce((acc, show) => {
-        return (
-          acc +
-          (show.seasons?.reduce((sAcc, season) => {
-            return (
-              sAcc +
-              (season.episodes?.reduce(
-                (eAcc, e) => eAcc + (e.episodeMinutes || 0),
-                0
-              ) || 0)
-            );
-          }, 0) || 0)
-        );
-      }, 0);
-      setTotalMinutesTimeTv(totalMinutes);
-      setTotalWatchedTimeTv(formatTime(totalMinutes));
+        // 4. Movie Statistics Screen Logic
+        setListItems(data?.watchedMovies || []);
+
+        // 5. Tv Statistics Screen Logic
+        setListItemsTv(data?.watchedTv || []);
+      } else {
+        // Handle empty state
+        setLists([]);
+        setWatchedMovieCount(0);
+        setTotalMinutesTime(0);
+        setTotalWatchedTime(formatTime(0));
+        setWatchedTvCount(0);
+        setTotalSeasonsCount(0);
+        setTotalEpisodesCount(0);
+        setTotalMinutesTimeTv(0);
+        setTotalWatchedTimeTv(formatTime(0));
+        setListItems([]);
+        setListItemsTv([]);
+      }
+
+      // Turn off loading states
+      setIsLoadingMovieInfo(false);
       setIsLoadingShowInfo(false);
-    });
-
-    return () => unsub();
-  }, [uid]);
-  //!-------------------------------   📄 Liste verisini dinle
-  useEffect(() => {
-    if (!uid) return;
-
-    const unsub = onSnapshot(doc(db, "Lists", uid), (docSnap) => {
-      setLists(Object.entries(docSnap.data() || {}));
+      setIsLoading(false);
+      setLoadingTv(false);
     });
 
     return () => unsub();
@@ -341,7 +385,7 @@ export const ProfileScreenProvider = ({ children }) => {
   const [isEditable, setIsEditable] = useState(false);
   const [borderColorNotes, setBorderColorNotes] = useState(theme.border);
   const [backgroundColorNotes, setBackgroundColorNotes] = useState(
-    theme.secondary
+    theme.secondary,
   );
   const [notes, setNotes] = useState([]);
   const [selectedNote, setSelectedNote] = useState(null);
@@ -445,7 +489,7 @@ export const ProfileScreenProvider = ({ children }) => {
                 backgroundColor: backgroundColorNotes,
                 updatedAt: Date.now(),
               }
-            : note
+            : note,
         );
 
         await updateDoc(docRef, { notes: updatedNotes });
@@ -505,24 +549,6 @@ export const ProfileScreenProvider = ({ children }) => {
     return new Date(date);
   };
 
-  useEffect(() => {
-    if (!uid) return;
-    setIsLoading(true);
-    const docRef = doc(db, "Lists", uid);
-
-    // Firestore'dan veriyi dinamik olarak çek
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setListItems(data["watchedMovies"] || []);
-      } else {
-        setListItems([]);
-      }
-    });
-    setIsLoading(false);
-    return () => unsubscribe();
-  }, [uid]);
-
   const groupByDate = (items) => {
     const groups = {};
     items.forEach((item) => {
@@ -542,7 +568,7 @@ export const ProfileScreenProvider = ({ children }) => {
   };
 
   const sortedListItems = [...listItems].sort(
-    (a, b) => parseDate(b.dateAdded) - parseDate(a.dateAdded)
+    (a, b) => parseDate(b.dateAdded) - parseDate(a.dateAdded),
   );
 
   const groupedData = groupByDate(sortedListItems);
@@ -559,7 +585,7 @@ export const ProfileScreenProvider = ({ children }) => {
 
   // 2. Türleri en çoktan aza sırala
   const sortedGenres = Object.entries(genreCount || {}).sort(
-    (a, b) => b[1] - a[1]
+    (a, b) => b[1] - a[1],
   );
   // 3. En çok izlenen tür(ler)
   const mostWatchedGenre = sortedGenres[0]?.[0] || null;
@@ -611,31 +637,13 @@ export const ProfileScreenProvider = ({ children }) => {
             .slice(0, 10);
         }
         return "";
-      })
+      }),
     ),
   ].filter(Boolean);
   //!-------------------------------  TvShowStatisticsScreen
   const [listItemsTv, setListItemsTv] = useState([]);
   const [loadingTv, setLoadingTv] = useState(true);
   const [selectedDateTv, setSelectedDateTv] = useState(null);
-
-  useEffect(() => {
-    if (!uid) return;
-    setLoadingTv(true);
-    const docRef = doc(db, "Lists", uid);
-
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setListItemsTv(data["watchedTv"] || []);
-      } else {
-        setListItemsTv([]);
-      }
-      setLoadingTv(false);
-    });
-
-    return () => unsubscribe();
-  }, [uid]);
 
   // 1️⃣ Tüm bölümleri düzleştir
   const flatEpisodesTv = (listItemsTv || []).flatMap((tv) =>
@@ -655,8 +663,8 @@ export const ProfileScreenProvider = ({ children }) => {
         id: `${tv.id}_${season.seasonNumber}_${ep.episodeNumber}`,
         addedShowDate: tv.addedShowDate,
         addedSeasonDate: season.addedSeasonDate,
-      }))
-    )
+      })),
+    ),
   );
 
   // 2️⃣ Sıralama (son izlenme zamanına göre)
@@ -719,7 +727,7 @@ export const ProfileScreenProvider = ({ children }) => {
           }
           return null;
         })
-        .filter(Boolean)
+        .filter(Boolean),
     ),
   ].sort((a, b) => new Date(b) - new Date(a));
 
@@ -733,7 +741,7 @@ export const ProfileScreenProvider = ({ children }) => {
     });
   });
   const sortedGenresTv = Object.entries(genreCountTv).sort(
-    (a, b) => b[1] - a[1]
+    (a, b) => b[1] - a[1],
   );
   const mostWatchedGenreTv = sortedGenresTv[0]?.[0] || "-";
   const secondWatchedGenreTv = sortedGenresTv[1]?.[0] || "-";

@@ -137,10 +137,10 @@ const ProfileScreen = ({ navigation }) => {
   const rawProgressTv = (totalTimeTv % 10080) / 10080;
   const rawProgressMovie = (totalTime % 10080) / 10080;
   const safeProgressTv = parseInt(
-    Math.min(Math.max(rawProgressTv, 0), 1).toFixed(3) * 100
+    Math.min(Math.max(rawProgressTv, 0), 1).toFixed(3) * 100,
   );
   const safeProgressMovie = parseInt(
-    Math.min(Math.max(rawProgressMovie, 0), 1).toFixed(3) * 100
+    Math.min(Math.max(rawProgressMovie, 0), 1).toFixed(3) * 100,
   );
   //console.log("safeProgressTv:", safeProgressMovie);
   const [friendCount, setFriendCount] = useState();
@@ -153,9 +153,9 @@ const ProfileScreen = ({ navigation }) => {
     const unsubscribe = onSnapshot(currentUserRef, (doc) => {
       if (doc.exists()) {
         const data = doc.data();
-        const count = data.friends.length;
-        const receivedCount = data.friendRequests.receivedRequest.length;
-        const sendCount = data.friendRequests.sendRequest.length;
+        const count = data.friends?.length || 0;
+        const receivedCount = data.friendRequests?.receivedRequest?.length || 0;
+        const sendCount = data.friendRequests?.sendRequest?.length || 0;
         setFriendCount(count);
         setReceivedCount(receivedCount);
         setSendCount(sendCount);
@@ -179,6 +179,7 @@ const ProfileScreen = ({ navigation }) => {
           autoPlay={true}
           loop
         />
+
         <View style={styles.images}>
           <TouchableOpacity
             onPress={() => {
@@ -394,7 +395,7 @@ const ProfileScreen = ({ navigation }) => {
               <Text style={[styles.durationValue, { color: theme.accent }]}>
                 {formatTotalDurationTime(
                   (totalMinutesTimeTv || 0) + (totalMinutesTime || 0),
-                  timeDisplayMode
+                  timeDisplayMode,
                 )}
               </Text>
               <Text style={[styles.durationLabel, { color: theme.text.muted }]}>
@@ -412,7 +413,7 @@ const ProfileScreen = ({ navigation }) => {
               <Text style={[styles.durationValue, { color: borderColorMovie }]}>
                 {formatTotalDurationTime(
                   totalMinutesTime || 0,
-                  timeDisplayMode
+                  timeDisplayMode,
                 )}
               </Text>
               <Text style={[styles.durationLabel, { color: theme.text.muted }]}>
@@ -430,7 +431,7 @@ const ProfileScreen = ({ navigation }) => {
               <Text style={[styles.durationValue, { color: borderColorTv }]}>
                 {formatTotalDurationTime(
                   totalMinutesTimeTv || 0,
-                  timeDisplayMode
+                  timeDisplayMode,
                 )}
               </Text>
               <Text style={[styles.durationLabel, { color: theme.text.muted }]}>
@@ -872,12 +873,13 @@ const ProfileScreen = ({ navigation }) => {
               <FlatList
                 data={avatars || []}
                 keyExtractor={(item, index) => index.toString()}
+                showsVerticalScrollIndicator={false}
                 renderItem={({ item, index }) => (
                   <TouchableOpacity onPress={() => setSelectAvatarIndex(index)}>
                     {item && <Image source={item} style={styles.avatarImage} />}
                   </TouchableOpacity>
                 )}
-                numColumns={3}
+                numColumns={4}
               />
 
               <TouchableOpacity
@@ -952,7 +954,7 @@ const ProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 40,
+    //paddingTop: 0,
     marginBottom: 100,
     alignItems: "center",
     backgroundColor: "#000",
@@ -990,10 +992,10 @@ const styles = StyleSheet.create({
   },
   lottie: {
     position: "absolute",
-    top: 0,
+    top: -140,
     left: -60,
     right: -60,
-    bottom: -200,
+    bottom: -250,
     zIndex: 0,
   },
   profilImage: {
@@ -1025,7 +1027,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    margin: 10,
+    margin: 5,
   },
   closeButton: {
     marginTop: 20,

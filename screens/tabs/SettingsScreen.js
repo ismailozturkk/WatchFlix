@@ -22,7 +22,7 @@ import SwitchToggle from "../../modules/SwitchToggle";
 import SwipeCard from "../../modules/SwipeCard";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
-
+import CountryFlag from "react-native-country-flag";
 export default function SettingsScreen() {
   const [enabled, setEnabled] = useState(false);
   //const { showSnow, changeShowSnow } = useSnow();
@@ -90,12 +90,26 @@ export default function SettingsScreen() {
             </Text>
           </View>
           <TouchableOpacity
-            style={[styles.languageButton, { backgroundColor: theme.accent }]}
+            style={[
+              styles.languageButton,
+              {
+                backgroundColor: theme.accent,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+              },
+            ]}
             onPress={() => toggleLanguage(language === "tr" ? "en" : "tr")}
           >
             <Text style={styles.languageButtonText}>
               {language.toUpperCase()}
             </Text>
+            <CountryFlag
+              isoCode={language === "tr" ? "tr" : "us"}
+              size={25}
+              style={{ borderRadius: 5 }}
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -320,11 +334,14 @@ export default function SettingsScreen() {
             ]}
           >
             <Text style={[styles.version, { color: theme.text.primary }]}>
-              Watch Flix {"     "}Version: 1.0.1
+              Watch Flix {"     "}Version: 1.1.0
             </Text>
 
             <Text style={[styles.copyright, { color: theme.text.secondary }]}>
               Veriler TMDB API'sinden alınmıştır.
+            </Text>
+            <Text style={[styles.copyright, { color: theme.text.secondary }]}>
+              created by ismail ozturk{" "}
             </Text>
             <Text style={[styles.copyright, { color: theme.text.secondary }]}>
               © 2025 Watch Flix

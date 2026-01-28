@@ -28,7 +28,7 @@ import LottieView from "lottie-react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useSnow } from "../../context/SnowContext";
 import Toast from "react-native-toast-message";
-import { getDoc, doc, onSnapshot, updateDoc, setDoc } from "firebase/firestore";
+import { getDoc, doc, updateDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
@@ -43,7 +43,110 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 import Comment from "../../components/Comment";
 import ReactNativeModal from "react-native-modal";
 import SwipeCard from "../../modules/SwipeCard";
+import { useListStatus } from "../../modules/UseListStatus";
+import YoutubePlayer from "react-native-youtube-iframe";
+import { BlurView } from "expo-blur";
+import { useListStatusContext } from "../../context/ListStatusContext";
+
 const { width, height } = Dimensions.get("window");
+
+const SimilarMovieItem = ({ item, navigation }) => {
+  const { theme } = useTheme();
+  const { inWatchList, inFavorites, isWatched, isInOtherLists } = useListStatus(
+    item.id,
+    "movie",
+  );
+  const scaleValue = React.useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.timing(scaleValue, {
+      toValue: 0.9,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const onPressOut = () => {
+    Animated.timing(scaleValue, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const isInAnyList = inWatchList || isWatched || inFavorites || isInOtherLists;
+
+  return (
+    <Animated.View style={{ transform: [{ scale: scaleValue }] }}>
+      <TouchableOpacity
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        activeOpacity={0.8}
+        style={styles.similarItem}
+        onPress={() => navigation.push("MovieDetails", { id: item.id })}
+      >
+        <Image
+          source={
+            item.poster_path
+              ? { uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }
+              : require("../../assets/image/no_image.png")
+          }
+          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+        />
+
+        <View
+          style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}
+        >
+          <Text style={styles.similarRatingText}>
+            {item.vote_average.toFixed(1)}
+          </Text>
+        </View>
+        {isInAnyList && (
+          <View style={[styles.stats1]}>
+            <View
+              style={{
+                gap: 3,
+                backgroundColor: theme.secondaryt,
+                paddingVertical: 4,
+                paddingHorizontal: 2,
+                borderRadius: 10,
+              }}
+            >
+              {inWatchList && (
+                <View>
+                  <Ionicons
+                    name="bookmark"
+                    size={12}
+                    color={theme.colors.blue}
+                  />
+                </View>
+              )}
+              {isWatched && (
+                <View>
+                  <Ionicons
+                    name="eye-off"
+                    size={12}
+                    color={theme.colors.green}
+                  />
+                </View>
+              )}
+              {inFavorites && (
+                <View>
+                  <Ionicons name="heart" size={12} color={theme.colors.red} />
+                </View>
+              )}
+              {isInOtherLists && (
+                <View>
+                  <Ionicons name="grid" size={12} color={theme.colors.orange} />
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
 
 export default function MovieDetails({ navigation, route }) {
   const { id } = route.params;
@@ -134,41 +237,7 @@ export default function MovieDetails({ navigation, route }) {
       isRemaining: true,
     };
   };
-  const [scaleValues, setScaleValues] = useState({});
 
-  useEffect(() => {
-    const newScaleValues = {};
-
-    // Tüm önerilen ve benzer filmleri birleştir
-    const recommended = details?.recommendations?.results || [];
-    const similar = details?.similar?.results || [];
-    const allMovies = [...recommended.slice(0, 20), ...similar.slice(0, 20)];
-
-    allMovies.forEach((item) => {
-      if (item && item.id) {
-        newScaleValues[item.id] = new Animated.Value(1);
-      }
-    });
-
-    setScaleValues(newScaleValues);
-  }, [details]);
-  const onPressIn = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 0.9,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const onPressOut = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
   useEffect(() => {
     const fetchDetails = async () => {
       setLoading(true);
@@ -225,8 +294,8 @@ export default function MovieDetails({ navigation, route }) {
         const movieReminders = data.movieReminders || [];
         setIsReminderSet(
           movieReminders.some(
-            (movie) => movie.movieId === id && movie.type === "movie"
-          )
+            (movie) => movie.movieId === id && movie.type === "movie",
+          ),
         );
       } else {
         setIsReminderSet(false);
@@ -260,7 +329,7 @@ export default function MovieDetails({ navigation, route }) {
       }
 
       const movieIndex = movieReminders.findIndex(
-        (item) => item.movieId === details.id
+        (item) => item.movieId === details.id,
       );
 
       if (movieIndex === -1 && !isReminderSet) {
@@ -331,7 +400,7 @@ export default function MovieDetails({ navigation, route }) {
       let selectedList = data[listType] || [];
 
       const movieIndex = selectedList.findIndex(
-        (item) => item.id === details.id && item.type === type
+        (item) => item.id === details.id && item.type === type,
       );
       const getListTypeName = (list) => {
         switch (list) {
@@ -428,32 +497,26 @@ export default function MovieDetails({ navigation, route }) {
   //?--------------------------------------------------------------------------------
   //?--------------------------------------------------------------------------------
 
+  /*   const [listStates, setListStates] = useState({});
+   */
+  const { allLists } = useListStatusContext();
   const [listStates, setListStates] = useState({});
 
   useEffect(() => {
-    if (!user.uid || !id) return;
+    if (!allLists) {
+      setListStates({});
+      return;
+    }
 
-    const docRef = doc(db, "Lists", user.uid);
-
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const newStates = {};
-
-        Object.entries(data).forEach(([listName, listItems]) => {
-          newStates[listName] = Array.isArray(listItems)
-            ? listItems.some((item) => item.id === id && item.type === "movie")
-            : false;
-        });
-
-        setListStates(newStates);
-      } else {
-        setListStates({});
-      }
+    const newStates = {};
+    Object.entries(allLists).forEach(([listName, listItems]) => {
+      newStates[listName] = Array.isArray(listItems)
+        ? listItems.some((item) => item.id === id && item.type === "movie")
+        : false;
     });
 
-    return () => unsubscribe();
-  }, [user.uid, id]);
+    setListStates(newStates);
+  }, [allLists, id]);
 
   const renderCastMember = ({ item }) => (
     <TouchableOpacity
@@ -481,42 +544,6 @@ export default function MovieDetails({ navigation, route }) {
         </Text>
       </View>
     </TouchableOpacity>
-  );
-
-  const renderSimilarMovie = ({ item }) => (
-    <Animated.View
-      style={{ transform: [{ scale: scaleValues[item.id] || 1 }] }}
-    >
-      <TouchableOpacity
-        onPressIn={() => onPressIn(item.id)}
-        onPressOut={() => onPressOut(item.id)}
-        activeOpacity={0.8}
-        style={styles.similarItem}
-        onPress={() => navigation.push("MovieDetails", { id: item.id })}
-      >
-        <Image
-          source={
-            item.poster_path
-              ? { uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }
-              : require("../../assets/image/no_image.png")
-          }
-          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
-        />
-        <Text
-          style={[styles.similarTitle, { color: theme.text.primary }]}
-          numberOfLines={2}
-        >
-          {item.title}
-        </Text>
-        <View
-          style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}
-        >
-          <Text style={styles.similarRatingText}>
-            {item.vote_average.toFixed(1)}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
   );
 
   const renderVideo = ({ item }) => (
@@ -867,28 +894,28 @@ export default function MovieDetails({ navigation, route }) {
                       ? `https://www.imdb.com/title/${details.external_ids.imdb_id}`
                       : null,
                     "imdb",
-                    "IMDb"
+                    "IMDb",
                   )}
                   {renderExternalLink(
                     details.external_ids.facebook_id
                       ? `https://www.facebook.com/${details.external_ids.facebook_id}`
                       : null,
                     "facebook",
-                    "Facebook"
+                    "Facebook",
                   )}
                   {renderExternalLink(
                     details.external_ids.instagram_id
                       ? `https://www.instagram.com/${details.external_ids.instagram_id}`
                       : null,
                     "instagram",
-                    "Instagram"
+                    "Instagram",
                   )}
                   {renderExternalLink(
                     details.external_ids.twitter_id
                       ? `https://twitter.com/${details.external_ids.twitter_id}`
                       : null,
                     "twitter",
-                    "Twitter"
+                    "Twitter",
                   )}
                 </View>
               </ScrollView>
@@ -934,7 +961,7 @@ export default function MovieDetails({ navigation, route }) {
                             {provider.provider_name}
                           </Text>
                         </View>
-                      )
+                      ),
                     )}
                   </View>
                 </View>
@@ -949,7 +976,7 @@ export default function MovieDetails({ navigation, route }) {
 
                 <FlatList
                   data={details.videos.results.filter(
-                    (video) => video.site === "YouTube"
+                    (video) => video.site === "YouTube",
                   )}
                   renderItem={renderVideo}
                   keyExtractor={(item) => item.id}
@@ -1043,7 +1070,7 @@ export default function MovieDetails({ navigation, route }) {
                           </Text>
                         </View>
                       )
-                    )
+                    ),
                   )}
                 </View>
                 {details.keywords?.keywords.length > 10 && (
@@ -1109,7 +1136,9 @@ export default function MovieDetails({ navigation, route }) {
                 </Text>
                 <FlatList
                   data={details.recommendations.results.slice(0, 20)}
-                  renderItem={renderSimilarMovie}
+                  renderItem={({ item }) => (
+                    <SimilarMovieItem item={item} navigation={navigation} />
+                  )}
                   keyExtractor={(item) => item.id.toString()}
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -1126,7 +1155,9 @@ export default function MovieDetails({ navigation, route }) {
                 </Text>
                 <FlatList
                   data={details.similar.results.slice(0, 20)}
-                  renderItem={renderSimilarMovie}
+                  renderItem={({ item }) => (
+                    <SimilarMovieItem item={item} navigation={navigation} />
+                  )}
                   keyExtractor={(item) => item.id.toString()}
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -1159,7 +1190,7 @@ export default function MovieDetails({ navigation, route }) {
                         activeOpacity={0.8}
                         onPress={() =>
                           setReviewTextLenght(
-                            review.id == reviewTextLenght ? null : review.id
+                            review.id == reviewTextLenght ? null : review.id,
                           )
                         }
                       >
@@ -1204,7 +1235,7 @@ export default function MovieDetails({ navigation, route }) {
                       setReviewLenght(
                         details.reviews?.results.length === reviewLenght
                           ? 5
-                          : details.reviews?.results.length
+                          : details.reviews?.results.length,
                       )
                     }
                     style={{
@@ -1306,23 +1337,11 @@ export default function MovieDetails({ navigation, route }) {
         transparent={true}
       >
         <View style={styles.modalContainerVideo}>
-          <LinearGradient
-            colors={[
-              "rgba(0,0,0,0)",
-              "rgba(0,0,0,0.9)",
-              "rgba(0,0,0,0.9)",
-              "rgba(0,0,0,0.9)",
-              "rgba(0,0,0,0.9)",
-              "rgba(0,0,0,0.9)",
-              "rgba(0,0,0,0)",
-            ]}
-            style={{
-              position: "absolute",
-              top: 0,
-              right: 0,
-              left: 0,
-              bottom: 0,
-            }}
+          <BlurView
+            tint="dark"
+            intensity={50}
+            experimentalBlurMethod="dimezisBlurView" // Android için sihirli kod
+            style={StyleSheet.absoluteFill}
           />
           <TouchableOpacity
             style={{
@@ -1342,15 +1361,7 @@ export default function MovieDetails({ navigation, route }) {
               <FontAwesome5 name="times" size={24} color="#fff" />
             </TouchableOpacity>
             {selectedVideo && (
-              <WebView
-                style={styles.webview}
-                javaScriptEnabled={true}
-                domStorageEnabled={true}
-                source={{
-                  uri: `https://www.youtube.com/embed/${selectedVideo}?rel=0&autoplay=1`,
-                }}
-                allowsFullscreenVideo={true}
-              />
+              <YoutubePlayer height={250} videoId={selectedVideo} play={true} />
             )}
           </View>
         </View>
@@ -1419,7 +1430,7 @@ export default function MovieDetails({ navigation, route }) {
                   updateMovieList(
                     "watchedMovies",
                     "movie",
-                    formatDateSave(new Date())
+                    formatDateSave(new Date()),
                   )
                 }
               >
@@ -1442,7 +1453,7 @@ export default function MovieDetails({ navigation, route }) {
                   updateMovieList(
                     "watchedMovies",
                     "movie",
-                    formatDateSave(new Date(details.release_date))
+                    formatDateSave(new Date(details.release_date)),
                   )
                 }
               >
@@ -1480,29 +1491,16 @@ export default function MovieDetails({ navigation, route }) {
       <Modal
         visible={PosterModalVisible || backdropModalVisible} // artık state'e bağlı
         onRequestClose={() => {
-          setPosterModalVisible(false), setBacdropModalVisible(false);
+          (setPosterModalVisible(false), setBacdropModalVisible(false));
         }}
         animationType="fade"
         transparent={true}
       >
-        <LinearGradient
-          colors={[
-            "transparent",
-            "rgba(0,0,0,0.8)",
-            "rgba(0,0,0,0.8)",
-            "rgba(0,0,0,0.8)",
-            "rgba(0,0,0,0.8)",
-            "rgba(0,0,0,0.8)",
-            "rgba(0,0,0,0.8)",
-            "transparent",
-          ]}
-          style={{
-            position: "absolute",
-            top: 0,
-            right: 0,
-            left: 0,
-            bottom: 0,
-          }}
+        <BlurView
+          tint="dark"
+          intensity={50}
+          experimentalBlurMethod="dimezisBlurView" // Android için sihirli kod
+          style={StyleSheet.absoluteFill}
         />
         <TouchableOpacity
           style={{
@@ -1513,7 +1511,7 @@ export default function MovieDetails({ navigation, route }) {
             bottom: 0,
           }}
           onPress={() => {
-            setPosterModalVisible(false), setBacdropModalVisible(false);
+            (setPosterModalVisible(false), setBacdropModalVisible(false));
           }}
         />
         <View
@@ -1719,6 +1717,13 @@ const styles = StyleSheet.create({
     shadowRadius: 10.32,
     elevation: 5,
   },
+  stats1: {
+    alignItems: "center",
+    position: "absolute",
+    left: 3,
+    bottom: 6,
+    justifyContent: "center",
+  },
   statItem: {
     alignItems: "center",
   },
@@ -1800,12 +1805,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   similarItem: {
-    width: width * 0.3,
+    width: width * 0.4,
     marginRight: 10,
   },
   similarPoster: {
-    width: width * 0.3,
-    height: width * 0.45,
+    width: width * 0.4,
+    height: width * 0.6,
     borderRadius: 10,
     marginBottom: 5,
     shadowColor: "#000",
@@ -1824,8 +1829,8 @@ const styles = StyleSheet.create({
   },
   similarRating: {
     position: "absolute",
-    bottom: 45,
-    right: 5,
+    bottom: 6,
+    right: 3,
     width: 30,
     borderRadius: 10,
     justifyContent: "center",

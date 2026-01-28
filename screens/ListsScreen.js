@@ -30,6 +30,7 @@ export default function ListsScreen({ route, navigation }) {
   const { listName } = route.params;
   const [listItems, setListItems] = useState([]);
   const [listModalItems, setListModalItems] = useState([]);
+  const [randomModalItems, setRandomModalItems] = useState({});
   const [searchQuery, setSearchQuery] = useState(""); // Arama için state
   const { t, language } = useLanguage();
   const { user } = useAuth();
@@ -38,8 +39,7 @@ export default function ListsScreen({ route, navigation }) {
   const [reorderModalVisible, setReorderModalVisible] = useState(false);
   const [index, setIndex] = useState(0);
   const [reorderItems, setReorderItems] = useState(null);
-  const [shooseRandomlyModalVisible, setChooseRandomlyModalVisible] =
-    useState(false);
+  const [randomModalVisible, setRandomModalVisible] = useState(false);
   const [value, setValue] = useState("");
 
   const handleChange = (text) => {
@@ -236,8 +236,8 @@ export default function ListsScreen({ route, navigation }) {
       return;
     }
     const randomIndex = Math.floor(Math.random() * chooseItem.length);
-    setListModalItems([chooseItem[randomIndex]]);
-    setModalVisible(true);
+    setRandomModalItems(chooseItem[randomIndex]);
+    setRandomModalVisible(true);
   };
   return (
     <SafeAreaView
@@ -247,12 +247,12 @@ export default function ListsScreen({ route, navigation }) {
         {listName == "watchedMovies"
           ? "İzlenen Filmler"
           : listName == "watchedTv"
-          ? "İzlenen Diziler"
-          : listName == "favorites"
-          ? "Favoriler"
-          : listName == "watchList"
-          ? "İzlenecekler"
-          : listName}
+            ? "İzlenen Diziler"
+            : listName == "favorites"
+              ? "Favoriler"
+              : listName == "watchList"
+                ? "İzlenecekler"
+                : listName}
       </Text>
 
       {/* 15'ten fazla öğe varsa arama çubuğunu göster */}
@@ -422,33 +422,33 @@ export default function ListsScreen({ route, navigation }) {
                       item.type === "movie"
                         ? { borderWidth: 0 }
                         : item.showEpisodeCount ===
-                          (Array.isArray(item.seasons)
-                            ? item.seasons.reduce(
-                                (acc, season) =>
-                                  acc +
-                                  (season.episodes
-                                    ? season.episodes.length
-                                    : 0),
-                                0
-                              )
-                            : 0)
-                        ? item.showEpisodeCount && {
-                            borderWidth: 1, // Border kalınlığını artırdım
-                            borderTopColor: theme.primary,
-                            borderLeftColor: theme.primary,
-                            borderRightColor: theme.primary,
-                            borderBottomColor: theme.colors.green,
-                            borderRadius: 11,
-                          }
-                        : item.showEpisodeCount && {
-                            borderWidth: 1, // Border kalınlığını artırdım
-                            borderTopColor: theme.primary,
-                            borderLeftColor: theme.primary,
-                            borderRightColor: theme.primary,
-                            borderBottomColor: theme.colors.orange,
+                            (Array.isArray(item.seasons)
+                              ? item.seasons.reduce(
+                                  (acc, season) =>
+                                    acc +
+                                    (season.episodes
+                                      ? season.episodes.length
+                                      : 0),
+                                  0
+                                )
+                              : 0)
+                          ? item.showEpisodeCount && {
+                              borderWidth: 1, // Border kalınlığını artırdım
+                              borderTopColor: theme.primary,
+                              borderLeftColor: theme.primary,
+                              borderRightColor: theme.primary,
+                              borderBottomColor: theme.colors.green,
+                              borderRadius: 11,
+                            }
+                          : item.showEpisodeCount && {
+                              borderWidth: 1, // Border kalınlığını artırdım
+                              borderTopColor: theme.primary,
+                              borderLeftColor: theme.primary,
+                              borderRightColor: theme.primary,
+                              borderBottomColor: theme.colors.orange,
 
-                            borderRadius: 11,
-                          },
+                              borderRadius: 11,
+                            },
                     ]}
                   >
                     <Image
@@ -509,12 +509,18 @@ export default function ListsScreen({ route, navigation }) {
         </>
       )}
       <Modal
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalContainer}>
+          <BlurView
+            tint="dark"
+            intensity={50}
+            experimentalBlurMethod="dimezisBlurView"
+            style={StyleSheet.absoluteFill}
+          />
           <TouchableOpacity
             style={{
               position: "absolute",
@@ -523,205 +529,47 @@ export default function ListsScreen({ route, navigation }) {
               right: 0,
               bottom: 0,
             }}
+            activeOpacity={1}
             onPress={() => setModalVisible(false)}
           />
-          <LinearGradient
-            colors={["transparent", theme.shadow, theme.shadow]}
-            style={{
-              position: "absolute",
-              top: 0,
-              right: 0,
-              left: 0,
-              bottom: 0,
-              zIndex: -1,
-            }}
-          />
-          <View
-            style={{
-              width: "100%",
-              //height: 200,
-              padding: 5,
-              borderRadius: 15,
-              backgroundColor: theme.secondary,
-            }}
-          >
-            {isLoading
-              ? renderSkeleton()
-              : listModalItems.length > 0 && (
-                  <FlatList
-                    data={listModalItems}
-                    keyExtractor={(item) => item.id.toString()}
-                    initialNumToRender={8} // Başlangıçta 10 öğe yükler
-                    //windowSize={5} // Performans için pencere boyutunu ayarla
-                    removeClippedSubviews={true} // Görünmeyen elemanları kaldır
-                    showsVerticalScrollIndicator={false}
-                    renderItem={({ item }) => {
-                      return listName !== "watchList" ? (
-                        <View style={[styles.infoContainer, {}]}>
-                          <TouchableOpacity
-                            onPress={() => {
-                              setModalVisible(false),
-                                navigation.navigate("TvShowsDetails", {
-                                  id: item.id,
-                                });
-                            }}
-                            style={styles.itemTvShow}
-                          >
-                            <Image
-                              source={
-                                item.imagePath
-                                  ? {
-                                      uri: `https://image.tmdb.org/t/p/w500${item.imagePath}`,
-                                      cache: "force-cache",
-                                    }
-                                  : require("../assets/image/no_image.png")
-                              }
-                              style={styles.imageSelected}
-                            />
-                            <Text
-                              style={[
-                                styles.title,
-                                { color: theme.text.primary },
-                              ]}
-                            >
-                              {item.name}
-                            </Text>
-                            <Text
-                              style={[
-                                styles.detail,
-                                { color: theme.text.secondary },
-                              ]}
-                            >
-                              Sezon: {item.showSeasonCount} - Bölüm:{" "}
-                              {item.showEpisodeCount}
-                            </Text>
-                          </TouchableOpacity>
-                          <View
-                            style={{ flexDirection: "column", flexShrink: 1 }}
-                          >
-                            <ScrollView
-                              contentContainerStyle={{
-                                flexDirection: "row",
-                                flexWrap: "wrap",
-                              }}
-                              showsVerticalScrollIndicator={false}
-                            >
-                              {item.seasons && item.seasons.length > 0 ? (
-                                item.seasons.map((season) => (
-                                  <View
-                                    key={season.seasonNumber}
-                                    style={{
-                                      padding: 3,
-                                      //backgroundColor: "red",
-                                    }}
-                                  >
-                                    <TouchableOpacity
-                                      onPress={() => {
-                                        setModalVisible(false),
-                                          navigation.navigate("SeasonDetails", {
-                                            showId: item.id,
-                                            seasonNumber: season.seasonNumber,
-                                          });
-                                      }}
-                                    >
-                                      <View
-                                        style={[
-                                          styles.seasonBox,
-                                          {
-                                            borderColor:
-                                              season.episodes?.length ===
-                                              season.seasonEpisodes
-                                                ? theme.colors.green
-                                                : theme.colors.orange,
-                                            backgroundColor: theme.primary,
-                                          },
-                                        ]}
-                                      >
-                                        <Image
-                                          source={{
-                                            uri: `https://image.tmdb.org/t/p/original${season.seasonPosterPath}`,
-                                            cache: "force-cache",
-                                          }}
-                                          style={{
-                                            width: 50,
-                                            height: 75,
-                                            borderRadius: 7,
-                                            marginBottom: 2,
-                                            shadowColor: "#000",
-                                            shadowOffset: {
-                                              width: 0,
-                                              height: 8,
-                                            },
-                                            shadowOpacity: 0.94,
-                                            shadowRadius: 10.32,
-                                            elevation: 5,
-                                          }}
-                                        />
-                                        <Text
-                                          style={[
-                                            styles.detailSeason,
-                                            {
-                                              color:
-                                                season.episodes?.length ===
-                                                season.seasonEpisodes
-                                                  ? theme.colors.green
-                                                  : theme.colors.orange,
-                                            },
-                                          ]}
-                                        >
-                                          {season.seasonNumber}. sezon
-                                        </Text>
-                                        <Text
-                                          style={[
-                                            styles.detailSeason,
-                                            {
-                                              color:
-                                                season.episodes?.length ===
-                                                season.seasonEpisodes
-                                                  ? theme.colors.green
-                                                  : theme.colors.orange,
-                                            },
-                                          ]}
-                                        >
-                                          {season.episodes.length} /{" "}
-                                          {season.seasonEpisodes}
-                                        </Text>
-                                      </View>
-                                    </TouchableOpacity>
-                                  </View>
-                                ))
-                              ) : (
-                                <Text
-                                  style={{
-                                    color: theme.text.muted,
-                                    textAlign: "center",
-                                  }}
-                                >
-                                  Bu dizi boş.
-                                </Text>
-                              )}
-                            </ScrollView>
-                          </View>
-                        </View>
-                      ) : (
+
+          {isLoading
+            ? renderSkeleton()
+            : listModalItems.length > 0 && (
+                <FlatList
+                  data={listModalItems}
+                  keyExtractor={(item) => item.id.toString()}
+                  initialNumToRender={8} // Başlangıçta 10 öğe yükler
+                  //windowSize={5} // Performans için pencere boyutunu ayarla
+                  removeClippedSubviews={true} // Görünmeyen elemanları kaldır
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{
+                    paddingVertical: 20,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                  renderItem={({ item }) => {
+                    return (
+                      <View style={[styles.infoContainer, {}]}>
+                        <TouchableOpacity
+                          style={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                          }}
+                          activeOpacity={1}
+                          onPress={() => setModalVisible(false)}
+                        />
                         <TouchableOpacity
                           onPress={() => {
-                            setModalVisible(false),
-                              navigation.navigate(
-                                item.type === "movie"
-                                  ? "MovieDetails"
-                                  : "TvShowsDetails",
-                                {
-                                  id: item.id,
-                                }
-                              );
+                            (setModalVisible(false),
+                              navigation.navigate("TvShowsDetails", {
+                                id: item.id,
+                              }));
                           }}
-                          style={{
-                            flexDirection: "row",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            gap: 10,
-                          }}
+                          style={styles.itemTvShow}
                         >
                           <Image
                             source={
@@ -734,55 +582,263 @@ export default function ListsScreen({ route, navigation }) {
                             }
                             style={styles.imageSelected}
                           />
-                          <View style={{ gap: 5 }}>
-                            <Text
-                              style={[
-                                styles.title,
-                                { color: theme.text.primary },
-                              ]}
-                            >
-                              {item.name}
-                            </Text>
-
-                            <Text
-                              style={[
-                                styles.detail,
-                                { color: theme.text.secondary },
-                              ]}
-                            >
-                              Tür: {item.type}
-                            </Text>
-                            {item.dateAdded && (
+                          <Text
+                            style={[
+                              styles.title,
+                              { color: theme.text.primary },
+                            ]}
+                          >
+                            {item.name}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.detail,
+                              { color: theme.text.secondary },
+                            ]}
+                          >
+                            Sezon: {item.showSeasonCount} - Bölüm:{" "}
+                            {item.showEpisodeCount}
+                          </Text>
+                        </TouchableOpacity>
+                        <View
+                          style={{ flexDirection: "column", flexShrink: 1 }}
+                        >
+                          <ScrollView
+                            contentContainerStyle={{
+                              flexDirection: "row",
+                              flexWrap: "wrap",
+                            }}
+                            showsVerticalScrollIndicator={false}
+                          >
+                            {item.seasons && item.seasons.length > 0 ? (
+                              item.seasons.map((season) => (
+                                <View
+                                  key={season.seasonNumber}
+                                  style={{
+                                    padding: 3,
+                                    //backgroundColor: "red",
+                                  }}
+                                >
+                                  <TouchableOpacity
+                                    onPress={() => {
+                                      (setModalVisible(false),
+                                        navigation.navigate("SeasonDetails", {
+                                          showId: item.id,
+                                          seasonNumber: season.seasonNumber,
+                                        }));
+                                    }}
+                                  >
+                                    <View
+                                      style={[
+                                        styles.seasonBox,
+                                        {
+                                          borderColor:
+                                            season.episodes?.length ===
+                                            season.seasonEpisodes
+                                              ? theme.colors.green
+                                              : theme.colors.orange,
+                                          backgroundColor: theme.primary,
+                                        },
+                                      ]}
+                                    >
+                                      <Image
+                                        source={{
+                                          uri: `https://image.tmdb.org/t/p/original${season.seasonPosterPath}`,
+                                          cache: "force-cache",
+                                        }}
+                                        style={{
+                                          width: 50,
+                                          height: 75,
+                                          borderRadius: 7,
+                                          marginBottom: 2,
+                                          shadowColor: "#000",
+                                          shadowOffset: {
+                                            width: 0,
+                                            height: 8,
+                                          },
+                                          shadowOpacity: 0.94,
+                                          shadowRadius: 10.32,
+                                          elevation: 5,
+                                        }}
+                                      />
+                                      <Text
+                                        style={[
+                                          styles.detailSeason,
+                                          {
+                                            color:
+                                              season.episodes?.length ===
+                                              season.seasonEpisodes
+                                                ? theme.colors.green
+                                                : theme.colors.orange,
+                                          },
+                                        ]}
+                                      >
+                                        {season.seasonNumber}. sezon
+                                      </Text>
+                                      <Text
+                                        style={[
+                                          styles.detailSeason,
+                                          {
+                                            color:
+                                              season.episodes?.length ===
+                                              season.seasonEpisodes
+                                                ? theme.colors.green
+                                                : theme.colors.orange,
+                                          },
+                                        ]}
+                                      >
+                                        {season.episodes.length} /{" "}
+                                        {season.seasonEpisodes}
+                                      </Text>
+                                    </View>
+                                  </TouchableOpacity>
+                                </View>
+                              ))
+                            ) : (
                               <Text
-                                style={[
-                                  styles.detail,
-                                  { color: theme.text.secondary },
-                                ]}
+                                style={{
+                                  color: theme.text.muted,
+                                  textAlign: "center",
+                                }}
                               >
-                                eklenme tarihi: {formatDate(item.dateAdded)}
+                                Bu dizi boş.
                               </Text>
                             )}
-                            <View style={{ flexDirection: "row", gap: 5 }}>
-                              {item.genres.map((genres) => (
-                                <Text
-                                  key={genres}
-                                  style={[
-                                    styles.detailGenres,
-                                    {
-                                      color: theme.text.secondary,
-                                      backgroundColor: theme.primary,
-                                    },
-                                  ]}
-                                >
-                                  {genres}
-                                </Text>
-                              ))}
-                            </View>
-                          </View>
-                        </TouchableOpacity>
-                      );
+                          </ScrollView>
+                        </View>
+                      </View>
+                    );
+                  }}
+                />
+              )}
+        </View>
+      </Modal>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={randomModalVisible}
+        onRequestClose={() => setRandomModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <BlurView
+            tint="dark"
+            intensity={50}
+            experimentalBlurMethod="dimezisBlurView"
+            style={StyleSheet.absoluteFill}
+          />
+          <TouchableOpacity
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+            }}
+            activeOpacity={1}
+            onPress={() => setRandomModalVisible(false)}
+          />
+
+          <View
+            style={{
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <TouchableOpacity
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+              }}
+              activeOpacity={1}
+              onPress={() => setRandomModalVisible(false)}
+            />
+            {isLoading
+              ? renderSkeleton()
+              : Object.keys(randomModalItems).length > 0 && (
+                  <View
+                    style={{
+                      justifyContent: "center",
+                      alignItems: "center",
                     }}
-                  />
+                  >
+                    <TouchableOpacity
+                      onPress={() => {
+                        (setRandomModalVisible(false),
+                          navigation.navigate(
+                            randomModalItems.type === "movie"
+                              ? "MovieDetails"
+                              : "TvShowsDetails",
+                            {
+                              id: randomModalItems.id,
+                            }
+                          ));
+                      }}
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
+                    >
+                      <Image
+                        source={
+                          randomModalItems.imagePath
+                            ? {
+                                uri: `https://image.tmdb.org/t/p/w500${randomModalItems.imagePath}`,
+                                cache: "force-cache",
+                              }
+                            : require("../assets/image/no_image.png")
+                        }
+                        style={styles.imageSelected}
+                      />
+                      <View style={{ gap: 5 }}>
+                        <Text
+                          style={[styles.title, { color: theme.text.primary }]}
+                        >
+                          {randomModalItems.name}
+                        </Text>
+
+                        <Text
+                          style={[
+                            styles.detail,
+                            { color: theme.text.secondary },
+                          ]}
+                        >
+                          Tür: {randomModalItems.type}
+                        </Text>
+                        {randomModalItems.dateAdded && (
+                          <Text
+                            style={[
+                              styles.detail,
+                              { color: theme.text.secondary },
+                            ]}
+                          >
+                            eklenme tarihi:{" "}
+                            {formatDate(randomModalItems.dateAdded)}
+                          </Text>
+                        )}
+                        <View style={{ flexDirection: "row", gap: 5 }}>
+                          {randomModalItems?.genres?.map((genres) => (
+                            <Text
+                              key={genres}
+                              style={[
+                                styles.detailGenres,
+                                {
+                                  color: theme.text.secondary,
+                                  backgroundColor: theme.primary,
+                                },
+                              ]}
+                            >
+                              {genres}
+                            </Text>
+                          ))}
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
                 )}
           </View>
         </View>
@@ -794,10 +850,10 @@ export default function ListsScreen({ route, navigation }) {
         onRequestClose={() => setReorderModalVisible(false)}
       >
         <BlurView
-        tint="dark"
-        intensity={50}
-        experimentalBlurMethod="dimezisBlurView"
-        style={StyleSheet.absoluteFill}
+          tint="dark"
+          intensity={50}
+          experimentalBlurMethod="dimezisBlurView"
+          style={StyleSheet.absoluteFill}
         />
         <TouchableOpacity
           style={{
@@ -809,7 +865,7 @@ export default function ListsScreen({ route, navigation }) {
           }}
           onPress={() => setReorderModalVisible(false)}
         />
-        
+
         <View
           style={{
             flex: 1,
@@ -912,7 +968,7 @@ export default function ListsScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 40,
+    //paddingTop: 0,
     paddingHorizontal: 0,
     alignItems: "center",
     justifyContent: "center",
@@ -977,7 +1033,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    justifyContent: "flex-end",
+    justifyContent: "center",
     alignItems: "center",
   },
   skeletonImage: {
@@ -999,11 +1055,11 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   infoContainer: {
-    maxHeight: 250,
-    flexDirection: "row",
     paddingTop: 15,
     borderTopRightRadius: 15,
     borderTopLeftRadius: 15,
+    justifyContent: "center",
+    alignItems: "center",
   },
   item: {
     alignItems: "center",
@@ -1020,7 +1076,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   imageReorder: {
-    width: width * 0.40,
+    width: width * 0.4,
     height: height * 0.3,
     borderRadius: 10,
     shadowColor: "#000",
