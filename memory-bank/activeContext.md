@@ -2,12 +2,33 @@
 
 ## 🔥 Şu Anki Odak
 
-- **Reanimated 4 Migrasyon**: `createAnimatedPropAdapter` deprecated uyarıları temizlendi
-- **Sosyal Özellikler**: Arkadaş sistemi, chat ve yorum özellikleri aktif
-- **İstatistik & Rank Sistemi**: Film/dizi izleme istatistikleri, dinamik rank renkleri
-- **Not Sistemi**: Kullanıcı notları (Notes collection) Firestore'da aktif
-- **Hatırlatıcı Sistemi**: Film/dizi yayın tarihi hatırlatmaları (Reminders collection)
-- **Performans Optimizasyonu**: Firebase okuma maliyetleri düşürüldü, gereksiz dinleyiciler temizlendi.
+## Active Tasks
+
+- [x] **Chat Screen Optimization**
+  - Implement `inverted` FlatList for better UX.
+  - Implement `limit(20)` and pagination with `onEndReached`.
+  - Fix scroll jumping issues.
+- [x] **Skeleton Loading Improvements**
+  - Fix dimensions for `MovieOscarSkeleton`, `MovieUpComingSkeleton`, `SearchSkeleton`.
+  - Add `MovieBestsSkeleton`.
+  - Fix `MovieCardSkeleton` (added scale animation placeholders).
+- [x] **API & Performance Optimizations (Phase 1)**
+  - Switched from Axios to Fetch in `ChatModal.js` to fix UI-blocking `Network Error` from Gemini.
+  - Wrapped `MovieContext` and `TvShowContext` values in `useMemo` to prevent unnecessary component re-renders.
+  - Fixed `setLoading` reference bug in `MovieContext` (`fetchMoviesByGenres`).
+- [ ] **Memory Bank Updates** (In Progress)
+
+## Recent Changes
+
+- `screens/ChatScreen.js`: Refactored to usage `inverted` list, removed `RefreshControl`, optimized Firestore query.
+- `components/Skeleton.js`: Updated dimensions to match real cards. Added `MovieBestsSkeleton`.
+- `screens/movie/MovieBests.js`: Integrated `MovieBestsSkeleton`.
+- `screens/movie/MovieTrends.js`: Optimized loading state and animation binding.
+
+## Immediate Next Steps
+
+- Verify build stability after Skeleton import fix.
+- Continue with planned features (Group Chat / Media Sharing) if user desires.
 
 ## ⚙️ Mevcut Mimari
 

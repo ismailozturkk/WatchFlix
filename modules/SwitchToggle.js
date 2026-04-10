@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useRef } from "react";
-import {
-  View,
-  Animated,
-  Pressable,
-  StyleSheet,
-  Easing,
-  TouchableOpacity,
-} from "react-native";
+import React, { useEffect } from "react";
+import { Pressable, StyleSheet } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  interpolateColor,
+} from "react-native-reanimated";
 import { useTheme } from "../context/ThemeContext";
 
 export default function SwitchToggle({
@@ -20,31 +19,55 @@ export default function SwitchToggle({
   disabled = false,
 }) {
   const { theme } = useTheme();
-  const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
 
+  // Reanimated shared value: represents 0 for off, 1 for on
+  const progress = useSharedValue(value ? 1 : 0);
+
+  // Sync state changes from parents to the shared value via Spring animation
   useEffect(() => {
-    Animated.timing(anim, {
-      toValue: value ? 1 : 0,
-      duration: 400,
-      easing: Easing.out(Easing.circle),
-      useNativeDriver: false,
-    }).start();
-  }, [value]);
+    progress.value = withSpring(value ? 1 : 0, {
+      mass: 0.5,
+      damping: 12,
+      stiffness: 150,
+      overshootClamping: false, // Ensures the bouncy iOS feel
+    });
+  }, [value, progress]);
 
-  const toggle = () => onValueChange(!value);
+  const toggle = () => {
+    if (!disabled) {
+      onValueChange(!value);
+    }
+  };
 
-  const trackColor = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [offColor, onColor],
+  // Switch Track style (Background color animation)
+  const trackAnimatedStyle = useAnimatedStyle(() => {
+    const backgroundColor = interpolateColor(
+      progress.value,
+      [0, 1],
+      [offColor, onColor]
+    );
+
+    return {
+      backgroundColor: disabled ? disabledColor : backgroundColor,
+    };
   });
 
-  const knobTranslate = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [2, size - size / 3],
+  // Switch Knob style (Translation)
+  const knobAnimatedStyle = useAnimatedStyle(() => {
+    // Determine bounds for knob translation based on given size
+    const translateMax = size * 1.61 - size + 2; 
+
+    return {
+      transform: [
+        {
+          translateX: progress.value * (translateMax - 2) + 2,
+        },
+      ],
+    };
   });
 
   return (
-    <TouchableOpacity onPress={toggle} activeOpacity={0.5} disabled={disabled}>
+    <Pressable onPress={toggle} disabled={disabled}>
       <Animated.View
         style={[
           styles.track,
@@ -52,8 +75,8 @@ export default function SwitchToggle({
             width: size * 1.61,
             height: size,
             borderRadius: size / 2,
-            backgroundColor: disabled ? disabledColor : trackColor,
           },
+          trackAnimatedStyle,
         ]}
       >
         <Animated.View
@@ -64,12 +87,12 @@ export default function SwitchToggle({
               height: size - 4,
               borderRadius: (size - 4) / 2,
               backgroundColor: knobColor,
-              transform: [{ translateX: knobTranslate }],
             },
+            knobAnimatedStyle,
           ]}
         />
       </Animated.View>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -81,8 +104,9 @@ const styles = StyleSheet.create({
   knob: {
     shadowColor: "#000",
     shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 1.5,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 2.5,
+    elevation: 3,
   },
 });
+

@@ -75,13 +75,13 @@ export default function WatchedAdd({
 
         // 2️⃣ Sezonu bul
         const season = tvShow.seasons.find(
-          (s) => s.seasonNumber === seasonNumber
+          (s) => s.seasonNumber === seasonNumber,
         );
         if (!season) return setIsWatched(false);
 
         // 3️⃣ Bölümü bul
         const episode = season.episodes.find(
-          (ep) => ep.episodeNumber === episodeNumber
+          (ep) => ep.episodeNumber === episodeNumber,
         );
         setIsWatched(!!episode);
       }
@@ -130,14 +130,14 @@ export default function WatchedAdd({
           let show = watchedTv[tvShowIndex];
           let seasons = show.seasons || [];
           let seasonIndex = seasons.findIndex(
-            (season) => season.seasonNumber === seasonNumber
+            (season) => season.seasonNumber === seasonNumber,
           );
 
           if (seasonIndex !== -1) {
             let season = seasons[seasonIndex];
             let episodes = season.episodes || [];
             let episodeIndex = episodes.findIndex(
-              (ep) => ep.episodeNumber === episodeNumber
+              (ep) => ep.episodeNumber === episodeNumber,
             );
 
             if (episodeIndex !== -1) {
@@ -154,7 +154,7 @@ export default function WatchedAdd({
               show.seasonCount = seasons.length;
               show.episodeCount = seasons.reduce(
                 (acc, s) => acc + (s.episodes?.length || 0),
-                0
+                0,
               );
 
               if (show.episodeCount === 0) {
@@ -214,7 +214,7 @@ export default function WatchedAdd({
 
         let seasons = show.seasons || [];
         let seasonIndex = seasons.findIndex(
-          (season) => season.seasonNumber === seasonNumber
+          (season) => season.seasonNumber === seasonNumber,
         );
 
         if (seasonIndex === -1) {
@@ -242,7 +242,7 @@ export default function WatchedAdd({
 
           let episodes = season.episodes || [];
           let episodeIndex = episodes.findIndex(
-            (ep) => ep.episodeNumber === episodeNumber
+            (ep) => ep.episodeNumber === episodeNumber,
           );
 
           if (episodeIndex === -1) {
@@ -263,7 +263,7 @@ export default function WatchedAdd({
           .map((season) => ({
             ...season,
             episodes: (season.episodes || []).sort(
-              (a, b) => a.episodeNumber - b.episodeNumber
+              (a, b) => a.episodeNumber - b.episodeNumber,
             ),
           }))
           .sort((a, b) => a.seasonNumber - b.seasonNumber);
@@ -271,7 +271,7 @@ export default function WatchedAdd({
         show.seasonCount = show.seasons.length;
         show.episodeCount = show.seasons.reduce(
           (acc, s) => acc + (s.episodes?.length || 0),
-          0
+          0,
         );
 
         watchedTv[tvShowIndex] = show;
@@ -374,7 +374,10 @@ export default function WatchedAdd({
                   size={48}
                   color={theme.text.primary}
                 />
-                <Text style={[styles.inputText, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.inputText, { color: theme.text.primary }]}
+                >
                   {selectedDate ? formatDate(selectedDate) : "Tarih seçiniz"}
                 </Text>
               </TouchableOpacity>
@@ -383,7 +386,10 @@ export default function WatchedAdd({
                 onPress={() => markEpisodeAsWatched(new Date())}
               >
                 <Entypo name="stopwatch" size={48} color={theme.text.primary} />
-                <Text style={[styles.inputText, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.inputText, { color: theme.text.primary }]}
+                >
                   Şimdi
                 </Text>
                 <Text
@@ -404,7 +410,10 @@ export default function WatchedAdd({
                   size={48}
                   color={theme.text.primary}
                 />
-                <Text style={[styles.inputText, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.inputText, { color: theme.text.primary }]}
+                >
                   Yayınlanma Tarih
                 </Text>
                 <Text

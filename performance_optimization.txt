@@ -1,692 +1,1037 @@
-==============================================
-WATCHFLIX PROJESİ - PERFORMANS ANALİZİ VE OPTİMİZASYON ÖNERİLERİ
-==============================================
-Tarih: 08.01.2026
-Proje: WatchFlix - Film/Dizi İzleme Uygulaması
-Teknoloji: React Native (Expo SDK 54), Firebase, TMDB API
+================================================================
+WATCHFLIX - KAPSAMLI PERFORMANS VE KOD KALİTESİ ANALİZİ
+================================================================
+Tarih: 10.04.2026
+Proje: WatchFlix - React Native (Expo SDK 54)
+Analiz: Tüm kaynak dosyalar tek tek incelenerek hazırlanmıştır.
+================================================================
 
-==============================================
+NOT: Bu dosyadaki her sorun gerçek kaynak dosyasından alınmıştır.
+     Satır numaraları referans için verilmiştir.
+
+================================================================
 İÇİNDEKİLER
-==============================================
-1. MEVCUT PROJE YAPISI ANALİZİ
-2. TESPİT EDİLEN PERFORMANS SORUNLARI
-3. ÖNCELİKLİ OPTİMİZASYON ÖNERİLERİ
-4. UYGULAMA PLANI
-5. BEKLENEN İYİLEŞTİRMELER
+================================================================
+1.  KRİTİK HATALAR (Hemen düzeltilmeli)
+2.  CONTEXT / STATE YÖNETİMİ
+3.  API ÇAĞRILARI VE CACHE
+4.  FIREBASE LİSTENER SORUNLARI
+5.  FLATLIST OPTİMİZASYONLARI
+6.  ANİMASYON SORUNLARI
+7.  IMAGE LOADING
+8.  ASYNCSTORAGE
+9.  STYLE SORUNLARI
+10. ÖLÇEK SORUNLARI (Screen bazında)
+11. GÜVENLİK
+12. KOD KALİTESİ
+13. ÖNCELİK SIRALI AKSIYON PLANI
+================================================================
 
-==============================================
-1. MEVCUT PROJE YAPISI ANALİZİ
-==============================================
 
-1.1 GENEL DURUM
-----------------
-✅ Toplam Screen: 54 (Movie: 9, TV: 12, Tabs: 16, Search: 6, Auth: 3, Actor: 1)
-✅ Context Providers: 9 adet
-✅ Components: 10 adet
-✅ Firestore Collections: 5 (Lists, Notes, Reminders, Users, Comments)
-⚠️ Context Boyutları:
-   - ProfileScreenContext: 918 satır (28KB) - ÇOK BÜYÜK
-   - MovieContext: 570 satır (18KB) - ÇOK BÜYÜK
-   - TvShowContext: 400+ satır (11KB) - BÜYÜK
-   - LanguageContext: 19KB
+================================================================
+1. KRİTİK HATALAR (Hemen düzeltilmeli)
+================================================================
 
-1.2 CONTEXT YAPISININ SORUNLARI
---------------------------------
-❌ GOD OBJECT ANTİ-DESENİ:
-   - MovieContext tek başına 8 farklı özellik yönetiyor:
-     * Trends (week/day)
-     * Bests (vote_count, popularity)
-     * Oscar winning movies
-     * Collections
-     * Genres
-     * Providers
-     * Now Playing
-     * Upcoming
-   
-   - Sonuç: Herhangi bir özellik güncellendiğinde TÜM consumer'lar 
-     re-render oluyor (gereksiz performans kaybı)
+--- 1.1 HARDCODED API KEY (GÜVENLİK AÇIĞI) ---
 
-❌ OVERSIZED CONTEXT:
-   - ProfileScreenContext çok fazla sorumluluk taşıyor:
-     * Avatar yönetimi
-     * İstatistik hesaplamaları (film/dizi)
-     * Not sistemi (CRUD)
-     * Hatırlatıcı yönetimi
-     * Liste görünüm ayarları
-     * Rank sistemi ve renk hesaplamaları
-   
-   - Sonuç: Profil sayfasında her küçük değişiklik tüm context'i 
-     re-render ediyor
+DOSYA: components/ChatModal.js, satır ~101
+KOD:   const geminiKey = "...";
 
-❌ FIRESTORE REAL-TIME LISTENERS:
-   - ProfileScreenContext'te 4 ayrı onSnapshot() kullanılıyor
-   - Her listener ayrı bir Firestore read operation = MALIYET
-   - Gereksiz yerlerde real-time güncelleme
+SORUN:
+- Google Gemini API anahtarı kaynak kodda düz metin olarak duruyor
+- Bu uygulama App Store / Play Store'da yayınlanırsa herkes
+  uygulamayı reverse-engineer edip bu anahtarı çalabilir
+- Başkaları senin API kotanı kullanabilir
+- Google bu anahtarı tespit ederse otomatik iptal edebilir
 
-==============================================
-2. TESPİT EDİLEN PERFORMANS SORUNLARI
-==============================================
+ÇÖZÜM:
+  1. Backend proxy yaz (Firebase Functions, Node.js vs.)
+  2. İstek önce backend'e gitsin, backend Gemini'ye iletsin
+  3. Backend'de per-user rate limiting uygula
 
-2.1 RE-RENDER SORUNLARI (Yüksek Öncelik)
------------------------------------------
-SORUN: Context değişikliklerinde gereksiz re-render'lar
+VEYA (kısa vadeli):
+  .env dosyası kullan + react-native-dotenv paketi:
+    GEMINI_API_KEY=AIzaSyC1ZGo...
 
-Örnek Senaryo:
-- Kullanıcı "Trending Movies" sekmesinden "Popular Movies" sekmesine geçiyor
-- MovieContext içinde selectedCategoryBests state değişiyor
-- Bu değişiklik TÜÜÜM MovieContext consumer'larını re-render ediyor
-- Oysa sadece "Bests" bileşeni etkilenmeli
+  ChatModal.js içinde:
+    import { GEMINI_API_KEY } from '@env';
 
-ETKİSİ:
-- UI donmaları
-- Yavaş sayfa geçişleri
-- Aşırı pil tüketimi
-- Android'de ANR (Application Not Responding) riski
+  ÖNEMLİ: .env dosyasını .gitignore'a ekle!
+  ÖNEMLİ: Mevcut anahtarı Google Console'dan iptal et ve yenisini al.
 
-NEREDE OLUYOR:
-✗ MovieContext'i kullanan tüm screen'ler (9+ screen)
-✗ TvShowContext'i kullanan tüm screen'ler (12+ screen)
-✗ ProfileScreenContext'i kullanan 5+ component
 
-2.2 API ÇAĞRI YÖNETİMİ SORUNLARI (Yüksek Öncelik)
-------------------------------------------------
-SORUN 1: Merkezi API servisi yok
+--- 1.2 CONTEXT DEĞERLERİ MEMOIZE EDİLMEMİŞ ---
 
-- MovieContext'te 9 farklı yerde axios.request()
-- TvShowContext'te 7 farklı yerde axios.get()
-- ProfileScreenContext'te 5 farklı yerde axios
-- Her yerde aynı kod tekrarı: API_KEY, headers, error handling
+DOSYA: context/MovieContex.js (satır ~471-537)
+DOSYA: context/TvShowContex.js (satır ~351-413)
 
-ETKİSİ:
-- Kod tekrarı (maintainability düşük)
-- API key güvenliği riski (hardcoded)
-- Hata yönetimi tutarsız
-- Retry mekanizması yok
+SORUN:
+- Her iki context da value prop'unu her render'da yeni bir obje olarak döndürüyor
+- Bu demek ki bu context'i kullanan HER component,
+  herhangi bir state değiştiğinde (alakasız bile olsa) yeniden render oluyor
 
-SORUN 2: Cache mekanizması yok
+ÖRNEK:
+  MovieScreen hem trend hem popular hem oscar verisi kullanıyor.
+  Kullanıcı "Trending" sayfasındayken sayfa değiştiriyor.
+  selectedCategoryTrend state değişiyor.
+  Bu MovieContext'i kullanan TÜM componentler re-render oluyor,
+  aslında sadece trend bölümü etkilenmeli.
 
-- Her sayfa açılışında API'ye yeniden istek
-- Trend filmler her seferinde çekiliyor
-- Popüler diziler cache'lenmiyor
+ÇÖZÜM:
+  // context/MovieContex.js - satır ~471
+  // ŞU AN:
+  return (
+    <MovieContext.Provider value={{ movieTrends, loadingTrends, ... }}>
 
-ETKİSİ:
-- Gereksiz network trafiği
-- Yavaş sayfa açılışları
-- TMDB API limit riski (40/saniye)
-- Offline kullanım imkanı yok
+  // OLMASI GEREKEN:
+  const contextValue = useMemo(() => ({
+    movieTrends, loadingTrends, ...tüm diğer değerler
+  }), [movieTrends, loadingTrends, ...bağımlılıklar]);
 
-2.3 IMAGE LOADING SORUNLARI (Orta Öncelik)
-------------------------------------------
-SORUN: Image optimizasyonu yok
+  return (
+    <MovieContext.Provider value={contextValue}>
 
-- TMDB'den gelen poster'ler optimize edilmiyor
-- Thumbnail yerine full resolution kullanılıyor
-- Lazy loading eksik
+  Aynı düzeltme TvShowContex.js için de yapılmalı.
+  Tahmini iyileşme: %30-40 gereksiz re-render azalır.
 
-ETKİSİ:
-- Yavaş scroll performance
-- Yüksek memory kullanımı
-- Network data tüketimi
 
-2.4 ANIMATION PERFORMANS (Orta Öncelik)
----------------------------------------
-SORUN: React Native Reanimated 4 adaptasyonu eksik
+--- 1.3 OSCARS: 30+ PARALEL API İSTEĞİ ---
 
-- Deprecated API uyarıları var
-- createAnimatedPropAdapter kullanımı kaldırılmalı
+DOSYA: context/MovieContex.js (satır ~137-162)
 
-ETKİSİ:
-- Animasyonlarda mikro-gecikmeler
-- iOS'ta 60 FPS'nin altına düşme
+SORUN:
+  Uygulama her açıldığında ~30 farklı film ID'si için
+  tek tek API isteği atıyor. Bu Promise.all() ile paralel yapılmış
+  ama yine de 30 istek = 30 API kredisi tüketimi.
 
-2.5 FIRESTORE KULLANIM SORUNLARI (Orta Öncelik)
------------------------------------------------
-SORUN: onSnapshot() overuse
+  TMDB API rate limit: saniyede 40 istek.
+  30 istek aynı anda gidiyor, bunların hepsi ek isteklerle
+  rate limit'e yaklaşıyor.
 
-- ProfileScreenContext'te 4 ayrı onSnapshot listener
-- Her listener ayrı ayrı real-time dinliyor
-- Notes ekranı her açıldığında yeni listener
+ÇÖZÜM:
+  Bu veriler hiç değişmiyor (Oscar kazananlar sabit).
+  AsyncStorage'e yaz, bir kere çek, 7 gün cache'de tut:
 
-ETKİSİ:
-- Firestore read maliyeti artışı
-- Gereksiz re-render'lar
-- Internet trafiği
+  const fetchMoviesOscar = async () => {
+    const CACHE_KEY = 'oscar_movies';
+    const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 gün
 
-2.6 STATE YÖNETİMİ KARMAŞASI (Düşük Öncelik)
---------------------------------------------
-SORUN: 9 Context Provider iç içe
-
-App.js'te:
-<LanguageProvider>
-  <ThemeProvider>
-    <SnowProvider>
-      <AppSettingsProvider>
-        <AuthProvider>
-          <ListStatusProvider>
-            <ProfileScreenProvider>
-              <TvShowProvider>
-                <MovieProvider>
-                  ...
-                </MovieProvider>
-              </TvShowProvider>
-            </ProfileScreenProvider>
-          </ListStatusProvider>
-        </AuthProvider>
-      </AppSettingsProvider>
-    </SnowProvider>
-  </ThemeProvider>
-</LanguageProvider>
-
-ETKİSİ:
-- Provider ağacı derinleşti
-- Debug zorluğu
-- Re-render propagation karmaşası
-
-==============================================
-3. ÖNCELİKLİ OPTİMİZASYON ÖNERİLERİ
-==============================================
-
-3.1 CONTEXT REFACTORING (YÜksek Öncelik - 1 Hafta)
---------------------------------------------------
-AMAÇ: God Object pattern'den kurtulmak
-
-MovieContext Refactoring:
-┌─────────────────────────────────────────┐
-│ ÖNCESİ: MovieContext (570 satır)        │
-│ - 8 farklı özellik                      │
-│ - 40+ state variable                    │
-│ - Tüm consumer'lar her değişimde        │
-│   re-render oluyor                      │
-└─────────────────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────────┐
-│ SONRASI: Custom Hooks                   │
-│                                         │
-│ hooks/                                  │
-│ ├── movie/                              │
-│ │   ├── useTrendingMovies.js            │
-│ │   ├── usePopularMovies.js             │
-│ │   ├── useOscarMovies.js               │
-│ │   ├── useMovieCollections.js          │
-│ │   ├── useMovieGenres.js               │
-│ │   ├── useMovieProviders.js            │
-│ │   ├── useNowPlayingMovies.js          │
-│ │   └── useUpcomingMovies.js            │
-│ └── tv/                                 │
-│     ├── useTrendingTv.js                │
-│     ├── usePopularTv.js                 │
-│     └── useTvGenres.js                  │
-└─────────────────────────────────────────┘
-
-Örnek Custom Hook:
-
-// hooks/movie/useTrendingMovies.js
-import { useState, useEffect } from 'react';
-import { movieAPI } from '../../services/tmdb';
-import { useCache } from '../useCache';
-
-export const useTrendingMovies = ({ timeWindow = 'week' }) => {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
-  // Cache kontrolü
-  const { getCached, setCache } = useCache();
-  const cacheKey = `trending_movies_${timeWindow}`;
-  
-  useEffect(() => {
-    const fetchData = async () => {
-      // Önce cache'e bak
-      const cached = getCached(cacheKey);
-      if (cached) {
-        setData(cached);
-        setLoading(false);
+    const cached = await AsyncStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      if (Date.now() - timestamp < CACHE_TTL) {
+        setMoviesOscar(data);
+        setLoadingOscar(false);
         return;
       }
-      
-      setLoading(true);
-      try {
-        const result = await movieAPI.getTrending(timeWindow);
-        setData(result);
-        setCache(cacheKey, result, 300000); // 5 dakika cache
-      } catch (err) {
-        setError(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchData();
-  }, [timeWindow]);
-  
-  return { data, loading, error, refetch: fetchData };
-};
-
-KULLANIM (Component'te):
-
-// Önce:
-const { movieTrends, loadingTrends } = useMovie();
-
-// Sonra:
-const { data: trends, loading } = useTrendingMovies({ timeWindow: 'week' });
-
-FAYDAsx:
-✓ Sadece ilgili component re-render olur
-✓ Her hook kendi cache'ini yönetir
-✓ Test edilebilirlik artar
-✓ Kod okunabilirliği yükselir
-✓ %60-70 re-render azalması bekleniyor
-
-3.2 MERKEZİ API SERVİS KATMANI (Yüksek Öncelik - 3 Gün)
--------------------------------------------------------
-YAPILACAKLAR:
-
-1. Axios Instance Oluştur:
-
-// services/tmdb/axios-instance.js
-import axios from 'axios';
-import { TMDB_API_KEY } from '@env'; // .env'den al
-
-const tmdbClient = axios.create({
-  baseURL: 'https://api.themoviedb.org/3',
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${TMDB_API_KEY}`,
-  },
-});
-
-// Request interceptor
-tmdbClient.interceptors.request.use(
-  (config) => {
-    console.log('API Request:', config.url);
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor
-tmdbClient.interceptors.response.use(
-  (response) => response.data,
-  async (error) => {
-    // Retry logic
-    if (error.response?.status === 429) {
-      // Rate limit, bekle ve tekrar dene
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return tmdbClient.request(error.config);
     }
-    return Promise.reject(error);
+
+    // İlk kez veya cache süresi dolmuşsa çek
+    const results = await Promise.all(oscarIds.map(id => fetchMovieById(id)));
+    const filtered = results.filter(Boolean);
+    setMoviesOscar(filtered);
+    AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
+      data: filtered,
+      timestamp: Date.now()
+    }));
+  };
+
+
+--- 1.4 COLLECTIONS: 19 PARALEL API İSTEĞİ ---
+
+DOSYA: context/MovieContex.js (satır ~195-226)
+
+SORUN:
+  19 koleksiyon ID'si için 19 ayrı API çağrısı yapılıyor.
+  Bu veriler de nadiren değişiyor (film koleksiyonları sabit kalır).
+
+ÇÖZÜM: Aynı cache stratejisi — 30 gün TTL ile AsyncStorage'e yaz.
+
+
+--- 1.5 setLoading BUG ---
+
+DOSYA: context/MovieContex.js (satır ~329)
+DOSYA: context/TvShowContex.js (satır ~277-291)
+
+SORUN:
+  Genres fetch fonksiyonunda `setLoading` çağrılıyor ama
+  bu fonksiyon tanımlı değil. `setLoadingGenres` olması gerekiyor.
+  Bu yüzden genres yüklenirken loading state hiçbir zaman
+  doğru yönetilmiyor.
+
+KOD (MovieContex.js ~329):
+  } finally {
+    setLoading(false); // BUG: setLoading yok, setLoadingGenres olmalı
   }
-);
 
-export default tmdbClient;
+ÇÖZÜM:
+  } finally {
+    setLoadingGenres(false);
+  }
 
-2. API Servis Dosyaları:
 
-// services/tmdb/movies.api.js
-import tmdbClient from './axios-instance';
+================================================================
+2. CONTEXT / STATE YÖNETİMİ
+================================================================
 
-export const movieAPI = {
-  getTrending: async (timeWindow = 'week') => {
-    return tmdbClient.get(`/trending/movie/${timeWindow}`);
-  },
-  
-  getPopular: async (page = 1) => {
-    return tmdbClient.get('/discover/movie', {
-      params: {
-        sort_by: 'popularity.desc',
-        page,
-      },
+--- 2.1 PROFIL CONTEXT ÇOK BÜYÜK ---
+
+DOSYA: context/ProfileScreenContext.js (~918 satır)
+
+SORUN:
+  Tek context dosyası şu sorumlulukları taşıyor:
+  - Avatar yükleme/güncelleme
+  - Film istatistikleri (izleme süresi, tür dağılımı)
+  - Dizi istatistikleri
+  - Not CRUD işlemleri
+  - Hatırlatıcı yönetimi
+  - Liste görünüm ayarları
+  - Rank hesaplamaları
+
+  Bu kadar çok sorumluluğu olan bir context'te herhangi bir şey
+  değiştiğinde (mesela bir not eklendiğinde) profil ekranındaki
+  tüm istatistikler de yeniden hesaplanıyor.
+
+ÇÖZÜM (uzun vade - kademeli yapılabilir):
+  context/
+  ├── ProfileStatsContext.js    (istatistikler)
+  ├── NotesContext.js           (notlar)
+  ├── RemindersContext.js       (hatırlatıcılar)
+  └── ProfileSettingsContext.js (görünüm ayarları)
+
+
+--- 2.2 ÇAKIŞAN STATE TİPLERİ ---
+
+DOSYA: context/MovieContex.js (satır ~14-20)
+DOSYA: context/TvShowContex.js (satır ~141)
+
+SORUN:
+  const [totalPagesBest, setTotalPagesBest] = useState([]); // [] array
+  ...
+  setTotalPagesBest(response.data.total_pages); // number atanıyor
+
+  State tipi ile kullanım tipi uyuşmuyor.
+
+ÇÖZÜM:
+  const [totalPagesBest, setTotalPagesBest] = useState(0); // 0 ile başlat
+
+
+--- 2.3 YENİDEN KULLANILAN AMA FARKLI İSİMLİ STATE'LER ---
+
+DOSYA: context/ProfileScreenContext.js (satır ~100-149)
+
+SORUN:
+  isloadingAvatar, isloadingShowInfo, isloadingMovieInfo gibi
+  3 ayrı loading state'i var ama bunların hepsi aynı Firebase
+  listener callback'inden set ediliyor.
+
+  Kullanım yerlerinde sadece tek loading durumu lazım.
+
+ÇÖZÜM:
+  const [isLoading, setIsLoading] = useState(true);
+  // ve tek bir yerde set et
+
+
+--- 2.4 ANIMATED VALUES STATE'DE TUTULUYOR ---
+
+DOSYA: components/ListView.js (satır ~40-76)
+DOSYA: components/ListViewTv.js (satır ~36-43)
+DOSYA: screens/movie/MovieBests.js (satır ~39-49)
+
+SORUN:
+  Animated.Value nesneleri useState içinde tutuluyor.
+  allLists her değiştiğinde yeni Animated.Value nesneleri yaratılıyor.
+  Eski nesneler garbage collect edilemiyor.
+  Çok liste varsa bellek sızıntısı oluşuyor.
+
+KOD (ListView.js):
+  const [scaleValues, setScaleValues] = useState({}); // YANLIŞ
+  useEffect(() => {
+    const newScaleValues = {};
+    (fullLists || []).forEach((listName) => {
+      newScaleValues[listName] = new Animated.Value(1); // Yeni obje!
     });
-  },
-  
-  // ... diğer endpoint'ler
-};
+    setScaleValues(newScaleValues); // Re-render tetikliyor
+  }, [fullLists]);
 
-3. Environment Variables (.env):
+ÇÖZÜM:
+  const scaleValuesRef = useRef({}); // useRef kullan
 
-TMDB_API_KEY=Bearer_eyJhbGci...
-TMDB_BASE_URL=https://api.themoviedb.org/3
-FIREBASE_API_KEY=AIzaSy...
-GEMINI_API_KEY=AIzaSyCzAbc...
-
-FAYDALAR:
-✓ API key güvenliği
-✓ Tek yerden yönetim
-✓ Retry mekanizması
-✓ Rate limiting kontrolü
-✓ Error handling standartlaşması
-
-3.3 CACHE STRATEJISI (Yüksek Öncelik - 4 Gün)
----------------------------------------------
-YAPILACAKLAR:
-
-1. Cache Hook Oluştur:
-
-// hooks/useCache.js
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-export const useCache = () => {
-  const getCached = async (key) => {
-    try {
-      const cached = await AsyncStorage.getItem(key);
-      if (!cached) return null;
-      
-      const { data, timestamp, ttl } = JSON.parse(cached);
-      
-      // TTL kontrolü
-      if (Date.now() - timestamp > ttl) {
-        await AsyncStorage.removeItem(key);
-        return null;
+  useEffect(() => {
+    (fullLists || []).forEach((listName) => {
+      if (!scaleValuesRef.current[listName]) {
+        scaleValuesRef.current[listName] = new Animated.Value(1);
       }
-      
-      return data;
-    } catch (error) {
-      console.error('Cache get error:', error);
+      // Varsa yeniden yaratma
+    });
+  }, [fullLists]);
+
+  // Kullanım: scaleValuesRef.current[listName] || new Animated.Value(1)
+
+
+================================================================
+3. API ÇAĞRILARI VE CACHE
+================================================================
+
+--- 3.1 TÜM API'LERDE CACHE YOK ---
+
+ETKİLENEN DOSYALAR:
+  context/MovieContex.js (9 ayrı API çağrısı)
+  context/TvShowContex.js (7 ayrı API çağrısı)
+
+SORUN:
+  Her sayfa açıldığında API'ye istek gidiyor.
+  Trending filmler 5 dakikada bir değişiyor, ama her scroll/tab
+  değişiminde yeniden çekiliyor.
+
+ÇÖZÜM - Basit in-memory cache:
+  // Her context'in başına ekle
+  const apiCacheRef = useRef({});
+
+  const getCached = (key, ttlMs = 300000) => {
+    const entry = apiCacheRef.current[key];
+    if (!entry) return null;
+    if (Date.now() - entry.ts > ttlMs) {
+      delete apiCacheRef.current[key];
       return null;
     }
+    return entry.data;
   };
-  
-  const setCache = async (key, data, ttl = 300000) => {
-    try {
-      await AsyncStorage.setItem(key, JSON.stringify({
-        data,
-        timestamp: Date.now(),
-        ttl,
-      }));
-    } catch (error) {
-      console.error('Cache set error:', error);
+
+  const setApiCache = (key, data) => {
+    apiCacheRef.current[key] = { data, ts: Date.now() };
+  };
+
+  // Fetch fonksiyonunda kullan:
+  const fetchSeriesTrends = async () => {
+    const cacheKey = `trends_${selectedCategoryTrend}_${language}`;
+    const cached = getCached(cacheKey, 5 * 60 * 1000);
+    if (cached) {
+      setSeriesTrend(cached);
+      setLoadingTren(false);
+      return;
     }
+    // ...API isteği...
+    setApiCache(cacheKey, result);
   };
-  
-  return { getCached, setCache };
-};
 
-2. Cache Stratejileri:
 
-┌────────────────────────────────────────────┐
-│ VERİ TÜRÜ        │ TTL      │ CACHE KEY    │
-├────────────────────────────────────────────┤
-│ Trending Movies  │ 5 dk     │ trending_m_w │
-│ Popular Movies   │ 1 saat   │ popular_m    │
-│ Movie Details    │ 24 saat  │ movie_{id}   │
-│ Oscar Movies     │ 7 gün    │ oscar_movies │
-│ Collections      │ 30 gün   │ collections  │
-│ Genres           │ 30 gün   │ genres_movie │
-└────────────────────────────────────────────┘
+--- 3.2 API ANAHTARI TEK YERDE DEĞİL ---
 
-3. Stale-While-Revalidate Pattern:
+SORUN:
+  Her context dosyasında ayrı ayrı axios isteği yapılıyor.
+  API key AppSettingsContext'ten geliyor ama headers her yerde
+  tekrar yazılıyor.
 
-const { data, loading } = useTrendingMovies();
+ÇÖZÜM - Merkezi axios instance:
+  // services/tmdb.js
+  import axios from 'axios';
 
-// 1. Önce cache'den göster (hızlı)
-// 2. Arka planda API'ye istek at
-// 3. Gelen veriyi cache'e yaz ve güncelle
+  let tmdbClient = null;
 
-FAYDALAR:
-✓ Hızlı sayfa açılışları
-✓ Offline kullanım
-✓ API kullanımı %60-70 azalır
-✓ Network data tasarrufu
+  export const initTmdbClient = (apiKey) => {
+    tmdbClient = axios.create({
+      baseURL: 'https://api.themoviedb.org/3',
+      timeout: 10000,
+      headers: { Authorization: apiKey }
+    });
+  };
 
-3.4 MEMOIZATION VE REACT.MEMO (Orta Öncelik - 2 Gün)
-----------------------------------------------------
-YAPILACAKLAR:
+  export const getTmdbClient = () => tmdbClient;
 
-1. React.memo ile Component Memoization:
 
-// components/ListView.js
-import React, { memo } from 'react';
+--- 3.3 LANGUAGE DEĞIŞINCE TÜM API'LER YENİDEN ÇALIŞIYOR ---
 
-const ListView = memo(({ item, onPress }) => {
-  return (
-    <TouchableOpacity onPress={() => onPress(item.id)}>
-      <Image source={{ uri: item.poster }} />
-      <Text>{item.title}</Text>
-    </TouchableOpacity>
+SORUN:
+  MovieContex ve TvShowContex'teki tüm useEffect'ler `language`'a
+  bağımlı. Kullanıcı dil değiştirince app'in tüm verisi yeniden
+  çekiliyor. Bu normal, ama cache olmadan çok pahalı.
+
+ÇÖZÜM:
+  Cache key'e language ekle:
+  const cacheKey = `trending_${language}_${selectedCategoryTrend}`;
+
+  Böylece dil değişince ilk kez çekilir ama sonra cache'den gelir.
+
+
+================================================================
+4. FİREBASE LİSTENER SORUNLARI
+================================================================
+
+--- 4.1 CHATSCREEN'DE MOUNT KORUMASI YOK ---
+
+DOSYA: screens/ChatScreen.js (satır ~95-130)
+
+SORUN:
+  goOnline() ve goOffline() çağrılıyor ama component hızlıca
+  mount/unmount olursa race condition oluşabilir.
+  Kullanıcı hızlı gezinirse Firebase'e gereksiz writes gidiyor.
+
+ÇÖZÜM:
+  useEffect(() => {
+    let isMounted = true;
+
+    const setup = async () => {
+      if (!isMounted) return;
+      await goOnline();
+    };
+
+    setup();
+
+    return () => {
+      isMounted = false;
+      goOffline();
+    };
+  }, []);
+
+
+--- 4.2 MOVIEDETAIL'DE COMMENTS LİSTENER ---
+
+DOSYA: screens/movie/MovieDetail.js (satır ~289-320 civarı)
+
+SORUN:
+  Her film detay sayfası açıldığında Firebase listener başlatılıyor.
+  Geri tuşuna basıldığında cleanup yapıldığından emin olunmalı.
+
+KONTROL EDİLMESİ GEREKEN:
+  useEffect(() => {
+    const unsub = onSnapshot(...);
+    return () => unsub(); // Bu mutlaka var mı?
+  }, [...]);
+
+
+--- 4.3 TVSHOWCONTEX BAŞLANGIÇTA ÇIFT LİSTENER RİSKİ ---
+
+DOSYA: context/TvShowContex.js (satır ~58-82)
+
+SORUN:
+  İki ayrı useEffect var:
+  - Satır 58-73: mount'ta cache okuma + listener başlatma
+  - Satır 76-82: auth state değişince listener başlatma
+
+  Eğer user zaten login'se, startListener iki kez çağrılabilir.
+
+  Senaryo:
+  1. App açılıyor, cachedUserId var, startListener(cachedUid) çağrılıyor
+  2. onAuthStateChanged tetikleniyor, user.uid var, startListener(uid) tekrar çağrılıyor
+  3. İlk listener cleanup ediliyor (unsubRef.current() çağrılıyor) - bu doğru
+  4. Ama 2 snapshot event gelebiliyor kısa sürede
+
+ÇÖZÜM:
+  İki listener başlatmayı önlemek için flag ekle:
+  const initialListenerStarted = useRef(false);
+
+  // mount effect'inde:
+  if (cachedUid) {
+    initialListenerStarted.current = true;
+    startListener(cachedUid);
+  }
+
+  // auth effect'inde:
+  if (user?.uid) {
+    // Aynı UID ile zaten başlatıldıysa skip et
+    if (unsubRef.current && initialListenerStarted.current) {
+      initialListenerStarted.current = false;
+      return;
+    }
+    startListener(user.uid);
+  }
+
+
+--- 4.4 LİSTSTATUSCONTEXT CACHE YOK ---
+
+DOSYA: context/ListStatusContext.js
+
+SORUN:
+  Her uygulama açılışında Firebase'den taze veri çekiyor.
+  Bu veri "hangi listeye eklenmiş" bilgisi — nadiren değişiyor.
+  AsyncStorage cache eklenebilir (TvShowContex'teki gibi).
+
+
+================================================================
+5. FLATLIST OPTİMİZASYONLARI
+================================================================
+
+--- 5.1 TÜM FLATLIST'LERDE EKSİK OPTİMİZASYON ---
+
+ETKİLENEN DOSYALAR:
+  screens/movie/MovieDetail.js (4 FlatList: videos, cast, recommendations, similar)
+  screens/tv/TvShowsDetails.js (benzer FlatList'ler)
+  screens/movie/MovieBests.js
+  screens/movie/MovieTrends.js
+  screens/movie/MovieGenres.js
+  screens/tabs/ProfileScreen.js
+  screens/tabs/profile/MovieStatisticsScreen.js
+
+MEVCUT:
+  <FlatList data={cast} renderItem={renderItem} keyExtractor={...} />
+
+OLMASI GEREKEN:
+  <FlatList
+    data={cast}
+    renderItem={renderItem}
+    keyExtractor={(item) => item.id.toString()}
+    removeClippedSubviews={true}        // Ekran dışı itemları kaldır
+    maxToRenderPerBatch={8}             // Batch başına max render
+    updateCellsBatchingPeriod={50}      // ms
+    windowSize={5}                      // Ekran boyutu çarpanı (varsayılan 21!)
+    initialNumToRender={6}              // İlk render sayısı
+    getItemLayout={(data, index) => ({  // Sabit yükseklik varsa
+      length: ITEM_HEIGHT,
+      offset: ITEM_HEIGHT * index,
+      index,
+    })}
+  />
+
+NOT: getItemLayout sadece tüm itemlar aynı yükseklikteyse kullanılır.
+     Farklı yükseklikler varsa kullanma.
+
+
+--- 5.2 renderItem MEMOIZE EDİLMEMİŞ ---
+
+SORUN:
+  FlatList'e geçilen renderItem fonksiyonu her render'da yeniden
+  oluşturuluyor. Bu FlatList'in tüm itemlarını gereksiz yere
+  re-render etmesine neden olabilir.
+
+ÇÖZÜM:
+  // Önce:
+  <FlatList renderItem={({ item }) => <MovieCard item={item} />} />
+
+  // Sonra:
+  const renderMovieItem = useCallback(
+    ({ item }) => <MovieCard item={item} />,
+    [] // bağımlılıklar
   );
-}, (prevProps, nextProps) => {
-  // Sadece item değiştiğinde re-render
-  return prevProps.item.id === nextProps.item.id;
-});
 
-export default ListView;
+  <FlatList renderItem={renderMovieItem} />
 
-2. useMemo ile Hesaplama Memoization:
 
-// ProfileScreenContext.js
-const totalWatchTime = useMemo(() => {
-  return movies.reduce((acc, m) => acc + (m.minutes || 0), 0);
-}, [movies]); // Sadece movies değiştiğinde hesapla
+--- 5.3 LIST ITEM COMPONENT'LARI MEMO DEĞİL ---
 
-3. useCallback ile Callback Memoization:
+ETKİLENEN DOSYALAR:
+  components/TVShowItem.js
+  ve MovieDetail'deki inline card component'ları
 
-const handlePress = useCallback((movieId) => {
-  navigation.navigate('MovieDetails', { id: movieId });
-}, [navigation]);
+ÇÖZÜM:
+  // TVShowItem.js
+  import React, { memo } from 'react';
 
-NEREDE KULLANILMALI:
-✓ FlatList renderItem fonksiyonları
-✓ Büyük listelerde her item
-✓ Karmaşık hesaplamalar (rank color, statistics)
-
-FAYDALAR:
-✓ FlatList scroll performance artışı
-✓ %40-50 re-render azalması
-
-3.5 IMAGE OPTIMIZATION (Orta Öncelik - 2 Gün)
----------------------------------------------
-YAPILACAKLAR:
-
-1. react-native-fast-image Kullan:
-
-// components/MoviePoster.js
-import FastImage from 'react-native-fast-image';
-
-const MoviePoster = ({ uri }) => {
-  return (
-    <FastImage
-      source={{
-        uri,
-        priority: FastImage.priority.normal,
-      }}
-      resizeMode={FastImage.resizeMode.cover}
-      style={styles.poster}
-    />
-  );
-};
-
-2. TMDB Image Size Optimizasyonu:
-
-// Önce: https://image.tmdb.org/t/p/original/...jpg (2-5 MB)
-// Sonra: https://image.tmdb.org/t/p/w342/...jpg (50-100 KB)
-
-const TMDB_IMAGE_SIZES = {
-  thumbnail: 'w92',
-  small: 'w154',
-  medium: 'w342',
-  large: 'w780',
-  original: 'original',
-};
-
-3. Lazy Image Loading:
-
-- FlatList'te initialNumToRender={10}
-- maxToRenderPerBatch={5}
-- windowSize={5}
-
-FAYDALAR:
-✓ %70-80 image loading hızı artışı
-✓ Memory kullanımı düşer
-✓ Scroll performance iyileşir
-
-3.6 FIRESTORE OPTİMİZASYONU (Orta Öncelik - 2 Gün)
---------------------------------------------------
-YAPILACAKLAR:
-
-1. onSnapshot Azaltma:
-
-// Önce: ProfileScreenContext'te 4 ayrı onSnapshot
-// Sonra: 1 onSnapshot + local state management
-
-useEffect(() => {
-  const unsubscribe = onSnapshot(doc(db, 'Lists', uid), (docSnap) => {
-    const data = docSnap.data();
-    
-    // Tüm verileri bir seferde al
-    setWatchedMovies(data.watchedMovies || []);
-    setWatchedTv(data.watchedTv || []);
-    setFavorites(data.favorites || []);
-    setWatchList(data.watchList || []);
+  const TVShowItem = memo(({ item, onPress }) => {
+    return (
+      <TouchableOpacity onPress={() => onPress(item.id)}>
+        ...
+      </TouchableOpacity>
+    );
   });
-  
-  return () => unsubscribe();
-}, [uid]);
 
-2. Firestore Local Cache:
+  export default TVShowItem;
 
-import { initializeFirestore, persistentLocalCache } from 'firebase/firestore';
 
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache(),
-});
+================================================================
+6. ANİMASYON SORUNLARI
+================================================================
 
-3. Pagination:
+--- 6.1 SKELETON'DA ANIMATED VALUE YANLIŞI ---
 
-const fetchMovies = async (page = 1, limit = 20) => {
-  const moviesRef = collection(db, 'Lists', uid, 'watchedMovies');
-  const q = query(
-    moviesRef,
-    orderBy('dateAdded', 'desc'),
-    startAfter(page > 1 ? lastDoc : null),
-    limit(limit)
-  );
+DOSYA: components/Skeleton.js (satır ~12-52)
+
+SORUN:
+  const animatedValue = new Animated.Value(0); // Satır ~14
+
+  Bu fonksiyon component'ın body'sinde direkt çağrılıyor.
+  Her render'da yeni Animated.Value oluşturuluyor.
+  Birden fazla skeleton varsa çok fazla nesne birikir.
+
+ÇÖZÜM:
+  const animatedValue = useRef(new Animated.Value(0)).current;
+
+  // useRef ile bir kez oluşturulur, her render'da aynı referans
+
+
+--- 6.2 SWIPECARD ANİMASYON TEMIZLEME ---
+
+DOSYA: modules/SwipeCard.js
+
+KONTROL EDİLMESİ GEREKEN:
+  Animated.loop veya Animated.timing kullanıyorsa,
+  component unmount olduğunda animasyon durdurulmalı:
+
+  const animation = useRef(null);
+
+  useEffect(() => {
+    animation.current = Animated.loop(...);
+    animation.current.start();
+
+    return () => {
+      if (animation.current) animation.current.stop();
+    };
+  }, []);
+
+
+================================================================
+7. IMAGE LOADING
+================================================================
+
+--- 7.1 REACT NATIVE'İN VARSAYILAN IMAGE COMPONENT'I KULLANILIYOR ---
+
+ETKİLENEN DOSYALAR: Neredeyse tüm screen ve component dosyaları
+
+SORUN:
+  React Native'in <Image> component'ı:
+  - Native disk cache kullanmıyor (Android'de sınırlı)
+  - Memory cache yönetimi zayıf
+  - Büyük listelerde bellek sızıntısına yol açabilir
+
+  Uygulama poster yoğun (film/dizi app), yüzlerce image yükleniyor.
+
+ÇÖZÜM:
+  expo-image paketi (Expo ile sorunsuz çalışır, FastImage alternatifi):
+
+  npx expo install expo-image
+
+  Kullanım:
+  import { Image } from 'expo-image';
+
+  <Image
+    source={`https://image.tmdb.org/t/p/w342${item.poster_path}`}
+    style={styles.poster}
+    contentFit="cover"
+    transition={200}
+    cachePolicy="memory-disk"  // Hem memory hem disk cache
+  />
+
+  Avantajları:
+  - Otomatik disk cache
+  - Thumbhash/blurhash placeholder desteği
+  - Memory yönetimi çok daha iyi
+  - Expo SDK ile sorunsuz entegrasyon
+
+
+--- 7.2 TMDB IMAGE BOYUTU OPTİMİZASYONU ---
+
+SORUN:
+  Bazı yerlerde "original" boyut kullanılıyor olabilir.
+  TMDB küçük görüntüler için w342, w185 gibi boyutlar sunuyor.
+
+ÖNERILEN BOYUTLAR:
+  - Liste/kart görünümü: w342 (poster), w300 (backdrop)
+  - Detay sayfası poster: w500
+  - Detay sayfası backdrop: w780
+  - Aktör/cast küçük resim: w185
+  - Original boyutu SADECE full-screen zoom için kullan
+
+
+================================================================
+8. ASYNCSTORAGE
+================================================================
+
+--- 8.1 APPSETTINGSCONTEXT'TE SIRAYLA OKUMA ---
+
+DOSYA: context/AppSettingsContext.js (satır ~39-88)
+
+SORUN:
+  6 ayrı AsyncStorage.getItem() çağrısı sıralı yapılıyor.
+  Her biri bir önceki bitmeden başlamıyor.
+
+KOD (tahminî):
+  const theme = await AsyncStorage.getItem('theme');
+  const language = await AsyncStorage.getItem('language');
+  const adultContent = await AsyncStorage.getItem('adultContent');
   // ...
-};
 
-FAYDALAR:
-✓ Firestore read maliyeti %60 azalır
-✓ Real-time update sadece gerekli yerlerde
-✓ Offline support
+ÇÖZÜM:
+  const [theme, language, adultContent, ...rest] = await Promise.all([
+    AsyncStorage.getItem('theme'),
+    AsyncStorage.getItem('language'),
+    AsyncStorage.getItem('adultContent'),
+    // ...diğerleri
+  ]);
 
-3.7 LAZY LOADING VE CODE SPLITTING (Düşük Öncelik - 2 Gün)
----------------------------------------------------------
-YAPILACAKLAR:
+  Kazanım: ~200-400ms startup hızlanması
 
-1. React.lazy ile Screen Loading:
 
-import React, { lazy, Suspense } from 'react';
+--- 8.2 HER CONTEXT KENDİ CACHE'İNİ YÖNETİYOR ---
 
-const MovieDetails = lazy(() => import('./screens/movie/MovieDetail'));
-const TvShowDetails = lazy(() => import('./screens/tv/TvShowsDetails'));
+SORUN:
+  TvShowContex.js ve MovieContex.js'te cache mantığı
+  tekrar tekrar yazılmış. Standart değil, hata-prone.
 
-// Navigation'da:
-<Stack.Screen name="MovieDetails">
-  {(props) => (
-    <Suspense fallback={<LoadingScreen />}>
-      <MovieDetails {...props} />
-    </Suspense>
-  )}
-</Stack.Screen>
+ÇÖZÜM - Merkezi cache yardımcı fonksiyonu:
+  // utils/cache.js
+  import AsyncStorage from '@react-native-async-storage/async-storage';
 
-2. Lottie Animation Lazy Load:
+  export const getCache = async (key, ttlMs) => {
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    if (ttlMs && Date.now() - ts > ttlMs) {
+      AsyncStorage.removeItem(key).catch(() => {});
+      return null;
+    }
+    return data;
+  };
 
-const GeminiAnimation = lazy(() => import('./LottieJson/gemini.json'));
+  export const setCache = async (key, data) => {
+    await AsyncStorage.setItem(key, JSON.stringify({ data, ts: Date.now() }));
+  };
 
-FAYDALAR:
-✓ İlk bundle boyutu küçülür
-✓ App açılış hızı artar
 
-==============================================
-4. UYGULAMA PLANI
-==============================================
+================================================================
+9. STYLE SORUNLARI
+================================================================
 
-HAFTA 1: Context Refactoring (Yüksek Öncelik)
-----------------------------------------------
-✓ Gün 1-2: MovieContext → Custom Hooks
-✓ Gün 3-4: TvShowContext → Custom Hooks
-✓ Gün 5: Testing ve bug fixing
+--- 9.1 THEME BAĞIMLI INLINE STİLLER ---
 
-HAFTA 2: API ve Cache Sistemi (Yüksek Öncelik)
-----------------------------------------------
-✓ Gün 1: Merkezi API servisi (axios instance)
-✓ Gün 2-3: Cache hook ve stratejileri
-✓ Gün 4: Environment variables setup
-✓ Gün 5: Testing
+ETKİLENEN DOSYALAR: Hemen hemen her screen ve component
 
-HAFTA 3: Memoization ve Image Optimization
-------------------------------------------
-✓ Gün 1-2: React.memo, useMemo, useCallback ekle
-✓ Gün 3-4: FastImage integration
-✓ Gün 5: Testing
+SORUN:
+  <View style={{
+    backgroundColor: theme.secondary,
+    borderRadius: 10,
+    padding: 16,
+    marginBottom: 20
+  }}>
 
-HAFTA 4: Firestore ve Final Optimizations
------------------------------------------
-✓ Gün 1-2: Firestore optimizasyonu
-✓ Gün 3: ProfileScreenContext refactoring
-✓ Gün 4-5: Final testing ve performance ölçümü
+  Her render'da yeni obje oluşturuluyor. Bu özellikle
+  FlatList item'larında çok maliyetli.
 
-==============================================
-5. BEKLENEN İYİLEŞTİRMELER
-==============================================
+ÇÖZÜM - Dynamic stylesheet factory:
+  // Static kısmı dışarı al
+  const styles = StyleSheet.create({
+    card: {
+      borderRadius: 10,
+      padding: 16,
+      marginBottom: 20,
+    }
+  });
 
-PERFORMANS METRİKLERİ:
-┌────────────────────────────────────────────────────┐
-│ Metrik                │ Önce    │ Sonra  │ İyileşme│
-├────────────────────────────────────────────────────┤
-│ İlk Açılış           │ 3.5s    │ 1.8s   │ -48%    │
-│ Sayfa Geçişleri      │ 800ms   │ 300ms  │ -62%    │
-│ FlatList Scroll FPS  │ 45 FPS  │ 58 FPS │ +29%    │
-│ API Çağrı Sayısı     │ 100/dk  │ 35/dk  │ -65%    │
-│ Memory Kullanımı     │ 180 MB  │ 120 MB │ -33%    │
-│ Re-render Sayısı     │ 450/dk  │ 180/dk │ -60%    │
-│ Bundle Boyutu        │ 8.5 MB  │ 6.2 MB │ -27%    │
-│ Firestore Reads      │ 250/gün │ 90/gün │ -64%    │
-└────────────────────────────────────────────────────┘
+  // Dynamic kısmı ayrı tut
+  <View style={[styles.card, { backgroundColor: theme.secondary }]}>
 
-KULLANICI DENEYİMİ:
-✓ Daha akıcı animasyonlar
-✓ Hızlı sayfa geçişleri
-✓ Offline kullanım desteği
-✓ Düşük pil tüketimi
-✓ Az data kullanımı
+  Böylece sadece backgroundColor dinamik kalır, geri kalan
+  StyleSheet.create() tarafından optimize edilir.
 
-GELİŞTİRİCİ DENEYİMİ:
-✓ Okunabilir kod yapısı
-✓ Test edilebilir bileşenler
-✓ Kolay bakım
-✓ Modüler mimari
 
-==============================================
-EK KAYNAKLAR VE REFERANSLAR
-==============================================
+--- 9.2 ÇIFT 'm' TYPO ---
 
-1. React Native Performance Best Practices:
-   https://reactnative.dev/docs/performance
+DOSYA: components/Skeleton.js (satır ~131)
 
-2. React.memo ve Memoization:
-   https://react.dev/reference/react/memo
+KOD:   mmarginBottom: 5    // YANLIŞ
+OLMALI: marginBottom: 5
 
-3. AsyncStorage Optimization:
-   https://github.com/react-native-async-storage/async-storage
 
-4. Firestore Best Practices:
-   https://firebase.google.com/docs/firestore/best-practices
+================================================================
+10. SAYFA BAZINDA ANALİZ
+================================================================
 
-5. TMDB API Documentation:
-   https://developer.themoviedb.org/docs
+--- 10.1 MovieDetail.js ---
 
-==============================================
-SONUÇ
-==============================================
+SORUNLAR:
+  - 4 ayrı yatay FlatList (videos, cast, recommendations, similar)
+    hiçbirinde windowSize, removeClippedSubviews yok
+  - Sayfa çok uzun (600+ satır render), useMemo kullanılmıyor
+  - Comment section her açılışta Firebase'den çekiyor
 
-Bu optimizasyon planı uygulandığında:
-- Uygulama %50-60 daha hızlı olacak
-- API maliyetleri %65 azalacak
-- Kullanıcı deneyimi önemli ölçüde iyileşecek
-- Kod kalitesi ve bakım kolaylığı artacak
+ÖNERİLER:
+  - Tabs/Accordion ile içeriği lazily yükle
+    (kullanıcı "Similar" tabına geçince o veriyi çek)
+  - Cast FlatList için React.memo'lu CastItem component yaz
+  - useMemo ile derived state hesaplamalarını optimize et
 
-Öncelik sırası: Context Refactoring → API Servisi → Cache → Memoization
 
-Başarılar! 🚀
+--- 10.2 ProfileScreen.js ve MovieStatisticsScreen.js ---
+
+SORUNLAR:
+  - Circular progress indicator hesaplamaları her render'da tekrar yapılıyor
+  - Genre dağılımı, toplam izleme süresi gibi hesaplamalar pahalı
+
+ÖNERİLER:
+  const totalWatchTime = useMemo(() =>
+    movies.reduce((acc, m) => acc + (m.runtime || 0), 0),
+    [movies]
+  );
+
+  const genreDistribution = useMemo(() =>
+    calculateGenres(movies),
+    [movies]
+  );
+
+
+--- 10.3 SearchScreen ve alt sayfalar ---
+
+DOSYALAR:
+  screens/search/MovieSearch.js
+  screens/search/TvShowSearch.js
+  screens/search/ActorSearch.js
+  screens/search/SearchAll.js
+
+SORUNLAR:
+  - Her tuş vuruşunda API isteği gidiyor olabilir (debounce yok?)
+
+ÖNERİLER:
+  import { useDeferredValue, useTransition } from 'react';
+  // veya lodash debounce kullan
+
+  const debouncedQuery = useDebounce(query, 400);
+
+  useEffect(() => {
+    if (debouncedQuery.length > 2) {
+      searchMovies(debouncedQuery);
+    }
+  }, [debouncedQuery]);
+
+
+--- 10.4 ChatScreen.js ---
+
+SORUNLAR:
+  - Firebase Realtime Database / Firestore her mesajda write
+  - FlatList mesaj listesi optimize edilmemiş olabilir
+  - isMounted guard eksik (belirtildi üstte)
+
+ÖNERİLER:
+  - Mesaj FlatList'inde inverted={true} kullan (sondan başa)
+  - maxToRenderPerBatch={15} ekle
+  - Okunmamış mesaj sayısı için memo kullan
+
+
+--- 10.5 ListsScreen, ListsViewScreen, ListsTvShowScreen ---
+
+SORUNLAR:
+  - Liste verisi her açılışta Firestore'dan çekiliyor
+  - Kullanıcının listeleri nadiren değişiyor ama cache yok
+
+ÖNERİLER:
+  - ListStatusContext zaten var, o cache'lenebilir
+  - Tab geçişlerinde gereksiz re-fetch'i önle
+
+
+--- 10.6 SettingsScreen.js ---
+
+GENEL DURUM: İyi görünüyor. Son yapılan language modal redesign temiz.
+Ek öneri: Adult content toggle gibi değerler değiştiğinde
+AppSettingsContext'i güncellerken useMemo/useCallback fırsatları var.
+
+
+--- 10.7 TvShowsDetails.js ---
+
+SORUNLAR: MovieDetail.js ile aynı sorunlar.
+  - FlatList optimizasyon eksik
+  - Season seçici performansı optimize edilebilir
+
+
+================================================================
+11. GÜVENLİK
+================================================================
+
+--- 11.1 API ANAHTARLARI ---
+
+MEVCUT RİSKLER:
+  1. ChatModal.js içinde Gemini API key (kritik, yukarıda açıklandı)
+  2. TMDB API key AppSettingsContext üzerinden geliyor — bu nereden geliyor?
+     Eğer Firebase'den veya doğrudan kodda tanımlıysa aynı risk var.
+
+KONTROl EDİLMESİ GEREKEN:
+  - AppSettingsContext.js içinde API_KEY nasıl set ediliyor?
+  - Eğer Firebase Remote Config'den geliyorsa iyi.
+  - Eğer kodda hardcoded ise .env'e taşı.
+
+
+--- 11.2 ADULT CONTENT KONTROLÜ ---
+
+DOSYA: context/AppSettingsContext.js
+
+SORUN:
+  adultContent filtresi sadece API parametresiyle yapılıyor
+  (include_adult: false). Kullanıcı bu değeri değiştirirse
+  veya API bypass edilirse filtreleme çalışmıyor.
+
+ÖNERİ:
+  Render tarafında da filtre uygula:
+  data.filter(item => !item.adult || userAllowsAdult)
+
+
+--- 11.3 FİRESTORE GÜVENLİK KURALLARI ---
+
+Kod tarafından bakılabilecek bir şey değil ama önemli:
+  Firebase Console > Firestore > Rules kısmını kontrol et.
+
+  Temel kurallar:
+  - Kullanıcı sadece kendi verisini okuyabilmeli
+  - Başka kullanıcının listelerine yazamamamalı
+  - Yorum/rating için rate limiting kuralı ekle
+
+
+================================================================
+12. KOD KALİTESİ
+================================================================
+
+--- 12.1 YAZIM HATALARI (Dosya isimleri) ---
+
+  MovieContex.js     → MovieContext.js olmalı
+  TvShowContex.js    → TvShowContext.js olmalı
+  MovieProvders.js   → MovieProviders.js olmalı
+
+  Bu isimler import'larda tutarsızlığa yol açabilir.
+  Yeniden adlandırırken tüm import'ları güncellemeyi unutma.
+
+
+--- 12.2 YAZIM HATALARI (Kod içinde) ---
+
+  ProfileScreenContext.js satır ~128:
+    chaneAdultContent → changeAdultContent
+
+  Skeleton.js satır ~131:
+    mmarginBottom → marginBottom
+
+
+--- 12.3 KULLANILMAYAN IMPORT'LAR ---
+
+DOSYA: App.js (büyük yorum bloku satır ~490-536)
+  - Online/offline status kodu yorum satırına alınmış
+  - Buna bağlı import'lar hala aktif olabilir
+  - Gerçekten kullanılmıyorsa sil
+
+DOSYA: screens/ChatScreen.js satır ~54
+  - FeOffset import edilmiş ama kullanılmıyor
+
+
+--- 12.4 YENİ REACT NATIVE VE EXPO UYUMU ---
+
+SORUN:
+  React Native Reanimated 4'e geçilmişse deprecated API kullanımları
+  uyarı üretebilir:
+  - createAnimatedPropAdapter kaldırılmış
+  - useAnimatedStyle güncellendi
+
+ÖNERİ:
+  npx expo-doctor çalıştır ve uyarıları düzelt.
+  package.json'daki bağımlılıkların versiyonlarını kontrol et.
+
+
+--- 12.5 TÜRKÇE YAZILMIŞ HARDCODED METİN ---
+
+DOSYA: components/ListViewTv.js (satır 196, 271, 283, 292, 299)
+DOSYA: components/ListView.js (benzer satırlar)
+
+SORUN:
+  "Diğer Listeler", "Liste Bulunamadı", "Kapat", "Liste Oluştur"
+  gibi metinler direkt yazılmış, LanguageContext'ten gelmiyor.
+
+  İngilizce kullanıcılar için sorun olur.
+
+ÇÖZÜM:
+  const { t } = useLanguage();
+
+  // t.otherLists, t.noListsFound, t.cancel gibi çeviriler ekle
+
+
+--- 12.6 ARTIK KULLANILMAYAN DOSYALAR ---
+
+Kontrol edilmesi gereken:
+  - assets/simgeler/ klasöründe silinen icon dosyaları (git status'te görünüyor)
+  - dosyaların_eski_hali.txt — bu production'a gitmemeli
+  - degisen.txt — bu production'a gitmemeli
+  - GELISTIRME_PLANI.txt, PERFORMANS_OPTIMIZASYON_PLANI.txt gibi txt dosyaları
+    .gitignore'a ekle veya sil
+
+
+================================================================
+13. ÖNCELİK SIRALI AKSİYON PLANI
+================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FAZA 1 — KRİTİK DÜZELTMELER (Yayına çıkmadan mutlaka)
+Süre: 2-3 gün
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+☐ 1. Gemini API key'ini hardcoded'dan çıkar (.env veya backend proxy)
+☐ 2. setLoading bug'ını düzelt (MovieContex ve TvShowContex genres)
+☐ 3. MovieContex ve TvShowContex'te useMemo ile context value sar
+☐ 4. Animated values'ı useState'den useRef'e taşı (ListView, ListViewTv)
+☐ 5. Oscar ve Collections için AsyncStorage cache ekle
+☐ 6. Production'a gitmeyen .txt dosyalarını .gitignore'a ekle
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FAZA 2 — PERFORMANS İYİLEŞTİRMELERİ (1-2 hafta)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+☐ 6. Tüm API fetch fonksiyonlarına basit in-memory cache ekle
+☐ 7. AppSettingsContext AsyncStorage okumalarını Promise.all'a çevir
+☐ 8. FlatList optimizasyonlarını ekle (en önemli ekranlar: MovieDetail, TvShowsDetails)
+☐ 9. TVShowItem ve benzer list item'larını React.memo ile sar
+☐ 10. Search ekranlarına debounce ekle
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FAZA 3 — KOD KALİTESİ (2-3 hafta)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+☐ 11. expo-image'a geç (Image yerine)
+☐ 12. ListViewTv ve ListView'deki hardcoded Türkçe metinleri LanguageContext'e taşı
+☐ 13. ProfileScreenContext'i küçük context'lere böl
+☐ 14. ChatScreen'e isMounted guard ekle
+☐ 15. Skeleton animasyonunu useRef'e taşı
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FAZA 4 — UZUN VADE (İsteğe bağlı, 1 ay+)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+☐ 16. MovieContex ve TvShowContex'i custom hooks'a ayır
+☐ 17. Merkezi axios instance ve API servis katmanı
+☐ 18. Firestore Persistent Cache aktif et
+☐ 19. ListStatusContext'e AsyncStorage cache ekle
+☐ 20. Dosya isimlerini düzelt (MovieContex → MovieContext, vs.)
+
+
+================================================================
+ÖZET TABLO
+================================================================
+
+| SORUN                              | DOSYA                         | ÖNCELİK  |
+|------------------------------------|-------------------------------|----------|
+| Gemini API key hardcoded           | ChatModal.js                  | KRİTİK   |
+| Context value memoize değil        | MovieContex, TvShowContex     | KRİTİK   |
+| 30 Oscar + 19 Collection API call  | MovieContex.js                | KRİTİK   |
+| setLoading bug (genres)            | MovieContex, TvShowContex     | KRİTİK   |
+| Animated.Value state'de            | ListView, ListViewTv          | YÜKSEK   |
+| FlatList optimizasyon eksik        | MovieDetail, TvShowsDetails   | YÜKSEK   |
+| API cache yok                      | Tüm context'ler               | YÜKSEK   |
+| Promise.all yok (AsyncStorage)     | AppSettingsContext             | YÜKSEK   |
+| Search debounce yok                | Search ekranları              | YÜKSEK   |
+| Image caching yok                  | Tüm ekranlar                  | ORTA     |
+| Skeleton Animated.Value            | Skeleton.js                   | ORTA     |
+| Hardcoded TR metinler              | ListView, ListViewTv          | ORTA     |
+| ChatScreen isMounted guard eksik   | ChatScreen.js                 | ORTA     |
+| renderItem memoize değil           | FlatList'li tüm ekranlar      | ORTA     |
+| Typo: mmarginBottom                | Skeleton.js                   | DÜŞÜK    |
+| Kullanılmayan import'lar           | App.js, ChatScreen.js         | DÜŞÜK    |
+| Dosya isim yazım hataları          | MovieContex, TvShowContex     | DÜŞÜK    |
+
+
+================================================================
+SON NOT
+================================================================
+
+Bu analiz kodların gerçek içeriğine dayanmaktadır.
+Faza 1'deki maddeler yayına çıkmadan önce tamamlanmalı.
+Faza 2-3 yayın sonrası ilk haftalarda yapılabilir.
+
+Başarılar!
+================================================================
+
+
+Kritik (yayına çıkmadan önce):
+
+Gemini API key — ChatModal.js içinde düz metin olarak duruyor, herkes çalabilir
+useMemo eksik — MovieContex ve TvShowContex'teki context value her render'da yeni obje oluşturuyor, tüm sayfalar gereksiz re-render oluyor
+30 Oscar + 19 Collection API isteği — Uygulama her açılışta bu istekleri atıyor, AsyncStorage cache ile düzeltilebilir
+setLoading bug — Genres fetch'te setLoading çağrılıyor ama bu fonksiyon yok, setLoadingGenres olmalı
+Animated.Value state'de — ListView ve ListViewTv'de, useRef olmalı
+Performans (yayın sonrası 1-2 hafta):
+
+Tüm FlatList'lere removeClippedSubviews, maxToRenderPerBatch, windowSize ekle
+API fetch fonksiyonlarına basit in-memory cache ekle
+AppSettingsContext'te 6 AsyncStorage okuması sıralı yapılıyor → Promise.all'a çevir
+Search ekranlarına debounce ekle
+expo-image paketi ile Image caching sağla
+Dosyada her sorun için hangi dosya, hangi satır ve nasıl düzeltileceği kod örnekleriyle yazıyor.

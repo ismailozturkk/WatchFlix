@@ -29,6 +29,7 @@ import { useAppSettings } from "../../context/AppSettingsContext";
 import { useFocusEffect } from "@react-navigation/native";
 import { useListStatus } from "../../modules/UseListStatus";
 import { SafeAreaView } from "react-native-safe-area-context";
+import IconBacground from "../../components/IconBacground";
 export default function MovieSearch({ navigation, route }) {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState([]);
@@ -38,8 +39,7 @@ export default function MovieSearch({ navigation, route }) {
   const { theme } = useTheme();
   const searchTimeout = useRef(null);
   const [lastSearch, setLastSearch] = useState([]);
-  const { showSnow } = useAppSettings();
-  const { API_KEY, adultContent } = useAppSettings();
+  const { API_KEY, adultContent, imageQuality, showSnow } = useAppSettings();
 
   const [scaleValues, setScaleValues] = useState({});
 
@@ -52,7 +52,7 @@ export default function MovieSearch({ navigation, route }) {
           inputRef.current?.focus();
         }, 100);
       }
-    }, [route.params])
+    }, [route.params]),
   );
 
   useEffect(() => {
@@ -120,7 +120,7 @@ export default function MovieSearch({ navigation, route }) {
 
         // **Type'a göre filtreleme**: Aynı ID'li ancak farklı türdeki içerikler karışmasın
         const movieIndex = selectedList.findIndex(
-          (movie) => movie.id === item.id && movie.type === type
+          (movie) => movie.id === item.id && movie.type === type,
         );
 
         if (movieIndex !== -1) {
@@ -189,7 +189,7 @@ export default function MovieSearch({ navigation, route }) {
           {item.backdrop_path && (
             <Image
               source={{
-                uri: `https://image.tmdb.org/t/p/w500${item.backdrop_path}`,
+                uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.backdrop_path}`,
               }}
               style={[
                 styles.backDrop,
@@ -202,7 +202,7 @@ export default function MovieSearch({ navigation, route }) {
           {item.poster_path ? (
             <Image
               source={{
-                uri: `https://image.tmdb.org/t/p/w500${item.poster_path}`,
+                uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
               }}
               style={[styles.posterTvRating, { shadowColor: theme.shadow }]}
             />
@@ -217,19 +217,31 @@ export default function MovieSearch({ navigation, route }) {
             </View>
           )}
           <View style={styles.seriesInfo}>
-            <Text style={[styles.showName, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.showName, { color: theme.text.primary }]}
+            >
               {item.title || "İsimsiz"}
             </Text>
-            <Text style={[styles.showDate, { color: theme.text.secondary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.showDate, { color: theme.text.secondary }]}
+            >
               {item.release_date
                 ? new Date(item.release_date).getFullYear()
                 : "Tarih yok"}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={[styles.voteAverage, { color: theme.accent }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.voteAverage, { color: theme.accent }]}
+              >
                 {item.vote_average ? item.vote_average.toFixed(1) : "0.0"}
               </Text>
-              <Text style={[styles.voteCount, { color: theme.text.secondary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.voteCount, { color: theme.text.secondary }]}
+              >
                 ({item.vote_count || 0})
               </Text>
             </View>
@@ -350,16 +362,16 @@ export default function MovieSearch({ navigation, route }) {
         const response = await axios.get(url, { params, headers });
         // Sonuçları vote_count'a göre sırala
         const sortedResults = response.data.results.sort(
-          (a, b) => b.vote_count - a.vote_count
+          (a, b) => b.vote_count - a.vote_count,
         );
         // Tarihe göre sıralama
         const sortedByDate = results.sort(
-          (a, b) => new Date(b.release_date) - new Date(a.release_date)
+          (a, b) => new Date(b.release_date) - new Date(a.release_date),
         );
 
         // İsme göre sıralama
         const sortedByName = results.sort((a, b) =>
-          a.title.localeCompare(b.title)
+          a.title.localeCompare(b.title),
         );
         setResults(sortedResults);
 
@@ -374,8 +386,8 @@ export default function MovieSearch({ navigation, route }) {
               self.findIndex(
                 (s) =>
                   s.toLowerCase().includes(search.toLowerCase()) ||
-                  search.toLowerCase().includes(s.toLowerCase())
-              ) === index
+                  search.toLowerCase().includes(s.toLowerCase()),
+              ) === index,
           );
 
           // Son 5 aramayı tut
@@ -393,7 +405,7 @@ export default function MovieSearch({ navigation, route }) {
         setLoading(false);
       }
     },
-    [language]
+    [language],
   );
 
   if (loading && !search) {
@@ -404,12 +416,15 @@ export default function MovieSearch({ navigation, route }) {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.primary }]}
     >
-      <LottieView
-        style={[styles.lottie, { display: showSnow ? "flex" : "none" }]}
-        source={require("../../LottieJson/snow.json")}
-        autoPlay={true}
-        loop
-      />
+      <IconBacground opacity={0.3} />
+      {showSnow && (
+        <LottieView
+          style={styles.lottie}
+          source={require("../../LottieJson/snow.json")}
+          autoPlay={true}
+          loop
+        />
+      )}
       <Text
         style={{
           color: theme.text.primary,
@@ -465,7 +480,10 @@ export default function MovieSearch({ navigation, route }) {
       </View>
       {error ? (
         <View style={styles.errorContainer}>
-          <Text style={[styles.errorText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.errorText, { color: theme.text.primary }]}
+          >
             {error}
           </Text>
         </View>
@@ -521,7 +539,7 @@ export default function MovieSearch({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 45,
+    paddingTop: 10,
   },
   lottie: {
     position: "absolute",

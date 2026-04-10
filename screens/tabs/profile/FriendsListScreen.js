@@ -22,12 +22,16 @@ import SwipeCard from "../../../modules/SwipeCard";
 import Toast from "react-native-toast-message";
 import { useLanguage } from "../../../context/LanguageContext";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import IconBacground from "../../../components/IconBacground";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useAppSettings } from "../../../context/AppSettingsContext";
 
 export default function FriendsListScreen({ navigation }) {
   const [friends, setFriends] = useState([]);
   const auth = getAuth();
   const user = auth.currentUser;
   const { avatars, lists, gridStyle } = useProfileScreen(); // ProfileScreen context'inden listeleri alalım
+  const { imageQuality } = useAppSettings();
   const { theme } = useTheme();
   const { t } = useLanguage();
   const [selectedFriend, setSelectedFriend] = useState(null); // Hangi arkadaşın listelerinin gösterileceğini tutar
@@ -73,7 +77,7 @@ export default function FriendsListScreen({ navigation }) {
 
         const allLists = Object.entries(listsSnap.data() || {});
         const filteredLists = allLists.filter(([listName]) =>
-          visibleListNames.includes(listName)
+          visibleListNames.includes(listName),
         );
 
         setFriendLists(filteredLists);
@@ -160,10 +164,16 @@ export default function FriendsListScreen({ navigation }) {
         <View style={styles.userInfo}>
           <Image source={avatars[item.avatarIndex]} style={styles.avatar} />
           <View>
-            <Text style={[styles.name, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.name, { color: theme.text.primary }]}
+            >
               {item.displayName}
             </Text>
-            <Text style={[styles.username, { color: theme.text.secondary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.username, { color: theme.text.secondary }]}
+            >
               @{item.username}
             </Text>
           </View>
@@ -175,7 +185,7 @@ export default function FriendsListScreen({ navigation }) {
           data={[
             ...protectedLists
               .map((name) =>
-                friendLists.find(([listName]) => listName === name)
+                friendLists.find(([listName]) => listName === name),
               )
               .filter(Boolean),
             ...friendLists
@@ -214,7 +224,7 @@ export default function FriendsListScreen({ navigation }) {
                           <Image
                             key={index}
                             source={{
-                              uri: `https://image.tmdb.org/t/p/w500${contentItem.imagePath}`,
+                              uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${contentItem.imagePath}`,
                             }}
                             style={[
                               styles.listImage,
@@ -294,7 +304,10 @@ export default function FriendsListScreen({ navigation }) {
                           size={16}
                           color={theme.colors.green}
                         />
-                        <Text style={{ color: theme.text.primary }}>
+                        <Text
+                          allowFontScaling={false}
+                          style={{ color: theme.text.primary }}
+                        >
                           İzlenen Filmler
                         </Text>
                       </>
@@ -306,7 +319,10 @@ export default function FriendsListScreen({ navigation }) {
                           size={15}
                           color={theme.colors.green}
                         />
-                        <Text style={{ color: theme.text.primary }}>
+                        <Text
+                          allowFontScaling={false}
+                          style={{ color: theme.text.primary }}
+                        >
                           İzlenen Diziler
                         </Text>
                       </>
@@ -318,7 +334,10 @@ export default function FriendsListScreen({ navigation }) {
                           size={16}
                           color={theme.colors.red}
                         />
-                        <Text style={{ color: theme.text.primary }}>
+                        <Text
+                          allowFontScaling={false}
+                          style={{ color: theme.text.primary }}
+                        >
                           Favoriler
                         </Text>
                       </>
@@ -330,7 +349,10 @@ export default function FriendsListScreen({ navigation }) {
                           size={16}
                           color={theme.colors.blue}
                         />
-                        <Text style={{ color: theme.text.primary }}>
+                        <Text
+                          allowFontScaling={false}
+                          style={{ color: theme.text.primary }}
+                        >
                           İzlenecekler
                         </Text>
                       </>
@@ -366,7 +388,10 @@ export default function FriendsListScreen({ navigation }) {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.primary }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.primary }]}
+    >
+      <IconBacground opacity={0.3} />
       {friends.length === 0 && !user ? (
         <Text>Henüz arkadaşınız yok.</Text>
       ) : (
@@ -377,7 +402,7 @@ export default function FriendsListScreen({ navigation }) {
           contentContainerStyle={{ paddingBottom: 20, paddingHorizontal: 15 }}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -385,7 +410,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingVertical: 15,
-    paddingTop: 80,
+    paddingTop: 40,
   },
   friendItem: {
     flexDirection: "row",

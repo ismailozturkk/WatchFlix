@@ -53,6 +53,8 @@ import { BlurView } from "expo-blur";
 import { useListStatus } from "../../modules/UseListStatus";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { useListStatusContext } from "../../context/ListStatusContext";
+import IconBacground from "../../components/IconBacground";
+
 export default function TvShowsDetails({ route, navigation }) {
   const { id } = route.params;
   const [details, setDetails] = useState(null);
@@ -67,7 +69,7 @@ export default function TvShowsDetails({ route, navigation }) {
 
   const [PosterModalVisible, setPosterModalVisible] = useState(false);
   const [backdropModalVisible, setBacdropModalVisible] = useState(false);
-  const { API_KEY, showSnow } = useAppSettings();
+  const { API_KEY, showSnow, imageQuality } = useAppSettings();
   const formatDate = (timestamp) => {
     const date = new Date(timestamp);
     return new Intl.DateTimeFormat(language, {
@@ -471,7 +473,9 @@ export default function TvShowsDetails({ route, navigation }) {
           <Image
             source={
               item.poster_path
-                ? { uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }
+                ? {
+                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                  }
                 : require("../../assets/image/no_image.png")
             }
             style={[styles.similarPoster, { shadowColor: theme.shadow }]}
@@ -483,7 +487,7 @@ export default function TvShowsDetails({ route, navigation }) {
               { backgroundColor: theme.secondaryt },
             ]}
           >
-            <Text style={styles.similarRatingText}>
+            <Text allowFontScaling={false} style={styles.similarRatingText}>
               {item.vote_average.toFixed(1)}
             </Text>
           </View>
@@ -561,7 +565,10 @@ export default function TvShowsDetails({ route, navigation }) {
       >
         {item.name}
       </Text>
-      <Text style={[styles.videoType, { color: theme.text.muted }]}>
+      <Text
+        allowFontScaling={false}
+        style={[styles.videoType, { color: theme.text.muted }]}
+      >
         {item.type}
       </Text>
     </TouchableOpacity>
@@ -573,212 +580,244 @@ export default function TvShowsDetails({ route, navigation }) {
   if (!details) {
     return (
       <View style={[styles.container, { backgroundColor: theme.primary }]}>
-        <Text style={[styles.loadingText, { color: theme.text.primary }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.loadingText, { color: theme.text.primary }]}
+        >
           {t.loading}
         </Text>
       </View>
     );
   }
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.primary }]}>
-      <StatusBar barStyle="light-content" />
-      {check && (
-        <LottieView
-          style={{
-            position: "absolute",
-            height: 600,
-            left: 0,
-            right: 0,
-            zIndex: 3,
-          }}
-          source={require("../../LottieJson/confetti_2.json")}
-          opacity={1}
-          autoPlay={check}
-          loop={false}
-        />
-      )}
-      <View style={styles.headerContainer}>
-        {details.backdrop_path ? (
-          <TouchableOpacity onPress={() => setBacdropModalVisible(true)}>
-            <Image
-              source={{
-                uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,
-              }}
-              style={styles.backdrop}
-            />
-          </TouchableOpacity>
-        ) : (
-          <View
-            style={[
-              styles.noImageContainer,
-              { backgroundColor: theme.secondary },
-            ]}
-          >
-            <Ionicons name="image" size={180} color={theme.text.muted} />
-          </View>
+    <View style={{ flex: 1, backgroundColor: theme.primary }}>
+      <IconBacground opacity={0.3} />
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <StatusBar barStyle="light-content" />
+        {check && (
+          <LottieView
+            style={{
+              position: "absolute",
+              height: 600,
+              left: 0,
+              right: 0,
+              zIndex: 3,
+            }}
+            source={require("../../LottieJson/confetti_2.json")}
+            opacity={1}
+            autoPlay={check}
+            loop={false}
+          />
         )}
-        <LinearGradient
-          colors={["transparent", theme.primary]}
-          style={styles.gradient}
-        />
-      </View>
-      <View style={[styles.content, { backgroundColor: theme.primary }]}>
-        {details.seasons.map((se, index) => {
-          if ((index + 4) % 4 === 0 || index < 4) {
-            return (
-              <LottieView
-                key={se.season_number}
-                style={[
-                  styles.lottie,
-                  {
-                    display: showSnow ? "flex" : "none",
-                    top: 1000 * Math.floor(index < 4 ? index : index / 4),
-                  },
-                ]}
-                source={require("../../LottieJson/snow.json")}
-                autoPlay={true}
-                loop
+        <View style={styles.headerContainer}>
+          {details.backdrop_path ? (
+            <TouchableOpacity onPress={() => setBacdropModalVisible(true)}>
+              <Image
+                source={{
+                  uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,
+                }}
+                style={styles.backdrop}
               />
-            );
-          }
-          return null;
-        })}
-
-        <View style={styles.header}>
-          <View style={styles.posterView}>
-            {details.poster_path ? (
-              <TouchableOpacity onPress={() => setPosterModalVisible(true)}>
-                <Image
-                  source={{
-                    uri: `https://image.tmdb.org/t/p/w500${details.poster_path}`,
-                  }}
-                  style={[
-                    styles.poster,
-                    { borderColor: theme.border, shadowColor: theme.shadow },
-                  ]}
-                />
-              </TouchableOpacity>
-            ) : (
-              <View
-                style={[
-                  styles.noPosterContainer,
-                  { backgroundColor: theme.secondary },
-                ]}
-              >
-                <Ionicons name="image" size={80} color={theme.text.muted} />
-              </View>
-            )}
-          </View>
-          <View style={styles.headerInfo}>
-            <View style={styles.tvInformation}>
-              <View style={styles.Info}>
-                <Text style={[styles.title, { color: theme.text.primary }]}>
-                  {details.name}
-                </Text>
-                <Text style={[styles.tagline, { color: theme.text.secondary }]}>
-                  {details.tagline || t.tvShowsDetails.noTagline}
-                </Text>
-              </View>
+            </TouchableOpacity>
+          ) : (
+            <View
+              style={[
+                styles.noImageContainer,
+                { backgroundColor: theme.secondary },
+              ]}
+            >
+              <Ionicons name="image" size={180} color={theme.text.muted} />
             </View>
+          )}
+          <LinearGradient
+            colors={["transparent", theme.primary]}
+            style={styles.gradient}
+          />
+        </View>
+        <View style={styles.content}>
+          {showSnow &&
+            details.seasons.map((se, index) => {
+              if ((index + 4) % 4 === 0 || index < 4) {
+                return (
+                  <LottieView
+                    key={se.season_number}
+                    style={[
+                      styles.lottie,
+                      {
+                        top: 1000 * Math.floor(index < 4 ? index : index / 4),
+                      },
+                    ]}
+                    source={require("../../LottieJson/snow.json")}
+                    autoPlay={true}
+                    loop
+                  />
+                );
+              }
+              return null;
+            })}
 
-            <View style={styles.genres}>
-              {details.genres.length > 0 ? (
-                details.genres.map((genre) => (
+          <View style={styles.header}>
+            <View style={styles.posterView}>
+              {details.poster_path ? (
+                <TouchableOpacity onPress={() => setPosterModalVisible(true)}>
+                  <Image
+                    source={{
+                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${details.poster_path}`,
+                    }}
+                    style={[
+                      styles.poster,
+                      { borderColor: theme.border, shadowColor: theme.shadow },
+                    ]}
+                  />
+                </TouchableOpacity>
+              ) : (
+                <View
+                  style={[
+                    styles.noPosterContainer,
+                    { backgroundColor: theme.secondary },
+                  ]}
+                >
+                  <Ionicons name="image" size={80} color={theme.text.muted} />
+                </View>
+              )}
+            </View>
+            <View style={styles.headerInfo}>
+              <View style={styles.tvInformation}>
+                <View style={styles.Info}>
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.title, { color: theme.text.primary }]}
+                  >
+                    {details.name}
+                  </Text>
+                  <Text
+                    style={[styles.tagline, { color: theme.text.secondary }]}
+                  >
+                    {details.tagline || t.tvShowsDetails.noTagline}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.genres}>
+                {details.genres.length > 0 ? (
+                  details.genres.map((genre) => (
+                    <View
+                      key={genre.id}
+                      style={[
+                        styles.genreTag,
+                        { backgroundColor: theme.accent },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.genreText,
+                          { color: theme.text.primary },
+                        ]}
+                      >
+                        {genre.name}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
                   <View
-                    key={genre.id}
                     style={[styles.genreTag, { backgroundColor: theme.accent }]}
                   >
                     <Text
                       style={[styles.genreText, { color: theme.text.primary }]}
                     >
-                      {genre.name}
+                      {t.noGenreInfo}
                     </Text>
                   </View>
-                ))
-              ) : (
-                <View
-                  style={[styles.genreTag, { backgroundColor: theme.accent }]}
+                )}
+              </View>
+              <View style={styles.mainRating}>
+                <Text
+                  style={[styles.ratingText, { color: theme.colors.orange }]}
                 >
+                  {details.vote_average > 0
+                    ? `${details.vote_average.toFixed(1)} `
+                    : t.tvShowsDetails.notYetRated}
+                </Text>
+                <Text
+                  style={[styles.ratingText, { color: theme.text.primary }]}
+                >
+                  {details.vote_average > 0 && (
+                    <RatingStars rating={details.vote_average} />
+                  )}{" "}
+                  •{" "}
+                </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "center",
+                    alignItems: "baseline",
+                    gap: 3,
+                  }}
+                >
+                  <FontAwesome
+                    name="user"
+                    size={14}
+                    color={theme.colors.blue}
+                  />
                   <Text
-                    style={[styles.genreText, { color: theme.text.primary }]}
+                    style={[styles.ratingText, { color: theme.colors.blue }]}
                   >
-                    {t.noGenreInfo}
+                    {details.vote_count || 0}
                   </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+          <View style={{ marginTop: 10, marginBottom: 30 }}>
+            <View>
+              <Text
+                style={[styles.sectionTitle, { color: theme.text.primary }]}
+              >
+                {t.tvShowsDetails?.lists}
+              </Text>
+              <ListViewTv
+                isSeasonWatched={isSeasonWatched}
+                navigation={navigation}
+                updateList={updateTvSeriesList}
+                openModal={openModal}
+                addShowToFirestore={addShowToFirestore}
+                isLoading={isLoading}
+                listStates={listStates}
+                type={"tv"}
+              />
+              {true && (
+                <View
+                  style={{
+                    position: "absolute",
+                    bottom: 20,
+                    right: 7,
+                    left: 7,
+                  }}
+                >
+                  <Progress.Bar
+                    progress={isSeasonWatched}
+                    width={width * 0.89}
+                    height={1}
+                    borderWidth={0}
+                    animationConfig={{ bounciness: 10 }}
+                    color={
+                      isSeasonWatched === 1
+                        ? theme.colors.green
+                        : showEpisodes !== undefined
+                          ? theme.colors.orange
+                          : theme.colors.blue
+                    }
+                    //style={{ marginBottom: 10 }}
+                  />
                 </View>
               )}
             </View>
-            <View style={styles.mainRating}>
-              <Text style={[styles.ratingText, { color: theme.colors.orange }]}>
-                {details.vote_average > 0
-                  ? `${details.vote_average.toFixed(1)} `
-                  : t.tvShowsDetails.notYetRated}
-              </Text>
-              <Text style={[styles.ratingText, { color: theme.text.primary }]}>
-                {details.vote_average > 0 && (
-                  <RatingStars rating={details.vote_average} />
-                )}{" "}
-                •{" "}
-              </Text>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "center",
-                  alignItems: "baseline",
-                  gap: 3,
-                }}
-              >
-                <FontAwesome name="user" size={14} color={theme.colors.blue} />
-                <Text style={[styles.ratingText, { color: theme.colors.blue }]}>
-                  {details.vote_count || 0}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-        <View style={{ marginTop: 10, marginBottom: 30 }}>
-          <View>
-            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
-              {t.tvShowsDetails?.lists}
-            </Text>
-            <ListViewTv
-              isSeasonWatched={isSeasonWatched}
-              navigation={navigation}
-              updateList={updateTvSeriesList}
-              openModal={openModal}
-              addShowToFirestore={addShowToFirestore}
-              isLoading={isLoading}
-              listStates={listStates}
-              type={"tv"}
-            />
-            {true && (
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: 20,
-                  right: 7,
-                  left: 7,
-                }}
-              >
-                <Progress.Bar
-                  progress={isSeasonWatched}
-                  width={width * 0.89}
-                  height={1}
-                  borderWidth={0}
-                  animationConfig={{ bounciness: 10 }}
-                  color={
-                    isSeasonWatched === 1
-                      ? theme.colors.green
-                      : showEpisodes !== undefined
-                        ? theme.colors.orange
-                        : theme.colors.blue
-                  }
-                  //style={{ marginBottom: 10 }}
-                />
-              </View>
-            )}
-          </View>
 
-          {/* <TouchableOpacity
+            {/* <TouchableOpacity
             onPress={() =>
               updateGenres({ showId: details.id, genres: details.genres })
             }
@@ -796,433 +835,247 @@ export default function TvShowsDetails({ route, navigation }) {
               gap: 5,
             }}
           >
-            <Text style={{ color: theme.text.secondary }}>
+            <Text allowFontScaling={false}style={{ color: theme.text.secondary }}>
               genre güncelleme
             </Text>
           </TouchableOpacity> */}
-          <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
-            {t.tvInformation}
-          </Text>
-          <View
-            style={[
-              styles.stats,
-              { backgroundColor: theme.secondary, shadowColor: theme.shadow },
-            ]}
-          >
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: theme.text.primary }]}>
-                {details.number_of_seasons || 0}
-              </Text>
-              <Text style={[styles.statLabel, { color: theme.text.secondary }]}>
-                {t.seasons}
-              </Text>
-            </View>
-            <View style={styles.statItem}>
-              <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
-                <Text style={[styles.statValue, { color: theme.text.primary }]}>
-                  {details.number_of_episodes || 0}
+            <Text
+              allowFontScaling={false}
+              style={[styles.sectionTitle, { color: theme.text.primary }]}
+            >
+              {t.tvInformation}
+            </Text>
+            <View
+              style={[
+                styles.stats,
+                { backgroundColor: theme.secondary, shadowColor: theme.shadow },
+              ]}
+            >
+              <View style={styles.statItem}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.statValue, { color: theme.text.primary }]}
+                >
+                  {details.number_of_seasons || 0}
                 </Text>
                 <Text
-                  style={[
-                    styles.statValue,
-                    {
-                      color: theme.text.primary,
-                      fontSize: 12,
-                      fontWeight: "300",
-                    },
-                  ]}
+                  style={[styles.statLabel, { color: theme.text.secondary }]}
                 >
-                  {showEpisodes ? " /" + showEpisodes : null}
+                  {t.seasons}
                 </Text>
               </View>
-              <Text style={[styles.statLabel, { color: theme.text.secondary }]}>
-                {t.episode}
-              </Text>
+              <View style={styles.statItem}>
+                <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
+                  <Text
+                    style={[styles.statValue, { color: theme.text.primary }]}
+                  >
+                    {details.number_of_episodes || 0}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.statValue,
+                      {
+                        color: theme.text.primary,
+                        fontSize: 12,
+                        fontWeight: "300",
+                      },
+                    ]}
+                  >
+                    {showEpisodes ? " /" + showEpisodes : null}
+                  </Text>
+                </View>
+                <Text
+                  style={[styles.statLabel, { color: theme.text.secondary }]}
+                >
+                  {t.episode}
+                </Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.statValue, { color: theme.text.primary }]}
+                >
+                  {formatDate(details.first_air_date)}
+                </Text>
+                <Text
+                  style={[styles.statLabel, { color: theme.text.secondary }]}
+                >
+                  {t.tvShowsDetails.airDate}
+                </Text>
+              </View>
             </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: theme.text.primary }]}>
-                {formatDate(details.first_air_date)}
-              </Text>
-              <Text style={[styles.statLabel, { color: theme.text.secondary }]}>
-                {t.tvShowsDetails.airDate}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.section}>
-            <TVShowItem item={details} navigation={navigation} />
-          </View>
-          {details.seasons.filter((season) => season.season_number > 0).length >
-          0 ? (
             <View style={styles.section}>
-              <TouchableOpacity
-                onPress={() =>
-                  navigation.navigate("TvGraphDetailScreen", { id })
-                }
-              >
-                <View style={styles.headerGraph}>
-                  <BlurView
-                    tint="dark"
-                    intensity={5}
-                    experimentalBlurMethod="dimezisBlurView" // Android için sihirli kod
-                    style={StyleSheet.absoluteFill}
-                  />
-                  {details.backdrop_path ? (
-                    <Image
-                      source={{
-                        uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,
-                      }}
-                      style={[
-                        styles.backdropGraph,
-                        { shadowColor: theme.shadow },
-                      ]}
+              <TVShowItem item={details} navigation={navigation} />
+            </View>
+            {details.seasons.filter((season) => season.season_number > 0)
+              .length > 0 ? (
+              <View style={styles.section}>
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate("TvGraphDetailScreen", { id })
+                  }
+                >
+                  <View style={styles.headerGraph}>
+                    <BlurView
+                      tint="dark"
+                      intensity={5}
+                      experimentalBlurMethod="dimezisBlurView" // Android için sihirli kod
+                      style={StyleSheet.absoluteFill}
                     />
-                  ) : (
-                    <View
-                      style={[
-                        styles.noImageContainerTvGraph,
-                        {
-                          backgroundColor: theme.secondary,
-                          shadowColor: theme.shadow,
-                        },
-                      ]}
-                    />
-                  )}
-                  <View style={styles.posterViewGraph}>
-                    {details.poster_path ? (
+                    {details.backdrop_path ? (
                       <Image
                         source={{
-                          uri: `https://image.tmdb.org/t/p/w500${details.poster_path}`,
+                          uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,
                         }}
                         style={[
-                          styles.poster,
-                          {
-                            borderColor: theme.border,
-                            shadowColor: theme.shadow,
-                          },
+                          styles.backdropGraph,
+                          { shadowColor: theme.shadow },
                         ]}
                       />
                     ) : (
                       <View
                         style={[
-                          styles.noPosterContainer,
-                          { backgroundColor: theme.secondary },
+                          styles.noImageContainerTvGraph,
+                          {
+                            backgroundColor: theme.secondary,
+                            shadowColor: theme.shadow,
+                          },
                         ]}
-                      >
-                        <Ionicons
-                          name="image"
-                          size={80}
-                          color={theme.text.muted}
-                        />
-                      </View>
+                      />
                     )}
-                  </View>
-                  <View style={styles.headerInfo}>
-                    <Text style={[styles.title, { color: theme.text.primary }]}>
-                      {details.name}
-                    </Text>
-                    <View style={styles.mainRating}>
+                    <View style={styles.posterViewGraph}>
+                      {details.poster_path ? (
+                        <Image
+                          source={{
+                            uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${details.poster_path}`,
+                          }}
+                          style={[
+                            styles.poster,
+                            {
+                              borderColor: theme.border,
+                              shadowColor: theme.shadow,
+                            },
+                          ]}
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.noPosterContainer,
+                            { backgroundColor: theme.secondary },
+                          ]}
+                        >
+                          <Ionicons
+                            name="image"
+                            size={80}
+                            color={theme.text.muted}
+                          />
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.headerInfo}>
                       <Text
-                        style={[
-                          styles.ratingText,
-                          { color: theme.text.primary },
-                        ]}
+                        style={[styles.title, { color: theme.text.primary }]}
                       >
-                        {details.vote_average > 0
-                          ? `${details.vote_average.toFixed(1)} / 10`
-                          : t.tvShowsDetails.notYetRated}
+                        {details.name}
                       </Text>
-                      <View>
-                        {details.vote_average > 0 && (
-                          <RatingStars rating={details.vote_average} />
-                        )}
-                      </View>
-                    </View>
-                    <View style={styles.statsGraph}>
-                      <View style={styles.statItem}>
+                      <View style={styles.mainRating}>
                         <Text
                           style={[
-                            styles.statValue,
+                            styles.ratingText,
                             { color: theme.text.primary },
                           ]}
                         >
-                          {details.number_of_seasons || 0}
+                          {details.vote_average > 0
+                            ? `${details.vote_average.toFixed(1)} / 10`
+                            : t.tvShowsDetails.notYetRated}
                         </Text>
-                        <Text
-                          style={[
-                            styles.statLabel,
-                            { color: theme.text.secondary },
-                          ]}
-                        >
-                          {t.seasons}
-                        </Text>
+                        <View>
+                          {details.vote_average > 0 && (
+                            <RatingStars rating={details.vote_average} />
+                          )}
+                        </View>
                       </View>
-                      <View style={styles.statItem}>
-                        <Text
-                          style={[
-                            styles.statValue,
-                            { color: theme.text.primary },
-                          ]}
-                        >
-                          {details.number_of_episodes || 0}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.statLabel,
-                            { color: theme.text.secondary },
-                          ]}
-                        >
-                          {t.episode}
-                        </Text>
-                      </View>
-                      <View style={styles.statItem}>
-                        <Text
-                          style={[
-                            styles.statValue,
-                            { color: theme.text.primary },
-                          ]}
-                        >
-                          {details.vote_count || 0}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.statLabel,
-                            { color: theme.text.secondary },
-                          ]}
-                        >
-                          {t.votes}
-                        </Text>
+                      <View style={styles.statsGraph}>
+                        <View style={styles.statItem}>
+                          <Text
+                            style={[
+                              styles.statValue,
+                              { color: theme.text.primary },
+                            ]}
+                          >
+                            {details.number_of_seasons || 0}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.statLabel,
+                              { color: theme.text.secondary },
+                            ]}
+                          >
+                            {t.seasons}
+                          </Text>
+                        </View>
+                        <View style={styles.statItem}>
+                          <Text
+                            style={[
+                              styles.statValue,
+                              { color: theme.text.primary },
+                            ]}
+                          >
+                            {details.number_of_episodes || 0}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.statLabel,
+                              { color: theme.text.secondary },
+                            ]}
+                          >
+                            {t.episode}
+                          </Text>
+                        </View>
+                        <View style={styles.statItem}>
+                          <Text
+                            style={[
+                              styles.statValue,
+                              { color: theme.text.primary },
+                            ]}
+                          >
+                            {details.vote_count || 0}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.statLabel,
+                              { color: theme.text.secondary },
+                            ]}
+                          >
+                            {t.votes}
+                          </Text>
+                        </View>
                       </View>
                     </View>
                   </View>
-                </View>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
-              {t.overview}
-            </Text>
-            <Text
-              style={[styles.overview, { color: theme.text.secondary }]}
-              numberOfLines={numberOfLines ? null : 10}
-              ellipsizeMode="tail"
-              onTextLayout={(event) => {
-                const { lines } = event.nativeEvent;
-                setLineCount(lines.length); // Satır sayısını güncelle
-              }}
-            >
-              {details.overview || t.tvShowsDetails.noOverviewAvailable}
-            </Text>
-            {lineCount > 10 ? (
-              <TouchableOpacity
-                onPress={() => setNumberOfLines(!numberOfLines)}
-                style={{
-                  width: "100%",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginTop: 10,
-                }}
-                activeOpacity={0.8}
-              >
-                {numberOfLines ? (
-                  <MaterialIcons
-                    name="keyboard-arrow-up"
-                    size={40}
-                    color={theme.text.primary}
-                    style={{
-                      width: 40,
-                      backgroundColor: theme.secondary,
-                      borderRadius: 15,
-                      shadowColor: theme.shadow,
-                      shadowOffset: {
-                        width: 0,
-                        height: 8,
-                      },
-                      shadowOpacity: 0.94,
-                      shadowRadius: 10.32,
-                      elevation: 5,
-                    }}
-                  />
-                ) : (
-                  <MaterialIcons
-                    name="keyboard-arrow-down"
-                    size={40}
-                    color={theme.text.primary}
-                    style={{
-                      width: 40,
-                      backgroundColor: theme.secondary,
-                      borderRadius: 15,
-                      shadowColor: theme.shadow,
-                      shadowOffset: {
-                        width: 0,
-                        height: 8,
-                      },
-                      shadowOpacity: 0.94,
-                      shadowRadius: 10.32,
-                      elevation: 5,
-                    }}
-                  />
-                )}
-              </TouchableOpacity>
-            ) : null}
-          </View>
-          {details.videos?.results.length > 0 && (
-            <View style={styles.section}>
-              <Text
-                style={[styles.sectionTitle, { color: theme.text.primary }]}
-              >
-                {t.videos}
-              </Text>
-
-              <FlatList
-                data={details.videos.results.filter(
-                  (video) => video.site === "YouTube",
-                )}
-                renderItem={renderVideo}
-                keyExtractor={(item) => item.id}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.videosList}
-              />
-            </View>
-          )}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
-              {t.seasons}
-            </Text>
-            {details.seasons.filter((season) => season.season_number > 0)
-              .length > 0 ? (
-              details.seasons
-                .filter((season) => season.season_number > 0)
-                .map((season) => (
-                  <SeasonItem
-                    key={season.id}
-                    season={season}
-                    details={details}
-                    navigation={navigation}
-                  />
-                ))
-            ) : (
-              <View
-                style={[
-                  styles.noContentContainer,
-                  {
-                    backgroundColor: theme.secondary,
-                    shadowColor: theme.shadow,
-                  },
-                ]}
-              >
-                <Text
-                  style={[styles.noContentText, { color: theme.text.muted }]}
-                >
-                  {t.noSeasonInfo}
-                </Text>
+                </TouchableOpacity>
               </View>
-            )}
-          </View>
-          {details.recommendations?.results.length > 0 && (
+            ) : null}
             <View style={styles.section}>
               <Text
                 style={[styles.sectionTitle, { color: theme.text.primary }]}
               >
-                {t.recommendedTvShows}
+                {t.overview}
               </Text>
-              <FlatList
-                data={details.recommendations.results.slice(0, 20)}
-                renderItem={({ item }) => (
-                  <SimilarTvShow item={item} navigation={navigation} />
-                )}
-                keyExtractor={(item) => item.id.toString()}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.similarList}
-              />
-            </View>
-          )}
-          {details.similar?.results.length > 0 && (
-            <View style={styles.section}>
               <Text
-                style={[styles.sectionTitle, { color: theme.text.primary }]}
+                style={[styles.overview, { color: theme.text.secondary }]}
+                numberOfLines={numberOfLines ? null : 10}
+                ellipsizeMode="tail"
+                onTextLayout={(event) => {
+                  const { lines } = event.nativeEvent;
+                  setLineCount(lines.length); // Satır sayısını güncelle
+                }}
               >
-                {t.similarTvShows}
+                {details.overview || t.tvShowsDetails.noOverviewAvailable}
               </Text>
-              <FlatList
-                data={details.similar.results.slice(0, 20)}
-                renderItem={({ item }) => (
-                  <SimilarTvShow item={item} navigation={navigation} />
-                )}
-                keyExtractor={(item) => item.id.toString()}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.similarList}
-              />
-            </View>
-          )}
-          {details.reviews?.results.length > 0 && (
-            <View style={styles.section}>
-              <Text
-                style={[styles.sectionTitle, { color: theme.text.primary }]}
-              >
-                {t.reviews}
-              </Text>
-              {details.reviews.results.slice(0, reviewLenght).map((review) => (
-                <View
-                  key={review.id}
-                  style={[
-                    styles.reviewItem,
-                    {
-                      backgroundColor: theme.secondary,
-                      shadowColor: theme.shadow,
-                    },
-                  ]}
-                >
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() =>
-                      setReviewTextLenght(
-                        review.id == reviewTextLenght ? null : review.id,
-                      )
-                    }
-                  >
-                    <View style={styles.reviewHeader}>
-                      <Text
-                        style={[
-                          styles.reviewAuthor,
-                          { color: theme.text.primary },
-                        ]}
-                      >
-                        {review.author}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.reviewDate,
-                          { color: theme.text.secondary },
-                        ]}
-                      >
-                        {new Date(review.created_at).toLocaleDateString()}
-                      </Text>
-                    </View>
-                    <Text
-                      style={[
-                        styles.reviewContent,
-                        { color: theme.text.secondary },
-                      ]}
-                      numberOfLines={review.id === reviewTextLenght ? null : 2}
-                    >
-                      {review.content}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-              {details.reviews?.results.length > 5 ? (
+              {lineCount > 10 ? (
                 <TouchableOpacity
-                  onPress={() =>
-                    setReviewLenght(
-                      details.reviews?.results.length === reviewLenght
-                        ? 5
-                        : details.reviews?.results.length,
-                    )
-                  }
+                  onPress={() => setNumberOfLines(!numberOfLines)}
                   style={{
                     width: "100%",
                     justifyContent: "center",
@@ -1231,41 +1084,443 @@ export default function TvShowsDetails({ route, navigation }) {
                   }}
                   activeOpacity={0.8}
                 >
-                  <MaterialIcons
-                    name={
-                      reviewLenght > 5
-                        ? "keyboard-arrow-up"
-                        : "keyboard-arrow-down"
-                    }
-                    size={40}
-                    color={theme.text.primary}
-                    style={{
-                      width: 40,
-                      backgroundColor: theme.secondary,
-                      borderRadius: 15,
-                      shadowColor: theme.shadow,
-                      shadowOffset: {
-                        width: 0,
-                        height: 8,
-                      },
-                      shadowOpacity: 0.94,
-                      shadowRadius: 10.32,
-                      elevation: 5,
-                    }}
-                  />
+                  {numberOfLines ? (
+                    <MaterialIcons
+                      name="keyboard-arrow-up"
+                      size={40}
+                      color={theme.text.primary}
+                      style={{
+                        width: 40,
+                        backgroundColor: theme.secondary,
+                        borderRadius: 15,
+                        shadowColor: theme.shadow,
+                        shadowOffset: {
+                          width: 0,
+                          height: 8,
+                        },
+                        shadowOpacity: 0.94,
+                        shadowRadius: 10.32,
+                        elevation: 5,
+                      }}
+                    />
+                  ) : (
+                    <MaterialIcons
+                      name="keyboard-arrow-down"
+                      size={40}
+                      color={theme.text.primary}
+                      style={{
+                        width: 40,
+                        backgroundColor: theme.secondary,
+                        borderRadius: 15,
+                        shadowColor: theme.shadow,
+                        shadowOffset: {
+                          width: 0,
+                          height: 8,
+                        },
+                        shadowOpacity: 0.94,
+                        shadowRadius: 10.32,
+                        elevation: 5,
+                      }}
+                    />
+                  )}
                 </TouchableOpacity>
               ) : null}
             </View>
-          )}
+            {details.videos?.results.length > 0 && (
+              <View style={styles.section}>
+                <Text
+                  style={[styles.sectionTitle, { color: theme.text.primary }]}
+                >
+                  {t.videos}
+                </Text>
+
+                <FlatList
+                  data={details.videos.results.filter(
+                    (video) => video.site === "YouTube",
+                  )}
+                  renderItem={renderVideo}
+                  keyExtractor={(item) => item.id}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.videosList}
+                />
+              </View>
+            )}
+            <View style={styles.section}>
+              <Text
+                style={[styles.sectionTitle, { color: theme.text.primary }]}
+              >
+                {t.seasons}
+              </Text>
+              {details.seasons.filter((season) => season.season_number > 0)
+                .length > 0 ? (
+                details.seasons
+                  .filter((season) => season.season_number > 0)
+                  .map((season) => (
+                    <SeasonItem
+                      key={season.id}
+                      season={season}
+                      details={details}
+                      navigation={navigation}
+                    />
+                  ))
+              ) : (
+                <View
+                  style={[
+                    styles.noContentContainer,
+                    {
+                      backgroundColor: theme.secondary,
+                      shadowColor: theme.shadow,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[styles.noContentText, { color: theme.text.muted }]}
+                  >
+                    {t.noSeasonInfo}
+                  </Text>
+                </View>
+              )}
+            </View>
+            {details.recommendations?.results.length > 0 && (
+              <View style={styles.section}>
+                <Text
+                  style={[styles.sectionTitle, { color: theme.text.primary }]}
+                >
+                  {t.recommendedTvShows}
+                </Text>
+                <FlatList
+                  data={details.recommendations.results.slice(0, 20)}
+                  renderItem={({ item }) => (
+                    <SimilarTvShow item={item} navigation={navigation} />
+                  )}
+                  keyExtractor={(item) => item.id.toString()}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.similarList}
+                />
+              </View>
+            )}
+            {details.similar?.results.length > 0 && (
+              <View style={styles.section}>
+                <Text
+                  style={[styles.sectionTitle, { color: theme.text.primary }]}
+                >
+                  {t.similarTvShows}
+                </Text>
+                <FlatList
+                  data={details.similar.results.slice(0, 20)}
+                  renderItem={({ item }) => (
+                    <SimilarTvShow item={item} navigation={navigation} />
+                  )}
+                  keyExtractor={(item) => item.id.toString()}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.similarList}
+                />
+              </View>
+            )}
+            {details.reviews?.results.length > 0 && (
+              <View style={styles.section}>
+                <Text
+                  style={[styles.sectionTitle, { color: theme.text.primary }]}
+                >
+                  {t.reviews}
+                </Text>
+                {details.reviews.results
+                  .slice(0, reviewLenght)
+                  .map((review) => (
+                    <View
+                      key={review.id}
+                      style={[
+                        styles.reviewItem,
+                        {
+                          backgroundColor: theme.secondary,
+                          shadowColor: theme.shadow,
+                        },
+                      ]}
+                    >
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() =>
+                          setReviewTextLenght(
+                            review.id == reviewTextLenght ? null : review.id,
+                          )
+                        }
+                      >
+                        <View style={styles.reviewHeader}>
+                          <Text
+                            style={[
+                              styles.reviewAuthor,
+                              { color: theme.text.primary },
+                            ]}
+                          >
+                            {review.author}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.reviewDate,
+                              { color: theme.text.secondary },
+                            ]}
+                          >
+                            {new Date(review.created_at).toLocaleDateString()}
+                          </Text>
+                        </View>
+                        <Text
+                          style={[
+                            styles.reviewContent,
+                            { color: theme.text.secondary },
+                          ]}
+                          numberOfLines={
+                            review.id === reviewTextLenght ? null : 2
+                          }
+                        >
+                          {review.content}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                {details.reviews?.results.length > 5 ? (
+                  <TouchableOpacity
+                    onPress={() =>
+                      setReviewLenght(
+                        details.reviews?.results.length === reviewLenght
+                          ? 5
+                          : details.reviews?.results.length,
+                      )
+                    }
+                    style={{
+                      width: "100%",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      marginTop: 10,
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialIcons
+                      name={
+                        reviewLenght > 5
+                          ? "keyboard-arrow-up"
+                          : "keyboard-arrow-down"
+                      }
+                      size={40}
+                      color={theme.text.primary}
+                      style={{
+                        width: 40,
+                        backgroundColor: theme.secondary,
+                        borderRadius: 15,
+                        shadowColor: theme.shadow,
+                        shadowOffset: {
+                          width: 0,
+                          height: 8,
+                        },
+                        shadowOpacity: 0.94,
+                        shadowRadius: 10.32,
+                        elevation: 5,
+                      }}
+                    />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            )}
+          </View>
         </View>
-      </View>
-      <Modal
-        visible={selectedVideo !== null}
-        onRequestClose={() => setSelectedVideo(null)}
-        animationType="slide"
-        transparent={true}
-      >
-        <View style={styles.modalContainerVideo}>
+        <Modal
+          visible={selectedVideo !== null}
+          onRequestClose={() => setSelectedVideo(null)}
+          animationType="slide"
+          transparent={true}
+        >
+          <View style={styles.modalContainerVideo}>
+            <BlurView
+              tint="dark"
+              intensity={50}
+              experimentalBlurMethod="dimezisBlurView" // Android için sihirli kod
+              style={StyleSheet.absoluteFill}
+            />
+            <TouchableOpacity
+              style={{
+                position: "absolute",
+                top: 0,
+                right: 0,
+                left: 0,
+                bottom: 0,
+              }}
+              onPress={() => setSelectedVideo(null)}
+            />
+            <View style={styles.modalContentVideo}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setSelectedVideo(null)}
+              >
+                <FontAwesome5 name="times" size={24} color="#fff" />
+              </TouchableOpacity>
+              {selectedVideo && (
+                <YoutubePlayer
+                  height={250}
+                  videoId={selectedVideo}
+                  play={true}
+                />
+              )}
+            </View>
+          </View>
+        </Modal>
+        <Modal
+          visible={modalVisible} // artık state'e bağlı
+          onRequestClose={closeModal}
+          animationType="slide"
+          transparent={true}
+        >
+          <View style={styles.modalContainer}>
+            <LinearGradient
+              colors={[
+                "rgba(0,0,0,0)",
+                "rgba(0,0,0,0)",
+                "rgba(0,0,0,0.7)",
+                "rgba(0,0,0,0.9)",
+              ]}
+              style={{
+                position: "absolute",
+                top: 0,
+                right: 0,
+                left: 0,
+                bottom: 0,
+              }}
+            />
+            <TouchableOpacity
+              style={{
+                position: "absolute",
+                top: 0,
+                right: 0,
+                left: 0,
+                bottom: 0,
+              }}
+              onPress={closeModal}
+            />
+            <View
+              style={[
+                styles.modalContent,
+                { backgroundColor: theme.secondary },
+              ]}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  gap: 5,
+                }}
+              >
+                {/* İleride başka seçenekler de ekleyebilirsin */}
+                <TouchableOpacity
+                  style={[styles.input, { backgroundColor: theme.primary }]}
+                  onPress={showDatePicker}
+                >
+                  <Ionicons
+                    name="calendar-outline"
+                    size={48}
+                    color={theme.text.primary}
+                  />
+                  {!selectedDate ? (
+                    <Text
+                      style={[styles.inputText, { color: theme.text.primary }]}
+                    >
+                      Tarih seçiniz
+                    </Text>
+                  ) : (
+                    <>
+                      <Text
+                        style={[
+                          styles.inputText,
+                          { color: theme.text.primary },
+                        ]}
+                      >
+                        Seçili Tarih
+                      </Text>
+                      <Text
+                        style={[
+                          styles.inputTextDate,
+                          { color: theme.text.secondary },
+                        ]}
+                      >
+                        {formatDate(selectedDate)}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.input, { backgroundColor: theme.primary }]}
+                  onPress={() => {
+                    (setSelectedDate(new Date()),
+                      addShowToFirestore(new Date()));
+                  }}
+                >
+                  <Entypo
+                    name="stopwatch"
+                    size={48}
+                    color={theme.text.primary}
+                  />
+                  <Text
+                    style={[styles.inputText, { color: theme.text.primary }]}
+                  >
+                    Şimdi
+                  </Text>
+                  <Text
+                    style={[
+                      styles.inputTextDate,
+                      { color: theme.text.secondary },
+                    ]}
+                  >
+                    {formatDate(new Date())}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.input, { backgroundColor: theme.primary }]}
+                  onPress={() => {
+                    (setSelectedDate(showReleaseDateTime),
+                      addShowToFirestore(showReleaseDateTime));
+                  }}
+                >
+                  <MaterialCommunityIcons
+                    name="movie-play-outline"
+                    size={48}
+                    color={theme.text.primary}
+                  />
+                  <Text
+                    style={[styles.inputText, { color: theme.text.primary }]}
+                  >
+                    Yayınlanma Tarih
+                  </Text>
+                  <Text
+                    style={[
+                      styles.inputTextDate,
+                      { color: theme.text.secondary },
+                    ]}
+                  >
+                    {formatDate(showReleaseDateTime)}
+                  </Text>
+                </TouchableOpacity>
+                <DateTimePickerModal
+                  isVisible={isDatePickerVisible}
+                  mode="date"
+                  onConfirm={handleConfirm}
+                  onCancel={hideDatePicker}
+                  minimumDate={new Date(showReleaseDateTime)} // 1 Ocak 2000'den önce seçilemez
+                  maximumDate={new Date()} // Bugünden ileri seçilemez
+                />
+
+                {/* Buraya başka butonlar veya seçenekler ekleyebilirsin */}
+              </View>
+            </View>
+          </View>
+        </Modal>
+        <Modal
+          visible={PosterModalVisible || backdropModalVisible} // artık state'e bağlı
+          onRequestClose={() => {
+            (setPosterModalVisible(false), setBacdropModalVisible(false));
+          }}
+          animationType="fade"
+          transparent={true}
+        >
           <BlurView
             tint="dark"
             intensity={50}
@@ -1280,204 +1535,35 @@ export default function TvShowsDetails({ route, navigation }) {
               left: 0,
               bottom: 0,
             }}
-            onPress={() => setSelectedVideo(null)}
-          />
-          <View style={styles.modalContentVideo}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setSelectedVideo(null)}
-            >
-              <FontAwesome5 name="times" size={24} color="#fff" />
-            </TouchableOpacity>
-            {selectedVideo && (
-              <YoutubePlayer height={250} videoId={selectedVideo} play={true} />
-            )}
-          </View>
-        </View>
-      </Modal>
-      <Modal
-        visible={modalVisible} // artık state'e bağlı
-        onRequestClose={closeModal}
-        animationType="slide"
-        transparent={true}
-      >
-        <View style={styles.modalContainer}>
-          <LinearGradient
-            colors={[
-              "rgba(0,0,0,0)",
-              "rgba(0,0,0,0)",
-              "rgba(0,0,0,0.7)",
-              "rgba(0,0,0,0.9)",
-            ]}
-            style={{
-              position: "absolute",
-              top: 0,
-              right: 0,
-              left: 0,
-              bottom: 0,
+            onPress={() => {
+              (setPosterModalVisible(false), setBacdropModalVisible(false));
             }}
-          />
-          <TouchableOpacity
-            style={{
-              position: "absolute",
-              top: 0,
-              right: 0,
-              left: 0,
-              bottom: 0,
-            }}
-            onPress={closeModal}
           />
           <View
-            style={[styles.modalContent, { backgroundColor: theme.secondary }]}
+            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
           >
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                gap: 5,
-              }}
-            >
-              {/* İleride başka seçenekler de ekleyebilirsin */}
-              <TouchableOpacity
-                style={[styles.input, { backgroundColor: theme.primary }]}
-                onPress={showDatePicker}
-              >
-                <Ionicons
-                  name="calendar-outline"
-                  size={48}
-                  color={theme.text.primary}
-                />
-                {!selectedDate ? (
-                  <Text
-                    style={[styles.inputText, { color: theme.text.primary }]}
-                  >
-                    Tarih seçiniz
-                  </Text>
-                ) : (
-                  <>
-                    <Text
-                      style={[styles.inputText, { color: theme.text.primary }]}
-                    >
-                      Seçili Tarih
-                    </Text>
-                    <Text
-                      style={[
-                        styles.inputTextDate,
-                        { color: theme.text.secondary },
-                      ]}
-                    >
-                      {formatDate(selectedDate)}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.input, { backgroundColor: theme.primary }]}
-                onPress={() => {
-                  (setSelectedDate(new Date()), addShowToFirestore(new Date()));
-                }}
-              >
-                <Entypo name="stopwatch" size={48} color={theme.text.primary} />
-                <Text style={[styles.inputText, { color: theme.text.primary }]}>
-                  Şimdi
-                </Text>
-                <Text
-                  style={[
-                    styles.inputTextDate,
-                    { color: theme.text.secondary },
-                  ]}
-                >
-                  {formatDate(new Date())}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.input, { backgroundColor: theme.primary }]}
-                onPress={() => {
-                  (setSelectedDate(showReleaseDateTime),
-                    addShowToFirestore(showReleaseDateTime));
-                }}
-              >
-                <MaterialCommunityIcons
-                  name="movie-play-outline"
-                  size={48}
-                  color={theme.text.primary}
-                />
-                <Text style={[styles.inputText, { color: theme.text.primary }]}>
-                  Yayınlanma Tarih
-                </Text>
-                <Text
-                  style={[
-                    styles.inputTextDate,
-                    { color: theme.text.secondary },
-                  ]}
-                >
-                  {formatDate(showReleaseDateTime)}
-                </Text>
-              </TouchableOpacity>
-              <DateTimePickerModal
-                isVisible={isDatePickerVisible}
-                mode="date"
-                onConfirm={handleConfirm}
-                onCancel={hideDatePicker}
-                minimumDate={new Date(showReleaseDateTime)} // 1 Ocak 2000'den önce seçilemez
-                maximumDate={new Date()} // Bugünden ileri seçilemez
-              />
-
-              {/* Buraya başka butonlar veya seçenekler ekleyebilirsin */}
-            </View>
+            <Image
+              source={
+                PosterModalVisible
+                  ? {
+                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${details.poster_path}`,
+                    }
+                  : {
+                      uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,
+                    }
+              }
+              style={[
+                {
+                  width: PosterModalVisible ? 360 : 380,
+                  height: PosterModalVisible ? 540 : 300,
+                  borderRadius: 20,
+                },
+              ]}
+            />
           </View>
-        </View>
-      </Modal>
-      <Modal
-        visible={PosterModalVisible || backdropModalVisible} // artık state'e bağlı
-        onRequestClose={() => {
-          (setPosterModalVisible(false), setBacdropModalVisible(false));
-        }}
-        animationType="fade"
-        transparent={true}
-      >
-        <BlurView
-          tint="dark"
-          intensity={50}
-          experimentalBlurMethod="dimezisBlurView" // Android için sihirli kod
-          style={StyleSheet.absoluteFill}
-        />
-        <TouchableOpacity
-          style={{
-            position: "absolute",
-            top: 0,
-            right: 0,
-            left: 0,
-            bottom: 0,
-          }}
-          onPress={() => {
-            (setPosterModalVisible(false), setBacdropModalVisible(false));
-          }}
-        />
-        <View
-          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-        >
-          <Image
-            source={
-              PosterModalVisible
-                ? {
-                    uri: `https://image.tmdb.org/t/p/w500${details.poster_path}`,
-                  }
-                : {
-                    uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,
-                  }
-            }
-            style={[
-              {
-                width: PosterModalVisible ? 360 : 380,
-                height: PosterModalVisible ? 540 : 300,
-                borderRadius: 20,
-              },
-            ]}
-          />
-        </View>
-      </Modal>
-    </ScrollView>
+        </Modal>
+      </ScrollView>
+    </View>
   );
 }
 

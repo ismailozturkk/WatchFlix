@@ -15,10 +15,12 @@ import { MovieSkeleton } from "../../components/Skeleton";
 import { useTvShow } from "../../context/TvShowContex";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useAppSettings } from "../../context/AppSettingsContext";
 const { width } = Dimensions.get("window");
 
 export default function TvShowsProvders({ navigation }) {
   const { theme } = useTheme();
+  const { imageQuality } = useAppSettings();
   const {
     providers,
     selectedProvider,
@@ -121,7 +123,9 @@ export default function TvShowsProvders({ navigation }) {
           <Image
             source={
               item.poster_path
-                ? { uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }
+                ? {
+                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                  }
                 : require("../../assets/image/no_image.png")
             }
             style={[styles.similarPoster, { shadowColor: theme.shadow }]}
@@ -133,7 +137,7 @@ export default function TvShowsProvders({ navigation }) {
               { backgroundColor: theme.secondaryt },
             ]}
           >
-            <Text style={styles.similarRatingText}>
+            <Text allowFontScaling={false} style={styles.similarRatingText}>
               {item.vote_average.toFixed(1)}
             </Text>
           </View>

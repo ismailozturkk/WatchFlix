@@ -25,6 +25,7 @@ export default function MovieNowPlaying({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
   const { moviesNowPlaying, loadingNowPlaying } = useMovie();
+  const { imageQuality } = useAppSettings();
 
   // Animated import'unun eklendiğinden emin olun
   const [scaleValues, setScaleValues] = useState({});
@@ -60,7 +61,10 @@ export default function MovieNowPlaying({ navigation }) {
   if (loadingNowPlaying) {
     return (
       <View style={{ flex: 1, paddingVertical: 10 }}>
-        <Text style={[styles.title, { color: theme.text.secondary }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.title, { color: theme.text.secondary }]}
+        >
           {t.movieScreens.theaters}
         </Text>
 
@@ -95,7 +99,9 @@ export default function MovieNowPlaying({ navigation }) {
           <Image
             source={
               item.poster_path
-                ? { uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }
+                ? {
+                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                  }
                 : require("../../assets/image/no_image.png")
             }
             style={[styles.similarPoster, { shadowColor: theme.shadow }]}
@@ -107,7 +113,7 @@ export default function MovieNowPlaying({ navigation }) {
               { backgroundColor: theme.secondaryt },
             ]}
           >
-            <Text style={styles.similarRatingText}>
+            <Text allowFontScaling={false} style={styles.similarRatingText}>
               {item.vote_average.toFixed(1)}
             </Text>
           </View>
@@ -181,7 +187,10 @@ export default function MovieNowPlaying({ navigation }) {
   };
   return (
     <View style={{ flex: 1, paddingVertical: 10 }}>
-      <Text style={[styles.title, { color: theme.text.secondary }]}>
+      <Text
+        allowFontScaling={false}
+        style={[styles.title, { color: theme.text.secondary }]}
+      >
         {t.movieScreens.theaters}
       </Text>
 

@@ -16,6 +16,7 @@ import { useTvShow } from "../../context/TvShowContex";
 import { useLanguage } from "../../context/LanguageContext";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useAppSettings } from "../../context/AppSettingsContext";
 
 const { width } = Dimensions.get("window");
 
@@ -30,7 +31,7 @@ export default function TvShowsAiringToday({ navigation }) {
     pageAiringToday,
   } = useTvShow();
   // Film türlerini API'den almak
-
+  const { imageQuality } = useAppSettings();
   // Animated import'unun eklendiğinden emin olun
   const [scaleValues, setScaleValues] = useState({});
 
@@ -66,7 +67,10 @@ export default function TvShowsAiringToday({ navigation }) {
     return (
       <View style={{ flex: 1, paddingVertical: 10 }}>
         <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <Text style={[styles.title, { color: theme.text.secondary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.title, { color: theme.text.secondary }]}
+          >
             {t.tvShowScreens.airingToday}
           </Text>
         </View>
@@ -86,7 +90,10 @@ export default function TvShowsAiringToday({ navigation }) {
             alignItems: "center",
           }}
         >
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
             ●●●
           </Text>
           {pageAiringToday > 5 && (
@@ -100,11 +107,17 @@ export default function TvShowsAiringToday({ navigation }) {
                   },
                 ]}
               >
-                <Text style={[styles.genreText, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.genreText, { color: theme.text.primary }]}
+                >
                   {pageAiringToday - 5}
                 </Text>
               </TouchableOpacity>
-              <Text style={[styles.genreText, { color: theme.text.muted }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.muted }]}
+              >
                 ●
               </Text>
             </>
@@ -120,7 +133,10 @@ export default function TvShowsAiringToday({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageAiringToday - 2}
               </Text>
             </TouchableOpacity>
@@ -135,7 +151,10 @@ export default function TvShowsAiringToday({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageAiringToday - 1}
               </Text>
             </TouchableOpacity>
@@ -162,7 +181,10 @@ export default function TvShowsAiringToday({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageAiringToday + 1}
             </Text>
           </TouchableOpacity>
@@ -175,11 +197,19 @@ export default function TvShowsAiringToday({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageAiringToday + 2}
             </Text>
           </TouchableOpacity>
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>●</Text>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
+            ●
+          </Text>
           <TouchableOpacity
             onPress={() => setPageAiringToday(pageAiringToday + 5)}
             style={[
@@ -189,11 +219,17 @@ export default function TvShowsAiringToday({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageAiringToday + 5}
             </Text>
           </TouchableOpacity>
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
             ●●●
           </Text>
         </View>
@@ -223,7 +259,7 @@ export default function TvShowsAiringToday({ navigation }) {
               source={
                 item.poster_path
                   ? {
-                      uri: `https://image.tmdb.org/t/p/w500${item.poster_path}`,
+                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
                     }
                   : require("../../assets/image/no_image.png")
               }
@@ -333,7 +369,10 @@ export default function TvShowsAiringToday({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <Text style={[styles.title, { color: theme.text.secondary }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.title, { color: theme.text.secondary }]}
+        >
           {t.tvShowScreens.airingToday}
         </Text>
       </View>
@@ -353,7 +392,12 @@ export default function TvShowsAiringToday({ navigation }) {
           alignItems: "center",
         }}
       >
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●●●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●●●
+        </Text>
         {pageAiringToday > 1 && (
           <>
             <TouchableOpacity
@@ -365,11 +409,17 @@ export default function TvShowsAiringToday({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {1}
               </Text>
             </TouchableOpacity>
-            <Text style={[styles.genreText, { color: theme.text.muted }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.muted }]}
+            >
               ●
             </Text>
           </>
@@ -385,7 +435,10 @@ export default function TvShowsAiringToday({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageAiringToday - 2}
             </Text>
           </TouchableOpacity>
@@ -400,7 +453,10 @@ export default function TvShowsAiringToday({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageAiringToday - 1}
             </Text>
           </TouchableOpacity>
@@ -429,7 +485,10 @@ export default function TvShowsAiringToday({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageAiringToday + 1}
               </Text>
             </TouchableOpacity>
@@ -443,13 +502,21 @@ export default function TvShowsAiringToday({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageAiringToday + 2}
               </Text>
             </TouchableOpacity>
           </>
         ) : null}
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●
+        </Text>
         <TouchableOpacity
           onPress={() => setPageAiringToday(totalPagesAiringToday)}
           style={[
@@ -459,11 +526,19 @@ export default function TvShowsAiringToday({ navigation }) {
             },
           ]}
         >
-          <Text style={[styles.genreText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.primary }]}
+          >
             {totalPagesAiringToday}
           </Text>
         </TouchableOpacity>
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●●●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●●●
+        </Text>
       </View>
     </View>
   );

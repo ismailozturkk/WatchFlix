@@ -11,15 +11,10 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useTheme } from "../context/ThemeContext";
-import { doc, getDoc, onSnapshot } from "firebase/firestore";
-import { db } from "../firebase";
-import { useAuth } from "../context/AuthContext";
-import { LinearGradient } from "expo-linear-gradient";
-import Entypo from "@expo/vector-icons/Entypo";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useLanguage } from "../context/LanguageContext";
 import LottieView from "lottie-react-native";
 import { useListStatusContext } from "../context/ListStatusContext";
+import { BlurView } from "expo-blur";
 
 const ListViewTv = ({
   updateList,
@@ -33,30 +28,28 @@ const ListViewTv = ({
 }) => {
   const { t } = useLanguage();
   const { theme } = useTheme();
-  const { user } = useAuth();
   const [modalVisible, setModalVisible] = useState(false);
   const [otherLists, setOtherLists] = useState();
   const [fullLists, setFullLists] = useState();
-  const trueCount = otherLists?.filter((list) => listStates[list]).length; //! other list var ise değilde other listin içerisinde var ise görünümleri değiştir
+  const trueCount = otherLists?.filter((list) => listStates[list]).length;
 
   const [scaleValues, setScaleValues] = useState({});
   useEffect(() => {
     const newScaleValues = {};
-    // otherLists dizisinde tüm liste isimleri var
     (fullLists || []).forEach((listName) => {
       newScaleValues[listName] = new Animated.Value(1);
     });
     setScaleValues(newScaleValues);
   }, [fullLists]);
+
   const onPressIn = (listName) => {
     if (!scaleValues[listName]) return;
-
     Animated.spring(scaleValues[listName], {
       toValue: 0.6,
       friction: 3,
       tension: 200,
       useNativeDriver: true,
-    }).start(() => {});
+    }).start();
   };
 
   const onPressOut = (listName) => {
@@ -77,20 +70,11 @@ const ListViewTv = ({
       setOtherLists([]);
       return;
     }
-    const predefinedLists = [
-      "watchedTv",
-      "favorites",
-      "watchList",
-      "watchedMovies",
-    ];
+    const predefinedLists = ["watchedTv", "favorites", "watchList", "watchedMovies"];
     setFullLists(Object.keys(allLists));
-    // Dinamik olarak diğer listeleri bul
-    const otherLists = Object.keys(allLists).filter(
-      (list) => !predefinedLists.includes(list),
-    );
-
-    setOtherLists(otherLists);
+    setOtherLists(Object.keys(allLists).filter((list) => !predefinedLists.includes(list)));
   }, [allLists]);
+
   return (
     <View
       style={[
@@ -98,47 +82,28 @@ const ListViewTv = ({
         { backgroundColor: theme.secondary, shadowColor: theme.shadow },
       ]}
     >
+      {/* İzleme Listesi */}
       <TouchableOpacity
         onPressIn={() => onPressIn("watchList")}
         onPressOut={() => onPressOut("watchList")}
-        onPress={() => {
-          updateList("watchList", type);
-        }}
+        onPress={() => updateList("watchList", type)}
       >
-        <Animated.View
-          style={[
-            {
-              transform: [{ scale: scaleValues["watchList"] || 1 }],
-            },
-          ]}
-        >
+        <Animated.View style={{ transform: [{ scale: scaleValues["watchList"] || 1 }] }}>
           {listStates["watchList"] ? (
             <Ionicons name="bookmark" size={32} color={theme.colors.blue} />
           ) : (
-            <Ionicons
-              name="bookmark-outline"
-              size={32}
-              color={theme.text.secondary}
-            />
+            <Ionicons name="bookmark-outline" size={32} color={theme.text.secondary} />
           )}
         </Animated.View>
       </TouchableOpacity>
+
+      {/* İzlendi */}
       <TouchableOpacity
         onPressIn={() => onPressIn("watchedTv")}
         onPressOut={() => onPressOut("watchedTv")}
-        onPress={() => {
-          !listStates["watchedTv"]
-            ? openModal()
-            : addShowToFirestore(new Date());
-        }}
+        onPress={() => (!listStates["watchedTv"] ? openModal() : addShowToFirestore(new Date()))}
       >
-        <Animated.View
-          style={[
-            {
-              transform: [{ scale: scaleValues["watchedTv"] || 1 }],
-            },
-          ]}
-        >
+        <Animated.View style={{ transform: [{ scale: scaleValues["watchedTv"] || 1 }] }}>
           {isLoading ? (
             <LottieView
               source={require("../LottieJson/loading15.json")}
@@ -150,328 +115,195 @@ const ListViewTv = ({
             <Ionicons
               name="eye"
               size={32}
-              color={
-                isSeasonWatched === 1 ? theme.colors.green : theme.colors.orange
-              }
+              color={isSeasonWatched === 1 ? theme.colors.green : theme.colors.orange}
             />
           ) : (
-            <Ionicons
-              name="eye-outline"
-              size={32}
-              color={theme.text.secondary}
-            />
+            <Ionicons name="eye-outline" size={32} color={theme.text.secondary} />
           )}
         </Animated.View>
       </TouchableOpacity>
+
+      {/* Favoriler */}
       <TouchableOpacity
         onPressIn={() => onPressIn("favorites")}
         onPressOut={() => onPressOut("favorites")}
-        onPress={() => {
-          updateList("favorites", type);
-        }}
+        onPress={() => updateList("favorites", type)}
       >
-        <Animated.View
-          style={[
-            {
-              transform: [{ scale: scaleValues["favorites"] || 1 }],
-            },
-          ]}
-        >
+        <Animated.View style={{ transform: [{ scale: scaleValues["favorites"] || 1 }] }}>
           {listStates["favorites"] ? (
             <Ionicons name="heart" size={32} color={theme.colors.red} />
           ) : (
-            <Ionicons
-              name="heart-outline"
-              size={32}
-              color={theme.text.secondary}
-            />
+            <Ionicons name="heart-outline" size={32} color={theme.text.secondary} />
           )}
         </Animated.View>
       </TouchableOpacity>
 
+      {/* Diğer Listeler butonu */}
       <TouchableOpacity
-        onPress={() => {
-          {
-            (setModalVisible(true), OtherLists());
-          }
-        }}
+        onPress={() => setModalVisible(true)}
         style={{ justifyContent: "center", alignItems: "center" }}
       >
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 0,
-          }}
-        >
-          <Ionicons
-            name="square"
-            size={14}
-            color={
-              otherLists?.length > 0
-                ? trueCount > 0
-                  ? theme.colors.green
-                  : theme.accent
-                : theme.between
-            }
-          />
-          <Ionicons
-            name="square"
-            size={14}
-            color={
-              otherLists?.length > 1
-                ? trueCount > 1
-                  ? theme.colors.green
-                  : theme.accent
-                : theme.between
-            }
-          />
+        <View style={{ flexDirection: "row", gap: 0 }}>
+          <Ionicons name="square" size={14} color={otherLists?.length > 0 ? (trueCount > 0 ? theme.colors.green : theme.accent) : theme.between} />
+          <Ionicons name="square" size={14} color={otherLists?.length > 1 ? (trueCount > 1 ? theme.colors.green : theme.accent) : theme.between} />
         </View>
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 0,
-          }}
-        >
-          <Ionicons
-            name="square"
-            size={14}
-            color={
-              otherLists?.length > 2
-                ? trueCount > 2
-                  ? theme.colors.green
-                  : theme.accent
-                : theme.between
-            }
-          />
-          <View
-            style={{
-              flex: 1,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                gap: 0,
-              }}
-            >
-              <Ionicons
-                name="square"
-                size={6}
-                color={
-                  otherLists?.length > 3
-                    ? trueCount > 3
-                      ? theme.colors.green
-                      : theme.accent
-                    : theme.between
-                }
-              />
-              <Ionicons
-                name="square"
-                size={6}
-                color={
-                  otherLists?.length > 4
-                    ? trueCount > 4
-                      ? theme.colors.green
-                      : theme.accent
-                    : theme.between
-                }
-              />
+        <View style={{ flexDirection: "row", gap: 0 }}>
+          <Ionicons name="square" size={14} color={otherLists?.length > 2 ? (trueCount > 2 ? theme.colors.green : theme.accent) : theme.between} />
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <View style={{ flexDirection: "row", gap: 0 }}>
+              <Ionicons name="square" size={6} color={otherLists?.length > 3 ? (trueCount > 3 ? theme.colors.green : theme.accent) : theme.between} />
+              <Ionicons name="square" size={6} color={otherLists?.length > 4 ? (trueCount > 4 ? theme.colors.green : theme.accent) : theme.between} />
             </View>
-            <View
-              style={{
-                flexDirection: "row",
-                gap: 0,
-              }}
-            >
-              <Ionicons
-                name="square"
-                size={6}
-                color={
-                  otherLists?.length > 5
-                    ? trueCount > 5
-                      ? theme.colors.green
-                      : theme.accent
-                    : theme.between
-                }
-              />
-              <Ionicons
-                name="square"
-                size={6}
-                color={
-                  otherLists?.length > 6
-                    ? trueCount > 6
-                      ? theme.colors.green
-                      : theme.accent
-                    : theme.between
-                }
-              />
+            <View style={{ flexDirection: "row", gap: 0 }}>
+              <Ionicons name="square" size={6} color={otherLists?.length > 5 ? (trueCount > 5 ? theme.colors.green : theme.accent) : theme.between} />
+              <Ionicons name="square" size={6} color={otherLists?.length > 6 ? (trueCount > 6 ? theme.colors.green : theme.accent) : theme.between} />
             </View>
           </View>
         </View>
       </TouchableOpacity>
 
-      {otherLists?.length > 0 ? (
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalVisible}
-          onRequestClose={() => setModalVisible(false)}
-        >
-          <View style={styles.modalContainerList}>
-            <LinearGradient
-              colors={["transparent", theme.shadow, theme.shadow]}
-              style={{
-                position: "absolute",
-                top: 0,
-                right: 0,
-                left: 0,
-                bottom: 0,
-                zIndex: 0,
-              }}
-            />
-            <TouchableOpacity
-              onPress={() => setModalVisible(false)}
-              style={{
-                position: "absolute",
-                top: 0,
-                right: 0,
-                left: 0,
-                bottom: 0,
-                zIndex: 0,
-              }}
-            />
-            <View
-              style={[styles.modalViewList, { backgroundColor: theme.primary }]}
-            >
-              <Text
-                style={[styles.modalTextList, { color: theme.text.primary }]}
-              >
-                Diğer Listeler
-              </Text>
+      {/* Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.overlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setModalVisible(false)}
+          />
+          <BlurView
+            tint="dark"
+            intensity={40}
+            experimentalBlurMethod="dimezisBlurView"
+            style={StyleSheet.absoluteFill}
+          />
 
-              <FlatList
-                data={otherLists || []} // otherLists undefined olursa boş dizi ver
-                keyExtractor={(item) => item}
-                numColumns={3}
-                contentContainerStyle={styles.listContainerList}
-                renderItem={({ item }) => (
+          <View style={[styles.sheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+            {/* Handle */}
+            <View style={[styles.handle, { backgroundColor: theme.border }]} />
+
+            {/* Başlık */}
+            <View style={styles.sheetHeader}>
+              <View style={styles.sheetTitleRow}>
+                <View style={[styles.sheetIconWrap, { backgroundColor: theme.accent + "22" }]}>
+                  <Ionicons name="grid" size={18} color={theme.accent} />
+                </View>
+                <Text allowFontScaling={false} style={[styles.sheetTitle, { color: theme.text.primary }]}>
+                  Diğer Listeler
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setModalVisible(false)}
+                style={[styles.closeBtn, { backgroundColor: theme.primary }]}
+              >
+                <Ionicons name="close" size={16} color={theme.text.muted} />
+              </TouchableOpacity>
+            </View>
+
+            {otherLists?.length > 0 ? (
+              <>
+                <FlatList
+                  data={otherLists}
+                  keyExtractor={(item) => item}
+                  numColumns={3}
+                  contentContainerStyle={styles.gridContainer}
+                  showsVerticalScrollIndicator={false}
+                  style={{ maxHeight: 320 }}
+                  renderItem={({ item }) => {
+                    const isIn = !!listStates[item];
+                    return (
+                      <TouchableOpacity
+                        style={[
+                          styles.gridItem,
+                          {
+                            backgroundColor: isIn ? theme.colors.green + "18" : theme.primary,
+                            borderColor: isIn ? theme.colors.green + "55" : theme.border,
+                          },
+                        ]}
+                        onPress={() => updateList(item, type)}
+                        onPressIn={() => onPressIn(item)}
+                        onPressOut={() => onPressOut(item)}
+                        activeOpacity={0.75}
+                      >
+                        <Animated.View
+                          style={{
+                            transform: [{ scale: scaleValues[item] || 1 }],
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <View style={[styles.gridIconWrap, { backgroundColor: isIn ? theme.colors.green + "30" : theme.secondary }]}>
+                            <Ionicons
+                              name={isIn ? "checkmark-circle" : "grid-outline"}
+                              size={28}
+                              color={isIn ? theme.colors.green : theme.text.muted}
+                            />
+                          </View>
+                          <Text
+                            allowFontScaling={false}
+                            style={[styles.gridLabel, { color: isIn ? theme.colors.green : theme.text.secondary }]}
+                            numberOfLines={2}
+                          >
+                            {item}
+                          </Text>
+                        </Animated.View>
+                      </TouchableOpacity>
+                    );
+                  }}
+                />
+                <View style={styles.sheetActions}>
                   <TouchableOpacity
-                    onPressIn={() => onPressIn(item)}
-                    onPressOut={() => onPressOut(item)}
-                    style={[
-                      styles.buttonList,
-                      {
-                        backgroundColor: theme.secondary,
-                      },
-                    ]}
-                    onPress={() => updateList(item, type)}
+                    style={[styles.actionBtn, { backgroundColor: theme.primary, borderColor: theme.border }]}
+                    onPress={() => setModalVisible(false)}
                   >
-                    <Animated.View
-                      style={{
-                        transform: [{ scale: scaleValues[item] || 1 }],
-                        justifyContent: "center",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Ionicons
-                        name="grid"
-                        size={48}
-                        color={
-                          listStates[item] ? theme.colors.green : theme.between
-                        }
-                      />
-
-                      <Text style={styles.buttonTextList} numberOfLines={3}>
-                        {item}
-                      </Text>
-                    </Animated.View>
+                    <Ionicons name="close-circle-outline" size={16} color={theme.text.muted} />
+                    <Text allowFontScaling={false} style={[styles.actionBtnText, { color: theme.text.muted }]}>Kapat</Text>
                   </TouchableOpacity>
-                )}
-              />
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  gap: 10,
-                }}
-              >
-                <TouchableOpacity
-                  style={[styles.button, { backgroundColor: theme.accent }]}
-                  onPress={() => setModalVisible(false)}
-                >
-                  <Text style={styles.buttonTextList}>Kapat</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.button, { backgroundColor: theme.accent }]}
-                  onPress={() => {
-                    (setModalVisible(false),
-                      navigation.navigate("ListsViewScreen"));
-                  }}
-                >
-                  <Text style={styles.buttonTextList}>Listeler</Text>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: theme.accent, borderColor: theme.accent }]}
+                    onPress={() => { setModalVisible(false); navigation.navigate("ListsViewScreen"); }}
+                  >
+                    <Ionicons name="list" size={16} color="#fff" />
+                    <Text allowFontScaling={false} style={[styles.actionBtnText, { color: "#fff" }]}>Tüm Listeler</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <View style={[styles.emptyIconWrap, { backgroundColor: theme.primary }]}>
+                  <Ionicons name="folder-open-outline" size={40} color={theme.text.muted} />
+                </View>
+                <Text allowFontScaling={false} style={[styles.emptyTitle, { color: theme.text.primary }]}>
+                  Liste Bulunamadı
+                </Text>
+                <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: theme.text.muted }]}>
+                  Henüz özel liste oluşturmadın. Listeler ekranından yeni liste ekleyebilirsin.
+                </Text>
+                <View style={styles.sheetActions}>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: theme.primary, borderColor: theme.border }]}
+                    onPress={() => setModalVisible(false)}
+                  >
+                    <Ionicons name="close-circle-outline" size={16} color={theme.text.muted} />
+                    <Text allowFontScaling={false} style={[styles.actionBtnText, { color: theme.text.muted }]}>{t.cancel}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: theme.accent, borderColor: theme.accent }]}
+                    onPress={() => { setModalVisible(false); navigation.navigate("ListsViewScreen"); }}
+                  >
+                    <Ionicons name="add-circle-outline" size={16} color="#fff" />
+                    <Text allowFontScaling={false} style={[styles.actionBtnText, { color: "#fff" }]}>Liste Oluştur</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
+            )}
           </View>
-        </Modal>
-      ) : (
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalVisible}
-          onRequestClose={() => setModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <TouchableOpacity
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-              }}
-              onPress={() => setModalVisible(false)}
-            />
-            <LinearGradient
-              colors={["transparent", theme.shadow, "transparent"]}
-              style={{
-                position: "absolute",
-                top: 0,
-                right: 0,
-                left: 0,
-                bottom: 0,
-                zIndex: -1,
-              }}
-            />
-            <View
-              style={[styles.modalView, { backgroundColor: theme.primary }]}
-            >
-              <Text style={[styles.modalText, { color: theme.text.primary }]}>
-                liste bulunamadı yeni oluşturmak istermisn
-              </Text>
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={[styles.button, styles.buttonCancel]}
-                  onPress={() => setModalVisible(false)}
-                >
-                  <Text style={styles.textStyle}>{t.cancel}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.button, styles.buttonConfirm]}
-                  onPress={() => {
-                    navigation.navigate("ListsViewScreen");
-                    setModalVisible(false);
-                  }}
-                >
-                  <Text style={styles.textStyle}>{t.confirm}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -484,99 +316,127 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 20,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.94,
     shadowRadius: 10.32,
     elevation: 5,
   },
-  modalContainerList: {
+  overlay: {
     flex: 1,
     justifyContent: "flex-end",
   },
-  modalViewList: {
-    margin: 20,
-    borderRadius: 20,
-    padding: 15,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+    paddingTop: 12,
   },
-  modalTextList: {
-    marginBottom: 15,
-    textAlign: "center",
-    fontSize: 18,
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 16,
   },
-  listContainerList: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonList: {
-    margin: 5,
-    padding: 10,
-    width: 100,
-    alignItems: "center",
-    borderRadius: 10,
-  },
-  buttonTextList: {
-    color: "white",
-    textAlign: "center",
-  },
-
-  modalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalView: {
-    margin: 20,
-    borderRadius: 20,
-    padding: 35,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  modalText: {
-    marginBottom: 15,
-    textAlign: "center",
-    fontSize: 18,
-  },
-  modalButtons: {
+  sheetHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
-  },
-  button: {
-    borderRadius: 20,
-    padding: 10,
-    elevation: 2,
-    width: "45%",
     alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
   },
-  buttonCancel: {
-    backgroundColor: "#f44336",
+  sheetTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
-  buttonConfirm: {
-    backgroundColor: "#4CAF50",
+  sheetIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  textStyle: {
-    color: "white",
-    fontWeight: "bold",
+  sheetTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  closeBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  gridContainer: {
+    gap: 10,
+    paddingBottom: 4,
+  },
+  gridItem: {
+    flex: 1,
+    margin: 4,
+    paddingVertical: 14,
+    paddingHorizontal: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  gridIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  gridLabel: {
+    fontSize: 11,
+    fontWeight: "600",
     textAlign: "center",
+  },
+  sheetActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 16,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  actionBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  emptyContainer: {
+    alignItems: "center",
+    paddingVertical: 24,
+    gap: 10,
+  },
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    textAlign: "center",
+    paddingHorizontal: 20,
+    lineHeight: 19,
   },
 });
 

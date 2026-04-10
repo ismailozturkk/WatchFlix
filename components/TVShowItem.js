@@ -14,28 +14,46 @@ export default function TVShowItem({ item }) {
     >
       <View style={styles.statusInfo}>
         <View style={styles.statusItem}>
-          <Text style={[styles.statusLabel, { color: theme.text.secondary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.statusLabel, { color: theme.text.secondary }]}
+          >
             {t.status}
           </Text>
-          <Text style={[styles.statusValue, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.statusValue, { color: theme.text.primary }]}
+          >
             {item.status === "Ended" ? t.tvStatusEnd : t.tvStatusCon}
           </Text>
         </View>
 
         <View style={styles.statusItem}>
-          <Text style={[styles.statusLabel, { color: theme.text.secondary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.statusLabel, { color: theme.text.secondary }]}
+          >
             {t.type}
           </Text>
-          <Text style={[styles.statusValue, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.statusValue, { color: theme.text.primary }]}
+          >
             {item.type || "Bilinmiyor"}
           </Text>
         </View>
 
         <View style={styles.statusItem}>
-          <Text style={[styles.statusLabel, { color: theme.text.secondary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.statusLabel, { color: theme.text.secondary }]}
+          >
             {t.country}
           </Text>
-          <Text style={[styles.statusValue, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.statusValue, { color: theme.text.primary }]}
+          >
             {item.origin_country?.length > 0
               ? item.origin_country.join(", ")
               : "Bilinmiyor"}
@@ -45,7 +63,10 @@ export default function TVShowItem({ item }) {
 
       {item.networks?.length > 0 && (
         <View style={styles.networkInfo}>
-          <Text style={[styles.networkLabel, { color: theme.text.secondary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.networkLabel, { color: theme.text.secondary }]}
+          >
             {t.network}
           </Text>
           <ScrollView
@@ -74,10 +95,16 @@ export default function TVShowItem({ item }) {
 
       {item.production_companies?.length > 0 && (
         <View style={styles.companyInfo}>
-          <Text style={[styles.companyLabel, { color: theme.text.secondary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.companyLabel, { color: theme.text.secondary }]}
+          >
             {t.productCompanies}
           </Text>
-          <Text style={[styles.companyValue, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.companyValue, { color: theme.text.primary }]}
+          >
             {item.production_companies
               .map((company) => company.name)
               .join(", ")}

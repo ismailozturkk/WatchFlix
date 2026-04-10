@@ -396,6 +396,9 @@ export const ProfileScreenProvider = ({ children }) => {
   const formatDate = (timestamp) => {
     if (!timestamp) return "";
     const date = new Date(timestamp);
+    if (isNaN(date.getTime())) {
+      return typeof timestamp === "string" ? timestamp : "Bilinmeyen Tarih";
+    }
     return new Intl.DateTimeFormat(language, {
       day: "numeric",
       month: "long",
@@ -427,21 +430,31 @@ export const ProfileScreenProvider = ({ children }) => {
   };
 
   // Not ekleme fonksiyonunu güncelle
+  const [noteType, setNoteType] = useState("note"); // "note" | "todo"
+  const [todoItems, setTodoItems] = useState([{ id: Date.now().toString(), text: "", done: false }]);
+  const [todoTitle, setTodoTitle] = useState(""); // Todo başlığı
+  const [scheduledDate, setScheduledDate] = useState(null); // "YYYY-MM-DD" | null
+
   const handleAddNote = async () => {
     try {
-      if (message.length == 0) {
-        Toast.show({
-          type: "warning",
-          text1: `boş not oluşturulamaz`,
-        });
+      if (noteType === "note" && message.trim().length === 0) {
+        Toast.show({ type: "warning", text1: "Boş not oluşturulamaz" });
+        return;
+      }
+      if (noteType === "todo" && todoItems.every((t) => t.text.trim() === "")) {
+        Toast.show({ type: "warning", text1: "En az bir todo maddesi giriniz" });
         return;
       }
       setLoadingNotes(true);
       const newNote = {
-        id: Date.now().toString(), // Benzersiz id
-        content: message,
+        id: Date.now().toString(),
+        type: noteType,
+        title: noteType === "todo" ? todoTitle.trim() : "",
+        content: noteType === "note" ? message : "",
+        todos: noteType === "todo" ? todoItems.filter((t) => t.text.trim() !== "") : [],
         color: borderColorNotes,
         backgroundColor: backgroundColorNotes,
+        scheduledDate: scheduledDate || null,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -450,24 +463,90 @@ export const ProfileScreenProvider = ({ children }) => {
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        // Mevcut notlara yeni notu ekle
-        await updateDoc(docRef, {
-          notes: arrayUnion(newNote),
-        });
+        await updateDoc(docRef, { notes: arrayUnion(newNote) });
       } else {
-        // İlk not için dokümanı oluştur
-        await setDoc(docRef, {
-          notes: [newNote],
-        });
+        await setDoc(docRef, { notes: [newNote] });
       }
 
       setMessage("");
+      setTodoTitle("");
+      setTodoItems([{ id: Date.now().toString(), text: "", done: false }]);
+      setScheduledDate(null);
       setModalVisibleNotesAdd(false);
       fetchNotes();
     } catch (error) {
       console.error("Error adding note:", error);
     } finally {
       setLoadingNotes(false);
+    }
+  };
+
+  // Todo maddesini tamamlandı/tamamlanmadı olarak işaretle
+  const handleToggleTodoItem = async (noteId, todoId) => {
+    try {
+      const docRef = doc(db, "Notes", uid);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) return;
+      const currentNotes = docSnap.data().notes;
+      const updatedNotes = currentNotes.map((note) => {
+        if (note.id !== noteId) return note;
+        return {
+          ...note,
+          todos: (note.todos || []).map((t) =>
+            t.id === todoId ? { ...t, done: !t.done } : t
+          ),
+          updatedAt: Date.now(),
+        };
+      });
+      await updateDoc(docRef, { notes: updatedNotes });
+      fetchNotes();
+    } catch (error) {
+      console.error("Error toggling todo:", error);
+    }
+  };
+
+  // Todo kartına yeni madde ekle
+  const handleAddTodoItem = async (noteId, newItemText) => {
+    try {
+      if (!newItemText.trim()) return;
+      const docRef = doc(db, "Notes", uid);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) return;
+      const currentNotes = docSnap.data().notes;
+      const updatedNotes = currentNotes.map((note) => {
+        if (note.id !== noteId) return note;
+        return {
+          ...note,
+          todos: [...(note.todos || []), { id: Date.now().toString(), text: newItemText.trim(), done: false }],
+          updatedAt: Date.now(),
+        };
+      });
+      await updateDoc(docRef, { notes: updatedNotes });
+      fetchNotes();
+    } catch (error) {
+      console.error("Error adding todo item:", error);
+    }
+  };
+
+  // Todo kartından madde sil
+  const handleDeleteTodoItem = async (noteId, todoId) => {
+    try {
+      const docRef = doc(db, "Notes", uid);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) return;
+      const currentNotes = docSnap.data().notes;
+      const updatedNotes = currentNotes.map((note) => {
+        if (note.id !== noteId) return note;
+        return {
+          ...note,
+          todos: (note.todos || []).filter((t) => t.id !== todoId),
+          updatedAt: Date.now(),
+        };
+      });
+      await updateDoc(docRef, { notes: updatedNotes });
+      fetchNotes();
+    } catch (error) {
+      console.error("Error deleting todo item:", error);
     }
   };
 
@@ -484,9 +563,11 @@ export const ProfileScreenProvider = ({ children }) => {
           note.id === noteId
             ? {
                 ...note,
-                content: noteContent,
+                content: note.type === "note" ? noteContent : note.content,
+                title: note.type === "todo" ? todoTitle.trim() : note.title,
                 color: borderColorNotes,
                 backgroundColor: backgroundColorNotes,
+                scheduledDate: scheduledDate !== undefined ? scheduledDate : (note.scheduledDate || null),
                 updatedAt: Date.now(),
               }
             : note,
@@ -505,7 +586,41 @@ export const ProfileScreenProvider = ({ children }) => {
     }
   };
 
-  // Not silme fonksiyonunu güncelle
+  // Todo notu güncelle (title + todos array + renk)
+  const handleUpdateTodoNote = async (noteId, newTitle, newTodos, newColor, newBg) => {
+    try {
+      setLoadingNotes(true);
+      const docRef = doc(db, "Notes", uid);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const currentNotes = docSnap.data().notes;
+        const updatedNotes = currentNotes.map((note) =>
+          note.id === noteId
+            ? {
+                ...note,
+                title: (newTitle || "").trim(),
+                todos: newTodos,
+                color: newColor || borderColorNotes,
+                backgroundColor: newBg || backgroundColorNotes,
+                scheduledDate: scheduledDate !== undefined ? scheduledDate : (note.scheduledDate || null),
+                updatedAt: Date.now(),
+              }
+            : note,
+        );
+        await updateDoc(docRef, { notes: updatedNotes });
+      }
+
+      setModalVisibleNotes(false);
+      setIsEditable(false);
+      fetchNotes();
+    } catch (error) {
+      console.error("Error updating todo note:", error);
+    } finally {
+      setLoadingNotes(false);
+    }
+  };
+
   const handleDeleteNote = async (noteId) => {
     try {
       setLoadingNotes(true);
@@ -757,7 +872,7 @@ export const ProfileScreenProvider = ({ children }) => {
 
   useEffect(() => {
     fetchReminders();
-  }, [activeTab, user, uid, reminders]);
+  }, [uid]); // Sadece uid değiştiğinde yeniden fetch et
 
   const fetchReminders = async () => {
     try {
@@ -925,6 +1040,18 @@ export const ProfileScreenProvider = ({ children }) => {
         handleUpdateNote,
         handleDeleteNote,
         setNoteContent,
+        noteType,
+        setNoteType,
+        todoItems,
+        setTodoItems,
+        todoTitle,
+        setTodoTitle,
+        scheduledDate,
+        setScheduledDate,
+        handleToggleTodoItem,
+        handleAddTodoItem,
+        handleDeleteTodoItem,
+        handleUpdateTodoNote,
       }}
     >
       {children}

@@ -1,17 +1,149 @@
-import React from "react";
-import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-} from "react-native";
+import React, { useEffect } from "react";
+import { StyleSheet, View, Text, Pressable, ScrollView } from "react-native";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useTheme } from "../../../context/ThemeContext";
+import { LinearGradient } from "expo-linear-gradient";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
+import { themes } from "../../../theme/colors";
+
+const THEME_CONFIGS = [
+  { key: "gray", icon: "contrast", labelKey: "grayTheme" },
+  { key: "blue", icon: "water", labelKey: "blueTheme" },
+  { key: "green", icon: "leaf", labelKey: "greenTheme" },
+  { key: "dark", icon: "moon", labelKey: "darkTheme" },
+  { key: "light", icon: "sunny", labelKey: "lightTheme" },
+];
+
+const ThemeCard = ({ themeKey, isSelected, onPress, label, icon }) => {
+  const p = themes[themeKey];
+
+  const scale = useSharedValue(isSelected ? 1.07 : 1);
+  const borderWidth = useSharedValue(isSelected ? 2 : 1);
+  const checkOpacity = useSharedValue(isSelected ? 1 : 0);
+
+  useEffect(() => {
+    scale.value = withSpring(isSelected ? 1.07 : 1, {
+      mass: 0.4,
+      damping: 12,
+      stiffness: 140,
+    });
+    borderWidth.value = withTiming(isSelected ? 2.5 : 1, { duration: 200 });
+    checkOpacity.value = withTiming(isSelected ? 1 : 0, { duration: 180 });
+  }, [isSelected]);
+
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    borderWidth: borderWidth.value,
+    borderColor: isSelected ? p.accent : p.border,
+  }));
+
+  const checkStyle = useAnimatedStyle(() => ({
+    opacity: checkOpacity.value,
+    transform: [{ scale: checkOpacity.value }],
+  }));
+
+  return (
+    <Pressable onPress={onPress} style={styles.cardWrapper}>
+      <Animated.View style={[styles.card, cardStyle]}>
+        {/* Üst renk şeridi */}
+        <LinearGradient
+          colors={[p.accent, p.bold || p.accent]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.topStrip}
+        />
+
+        {/* Mini UI mockup */}
+        <View style={[styles.mockup, { backgroundColor: p.primary }]}>
+          {/* Navbar */}
+          <View style={[styles.mockNav, { backgroundColor: p.secondary }]}>
+            <View style={[styles.mockNavDot, { backgroundColor: p.accent }]} />
+            <View style={[styles.mockNavLine, { backgroundColor: p.border }]} />
+          </View>
+
+          {/* İçerik satırları */}
+          <View style={styles.mockContent}>
+            <View
+              style={[
+                styles.mockRow,
+                { backgroundColor: p.between, width: "75%" },
+              ]}
+            />
+            <View
+              style={[
+                styles.mockRow,
+                { backgroundColor: p.secondary, width: "90%" },
+              ]}
+            />
+            <View
+              style={[
+                styles.mockRow,
+                { backgroundColor: p.secondary, width: "55%" },
+              ]}
+            />
+            <View
+              style={[
+                styles.mockRow,
+                { backgroundColor: p.between, width: "80%" },
+              ]}
+            />
+          </View>
+
+          {/* Accent buton */}
+          <View style={[styles.mockFab, { backgroundColor: p.accent }]} />
+
+          {/* Alt tab bar */}
+          <View
+            style={[
+              styles.mockTabBar,
+              { backgroundColor: p.secondary, borderTopColor: p.border },
+            ]}
+          >
+            {[0, 1, 2].map((i) => (
+              <View
+                key={i}
+                style={[
+                  styles.mockTabDot,
+                  { backgroundColor: i === 1 ? p.accent : p.border },
+                ]}
+              />
+            ))}
+          </View>
+        </View>
+
+        {/* Tema adı ve ikonu */}
+        <View style={[styles.cardFooter, { backgroundColor: p.secondary }]}>
+          <Ionicons name={icon} size={13} color={p.text.secondary} />
+          <Text
+            allowFontScaling={false}
+            numberOfLines={1}
+            style={[styles.cardLabel, { color: p.text.primary }]}
+          >
+            {label}
+          </Text>
+        </View>
+
+        {/* Seçim rozeti */}
+        <Animated.View
+          style={[styles.checkBadge, { backgroundColor: p.accent }, checkStyle]}
+        >
+          <Ionicons name="checkmark" size={11} color="#fff" />
+        </Animated.View>
+      </Animated.View>
+    </Pressable>
+  );
+};
+
 export default function SettingsTheme() {
   const { t } = useLanguage();
-
   const { selectedTheme, changeTheme, theme } = useTheme();
+
   return (
     <View
       style={[
@@ -19,226 +151,26 @@ export default function SettingsTheme() {
         {
           backgroundColor: theme.secondary,
           borderColor: theme.border,
-          shadowColor: theme.shdow,
+          shadowColor: theme.shadow,
         },
       ]}
     >
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.themeContainer}
-        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.scrollContent}
+        decelerationRate="fast"
       >
-        <TouchableOpacity
-          style={[
-            styles.themeOption,
-            styles.darkTheme,
-            selectedTheme === "dark" && styles.selectedTheme,
-          ]}
-          onPress={() => changeTheme("dark")}
-          activeOpacity={0.8}
-        >
-          <View style={styles.themePreview}>
-            <View style={styles.themeHeader}>
-              <View style={[styles.themeDot, { backgroundColor: "#2196F3" }]} />
-              <View style={styles.themeDot} />
-            </View>
-            <View style={styles.themeContent}>
-              <View style={[styles.themeBar, { width: "60%" }]} />
-              <View style={[styles.themeBar, { width: "80%" }]} />
-              <View style={[styles.themeBar, { width: "40%" }]} />
-            </View>
-          </View>
-          <Text style={styles.themeText}>{t.darkTheme}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.themeOption,
-            styles.grayTheme,
-            selectedTheme === "gray" && styles.selectedTheme,
-          ]}
-          onPress={() => changeTheme("gray")}
-          activeOpacity={0.8}
-        >
-          <View style={styles.themePreview}>
-            <View style={styles.themeHeader}>
-              <View style={[styles.themeDot, { backgroundColor: "#2196F3" }]} />
-              <View style={[styles.themeDot, { backgroundColor: "#bababa" }]} />
-            </View>
-            <View style={styles.themeContent}>
-              <View
-                style={[
-                  styles.themeBar,
-                  { width: "60%", backgroundColor: "#bababa" },
-                ]}
-              />
-              <View
-                style={[
-                  styles.themeBar,
-                  { width: "80%", backgroundColor: "#bababa" },
-                ]}
-              />
-              <View
-                style={[
-                  styles.themeBar,
-                  { width: "40%", backgroundColor: "#bababa" },
-                ]}
-              />
-            </View>
-          </View>
-          <Text style={[styles.themeText, { color: "#bababa" }]}>
-            {t.grayTheme}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.themeOption,
-            styles.blueTheme,
-            selectedTheme === "blue" && styles.selectedTheme,
-          ]}
-          onPress={() => changeTheme("blue")}
-          activeOpacity={0.8}
-        >
-          <View style={styles.themePreview}>
-            <View style={styles.themeHeader}>
-              <View
-                style={[
-                  styles.themeDot,
-                  { backgroundColor: "rgb(20, 28, 51)" },
-                ]}
-              />
-              <View
-                style={[
-                  styles.themeDot,
-                  { backgroundColor: "rgb(83, 116, 172)" },
-                ]}
-              />
-            </View>
-            <View style={styles.themeContent}>
-              <View
-                style={[
-                  styles.themeBar,
-                  { width: "60%", backgroundColor: "rgb(47, 69, 111)" },
-                ]}
-              />
-              <View
-                style={[
-                  styles.themeBar,
-                  { width: "80%", backgroundColor: "rgb(83, 116, 172)" },
-                ]}
-              />
-              <View
-                style={[
-                  styles.themeBar,
-                  { width: "40%", backgroundColor: "rgb(83, 116, 172)" },
-                ]}
-              />
-            </View>
-          </View>
-          <Text style={[styles.themeText, { color: "rgb(239, 245, 250)" }]}>
-            {t.blueTheme}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.themeOption,
-            styles.greenTheme,
-            selectedTheme === "green" && styles.selectedTheme,
-          ]}
-          onPress={() => changeTheme("green")}
-          activeOpacity={0.8}
-        >
-          <View style={styles.themePreview}>
-            <View style={styles.themeHeader}>
-              <View
-                style={[
-                  styles.themeDot,
-                  { backgroundColor: "rgb(77, 199, 184)" },
-                ]}
-              />
-              <View
-                style={[
-                  styles.themeDot,
-                  { backgroundColor: "rgb(58, 158, 161)" },
-                ]}
-              />
-            </View>
-            <View style={styles.themeContent}>
-              <View
-                style={[
-                  styles.themeBar,
-                  {
-                    width: "60%",
-                    backgroundColor: "rgb(169,189,187)",
-                  },
-                ]}
-              />
-              <View
-                style={[
-                  styles.themeBar,
-                  {
-                    width: "80%",
-                    backgroundColor: "rgb(169,189,187)",
-                  },
-                ]}
-              />
-              <View
-                style={[
-                  styles.themeBar,
-                  {
-                    width: "40%",
-                    backgroundColor: "rgb(169,189,187)",
-                  },
-                ]}
-              />
-            </View>
-          </View>
-          <Text style={[styles.themeText, { color: "rgb(28, 79, 78)" }]}>
-            {t.greenTheme}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.themeOption,
-            styles.lightTheme,
-            selectedTheme === "light" && styles.selectedTheme,
-          ]}
-          onPress={() => changeTheme("light")}
-          activeOpacity={0.8}
-        >
-          <View style={styles.themePreview}>
-            <View style={styles.themeHeader}>
-              <View style={[styles.themeDot, { backgroundColor: "#2196F3" }]} />
-              <View style={[styles.themeDot, { backgroundColor: "#444" }]} />
-            </View>
-            <View style={styles.themeContent}>
-              <View
-                style={[
-                  styles.themeBar,
-                  { width: "60%", backgroundColor: "#444" },
-                ]}
-              />
-              <View
-                style={[
-                  styles.themeBar,
-                  { width: "80%", backgroundColor: "#444" },
-                ]}
-              />
-              <View
-                style={[
-                  styles.themeBar,
-                  { width: "40%", backgroundColor: "#444" },
-                ]}
-              />
-            </View>
-          </View>
-          <Text style={[styles.themeText, { color: "#444" }]}>
-            {t.lightTheme}
-          </Text>
-        </TouchableOpacity>
+        {THEME_CONFIGS.map((cfg) => (
+          <ThemeCard
+            key={cfg.key}
+            themeKey={cfg.key}
+            isSelected={selectedTheme === cfg.key}
+            onPress={() => changeTheme(cfg.key)}
+            label={t[cfg.labelKey] || cfg.key}
+            icon={cfg.icon}
+          />
+        ))}
       </ScrollView>
     </View>
   );
@@ -246,91 +178,124 @@ export default function SettingsTheme() {
 
 const styles = StyleSheet.create({
   container: {
-    justifyContent: "center",
-    alignItems: "center",
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "blue",
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.94,
     shadowRadius: 10.32,
     elevation: 5,
+    overflow: "hidden",
   },
-
-  themeContainer: {
-    justifyContent: "center",
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    gap: 12,
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 20,
   },
-  themeOption: {
-    width: 100,
-    height: 160,
-    borderRadius: 12,
-    padding: 15,
-    marginRight: 15,
-    borderWidth: 2,
-  },
-  darkTheme: {
-    backgroundColor: "#1a1a1a",
-    borderColor: "#333",
-  },
-  lightTheme: {
-    backgroundColor: "#dddddd",
-    borderColor: "#666",
-  },
-  grayTheme: {
-    backgroundColor: "#424242",
-    borderColor: "#666",
-  },
-  blueTheme: {
-    backgroundColor: "rgb(20, 28, 51)", // #141c33
 
-    borderColor: "rgb(139, 175, 208)", // #8bafd0
+  /* Kart */
+  cardWrapper: {
+    padding: 4, // scale animasyonu için boşluk
   },
-  orangeTheme: {
-    backgroundColor: "rgb(255, 245, 224)",
-    borderColor: "rgb(255, 204, 173)",
+  card: {
+    width: 100,
+    borderRadius: 14,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 6,
   },
-  greenTheme: {
-    backgroundColor: "rgb(189,209,207)",
-    borderColor: "rgb(83,117,116)",
+
+  /* Üst renk şeridi */
+  topStrip: {
+    height: 5,
+    width: "100%",
   },
-  selectedTheme: {
-    borderColor: "#2196F3",
-    transform: [{ scale: 1.1 }],
+
+  /* Mockup alanı */
+  mockup: {
+    height: 120,
+    paddingBottom: 0,
+    overflow: "hidden",
   },
-  themePreview: {
-    flex: 1,
-    marginBottom: 10,
-  },
-  themeHeader: {
+  mockNav: {
+    height: 20,
     flexDirection: "row",
-    justifyContent: "flex-start",
-    gap: 8,
-    marginBottom: 15,
+    alignItems: "center",
+    paddingHorizontal: 8,
+    gap: 5,
   },
-  themeDot: {
-    width: 8,
-    height: 8,
+  mockNavDot: {
+    width: 7,
+    height: 7,
     borderRadius: 4,
-    backgroundColor: "#ddd",
   },
-  themeContent: {
-    gap: 8,
+  mockNavLine: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
   },
-  themeBar: {
-    height: 8,
+  mockContent: {
+    flex: 1,
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    gap: 6,
+  },
+  mockRow: {
+    height: 7,
     borderRadius: 4,
-    backgroundColor: "#ddd",
   },
-  themeText: {
-    fontSize: 14,
-    color: "#ddd",
-    textAlign: "left",
+  mockFab: {
+    position: "absolute",
+    bottom: 26,
+    right: 8,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+  },
+  mockTabBar: {
+    height: 22,
+    flexDirection: "row",
+    justifyContent: "space-evenly",
+    alignItems: "center",
+    borderTopWidth: 1,
+  },
+  mockTabDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+
+  /* Alt footer */
+  cardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+  },
+  cardLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    flex: 1,
+  },
+
+  /* Checkmark rozeti */
+  checkBadge: {
+    position: "absolute",
+    top: 10,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+    elevation: 4,
   },
 });

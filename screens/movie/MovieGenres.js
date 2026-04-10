@@ -15,9 +15,12 @@ import { MovieGenreSkeleton, MovieSkeleton } from "../../components/Skeleton";
 import { useMovie } from "../../context/MovieContex";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useAppSettings } from "../../context/AppSettingsContext";
 const { width, height } = Dimensions.get("window");
 export default function MovieGenres({ navigation }) {
   const { theme } = useTheme();
+  const { imageQuality } = useAppSettings();
+
   const {
     genres,
     toggleGenre,
@@ -80,7 +83,10 @@ export default function MovieGenres({ navigation }) {
               ]}
               onPress={() => toggleGenre(item.id)}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {item.name}
               </Text>
             </TouchableOpacity>
@@ -101,7 +107,10 @@ export default function MovieGenres({ navigation }) {
             alignItems: "center",
           }}
         >
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
             ●●●
           </Text>
           {pageGenres > 5 && (
@@ -117,11 +126,17 @@ export default function MovieGenres({ navigation }) {
                   alignItems: "center",
                 }}
               >
-                <Text style={[styles.genreText, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.genreText, { color: theme.text.primary }]}
+                >
                   {pageGenres - 5}
                 </Text>
               </TouchableOpacity>
-              <Text style={[styles.genreText, { color: theme.text.muted }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.muted }]}
+              >
                 ●
               </Text>
             </>
@@ -139,7 +154,10 @@ export default function MovieGenres({ navigation }) {
                 alignItems: "center",
               }}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageGenres - 2}
               </Text>
             </TouchableOpacity>
@@ -157,7 +175,10 @@ export default function MovieGenres({ navigation }) {
                 alignItems: "center",
               }}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageGenres - 1}
               </Text>
             </TouchableOpacity>
@@ -186,7 +207,10 @@ export default function MovieGenres({ navigation }) {
               alignItems: "center",
             }}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageGenres + 1}
             </Text>
           </TouchableOpacity>
@@ -201,11 +225,19 @@ export default function MovieGenres({ navigation }) {
               alignItems: "center",
             }}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageGenres + 2}
             </Text>
           </TouchableOpacity>
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>●</Text>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
+            ●
+          </Text>
           <TouchableOpacity
             onPress={() => setPageGenres(pageGenres + 5)}
             style={{
@@ -217,11 +249,17 @@ export default function MovieGenres({ navigation }) {
               alignItems: "center",
             }}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageGenres + 5}
             </Text>
           </TouchableOpacity>
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
             ●●●
           </Text>
         </View>
@@ -250,7 +288,9 @@ export default function MovieGenres({ navigation }) {
           <Image
             source={
               item.poster_path
-                ? { uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }
+                ? {
+                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                  }
                 : require("../../assets/image/no_image.png")
             }
             style={[styles.similarPoster, { shadowColor: theme.shadow }]}
@@ -262,7 +302,7 @@ export default function MovieGenres({ navigation }) {
               { backgroundColor: theme.secondaryt },
             ]}
           >
-            <Text style={styles.similarRatingText}>
+            <Text allowFontScaling={false} style={styles.similarRatingText}>
               {item.vote_average.toFixed(1)}
             </Text>
           </View>
@@ -354,7 +394,10 @@ export default function MovieGenres({ navigation }) {
             ]}
             onPress={() => toggleGenre(item.id)}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {item.name}
             </Text>
           </TouchableOpacity>
@@ -376,7 +419,12 @@ export default function MovieGenres({ navigation }) {
           alignItems: "center",
         }}
       >
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●●●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●●●
+        </Text>
         {pageGenres > 5 && (
           <>
             <TouchableOpacity
@@ -390,11 +438,17 @@ export default function MovieGenres({ navigation }) {
                 alignItems: "center",
               }}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageGenres - 5}
               </Text>
             </TouchableOpacity>
-            <Text style={[styles.genreText, { color: theme.text.muted }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.muted }]}
+            >
               ●
             </Text>
           </>
@@ -412,7 +466,10 @@ export default function MovieGenres({ navigation }) {
               alignItems: "center",
             }}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageGenres - 2}
             </Text>
           </TouchableOpacity>
@@ -430,7 +487,10 @@ export default function MovieGenres({ navigation }) {
               alignItems: "center",
             }}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageGenres - 1}
             </Text>
           </TouchableOpacity>
@@ -459,7 +519,10 @@ export default function MovieGenres({ navigation }) {
             alignItems: "center",
           }}
         >
-          <Text style={[styles.genreText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.primary }]}
+          >
             {pageGenres + 1}
           </Text>
         </TouchableOpacity>
@@ -474,11 +537,19 @@ export default function MovieGenres({ navigation }) {
             alignItems: "center",
           }}
         >
-          <Text style={[styles.genreText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.primary }]}
+          >
             {pageGenres + 2}
           </Text>
         </TouchableOpacity>
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●
+        </Text>
         <TouchableOpacity
           onPress={() => setPageGenres(pageGenres + 5)}
           style={{
@@ -490,11 +561,19 @@ export default function MovieGenres({ navigation }) {
             alignItems: "center",
           }}
         >
-          <Text style={[styles.genreText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.primary }]}
+          >
             {pageGenres + 5}
           </Text>
         </TouchableOpacity>
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●●●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●●●
+        </Text>
       </View>
     </View>
   );

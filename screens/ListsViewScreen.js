@@ -30,11 +30,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import SkeletonPlaceholder from "react-native-skeleton-placeholder";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
-
+import { useAppSettings } from "../context/AppSettingsContext";
 export default function ListsViewScreen({ navigation }) {
   const { t } = useLanguage();
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { imageQuality } = useAppSettings();
   const [isLoading, setIsLoading] = useState(true);
 
   const [lists, setLists] = useState([]); // Firestore'dan gelen listeler
@@ -188,7 +189,10 @@ export default function ListsViewScreen({ navigation }) {
         },
       ]}
     >
-      <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>
+      <Text
+        allowFontScaling={false}
+        style={[styles.sectionTitle, { color: theme.text.muted }]}
+      >
         Listeler
       </Text>
       <View style={styles.container}>
@@ -224,7 +228,10 @@ export default function ListsViewScreen({ navigation }) {
         </TouchableOpacity>
       </View>
       {lists.length === 0 ? (
-        <Text style={[styles.emptyText, { color: theme.text.muted }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.emptyText, { color: theme.text.muted }]}
+        >
           Liste bulunamadı
         </Text>
       ) : (
@@ -267,7 +274,7 @@ export default function ListsViewScreen({ navigation }) {
                         <Image
                           key={index}
                           source={{
-                            uri: `https://image.tmdb.org/t/p/w500${item.imagePath}`,
+                            uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
                           }}
                           style={[
                             styles.image,
@@ -388,7 +395,10 @@ export default function ListsViewScreen({ navigation }) {
             onPress={() => setModalVisible(false)}
           />
           <View style={[styles.modalView, { backgroundColor: theme.primary }]}>
-            <Text style={[styles.modalText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.modalText, { color: theme.text.primary }]}
+            >
               "{selectedList}" listesini silmek istiyor musunuz?
             </Text>
             <View style={styles.modalButtons}>
@@ -396,13 +406,17 @@ export default function ListsViewScreen({ navigation }) {
                 style={[styles.button, styles.buttonCancel]}
                 onPress={() => setModalVisible(false)}
               >
-                <Text style={styles.textStyle}>{t.cancel}</Text>
+                <Text allowFontScaling={false} style={styles.textStyle}>
+                  {t.cancel}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.button, styles.buttonConfirm]}
                 onPress={deleteList}
               >
-                <Text style={styles.textStyle}>{t.confirm}</Text>
+                <Text allowFontScaling={false} style={styles.textStyle}>
+                  {t.confirm}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

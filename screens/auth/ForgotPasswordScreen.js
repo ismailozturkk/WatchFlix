@@ -15,6 +15,7 @@ import { getAuth, sendPasswordResetEmail } from "firebase/auth";
 import Toast from "react-native-toast-message";
 import { useLanguage } from "../../context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import IconBacground from "../../components/IconBacground";
 const { width, height } = Dimensions.get("window");
 
 export default function ForgotPasswordScreen({ navigation }) {
@@ -33,7 +34,7 @@ export default function ForgotPasswordScreen({ navigation }) {
             type: "success",
             text1: email + t.ForgotPasswordScreen.forgotPasswordToast,
           });
-        }
+        },
       );
     } catch (error) {
       Toast.show({
@@ -46,74 +47,93 @@ export default function ForgotPasswordScreen({ navigation }) {
   };
 
   return (
-    <ScrollView
-      style={{ backgroundColor: theme.primary }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={[styles.container, { backgroundColor: theme.primary }]}>
-        <LottieView
-          style={[styles.lottie, { display: showSnow ? "flex" : "none" }]}
-          source={require("../../LottieJson/snow.json")}
-          autoPlay={true}
-          loop
-        />
-        <LottieView
-          source={require("../../LottieJson/forgot_password.json")}
-          style={{ width: 300, height: 300 }}
-          autoPlay
-          loop
-        />
-        <Text style={[styles.title, { color: theme.text.primary }]}>
-          {t.ForgotPasswordScreen.forgotPassword}
-        </Text>
-        <Text style={[styles.subtitle, { color: theme.text.secondary }]}>
-          {t.ForgotPasswordScreen.forgotPasswordText}
-        </Text>
-        <View
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.secondary,
-              borderColor: theme.border,
-            },
-          ]}
-        >
-          <Ionicons name="mail-outline" size={24} color={theme.border} />
-          <TextInput
-            style={{ width: "90%", height: "100%", color: theme.text.primary }}
-            placeholder={t.ForgotPasswordScreen.email}
-            placeholderTextColor={theme.text.secondary}
-            keyboardType="email-address"
-            onChangeText={(text) => setEmail(text)}
-          />
-        </View>
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: theme.accent }]}
-          onPress={() => resetPassword()}
-        >
-          {isloading ? (
+    <View style={{ flex: 1, backgroundColor: theme.primary }}>
+      <IconBacground opacity={0.3} />
+
+      <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+        <View style={styles.container}>
+          {showSnow && (
             <LottieView
-              source={require("../../LottieJson/loading15.json")}
-              style={{ width: 40, height: 40 }}
-              autoPlay
+              style={styles.lottie}
+              source={require("../../LottieJson/snow.json")}
+              autoPlay={true}
               loop
             />
-          ) : (
-            <Text style={[styles.buttonText, { color: theme.text.primary }]}>
-              {t.ForgotPasswordScreen.send}
-            </Text>
           )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: theme.secondary }]}
-          onPress={() => navigation.navigate("LoginScreen")}
-        >
-          <Text style={[styles.buttonText, { color: theme.text.primary }]}>
-            {t.ForgotPasswordScreen.loginButton}
+          <LottieView
+            source={require("../../LottieJson/forgot_password.json")}
+            style={{ width: 300, height: 300 }}
+            autoPlay
+            loop
+          />
+          <Text
+            allowFontScaling={false}
+            style={[styles.title, { color: theme.text.primary }]}
+          >
+            {t.ForgotPasswordScreen.forgotPassword}
           </Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          <Text
+            allowFontScaling={false}
+            style={[styles.subtitle, { color: theme.text.secondary }]}
+          >
+            {t.ForgotPasswordScreen.forgotPasswordText}
+          </Text>
+          <View
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.secondary,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            <Ionicons name="mail-outline" size={24} color={theme.border} />
+            <TextInput
+              style={{
+                width: "90%",
+                height: "100%",
+                color: theme.text.primary,
+              }}
+              placeholder={t.ForgotPasswordScreen.email}
+              placeholderTextColor={theme.text.secondary}
+              keyboardType="email-address"
+              onChangeText={(text) => setEmail(text)}
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: theme.accent }]}
+            onPress={() => resetPassword()}
+          >
+            {isloading ? (
+              <LottieView
+                source={require("../../LottieJson/loading15.json")}
+                style={{ width: 40, height: 40 }}
+                autoPlay
+                loop
+              />
+            ) : (
+              <Text
+                allowFontScaling={false}
+                style={[styles.buttonText, { color: theme.text.primary }]}
+              >
+                {t.ForgotPasswordScreen.send}
+              </Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: theme.secondary }]}
+            onPress={() => navigation.navigate("LoginScreen")}
+          >
+            <Text
+              allowFontScaling={false}
+              style={[styles.buttonText, { color: theme.text.primary }]}
+            >
+              {t.ForgotPasswordScreen.loginButton}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 

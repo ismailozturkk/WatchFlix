@@ -19,6 +19,8 @@ import { db } from "../../../firebase";
 import { useTheme } from "../../../context/ThemeContext";
 import { useProfileScreen } from "../../../context/ProfileScreenContext";
 import SwipeCard from "../../../modules/SwipeCard";
+import IconBacground from "../../../components/IconBacground";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function FriendRequestsScreen() {
   const [tab, setTab] = useState("received"); // 🔹 aktif sekme
@@ -73,7 +75,7 @@ export default function FriendRequestsScreen() {
       friends: arrayUnion(friendObj),
       "friendRequests.receivedRequest":
         userData.friendRequests.receivedRequest.filter(
-          (req) => req.uid !== friend.uid
+          (req) => req.uid !== friend.uid,
         ),
     });
 
@@ -81,7 +83,7 @@ export default function FriendRequestsScreen() {
       friends: arrayUnion(currentUserObj),
       "friendRequests.sendRequest":
         friendData.friendRequests.sendRequest.filter(
-          (req) => req.uid !== user.uid
+          (req) => req.uid !== user.uid,
         ),
     });
   };
@@ -100,14 +102,14 @@ export default function FriendRequestsScreen() {
     await updateDoc(userRef, {
       "friendRequests.receivedRequest":
         userData.friendRequests.receivedRequest.filter(
-          (req) => req.uid !== friend.uid
+          (req) => req.uid !== friend.uid,
         ),
     });
 
     await updateDoc(friendRef, {
       "friendRequests.sendRequest":
         friendData.friendRequests.sendRequest.filter(
-          (req) => req.uid !== user.uid
+          (req) => req.uid !== user.uid,
         ),
     });
   };
@@ -125,14 +127,14 @@ export default function FriendRequestsScreen() {
 
     await updateDoc(userRef, {
       "friendRequests.sendRequest": userData.friendRequests.sendRequest.filter(
-        (req) => req.uid !== friend.uid
+        (req) => req.uid !== friend.uid,
       ),
     });
 
     await updateDoc(friendRef, {
       "friendRequests.receivedRequest":
         friendData.friendRequests.receivedRequest.filter(
-          (req) => req.uid !== user.uid
+          (req) => req.uid !== user.uid,
         ),
     });
   };
@@ -159,10 +161,16 @@ export default function FriendRequestsScreen() {
         <View style={styles.userInfo}>
           <Image source={avatars[item?.avatarIndex]} style={styles.avatar} />
           <View>
-            <Text style={[styles.name, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.name, { color: theme.text.primary }]}
+            >
               {item.displayName}
             </Text>
-            <Text style={[styles.username, { color: theme.text.secondary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.username, { color: theme.text.secondary }]}
+            >
               @{item.username}
             </Text>
           </View>
@@ -174,7 +182,11 @@ export default function FriendRequestsScreen() {
   const activeData = tab === "received" ? requests : sentRequests;
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.primary }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.primary }]}
+    >
+      <IconBacground opacity={0.3} />
+
       {/* 🔹 Sekme Başlıkları */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
@@ -187,7 +199,10 @@ export default function FriendRequestsScreen() {
             },
           ]}
         >
-          <Text style={{ color: theme.text.primary, fontWeight: "600" }}>
+          <Text
+            allowFontScaling={false}
+            style={{ color: theme.text.primary, fontWeight: "600" }}
+          >
             Gelen İstekler
           </Text>
         </TouchableOpacity>
@@ -200,7 +215,10 @@ export default function FriendRequestsScreen() {
             },
           ]}
         >
-          <Text style={{ color: theme.text.primary, fontWeight: "600" }}>
+          <Text
+            allowFontScaling={false}
+            style={{ color: theme.text.primary, fontWeight: "600" }}
+          >
             Gönderilen İstekler
           </Text>
         </TouchableOpacity>
@@ -227,12 +245,12 @@ export default function FriendRequestsScreen() {
           contentContainerStyle={{ paddingBottom: 20, paddingHorizontal: 15 }}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingVertical: 15, paddingTop: 80 },
+  container: { flex: 1, paddingVertical: 15, paddingTop: 10 },
   tabContainer: {
     flexDirection: "row",
     justifyContent: "space-around",

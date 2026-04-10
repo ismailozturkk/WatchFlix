@@ -16,11 +16,13 @@ import { useTvShow } from "../../context/TvShowContex";
 import { useLanguage } from "../../context/LanguageContext";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useAppSettings } from "../../context/AppSettingsContext";
 const { width } = Dimensions.get("window");
 
 export default function TvShowsOnTheAir({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
+  const { imageQuality } = useAppSettings();
   const {
     pageOnTheAir,
     setPageOnTheAir,
@@ -64,7 +66,10 @@ export default function TvShowsOnTheAir({ navigation }) {
     return (
       <View style={{ flex: 1, paddingVertical: 10 }}>
         <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <Text style={[styles.title, { color: theme.text.secondary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.title, { color: theme.text.secondary }]}
+          >
             {t.tvShowScreens.onTheAir}
           </Text>
         </View>
@@ -84,7 +89,10 @@ export default function TvShowsOnTheAir({ navigation }) {
             alignItems: "center",
           }}
         >
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
             ●●●
           </Text>
           {pageOnTheAir > 5 && (
@@ -98,11 +106,17 @@ export default function TvShowsOnTheAir({ navigation }) {
                   },
                 ]}
               >
-                <Text style={[styles.genreText, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.genreText, { color: theme.text.primary }]}
+                >
                   {pageOnTheAir - 5}
                 </Text>
               </TouchableOpacity>
-              <Text style={[styles.genreText, { color: theme.text.muted }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.muted }]}
+              >
                 ●
               </Text>
             </>
@@ -118,7 +132,10 @@ export default function TvShowsOnTheAir({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageOnTheAir - 2}
               </Text>
             </TouchableOpacity>
@@ -133,7 +150,10 @@ export default function TvShowsOnTheAir({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageOnTheAir - 1}
               </Text>
             </TouchableOpacity>
@@ -160,7 +180,10 @@ export default function TvShowsOnTheAir({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageOnTheAir + 1}
             </Text>
           </TouchableOpacity>
@@ -173,11 +196,19 @@ export default function TvShowsOnTheAir({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageOnTheAir + 2}
             </Text>
           </TouchableOpacity>
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>●</Text>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
+            ●
+          </Text>
           <TouchableOpacity
             onPress={() => setPageOnTheAir(pageOnTheAir + 5)}
             style={[
@@ -187,11 +218,17 @@ export default function TvShowsOnTheAir({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageOnTheAir + 5}
             </Text>
           </TouchableOpacity>
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
             ●●●
           </Text>
         </View>
@@ -221,7 +258,7 @@ export default function TvShowsOnTheAir({ navigation }) {
               source={
                 item.poster_path
                   ? {
-                      uri: `https://image.tmdb.org/t/p/w500${item.poster_path}`,
+                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
                     }
                   : require("../../assets/image/no_image.png")
               }
@@ -331,7 +368,10 @@ export default function TvShowsOnTheAir({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <Text style={[styles.title, { color: theme.text.secondary }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.title, { color: theme.text.secondary }]}
+        >
           {t.tvShowScreens.onTheAir}
         </Text>
       </View>
@@ -351,7 +391,12 @@ export default function TvShowsOnTheAir({ navigation }) {
           alignItems: "center",
         }}
       >
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●●●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●●●
+        </Text>
         {pageOnTheAir > 1 && (
           <>
             <TouchableOpacity
@@ -363,11 +408,17 @@ export default function TvShowsOnTheAir({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {1}
               </Text>
             </TouchableOpacity>
-            <Text style={[styles.genreText, { color: theme.text.muted }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.muted }]}
+            >
               ●
             </Text>
           </>
@@ -383,7 +434,10 @@ export default function TvShowsOnTheAir({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageOnTheAir - 2}
             </Text>
           </TouchableOpacity>
@@ -398,7 +452,10 @@ export default function TvShowsOnTheAir({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageOnTheAir - 1}
             </Text>
           </TouchableOpacity>
@@ -427,7 +484,10 @@ export default function TvShowsOnTheAir({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageOnTheAir + 1}
               </Text>
             </TouchableOpacity>
@@ -441,13 +501,21 @@ export default function TvShowsOnTheAir({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageOnTheAir + 2}
               </Text>
             </TouchableOpacity>
           </>
         ) : null}
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●
+        </Text>
         <TouchableOpacity
           onPress={() => setPageOnTheAir(totalPagesOnTheAir)}
           style={[
@@ -457,11 +525,19 @@ export default function TvShowsOnTheAir({ navigation }) {
             },
           ]}
         >
-          <Text style={[styles.genreText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.primary }]}
+          >
             {totalPagesOnTheAir}
           </Text>
         </TouchableOpacity>
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●●●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●●●
+        </Text>
       </View>
     </View>
   );

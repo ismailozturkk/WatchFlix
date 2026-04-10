@@ -1,7 +1,11 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useRef, useMemo } from "react";
 import { useAppSettings } from "./AppSettingsContext";
 import Toast from "react-native-toast-message";
 import { useLanguage } from "./LanguageContext";
+import { useAuth } from "./AuthContext";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "../firebase";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 
 const TvShowContext = createContext();
@@ -16,6 +20,66 @@ export const TvShowProvider = ({ children }) => {
   const { API_KEY } = useAppSettings();
   const { language } = useLanguage();
   const { t } = useLanguage();
+  const { user } = useAuth();
+
+  // ── İzlenen diziler (Firebase + AsyncStorage cache) ────────────────────────
+  const WATCHED_TV_CACHE = "cache_watchedTvShows";
+  const [watchedTvShows, setWatchedTvShows] = useState([]);
+  const [loadingWatchedTv, setLoadingWatchedTv] = useState(true);
+  const unsubRef = useRef(null);
+
+  const processShows = (raw) => {
+    const filtered = raw.filter((s) => s.type === "tv" || s.seasons !== undefined);
+    filtered.sort((a, b) => new Date(b.addedShowDate) - new Date(a.addedShowDate));
+    return filtered;
+  };
+
+  const startListener = (uid) => {
+    if (unsubRef.current) {
+      unsubRef.current();
+      unsubRef.current = null;
+    }
+    if (!uid) {
+      setWatchedTvShows([]);
+      setLoadingWatchedTv(false);
+      AsyncStorage.removeItem(WATCHED_TV_CACHE).catch(() => {});
+      return;
+    }
+    const docRef = doc(db, "Lists", uid);
+    unsubRef.current = onSnapshot(docRef, (snap) => {
+      const raw = processShows(snap.exists() ? snap.data().watchedTv || [] : []);
+      setWatchedTvShows(raw);
+      setLoadingWatchedTv(false);
+      AsyncStorage.setItem(WATCHED_TV_CACHE, JSON.stringify(raw)).catch(() => {});
+    });
+  };
+
+  // Uygulama açılır açılmaz: önce cache'den yükle, sonra listener başlat
+  useEffect(() => {
+    Promise.all([
+      AsyncStorage.getItem(WATCHED_TV_CACHE),
+      AsyncStorage.getItem("cachedUserId"),
+    ]).then(([cached, cachedUid]) => {
+      if (cached) {
+        setWatchedTvShows(JSON.parse(cached));
+        setLoadingWatchedTv(false);
+      }
+      if (cachedUid) startListener(cachedUid);
+      else if (!cached) setLoadingWatchedTv(false);
+    });
+    return () => {
+      if (unsubRef.current) unsubRef.current();
+    };
+  }, []);
+
+  // Auth değişince listener'ı güncelle
+  useEffect(() => {
+    if (user?.uid) {
+      startListener(user.uid);
+    } else if (user === null) {
+      startListener(null);
+    }
+  }, [user?.uid]);
   const [refreshing, setRefreshing] = useState(false);
 
   const categoriesTrends = ["week", "day"];
@@ -284,64 +348,71 @@ export const TvShowProvider = ({ children }) => {
     fetchOnTheAir();
   }, [language, pageOnTheAir]);
 
-  return (
-    <TvShowContext.Provider
-      value={{
-        seriesTrend,
-        seriesBest,
-        loadingTrend,
-        loadingBest,
-        selectedCategoryTrend,
-        selectedCategoryBest,
-        totalPagesBest,
-        pageBest,
-        moviesAiringToday,
-        totalPagesAiringToday,
-        loadingAiringToday,
-        pageAiringToday,
-        providers,
-        selectedProvider,
-        moviesProviders,
-        loadingMoviesByProvider,
-        loadingProvider,
-        genres,
-        selectedGenres,
-        pageGenres,
-        moviesGenres,
-        loadingGenres,
-        genres,
-        pageOnTheAir,
-        moviesOnTheAir,
-        totalPagesOnTheAir,
-        loadingOnTheAir,
-        categoriesBest,
-        categoriesTrends,
-        refreshing,
-        setRefreshing,
+  const contextValue = useMemo(() => ({
+    seriesTrend,
+    seriesBest,
+    loadingTrend,
+    loadingBest,
+    selectedCategoryTrend,
+    selectedCategoryBest,
+    totalPagesBest,
+    pageBest,
+    moviesAiringToday,
+    totalPagesAiringToday,
+    loadingAiringToday,
+    pageAiringToday,
+    providers,
+    selectedProvider,
+    moviesProviders,
+    loadingMoviesByProvider,
+    loadingProvider,
+    genres,
+    selectedGenres,
+    pageGenres,
+    moviesGenres,
+    loadingGenres,
+    pageOnTheAir,
+    moviesOnTheAir,
+    totalPagesOnTheAir,
+    loadingOnTheAir,
+    categoriesBest,
+    categoriesTrends,
+    refreshing,
+    setRefreshing,
 
-        setPageBest,
-        fetchMoviesByProvider,
-        setSelectedCategoryTrend,
-        setSelectedCategoryTrendShow,
-        setSelectedCategoryBestShow,
-        setSelectedCategoryBest,
-        setPageBest,
-        setPageAiringToday,
-        setPageAiringToday,
-        setSelectedGenres,
-        setPageGenres,
-        setPageOnTheAir,
-        getCategoryTitleBest,
-        getCategoryTitleTrends,
-        //!
-        fetchSeriesTrends,
-        fetchSeriesBest,
-        fetchAiringToday,
-        fetchProviders,
-        fetchTvByGenres,
-        fetchOnTheAir,
-      }}
-    >
+    setPageBest,
+    fetchMoviesByProvider,
+    setSelectedCategoryTrend,
+    setSelectedCategoryTrendShow,
+    setSelectedCategoryBestShow,
+    setSelectedCategoryBest,
+    setPageAiringToday,
+    setSelectedGenres,
+    setPageGenres,
+    setPageOnTheAir,
+    getCategoryTitleBest,
+    getCategoryTitleTrends,
+    watchedTvShows,
+    loadingWatchedTv,
+    //!
+    fetchSeriesTrends,
+    fetchSeriesBest,
+    fetchAiringToday,
+    fetchProviders,
+    fetchTvByGenres,
+    fetchOnTheAir,
+  }), [
+    seriesTrend, seriesBest, loadingTrend, loadingBest, selectedCategoryTrend,
+    selectedCategoryBest, totalPagesBest, pageBest, moviesAiringToday,
+    totalPagesAiringToday, loadingAiringToday, pageAiringToday, providers,
+    selectedProvider, moviesProviders, loadingMoviesByProvider, loadingProvider,
+    genres, selectedGenres, pageGenres, moviesGenres, loadingGenres, pageOnTheAir,
+    moviesOnTheAir, totalPagesOnTheAir, loadingOnTheAir, categoriesBest,
+    categoriesTrends, refreshing, watchedTvShows, loadingWatchedTv
+  ]);
+
+  return (
+    <TvShowContext.Provider value={contextValue}>
       {children}
     </TvShowContext.Provider>
   );

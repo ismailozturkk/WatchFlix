@@ -233,7 +233,7 @@ main filmler
                             <Image
                               key={index}
                               source={{
-                                uri: `https://image.tmdb.org/t/p/w500${item.imagePath}`,
+                                uri: `https://image.tmdb.org/t/p/${imageQuality}${item.imagePath}`,
                               }}
                               style={[
                                 styles.image,
@@ -347,7 +347,7 @@ main filmler
                             source={
                               item.imagePath
                                 ? {
-                                    uri: `https://image.tmdb.org/t/p/w500${item.imagePath}`,
+                                    uri: `https://image.tmdb.org/t/p/${imageQuality}${item.imagePath}`,
                                     cache: "force-cache",
                                   }
                                 : require("../assets/image/no_image.png")
@@ -506,7 +506,7 @@ main filmler
                             source={
                               item.imagePath
                                 ? {
-                                    uri: `https://image.tmdb.org/t/p/w500${item.imagePath}`,
+                                    uri: `https://image.tmdb.org/t/p/${imageQuality}${item.imagePath}`,
                                     cache: "force-cache",
                                   }
                                 : require("../assets/image/no_image.png")

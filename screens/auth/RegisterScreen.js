@@ -29,6 +29,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { db } from "../../firebase";
+import IconBacground from "../../components/IconBacground";
 
 const { width, height } = Dimensions.get("window");
 
@@ -139,7 +140,7 @@ export default function RegisterScreen({ navigation }) {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
-        password
+        password,
       );
       const user = userCredential.user;
 
@@ -176,190 +177,232 @@ export default function RegisterScreen({ navigation }) {
   };
 
   return (
-    <ScrollView
-      style={{ backgroundColor: theme.primary }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={[styles.container, { backgroundColor: theme.primary }]}>
-        <LottieView
-          style={[styles.lottie, { display: showSnow ? "flex" : "none" }]}
-          source={require("../../LottieJson/snow.json")}
-          autoPlay
-          loop
-        />
-        <LottieView
-          source={require("../../LottieJson/register.json")}
-          style={{ width: 300, height: 300 }}
-          autoPlay
-          loop
-        />
-        <Text style={[styles.title, { color: theme.text.primary }]}>
-          {t.RegisterScreen.registerButton}
-        </Text>
-
-        <View
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.secondary,
-              borderColor:
-                usernameAvailable === null
-                  ? theme.border
-                  : usernameAvailable
-                    ? "rgb(37, 211, 102)"
-                    : "rgb(189, 8, 28)",
-            },
-          ]}
-        >
-          <Ionicons name="at-outline" size={24} color={theme.border} />
-          <TextInput
-            style={[
-              {
-                width: "90%",
-                height: "100%",
-                color: usernameAvailable === false ? "red" : theme.text.primary,
-              },
-              {
-                textDecorationLine:
-                  usernameAvailable === false ? "line-through" : "none",
-              },
-            ]}
-            placeholderTextColor={theme.text.secondary}
-            placeholder="Kullanıcı Adı"
-            onChangeText={handleUsernameChange}
-            autoCapitalize="none"
-          />
-          {usernameAvailable === false && (
-            <Text style={{ position: "absolute", right: 10, color: "red" }}>
-              Bu kullanıcı adı alınamaz!
-            </Text>
-          )}
-          {usernameAvailable === null && (
-            <Text
-              style={{
-                position: "absolute",
-                left: 15,
-                bottom: 0,
-                color: theme.text.muted,
-                fontSize: 10,
-              }}
-            >
-              (3-20 karakter, boşluk yok, sadece harf, rakam ve _, büyük harfler
-              ve ı,ü,ö,ç,ğ,ş kullanılamaz )
-            </Text>
-          )}
-        </View>
-
-        <View
-          style={[
-            styles.input,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
-        >
-          <Ionicons name="person-outline" size={24} color={theme.border} />
-          <TextInput
-            style={{ width: "90%", height: "100%", color: theme.text.primary }}
-            placeholderTextColor={theme.text.secondary}
-            placeholder={t.RegisterScreen.name}
-            onChangeText={(text) => setName(text)}
-          />
-        </View>
-
-        <View
-          style={[
-            styles.input,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
-        >
-          <Ionicons name="person" size={24} color={theme.border} />
-          <TextInput
-            style={{ width: "90%", height: "100%", color: theme.text.primary }}
-            placeholderTextColor={theme.text.secondary}
-            placeholder={t.RegisterScreen.lastName}
-            onChangeText={(text) => setLastname(text)}
-          />
-        </View>
-
-        <View
-          style={[
-            styles.input,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
-        >
-          <Ionicons name="mail-outline" size={24} color={theme.border} />
-          <TextInput
-            style={{ width: "90%", height: "100%", color: theme.text.primary }}
-            placeholderTextColor={theme.text.secondary}
-            placeholder={t.RegisterScreen.email}
-            keyboardType="email-address"
-            onChangeText={(text) => setEmail(text)}
-          />
-        </View>
-
-        <View
-          style={[
-            styles.input,
-            { backgroundColor: theme.secondary, borderColor: passwordCorrect },
-          ]}
-        >
-          <Ionicons name="lock-closed-outline" size={24} color={theme.border} />
-          <TextInput
-            style={{ width: "90%", height: "100%", color: theme.text.primary }}
-            placeholderTextColor={theme.text.secondary}
-            placeholder={t.RegisterScreen.password}
-            secureTextEntry
-            onChangeText={(text) => inputPassword(text)}
-          />
-        </View>
-
-        <View
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.secondary,
-              borderColor: passwordCorrectAgain,
-            },
-          ]}
-        >
-          <Ionicons name="lock-closed" size={24} color={theme.border} />
-          <TextInput
-            style={{ width: "90%", height: "100%", color: theme.text.primary }}
-            placeholderTextColor={theme.text.secondary}
-            placeholder={t.RegisterScreen.passwordAgain}
-            secureTextEntry
-            onChangeText={(text) => inputPasswordAgain(text)}
-          />
-        </View>
-
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: theme.accent }]}
-          onPress={() => createAccount()}
-          disabled={usernameAvailable === false}
-        >
-          {isloading ? (
+    <View style={{ flex: 1, backgroundColor: theme.primary }}>
+      <IconBacground opacity={0.3} />
+      <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+        <View style={styles.container}>
+          {showSnow && (
             <LottieView
-              source={require("../../LottieJson/loading15.json")}
-              style={{ width: 40, height: 40 }}
+              style={styles.lottie}
+              source={require("../../LottieJson/snow.json")}
               autoPlay
               loop
             />
-          ) : (
-            <Text style={[styles.buttonText, { color: theme.text.primary }]}>
-              {t.RegisterScreen.registerButton}
-            </Text>
           )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: theme.secondary }]}
-          onPress={() => navigation.navigate("LoginScreen")}
-        >
-          <Text style={[styles.buttonText, { color: theme.text.primary }]}>
-            {t.RegisterScreen.loginButton}
+          <LottieView
+            source={require("../../LottieJson/register.json")}
+            style={{ width: 300, height: 300 }}
+            autoPlay
+            loop
+          />
+          <Text
+            allowFontScaling={false}
+            style={[styles.title, { color: theme.text.primary }]}
+          >
+            {t.RegisterScreen.registerButton}
           </Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+
+          <View
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.secondary,
+                borderColor:
+                  usernameAvailable === null
+                    ? theme.border
+                    : usernameAvailable
+                      ? "rgb(37, 211, 102)"
+                      : "rgb(189, 8, 28)",
+              },
+            ]}
+          >
+            <Ionicons name="at-outline" size={24} color={theme.border} />
+            <TextInput
+              style={[
+                {
+                  width: "90%",
+                  height: "100%",
+                  color:
+                    usernameAvailable === false ? "red" : theme.text.primary,
+                },
+                {
+                  textDecorationLine:
+                    usernameAvailable === false ? "line-through" : "none",
+                },
+              ]}
+              placeholderTextColor={theme.text.secondary}
+              placeholder="Kullanıcı Adı"
+              onChangeText={handleUsernameChange}
+              autoCapitalize="none"
+            />
+            {usernameAvailable === false && (
+              <Text
+                allowFontScaling={false}
+                style={{ position: "absolute", right: 10, color: "red" }}
+              >
+                Bu kullanıcı adı alınamaz!
+              </Text>
+            )}
+            {usernameAvailable === null && (
+              <Text
+                style={{
+                  position: "absolute",
+                  left: 15,
+                  bottom: 0,
+                  color: theme.text.muted,
+                  fontSize: 10,
+                }}
+              >
+                (3-20 karakter, boşluk yok, sadece harf, rakam ve _, büyük
+                harfler ve ı,ü,ö,ç,ğ,ş kullanılamaz )
+              </Text>
+            )}
+          </View>
+
+          <View
+            style={[
+              styles.input,
+              { backgroundColor: theme.secondary, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons name="person-outline" size={24} color={theme.border} />
+            <TextInput
+              style={{
+                width: "90%",
+                height: "100%",
+                color: theme.text.primary,
+              }}
+              placeholderTextColor={theme.text.secondary}
+              placeholder={t.RegisterScreen.name}
+              onChangeText={(text) => setName(text)}
+            />
+          </View>
+
+          <View
+            style={[
+              styles.input,
+              { backgroundColor: theme.secondary, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons name="person" size={24} color={theme.border} />
+            <TextInput
+              style={{
+                width: "90%",
+                height: "100%",
+                color: theme.text.primary,
+              }}
+              placeholderTextColor={theme.text.secondary}
+              placeholder={t.RegisterScreen.lastName}
+              onChangeText={(text) => setLastname(text)}
+            />
+          </View>
+
+          <View
+            style={[
+              styles.input,
+              { backgroundColor: theme.secondary, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons name="mail-outline" size={24} color={theme.border} />
+            <TextInput
+              style={{
+                width: "90%",
+                height: "100%",
+                color: theme.text.primary,
+              }}
+              placeholderTextColor={theme.text.secondary}
+              placeholder={t.RegisterScreen.email}
+              keyboardType="email-address"
+              onChangeText={(text) => setEmail(text)}
+            />
+          </View>
+
+          <View
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.secondary,
+                borderColor: passwordCorrect,
+              },
+            ]}
+          >
+            <Ionicons
+              name="lock-closed-outline"
+              size={24}
+              color={theme.border}
+            />
+            <TextInput
+              style={{
+                width: "90%",
+                height: "100%",
+                color: theme.text.primary,
+              }}
+              placeholderTextColor={theme.text.secondary}
+              placeholder={t.RegisterScreen.password}
+              secureTextEntry
+              onChangeText={(text) => inputPassword(text)}
+            />
+          </View>
+
+          <View
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.secondary,
+                borderColor: passwordCorrectAgain,
+              },
+            ]}
+          >
+            <Ionicons name="lock-closed" size={24} color={theme.border} />
+            <TextInput
+              style={{
+                width: "90%",
+                height: "100%",
+                color: theme.text.primary,
+              }}
+              placeholderTextColor={theme.text.secondary}
+              placeholder={t.RegisterScreen.passwordAgain}
+              secureTextEntry
+              onChangeText={(text) => inputPasswordAgain(text)}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: theme.accent }]}
+            onPress={() => createAccount()}
+            disabled={usernameAvailable === false}
+          >
+            {isloading ? (
+              <LottieView
+                source={require("../../LottieJson/loading15.json")}
+                style={{ width: 40, height: 40 }}
+                autoPlay
+                loop
+              />
+            ) : (
+              <Text
+                allowFontScaling={false}
+                style={[styles.buttonText, { color: theme.text.primary }]}
+              >
+                {t.RegisterScreen.registerButton}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: theme.secondary }]}
+            onPress={() => navigation.navigate("LoginScreen")}
+          >
+            <Text
+              allowFontScaling={false}
+              style={[styles.buttonText, { color: theme.text.primary }]}
+            >
+              {t.RegisterScreen.loginButton}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 

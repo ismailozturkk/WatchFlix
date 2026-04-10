@@ -1,0 +1,570 @@
+=========================================================
+  WATCHFLIX - KAPSAMLI GELİŞTİRME PLANI
+  Oluşturulma: 2026-04-08
+  Toplam Ekran: 54 | Toplam Context: 9 | Toplam Component: 11
+=========================================================
+
+Bu belge, uygulamanın tüm dosyaları (App.js, 9 context, 54+ ekran,
+11 bileşen, modüller) incelenerek hazırlanmıştır.
+Geliştirmeler 5 öncelik katmanına ayrılmıştır:
+  [KRİTİK] → Güvenlik, veri kaybı veya çökme riski
+  [YÜKSEK]  → Performans veya mimari bozukluk
+  [ORTA]    → Kullanıcı deneyimi, özellik eksikliği
+  [DÜŞÜK]   → Kod kalitesi, tekrar azaltma
+  [BONUS]   → Yeni özellik fikirleri
+
+
+
+=========================================================
+ KATMAN 1 — KRİTİK ÖNCELİK (Hemen Yapılmalı)
+=========================================================
+
+──────────────────────────────────────────────────────────
+1. TMDB API_KEY AÇIK KAYNAK KODDA HARDCODED
+──────────────────────────────────────────────────────────
+Dosya   : context/AppSettingsContext.js (satır 117-119)
+Sorun   : JWT token açık metin olarak kaynak kodda duruyor.
+          Git geçmişinde de var, public repo'ya yüklenirse
+          token ele geçirilir, hesap kötüye kullanılır.
+Çözüm   :
+  1. .env dosyasına taşı:
+       TMDB_API_KEY=Bearer eyJhbGc...
+  2. babel.config.js'e react-native-dotenv ekle.
+  3. AppSettingsContext içinde:
+       import { TMDB_API_KEY } from '@env';
+  4. .gitignore'da .env olduğunu doğrula (zaten var).
+  5. Git geçmişini temizle (BFG Repo Cleaner veya
+     git filter-branch).
+Etki    : Güvenlik açığı kapatılır.
+
+──────────────────────────────────────────────────────────
+2. FIREBASE ONLINE STATUS — YORUM SATIRINDA KALDI
+──────────────────────────────────────────────────────────
+Dosya   : App.js (satır 456-502)
+Sorun   : isOnline / AppState takip kodu tamamen yorum satırı.
+          ChatScreen bu veriyi kullanıyor (friendIsOnline),
+          ancak değer hiçbir zaman doğru güncellenmiyor.
+          Kullanıcı uygulamayı kapattığında "Çevrimiçi"
+          görünmeye devam edebilir.
+Çözüm   :
+  - App.js'teki kodu aktif hale getir.
+  - AppState.addEventListener('change', ...) ile arka
+    plana geçildiğinde isOnline = false yap.
+  - AuthContext kullanıcı çıkışı yaptığında isOnline = false.
+Etki    : Chat ekranındaki "Son görülme" özelliği düzgün çalışır.
+
+──────────────────────────────────────────────────────────
+3. TOAST TİPİ YAZIM HATASI
+──────────────────────────────────────────────────────────
+Dosya   : App.js (satır 112)
+Sorun   : type: "succes" yazılmış (iki 's' eksik).
+          toastConfig'de "success" var, bu mesaj hiç gösterilmez.
+Çözüm   : "succes" → "success"
+Etki    : Belge oluşturma hatası sessizce geçiştirilir.
+
+──────────────────────────────────────────────────────────
+4. ÇAKIŞAN ANİMASYON TANIMI (App.js)
+──────────────────────────────────────────────────────────
+Dosya   : App.js (satır 178-179)
+Sorun   : `animation: "fade"` satırı hemen altında
+          `animation: "slide_from_right"` ile eziliyor.
+          İlk satır JS'te hiçbir etkisi yok, kaldırılmalı.
+Çözüm   : Sadece `animation: "slide_from_right"` bırak.
+Etki    : Kod okunabilirliği ve niyet netliği.
+
+──────────────────────────────────────────────────────────
+5. CHATSCREEN — DUPLICATE ONSNAPSHOT (mesaj query 2 kez)
+──────────────────────────────────────────────────────────
+Dosya   : screens/ChatScreen.js (satır 133-198)
+Sorun   : Mesajları dinlemek için iki ayrı useEffect var:
+          - Satır 133-161: Sadece durum güncellemesi (seen/delivered)
+          - Satır 164-198: Mesajları state'e yazma
+          Her ikisi de aynı Firestore sorgusunu açıyor →
+          2x okuma maliyeti, 2 listener.
+Çözüm   : Tek bir onSnapshot içinde hem seen/delivered
+          güncellemesini hem de state'e yazmayı birleştir.
+Etki    : Firestore okuma maliyeti %50 azalır, bellek tasarrufu.
+
+
+
+=========================================================
+ KATMAN 2 — YÜKSEK ÖNCELİK (Bu Sprint İçinde)
+=========================================================
+
+──────────────────────────────────────────────────────────
+6. GOD OBJECT ANTİ-DESENİ — MovieContext Refactor
+──────────────────────────────────────────────────────────
+Dosya   : context/MovieContex.js (18KB, 570 satır)
+Sorun   : 8 farklı API çağrısı (Trends, Bests, Oscar,
+          Collections, Genres, Providers, Upcoming,
+          NowPlaying) tek context'te.
+          Herhangi bir state değiştiğinde tüm consumer
+          bileşenler re-render olur.
+Çözüm   :
+  hooks/
+    useTrendingMovies.js
+    useMovieBests.js
+    useMovieOscar.js
+    useMovieCollections.js
+    useMovieGenres.js
+    useMovieProviders.js
+    useMovieUpcoming.js
+    useMovieNowPlaying.js
+  MovieContext sadece bu hook'ları aggregate etsin
+  veya tamamen kaldırılsın.
+Etki    : Re-render sayısı dramatik şekilde azalır.
+
+──────────────────────────────────────────────────────────
+7. GOD OBJECT ANTİ-DESENİ — TvShowContext Refactor
+──────────────────────────────────────────────────────────
+Dosya   : context/TvShowContex.js (11.8KB, 400+ satır)
+          [Not: Dosya adı typo: "Contex" değil "Context"]
+Sorun   : MovieContext ile aynı sorun, 7 farklı özellik.
+Çözüm   :
+  hooks/
+    useTvTrends.js
+    useTvBests.js
+    useTvGenres.js
+    useTvProviders.js
+    useTvAiringToday.js
+    useTvOnTheAir.js
+Etki    : Bağımsız özellik güncellemeleri.
+
+──────────────────────────────────────────────────────────
+8. OVERSIZED CONTEXT — ProfileScreenContext Refactor
+──────────────────────────────────────────────────────────
+Dosya   : context/ProfileScreenContext.js (28KB, 918 satır)
+Sorun   : Avatar, istatistikler, notlar, hatırlatıcılar,
+          görünüm ayarları, rank sistemi — hepsi tek dosyada.
+Çözüm   :
+  hooks/
+    useProfileStats.js   (izleme istatistikleri)
+    useProfileNotes.js   (not CRUD)
+    useProfileReminders.js (hatırlatıcı CRUD)
+    useProfileAvatar.js  (avatar yönetimi)
+    useProfileRank.js    (rank hesaplama)
+Etki    : Dosya 918 → ~150 satır parçalara bölünür,
+          bakım kolaylaşır.
+
+──────────────────────────────────────────────────────────
+9. MERKEZİ API SERVİS KATMANI YOKLUĞU
+──────────────────────────────────────────────────────────
+Sorun   : Axios her context/ekranda ayrı ayrı kullanılıyor:
+          MovieContext: 9 yer
+          TvShowContext: 7 yer
+          ChatScreen: 1 yer
+          ProfileScreenContext: 5 yer
+          Header, baseURL, hata yönetimi hepsi tekrarlanıyor.
+Çözüm   :
+  services/
+    tmdb/
+      apiClient.js    (axios instance, baseURL, auth header)
+      movies.js       (film endpoint'leri)
+      tv.js           (dizi endpoint'leri)
+      search.js       (arama endpoint'leri)
+    firebase/
+      auth.service.js
+      firestore.service.js
+Etki    : Tek yerden değişiklik; retry, timeout, interceptor
+          merkezi yönetilir.
+
+──────────────────────────────────────────────────────────
+10. HATA SINIRI (ERROR BOUNDARY) EKSİKLİĞİ
+──────────────────────────────────────────────────────────
+Sorun   : Hiçbir ekranda React Error Boundary yok.
+          Beklenmedik render hatası tüm uygulamayı çökertir.
+Çözüm   :
+  components/ErrorBoundary.js  oluştur.
+  App.js'te NavigationContainer'ı sar.
+  Critik ekranlar (MovieDetail, TvShowsDetails) için
+  ayrıca sar.
+  Sentry veya Firebase Crashlytics entegre et.
+Etki    : Uygulama beyaz ekranla çökmez; fallback UI gösterir.
+
+──────────────────────────────────────────────────────────
+11. REACT NATIVE REANIMATED 4 MİGRASYONU TAMAMLANMAMADI
+──────────────────────────────────────────────────────────
+Sorun   : App.js satır 10-12'de LogBox ile uyarı susturuluyor.
+          `createAnimatedPropAdapter` deprecated API hâlâ kullanılıyor.
+          Bir sonraki Reanimated versiyonunda çalışmayı durdurur.
+Çözüm   : Tüm dosyalarda `createAnimatedPropAdapter` ara,
+          doğrudan adapter function kullanacak şekilde güncelle.
+          LogBox.ignoreLogs kaldır (güvenli uyarı susturulmasın).
+Etki    : Gelecek SDK güncellemelerine hazır olunur.
+
+──────────────────────────────────────────────────────────
+12. OFFLINE-FIRST CACHE STRATEJİSİ EKSİK
+──────────────────────────────────────────────────────────
+Sorun   : Her uygulama açılışında tüm TMDB verileri yeniden
+          çekiliyor. İnternet yoksa içerik gösterilemiyor.
+Çözüm   :
+  - MMKV (hızlı) veya AsyncStorage ile TTL'li cache katmanı.
+  - Stale-while-revalidate: önce cache'i göster, arka planda yenile.
+  - Cache key: endpoint + parametreler.
+  - TTL: Trends → 15dk, Genres → 24sa, Details → 1sa.
+Etki    : Çevrimdışı kullanım, hız, TMDB rate limit tasarrufu.
+
+
+
+=========================================================
+ KATMAN 3 — ORTA ÖNCELİK (Sonraki Sprint)
+=========================================================
+
+──────────────────────────────────────────────────────────
+13. GEMİNİ AI ENTEGRASYONU (Temel Özellik Eksik)
+──────────────────────────────────────────────────────────
+Sorun   : Proje brief'inde belirtilen ana hedef henüz yok.
+          "Akıllı film/dizi önerileri" henüz uygulanmamış.
+Çözüm   :
+  - Gemini API (google/generative-ai) kur.
+  - Kullanıcının watchedMovies + watchedTv listesini gönder.
+  - "Sana göre öneriler" ekranı oluştur.
+  - ChatModal'a AI mesajlaşma modu ekle.
+  - profil istatistiklerini AI'ya verip "izleme profili" üret.
+Etki    : Uygulamanın temel farklılaştırıcı özelliği aktif olur.
+
+──────────────────────────────────────────────────────────
+14. SETTİNGS — İŞLEVSİZ TOGGLE'LAR
+──────────────────────────────────────────────────────────
+Dosya   : screens/tabs/SettingsScreen.js (satır 191-231)
+Sorun   : "Verileri İndir" ve "Düşük Veri Modu" toggle'ları
+          value={() => {}} ve onValueChange={() => {}} ile
+          tamamen boş — işlev yok.
+Çözüm   :
+  - "Verileri İndir": Offline cache için film listesini
+    AsyncStorage/MMKV'e indirme sistemi (Katman 2 ile bağlantılı).
+  - "Düşük Veri Modu": Küçük resim kalitesi (w185 yerine w92),
+    otomatik yüklemeyi kapat.
+  - Ya gerçekten implement et ya da "Yakında" bilgisiyle gizle.
+Etki    : Kullanıcı beklentisi karşılanır, arayüz yanıltmaz.
+
+──────────────────────────────────────────────────────────
+15. BİLDİRİM SİSTEMİ (Notifications DISABLED)
+──────────────────────────────────────────────────────────
+Dosya   : screens/tabs/SettingsScreen.js (satır 290-296)
+Sorun   : Bildirimler toggle'ı disabled={true} — hiç çalışmıyor.
+          Reminder sistemi var ama push bildirim yok.
+Çözüm   :
+  - expo-notifications kur.
+  - Hatırlatıcıya tarih girildiğinde yerel bildirim planla.
+  - Uzak bildirim için Firebase Cloud Messaging (FCM) ekle.
+  - Bildirim izni al (requestPermissionsAsync).
+Etki    : Hatırlatıcı özelliği gerçekten işe yarar hale gelir.
+
+──────────────────────────────────────────────────────────
+16. CHAT ARAMA — DEBOUNCE EKSİK
+──────────────────────────────────────────────────────────
+Dosya   : screens/ChatScreen.js (satır 205-227)
+Sorun   : handleTyping içinde her karakter girilişinde
+          fetchSearchResults çağrısı yapılıyor.
+          "#" sonrası her harf TMDB API'ye istek atar.
+Çözüm   :
+  - useRef ile debounce ekle (300-500ms).
+  - useDebouncedValue hook kullan.
+Etki    : TMDB rate limit'e çarpmaz, gereksiz API çağrısı azalır.
+
+──────────────────────────────────────────────────────────
+17. CHATSCREEN — YARATILIK GÖRÜNÜMÜ EKSİK
+──────────────────────────────────────────────────────────
+Dosya   : screens/ChatScreen.js
+Sorun   : Chat listesinde sadece mesajlar var, tarih ayırıcı yok.
+          Aynı gün içindeki mesajlar birikince kaybolup gidiyor.
+Çözüm   :
+  - Mesajları gün gruplarına bölen ayırıcı ekle.
+  - "Bugün", "Dün", "3 Nisan" gibi başlıklar.
+  - Mesaj listesine timestamp tabanlı groupBy uygula.
+Etki    : Kullanıcı sohbet geçmişini daha kolay tarar.
+
+──────────────────────────────────────────────────────────
+18. DOSYA ADI TYPO'LARI
+──────────────────────────────────────────────────────────
+Sorun   :
+  - context/MovieContex.js    (Context yazılmalı)
+  - context/TvShowContex.js   (Context yazılmalı)
+  - components/IconBacground.js (Background yazılmalı)
+  - screens/movie/MovieProvders.js (Providers yazılmalı)
+  - screens/tv/TvShowsProvders.js (Providers yazılmalı)
+Çözüm   : Dosyaları doğru adla yeniden adlandır,
+          tüm import referanslarını güncelle.
+Etki    : Kod tabanı profesyonel görünür, arama kolaylaşır.
+
+──────────────────────────────────────────────────────────
+19. SETTINGS — CACHE TEMİZLEME LOGOUT YAPMALI
+──────────────────────────────────────────────────────────
+Dosya   : screens/tabs/SettingsScreen.js (satır 36-43)
+Sorun   : AsyncStorage.clear() tüm veriyi siliyor,
+          ancak kullanıcı logout olmuyor.
+          Avatar, tema, dil sıfırlanıyor ama oturum açık kalıyor.
+          Sonraki açılışta undefined değerlerle sorun yaşanabilir.
+Çözüm   : Cache temizlendikten sonra kullanıcıyı logout et
+          ve LoginScreen'e yönlendir.
+Etki    : Tutarlı durum, veri uyumsuzluğu önlenir.
+
+──────────────────────────────────────────────────────────
+20. MOVIEDETAIL / TVSHOWSDETAILS — ÇOK BÜYÜK DOSYALAR
+──────────────────────────────────────────────────────────
+Dosya   : screens/movie/MovieDetail.js  (62KB!)
+          screens/tv/TvShowsDetails.js  (61KB!)
+Sorun   : Tek dosyada header, trailer, oyuncu listesi,
+          benzer filmler, yorum, liste işlemleri vs.
+          Bu boyut bakımı imkansız kılar.
+Çözüm   :
+  MovieDetail/
+    index.js           (ana bileşen)
+    MovieHeader.js     (poster, başlık, puan)
+    MovieTrailer.js    (YouTube iframe)
+    MovieCast.js       (oyuncu listesi)
+    MovieSimilar.js    (benzer filmler)
+    MovieActions.js    (listeye ekle, favorile)
+Etki    : Her özellik bağımsız geliştirilebilir ve test edilebilir.
+
+──────────────────────────────────────────────────────────
+21. SPLASH SCREEN SÜRESİ SABİT (2 SANİYE)
+──────────────────────────────────────────────────────────
+Dosya   : App.js (satır 447-453)
+Sorun   : setTimeout ile 2 saniye bekletiliyor.
+          Auth durumu yüklenene kadar değil, sadece 2 saniye.
+          Yavaş cihazda auth bitmeden ana ekrana geçilebilir.
+Çözüm   :
+  - Splash'ı setTimeout ile değil, auth durumu çözülünce kaldır.
+  - useAuth().loading tamamlanana kadar splash göster.
+Etki    : Yavaş cihazlarda boş ekran flash'ı önlenir.
+
+──────────────────────────────────────────────────────────
+22. İSTATİSTİK EKRANLARI — GRAFIK KÜTÜPHANESİ UYUMU
+──────────────────────────────────────────────────────────
+Dosya   : screens/tabs/profile/MovieStatisticsScreen.js (24KB)
+          screens/tabs/profile/TvStatisticsScreen.js    (28KB)
+Sorun   : @shopify/react-native-skia kullanılıyor (2.2.12).
+          Skia + Reanimated 4 kombinasyonu dikkatli olmalı.
+          Deprecation uyarısı verebilir.
+Çözüm   : Skia versiyonunu Reanimated 4 ile uyumlu versiyona güncelle.
+          react-native-chart-kit alternatifi değerlendirilebilir.
+Etki    : Grafik ekranlarında çökme riski önlenir.
+
+
+
+=========================================================
+ KATMAN 4 — DÜŞÜK ÖNCELİK (Teknik Borç)
+=========================================================
+
+──────────────────────────────────────────────────────────
+23. PROVIDER AĞACI DERİNLİĞİ (8 İÇ İÇE PROVIDER)
+──────────────────────────────────────────────────────────
+Dosya   : App.js (satır 504-527)
+Sorun   : 8 iç içe Provider — "Christmas tree" anti-deseni.
+Çözüm   :
+  - compose() utility ile providers birleştirilebilir.
+  - Veya tek bir AppProviders.js bileşeni oluştur.
+Etki    : App.js okunabilirliği artar.
+
+──────────────────────────────────────────────────────────
+24. CHATSCREEN — CONSOLE.LOG BIRAKILMIŞ
+──────────────────────────────────────────────────────────
+Dosya   : screens/ChatScreen.js (satır 231)
+Sorun   : console.log("sendMessage", text) üretim kodunda.
+Çözüm   : Kaldır veya __DEV__ kontrolüne al.
+Etki    : Güvenlik (mesaj içerikleri loglanmamalı).
+
+──────────────────────────────────────────────────────────
+25. KULLANILMAYAN IMPORT'LAR
+──────────────────────────────────────────────────────────
+Dosya   : screens/ChatScreen.js (satır 53)
+          → import { FeOffset } from "react-native-svg"  (kullanılmıyor)
+          screens/ChatScreen.js
+          → import { KeyboardAwareScrollView } (kullanılmıyor)
+          App.js (satır 16)
+          → import FontAwesome5 (kullanılmıyor)
+          App.js (satır 3-9)
+          → AppState import var, kullanımı yorum satırında
+Çözüm   : Tüm unused import'ları temizle (ESLint kuralı ekle).
+Etki    : Bundle size küçülür, kod netleşir.
+
+──────────────────────────────────────────────────────────
+26. ESLİNT / PRETTIER KURULMAMDI
+──────────────────────────────────────────────────────────
+Sorun   : devDependencies'de ESLint/Prettier yok.
+          Kod stili inconsistent: bazı dosyalar \r\n (Windows),
+          bazıları \n (Unix) satır sonu kullanıyor.
+Çözüm   :
+  npm install --save-dev eslint prettier \
+    eslint-plugin-react eslint-plugin-react-native \
+    eslint-config-prettier
+  .eslintrc.js + .prettierrc oluştur.
+  VS Code format on save aktif et.
+Etki    : Tutarlı kod stili, ekip çalışmasına hazır.
+
+──────────────────────────────────────────────────────────
+27. TYPESCRIPT GEÇİŞ PLANLAMASI
+──────────────────────────────────────────────────────────
+Sorun   : Proje tamamen JavaScript. @types/react mevcut.
+          Runtime type hataları debug'ı zorlaştırıyor.
+Çözüm   :
+  - Kademeli geçiş: Yeni dosyalar .tsx olarak yaz.
+  - Context dosyalarına tip ekle (en çok fayda sağlar).
+  - TSConfig ayarla, strict: false'dan başla.
+Etki    : Hata yakalamada IDE desteği, refactor güvenliği.
+
+──────────────────────────────────────────────────────────
+28. GÖRÜNTÜ ÖNBELLEKLEME (Image Caching) EKSİK
+──────────────────────────────────────────────────────────
+Sorun   : Tüm ResNet görselleri her seferinde yeniden yükleniyor.
+          expo-image veya react-native-fast-image kullanılmıyor.
+Çözüm   :
+  - expo-image ile değiştir (yerleşik cache, blurhash desteği).
+  - Tüm <Image> bileşenlerini <ExpoImage> ile değiştir.
+Etki    : Görsel yüklenme süresi %60-80 azalır.
+
+──────────────────────────────────────────────────────────
+29. FlatList optimizasyonları eksik (bazı ekranlar)
+──────────────────────────────────────────────────────────
+Sorun   : Bazı FlatList'lerde getItemLayout, maxToRenderPerBatch,
+          windowSize, removeClippedSubviews eksik.
+Dosyalar: MovieBests.js, TvShowBests.js, MovieUpcoming.js
+Çözüm   : Her büyük listeye performans props ekle:
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            initialNumToRender={5}
+Etki    : Uzun listelerde scroll performansı artar.
+
+──────────────────────────────────────────────────────────
+30. MEMO / CALLBACK OPTİMİZASYON GENEL TARAMA
+──────────────────────────────────────────────────────────
+Sorun   : Büyük ekranlarda (MovieDetail 62KB, ProfileScreen 39KB)
+          her render'da yeniden oluşturulan inline fonksiyonlar var.
+Çözüm   : useCallback, useMemo kullanımını sistematik yap.
+          React DevTools Profiler ile ölçümle.
+Etki    : Re-render sayısı azalır, scroll pürüzsüzleşir.
+
+
+
+=========================================================
+ KATMAN 5 — BONUS ÖZELLİK FİKİRLERİ
+=========================================================
+
+──────────────────────────────────────────────────────────
+31. GRUP SOHBET (Group Chat)
+──────────────────────────────────────────────────────────
+Durum   : memory-bank'ta "[ ] Group Chat?" olarak listelendi.
+Öneri   :
+  - Firestore'da "groups" koleksiyonu.
+  - Grup oluşturma / davet.
+  - Grup içi film/dizi paylaşımı (mevcut # sistemi).
+
+──────────────────────────────────────────────────────────
+32. WATCHPARTY — EŞZAMANLI İZLEME
+──────────────────────────────────────────────────────────
+Öneri   : Arkadaşlarla aynı filmi eşzamanlı "izlemek" için
+          sayaç senkronizasyonu + canlı sohbet birleşimi.
+
+──────────────────────────────────────────────────────────
+33. UYGULAMA İÇİ FILM/DİZİ PUANLAMA
+──────────────────────────────────────────────────────────
+Öneri   : TMDB puanı yerine kendi puanlama sistemi.
+          Kullanıcı 1-10 puan versin, istatistiklere yansısın.
+
+──────────────────────────────────────────────────────────
+34. HAPTİK GERİBİLDİRİM
+──────────────────────────────────────────────────────────
+Öneri   : expo-haptics ile liste ekleme, favori, beğeni
+          aksiyonlarında hafif titreşim.
+
+──────────────────────────────────────────────────────────
+35. WİDGET DESTEĞİ (Expo Modules API)
+──────────────────────────────────────────────────────────
+Öneri   : Ana ekran widget'ı — "Bu hafta izlenecek" listesi.
+          expo-widgets (Android) veya iOS WidgetKit ile.
+
+──────────────────────────────────────────────────────────
+36. DEEP LINK DESTEĞİ
+──────────────────────────────────────────────────────────
+Öneri   : watchflix://movie/123 formatında deep link.
+          Arkadaşa film linki paylaşılınca direkt açılsın.
+          expo-linking ile uygulanabilir.
+
+──────────────────────────────────────────────────────────
+37. PROFIL SAYFASı — PAYLAŞILABILIR KART
+──────────────────────────────────────────────────────────
+Öneri   : Kullanıcının izleme istatistiklerini (rank, tür,
+          toplam süre) görsel bir kart olarak paylaşma.
+          react-native-view-shot + Share API.
+
+──────────────────────────────────────────────────────────
+38. KARIŞTIR MOD (Discover / Random)
+──────────────────────────────────────────────────────────
+Öneri   : "Ne izlesem bilemedim" için rastgele film/dizi önerisi.
+          Tinder benzeri swipe kartları (SwipeCard modülü mevcut!).
+
+──────────────────────────────────────────────────────────
+39. GELİŞMİŞ FİLTRELEME
+──────────────────────────────────────────────────────────
+Öneri   : Arama ekranında yıl, tür, dil, puan filtreleri.
+          TMDB /discover endpoint'i ile desteklenir.
+
+──────────────────────────────────────────────────────────
+40. EXPO OTA GÜNCELLEME
+──────────────────────────────────────────────────────────
+Öneri   : expo-updates ile uygulama mağaza güncellemesi
+          gerektirmeden bug fix dağıtımı.
+          eas.json'da zaten preview channel var.
+
+
+
+=========================================================
+ ÖZET TABLO
+=========================================================
+
+ Öncelik  | Adet | Tahmini Süre
+──────────────────────────────
+ KRİTİK   |  5   | 1-2 gün
+ YÜKSEK   |  7   | 1-2 hafta
+ ORTA     | 10   | 2-3 hafta
+ DÜŞÜK    |  8   | 1 hafta
+ BONUS    | 10   | Backlog
+──────────────────────────────
+ TOPLAM   | 40   | ~6-8 hafta (tam zamanlı)
+
+
+
+=========================================================
+ ÖNERİLEN ÇALIŞMA SIRASI
+=========================================================
+
+Hafta 1 → KRİTİK: #1 (API Key), #3 (Toast typo), #4 (anim),
+           #5 (duplicate onsnapshot), #2 (online status)
+
+Hafta 2 → YÜKSEK: #9 (servis katmanı), #10 (error boundary),
+           #11 (Reanimated migrasyon)
+
+Hafta 3 → YÜKSEK: #6 (MovieContext refactor)
+
+Hafta 4 → YÜKSEK: #7 (TvShowContext), #8 (ProfileScreenContext)
+
+Hafta 5 → ORTA: #13 (Gemini AI), #14 (Settings toggle'lar),
+           #12 (offline cache)
+
+Hafta 6 → ORTA: #15 (Bildirimler), #20 (büyük dosya bölme),
+           #21 (splash auth)
+
+Hafta 7 → DÜŞÜK: #26 (ESLint), #25 (unused imports),
+           #28 (image cache), #29 (FlatList opts)
+
+Hafta 8 → DÜŞÜK: #18 (typo dosya adları), #27 (TypeScript),
+           #30 (memo/callback)
+
+Sonrası  → BONUS özelliklere başla.
+
+
+
+=========================================================
+ Son Not
+=========================================================
+
+Bu belge 2026-04-08 tarihinde Antigravity (AI Coding Assistant)
+tarafından uygulamanın tüm kaynak dosyaları analiz edilerek
+hazırlanmıştır. Değişen gereksinimlerle birlikte güncellenmeli,
+tamamlanan maddeler işaretlenmelidir.
+
+memory-bank/progress.md bu belgeyle paralel tutulmalıdır.
+=========================================================

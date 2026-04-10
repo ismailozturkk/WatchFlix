@@ -16,6 +16,7 @@ import { Picker } from "@react-native-picker/picker"; // veya başka bir dropdow
 import Fontisto from "@expo/vector-icons/Fontisto";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
+import { useAppSettings } from "../../../context/AppSettingsContext";
 const MovieStatisticsScreen = ({ navigation }) => {
   const {
     watchedMovieCount,
@@ -40,14 +41,14 @@ const MovieStatisticsScreen = ({ navigation }) => {
   const { theme } = useTheme();
   const [searchVisible, setSearchVisible] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
-
+  const { imageQuality } = useAppSettings();
   const [search, setSearch] = useState("");
   const filteredGroupedData = groupedData
     .map((section) => ({
       ...section,
       data: section.data.filter(
         (item) =>
-          !search || item.name?.toLowerCase().includes(search.toLowerCase())
+          !search || item.name?.toLowerCase().includes(search.toLowerCase()),
       ),
     }))
     .filter((section) => section.data.length > 0);
@@ -314,7 +315,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
                     >
                       {formatTotalDurationTime(
                         totalMinutesTime || 0,
-                        timeDisplayMode
+                        timeDisplayMode,
                       )}
                     </Text>
                     <Fontisto
@@ -472,7 +473,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
           <Picker
             selectedValue={selectedDate}
             onValueChange={(itemValue) => {
-              setSearchVisible(false), setSelectedDate(itemValue);
+              (setSearchVisible(false), setSelectedDate(itemValue));
             }}
             style={{
               color: theme.text.primary,
@@ -506,12 +507,12 @@ const MovieStatisticsScreen = ({ navigation }) => {
         renderSectionHeader={({ section: { title, data } }) => {
           const uniqueGenres = [
             ...new Set(
-              data.flatMap((film) => film.genres || []).filter(Boolean)
+              data.flatMap((film) => film.genres || []).filter(Boolean),
             ),
           ];
           const totalMinutes = data.reduce(
             (acc, item) => acc + (item.minutes ? item.minutes : 0),
-            0
+            0,
           );
 
           return title === selectedDate || selectedDate == null ? (
@@ -556,48 +557,54 @@ const MovieStatisticsScreen = ({ navigation }) => {
                     textAlign: "center",
                   }}
                 >
-                  {formatDate(title)}
+                  {title && !isNaN(new Date(title).getTime())
+                    ? formatDate(title)
+                    : "Eski Kayıtlar"}
                 </Text>
 
-                <Text
-                  style={{
-                    paddingVertical: 3,
-                    paddingHorizontal: 6,
-                    borderRadius: 10,
-                    fontSize: 12,
-                    color: theme.notesColor.yellow,
-                    fontWeight: "500",
-                    backgroundColor: theme.notesColor.yellowBackground,
-                    textAlign: "center",
-                  }}
-                >
-                  {totalMinutes} {t.minutes}
-                </Text>
+                {totalMinutes > 0 && (
+                  <Text
+                    style={{
+                      paddingVertical: 3,
+                      paddingHorizontal: 6,
+                      borderRadius: 10,
+                      fontSize: 12,
+                      color: theme.notesColor.yellow,
+                      fontWeight: "500",
+                      backgroundColor: theme.notesColor.yellowBackground,
+                      textAlign: "center",
+                    }}
+                  >
+                    {totalMinutes} {t.minutes}
+                  </Text>
+                )}
 
-                <FlatList
-                  data={uniqueGenres}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  keyExtractor={(genre, idx) => genre + idx}
-                  style={{ paddingVertical: 0 }}
-                  renderItem={({ item }) => (
-                    <Text
-                      style={{
-                        paddingVertical: 3,
-                        paddingHorizontal: 6,
-                        borderRadius: 10,
-                        fontSize: 10,
-                        color: theme.text.primary,
-                        fontWeight: "500",
-                        backgroundColor: theme.secondary,
-                        textAlign: "center",
-                        marginRight: 5,
-                      }}
-                    >
-                      {item}
-                    </Text>
-                  )}
-                />
+                {uniqueGenres.length > 0 && (
+                  <FlatList
+                    data={uniqueGenres}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    keyExtractor={(genre, idx) => genre + idx}
+                    style={{ paddingVertical: 0 }}
+                    renderItem={({ item }) => (
+                      <Text
+                        style={{
+                          paddingVertical: 3,
+                          paddingHorizontal: 6,
+                          borderRadius: 10,
+                          fontSize: 10,
+                          color: theme.text.primary,
+                          fontWeight: "500",
+                          backgroundColor: theme.secondary,
+                          textAlign: "center",
+                          marginRight: 5,
+                        }}
+                      >
+                        {item}
+                      </Text>
+                    )}
+                  />
+                )}
               </View>
               <View
                 style={{
@@ -645,7 +652,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
                               source={
                                 item.imagePath
                                   ? {
-                                      uri: `https://image.tmdb.org/t/p/w500${item.imagePath}`,
+                                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
                                     }
                                   : require("../../../assets/image/no_image.png")
                               }
@@ -660,24 +667,25 @@ const MovieStatisticsScreen = ({ navigation }) => {
                             >
                               {item.name}
                             </Text>
-                            <Text
-                              style={{
-                                position: "absolute",
-                                top: 2,
-                                right: 2,
-                                fontSize: 9,
-                                fontWeight: "500",
-                                backgroundColor: theme.secondaryt,
-                                color: theme.text.primary,
-                                paddingVertical: 2,
-                                paddingHorizontal: 4,
-                                borderRadius: 10,
-                                textAlign: "center",
-                                backgroundColor: theme.secondaryt,
-                              }}
-                            >
-                              {item.minutes} {t.minutes}
-                            </Text>
+                            {item.minutes > 0 && (
+                              <Text
+                                style={{
+                                  position: "absolute",
+                                  top: 2,
+                                  right: 2,
+                                  fontSize: 9,
+                                  fontWeight: "500",
+                                  color: theme.text.primary,
+                                  paddingVertical: 2,
+                                  paddingHorizontal: 4,
+                                  borderRadius: 10,
+                                  textAlign: "center",
+                                  backgroundColor: theme.secondaryt,
+                                }}
+                              >
+                                {item.minutes} {t.minutes}
+                              </Text>
+                            )}
                           </View>
                         </TouchableOpacity>
                       </Animated.View>

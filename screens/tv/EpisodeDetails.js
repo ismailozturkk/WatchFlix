@@ -37,12 +37,13 @@ export default function EpisodeDetails({ route, navigation }) {
     seasonPosterPath,
     genres,
   } = route.params;
+
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const [check, setChecked] = useState(false);
-  const { API_KEY, showSnow } = useAppSettings();
+  const { API_KEY, showSnow, imageQuality } = useAppSettings();
   const formatDate = (timestamp) => {
     const date = new Date(timestamp);
     return new Intl.DateTimeFormat(language, {
@@ -85,7 +86,10 @@ export default function EpisodeDetails({ route, navigation }) {
   if (!details) {
     return (
       <View style={[styles.container, { backgroundColor: theme.primary }]}>
-        <Text style={[styles.loadingText, { color: theme.text.primary }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.loadingText, { color: theme.text.primary }]}
+        >
           {t.loading}
         </Text>
       </View>
@@ -93,7 +97,11 @@ export default function EpisodeDetails({ route, navigation }) {
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.primary }]}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.primary }]}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
       <StatusBar barStyle="light-content" />
       {check && (
         <LottieView
@@ -134,17 +142,15 @@ export default function EpisodeDetails({ route, navigation }) {
         />
       </View>
       <View style={[styles.content, { backgroundColor: theme.primary }]}>
-        <LottieView
-          style={[
-            styles.lottie,
-            {
-              display: showSnow ? "flex" : "none",
-            },
-          ]}
-          source={require("../../LottieJson/snow.json")}
-          autoPlay={true}
-          loop
-        />
+        {showSnow && (
+          <LottieView
+            style={styles.lottie}
+            source={require("../../LottieJson/snow.json")}
+            autoPlay={true}
+            loop
+          />
+        )}
+
         <View style={styles.header}>
           <View style={styles.tvInformation}>
             <View style={styles.info}>
@@ -153,10 +159,16 @@ export default function EpisodeDetails({ route, navigation }) {
               >
                 {seasonNumber}. {t.season} {episodeNumber}. {t.episode}
               </Text>
-              <Text style={[styles.title, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.title, { color: theme.text.primary }]}
+              >
                 {details.name}
               </Text>
-              <Text style={[styles.airDate, { color: theme.text.secondary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.airDate, { color: theme.text.secondary }]}
+              >
                 {details.air_date
                   ? formatDate(details.air_date)
                   : t.dateUnknown}
@@ -187,7 +199,10 @@ export default function EpisodeDetails({ route, navigation }) {
 
           {details.vote_average > 0 && (
             <View style={styles.rating}>
-              <Text style={[styles.ratingText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.ratingText, { color: theme.text.primary }]}
+              >
                 {details.vote_average.toFixed(1)} / 10
               </Text>
               <RatingStars rating={details.vote_average} />
@@ -196,17 +211,26 @@ export default function EpisodeDetails({ route, navigation }) {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.sectionTitle, { color: theme.text.primary }]}
+          >
             {t.overview}
           </Text>
-          <Text style={[styles.overview, { color: theme.text.secondary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.overview, { color: theme.text.secondary }]}
+          >
             {details.overview || t.noOverviewAvailable}
           </Text>
         </View>
 
         {details.guest_stars?.length > 0 && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.sectionTitle, { color: theme.text.primary }]}
+            >
               {t.guestStars}
             </Text>
             <ScrollView
@@ -227,7 +251,7 @@ export default function EpisodeDetails({ route, navigation }) {
                     {actor.profile_path ? (
                       <Image
                         source={{
-                          uri: `https://image.tmdb.org/t/p/w500${actor.profile_path}`,
+                          uri: `https://image.tmdb.org/t/p/${imageQuality}${actor.profile_path}`,
                         }}
                         style={[
                           styles.castImage,
@@ -278,7 +302,10 @@ export default function EpisodeDetails({ route, navigation }) {
 
         {details.crew?.length > 0 && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.sectionTitle, { color: theme.text.primary }]}
+            >
               {t.crew}
             </Text>
             <ScrollView
@@ -299,7 +326,7 @@ export default function EpisodeDetails({ route, navigation }) {
                     {member.profile_path ? (
                       <Image
                         source={{
-                          uri: `https://image.tmdb.org/t/p/w500${member.profile_path}`,
+                          uri: `https://image.tmdb.org/t/p/${imageQuality}${member.profile_path}`,
                         }}
                         style={[
                           styles.castImage,

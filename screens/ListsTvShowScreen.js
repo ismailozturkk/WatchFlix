@@ -17,9 +17,11 @@ import { useTheme } from "../context/ThemeContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import SkeletonPlaceholder from "react-native-skeleton-placeholder";
+import { useAppSettings } from "../context/AppSettingsContext";
 export default function ListsTvShowScreen({ navigation }) {
   const { theme, selectedTheme } = useTheme();
   const { user } = useAuth();
+  const { imageQuality } = useAppSettings();
   const [watchedTv, setWatchedTv] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedShows, setExpandedShows] = useState({});
@@ -36,7 +38,7 @@ export default function ListsTvShowScreen({ navigation }) {
         setWatchedTv((prevData) =>
           JSON.stringify(prevData) !== JSON.stringify(newData)
             ? newData
-            : prevData
+            : prevData,
         );
       }
     });
@@ -53,8 +55,8 @@ export default function ListsTvShowScreen({ navigation }) {
     // Bölüm adında arama
     const matchesEpisodeName = tv.seasons?.some((season) =>
       season.episodes?.some((episode) =>
-        episode.episodeName.toLowerCase().includes(searchLower)
-      )
+        episode.episodeName.toLowerCase().includes(searchLower),
+      ),
     );
 
     return matchesShowName || matchesEpisodeName;
@@ -93,7 +95,10 @@ export default function ListsTvShowScreen({ navigation }) {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.primary }]}
     >
-      <Text style={[styles.header, { color: theme.text.primary }]}>
+      <Text
+        allowFontScaling={false}
+        style={[styles.header, { color: theme.text.primary }]}
+      >
         İzlenen Diziler
       </Text>
 
@@ -165,7 +170,10 @@ export default function ListsTvShowScreen({ navigation }) {
       {isLoading ? (
         <ActivityIndicator />
       ) : filteredTvShows.length === 0 ? (
-        <Text style={[styles.emptyText, { color: theme.text.muted }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.emptyText, { color: theme.text.muted }]}
+        >
           {searchQuery ? "Sonuç bulunamadı." : "Henüz izlenmiş bir dizi yok."}
         </Text>
       ) : (
@@ -203,14 +211,17 @@ export default function ListsTvShowScreen({ navigation }) {
                     source={
                       item.imagePath
                         ? {
-                            uri: `https://image.tmdb.org/t/p/w500${item.imagePath}`,
+                            uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
                             cache: "force-cache",
                           }
                         : require("../assets/image/no_image.png")
                     }
                     style={styles.image}
                   />
-                  <Text style={[styles.title, { color: theme.text.primary }]}>
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.title, { color: theme.text.primary }]}
+                  >
                     {item.name}
                   </Text>
                   <Text
@@ -289,7 +300,7 @@ export default function ListsTvShowScreen({ navigation }) {
                       ? // Bölümleri göster (Sezon seçildiğinde)
                         chunkArray(
                           showData.selectedSeason?.episodes || [],
-                          3
+                          3,
                         ).map((column, columnIndex) => (
                           <View
                             key={columnIndex}
@@ -483,7 +494,7 @@ export default function ListsTvShowScreen({ navigation }) {
                                 </TouchableOpacity>
                               ))}
                             </View>
-                          )
+                          ),
                         )}
                   </ScrollView>
                 </View>

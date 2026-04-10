@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useMemo } from "react";
 import { useAppSettings } from "./AppSettingsContext";
 import Toast from "react-native-toast-message";
 import { useLanguage } from "./LanguageContext";
@@ -123,38 +123,11 @@ export const MovieProvider = ({ children }) => {
   }, [selectedCategoryTrends, selectedCategoryTrendsMovie, language]);
 
   //!--------------------------- movie oscar --------------
-  const moviesOscarList = [
-    "Anora",
-    "Oppenheimer",
-    "Everything Everywhere All at Once",
-    "CODA",
-    "Nomadland",
-    "Parasite",
-    "Green Book",
-    "The Shape of Water",
-    "Moonlight",
-    "Spotlight",
-    "Birdman",
-    "12 Years a Slave",
-    "Argo",
-    "The Artist",
-    "The King's Speech",
-    "The Hurt Locker",
-    "Slumdog Millionaire",
-    "No Country for Old Men",
-    "The Departed",
-    "Crash",
-    "Million Dollar Baby",
-    "The Lord of the Rings: The Return of the King",
-    "Chicago",
-    "A Beautiful Mind",
-    "Gladiator",
-    "American Beauty",
-    "Shakespeare in Love",
-    "Titanic",
-    "The English Patient",
-    "Braveheart",
-    "Forrest Gump",
+  // Önceki adımda bulduğumuz TMDB ID'leri
+  const moviesOscarIds = [
+    1054867, 1064213, 872585, 545611, 776503, 581734, 496243, 490132, 399055,
+    376867, 314365, 194662, 76203, 68734, 70586, 45269, 12162, 12405, 6978,
+    1422, 10123, 70, 122, 1574, 274, 98, 14, 1934, 597, 409, 197, 13,
   ];
 
   const [moviesOscar, setMoviesOscar] = useState([]);
@@ -164,33 +137,30 @@ export const MovieProvider = ({ children }) => {
   const fetchMoviesOscar = async () => {
     setLoadingOscar(true);
     try {
-      const moviePromises = moviesOscarList.map(async (film) => {
-        const url = `https://api.themoviedb.org/3/search/movie`;
-        const params = {
-          query: film,
-          include_adult: "false",
-          language: language === "tr" ? "tr-TR" : "en-US",
-          page: "1",
-        };
-        const headers = {
-          Authorization: API_KEY,
-        };
+      const moviePromises = moviesOscarIds.map((id) =>
+        axios.get(`https://api.themoviedb.org/3/movie/${id}`, {
+          params: {
+            language: language === "tr" ? "tr-TR" : "en-US",
+          },
+          headers: {
+            Authorization: API_KEY,
+          },
+        }),
+      );
 
-        const response = await axios.get(url, { params, headers });
-        const movies = response.data.results;
-        // Oy sayısı en az 1000 olan ilk filmi al
-        return movies.find((movie) => movie.vote_count >= 1000);
-      });
+      const responses = await Promise.all(moviePromises);
+      // axios response içindeki data objelerini (filmleri) alıyoruz
+      const movieResults = responses.map((res) => res.data);
 
-      const movieResults = await Promise.all(moviePromises);
-      setMoviesOscar(movieResults.filter((movie) => movie !== undefined)); // undefined olanları filtrele
+      setMoviesOscar(movieResults);
       setErrorOscar(null);
     } catch (err) {
-      setError(err.message);
+      setErrorOscar(err.message);
     } finally {
       setLoadingOscar(false);
     }
   };
+
   useEffect(() => {
     fetchMoviesOscar();
   }, [language]);
@@ -356,7 +326,7 @@ export const MovieProvider = ({ children }) => {
     } catch (err) {
       console.error(err.message);
     } finally {
-      setLoading(false);
+      setLoadingGenres(false);
     }
   };
   // Seçilen türlere göre filmleri almak
@@ -407,7 +377,7 @@ export const MovieProvider = ({ children }) => {
   const [isFocusUpcoming, setIsFocusUpcoming] = useState(false);
   const [calculatedDate, setCalculatedDate] = useState("");
 
-  const dateData = [
+  const dateData = useMemo(() => [
     { label: t.movieScreens.movieUpcaming.label, value: "0" },
     { label: t.movieScreens.movieUpcaming.label1, value: "1" },
     { label: t.movieScreens.movieUpcaming.label2, value: "2" },
@@ -415,7 +385,7 @@ export const MovieProvider = ({ children }) => {
     { label: t.movieScreens.movieUpcaming.label4, value: "12" },
     { label: t.movieScreens.movieUpcaming.label5, value: "24" },
     { label: t.movieScreens.movieUpcaming.label6, value: "36" },
-  ];
+  ], [t]);
 
   const today = new Date();
   today.setDate(today.getDate() + 1);
@@ -498,71 +468,80 @@ export const MovieProvider = ({ children }) => {
     return diffDays;
   };
 
-  return (
-    <MovieContext.Provider
-      value={{
-        pageBest,
-        loadingBests,
-        movieBests,
-        selectedCategoryTrends,
-        categoriesTrends,
-        categorieBests,
-        movieTrends,
-        loadingTrends,
-        selectedCategoryTrendsMovie,
-        selectedCategoryBests,
-        totalPagesBest,
-        moviesOscar,
-        loadingOscar,
-        errorOscar,
-        selectedProvider,
-        providers,
-        loadingProvider,
-        loadingMovieProvider,
-        moviesProvider,
-        moviesNowPlaying,
-        loadingNowPlaying,
-        genres,
-        loadingGenres,
-        moviesGenres,
-        pageGenres,
-        selectedGenres,
-        dateData,
-        moviesUpcoming,
-        loadingUpcoming,
-        pageUpcoming,
-        valueUpcoming,
-        isFocusUpcoming,
-        valueUpcoming,
-        moviesCollection,
-        loadingCollection,
-        errorCollection,
+  const contextValue = useMemo(() => ({
+    pageBest,
+    loadingBests,
+    movieBests,
+    selectedCategoryTrends,
+    categoriesTrends,
+    categorieBests,
+    movieTrends,
+    loadingTrends,
+    selectedCategoryTrendsMovie,
+    selectedCategoryBests,
+    totalPagesBest,
+    moviesOscar,
+    loadingOscar,
+    errorOscar,
+    selectedProvider,
+    providers,
+    loadingProvider,
+    loadingMovieProvider,
+    moviesProvider,
+    moviesNowPlaying,
+    loadingNowPlaying,
+    genres,
+    loadingGenres,
+    moviesGenres,
+    pageGenres,
+    selectedGenres,
+    dateData,
+    moviesUpcoming,
+    loadingUpcoming,
+    pageUpcoming,
+    valueUpcoming,
+    isFocusUpcoming,
+    moviesCollection,
+    loadingCollection,
+    errorCollection,
 
-        setTotalPagesBest,
-        setPageBest,
-        setSelectedCategoryBests,
-        getCategoryTitleTrends,
-        getCategoryTitleBests,
-        setSelectedCategoryTrends,
-        setSelectedCategoryTrendsMovie,
-        fetchMoviesByProvider,
-        toggleGenre,
-        setPageGenres,
-        addTimeToDate,
-        setPageUpcoming,
-        setValueUpcoming,
-        setIsFocusUpcoming,
-        RelaseCount,
-        //!
-        fetchSeriesTrends,
-        fetchMoviesBests,
-        fetchMoviesOscar,
-        fetchMoviesCollection,
-        fetchMoviNowPlaying,
-        fetchMovieUpcoming,
-        fetchMoviesByGenres,
-      }}
-    >
+    setTotalPagesBest,
+    setPageBest,
+    setSelectedCategoryBests,
+    getCategoryTitleTrends,
+    getCategoryTitleBests,
+    setSelectedCategoryTrends,
+    setSelectedCategoryTrendsMovie,
+    fetchMoviesByProvider,
+    toggleGenre,
+    setPageGenres,
+    addTimeToDate,
+    setPageUpcoming,
+    setValueUpcoming,
+    setIsFocusUpcoming,
+    RelaseCount,
+    //!
+    fetchSeriesTrends,
+    fetchMoviesBests,
+    fetchMoviesOscar,
+    fetchMoviesCollection,
+    fetchMoviNowPlaying,
+    fetchMovieUpcoming,
+    fetchMoviesByGenres,
+  }), [
+    pageBest, loadingBests, movieBests, selectedCategoryTrends,
+    categoriesTrends, categorieBests, movieTrends, loadingTrends,
+    selectedCategoryTrendsMovie, selectedCategoryBests, totalPagesBest,
+    moviesOscar, loadingOscar, errorOscar, selectedProvider, providers,
+    loadingProvider, loadingMovieProvider, moviesProvider, moviesNowPlaying,
+    loadingNowPlaying, genres, loadingGenres, moviesGenres, pageGenres,
+    selectedGenres, dateData, moviesUpcoming, loadingUpcoming,
+    pageUpcoming, valueUpcoming, isFocusUpcoming, moviesCollection,
+    loadingCollection, errorCollection
+  ]);
+
+  return (
+    <MovieContext.Provider value={contextValue}>
       {children}
     </MovieContext.Provider>
   );

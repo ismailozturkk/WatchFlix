@@ -87,6 +87,14 @@
 
 - ✅ `onSnapshot` kullanımı optimize edildi (Tekil global listener yapısı)
 - ✅ N+1 sorgu sorunları giderildi (`SeasonItem`, `ListView`)
-- useMemo & useCallback optimizasyonları
-- Lazy loading & pagination geliştirmeleri
+- useMemo &- [x] **Chat Optimization**
+  - [x] Use `limit` query for Firestore.
+  - [x] Switch to `inverted` FlatList.
+  - [x] Fix scroll behavior on load more.
+- [x] **Skeleton Loading**
+  - [x] Fix dimension mismatches in `Skeleton.js` for Oscar, Upcoming, and Search.
+  - [x] Create `MovieBestsSkeleton`.
+- [ ] **Next Features**
+  - [ ] Group Chat?
+  - [ ] Media Sharing?
 - Image caching & optimization

@@ -27,48 +27,113 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
   const [selectedEpisode, setSelectedEpisode] = useState(null);
   const { t, language } = useLanguage();
   const { theme } = useTheme();
-  const { showSnow } = useAppSettings();
-
+  const { showSnow, imageQuality } = useAppSettings();
+  const apiKey = process.env.EXPO_PUBLIC_API_KEY;
   useEffect(() => {
     const fetchAllSeasons = async () => {
       try {
+        // 1. TMDb Ana Detaylar
         const tvShowResponse = await axios.get(
           `https://api.themoviedb.org/3/tv/${id}`,
           {
-            params: { language: language === "tr" ? "tr-TR" : "en-US" },
+            params: {
+              language: language === "tr" ? "tr-TR" : "en-US",
+              append_to_response: "external_ids",
+            },
             headers: {
               accept: "application/json",
-              Authorization: `Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJhOGQ3NjQ0YzNjMjVjMDQzMDgzODgyMTRkOTJjY2UyOSIsIm5iZiI6MTczMDIxMjE0OC45MTg2ODksInN1YiI6IjY1OGEwMTdlNjg4Y2QwNTdlYjg1NzA2NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.tvfmFX1OxyT_u37Z_bYU-APBZmvokqg1HZNFljGe-to`,
+              Authorization: apiKey,
             },
-          }
-        );
-        setShowDetail(tvShowResponse.data);
-        setSeasonsLenght(
-          tvShowResponse.data.seasons
-            .filter((season) => season.season_number !== 0) // Sezon numarası 0 olanları filtrele
-            .map((season) => 1).length
+          },
         );
 
-        const seasonPromises = tvShowResponse.data.seasons
-          .filter((season) => season.season_number !== 0) // Sezon numarası 0 olanları filtrele
-          .map((season) =>
-            axios.get(
-              `https://api.themoviedb.org/3/tv/${id}/season/${season.season_number}`,
-              {
-                params: { language: language === "tr" ? "tr-TR" : "en-US" },
-                headers: {
-                  accept: "application/json",
-                  Authorization: `Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJhOGQ3NjQ0YzNjMjVjMDQzMDgzODgyMTRkOTJjY2UyOSIsIm5iZiI6MTczMDIxMjE0OC45MTg2ODksInN1YiI6IjY1OGEwMTdlNjg4Y2QwNTdlYjg1NzA2NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.tvfmFX1OxyT_u37Z_bYU-APBZmvokqg1HZNFljGe-to`,
-                },
-              }
-            )
+        const imdbId = tvShowResponse.data.external_ids?.imdb_id;
+
+        // --- IMDb Genel Puan ---
+        let imdbMainInfo = {
+          rating: tvShowResponse.data.vote_average,
+          votes: tvShowResponse.data.vote_count,
+        };
+
+        if (imdbId) {
+          try {
+            const omdbMainRes = await axios.get(
+              `https://www.omdbapi.com/?i=${imdbId}&apikey=38aaeabe`,
+            );
+            if (omdbMainRes.data.Response === "True") {
+              imdbMainInfo = {
+                rating:
+                  omdbMainRes.data.imdbRating !== "N/A"
+                    ? parseFloat(omdbMainRes.data.imdbRating)
+                    : tvShowResponse.data.vote_average,
+                votes:
+                  omdbMainRes.data.imdbVotes || tvShowResponse.data.vote_count,
+              };
+            }
+          } catch (e) {
+            console.log("OMDb Ana Hata:", e);
+          }
+        }
+
+        setShowDetail({
+          ...tvShowResponse.data,
+          vote_average: imdbMainInfo.rating,
+          imdb_votes: imdbMainInfo.votes,
+        });
+
+        const validSeasons = tvShowResponse.data.seasons.filter(
+          (s) => s.season_number !== 0,
+        );
+        setSeasonsLenght(validSeasons.length);
+
+        // 2. Sezonları ve OMDb Puanlarını Çek
+        const seasonPromises = validSeasons.map(async (season) => {
+          // TMDb Sezon İsteği
+          const tmdbRes = await axios.get(
+            `https://api.themoviedb.org/3/tv/${id}/season/${season.season_number}`,
+            {
+              params: { language: language === "tr" ? "tr-TR" : "en-US" },
+              headers: {
+                accept: "application/json",
+                // DÜZELTİLDİ: Sadece TMDb Token'ı bırakıldı, Gemini Key silindi.
+                Authorization: apiKey,
+              },
+            },
           );
 
+          let omdbEpisodes = [];
+          if (imdbId) {
+            try {
+              const omdbRes = await axios.get(
+                `https://www.omdbapi.com/?i=${imdbId}&Season=${season.season_number}&apikey=38aaeabe`,
+              );
+              omdbEpisodes = omdbRes.data.Episodes || [];
+            } catch (e) {
+              console.log("OMDb Sezon Hata:", e);
+            }
+          }
+
+          const enrichedEpisodes = tmdbRes.data.episodes.map((ep) => {
+            const omdbEp = omdbEpisodes.find(
+              (o) => parseInt(o.Episode) === ep.episode_number,
+            );
+            return {
+              ...ep,
+              vote_average:
+                omdbEp && omdbEp.imdbRating !== "N/A"
+                  ? parseFloat(omdbEp.imdbRating)
+                  : ep.vote_average,
+            };
+          });
+
+          return { ...tmdbRes.data, episodes: enrichedEpisodes };
+        });
+
         const seasonsData = await Promise.all(seasonPromises);
-        setTVShows(seasonsData.map((response) => response.data));
+        setTVShows(seasonsData);
       } catch (err) {
-        setError(err);
-        console.error(err);
+        setError(err.message);
+        console.error("Genel Hata:", err);
       } finally {
         setLoading(false);
       }
@@ -76,7 +141,6 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
 
     fetchAllSeasons();
   }, [id]);
-
   const renderSkeletonLoading = () => {
     return (
       <SafeAreaView
@@ -114,8 +178,12 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
   if (error) {
     return (
       <SafeAreaView style={styles.errorContainer}>
-        <Text style={styles.errorTitle}>{t.mistake}</Text>
-        <Text style={styles.errorMessage}>{error}</Text>
+        <Text allowFontScaling={false} style={styles.errorTitle}>
+          {t.mistake}
+        </Text>
+        <Text allowFontScaling={false} style={styles.errorMessage}>
+          {error}
+        </Text>
         <TouchableOpacity
           style={styles.retryButton}
           onPress={() => {
@@ -124,51 +192,59 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
             fetchAllSeasons();
           }}
         >
-          <Text style={styles.retryButtonText}>{t.tryAgain}</Text>
+          <Text allowFontScaling={false} style={styles.retryButtonText}>
+            {t.tryAgain}
+          </Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
   }
   // En uzun sezonun bölüm sayısını bul
   const maxEpisodes = Math.max(
-    ...tvShows.map((season) => season.episodes.length)
+    ...tvShows.map((season) => season.episodes.length),
   );
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.primary }]}
     >
-      <LottieView
-        style={[styles.lottie, { display: showSnow ? "flex" : "none" }]}
-        source={require("../../LottieJson/snow.json")}
-        autoPlay={true}
-        loop
-      />
+      {showSnow && (
+        <LottieView
+          style={styles.lottie}
+          source={require("../../LottieJson/snow.json")}
+          autoPlay={true}
+          loop
+        />
+      )}
       <View style={styles.item}>
         <Image
           source={{
-            uri: `https://image.tmdb.org/t/p/w500${showDetail.backdrop_path}`,
+            uri: `https://image.tmdb.org/t/p/${imageQuality.backdrop}${showDetail.backdrop_path}`,
           }}
           style={styles.backDrop}
         />
         <Image
           source={{
-            uri: `https://image.tmdb.org/t/p/w500${showDetail.poster_path}`,
+            uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${showDetail.poster_path}`,
           }}
           style={styles.poster}
         />
         <View style={styles.seriesInfo}>
-          <Text style={styles.showName}>{showDetail.name}</Text>
-          <Text style={styles.showDate}>
+          <Text allowFontScaling={false} style={styles.showName}>
+            {showDetail.name}
+          </Text>
+          <Text allowFontScaling={false} style={styles.showDate}>
             {showDetail.first_air_date} -{" "}
             {showDetail.status == "Ended"
               ? showDetail.last_air_date
               : "Devam ediyor"}
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Text style={styles.voteAverage}>
+            <Text allowFontScaling={false} style={styles.voteAverage}>
               {showDetail.vote_average.toFixed(1)}
             </Text>
-            <Text style={styles.voteCount}>({showDetail.vote_count})</Text>
+            <Text allowFontScaling={false} style={styles.voteCount}>
+              ({showDetail.imdb_votes})
+            </Text>
           </View>
         </View>
       </View>
@@ -226,12 +302,6 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                               {t.PublicationDate}{" "}
                               {season.episodes[episodeIndex].air_date}
                             </Text>
-                            <Text
-                              style={{ color: "white", textAlign: "center" }}
-                            >
-                              {season.episodes[episodeIndex].vote_count}{" "}
-                              {t.evaluation}
-                            </Text>
                             <TouchableOpacity
                               style={styles.btnEpisodeNavigate}
                               onPress={() =>
@@ -264,12 +334,12 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                             `${season.season_number}-${episodeIndex}`
                               ? setSelectedEpisode(null)
                               : setSelectedEpisode(
-                                  `${season.season_number}-${episodeIndex}`
+                                  `${season.season_number}-${episodeIndex}`,
                                 );
                           }}
                           style={[
                             getRatingStyle(
-                              season.episodes[episodeIndex].vote_average
+                              season.episodes[episodeIndex].vote_average,
                             ).backgroundColor,
 
                             selectedEpisode ===
@@ -300,7 +370,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                                 fontSize: 9,
                               },
                               getRatingStyle(
-                                season.episodes[episodeIndex].vote_average
+                                season.episodes[episodeIndex].vote_average,
                               ).color,
                             ]}
                           >
@@ -315,7 +385,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                                 fontSize: 9,
                               },
                               getRatingStyle(
-                                season.episodes[episodeIndex].vote_average
+                                season.episodes[episodeIndex].vote_average,
                               ).color,
                             ]}
                           >
@@ -329,7 +399,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                                 fontSize: 14,
                               },
                               getRatingStyle(
-                                season.episodes[episodeIndex].vote_average
+                                season.episodes[episodeIndex].vote_average,
                               ).color,
                             ]}
                           >
@@ -342,7 +412,12 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                         </TouchableOpacity>
                       </View>
                     ) : (
-                      <Text style={styles.noData.color}>●</Text>
+                      <Text
+                        allowFontScaling={false}
+                        style={styles.noData.color}
+                      >
+                        ●
+                      </Text>
                     )}
                   </View>
                 ))}

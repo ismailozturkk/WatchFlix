@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase"; // Firebase bağlantını ekle
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const AuthContext = createContext();
 
@@ -14,9 +15,11 @@ export const AuthProvider = ({ children }) => {
         setInitialRoute("TabScreen");
         setUser(user);
         setLoading(false);
+        AsyncStorage.setItem("cachedUserId", user.uid).catch(() => {});
       } else {
         setInitialRoute("LoginScreen");
         setLoading(false);
+        AsyncStorage.removeItem("cachedUserId").catch(() => {});
       }
     });
 

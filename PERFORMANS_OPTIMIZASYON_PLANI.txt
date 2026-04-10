@@ -1,0 +1,374 @@
+================================================================================
+  WATCHFLIX — PERFORMANS & OPTİMİZASYON PLANI
+  Oluşturulma: 2026-04-09
+  Analiz edilen dosyalar: tüm context/, screens/, components/, modules/
+================================================================================
+
+Bu döküman, WatchFlix uygulamasının kodu incelenerek tespit edilen
+performans sorunlarını ve bunların nasıl düzeltileceğini açıklar.
+Her madde "Sorun → Çözüm → Neden Önemli" formatında yazılmıştır.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ BÖLÜM 1: TMDB API İSTEKLERİ — EN KRİTİK SORUN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ SORUN 1.1 — Oscar Filmler için 30 Paralel API İsteği (MovieContex.js:164-193)
+  Her uygulama açılışında moviesOscarList dizisindeki 30 film için
+  Promise.all ile 30 ayrı /search/movie isteği atılıyor.
+  Bu hem TMDB rate limit'e takılma riskini hem de bandwidth'i ciddi artırıyor.
+
+  ✅ ÇÖZÜM:
+    - Bu 30 filmin ID'lerini TMDB'den bir kez çekip hardcode edin.
+      Örnek: moviesOscarIds = [12477, 19404, ...] → tek bir /movie/{id} yerine
+      /discover/movie?with_ids=12477,19404,... şeklinde birleştirin.
+    - Ya da AsyncStorage cache: uygulama ilk açılışında çek, 7 gün sakla.
+      language değişmedikçe tekrar istek atma.
+
+  📊 KAZANIM: Açılışta 30 istek → 1 istek. Büyük hız farkı.
+
+
+❌ SORUN 1.2 — Collection Fetch: 19 Paralel İstek (MovieContex.js:225-256)
+  moviesCollectionList içindeki 19 koleksiyon ID'si için Promise.all
+  ile 19 ayrı istek atılıyor. Oscar ile beraber uygulama açılışında
+  toplam ~50 API isteği tetikleniyor.
+
+  ✅ ÇÖZÜM:
+    - AsyncStorage cache kullanın. TTL (yaşam süresi) = 24 saat.
+    - Örnek pattern:
+        const cached = await AsyncStorage.getItem('collections_tr');
+        const { data, ts } = JSON.parse(cached);
+        if (Date.now() - ts < 86400000) return setMoviesCollection(data);
+        // değilse fetch et ve kaydet
+
+
+❌ SORUN 1.3 — Context'ler App Açılışında Aynı Anda Tetikleniyor
+  TvShowContext ve MovieContext, App.js'de provider olarak sarılıyor ve
+  içlerindeki tüm useEffect'ler mount anında çalışıyor. Bu:
+  - fetchSeriesTrends, fetchSeriesBest, fetchAiringToday, fetchProviders,
+    fetchTvByGenres, fetchOnTheAir (6 istek — TV)
+  - fetchMoviesBests, fetchSeriesTrends, fetchMoviesOscar (×30),
+    fetchMoviesCollection (×19), fetchMoviNowPlaying,
+    fetchMoviesByGenres (6+ istek — Film)
+  Uygulama açılırken aynı anda 60+ istek atılıyor.
+
+  ✅ ÇÖZÜM — Lazy Loading ile Tab'a Göre Fetch:
+    - TvShowContext ve MovieContext'deki fetch'leri otomatik başlatmayın.
+    - Bunun yerine her tab mount olduğunda ilgili fetch'i tetikleyin.
+    - Örnek: TvShowScreen mount olduğunda kontrol:
+        useEffect(() => { if (seriesTrend.length === 0) fetchSeriesTrends(); }, []);
+    - Bu şekilde kullanıcı TV tabına hiç gitmezse o 6 istek hiç atılmaz.
+
+  📊 KAZANIM: Açılış süresi önemli ölçüde kısalır, düşük internet'te çok belirgin.
+
+
+❌ SORUN 1.4 — CalendarContext: TMDB Discover/Movie + Discover/TV her değişimde
+  CalendarContext.js'de rangeDays değiştiğinde TMDB'ye her defasında
+  büyük tarih aralıklı (90 güne kadar) sorgu atılıyor. Cache var ama
+  1 saatlik TTL çok agresif, kullanıcı aralığı değiştirirse her seferinde
+  yeni istek gidiyor.
+
+  ✅ ÇÖZÜM:
+    - Farklı rangeDays değerleri için ayrı cache key kullanın:
+        `tmdb_events_${rangeDays}_${dateStr}`
+    - Zaten çekili bir aralık varsa tekrar istek atmayın.
+    - TTL'yi 4 saat yapın (takvim verileri sık değişmez).
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ BÖLÜM 2: FİREBASE (FIRESTORE) OPTİMİZASYONU
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ SORUN 2.1 — Aynı Belge için Birden Fazla onSnapshot Dinleyici
+  Şu anda aşağıdaki context/component'lar Lists/{uid} belgesini
+  aynı anda dinliyor:
+    - ListStatusContext.js (1 onSnapshot)
+    - TvOngoingSection.js (1 onSnapshot — bu ekranı onSnapshot kullanıyor)
+    - OnGoingSeries.js (1 onSnapshot)
+    - Büyük ihtimalle başka component'lar da
+
+  Bu aynı Firestore belgesine 3+ aktif dinleyici demek. Her değişimde
+  hepsi tetikleniyor, gereksiz re-render'a yol açıyor.
+
+  ✅ ÇÖZÜM:
+    - ListStatusContext.js zaten Lists/{uid} belgesini dinliyor ve
+      allLists state'ini tutuyor. Bu context TÜM uygulama için tek kaynak olmalı.
+    - TvOngoingSection.js ve OnGoingSeries.js'deki kendi onSnapshot'larını
+      KALDIRIN, yerine useListStatusContext()'den allLists?.watchedTv kullanın.
+    - Böylece 3 dinleyici → 1 dinleyici.
+
+  📊 KAZANIM: Firestore okuma maliyeti düşer, pil tüketimi azalır, re-render azalır.
+
+
+❌ SORUN 2.2 — TvShowsDetails.js: 61 KB — Çok Büyük Bileşen
+  TvShowsDetails.js, uygulamanın en büyük dosyası (61 KB).
+  Her detay sayfası açılışında bu devasa component yüklenip
+  tüm state'leri (sezonlar, bölümler, oyuncu bilgileri, YouTube, vb.)
+  aynı anda başlatılıyor.
+
+  ✅ ÇÖZÜM:
+    - Sekmeli yapıya geçin: tab değişene kadar o sekmenin içeriği render edilmesin.
+    - React.lazy + Suspense kullanarak bölüm alt componentlerini ayırın.
+    - useMemo ile hesaplanan değerleri (progress %'si, sezon listesi) cache'leyin.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ BÖLÜM 3: CONTEXT MİMARİSİ SORUNLARI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ SORUN 3.1 — ProfileScreenContext.js: 1058 Satır, 33 KB
+  Bu dosya tek başına tüm profil ekranı mantığını taşıyor:
+  - 56 avatar fotoğrafının require() ile yüklenmesi (satır 18-75)
+  - Not sistemi, todo sistemi, istatistikler, arkadaşlar vb.
+
+  Sorun: Bu context App.js'de tüm uygulama için sarmallıyor.
+  Profil sayfasına hiç girmesek bile tüm state ve useEffect'ler
+  mount anında çalışıyor.
+
+  ✅ ÇÖZÜM:
+    - Profil contextini birden fazla küçük context'e bölün:
+        * ProfileBasicContext (avatar, kullanıcı bilgisi)
+        * NotesContext (notlar, todo)
+        * StatsContext (istatistikler)
+    - Bu context'leri sadece ProfileScreen'in içinde sarmallayın,
+      App.js seviyesinde değil.
+    - Avatar array'ini lazy require yerine dinamik URI veya
+      CDN'den çekin.
+
+
+❌ SORUN 3.2 — LanguageContext.js: 19 KB — Büyük Çeviri Objesi
+  Tüm çeviriler tek bir büyük objede tutuluyor ve context üzerinden
+  paylaşılıyor. Her dil değişiminde tüm bu obje yeniden oluşturuluyor.
+
+  ✅ ÇÖZÜM:
+    - useMemo ile çeviri objesini cache'leyin:
+        const t = useMemo(() => translations[language], [language]);
+    - Bu sayede gereksiz yeniden oluşturma engellenir.
+
+
+❌ SORUN 3.3 — Context'lerde Tekrarlanan State Güncellemeleri
+  TvShowContex.js satır 328-330:
+    setPageBest birden kez value property'sinde tanımlanmış (duplicate key).
+  MovieContex.js satır 536:
+    valueUpcoming iki kez tanımlı.
+  Bu JavaScript'te son olanın geçerli olmasına neden olur ama
+  okunabilirliği bozar ve potansiyel bug kaynağıdır.
+
+  ✅ ÇÖZÜM: Duplicate key'leri temizleyin.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ BÖLÜM 4: RENDER OPTİMİZASYONU
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ SORUN 4.1 — FlatList'lerde keyExtractor ve renderItem Stabilite Eksikliği
+  TvShowBests, TvShowsGenres ve diğer FlatList bileşenlerinde
+  renderItem fonksiyonu component içinde tanımlı.
+  Bu her parent render'da yeni bir fonksiyon referansı oluşturur
+  ve FlatList tüm öğeleri yeniden render eder.
+
+  ✅ ÇÖZÜM:
+    - renderItem fonksiyonunu useCallback ile sarın:
+        const renderItem = useCallback(({ item }) => <MovieItem item={item} />, []);
+    - MovieItem component'ini React.memo ile sarın:
+        const MovieItem = React.memo(({ item, navigation, theme }) => { ... });
+
+
+❌ SORUN 4.2 — Animated.Value'lar Her Data Refresh'de Yeniden Oluşturuluyor
+  TvShowBests.js (satır 41-49) ve TvShowsGenres.js (satır 33-41):
+  Her seriesBest/moviesGenres değişiminde tüm Animated.Value'lar
+  sıfırdan oluşturuluyor. Bu render kesilmelerine yol açıyor.
+
+  ✅ ÇÖZÜM:
+    - useRef içinde scaleValues tutun, sadece yeni ID'ler için Value ekleyin:
+        const scaleRef = useRef({});
+        items.forEach(item => {
+          if (!scaleRef.current[item.id])
+            scaleRef.current[item.id] = new Animated.Value(1);
+        });
+    - Bu şekilde mevcut animasyonlar sıfırlanmaz.
+
+
+❌ SORUN 4.3 — TvShowsDetails.js'de İç İçe Scroll Performansı
+  61 KB'lik bu dosya büyük ihtimalle ScrollView içinde başka
+  ScrollView veya FlatList barındırıyor. Bu React Native'de
+  kritik bir performans sorunudur.
+
+  ✅ ÇÖZÜM:
+    - Dış ScrollView'u SectionList veya FlatList'e çevirin.
+    - Sezon listesi için nested FlatList yerine düz veri yapısı kullanın.
+
+
+❌ SORUN 4.4 — Image Optimizasyonu: TMDB Poster Boyutları
+  TvOngoingSection.js'de ${imageQuality} poster çekiliyor ama kartlar
+  width * 0.4 ≈ 160px genişliğinde. ${imageQuality} = 500px genişliğinde resim
+  indiriliyor. 3x fazla veri aktarımı.
+
+  ✅ ÇÖZÜM — Doğru TMDB poster boyutlarını kullanın:
+    - Küçük kart (≤200px): /t/p/w154 veya /t/p/w185
+    - Orta kart (≤300px): /t/p/w342
+    - Büyük poster (≥300px): /t/p/${imageQuality}
+    - Tam ekran/backdrop: /t/p/original
+
+  📊 KAZANIM: Düşük internet'te çok belirgin hız artışı, data tasarrufu.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ BÖLÜM 5: ANIMASYON SORUNLARI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ SORUN 5.1 — Animated.timing Yerine react-native-reanimated Kullanılmalı
+  Proje zaten react-native-reanimated@4.1.1 bağımlılığını içeriyor
+  ama birçok yerde hâlâ eski Animated API (Animated.timing, Animated.spring)
+  kullanılıyor. Reanimated, animasyonları JS thread yerine UI thread'de
+  çalıştırır; bu özellikle scroll sırasında büyük fark yaratır.
+
+  En kritik yerler:
+    - TvShowBests.js ve TvShowsGenres.js: press animasyonları
+    - OnGoingSeries.js: kart scale animasyonları
+    - ProfileScreenContext.js: Animated import'u var ama nasıl kullanıldığı
+      bileşene bağlı
+
+  ✅ ÇÖZÜM:
+    - useAnimatedStyle + useSharedValue kullanın:
+        const scale = useSharedValue(1);
+        const animStyle = useAnimatedStyle(() => ({
+          transform: [{ scale: scale.value }]
+        }));
+        // onPressIn:
+        scale.value = withSpring(0.92);
+
+
+❌ SORUN 5.2 — LottieView: 3 Kopya Aynı Anda — TvShowScreen ve MovieScreen
+  TvShowScreen.js'de aynı snow.json için 3 LottieView render ediliyor.
+  Lottie animasyonları GPU yoğun. showSnow=false olduğunda style ile
+  gizleniyor ama hâlâ render edilip çalışıyor.
+
+  ✅ ÇÖZÜM:
+    - Conditional render kullanın:
+        {showSnow && <LottieView ... />}
+    - 3 kopya yerine 1 kopya yeterli, CSS position ile tüm ekranı kaplasın.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ BÖLÜM 6: PAKETLEMEYİ ETKİLEYEN SORUNLAR (Bundle Size)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ SORUN 6.1 — Çakışan Gradient Paketleri
+  package.json'da hem expo-linear-gradient hem de
+  react-native-linear-gradient var. Bu iki paket aynı işi yapar.
+  İkisi birden bundle'a giriyor ve APK boyutunu şişiriyor.
+
+  ✅ ÇÖZÜM:
+    - expo-linear-gradient kullanımına standardize edin.
+    - react-native-linear-gradient'ı kaldırın:
+        npm uninstall react-native-linear-gradient
+    - Hangi dosyaların react-native-linear-gradient import ettiğini
+      bulup expo-linear-gradient'a geçirin.
+    - Arama komutu: grep -r "react-native-linear-gradient" screens/ components/
+
+
+❌ SORUN 6.2 — @react-navigation/stack ve @react-navigation/native-stack
+  İki farklı stack navigator paketi var. native-stack çok daha performanslı
+  (native thread kullanır). Eğer stack hâlâ kullanılıyorsa gereksiz bundle yükü.
+
+  ✅ ÇÖZÜM:
+    - App.js'de sadece native-stack kullanılıyorsa @react-navigation/stack
+      kaldırılabilir:
+        npm uninstall @react-navigation/stack
+
+
+❌ SORUN 6.3 — react-native-shadow-2 Paketi
+  Bu paket SVG tabanlı gölgeler oluşturur ama React Native 0.76+
+  artık Android'de box-shadow desteği sunuyor. elevation ve boxShadow
+  kullanılabilir.
+
+  ✅ ÇÖZÜM:
+    - Kullanım yerlerini belirleyin. Az kullanılıyorsa platform özelinde
+      elevation ile değiştirin, paketi kaldırın.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ BÖLÜM 7: KOD KALİTESİ — DOLAYS IZ PERFORMANS ETKİSİ OLMAYANLAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ SORUN 7.1 — console.error Çağrıları Production'da Kalsın
+  MovieContex.js ve TvShowContex.js'de çok sayıda console.error var.
+  Bu production build'de JS thread'i yavaşlatır.
+
+  ✅ ÇÖZÜM:
+    - babel.config.js'e ekleyin:
+        plugins: ["transform-remove-console"]
+    - Ya da: global.console.error = () => {} production için.
+
+
+❌ SORUN 7.2 — useEffect Bağımlılıkları Eksik / Yanlış
+  MovieContex.js satır 484-487:
+    addTimeToDate ve fetchMovieUpcoming aynı useEffect'te,
+    calculatedDate bağımlılık listesinde — bu sonsuz döngü riski.
+
+  ✅ ÇÖZÜM:
+    - addTimeToDate için ayrı useEffect:
+        useEffect(() => { addTimeToDate(valueUpcoming); }, [valueUpcoming]);
+    - fetchMovieUpcoming sadece calculatedDate değişince çalışsın:
+        useEffect(() => { if (calculatedDate) fetchMovieUpcoming(); }, [calculatedDate, language, pageUpcoming]);
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ÖNCE YAPILMASI ÖNERİLEN SIRALI EYLEM PLANI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ AŞAMA 1 — Düşük efor, yüksek etki (1-2 gün)
+ ─────────────────────────────────────────────
+ [1] LottieView'ları conditional render yapın (display:none → {showSnow && ...})
+ [2] TvOngoingSection ve OnGoingSeries'deki kendi Firebase dinleyicilerini
+     kaldırın, ListStatusContext.allLists kullanın (1 → 3 yük azaltma)
+ [3] FlatList renderItem'larını useCallback + React.memo ile sarın
+ [4] Resim boyutlarını düzeltin: kart boyutuna göre w185/w342 kullanın
+
+ AŞAMA 2 — Orta efor, yüksek etki (2-5 gün)
+ ─────────────────────────────────────────────
+ [5] Oscar (30 istek) ve Collection (19 istek) için AsyncStorage cache ekleyin
+     TTL: 7 gün, key: oscar_${language} ve collection_${language}
+ [6] react-native-linear-gradient paketini kaldırın, expo-linear-gradient'a geçin
+ [7] TvShowContext ve MovieContext'teki fetch'leri lazy yükleyin
+     (tab mount olduğunda, veri yoksa çek)
+ [8] useCallback/useMemo eksikliklerini giderin (LanguageContext t objesi vb.)
+
+ AŞAMA 3 — Uzun vadeli mimari iyileştirmeler (1-2 hafta)
+ ────────────────────────────────────────────────────────
+ [9]  ProfileScreenContext'i 3 ayrı küçük context'e bölün
+ [10] Press animasyonlarını Reanimated'a geçirin (useSharedValue)
+ [11] TvShowsDetails.js'i sekmeli yapıya geçirin (lazy sekme içeriği)
+ [12] MovieContex.js ve TvShowContex.js'deki duplicate context key'leri temizleyin
+ [13] @react-navigation/stack kaldırılıp kaldırılmayacağını değerlendirin
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ BEKLENEN TOPLAM KAZANIMLAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ • Uygulama açılış süresi:          %40-60 iyileşme (Oscar+Collection cache)
+ • API istek sayısı (ilk açılış):   ~60 istek → ~10 istek (lazy + cache)
+ • Firestore okuma maliyeti:         %66 azalma (3 dinleyici → 1)
+ • Pil tüketimi:                     Daha az ağ isteği + daha az render
+ • Scroll akıcılığı:                 Reanimated + React.memo ile belirgin iyileşme
+ • APK boyutu:                       ~2-5 MB azalma (duplicate paket kaldırma)
+ • Görsel kalite (aynı veri):        Uygun TMDB boyutu → gereksiz veri indirme yok
+
+================================================================================
+📋 Planın Özeti — En Kritik Bulgular
+🔴 Kritik (Hemen Yapılmalı)
+Sorun	Etki
+Oscar için 30 + Collection için 19 paralel API isteği açılışta atılıyor	Açılış süresi 2-3x uzuyor
+3 farklı component aynı Firebase belgesini dinliyor	Gereksiz Firestore okuma & re-render
+LottieView'lar display:none ile gizleniyor ama hâlâ çalışıyor	GPU boşa harcıyor
+TMDB poster boyutu → kart 160px ama ${imageQuality} (500px) indiriliyor	3x fazla veri
+🟡 Orta (Bu Hafta)
+oscar_${language} ve collection_${language} için 7 günlük AsyncStorage cache
+react-native-linear-gradient kaldırılıp expo-linear-gradient'a standardize etme (APK ~2 MB küçülür)
+FlatList renderItem'larına useCallback + React.memo
+🟢 Uzun Vadeli
+ProfileScreenContext.js (33KB, 1058 satır) → 3 küçük context'e bölme
+Press animasyonlarını react-native-reanimated'a geçirme
+TvShowsDetails.js (61KB) → sekmeli lazy yapı

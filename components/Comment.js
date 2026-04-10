@@ -74,7 +74,7 @@ const CommentItem = memo(
           "MovieComment",
           contextId,
           "comments",
-          commentId
+          commentId,
         );
         await deleteDoc(commentRef);
 
@@ -84,7 +84,7 @@ const CommentItem = memo(
           contextId,
           "comments",
           commentId,
-          "replies"
+          "replies",
         );
         const repliesSnapshot = await getDocs(repliesRef);
         repliesSnapshot.forEach(async (repDoc) => {
@@ -104,7 +104,7 @@ const CommentItem = memo(
           "comments",
           parentId,
           "replies",
-          replyId
+          replyId,
         );
         await deleteDoc(replyRef);
       } catch (err) {
@@ -152,7 +152,10 @@ const CommentItem = memo(
                 alignItems: "center",
               }}
             >
-              <Text style={{ fontWeight: "bold", color: theme.text.primary }}>
+              <Text
+                allowFontScaling={false}
+                style={{ fontWeight: "bold", color: theme.text.primary }}
+              >
                 {item.username}
               </Text>
               <Text
@@ -175,7 +178,10 @@ const CommentItem = memo(
                   justifyContent: "space-between",
                 }}
               >
-                <Text style={{ fontStyle: "italic", color: "#ccc" }}>
+                <Text
+                  allowFontScaling={false}
+                  style={{ fontStyle: "italic", color: "#ccc" }}
+                >
                   Spoiler içerik – görmek için tıkla
                 </Text>
                 <Ionicons
@@ -192,7 +198,10 @@ const CommentItem = memo(
                   justifyContent: "space-between",
                 }}
               >
-                <Text style={{ marginTop: 4, color: theme.text.primary }}>
+                <Text
+                  allowFontScaling={false}
+                  style={{ marginTop: 4, color: theme.text.primary }}
+                >
                   {item.text}
                 </Text>
 
@@ -379,7 +388,7 @@ const CommentItem = memo(
         </View>
       </View>
     );
-  }
+  },
 );
 
 // ==========================
@@ -416,7 +425,7 @@ const Comment = ({ contextId }) => {
       db,
       "MovieComment",
       contextIdConvert,
-      "comments"
+      "comments",
     );
     const q = query(commentsRef, orderBy("timestamp", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -443,7 +452,7 @@ const Comment = ({ contextId }) => {
         contextIdConvert,
         "comments",
         comment.id,
-        "replies"
+        "replies",
       );
       const q = query(repliesRef, orderBy("timestamp", "asc"));
       replyListenersRef.current[comment.id] = onSnapshot(q, (snap) => {
@@ -504,7 +513,7 @@ const Comment = ({ contextId }) => {
               "comments",
               parentId,
               "replies",
-              editId
+              editId,
             )
           : doc(db, "MovieComment", contextIdConvert, "comments", editId);
         await updateDoc(editRef, { text: text.trim(), isSpoiler });
@@ -517,7 +526,7 @@ const Comment = ({ contextId }) => {
               contextIdConvert,
               "comments",
               parentId,
-              "replies"
+              "replies",
             )
           : collection(db, "MovieComment", contextIdConvert, "comments");
         await addDoc(collectionPath, {
@@ -578,7 +587,9 @@ const Comment = ({ contextId }) => {
             borderRadius: 10,
           }}
         />
-        <Text style={{ color: theme.text.secondary }}>YORUMLAR</Text>
+        <Text allowFontScaling={false} style={{ color: theme.text.secondary }}>
+          YORUMLAR
+        </Text>
       </View>
       <FlatList
         data={comments}
@@ -645,7 +656,10 @@ const Comment = ({ contextId }) => {
                   paddingHorizontal: 10,
                 }}
               >
-                <Text style={{ color: theme.text.secondary }}>
+                <Text
+                  allowFontScaling={false}
+                  style={{ color: theme.text.secondary }}
+                >
                   {commentInputState.replieName} yorum Düzenleniyor
                 </Text>
               </View>
@@ -661,7 +675,10 @@ const Comment = ({ contextId }) => {
                   paddingHorizontal: 10,
                 }}
               >
-                <Text style={{ color: theme.text.secondary }}>
+                <Text
+                  allowFontScaling={false}
+                  style={{ color: theme.text.secondary }}
+                >
                   {commentInputState.replieName} ün{" "}
                   {commentInputState.replieText} yazısına cevap yazılıyor...
                 </Text>
@@ -678,7 +695,10 @@ const Comment = ({ contextId }) => {
                   paddingHorizontal: 10,
                 }}
               >
-                <Text style={{ color: theme.text.secondary }}>
+                <Text
+                  allowFontScaling={false}
+                  style={{ color: theme.text.secondary }}
+                >
                   cevap düzenleniyor...
                 </Text>
               </View>
@@ -760,7 +780,10 @@ const Comment = ({ contextId }) => {
             </TouchableOpacity>
           </View>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Text style={{ color: theme.text.secondary, marginRight: 8 }}>
+            <Text
+              allowFontScaling={false}
+              style={{ color: theme.text.secondary, marginRight: 8 }}
+            >
               Spoiler
             </Text>
             <SwitchToggle

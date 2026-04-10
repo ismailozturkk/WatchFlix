@@ -16,10 +16,12 @@ import { MovieBestsSkeleton } from "../../components/Skeleton";
 import { useMovie } from "../../context/MovieContex";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useAppSettings } from "../../context/AppSettingsContext";
 
 export default function MovieBests({ navigation }) {
   const { t } = useLanguage();
   const { theme } = useTheme();
+  const { imageQuality } = useAppSettings();
 
   const {
     loadingBests,
@@ -136,7 +138,10 @@ export default function MovieBests({ navigation }) {
             alignItems: "center",
           }}
         >
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
             ●●●
           </Text>
           {pageBest > 5 && (
@@ -152,11 +157,17 @@ export default function MovieBests({ navigation }) {
                   alignItems: "center",
                 }}
               >
-                <Text style={[styles.genreText, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.genreText, { color: theme.text.primary }]}
+                >
                   {pageBest - 5}
                 </Text>
               </TouchableOpacity>
-              <Text style={[styles.genreText, { color: theme.text.muted }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.muted }]}
+              >
                 ●
               </Text>
             </>
@@ -174,7 +185,10 @@ export default function MovieBests({ navigation }) {
                 alignItems: "center",
               }}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageBest - 2}
               </Text>
             </TouchableOpacity>
@@ -192,7 +206,10 @@ export default function MovieBests({ navigation }) {
                 alignItems: "center",
               }}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageBest - 1}
               </Text>
             </TouchableOpacity>
@@ -221,7 +238,10 @@ export default function MovieBests({ navigation }) {
               alignItems: "center",
             }}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageBest + 1}
             </Text>
           </TouchableOpacity>
@@ -236,11 +256,19 @@ export default function MovieBests({ navigation }) {
               alignItems: "center",
             }}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageBest + 2}
             </Text>
           </TouchableOpacity>
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>●</Text>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
+            ●
+          </Text>
           <TouchableOpacity
             onPress={() => setPageBest(pageBest + 5)}
             style={{
@@ -252,11 +280,17 @@ export default function MovieBests({ navigation }) {
               alignItems: "center",
             }}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageBest + 5}
             </Text>
           </TouchableOpacity>
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
             ●●●
           </Text>
         </View>
@@ -285,7 +319,9 @@ export default function MovieBests({ navigation }) {
           <Image
             source={
               item.poster_path
-                ? { uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }
+                ? {
+                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                  }
                 : require("../../assets/image/no_image.png")
             }
             style={[styles.similarPoster, { shadowColor: theme.shadow }]}
@@ -407,7 +443,12 @@ export default function MovieBests({ navigation }) {
           alignItems: "center",
         }}
       >
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●●●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●●●
+        </Text>
         {pageBest > 1 && (
           <>
             <TouchableOpacity
@@ -421,11 +462,17 @@ export default function MovieBests({ navigation }) {
                 alignItems: "center",
               }}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {1}
               </Text>
             </TouchableOpacity>
-            <Text style={[styles.genreText, { color: theme.text.muted }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.muted }]}
+            >
               ●
             </Text>
           </>
@@ -443,7 +490,10 @@ export default function MovieBests({ navigation }) {
               alignItems: "center",
             }}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageBest - 2}
             </Text>
           </TouchableOpacity>
@@ -461,7 +511,10 @@ export default function MovieBests({ navigation }) {
               alignItems: "center",
             }}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageBest - 1}
             </Text>
           </TouchableOpacity>
@@ -492,7 +545,10 @@ export default function MovieBests({ navigation }) {
                 alignItems: "center",
               }}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageBest + 1}
               </Text>
             </TouchableOpacity>
@@ -508,13 +564,21 @@ export default function MovieBests({ navigation }) {
                 alignItems: "center",
               }}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageBest + 2}
               </Text>
             </TouchableOpacity>
           </>
         ) : null}
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●
+        </Text>
         <TouchableOpacity
           onPress={() => setPageBest(totalPagesBest)}
           style={{
@@ -526,11 +590,19 @@ export default function MovieBests({ navigation }) {
             alignItems: "center",
           }}
         >
-          <Text style={[styles.genreText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.primary }]}
+          >
             {totalPagesBest}
           </Text>
         </TouchableOpacity>
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●●●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●●●
+        </Text>
       </View>
     </View>
   );

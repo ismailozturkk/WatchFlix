@@ -26,7 +26,8 @@ const { width } = Dimensions.get("window");
 
 export default function MovieProviders({ navigation }) {
   const { theme } = useTheme();
-
+  const { t } = useLanguage();
+  const { imageQuality } = useAppSettings();
   // Sağlayıcıları çek
   const {
     selectedProvider,
@@ -130,7 +131,9 @@ export default function MovieProviders({ navigation }) {
           <Image
             source={
               item.poster_path
-                ? { uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }
+                ? {
+                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                  }
                 : require("../../assets/image/no_image.png")
             }
             style={[styles.similarPoster, { shadowColor: theme.shadow }]}
@@ -142,7 +145,7 @@ export default function MovieProviders({ navigation }) {
               { backgroundColor: theme.secondaryt },
             ]}
           >
-            <Text style={styles.similarRatingText}>
+            <Text allowFontScaling={false} style={styles.similarRatingText}>
               {item.vote_average.toFixed(1)}
             </Text>
           </View>

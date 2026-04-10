@@ -36,7 +36,7 @@
           <View style={styles.modalContent}>
             {/* İleride başka seçenekler de ekleyebilirsin */}
             <TouchableOpacity style={styles.input} onPress={showDatePicker}>
-              <Text style={styles.inputText}>
+              <Text allowFontScaling={false}style={styles.inputText}>
                 Seçilen Tarih:{" "}
                 {selectedDate ? formatDate(selectedDate) : "Tarih seçiniz"}
               </Text>
@@ -55,7 +55,7 @@
               onPress={markEpisodeAsWatched}
               disabled={!selectedDate}
             >
-              <Text style={[styles.inputText, { color: "#fff" }]}>Kaydet</Text>
+              <Text allowFontScaling={false}style={[styles.inputText, { color: "#fff" }]}>Kaydet</Text>
             </TouchableOpacity>
             {/* Buraya başka butonlar veya seçenekler ekleyebilirsin */}
           </View>

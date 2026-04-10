@@ -5,8 +5,13 @@ import {
   TouchableOpacity,
   Text,
   Dimensions,
-  Animated,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { useLanguage } from "../context/LanguageContext";
 import { useTheme } from "../context/ThemeContext";
 import SearchScreen from "./tabs/SearchScreen";
@@ -24,13 +29,76 @@ import { useProfileScreen } from "../context/ProfileScreenContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { FontAwesome } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
+
 const { width } = Dimensions.get("window");
+
+const TabItem = memo(({ label, icon, isActive, onPress, theme }) => {
+  const scale = useSharedValue(isActive ? 1.2 : 1);
+  const opacity = useSharedValue(isActive ? 1 : 0);
+  const translateX = useSharedValue(isActive ? 0 : -20);
+
+  useEffect(() => {
+    scale.value = withSpring(isActive ? 1.2 : 1, { mass: 0.5, damping: 10, stiffness: 150 });
+    opacity.value = withTiming(isActive ? 1 : 0, { duration: 150 });
+    translateX.value = withTiming(isActive ? 0 : -20, { duration: 150 });
+  }, [isActive]);
+
+  const iconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const labelStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.tab,
+        isActive && [
+          styles.activeTab,
+          {
+            backgroundColor: theme.primary,
+            borderBottomWidth: 2,
+            borderLeftWidth: 1,
+            borderRightWidth: 1,
+            borderTopWidth: 0,
+            borderTopColor: theme.primary,
+            borderRightColor: theme.primary,
+            borderLeftColor: theme.primary,
+            borderBottomColor: theme.accent,
+          },
+        ],
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      {isActive ? (
+        <Animated.View style={[styles.tabContent, iconStyle]}>
+          {icon(20, theme.text.primary)}
+          <Animated.Text
+            style={[styles.tabText, styles.activeTabText, { color: theme.text.primary }, labelStyle]}
+          >
+            {label}
+          </Animated.Text>
+        </Animated.View>
+      ) : (
+        <Animated.View style={iconStyle}>
+          {icon(24, theme.text.secondary)}
+        </Animated.View>
+      )}
+    </TouchableOpacity>
+  );
+});
 
 function TabScreenNavigator({ navigation }) {
   const [activeTab, setActiveTab] = useState("tvshows");
   const { t, language, toggleLanguage } = useLanguage();
   const { theme } = useTheme();
-  // Ekranları memoize edelim
+
+  // Ekranlar sadece navigation değişince yeniden oluşturulsun.
+  // theme/t/language burada dependency olmamalı — screen'ler kendi içlerinde context'ten alır.
   const screens = useMemo(
     () => ({
       tvshows: <TvShowScreen navigation={navigation} />,
@@ -39,7 +107,7 @@ function TabScreenNavigator({ navigation }) {
       settings: <SettingsScreen navigation={navigation} />,
       profile: <ProfileScreen navigation={navigation} />,
     }),
-    [navigation, theme, t, language]
+    [navigation],
   );
 
   // renderScreen fonksiyonunu basitleştirelim
@@ -81,113 +149,6 @@ function TabScreenNavigator({ navigation }) {
     },
   ];
 
-  const TabItem = memo(({ name, label, icon, isActive, onPress, theme }) => {
-    // Animasyon değerleri
-    const [scaleAnim] = useState(new Animated.Value(1));
-    const [labelWidth] = useState(new Animated.Value(0));
-
-    useEffect(() => {
-      const animations = [];
-
-      if (isActive) {
-        animations.push(
-          Animated.spring(scaleAnim, {
-            toValue: 1.2,
-            friction: 3,
-            useNativeDriver: true,
-          }),
-          Animated.timing(labelWidth, {
-            toValue: 1,
-            duration: 150,
-            useNativeDriver: true,
-          })
-        );
-      } else {
-        animations.push(
-          Animated.spring(scaleAnim, {
-            toValue: 1,
-            friction: 4,
-            useNativeDriver: true,
-          }),
-          Animated.timing(labelWidth, {
-            toValue: 0,
-            duration: 100,
-            useNativeDriver: true,
-          })
-        );
-      }
-
-      Animated.parallel(animations).start();
-    }, [isActive]);
-
-    return (
-      <TouchableOpacity
-        style={[
-          styles.tab,
-          isActive && [
-            styles.activeTab,
-            {
-              backgroundColor: theme.primary,
-              borderBottomWidth: 2,
-              borderLeftWidth: 1,
-              borderRightWidth: 1,
-              borderTopWidth: 0,
-
-              borderTopColor: theme.primary,
-              borderRightColor: theme.primary,
-              borderLeftColor: theme.primary,
-              borderBottomColor: theme.accent,
-            },
-          ],
-        ]}
-        onPress={onPress}
-        activeOpacity={0.7}
-      >
-        {/* {isActive && (
-          <LinearGradient
-            colors={["transparent", "transparent", theme.accent]}
-            style={[styles.positionStyle, { zIndex: 9999999999 }]}
-          />
-        )} */}
-        {isActive ? (
-          <Animated.View
-            style={[
-              styles.tabContent,
-              {
-                transform: [{ scale: scaleAnim }],
-              },
-            ]}
-          >
-            {icon(20, theme.text.primary)}
-            <Animated.Text
-              style={[
-                styles.tabText,
-                styles.activeTabText,
-                {
-                  color: theme.text.primary,
-                  opacity: labelWidth,
-                  transform: [
-                    {
-                      translateX: labelWidth.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-20, 0],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              {label}
-            </Animated.Text>
-          </Animated.View>
-        ) : (
-          <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-            {icon(24, theme.text.secondary)}
-          </Animated.View>
-        )}
-      </TouchableOpacity>
-    );
-  });
   const pagerRef = React.useRef(null);
 
   const handleTabPress = (index, name) => {
@@ -242,7 +203,7 @@ function TabScreenNavigator({ navigation }) {
         >
           <BlurView
             tint="dark"
-            intensity={30}
+            intensity={50}
             experimentalBlurMethod="dimezisBlurView" // Android için sihirli kod
             style={[
               styles.tabContainer,

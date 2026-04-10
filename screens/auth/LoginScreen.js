@@ -17,6 +17,7 @@ import Toast from "react-native-toast-message";
 import { useLanguage } from "../../context/LanguageContext";
 import Checkbox from "expo-checkbox";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import IconBacground from "../../components/IconBacground";
 
 const { width, height } = Dimensions.get("window");
 
@@ -52,7 +53,7 @@ export default function LoginScreen({ navigation }) {
 
       // Aynı e-posta varsa eskiyi kaldır
       updatedUsers = updatedUsers.filter(
-        (u, i, arr) => arr.findIndex((x) => x.email === u.email) === i
+        (u, i, arr) => arr.findIndex((x) => x.email === u.email) === i,
       );
 
       // En fazla 3 kullanıcı kalsın
@@ -76,7 +77,7 @@ export default function LoginScreen({ navigation }) {
       const userCredentials = await signInWithEmailAndPassword(
         auth,
         userEmail,
-        userPassword
+        userPassword,
       );
 
       if (isChecked) {
@@ -116,163 +117,200 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <ScrollView
-      style={{ backgroundColor: theme.primary }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <TouchableOpacity
-        style={[styles.languageButton, { backgroundColor: theme.secondary }]}
-        onPress={() => toggleLanguage(language === "tr" ? "en" : "tr")}
-      >
-        <Text
-          style={[styles.languageButtonText, { color: theme.text.primary }]}
-        >
-          {language.toUpperCase()}
-        </Text>
-      </TouchableOpacity>
-
-      <View style={[styles.container, { backgroundColor: theme.primary }]}>
-        <LottieView
-          style={[styles.lottie, { display: showSnow ? "flex" : "none" }]}
-          source={require("../../LottieJson/snow.json")}
-          autoPlay
-          loop
-        />
-        <LottieView
-          source={require("../../LottieJson/login.json")}
-          style={{ width: 400, height: 400 }}
-          autoPlay
-          loop
-        />
-        {/* Son 3 kullanıcı */}
-        {recentUsers.length > 0 && (
-          <View style={styles.recentContainer}>
-            <Text style={[styles.recentTitle, { color: theme.text.primary }]}>
-              Son Giriş Yapanlar:
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {recentUsers.map((user, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.recentUser,
-                    {
-                      backgroundColor: theme.secondary,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                  onPress={() => handleUserPress(user)}
-                >
-                  <Text
-                    style={{ color: theme.text.primary, fontWeight: "600" }}
-                  >
-                    {user.email}
-                  </Text>
-                  <Text style={{ color: theme.text.muted, fontSize: 12 }}>
-                    {user.date}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-        <Text style={[styles.title, { color: theme.text.primary }]}>
-          {t.LoginScreen.loginButton}
-        </Text>
-
-        {/* Email */}
-        <View
-          style={[
-            styles.input,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
-        >
-          <Ionicons name="mail-outline" size={24} color={theme.border} />
-          <TextInput
-            style={{ width: "90%", height: "100%", color: theme.text.primary }}
-            placeholder={t.LoginScreen.email}
-            placeholderTextColor={theme.text.secondary}
-            keyboardType="email-address"
-            onChangeText={setEmail}
-            value={email}
-          />
-        </View>
-
-        {/* Şifre */}
-        <View
-          style={[
-            styles.input,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
-        >
-          <Ionicons name="lock-closed-outline" size={24} color={theme.border} />
-          <TextInput
-            style={{ width: "90%", height: "100%", color: theme.text.primary }}
-            placeholderTextColor={theme.text.secondary}
-            placeholder={t.LoginScreen.password}
-            secureTextEntry
-            onChangeText={setPassword}
-            value={password}
-          />
-        </View>
-
-        {/* Beni Hatırla */}
-        <View style={styles.section}>
-          <Checkbox
-            style={styles.checkbox}
-            value={isChecked}
-            onValueChange={setChecked}
-            color={isChecked ? theme.accent : undefined}
-          />
-          <Text style={[styles.paragraph, { color: theme.text.secondary }]}>
-            Beni Hatırla
-          </Text>
-        </View>
-
-        {/* Giriş Butonu */}
+    <View style={{ flex: 1, backgroundColor: theme.primary }}>
+      <IconBacground opacity={0.3} />
+      <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
         <TouchableOpacity
-          style={[
-            styles.button,
-            { backgroundColor: theme.accent, borderColor: theme.border },
-          ]}
-          onPress={() => signIn()}
+          style={[styles.languageButton, { backgroundColor: theme.secondary }]}
+          onPress={() => toggleLanguage(language === "tr" ? "en" : "tr")}
         >
-          {isloading ? (
+          <Text
+            style={[styles.languageButtonText, { color: theme.text.primary }]}
+          >
+            {language.toUpperCase()}
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.container}>
+          {/* Snow */}
+          {showSnow && (
             <LottieView
-              source={require("../../LottieJson/loading15.json")}
-              style={{ width: 40, height: 40 }}
+              style={styles.lottie}
+              source={require("../../LottieJson/snow.json")}
               autoPlay
               loop
             />
-          ) : (
-            <Text style={[styles.buttonText, { color: theme.text.primary }]}>
-              {t.LoginScreen.loginButton}
-            </Text>
           )}
-        </TouchableOpacity>
-
-        {/* Kayıt & Şifre Unutma */}
-        <TouchableOpacity
-          style={[
-            styles.button,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
-          onPress={() => navigation.navigate("RegisterScreen")}
-        >
-          <Text style={[styles.buttonText, { color: theme.text.primary }]}>
-            {t.LoginScreen.registerButton}
+          {/* Logo */}
+          <LottieView
+            source={require("../../LottieJson/login.json")}
+            style={{ width: 400, height: 400 }}
+            autoPlay
+            loop
+          />
+          {/* Son 3 kullanıcı */}
+          {recentUsers.length > 0 && (
+            <View style={styles.recentContainer}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.recentTitle, { color: theme.text.primary }]}
+              >
+                Son Giriş Yapanlar:
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {recentUsers.map((user, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.recentUser,
+                      {
+                        backgroundColor: theme.secondary,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                    onPress={() => handleUserPress(user)}
+                  >
+                    <Text
+                      style={{ color: theme.text.primary, fontWeight: "600" }}
+                    >
+                      {user.email}
+                    </Text>
+                    <Text
+                      allowFontScaling={false}
+                      style={{ color: theme.text.muted, fontSize: 12 }}
+                    >
+                      {user.date}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+          <Text
+            allowFontScaling={false}
+            style={[styles.title, { color: theme.text.primary }]}
+          >
+            {t.LoginScreen.loginButton}
           </Text>
-        </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => navigation.navigate("ForgotPasswordScreen")}
-        >
-          <Text style={[styles.forgotPassword, { color: theme.text.muted }]}>
-            {t.LoginScreen.forgotPassword}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          {/* Email */}
+          <View
+            style={[
+              styles.input,
+              { backgroundColor: theme.secondary, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons name="mail-outline" size={24} color={theme.border} />
+            <TextInput
+              style={{
+                width: "90%",
+                height: "100%",
+                color: theme.text.primary,
+              }}
+              placeholder={t.LoginScreen.email}
+              placeholderTextColor={theme.text.secondary}
+              keyboardType="email-address"
+              onChangeText={setEmail}
+              value={email}
+            />
+          </View>
+
+          {/* Şifre */}
+          <View
+            style={[
+              styles.input,
+              { backgroundColor: theme.secondary, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons
+              name="lock-closed-outline"
+              size={24}
+              color={theme.border}
+            />
+            <TextInput
+              style={{
+                width: "90%",
+                height: "100%",
+                color: theme.text.primary,
+              }}
+              placeholderTextColor={theme.text.secondary}
+              placeholder={t.LoginScreen.password}
+              secureTextEntry
+              onChangeText={setPassword}
+              value={password}
+            />
+          </View>
+
+          {/* Beni Hatırla */}
+          <View style={styles.section}>
+            <Checkbox
+              style={styles.checkbox}
+              value={isChecked}
+              onValueChange={setChecked}
+              color={isChecked ? theme.accent : undefined}
+            />
+            <Text
+              allowFontScaling={false}
+              style={[styles.paragraph, { color: theme.text.secondary }]}
+            >
+              Beni Hatırla
+            </Text>
+          </View>
+
+          {/* Giriş Butonu */}
+          <TouchableOpacity
+            style={[
+              styles.button,
+              { backgroundColor: theme.accent, borderColor: theme.border },
+            ]}
+            onPress={() => signIn()}
+          >
+            {isloading ? (
+              <LottieView
+                source={require("../../LottieJson/loading15.json")}
+                style={{ width: 40, height: 40 }}
+                autoPlay
+                loop
+              />
+            ) : (
+              <Text
+                allowFontScaling={false}
+                style={[styles.buttonText, { color: theme.text.primary }]}
+              >
+                {t.LoginScreen.loginButton}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Kayıt & Şifre Unutma */}
+          <TouchableOpacity
+            style={[
+              styles.button,
+              { backgroundColor: theme.secondary, borderColor: theme.border },
+            ]}
+            onPress={() => navigation.navigate("RegisterScreen")}
+          >
+            <Text
+              allowFontScaling={false}
+              style={[styles.buttonText, { color: theme.text.primary }]}
+            >
+              {t.LoginScreen.registerButton}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate("ForgotPasswordScreen")}
+          >
+            <Text
+              allowFontScaling={false}
+              style={[styles.forgotPassword, { color: theme.text.muted }]}
+            >
+              {t.LoginScreen.forgotPassword}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 

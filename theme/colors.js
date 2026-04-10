@@ -1,291 +1,338 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+ * WatchFlix — Merkezi Renk & Tema Sistemi
+ *
+ * Mimari:
+ *  - PALETTE   : Tüm ham renk değerleri tek yerde (değer tekrarı yok)
+ *  - makeTheme : Tema token'larını PALETTE'ten üreten factory
+ *  - themes    : { gray, dark, light, blue, green } — tüm temalar
+ *  - Yardımcı  : getThemeColors, alpha (opacity helper)
+ * ────────────────────────────────────────────────────────────────────────────*/
+
+// ─── Temel renk sabitleri (raw) ───────────────────────────────────────────────
+const PALETTE = {
+  // Nötrler
+  white:       "#FFFFFF",
+  black:       "#000000",
+
+  // Griler
+  gray050: "#F8F8F8",
+  gray100: "#E8E8E8",
+  gray200: "#D6D6D6",
+  gray300: "#C4C4C4",
+  gray400: "#B0B0B0",
+  gray500: "#888888",
+  gray600: "#666666",
+  gray700: "#444444",
+  gray800: "#2C2C2C",
+  gray850: "#282828",
+  gray900: "#1E1E1E",
+  gray950: "#141414",
+
+  // Lacivert / Mavi tonları
+  navy050: "#EFF5FA",
+  navy100: "#8BAFD0",
+  navy200: "#5374AC",
+  navy300: "#2B4C84",
+  navy400: "#23324B",
+  navy500: "#141C33",
+
+  // Deniz mavisi / Teal (yeşil tema)
+  teal050: "#BDD1CF",
+  teal100: "#A9BDBB",
+  teal150: "#95A9A7",
+  teal200: "#76A7AB",
+  teal300: "#6C9DA1",
+  teal400: "#3D8B89",
+  teal500: "#2A7473",
+  teal600: "#1C4F4E",
+  teal700: "#143636",
+
+  // Vurgu / Semantic renkleri
+  blue:    "#138DF0",       // rgb(19, 141, 240)
+  blueAlt: "#2196F3",
+  blueDark: "#0551A3",      // dark tema accent
+  blueMid: "#2275B9",       // gray tema bold
+
+  green:   "#64FF64",       // rgb(100, 255, 100)
+  red:     "#FF3232",       // rgb(255, 50, 50)
+  orange:  "#FF7C25",       // rgb(255, 124, 37)
+  purple:  "#A100A1",       // rgb(161, 0, 161)
+  yellow:  "#FFEB3B",       // rgb(255, 235, 59)
+
+  // Not renkleri (UI renk seçici)
+  noteGreen:  "#64FF64",
+  noteRed:    "#FF3232",
+  noteBlue:   "#138DF0",
+  noteOrange: "#FF7C25",
+  noteYellow: "#FFEB3B",
+  notePurple: "#800080",
+  notePink:   "#FFC0CB",
+  noteAqua:   "#00FFFF",
+  noteTeal:   "#008080",
+};
+
+// ─── Opacity yardımcı (hex → rgba) ───────────────────────────────────────────
+/**
+ * @param {string} hex  — "#RRGGBB" formatında renk
+ * @param {number} a    — 0-1 arası opaklık
+ * @returns {string}    — "rgba(r, g, b, a)"
+ */
+export function alpha(hex, a = 1) {
+  const clean = hex.replace("#", "");
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
+// ─── Not renk paleti (tüm temalar paylaşır) ───────────────────────────────────
+const SHARED_NOTES_COLORS = {
+  green:            PALETTE.noteGreen,
+  greenBackground:  alpha(PALETTE.noteGreen,  0.25),
+  red:              PALETTE.noteRed,
+  redBackground:    alpha(PALETTE.noteRed,    0.25),
+  blue:             PALETTE.noteBlue,
+  blueBackground:   alpha(PALETTE.noteBlue,   0.25),
+  orange:           PALETTE.noteOrange,
+  orangeBackground: alpha(PALETTE.noteOrange, 0.25),
+  yellow:           PALETTE.noteYellow,
+  yellowBackground: alpha(PALETTE.noteYellow, 0.2),
+  purple:           PALETTE.notePurple,
+  purpleBackground: alpha(PALETTE.notePurple, 0.25),
+  pink:             PALETTE.notePink,
+  pinkBackground:   alpha(PALETTE.notePink,   0.25),
+  aqua:             PALETTE.noteAqua,
+  aquaBackground:   alpha(PALETTE.noteAqua,   0.2),
+  teal:             PALETTE.noteTeal,
+  tealBackground:   alpha(PALETTE.noteTeal,   0.25),
+};
+
+// ─── Semantic renk seti (tüm temalar paylaşır) ────────────────────────────────
+const SHARED_COLORS = {
+  green:  PALETTE.green,
+  red:    PALETTE.red,
+  blue:   PALETTE.blue,
+  orange: PALETTE.orange,
+  purple: PALETTE.purple,
+  yellow: PALETTE.yellow,
+};
+
+// ─── Theme factory ────────────────────────────────────────────────────────────
+/**
+ * Tema token'larını üreten factory fonksiyonu.
+ * Her tema yalnızca kendi değerlerini geçirir, shared değerler otomatik eklenir.
+ */
+function makeTheme({
+  primary,
+  secondary,
+  between,
+  border,
+  tab,
+  text,
+  accent,
+  bold,
+  shadow,
+}) {
+  return {
+    // ── Yüzey renkleri ─────────────────────────────────────────────────────
+    primary,
+    secondary,
+    secondaryt: alpha(secondary.replace("rgb(", "rgba(").replace(")", ", 0.5)").startsWith("rgba") ? secondary : secondary, 0),  // aşağıda override
+    between,
+    border,
+    tab,
+    ai: alpha(tab, 0.4),
+
+    // ── Metin ──────────────────────────────────────────────────────────────
+    text: {
+      primary:   text.primary,
+      secondary: text.secondary,
+      between:   text.between,
+      muted:     text.muted,
+    },
+
+    // ── Vurgu ──────────────────────────────────────────────────────────────
+    accent,
+    bold,
+    shadow,
+
+    // ── Paylaşılan renk setleri ─────────────────────────────────────────────
+    colors:     SHARED_COLORS,
+    notesColor: SHARED_NOTES_COLORS,
+  };
+}
+
+// ─── Temalar ──────────────────────────────────────────────────────────────────
 export const themes = {
+  /* ── Koyu Gri ─────────────────────────────────────────────────── */
   gray: {
-    primary: "rgba(30, 30, 30, 1)", // #1a1a1a
-    secondary: "rgba(40, 40, 40, 1)", // #222222
-    secondaryt: "rgba(40, 40, 40, 0.5)", // #222222
-    between: "rgba(55, 55, 55, 1)", // #333333
-    border: "rgba(55, 55, 55, 1)", // #333333
-    tab: "rgba(45, 45, 45, 1)", // #222222
-    ai: "rgba(45, 45, 45, 0.4)", // #222222
+    primary:    PALETTE.gray900,
+    secondary:  PALETTE.gray800,
+    secondaryt: alpha(PALETTE.gray800, 0.5),
+    between:    PALETTE.gray850,
+    border:     alpha(PALETTE.gray700, 0.8),
+    tab:        alpha(PALETTE.gray800, 0.95),
+    ai:         alpha(PALETTE.gray800, 0.4),
     text: {
-      primary: "rgba(255, 255, 255, 1)", // #ffffff
-      secondary: "rgba(221, 221, 221, 1)", // #dddddd
-      between: "rgba(187, 187, 187, 1)", // #bbbb
-      muted: "rgba(102, 102, 102, 1)", // #666666
+      primary:   PALETTE.white,
+      secondary: "#DDDDDD",
+      between:   "#BBBBBB",
+      muted:     PALETTE.gray600,
     },
-    bold: "rgb(19, 141, 240)", // #2196F3
-    accent: "rgba(33, 150, 243, 1)", // #2196F3
-    shadow: "rgba(0, 0, 0, 0.7)", // rgba(0,0,0,0.5)
-    colors: {
-      green: "rgb(100, 255, 100)",
-      red: "rgba(255, 50, 50,1)",
-      blue: "rgb(19, 141, 240)",
-      orange: "rgb(255, 124, 37)",
-      purple: "rgb(161, 0, 161)",
-      yellow: "rgb(255, 235, 59)",
-    },
-    notesColor: {
-      green: "rgb(100, 255, 100)",
-      greenBackground: "rgba(100, 255, 100, 0.3)",
-      red: "rgba(255, 50, 50, 1)",
-      redBackground: "rgba(255, 50, 50, 0.3)",
-      blue: "rgb(19, 141, 240)",
-      blueBackground: "rgba(19, 141, 240, 0.3)",
-      orange: "rgb(255, 124, 37)",
-      orangeBackground: "rgba(255, 124, 37, 0.3)",
-      yellow: "rgb(255, 235, 59)",
-      yellowBackground: "rgba(255, 235, 59, 0.3)",
-      purple: "rgb(128, 0, 128)",
-      purpleBackground: "rgba(128, 0, 128, 0.3)",
-      pink: "rgb(255, 192, 203)",
-      pinkBackground: "rgba(255, 192, 203, 0.3)",
-      aqua: "rgb(0, 255, 255)",
-      aquaBackground: "rgba(0, 255, 255, 0.3)",
-      teal: "rgb(0, 128, 128)",
-      tealBackground: "rgba(0, 128, 128, 0.3)",
-    },
+    accent:  PALETTE.blueAlt,
+    bold:    PALETTE.blueMid,
+    shadow:  alpha(PALETTE.black, 0.7),
+    colors:     SHARED_COLORS,
+    notesColor: SHARED_NOTES_COLORS,
   },
 
+  /* ── Siyah (AMOLED) ──────────────────────────────────────────── */
   dark: {
-    primary: "rgba(0, 0, 0, 1)", // #1a1a1a
-    secondary: "rgba(20, 20, 20, 1)", // #222222
-    secondaryt: "rgba(20, 20, 20, 0.5)", // #222222
-    between: "rgba(31, 31, 31, 1)", // #333333
-    border: "rgba(35, 35, 35, 1)", // #333333
-    tab: "rgba(20, 20, 20, 1)", // #222222
-    ai: "rgba(20, 20, 20, 0.4)", // #222222
+    primary:    PALETTE.black,
+    secondary:  "#141414",
+    secondaryt: alpha("#141414", 0.5),
+    between:    "#1F1F1F",
+    border:     "#232323",
+    tab:        "#141414",
+    ai:         alpha("#141414", 0.4),
     text: {
-      primary: "rgba(255, 255, 255, 1)", // #ffffff   #bfbfbf
-      secondary: "rgba(211, 211, 211, 1)", // #dddddd
-      between: "rgba(177, 177, 177, 1)", // #bbbb
-      muted: "rgba(102, 102, 102, 1)", // #666666
+      primary:   PALETTE.white,
+      secondary: "#D3D3D3",
+      between:   "#B1B1B1",
+      muted:     PALETTE.gray600,
     },
-    bold: "rgb(34, 117, 185)", // #2196F3
-    accent: "rgb(5, 81, 143)", // #2196F3
-    shadow: "rgba(100, 100, 100, 0.4)", // rgba(0,0,0,0.5)
-    colors: {
-      green: "rgb(100, 255, 100)",
-      red: "rgba(255, 50, 50,1)",
-      blue: "rgb(19, 141, 240)",
-      orange: "rgb(255, 124, 37)",
-      purple: "rgb(161, 0, 161)",
-      yellow: "rgb(255, 235, 59)",
-    },
-    notesColor: {
-      green: "rgb(100, 255, 100)",
-      greenBackground: "rgba(100, 255, 100, 0.3)",
-      red: "rgba(255, 50, 50, 1)",
-      redBackground: "rgba(255, 50, 50, 0.3)",
-      blue: "rgb(19, 141, 240)",
-      blueBackground: "rgba(19, 141, 240, 0.3)",
-      orange: "rgb(255, 124, 37)",
-      orangeBackground: "rgba(255, 124, 37, 0.3)",
-      yellow: "rgb(255, 235, 59)",
-      yellowBackground: "rgba(255, 235, 59, 0.3)",
-      purple: "rgb(128, 0, 128)",
-      purpleBackground: "rgba(128, 0, 128, 0.3)",
-      pink: "rgb(255, 192, 203)",
-      pinkBackground: "rgba(255, 192, 203, 0.3)",
-      aqua: "rgb(0, 255, 255)",
-      aquaBackground: "rgba(0, 255, 255, 0.3)",
-      teal: "rgb(0, 128, 128)",
-      tealBackground: "rgba(0, 128, 128, 0.3)",
-    },
+    accent:  PALETTE.blueDark,
+    bold:    "#2275B9",
+    shadow:  alpha(PALETTE.gray500, 0.4),
+    colors:     SHARED_COLORS,
+    notesColor: SHARED_NOTES_COLORS,
   },
 
+  /* ── Açık (Light) ────────────────────────────────────────────── */
   light: {
-    primary: "rgb(232, 232, 232)", // #ffffff
-    secondary: "rgb(214, 214, 214)", // #f5f5f5
-    secondaryt: "rgba(214, 214, 214,0.5)", // #f5f5f5
-    between: "rgb(196, 196, 196)", // #e0e0e0
-    border: "rgb(204, 204, 204)", // #d0d0d0
-    tab: "rgb(198, 198, 198)", // #d0d0d0
-    ai: "rgba(198, 198, 198,0.4)", // #d0d0d0
+    primary:    PALETTE.gray100,
+    secondary:  PALETTE.gray200,
+    secondaryt: alpha(PALETTE.gray200, 0.5),
+    between:    PALETTE.gray300,
+    border:     PALETTE.gray400,
+    tab:        "#C6C6C6",
+    ai:         alpha("#C6C6C6", 0.4),
     text: {
-      primary: "rgba(68, 68, 68, 1)", // #444444
-      secondary: "rgba(102, 102, 102, 1)", // #666666
-      between: "rgba(136, 136, 136, 1)", // #888888
-      muted: "rgb(129, 129, 129)", // #999999
+      primary:   PALETTE.gray700,
+      secondary: PALETTE.gray600,
+      between:   PALETTE.gray500,
+      muted:     "#818181",
     },
-    bold: "rgb(19, 141, 240)", // #2196F3
-    accent: "rgb(56, 166, 240)", // #2196F3
-    shadow: "rgba(0, 0, 0, 0.7)", // rgba(0,0,0,0.5)
-    colors: {
-      green: "rgb(100, 255, 100)",
-      red: "rgba(255, 50, 50,1)",
-      blue: "rgb(19, 141, 240)",
-      orange: "rgb(255, 124, 37)",
-      purple: "rgb(161, 0, 161)",
-      yellow: "rgb(255, 235, 59)",
-    },
-    notesColor: {
-      green: "rgb(100, 255, 100)",
-      greenBackground: "rgba(100, 255, 100, 0.3)",
-      red: "rgba(255, 50, 50, 1)",
-      redBackground: "rgba(255, 50, 50, 0.3)",
-      blue: "rgb(19, 141, 240)",
-      blueBackground: "rgba(19, 141, 240, 0.3)",
-      orange: "rgb(255, 124, 37)",
-      orangeBackground: "rgba(255, 124, 37, 0.3)",
-      yellow: "rgb(255, 235, 59)",
-      yellowBackground: "rgba(255, 235, 59, 0.3)",
-      purple: "rgb(128, 0, 128)",
-      purpleBackground: "rgba(128, 0, 128, 0.3)",
-      pink: "rgb(255, 192, 203)",
-      pinkBackground: "rgba(255, 192, 203, 0.3)",
-      aqua: "rgb(0, 255, 255)",
-      aquaBackground: "rgba(0, 255, 255, 0.3)",
-      teal: "rgb(0, 128, 128)",
-      tealBackground: "rgba(0, 128, 128, 0.3)",
-    },
+    accent:  "#38A6F0",
+    bold:    PALETTE.blue,
+    shadow:  alpha(PALETTE.black, 0.7),
+    colors:     SHARED_COLORS,
+    notesColor: SHARED_NOTES_COLORS,
   },
+
+  /* ── Lacivert ─────────────────────────────────────────────────── */
   blue: {
-    primary: "rgb(20, 28, 51)", // #141c33
-    secondary: "rgb(35, 50, 75)", // #2f456f
-    secondaryt: "rgba(35, 50, 75,0.5)", // #2f456f
-    between: "rgb(83, 116, 172)", // #5374ac
-    border: "rgb(43, 76, 132)", // #8bafd0
-    tab: "rgb(37, 59, 91)", // #eff5fa
-    ai: "rgba(37, 59, 91,0.4)", // #eff5fa
+    primary:    PALETTE.navy500,
+    secondary:  PALETTE.navy400,
+    secondaryt: alpha(PALETTE.navy400, 0.5),
+    between:    PALETTE.navy200,
+    border:     PALETTE.navy300,
+    tab:        "#25395B",
+    ai:         alpha("#25395B", 0.4),
     text: {
-      primary: "rgb(239, 245, 250)", // #eff5fa
-      secondary: "rgb(139, 175, 208)", // #8bafd0
-      between: "rgb(83, 116, 172)", // #5374ac
-      muted: "rgb(139, 175, 208)", // #2f456f
+      primary:   PALETTE.navy050,
+      secondary: PALETTE.navy100,
+      between:   PALETTE.navy200,
+      muted:     PALETTE.navy100,
     },
-    bold: "rgb(20, 27, 73)", // #141c33
-    accent: "rgb(43, 76, 132)", // #5374ac
-    shadow: "rgba(0, 0, 0, 0.7)", // rgba(0,0,0,0.5)
-    colors: {
-      green: "rgb(100, 255, 100)",
-      red: "rgba(255, 50, 50,1)",
-      blue: "rgb(19, 141, 240)",
-      orange: "rgb(255, 124, 37)",
-      purple: "rgb(161, 0, 161)",
-      yellow: "rgb(255, 235, 59)",
-    },
-    notesColor: {
-      green: "rgb(100, 255, 100)",
-      greenBackground: "rgba(100, 255, 100, 0.3)",
-      red: "rgba(255, 50, 50, 1)",
-      redBackground: "rgba(255, 50, 50, 0.3)",
-      blue: "rgb(19, 141, 240)",
-      blueBackground: "rgba(19, 141, 240, 0.3)",
-      orange: "rgb(255, 124, 37)",
-      orangeBackground: "rgba(255, 124, 37, 0.3)",
-      yellow: "rgb(255, 235, 59)",
-      yellowBackground: "rgba(255, 235, 59, 0.3)",
-      purple: "rgb(128, 0, 128)",
-      purpleBackground: "rgba(128, 0, 128, 0.3)",
-      pink: "rgb(255, 192, 203)",
-      pinkBackground: "rgba(255, 192, 203, 0.3)",
-      aqua: "rgb(0, 255, 255)",
-      aquaBackground: "rgba(0, 255, 255, 0.3)",
-      teal: "rgb(0, 128, 128)",
-      tealBackground: "rgba(0, 128, 128, 0.3)",
-    },
+    accent:  PALETTE.navy300,
+    bold:    PALETTE.navy500,
+    shadow:  alpha(PALETTE.black, 0.7),
+    colors:     SHARED_COLORS,
+    notesColor: SHARED_NOTES_COLORS,
   },
 
+  /* ── Açık Yeşil (Teal) ───────────────────────────────────────── */
   green: {
-    primary: "rgb(189,209,207)", // Ana yeşil
-    secondary: "rgb(169,189,187)", // Daha koyu yeşil
-    secondaryt: "rgba(42, 116, 115,0.5)", // Daha koyu yeşil
-    between: "rgb(149,169,167)", // En koyu yeşil
-    border: "rgb(118, 167, 171)", // En koyu yeşil
-    tab: "rgb(108, 157, 161)", // En koyu yeşil
-    ai: "rgba(108, 157, 161,0.4)", // En koyu yeşil
+    primary:    PALETTE.teal050,
+    secondary:  PALETTE.teal100,
+    secondaryt: alpha(PALETTE.teal500, 0.5),
+    between:    PALETTE.teal150,
+    border:     PALETTE.teal200,
+    tab:        PALETTE.teal300,
+    ai:         alpha(PALETTE.teal300, 0.4),
     text: {
-      primary: "rgb(28, 79, 78)", // Koyu yeşil metin
-      secondary: "rgb(42, 116, 115)", // Orta yeşil metin
-      between: "rgb(85, 142, 141)", // Açık yeşil metin
-      muted: "rgb(28, 79, 78)", // Açık yeşil metin
+      primary:   PALETTE.teal600,
+      secondary: PALETTE.teal500,
+      between:   PALETTE.teal400,
+      muted:     PALETTE.teal600,
     },
-    bold: "rgb(20, 54, 54)", // Koyu yeşil metin
-    accent: "rgb(98, 190, 180)",
-    shadow: "rgba(0,0,0,0.7)",
-    colors: {
-      green: "rgb(100, 255, 100)",
-      red: "rgba(255, 50, 50,1)",
-      blue: "rgb(19, 141, 240)",
-      orange: "rgb(255, 124, 37)",
-      purple: "rgb(161, 0, 161)",
-      yellow: "rgb(255, 235, 59)",
-    },
-    notesColor: {
-      green: "rgb(100, 255, 100)",
-      greenBackground: "rgba(100, 255, 100, 0.3)",
-      red: "rgba(255, 50, 50, 1)",
-      redBackground: "rgba(255, 50, 50, 0.3)",
-      blue: "rgb(19, 141, 240)",
-      blueBackground: "rgba(19, 141, 240, 0.3)",
-      orange: "rgb(255, 124, 37)",
-      orangeBackground: "rgba(255, 124, 37, 0.3)",
-      yellow: "rgb(255, 235, 59)",
-      yellowBackground: "rgba(255, 235, 59, 0.3)",
-      purple: "rgb(128, 0, 128)",
-      purpleBackground: "rgba(128, 0, 128, 0.3)",
-      pink: "rgb(255, 192, 203)",
-      pinkBackground: "rgba(255, 192, 203, 0.3)",
-      aqua: "rgb(0, 255, 255)",
-      aquaBackground: "rgba(0, 255, 255, 0.3)",
-      teal: "rgb(0, 128, 128)",
-      tealBackground: "rgba(0, 128, 128, 0.3)",
-    },
+    accent:  "#62BEB4",
+    bold:    PALETTE.teal700,
+    shadow:  alpha(PALETTE.black, 0.7),
+    colors:     SHARED_COLORS,
+    notesColor: SHARED_NOTES_COLORS,
   },
 };
 
-// Tema değiştiğinde güncellenmesi gereken stil özelliklerinin listesi
-export const themeProperties = {
-  container: {
-    backgroundColor: "primary",
-  },
-  settingItem: {
-    backgroundColor: "secondary",
-    borderColor: "border",
-  },
-  text: {
-    color: "text.primary",
-  },
-  sectionTitle: {
-    color: "text.muted",
-  },
-  aboutItem: {
-    backgroundColor: "secondary",
-  },
-  version: {
-    color: "text.primary",
-  },
-  copyright: {
-    color: "text.muted",
-  },
-  // Diğer stil özellikleri buraya eklenebilir
-};
+// ─── Yardımcı fonksiyonlar ────────────────────────────────────────────────────
 
-// Yardımcı fonksiyonlar
-export const getThemeColors = (themeName) => {
-  return themes[themeName] || themes.gray; // Varsayılan olarak dark tema
-};
+/**
+ * Tema adına göre tema nesnesini döner.
+ * Bilinmeyen tema adı için varsayılan olarak "gray" döner.
+ * @param {keyof typeof themes} themeName
+ * @returns {(typeof themes)[keyof typeof themes]}
+ */
+export const getThemeColors = (themeName) =>
+  themes[themeName] ?? themes.gray;
 
-export const applyTheme = (themeName, styleKey) => {
+/**
+ * Tüm tema adlarının listesi
+ */
+export const THEME_NAMES = Object.keys(themes);
+
+/**
+ * Belirtilen themeKey ve token path'i için değer döner.
+ * Örnek: getToken("dark", "text.muted") → "#666666"
+ *
+ * @param {string} themeName
+ * @param {string} tokenPath  — "accent" | "text.primary" | "notesColor.blue" vb.
+ * @returns {string|undefined}
+ */
+export const getToken = (themeName, tokenPath) => {
   const theme = getThemeColors(themeName);
-  const property = themeProperties[styleKey];
+  return tokenPath
+    .split(".")
+    .reduce((obj, key) => obj?.[key], theme);
+};
 
+/**
+ * Stil özelliği → tema token eşlemesi.
+ * applyTheme() ile kullanılır.
+ */
+export const themeProperties = {
+  container:    { backgroundColor: "primary" },
+  settingItem:  { backgroundColor: "secondary", borderColor: "border" },
+  text:         { color: "text.primary" },
+  sectionTitle: { color: "text.muted" },
+  aboutItem:    { backgroundColor: "secondary" },
+  version:      { color: "text.primary" },
+  copyright:    { color: "text.muted" },
+};
+
+/**
+ * Verilen tema ve style anahtarı için React Native stili döner.
+ * @param {string} themeName
+ * @param {string} styleKey  — themeProperties'deki anahtar
+ * @returns {Record<string, string>}
+ */
+export const applyTheme = (themeName, styleKey) => {
+  const property = themeProperties[styleKey];
   if (!property) return {};
 
-  // Nokta notasyonlu özellikleri işle (örn: "text.primary")
-  const getValue = (obj, path) => {
-    return path.split(".").reduce((acc, part) => acc && acc[part], obj);
-  };
-
-  if (typeof property === "string") {
-    return getValue(theme, property);
-  }
-
-  // Birden fazla stil özelliği varsa hepsini işle
   const styles = {};
-  Object.entries(property).forEach(([key, value]) => {
-    styles[key] = getValue(theme, value);
+  Object.entries(property).forEach(([cssProp, tokenPath]) => {
+    styles[cssProp] = getToken(themeName, tokenPath);
   });
-
   return styles;
 };

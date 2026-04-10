@@ -24,6 +24,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Toast from "react-native-toast-message";
 import SwipeCard from "../modules/SwipeCard";
 import { BlurView } from "expo-blur";
+import { useAppSettings } from "../context/AppSettingsContext";
 const { width, height } = Dimensions.get("window");
 export default function ListsScreen({ route, navigation }) {
   const { theme } = useTheme();
@@ -41,6 +42,7 @@ export default function ListsScreen({ route, navigation }) {
   const [reorderItems, setReorderItems] = useState(null);
   const [randomModalVisible, setRandomModalVisible] = useState(false);
   const [value, setValue] = useState("");
+  const { imageQuality } = useAppSettings();
 
   const handleChange = (text) => {
     // Sadece rakamları al
@@ -150,7 +152,7 @@ export default function ListsScreen({ route, navigation }) {
   // Arama filtresi
   const filteredItems = listItems
     .filter((item) =>
-      (item.name || "").toLowerCase().includes(searchQuery.toLowerCase())
+      (item.name || "").toLowerCase().includes(searchQuery.toLowerCase()),
     )
     .filter((item) => {
       if (tvShowStatus === null)
@@ -161,7 +163,7 @@ export default function ListsScreen({ route, navigation }) {
             ? item.seasons.reduce(
                 (acc, season) =>
                   acc + (season.episodes ? season.episodes.length : 0),
-                0
+                0,
               )
             : 0) ===
             item.showEpisodeCount) ===
@@ -173,7 +175,7 @@ export default function ListsScreen({ route, navigation }) {
             ? item.seasons.reduce(
                 (acc, season) =>
                   acc + (season.episodes ? season.episodes.length : 0),
-                0
+                0,
               )
             : 0) ===
             item.showEpisodeCount) ===
@@ -243,7 +245,10 @@ export default function ListsScreen({ route, navigation }) {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.primary }]}
     >
-      <Text style={[styles.header, { color: theme.text.primary }]}>
+      <Text
+        allowFontScaling={false}
+        style={[styles.header, { color: theme.text.primary }]}
+      >
         {listName == "watchedMovies"
           ? "İzlenen Filmler"
           : listName == "watchedTv"
@@ -260,7 +265,10 @@ export default function ListsScreen({ route, navigation }) {
       {isLoading ? (
         renderSkeleton()
       ) : listItems.length === 0 ? (
-        <Text style={[styles.emptyText, { color: theme.text.muted }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.emptyText, { color: theme.text.muted }]}
+        >
           Bu liste boş.
         </Text>
       ) : (
@@ -291,7 +299,12 @@ export default function ListsScreen({ route, navigation }) {
                   chooseRandomly("tv");
                 }}
               >
-                <Text style={{ color: theme.text.primary }}>Rastgele Dizi</Text>
+                <Text
+                  allowFontScaling={false}
+                  style={{ color: theme.text.primary }}
+                >
+                  Rastgele Dizi
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={{
@@ -305,7 +318,12 @@ export default function ListsScreen({ route, navigation }) {
                   chooseRandomly("movie");
                 }}
               >
-                <Text style={{ color: theme.text.primary }}>Rastgele Film</Text>
+                <Text
+                  allowFontScaling={false}
+                  style={{ color: theme.text.primary }}
+                >
+                  Rastgele Film
+                </Text>
               </TouchableOpacity>
             </View>
           )}
@@ -394,7 +412,7 @@ export default function ListsScreen({ route, navigation }) {
                 onLongPress={() => {
                   setReorderModalVisible(true);
                   const originalIndex = listItems.findIndex(
-                    (i) => i.id === item.id
+                    (i) => i.id === item.id,
                   );
                   setIndex(originalIndex);
                   setReorderItems(item);
@@ -405,7 +423,7 @@ export default function ListsScreen({ route, navigation }) {
                         item.type === "movie"
                           ? "MovieDetails"
                           : "TvShowsDetails",
-                        { id: item.id }
+                        { id: item.id },
                       )
                     : setModalVisible(true);
                   setListModalItems([item]); // Tek bir öğeyi modalda göstermek için diziye sarın
@@ -429,7 +447,7 @@ export default function ListsScreen({ route, navigation }) {
                                     (season.episodes
                                       ? season.episodes.length
                                       : 0),
-                                  0
+                                  0,
                                 )
                               : 0)
                           ? item.showEpisodeCount && {
@@ -455,7 +473,7 @@ export default function ListsScreen({ route, navigation }) {
                       source={
                         item.imagePath
                           ? {
-                              uri: `https://image.tmdb.org/t/p/w500${item.imagePath}`,
+                              uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
                             }
                           : require("../assets/image/no_image.png")
                       }
@@ -575,7 +593,7 @@ export default function ListsScreen({ route, navigation }) {
                             source={
                               item.imagePath
                                 ? {
-                                    uri: `https://image.tmdb.org/t/p/w500${item.imagePath}`,
+                                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
                                     cache: "force-cache",
                                   }
                                 : require("../assets/image/no_image.png")
@@ -773,7 +791,7 @@ export default function ListsScreen({ route, navigation }) {
                               : "TvShowsDetails",
                             {
                               id: randomModalItems.id,
-                            }
+                            },
                           ));
                       }}
                       style={{
@@ -787,7 +805,7 @@ export default function ListsScreen({ route, navigation }) {
                         source={
                           randomModalItems.imagePath
                             ? {
-                                uri: `https://image.tmdb.org/t/p/w500${randomModalItems.imagePath}`,
+                                uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${randomModalItems.imagePath}`,
                                 cache: "force-cache",
                               }
                             : require("../assets/image/no_image.png")
@@ -895,7 +913,7 @@ export default function ListsScreen({ route, navigation }) {
               source={
                 reorderItems?.imagePath
                   ? {
-                      uri: `https://image.tmdb.org/t/p/w500${reorderItems.imagePath}`,
+                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${reorderItems.imagePath}`,
                     }
                   : require("../assets/image/no_image.png")
               }

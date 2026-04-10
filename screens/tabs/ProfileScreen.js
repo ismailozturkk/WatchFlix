@@ -37,6 +37,8 @@ import { doc, onSnapshot } from "firebase/firestore";
 import UserAvatar from "./profile/UserAvatar";
 import Avatar from "./profile/Avatar";
 import { BlurView } from "expo-blur";
+import IconBacground from "../../components/IconBacground";
+import CalendarWidget from "../../components/profile/CalendarWidget";
 const ProfileScreen = ({ navigation }) => {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
@@ -166,788 +168,888 @@ const ProfileScreen = ({ navigation }) => {
   }, []);
 
   return (
-    <ScrollView
-      keyboardShouldPersistTaps="handled"
-      showsHorizontalScrollIndicator={false}
-    >
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: theme.primary }]}
-      >
-        <LottieView
-          style={[styles.lottie, { display: showSnow ? "flex" : "none" }]}
-          source={require("../../LottieJson/snow.json")}
-          autoPlay={true}
-          loop
-        />
+    <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
+      <IconBacground opacity={0.3} />
 
-        <View style={styles.images}>
-          <TouchableOpacity
-            onPress={() => {
-              setModalVisible(true);
-            }}
-            style={[
-              styles.profilImageTouch,
-              {
-                borderColor: borderColor || "#000",
-                shadowColor: shadowColor || "#000",
-                padding: 9,
-              },
-            ]}
-          >
-            {isloadingAvatar ? (
-              <AvatarSkeleton />
-            ) : (
-              <View
-                style={{
-                  shadowColor: shadowColorTv,
-                  //borderColor: borderColor,
-                  borderWidth: 0,
-                  borderRadius: 75,
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowRadius: 5,
-                  elevation: 15, // Android için gölge
-                }}
-              >
-                <View style={styles.circularProgress}>
-                  {!modalVisible && !modalVisibleLogout && (
-                    <CircularProgressBase
-                      {...props}
-                      value={safeProgressMovie}
-                      maxValue={100}
-                      radius={70}
-                      inActiveStrokeColor={borderColor2Movie || "#C25AFF"}
-                      activeStrokeColor={borderColorMovie || "#C25AFF"}
-                      activeStrokeSecondaryColor={
-                        borderColor2Movie || "#C25AFF"
-                      }
-                      duration={500}
-                      showProgressValue={false}
-                    >
-                      <CircularProgressBase
-                        {...props}
-                        value={safeProgressTv}
-                        maxValue={100}
-                        radius={80}
-                        duration={500}
-                        showProgressValue={false}
-                        inActiveStrokeColor={borderColor2Tv || "#C25AFF"}
-                        activeStrokeColor={borderColorTv || "#C25AFF"}
-                        activeStrokeSecondaryColor={borderColor2Tv || "#C25AFF"}
-                      />
-                    </CircularProgressBase>
-                  )}
-                </View>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <SafeAreaView
+          style={[styles.container, { backgroundColor: "transparent" }]}
+        >
+          {showSnow && (
+            <>
+              <LottieView
+                style={styles.lottie}
+                source={require("../../LottieJson/snow.json")}
+                autoPlay={true}
+                loop
+              />
+              <LottieView
+                style={styles.lottie1}
+                source={require("../../LottieJson/snow.json")}
+                autoPlay={true}
+                loop
+              />
+            </>
+          )}
+          <View style={styles.images}>
+            <TouchableOpacity
+              onPress={() => {
+                setModalVisible(true);
+              }}
+              style={[
+                styles.profilImageTouch,
+                {
+                  borderColor: borderColor || "#000",
+                  shadowColor: shadowColor || "#000",
+                  padding: 9,
+                },
+              ]}
+            >
+              {isloadingAvatar ? (
+                <AvatarSkeleton />
+              ) : (
                 <View
                   style={{
-                    overflow: "hidden",
-                    borderRadius: 100,
-                    padding: 10,
-                    margin: 10,
-                    backgroundColor: theme.primary,
+                    shadowColor: shadowColorTv,
+                    //borderColor: borderColor,
+                    borderWidth: 0,
+                    borderRadius: 75,
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowRadius: 5,
+                    elevation: 15, // Android için gölge
                   }}
                 >
-                  <Image
-                    source={avatar || require("../../assets/avatar/3.png")}
-                    style={[
-                      styles.profilImage,
-                      { backgroundColor: borderColor },
-                    ]}
-                  />
+                  <View style={styles.circularProgress}>
+                    {!modalVisible && !modalVisibleLogout && (
+                      <CircularProgressBase
+                        {...props}
+                        value={safeProgressMovie}
+                        maxValue={100}
+                        radius={70}
+                        inActiveStrokeColor={borderColor2Movie || "#C25AFF"}
+                        activeStrokeColor={borderColorMovie || "#C25AFF"}
+                        activeStrokeSecondaryColor={
+                          borderColor2Movie || "#C25AFF"
+                        }
+                        duration={500}
+                        showProgressValue={false}
+                      >
+                        <CircularProgressBase
+                          {...props}
+                          value={safeProgressTv}
+                          maxValue={100}
+                          radius={80}
+                          duration={500}
+                          showProgressValue={false}
+                          inActiveStrokeColor={borderColor2Tv || "#C25AFF"}
+                          activeStrokeColor={borderColorTv || "#C25AFF"}
+                          activeStrokeSecondaryColor={
+                            borderColor2Tv || "#C25AFF"
+                          }
+                        />
+                      </CircularProgressBase>
+                    )}
+                  </View>
+                  <View
+                    style={{
+                      overflow: "hidden",
+                      borderRadius: 100,
+                      padding: 10,
+                      margin: 10,
+                      backgroundColor: theme.primary,
+                    }}
+                  >
+                    <Image
+                      source={avatar || require("../../assets/avatar/3.png")}
+                      style={[
+                        styles.profilImage,
+                        { backgroundColor: borderColor },
+                      ]}
+                    />
+                  </View>
                 </View>
+              )}
+            </TouchableOpacity>
+            <View style={{ flexDirection: "column", width: "50%" }}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.textName, { color: theme.text.primary }]}
+              >
+                {user?.displayName}
+              </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 5,
+                }}
+              >
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.textEmail, { color: theme.text.primary }]}
+                >
+                  {user?.email}
+                </Text>
+
+                <MaterialIcons
+                  name="verified"
+                  size={14}
+                  color={
+                    user?.emailVerified
+                      ? "rgb(29, 161, 242)"
+                      : "rgb(229, 20, 0)"
+                  }
+                />
               </View>
-            )}
-          </TouchableOpacity>
-          <View style={{ flexDirection: "column", width: "50%" }}>
-            <Text style={[styles.textName, { color: theme.text.primary }]}>
-              {user?.displayName}
-            </Text>
-            <View
+              {!user.emailVerified && (
+                <Text
+                  style={[styles.textVerified, { color: "rgb(229, 20, 0)" }]}
+                >
+                  {t.profileScreen.emailVerified}
+                </Text>
+              )}
+              {user && user.metadata && (
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.textDate, { color: theme.text.primary }]}
+                >
+                  Katılma tarihi:{" "}
+                  {convertTimestampToDate(user.metadata.createdAt)}
+                </Text>
+              )}
+            </View>
+          </View>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 3,
+              marginBottom: 10,
+            }}
+          >
+            <TouchableOpacity
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 5,
-              }}
-            >
-              <Text style={[styles.textEmail, { color: theme.text.primary }]}>
-                {user?.email}
-              </Text>
-
-              <MaterialIcons
-                name="verified"
-                size={14}
-                color={
-                  user?.emailVerified ? "rgb(29, 161, 242)" : "rgb(229, 20, 0)"
-                }
-              />
-            </View>
-            {!user.emailVerified && (
-              <Text style={[styles.textVerified, { color: "rgb(229, 20, 0)" }]}>
-                {t.profileScreen.emailVerified}
-              </Text>
-            )}
-            {user && user.metadata && (
-              <Text style={[styles.textDate, { color: theme.text.primary }]}>
-                Katılma tarihi:{" "}
-                {convertTimestampToDate(user.metadata.createdAt)}
-              </Text>
-            )}
-          </View>
-        </View>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 3,
-            marginBottom: 10,
-          }}
-        >
-          <TouchableOpacity
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 3,
-              width: "30%",
-              paddingHorizontal: 6,
-              paddingVertical: 6,
-              borderTopLeftRadius: 10,
-              borderBottomLeftRadius: 10,
-              backgroundColor: theme.secondary,
-            }}
-            onPress={() => navigation.navigate("SearchFriendsScreen")}
-          >
-            <Text style={{ color: theme.text.secondary }}>Arama</Text>
-            <Text style={{ color: theme.text.secondary }}></Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 3,
-              width: "30%",
-              paddingHorizontal: 6,
-              paddingVertical: 6,
-              backgroundColor: theme.secondary,
-            }}
-            onPress={() => navigation.navigate("FriendsListScreen")}
-          >
-            <Text style={{ color: theme.text.secondary }}>Arkadaşlar</Text>
-            <Text style={{ color: theme.text.secondary }}>{friendCount}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 3,
-
-              borderTopRightRadius: 10,
-              borderBottomRightRadius: 10,
-              width: "30%",
-              paddingHorizontal: 6,
-              paddingVertical: 6,
-              backgroundColor: theme.secondary,
-            }}
-            onPress={() => navigation.navigate("FriendRequestsScreen")}
-          >
-            <Text style={{ color: theme.text.secondary }}>İstekler</Text>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ color: theme.text.secondary }}>
-                {receivedCount}
-              </Text>
-              <MaterialCommunityIcons
-                name="arrow-bottom-left"
-                size={14}
-                color="#70ffb0ff"
-              />
-              <Text style={{ color: theme.text.secondary }}>{sendCount}</Text>
-              <MaterialCommunityIcons
-                name="arrow-top-right"
-                size={14}
-                color="#70baffff"
-              />
-            </View>
-          </TouchableOpacity>
-        </View>
-        {/* <Avatar /> */}
-        <TouchableOpacity
-          onPress={() => handleTimeClick()}
-          activeOpacity={0.8}
-          style={[
-            styles.totalDurationContainer,
-            {
-              backgroundColor: theme.primary,
-              shadowColor: theme.shadow,
-              borderColor: theme.border,
-              borderWidth: 1,
-            },
-          ]}
-        >
-          <View style={styles.durationItem}>
-            <Ionicons
-              name="time-outline"
-              size={18}
-              color={theme.text.secondary}
-            />
-            <View>
-              <Text style={[styles.durationValue, { color: theme.accent }]}>
-                {formatTotalDurationTime(
-                  (totalMinutesTimeTv || 0) + (totalMinutesTime || 0),
-                  timeDisplayMode,
-                )}
-              </Text>
-              <Text style={[styles.durationLabel, { color: theme.text.muted }]}>
-                {t.profileScreen.totalDuration}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.durationItem}>
-            <Ionicons
-              name="film-outline"
-              size={18}
-              color={theme.text.secondary}
-            />
-            <View>
-              <Text style={[styles.durationValue, { color: borderColorMovie }]}>
-                {formatTotalDurationTime(
-                  totalMinutesTime || 0,
-                  timeDisplayMode,
-                )}
-              </Text>
-              <Text style={[styles.durationLabel, { color: theme.text.muted }]}>
-                {t.movies} {rankNameMovie}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.durationItem}>
-            <Ionicons
-              name="tv-outline"
-              size={18}
-              color={theme.text.secondary}
-            />
-            <View>
-              <Text style={[styles.durationValue, { color: borderColorTv }]}>
-                {formatTotalDurationTime(
-                  totalMinutesTimeTv || 0,
-                  timeDisplayMode,
-                )}
-              </Text>
-              <Text style={[styles.durationLabel, { color: theme.text.muted }]}>
-                {t.tvShows} {rankNameTv}
-              </Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>
-            {t.profileScreen.movieStatistics}
-          </Text>
-          {isloadingShowInfo ? (
-            <WatchedInfoSkeleton />
-          ) : (
-            <Animated.View style={{ transform: [{ scale: scaleAnimMovie }] }}>
-              <TouchableOpacity
-                onPress={() => {
-                  navigation.navigate("MovieStatisticsScreen");
-                }}
-                onPressIn={() => onPressIn("movie")}
-                onPressOut={() => onPressOut("movie")}
-                activeOpacity={0.8}
-                style={[
-                  styles.watchStats,
-                  {
-                    backgroundColor: theme.border,
-                    borderColor: theme.border,
-                    shadowColor: theme.shadow,
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.watchStatsView,
-                    {
-                      backgroundColor: theme.secondary,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.textSecondary,
-                      {
-                        color: theme.text.secondary,
-                      },
-                    ]}
-                  >
-                    {watchedMovieCount}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.textMuted,
-                      {
-                        color: theme.text.muted,
-                      },
-                    ]}
-                  >
-                    {t.profileScreen.movieWatched}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.watchStatsView2,
-                    {
-                      backgroundColor: theme.secondary,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                >
-                  <View>
-                    <Text
-                      style={[
-                        styles.textSecondary,
-                        {
-                          color: theme.text.secondary,
-                        },
-                      ]}
-                    >
-                      {totalWatchedTime?.years}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.textMuted,
-                        {
-                          color: theme.text.muted,
-                        },
-                      ]}
-                    >
-                      {t.profileScreen.years}
-                    </Text>
-                  </View>
-                  <View>
-                    <Text
-                      style={[
-                        styles.textSecondary,
-                        {
-                          color: theme.text.secondary,
-                        },
-                      ]}
-                    >
-                      {totalWatchedTime?.months}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.textMuted,
-                        {
-                          color: theme.text.muted,
-                        },
-                      ]}
-                    >
-                      {t.profileScreen.months}
-                    </Text>
-                  </View>
-                  <View>
-                    <Text
-                      style={[
-                        styles.textSecondary,
-                        {
-                          color: theme.text.secondary,
-                        },
-                      ]}
-                    >
-                      {totalWatchedTime?.days}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.textMuted,
-                        {
-                          color: theme.text.muted,
-                        },
-                      ]}
-                    >
-                      {t.profileScreen.days}
-                    </Text>
-                  </View>
-                  <View>
-                    <Text
-                      style={[
-                        styles.textSecondary,
-                        {
-                          color: theme.text.secondary,
-                        },
-                      ]}
-                    >
-                      {totalWatchedTime?.hours}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.textMuted,
-                        {
-                          color: theme.text.muted,
-                        },
-                      ]}
-                    >
-                      {t.profileScreen.hours}
-                    </Text>
-                  </View>
-                  <View>
-                    <Text
-                      style={[
-                        styles.textSecondary,
-                        {
-                          color: theme.text.secondary,
-                        },
-                      ]}
-                    >
-                      {totalWatchedTime?.minutes}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.textMuted,
-                        {
-                          color: theme.text.muted,
-                        },
-                      ]}
-                    >
-                      {t.profileScreen.minutes}
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-        </View>
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>
-            {t.profileScreen.tvShowStatistics}
-          </Text>
-          {isloadingMovieInfo ? (
-            <WatchedInfoSkeleton />
-          ) : (
-            <Animated.View style={{ transform: [{ scale: scaleAnimTv }] }}>
-              <TouchableOpacity
-                onPressIn={() => onPressIn("tv")}
-                onPressOut={() => onPressOut("tv")}
-                activeOpacity={0.8}
-                onPress={() => {
-                  navigation.navigate("TvStatisticsScreen");
-                }}
-                style={[
-                  styles.watchStats,
-                  {
-                    backgroundColor: theme.border,
-                    borderColor: theme.border,
-                    shadowColor: theme.shadow,
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.watchStatsView,
-                    {
-                      flexDirection: "row",
-                      justifyContent: "space-around",
-                      backgroundColor: theme.secondary,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                >
-                  <View>
-                    <Text
-                      style={[
-                        styles.textSecondary,
-                        {
-                          color: theme.text.secondary,
-                        },
-                      ]}
-                    >
-                      {watchedTvCount}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.textMuted,
-                        {
-                          color: theme.text.muted,
-                        },
-                      ]}
-                    >
-                      {t.profileScreen.tvShowCount}
-                    </Text>
-                  </View>
-
-                  <View>
-                    <Text
-                      style={[
-                        styles.textSecondary,
-                        {
-                          color: theme.text.secondary,
-                        },
-                      ]}
-                    >
-                      {totalEpisodesCount}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.textMuted,
-                        {
-                          color: theme.text.muted,
-                        },
-                      ]}
-                    >
-                      {t.profileScreen.tvShowEpisodetotalCount}
-                    </Text>
-                  </View>
-                </View>
-                <View
-                  style={[
-                    styles.watchStatsView2,
-                    {
-                      backgroundColor: theme.secondary,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                >
-                  <View>
-                    <Text
-                      style={[
-                        styles.textSecondary,
-                        {
-                          color: theme.text.secondary,
-                        },
-                      ]}
-                    >
-                      {totalWatchedTimeTv?.years}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.textMuted,
-                        {
-                          color: theme.text.muted,
-                        },
-                      ]}
-                    >
-                      {t.profileScreen.years}
-                    </Text>
-                  </View>
-                  <View>
-                    <Text
-                      style={[
-                        styles.textSecondary,
-                        {
-                          color: theme.text.secondary,
-                        },
-                      ]}
-                    >
-                      {totalWatchedTimeTv?.months}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.textMuted,
-                        {
-                          color: theme.text.muted,
-                        },
-                      ]}
-                    >
-                      {t.profileScreen.months}
-                    </Text>
-                  </View>
-                  <View>
-                    <Text
-                      style={[
-                        styles.textSecondary,
-                        {
-                          color: theme.text.secondary,
-                        },
-                      ]}
-                    >
-                      {totalWatchedTimeTv?.days}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.textMuted,
-                        {
-                          color: theme.text.muted,
-                        },
-                      ]}
-                    >
-                      {t.profileScreen.days}
-                    </Text>
-                  </View>
-                  <View>
-                    <Text
-                      style={[
-                        styles.textSecondary,
-                        {
-                          color: theme.text.secondary,
-                        },
-                      ]}
-                    >
-                      {totalWatchedTimeTv?.hours}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.textMuted,
-                        {
-                          color: theme.text.muted,
-                        },
-                      ]}
-                    >
-                      {t.profileScreen.hours}
-                    </Text>
-                  </View>
-                  <View>
-                    <Text
-                      style={[
-                        styles.textSecondary,
-                        {
-                          color: theme.text.secondary,
-                        },
-                      ]}
-                    >
-                      {totalWatchedTimeTv?.minutes}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.textMuted,
-                        {
-                          color: theme.text.muted,
-                        },
-                      ]}
-                    >
-                      {t.profileScreen.minutes}
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-        </View>
-        <ProfileLists navigation={navigation} />
-        <ProfileReminders navigation={navigation} />
-        <ProfileNotes navigation={navigation} />
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>
-            {t.logout}
-          </Text>
-          <TouchableOpacity
-            onPress={() => setModalVisibleLogout(true)}
-            style={[
-              styles.logout,
-              {
+                justifyContent: "space-between",
+                gap: 3,
+                width: "30%",
+                paddingHorizontal: 6,
+                paddingVertical: 6,
+                borderTopLeftRadius: 10,
+                borderBottomLeftRadius: 10,
                 backgroundColor: theme.secondary,
-                borderColor: theme.border,
+              }}
+              onPress={() => navigation.navigate("SearchFriendsScreen")}
+            >
+              <Text
+                allowFontScaling={false}
+                style={{ color: theme.text.secondary }}
+              >
+                Arama
+              </Text>
+              <Text
+                allowFontScaling={false}
+                style={{ color: theme.text.secondary }}
+              ></Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 3,
+                width: "30%",
+                paddingHorizontal: 6,
+                paddingVertical: 6,
+                backgroundColor: theme.secondary,
+              }}
+              onPress={() => navigation.navigate("FriendsListScreen")}
+            >
+              <Text
+                allowFontScaling={false}
+                style={{ color: theme.text.secondary }}
+              >
+                Arkadaşlar
+              </Text>
+              <Text
+                allowFontScaling={false}
+                style={{ color: theme.text.secondary }}
+              >
+                {friendCount}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 3,
+
+                borderTopRightRadius: 10,
+                borderBottomRightRadius: 10,
+                width: "30%",
+                paddingHorizontal: 6,
+                paddingVertical: 6,
+                backgroundColor: theme.secondary,
+              }}
+              onPress={() => navigation.navigate("FriendRequestsScreen")}
+            >
+              <Text
+                allowFontScaling={false}
+                style={{ color: theme.text.secondary }}
+              >
+                İstekler
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Text
+                  allowFontScaling={false}
+                  style={{ color: theme.text.secondary }}
+                >
+                  {receivedCount}
+                </Text>
+                <MaterialCommunityIcons
+                  name="arrow-bottom-left"
+                  size={14}
+                  color="#70ffb0ff"
+                />
+                <Text
+                  allowFontScaling={false}
+                  style={{ color: theme.text.secondary }}
+                >
+                  {sendCount}
+                </Text>
+                <MaterialCommunityIcons
+                  name="arrow-top-right"
+                  size={14}
+                  color="#70baffff"
+                />
+              </View>
+            </TouchableOpacity>
+          </View>
+          {/* <Avatar /> */}
+          <TouchableOpacity
+            onPress={() => handleTimeClick()}
+            activeOpacity={0.8}
+            style={[
+              styles.totalDurationContainer,
+              {
+                backgroundColor: theme.primary,
                 shadowColor: theme.shadow,
+                borderColor: theme.border,
+                borderWidth: 1,
               },
             ]}
           >
-            <Text style={[styles.settingText, { color: theme.text.primary }]}>
-              {t.logout}
-            </Text>
-            <Ionicons
-              name={"log-out-outline"}
-              size={24}
-              color={theme.text.primary}
-            />
-          </TouchableOpacity>
-        </View>
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={modalVisible}
-          onRequestClose={() => {
-            setModalVisible(false);
-          }}
-        >
-          <View style={styles.modalContainer}>
-            <BlurView
-              tint="dark"
-              intensity={50}
-              experimentalBlurMethod="dimezisBlurView"
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={[styles.modalContent, { marginVertical: 80 }]}>
-              <Text style={[styles.modalTitle, { color: theme.text.primary }]}>
-                {t.profileScreen.selectAvatar}
-              </Text>
-              <FlatList
-                data={avatars || []}
-                keyExtractor={(item, index) => index.toString()}
-                showsVerticalScrollIndicator={false}
-                renderItem={({ item, index }) => (
-                  <TouchableOpacity onPress={() => setSelectAvatarIndex(index)}>
-                    {item && <Image source={item} style={styles.avatarImage} />}
-                  </TouchableOpacity>
-                )}
-                numColumns={4}
+            <View style={styles.durationItem}>
+              <Ionicons
+                name="time-outline"
+                size={18}
+                color={theme.text.secondary}
               />
-
-              <TouchableOpacity
-                onPress={() => {
-                  setModalVisible(false);
-                }}
-                style={[styles.closeButton, { backgroundColor: theme.accent }]}
-              >
+              <View>
                 <Text
+                  allowFontScaling={false}
+                  style={[styles.durationValue, { color: theme.accent }]}
+                >
+                  {formatTotalDurationTime(
+                    (totalMinutesTimeTv || 0) + (totalMinutesTime || 0),
+                    timeDisplayMode,
+                  )}
+                </Text>
+                <Text
+                  style={[styles.durationLabel, { color: theme.text.muted }]}
+                >
+                  {t.profileScreen.totalDuration}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.durationItem}>
+              <Ionicons
+                name="film-outline"
+                size={18}
+                color={theme.text.secondary}
+              />
+              <View>
+                <Text
+                  style={[styles.durationValue, { color: borderColorMovie }]}
+                >
+                  {formatTotalDurationTime(
+                    totalMinutesTime || 0,
+                    timeDisplayMode,
+                  )}
+                </Text>
+                <Text
+                  style={[styles.durationLabel, { color: theme.text.muted }]}
+                >
+                  {t.movies} {rankNameMovie}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.durationItem}>
+              <Ionicons
+                name="tv-outline"
+                size={18}
+                color={theme.text.secondary}
+              />
+              <View>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.durationValue, { color: borderColorTv }]}
+                >
+                  {formatTotalDurationTime(
+                    totalMinutesTimeTv || 0,
+                    timeDisplayMode,
+                  )}
+                </Text>
+                <Text
+                  style={[styles.durationLabel, { color: theme.text.muted }]}
+                >
+                  {t.tvShows} {rankNameTv}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+          <View style={styles.section}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.sectionTitle, { color: theme.text.muted }]}
+            >
+              {t.profileScreen.movieStatistics}
+            </Text>
+            {isloadingShowInfo ? (
+              <WatchedInfoSkeleton />
+            ) : (
+              <Animated.View style={{ transform: [{ scale: scaleAnimMovie }] }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    navigation.navigate("MovieStatisticsScreen");
+                  }}
+                  onPressIn={() => onPressIn("movie")}
+                  onPressOut={() => onPressOut("movie")}
+                  activeOpacity={0.8}
                   style={[
-                    styles.closeButtonText,
-                    { color: theme.text.primary },
+                    styles.watchStats,
+                    {
+                      backgroundColor: theme.border,
+                      borderColor: theme.border,
+                      shadowColor: theme.shadow,
+                    },
                   ]}
                 >
-                  {t.profileScreen.close}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={modalVisibleLogout}
-          onRequestClose={() => setModalVisibleLogout(false)}
-        >
-          <View style={styles.modalContainer}>
-            <TouchableOpacity
-              style={styles.positionStyle}
-              onPress={() => setModalVisibleLogout(false)}
-            />
-            <BlurView
-              tint="dark"
-              intensity={50}
-              experimentalBlurMethod="dimezisBlurView"
-              style={StyleSheet.absoluteFill}
-            />
-
-            <View
-              style={[styles.modalView, { backgroundColor: theme.primary }]}
-            >
-              <Text style={[styles.modalText, { color: theme.text.primary }]}>
-                {t.profileScreen.logoutMessage}
-              </Text>
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={[styles.button, styles.buttonCancel]}
-                  onPress={() => setModalVisibleLogout(false)}
-                >
-                  <Text style={styles.textStyle}>{t.profileScreen.cancel}</Text>
+                  <View
+                    style={[
+                      styles.watchStatsView,
+                      {
+                        backgroundColor: theme.secondary,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.textSecondary,
+                        {
+                          color: theme.text.secondary,
+                        },
+                      ]}
+                    >
+                      {watchedMovieCount}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.textMuted,
+                        {
+                          color: theme.text.muted,
+                        },
+                      ]}
+                    >
+                      {t.profileScreen.movieWatched}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.watchStatsView2,
+                      {
+                        backgroundColor: theme.secondary,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    <View>
+                      <Text
+                        style={[
+                          styles.textSecondary,
+                          {
+                            color: theme.text.secondary,
+                          },
+                        ]}
+                      >
+                        {totalWatchedTime?.years}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.textMuted,
+                          {
+                            color: theme.text.muted,
+                          },
+                        ]}
+                      >
+                        {t.profileScreen.years}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text
+                        style={[
+                          styles.textSecondary,
+                          {
+                            color: theme.text.secondary,
+                          },
+                        ]}
+                      >
+                        {totalWatchedTime?.months}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.textMuted,
+                          {
+                            color: theme.text.muted,
+                          },
+                        ]}
+                      >
+                        {t.profileScreen.months}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text
+                        style={[
+                          styles.textSecondary,
+                          {
+                            color: theme.text.secondary,
+                          },
+                        ]}
+                      >
+                        {totalWatchedTime?.days}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.textMuted,
+                          {
+                            color: theme.text.muted,
+                          },
+                        ]}
+                      >
+                        {t.profileScreen.days}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text
+                        style={[
+                          styles.textSecondary,
+                          {
+                            color: theme.text.secondary,
+                          },
+                        ]}
+                      >
+                        {totalWatchedTime?.hours}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.textMuted,
+                          {
+                            color: theme.text.muted,
+                          },
+                        ]}
+                      >
+                        {t.profileScreen.hours}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text
+                        style={[
+                          styles.textSecondary,
+                          {
+                            color: theme.text.secondary,
+                          },
+                        ]}
+                      >
+                        {totalWatchedTime?.minutes}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.textMuted,
+                          {
+                            color: theme.text.muted,
+                          },
+                        ]}
+                      >
+                        {t.profileScreen.minutes}
+                      </Text>
+                    </View>
+                  </View>
                 </TouchableOpacity>
+              </Animated.View>
+            )}
+          </View>
+          <View style={styles.section}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.sectionTitle, { color: theme.text.muted }]}
+            >
+              {t.profileScreen.tvShowStatistics}
+            </Text>
+            {isloadingMovieInfo ? (
+              <WatchedInfoSkeleton />
+            ) : (
+              <Animated.View style={{ transform: [{ scale: scaleAnimTv }] }}>
                 <TouchableOpacity
-                  style={[styles.button, styles.buttonConfirm]}
+                  onPressIn={() => onPressIn("tv")}
+                  onPressOut={() => onPressOut("tv")}
+                  activeOpacity={0.8}
                   onPress={() => {
-                    SingOut();
-                    setModalVisibleLogout(false);
+                    navigation.navigate("TvStatisticsScreen");
                   }}
+                  style={[
+                    styles.watchStats,
+                    {
+                      backgroundColor: theme.border,
+                      borderColor: theme.border,
+                      shadowColor: theme.shadow,
+                    },
+                  ]}
                 >
-                  <Text style={styles.textStyle}>
-                    {t.profileScreen.confirm}
+                  <View
+                    style={[
+                      styles.watchStatsView,
+                      {
+                        flexDirection: "row",
+                        justifyContent: "space-around",
+                        backgroundColor: theme.secondary,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    <View>
+                      <Text
+                        style={[
+                          styles.textSecondary,
+                          {
+                            color: theme.text.secondary,
+                          },
+                        ]}
+                      >
+                        {watchedTvCount}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.textMuted,
+                          {
+                            color: theme.text.muted,
+                          },
+                        ]}
+                      >
+                        {t.profileScreen.tvShowCount}
+                      </Text>
+                    </View>
+
+                    <View>
+                      <Text
+                        style={[
+                          styles.textSecondary,
+                          {
+                            color: theme.text.secondary,
+                          },
+                        ]}
+                      >
+                        {totalEpisodesCount}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.textMuted,
+                          {
+                            color: theme.text.muted,
+                          },
+                        ]}
+                      >
+                        {t.profileScreen.tvShowEpisodetotalCount}
+                      </Text>
+                    </View>
+                  </View>
+                  <View
+                    style={[
+                      styles.watchStatsView2,
+                      {
+                        backgroundColor: theme.secondary,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    <View>
+                      <Text
+                        style={[
+                          styles.textSecondary,
+                          {
+                            color: theme.text.secondary,
+                          },
+                        ]}
+                      >
+                        {totalWatchedTimeTv?.years}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.textMuted,
+                          {
+                            color: theme.text.muted,
+                          },
+                        ]}
+                      >
+                        {t.profileScreen.years}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text
+                        style={[
+                          styles.textSecondary,
+                          {
+                            color: theme.text.secondary,
+                          },
+                        ]}
+                      >
+                        {totalWatchedTimeTv?.months}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.textMuted,
+                          {
+                            color: theme.text.muted,
+                          },
+                        ]}
+                      >
+                        {t.profileScreen.months}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text
+                        style={[
+                          styles.textSecondary,
+                          {
+                            color: theme.text.secondary,
+                          },
+                        ]}
+                      >
+                        {totalWatchedTimeTv?.days}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.textMuted,
+                          {
+                            color: theme.text.muted,
+                          },
+                        ]}
+                      >
+                        {t.profileScreen.days}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text
+                        style={[
+                          styles.textSecondary,
+                          {
+                            color: theme.text.secondary,
+                          },
+                        ]}
+                      >
+                        {totalWatchedTimeTv?.hours}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.textMuted,
+                          {
+                            color: theme.text.muted,
+                          },
+                        ]}
+                      >
+                        {t.profileScreen.hours}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text
+                        style={[
+                          styles.textSecondary,
+                          {
+                            color: theme.text.secondary,
+                          },
+                        ]}
+                      >
+                        {totalWatchedTimeTv?.minutes}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.textMuted,
+                          {
+                            color: theme.text.muted,
+                          },
+                        ]}
+                      >
+                        {t.profileScreen.minutes}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </Animated.View>
+            )}
+          </View>
+          <ProfileLists navigation={navigation} />
+          <CalendarWidget navigation={navigation} />
+          <ProfileReminders navigation={navigation} />
+          <ProfileNotes navigation={navigation} />
+          <View style={styles.section}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.sectionTitle, { color: theme.text.muted }]}
+            >
+              {t.logout}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setModalVisibleLogout(true)}
+              style={[
+                styles.logout,
+                {
+                  backgroundColor: theme.secondary,
+                  borderColor: theme.border,
+                  shadowColor: theme.shadow,
+                },
+              ]}
+            >
+              <Text
+                allowFontScaling={false}
+                style={[styles.settingText, { color: theme.text.primary }]}
+              >
+                {t.logout}
+              </Text>
+              <Ionicons
+                name={"log-out-outline"}
+                size={24}
+                color={theme.text.primary}
+              />
+            </TouchableOpacity>
+          </View>
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={modalVisible}
+            onRequestClose={() => {
+              setModalVisible(false);
+            }}
+          >
+            <View style={styles.modalContainer}>
+              <BlurView
+                tint="dark"
+                intensity={50}
+                experimentalBlurMethod="dimezisBlurView"
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={[styles.modalContent, { marginVertical: 80 }]}>
+                <Text
+                  style={[styles.modalTitle, { color: theme.text.primary }]}
+                >
+                  {t.profileScreen.selectAvatar}
+                </Text>
+                <FlatList
+                  data={avatars || []}
+                  keyExtractor={(item, index) => index.toString()}
+                  showsVerticalScrollIndicator={false}
+                  renderItem={({ item, index }) => (
+                    <TouchableOpacity
+                      onPress={() => setSelectAvatarIndex(index)}
+                    >
+                      {item && (
+                        <Image source={item} style={styles.avatarImage} />
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  numColumns={4}
+                />
+
+                <TouchableOpacity
+                  onPress={() => {
+                    setModalVisible(false);
+                  }}
+                  style={[
+                    styles.closeButton,
+                    { backgroundColor: theme.accent },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.closeButtonText,
+                      { color: theme.text.primary },
+                    ]}
+                  >
+                    {t.profileScreen.close}
                   </Text>
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
-        </Modal>
-      </SafeAreaView>
-    </ScrollView>
+          </Modal>
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={modalVisibleLogout}
+            onRequestClose={() => setModalVisibleLogout(false)}
+          >
+            <View style={styles.modalContainer}>
+              <TouchableOpacity
+                style={styles.positionStyle}
+                onPress={() => setModalVisibleLogout(false)}
+              />
+              <BlurView
+                tint="dark"
+                intensity={50}
+                experimentalBlurMethod="dimezisBlurView"
+                style={StyleSheet.absoluteFill}
+              />
+
+              <View
+                style={[styles.modalView, { backgroundColor: theme.primary }]}
+              >
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.modalText, { color: theme.text.primary }]}
+                >
+                  {t.profileScreen.logoutMessage}
+                </Text>
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.button, styles.buttonCancel]}
+                    onPress={() => setModalVisibleLogout(false)}
+                  >
+                    <Text allowFontScaling={false} style={styles.textStyle}>
+                      {t.profileScreen.cancel}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.button, styles.buttonConfirm]}
+                    onPress={() => {
+                      SingOut();
+                      setModalVisibleLogout(false);
+                    }}
+                  >
+                    <Text allowFontScaling={false} style={styles.textStyle}>
+                      {t.profileScreen.confirm}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        </SafeAreaView>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -992,7 +1094,15 @@ const styles = StyleSheet.create({
   },
   lottie: {
     position: "absolute",
-    top: -140,
+    top: -750,
+    left: -60,
+    right: -60,
+    bottom: -250,
+    zIndex: 0,
+  },
+  lottie1: {
+    position: "absolute",
+    top: 1150,
     left: -60,
     right: -60,
     bottom: -250,

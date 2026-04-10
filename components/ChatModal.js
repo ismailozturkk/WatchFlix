@@ -13,7 +13,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  LayoutAnimation,
+  UIManager,
 } from "react-native";
+
+if (Platform.OS === "android") {
+  if (UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+}
 import { useLanguage } from "../context/LanguageContext";
 import { useTheme } from "../context/ThemeContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -22,20 +30,25 @@ import axios from "axios";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { LinearGradient } from "expo-linear-gradient";
 import Markdown from "react-native-markdown-display";
+import Reanimated, { LinearTransition, FadeInDown, FadeOutDown, FadeIn, FadeOut } from "react-native-reanimated";
 import LottieView from "lottie-react-native";
 import { useNavigation } from "@react-navigation/native";
 import Feather from "@expo/vector-icons/Feather";
 import { useProfileScreen } from "../context/ProfileScreenContext";
 import { BlurView } from "expo-blur";
+
 export const ChatModal = () => {
   const navigation = useNavigation();
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [themeVisible, setThemeVisible] = useState(false);
-  const [message, setMessage] = useState(""); // Mesaj için state
-  const [sendMessage, setSendMessage] = useState(""); // Mesaj için state
+  const [message, setMessage] = useState("");
+  const [sendMessage, setSendMessage] = useState("");
+
+  // ✅ DÜZELTME: response artık düz string, JSON.stringify yok
   const [response, setResponse] = useState(null);
+
   const [error, setError] = useState(null);
   const [history, setHistory] = useState(false);
   const [array, setArray] = useState([]);
@@ -53,6 +66,13 @@ export const ChatModal = () => {
   } = useProfileScreen();
   const [genres, setGenres] = useState([]);
   const [genresTv, setGenresTv] = useState([]);
+  const [movies, setMovies] = useState([]);
+  const [tv, setTv] = useState([]);
+
+  const animateLayout = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  };
+
   const chooseGenres = () => {
     if (genres.length > 0) {
       setGenres([]);
@@ -61,6 +81,7 @@ export const ChatModal = () => {
       setGenres([mostWatchedGenre, secondWatchedGenre, threeWatchedGenre]);
     }
   };
+
   const chooseGenresTv = () => {
     if (genresTv.length > 0) {
       setGenresTv([]);
@@ -73,55 +94,193 @@ export const ChatModal = () => {
       ]);
     }
   };
+
+  // ✅ DÜZELTME: StyleSheet.create yerine düz obje — react-native-markdown-display
+  // StyleSheet.create ile oluşturulan stilleri bazen doğru işlemiyor
+  const markdownStyles = {
+    body: {
+      color: theme.text.secondary,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    heading1: {
+      color: theme.text.primary,
+      fontSize: 20,
+      fontWeight: "800",
+      marginVertical: 8,
+    },
+    heading2: {
+      color: theme.text.primary,
+      fontSize: 17,
+      fontWeight: "700",
+      marginVertical: 6,
+    },
+    heading3: {
+      color: theme.text.secondary,
+      fontSize: 15,
+      fontWeight: "600",
+      marginVertical: 4,
+    },
+    paragraph: {
+      marginVertical: 4,
+      flexWrap: "wrap",
+      flexDirection: "row",
+      alignItems: "flex-start",
+    },
+    // ✅ DÜZELTME: strong ve em mutlaka tanımlanmalı, yoksa ** görünür
+    strong: {
+      fontWeight: "bold",
+      color: theme.text.primary,
+    },
+    em: {
+      fontStyle: "italic",
+      color: theme.text.secondary,
+    },
+    s: {
+      textDecorationLine: "line-through",
+    },
+    link: {
+      color: theme.bold,
+      textDecorationLine: "underline",
+    },
+    blocklink: {
+      flex: 1,
+      borderBottomWidth: 1,
+      borderColor: theme.bold,
+    },
+    hardbreak: {
+      width: "100%",
+      height: 1,
+    },
+    blockquote: {
+      backgroundColor: theme.border,
+      borderLeftWidth: 3,
+      borderLeftColor: theme.text.secondary,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      marginVertical: 6,
+      borderRadius: 4,
+    },
+    bullet_list: {
+      paddingLeft: 8,
+      marginVertical: 4,
+    },
+    ordered_list: {
+      paddingLeft: 8,
+      marginVertical: 4,
+    },
+    list_item: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      marginBottom: 4,
+    },
+    bullet_list_icon: {
+      marginRight: 8,
+      marginTop: 4,
+      color: theme.text.secondary,
+    },
+    ordered_list_icon: {
+      marginRight: 8,
+      marginTop: 4,
+      color: theme.text.secondary,
+    },
+    code_inline: {
+      backgroundColor: theme.border,
+      color: theme.text.primary,
+      paddingHorizontal: 4,
+      borderRadius: 4,
+      fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+      fontSize: 13,
+    },
+    code_block: {
+      backgroundColor: theme.border,
+      color: theme.text.primary,
+      padding: 10,
+      borderRadius: 8,
+      fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+      fontSize: 13,
+      marginVertical: 6,
+    },
+    fence: {
+      backgroundColor: theme.border,
+      color: theme.text.primary,
+      padding: 10,
+      borderRadius: 8,
+      fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+      fontSize: 13,
+      marginVertical: 6,
+    },
+    table: {
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 6,
+      marginVertical: 8,
+    },
+    thead: {},
+    tbody: {},
+    th: {
+      backgroundColor: theme.between,
+      fontWeight: "bold",
+      padding: 8,
+      color: theme.text.primary,
+    },
+    tr: {
+      borderBottomWidth: 1,
+      borderColor: theme.border,
+      flexDirection: "row",
+    },
+    td: {
+      padding: 8,
+      color: theme.text.primary,
+    },
+    hr: {
+      backgroundColor: theme.border,
+      height: 1,
+      marginVertical: 8,
+    },
+  };
+
   useEffect(() => {
-    // Dinleyicileri oluştur
     const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
       setKeyboardVisible(true);
     });
     const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
       setKeyboardVisible(false);
     });
-
-    // Temizlik (Cleanup): Bileşen kapandığında dinleyicileri kaldır
     return () => {
       showSubscription.remove();
       hideSubscription.remove();
     };
   }, []);
+
   const FetchData = async () => {
-    console.log("🚀 FetchData called with message:", message);
     if (genres?.length <= 0 && genresTv?.length <= 0 && message.trim() === "") {
-      console.log("❌ Empty message, returning");
-      return; // Boş mesaj gönderme
+      return;
     }
 
-    console.log("✅ Starting API request...");
     setLoading(true);
     try {
-      const geminiKey = "***";
-      // Eğer modelin tam adı 'gemini-3.0-flash' ise:
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`; //!----------------------------------------------------------------
+      const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+      console.log(
+        "Gemini API Key Length:",
+        apiKey ? apiKey.length : "UNDEFINED",
+      );
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+      console.log("Request URL:", url);
 
-      // Kullanıcının mesajını önce geçmişe ekleyelim
       const updatedHistory = [
         ...conversationHistory,
         { role: "user", text: message },
       ];
       setConversationHistory(updatedHistory);
-      const formattedHistory = conversationHistory
-        .map((msg) => `${msg.role}: ${msg.text}`)
-        .join("\n");
-      //!----------------------------------------------------------------
 
       const requestText =
         genres.length > 0
-          ? `${genres} Recommend Movie According to These Types` + message
+          ? `${genres} Recommend Movie According to These Types ` + message
           : genresTv.length > 0
-            ? `${genresTv} Recommended Tv series According to These Types` +
+            ? `${genresTv} Recommended Tv series According to These Types ` +
               message
             : message;
-
-      console.log("📤 Request text:", requestText);
 
       const data = {
         contents: [
@@ -144,90 +303,93 @@ export const ChatModal = () => {
         systemInstruction: {
           parts: [
             {
-              //text: `You are a film and TV series information assistant. Provide users with details such as the plot, cast, director, release date, and IMDb rating of movies and TV series. Additionally, offer suggestions for similar titles and inform about available streaming platforms. Always provide recommendations based solely on the information provided by the user. If a user simply asks for a film or series recommendation without providing additional details, generate a recommendation on your own without asking for further information.If there are previous messages, continue in a natural way based on previous messages. If a user asks about anything unrelated to films, TV series, or watchable content, respond with 'I cannot answer questions unrelated to films, TV series, or watchable content.' Respond in ${language}.`,
-              text: `You are a film and TV series information assistant. Provide users with details such as the plot, cast, director, release date, and IMDb rating of movies and TV series. Additionally, offer suggestions for similar titles and inform about available streaming platforms. Always provide recommendations based solely on the information provided by the user. If a user simply asks for a film or series recommendation without providing additional details, generate a recommendation on your own without asking for further information. If there are previous messages, continue in a natural way based on previous messages. If a user asks about anything unrelated to films, TV series, or watchable content, respond with 'I cannot answer questions unrelated to films, TV series, or watchable content.' When mentioning or recommending a TV series, always format its name as < name >, and for movies, always format its name as -- name --. Respond in ${language}.`,
+              // ✅ DÜZELTME: Yeni format — <SERİ: isim> ve <FİLM: isim>
+              // Eski < name > ve -- name -- formatları markdown ile çakışıyordu
+              // Yeni format hem ayırt edici hem markdown-safe
+              text: `You are a film and TV series information assistant. Provide users with details such as the plot, cast, director, release date, and IMDb rating of movies and TV series. Additionally, offer suggestions for similar titles and inform about available streaming platforms. Always provide recommendations based solely on the information provided by the user. If a user simply asks for a film or series recommendation without providing additional details, generate a recommendation on your own without asking for further information. If there are previous messages, continue in a natural way based on previous messages. If a user asks about anything unrelated to films, TV series, or watchable content, respond with 'I cannot answer questions unrelated to films, TV series, or watchable content.' When mentioning or recommending a TV series, always format its name exactly as <SERIES: name> (example: <SERIES: Breaking Bad>), and for movies, always format its name exactly as <MOVIE: name> (example: <MOVIE: Inception>). Always use these exact tags. Respond in ${language}.`,
             },
           ],
         },
       };
 
-      console.log("📡 Sending request to Gemini API...");
-      const result = await axios.post(url, data, {
+      const responseObj = await fetch(url, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
       });
 
-      console.log("📥 API Response received:", result.data);
-      //!----------------------------------------------------------------
-      const botResponse = JSON.stringify(
-        FormatMessage(result.data.candidates[0].content.parts[0].text),
-      );
+      if (!responseObj.ok) {
+        const errorText = await responseObj.text();
+        console.error("Fetch API error:", responseObj.status, errorText);
+        throw new Error(`API Error: ${responseObj.status} - ${errorText}`);
+      }
 
-      console.log("💬 Bot response:", botResponse);
+      const responseData = await responseObj.json();
 
-      // Bot yanıtını geçmişe ekleyelim
+      // ✅ DÜZELTME: Ham string'i al — JSON.stringify KULLANMA
+      const rawText = responseData.candidates[0].content.parts[0].text;
+
+      // Bot yanıtını geçmişe düz string olarak ekle
       setConversationHistory((prevHistory) => [
         ...prevHistory,
-        { role: "assistant", text: botResponse },
+        { role: "assistant", text: rawText },
       ]);
-      //!----------------------------------------------------------------
 
-      setResponse(
-        JSON.stringify(result.data.candidates[0].content.parts[0].text),
-      );
-      FormatMatchMessage(
-        JSON.stringify(result.data.candidates[0].content.parts[0].text),
-      );
+      // ✅ DÜZELTME: State'e ham string koy
+      setResponse(rawText);
+
+      // ✅ DÜZELTME: Ham string üzerinde regex çalıştır
+      FormatMatchMessage(rawText);
+
       setSendMessage(message);
       setMessage("");
       setLoading(false);
-      console.log("✅ FetchData completed successfully");
     } catch (err) {
-      console.log(geminiKey);
-      console.error("❌ API Error:", err);
-      console.error("❌ Error details:", err.response?.data || err.message);
+      console.error("API Error in ChatModal:", err.message);
       setError(err);
       setLoading(false);
     }
   };
 
-  function FormatMessage(response) {
-    if (response !== null) {
-      return response
-        .replace(/\\n/g, "\n") // \n yerine gerçek satır sonu koy
-        .replace(/"/g, " ") // \n yerine gerçek satır sonu koy
-        .replace(/\\\"/g, '"') // Kaçışlı tırnakları düzelt
-        .replace(/\\/g, '"') // Kaçışlı tırnakları düzelt
-        .replace(/\n\n/g, "\n") // Gereksiz boşlukları temizle
-        .replace(/[<>]/g, "")
-        .replace(/--/g, "")
-        .trim();
-      //.replace(/\*(.*?)\*/g, "$1") // Tek yıldızlı yazıları temizle
-      //.replace(/\*\*(.*?)\*\*/g, "$1") // Kalın yazıları temizle // Başındaki ve sonundaki boşlukları kaldır
-    } else {
-      return response;
-    }
+  // ✅ DÜZELTME: FormatMessage sadeleştirildi
+  // Önceki replace(/"/g, " ") ve replace(/\\/g, '"') markdown'ı bozuyordu — kaldırıldı
+  function FormatMessage(text) {
+    if (!text) return text;
+    return text
+      .replace(/<MOVIE:\s*([^>]+)>/gi, "**$1**") // <MOVIE: Inception> -> **Inception** (Markdown Kalın)
+      .replace(/<SERIES:\s*([^>]+)>/gi, "**$1**") // <SERIES: Breaking Bad> -> **Breaking Bad** (Markdown Kalın)
+      .replace(/\r\n/g, "\n") // Windows satır sonlarını normalize et
+      .replace(/\n{3,}/g, "\n\n") // 3+ boş satırı 2'ye indir
+      .trim();
   }
-  const [movies, setMovies] = useState([]);
-  const [tv, setTv] = useState([]);
 
-  function FormatMatchMessage(response) {
-    // Regex ile < > içindeki isimleri bul
+  // ✅ DÜZELTME: Yeni sistem prompt ile uyumlu regex
+  // <SERIES: Breaking Bad> → "Breaking Bad"
+  // <MOVIE: Inception> → "Inception"
+  function FormatMatchMessage(text) {
+    if (!text) return;
+
     const extractedTv =
-      response.match(/<([^>]+)>/g)?.map((name) => name.replace(/[<>]/g, "")) ||
-      [];
+      text.match(/<SERIES:\s*([^>]+)>/gi)?.map((m) =>
+        m
+          .replace(/<SERIES:\s*/i, "")
+          .replace(">", "")
+          .trim(),
+      ) || [];
+
     const extractedMovies =
-      response.match(/--([^--]+)--/g)?.map((name) => name.replace(/--/g, "")) ||
-      [];
+      text.match(/<MOVIE:\s*([^>]+)>/gi)?.map((m) =>
+        m
+          .replace(/<MOVIE:\s*/i, "")
+          .replace(">", "")
+          .trim(),
+      ) || [];
 
-    // Set ile tekrar edenleri kaldır ve diziye çevir
-    const uniqueMovies = Array.from(new Set(extractedMovies));
     const uniqueTv = Array.from(new Set(extractedTv));
+    const uniqueMovies = Array.from(new Set(extractedMovies));
 
-    // Önceki filmlerle birleştirip tekrar edenleri yine kaldır
-    setTv((prevMovies) => Array.from(new Set([...prevMovies, ...uniqueTv])));
-    setMovies((prevMovies) =>
-      Array.from(new Set([...prevMovies, ...uniqueMovies])),
-    );
+    setTv((prev) => Array.from(new Set([...prev, ...uniqueTv])));
+    setMovies((prev) => Array.from(new Set([...prev, ...uniqueMovies])));
   }
 
   const AddToArray = (text) => {
@@ -241,7 +403,7 @@ export const ChatModal = () => {
   useEffect(() => {
     let loop;
     if (modalVisible) {
-      animation.setValue(0); // animasyonu başa sar
+      animation.setValue(0);
       loop = Animated.loop(
         Animated.timing(animation, {
           toValue: 1,
@@ -274,14 +436,7 @@ export const ChatModal = () => {
     <View>
       {!modalVisible && (
         <TouchableOpacity
-          style={[
-            styles.fab,
-            {
-              //backgroundColor: theme.ai,
-              //borderColor: theme.border,
-              //shadowColor: theme.shadow,
-            },
-          ]}
+          style={styles.fab}
           onPress={() => {
             setModalVisible(true);
           }}
@@ -296,13 +451,9 @@ export const ChatModal = () => {
             autoPlay
             loop
           />
-          {/*<MaterialCommunityIcons
-          name="star-four-points-outline"
-          size={24}
-          color={theme.text.primary}
-        />*/}
         </TouchableOpacity>
       )}
+
       <Modal
         animationType="slide"
         transparent={true}
@@ -326,13 +477,14 @@ export const ChatModal = () => {
           style={styles.modalContainer}
           keyboardVerticalOffset={0}
         >
-          <View style={{ flex: 1, width: "100%" }}></View>
+          <View style={{ flex: 1, width: "100%" }} />
 
           <TouchableOpacity
             onPress={() => {
-              (setModalVisible(false),
-                setSettingsVisible(false),
-                setThemeVisible(false));
+              animateLayout();
+              setModalVisible(false);
+              setSettingsVisible(false);
+              setThemeVisible(false);
             }}
             style={{
               position: "absolute",
@@ -343,11 +495,12 @@ export const ChatModal = () => {
               zIndex: 5,
             }}
           />
-          <View
+
+          <Reanimated.View
+            layout={LinearTransition.springify()}
             style={[
               styles.modalContent,
               {
-                backgroundColor: theme.secondary,
                 backgroundColor: "transparent",
                 zIndex: 11,
                 shadowColor: theme.shadow,
@@ -358,9 +511,10 @@ export const ChatModal = () => {
             <BlurView
               tint="dark"
               intensity={50}
-              experimentalBlurMethod="dimezisBlurView" // Android için sihirli kod
+              experimentalBlurMethod="dimezisBlurView"
               style={StyleSheet.absoluteFill}
             />
+
             {!history ? (
               <View style={{ zIndex: 15 }}>
                 {response !== null && response !== "" && (
@@ -388,7 +542,6 @@ export const ChatModal = () => {
                               padding: 5,
                               backgroundColor: theme.border,
                               paddingHorizontal: 10,
-
                               borderRadius: 10,
                               color: theme.text.primary,
                             }}
@@ -399,123 +552,37 @@ export const ChatModal = () => {
                       </TouchableOpacity>
                     )}
 
-                    <View
+                    <Reanimated.View
+                      layout={LinearTransition.springify()}
                       style={{
-                        //height: "100%",
-                        maxHeight: isKeyboardVisible ? 360 : 700,
+                        maxHeight: isKeyboardVisible ? 300 : 600,
                         flexDirection: "row",
                         maxWidth: "100%",
                         justifyContent: "space-between",
                         alignItems: "flex-end",
                       }}
                     >
-                      <Text
-                        selectable={true}
+                      <View
                         style={{
-                          maxWidth: "100%",
-                          backgroundColor: theme.border,
+                          flex: 1,
+                          backgroundColor: theme.secondary,
                           padding: 5,
                           paddingHorizontal: 10,
                           borderRadius: 10,
-                          color: theme.text.primary,
                         }}
                       >
                         <ScrollView
                           showsVerticalScrollIndicator={false}
                           keyboardShouldPersistTaps="handled"
                         >
-                          <Markdown
-                            style={{
-                              body: {
-                                width: "100%",
-                                padding: 0,
-                                color: theme.text.primary,
-                              },
-                              strong: {
-                                fontWeight: "bold",
-                                color: theme.bold,
-                              },
-                              em: {
-                                fontStyle: "italic",
-                              },
-                              s: {
-                                textDecorationLine: "line-through",
-                              },
-                              link: {
-                                color: theme.bold,
-                                textDecorationLine: "underline",
-                              },
-                              blocklink: {
-                                flex: 1,
-                                borderBottomWidth: 1,
-                                borderColor: theme.bold,
-                              },
-                              paragraph: {
-                                marginVertical: 6,
-                                flexWrap: "wrap",
-                                flexDirection: "row",
-                                width: "100%",
-                              },
-
-                              // Satır Sonları
-                              hardbreak: {
-                                width: "100%",
-                                height: 1,
-                              },
-                              blockquote: {
-                                backgroundColor: "#EFEFEF",
-                                borderLeftWidth: 4,
-                                borderLeftColor: "#888",
-                                paddingHorizontal: 10,
-                                marginVertical: 5,
-                              },
-
-                              // Listeler
-                              bullet_list: {
-                                paddingLeft: 10,
-                              },
-                              ordered_list: {
-                                paddingLeft: 10,
-                              },
-                              list_item: {
-                                flexDirection: "row",
-                                alignItems: "flex-start",
-                                marginBottom: 3,
-                              },
-                              bullet_list_icon: {
-                                marginRight: 8,
-                              },
-                              ordered_list_icon: {
-                                marginRight: 8,
-                              },
-
-                              // Tablolar
-                              table: {
-                                borderWidth: 1,
-                                borderColor: "#444",
-                                borderRadius: 5,
-                                marginVertical: 10,
-                              },
-                              th: {
-                                backgroundColor: "#DDD",
-                                fontWeight: "bold",
-                                padding: 8,
-                              },
-                              tr: {
-                                borderBottomWidth: 1,
-                                borderColor: "#CCC",
-                                flexDirection: "row",
-                              },
-                              td: {
-                                padding: 8,
-                              },
-                            }}
-                          >
+                          {/* ✅ DÜZELTME: response artık düz string, doğrudan FormatMessage'a ver */}
+                          <Markdown style={markdownStyles}>
                             {FormatMessage(response)}
                           </Markdown>
                         </ScrollView>
-                      </Text>
-                      <View style={{ flexDirection: "column" }}>
+                      </View>
+
+                      <View style={{ flexDirection: "column", marginLeft: 6 }}>
                         <TouchableOpacity onPress={() => setHistory(true)}>
                           <MaterialIcons
                             name="history"
@@ -523,10 +590,11 @@ export const ChatModal = () => {
                             color={theme.text.between}
                           />
                         </TouchableOpacity>
-
                         <TouchableOpacity
                           onPress={() => {
-                            (setMovies([]), setTv([]), setResponse(null));
+                            setMovies([]);
+                            setTv([]);
+                            setResponse(null);
                           }}
                         >
                           <MaterialIcons
@@ -536,93 +604,101 @@ export const ChatModal = () => {
                           />
                         </TouchableOpacity>
                       </View>
-                    </View>
+                    </Reanimated.View>
 
-                    <FlatList
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      keyboardShouldPersistTaps="handled"
-                      data={tv}
-                      keyExtractor={(item, index) => index.toString()}
-                      renderItem={({ item }) => (
-                        <TouchableOpacity
-                          style={{
-                            height: 35,
-                            marginHorizontal: 5,
-                            paddingVertical: 3,
-                            paddingHorizontal: 10,
-                            backgroundColor: theme.border,
-                            borderRadius: 10,
-                          }}
-                          onPress={() => {
-                            navigation.navigate("TvShowSearch", {
-                              name: item,
-                            });
-                          }}
-                        >
-                          <Text
+                    {tv.length > 0 && (
+                      <FlatList
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                        data={tv}
+                        keyExtractor={(item, index) => `tv-${index}`}
+                        renderItem={({ item }) => (
+                          <TouchableOpacity
                             style={{
-                              fontSize: 11,
-                              color: theme.notesColor.green,
+                              marginHorizontal: 5,
+                              paddingVertical: 3,
+                              paddingHorizontal: 10,
+                              backgroundColor: theme.primary,
+                              borderRadius: 10,
+                            }}
+                            onPress={() => {
+                              navigation.navigate("TvShowSearch", {
+                                name: item,
+                              });
                             }}
                           >
-                            {t.ChatModal.series}
-                          </Text>
-                          <Text
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                color: theme.notesColor.green,
+                              }}
+                            >
+                              {t.ChatModal.series}
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                color: theme.text.primary,
+                              }}
+                            >
+                              {item}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      />
+                    )}
+
+                    {movies.length > 0 && (
+                      <FlatList
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                        data={movies}
+                        keyExtractor={(item, index) => `movie-${index}`}
+                        renderItem={({ item }) => (
+                          <TouchableOpacity
                             style={{
-                              fontSize: 14,
-                              color: theme.text.primary,
+                              marginHorizontal: 5,
+                              paddingVertical: 3,
+                              paddingHorizontal: 10,
+                              backgroundColor: theme.primary,
+                              borderRadius: 10,
+                            }}
+                            onPress={() => {
+                              navigation.navigate("MovieSearch", {
+                                name: item,
+                              });
                             }}
                           >
-                            {item}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    />
-                    <FlatList
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      data={movies}
-                      keyExtractor={(item, index) => index.toString()}
-                      renderItem={({ item }) => (
-                        <TouchableOpacity
-                          style={{
-                            height: 35,
-                            marginHorizontal: 5,
-                            paddingVertical: 3,
-                            paddingHorizontal: 10,
-                            backgroundColor: theme.border,
-                            borderRadius: 10,
-                          }}
-                          onPress={() => {
-                            navigation.navigate("MovieSearch", {
-                              name: item,
-                            });
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 11,
-                              color: theme.notesColor.blue,
-                            }}
-                          >
-                            {t.ChatModal.movie}
-                          </Text>
-                          <Text
-                            style={{
-                              fontSize: 14,
-                              color: theme.text.primary,
-                            }}
-                          >
-                            {item}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    />
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                color: theme.notesColor.blue,
+                              }}
+                            >
+                              {t.ChatModal.movie}
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                color: theme.text.primary,
+                              }}
+                            >
+                              {item}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      />
+                    )}
                   </View>
                 )}
+
                 {themeVisible && (
-                  <View
+                  <Reanimated.View
+                    entering={FadeInDown.duration(300)}
+                    exiting={FadeOutDown.duration(200)}
+                    layout={LinearTransition.springify()}
                     style={{
                       paddingVertical: 5,
                       paddingHorizontal: 15,
@@ -630,7 +706,6 @@ export const ChatModal = () => {
                       flexDirection: "row",
                       justifyContent: "space-around",
                       alignItems: "center",
-                      //backgroundColor: "red",
                     }}
                   >
                     <TouchableOpacity
@@ -642,11 +717,12 @@ export const ChatModal = () => {
                           borderWidth: 1,
                         },
                       ]}
-                      onPress={() => {
-                        changeTheme("black");
-                      }}
+                      onPress={() => changeTheme("black")}
                     >
-                      <Text style={[styles.themeText, { color: "#fff" }]}>
+                      <Text
+                        allowFontScaling={false}
+                        style={[styles.themeText, { color: "#fff" }]}
+                      >
                         siyah
                       </Text>
                     </TouchableOpacity>
@@ -659,11 +735,12 @@ export const ChatModal = () => {
                           borderWidth: 1,
                         },
                       ]}
-                      onPress={() => {
-                        changeTheme("light");
-                      }}
+                      onPress={() => changeTheme("light")}
                     >
-                      <Text style={[styles.themeText, { color: "black" }]}>
+                      <Text
+                        allowFontScaling={false}
+                        style={[styles.themeText, { color: "black" }]}
+                      >
                         beyaz
                       </Text>
                     </TouchableOpacity>
@@ -676,11 +753,12 @@ export const ChatModal = () => {
                           borderWidth: 1,
                         },
                       ]}
-                      onPress={() => {
-                        changeTheme("gray");
-                      }}
+                      onPress={() => changeTheme("gray")}
                     >
-                      <Text style={[styles.themeText, { color: "#999" }]}>
+                      <Text
+                        allowFontScaling={false}
+                        style={[styles.themeText, { color: "#999" }]}
+                      >
                         gri
                       </Text>
                     </TouchableOpacity>
@@ -693,9 +771,7 @@ export const ChatModal = () => {
                           borderWidth: 1,
                         },
                       ]}
-                      onPress={() => {
-                        changeTheme("blue");
-                      }}
+                      onPress={() => changeTheme("blue")}
                     >
                       <Text
                         style={[
@@ -706,7 +782,6 @@ export const ChatModal = () => {
                         mavi
                       </Text>
                     </TouchableOpacity>
-
                     <TouchableOpacity
                       style={[
                         styles.themeBlue,
@@ -716,9 +791,7 @@ export const ChatModal = () => {
                           borderWidth: 1,
                         },
                       ]}
-                      onPress={() => {
-                        changeTheme("green");
-                      }}
+                      onPress={() => changeTheme("green")}
                     >
                       <Text
                         style={[styles.themeText, { color: "rgb(28, 79, 78)" }]}
@@ -726,19 +799,21 @@ export const ChatModal = () => {
                         yeşil
                       </Text>
                     </TouchableOpacity>
-                  </View>
+                  </Reanimated.View>
                 )}
+
                 {settingsVisible && (
-                  <View
+                  <Reanimated.View
+                    entering={FadeInDown.duration(300)}
+                    exiting={FadeOutDown.duration(200)}
+                    layout={LinearTransition.springify()}
                     style={{
                       paddingVertical: 5,
                       paddingHorizontal: 15,
                       gap: 10,
                       width: "100%",
                       flexDirection: "row",
-                      //justifyContent: "center",
                       alignItems: "center",
-                      //backgroundColor: "red",
                     }}
                   >
                     <TouchableOpacity
@@ -746,9 +821,9 @@ export const ChatModal = () => {
                         styles.languageButton,
                         { backgroundColor: theme.primary },
                       ]}
-                      onPress={() => {
-                        toggleLanguage(language === "tr" ? "en" : "tr");
-                      }}
+                      onPress={() =>
+                        toggleLanguage(language === "tr" ? "en" : "tr")
+                      }
                     >
                       <View
                         style={{
@@ -767,7 +842,6 @@ export const ChatModal = () => {
                           color={theme.notesColor.green}
                         />
                       </View>
-
                       <Text
                         style={[
                           styles.languageButtonText,
@@ -790,7 +864,10 @@ export const ChatModal = () => {
                           alignItems: "center",
                         },
                       ]}
-                      onPress={() => setThemeVisible(!themeVisible)}
+                      onPress={() => {
+                        animateLayout();
+                        setThemeVisible(!themeVisible);
+                      }}
                     >
                       <Text
                         style={[
@@ -814,6 +891,7 @@ export const ChatModal = () => {
                         />
                       )}
                     </TouchableOpacity>
+
                     <TouchableOpacity
                       style={[
                         styles.genresStyle,
@@ -839,6 +917,7 @@ export const ChatModal = () => {
                         İzlediğin türler
                       </Text>
                     </TouchableOpacity>
+
                     <TouchableOpacity
                       style={[
                         styles.genresStyle,
@@ -864,8 +943,9 @@ export const ChatModal = () => {
                         İzlediğin türler
                       </Text>
                     </TouchableOpacity>
-                  </View>
+                  </Reanimated.View>
                 )}
+
                 <Animated.View
                   style={[
                     {
@@ -881,7 +961,6 @@ export const ChatModal = () => {
                       width: "100%",
                       justifyContent: "space-between",
                       alignItems: "center",
-                      //backgroundColor: theme.secondary,
                       borderRadius: 20,
                       paddingHorizontal: 10,
                       paddingVertical: 10,
@@ -889,8 +968,9 @@ export const ChatModal = () => {
                   >
                     <TouchableOpacity
                       onPress={() => {
-                        (setSettingsVisible(!settingsVisible),
-                          setThemeVisible(false));
+                        animateLayout();
+                        setSettingsVisible(!settingsVisible);
+                        setThemeVisible(false);
                       }}
                       style={{
                         marginRight:
@@ -907,23 +987,19 @@ export const ChatModal = () => {
                         }
                       />
                     </TouchableOpacity>
+
                     {genres?.length > 0 || genresTv?.length > 0 ? (
                       <TouchableOpacity
-                        style={[
-                          {
-                            backgroundColor: theme.between,
-                            //borderColor: "rgb(28, 79, 78)",
-                            //borderWidth: 1,
-                            //width: 40,
-                            height: 35,
-                            paddingHorizontal: 4,
-                            paddingVertical: 2,
-                            borderRadius: 10,
-                            justifyContent: "center",
-                            alignItems: "center",
-                            zIndex: 1,
-                          },
-                        ]}
+                        style={{
+                          backgroundColor: theme.between,
+                          height: 35,
+                          paddingHorizontal: 4,
+                          paddingVertical: 2,
+                          borderRadius: 10,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          zIndex: 1,
+                        }}
                         onPress={
                           genres?.length > 0 ? chooseGenres : chooseGenresTv
                         }
@@ -952,6 +1028,7 @@ export const ChatModal = () => {
                         ))}
                       </TouchableOpacity>
                     ) : null}
+
                     <TextInput
                       style={[
                         styles.input,
@@ -974,25 +1051,24 @@ export const ChatModal = () => {
                       value={message}
                       onChangeText={setMessage}
                     />
+
                     <TouchableOpacity
                       style={[
                         styles.sendButton,
                         { backgroundColor: theme.border },
                       ]}
                       onPress={() => {
-                        console.log("ChatModal send message:", message);
                         if (
                           message.trim() === "" &&
                           genres?.length <= 0 &&
                           genresTv?.length <= 0
                         ) {
-                          console.log("Empty message, not sending");
                           return;
                         }
                         FetchData();
                         AddToArray(message);
                       }}
-                      disabled={loading} // Yükleniyorsa butonu devre dışı bırak
+                      disabled={loading}
                     >
                       {loading ? (
                         <ActivityIndicator color="#fff" />
@@ -1016,7 +1092,6 @@ export const ChatModal = () => {
                 <View
                   style={{
                     width: "100%",
-                    Height: 200,
                     paddingVertical: 10,
                     paddingHorizontal: 15,
                   }}
@@ -1031,21 +1106,19 @@ export const ChatModal = () => {
                       color={theme.text.primary}
                     />
                   </TouchableOpacity>
-
                   <Text
                     style={[styles.modalTitle, { color: theme.text.primary }]}
                   >
                     {t.ChatModal.history}
                   </Text>
                 </View>
+
                 <View>
                   {array.length > 0 ? (
                     <FlatList
-                      style={{
-                        maxHeight: 500,
-                      }}
+                      style={{ maxHeight: 500 }}
                       data={array}
-                      keyExtractor={(item, index) => index.toString()}
+                      keyExtractor={(item, index) => `history-${index}`}
                       renderItem={({ item }) => (
                         <TouchableOpacity
                           onPress={() => {
@@ -1060,14 +1133,20 @@ export const ChatModal = () => {
                             },
                           ]}
                         >
-                          <Text style={{ color: theme.text.primary }}>
+                          <Text
+                            allowFontScaling={false}
+                            style={{ color: theme.text.primary }}
+                          >
                             {item}
                           </Text>
                         </TouchableOpacity>
                       )}
                     />
                   ) : (
-                    <Text style={{ height: 150, color: theme.text.primary }}>
+                    <Text
+                      allowFontScaling={false}
+                      style={{ height: 150, color: theme.text.primary }}
+                    >
                       {t.ChatModal.historyText}
                     </Text>
                   )}
@@ -1084,26 +1163,19 @@ export const ChatModal = () => {
                 </View>
               </>
             )}
-          </View>
+          </Reanimated.View>
         </KeyboardAvoidingView>
       </Modal>
     </View>
   );
 };
+
 const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     bottom: 85,
     right: 25,
     borderRadius: 40,
-    //borderWidth: 1,
-    //shadowOffset: {
-    //  width: 0,
-    //  height: 8,
-    //},
-    //shadowOpacity: 0.94,
-    //shadowRadius: 10.32,
-    //elevation: 5,
   },
   modalContainer: {
     flex: 1,
@@ -1113,15 +1185,12 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: "95%",
-    backgroundColor: "#fff",
     borderRadius: 20,
     bottom: 10,
-    //paddingVertical: 10,
-    //paddingHorizontal: 15,
     justifyContent: "center",
     alignItems: "center",
-    elevation: 5, // Android için gölge
-    shadowColor: "#000", // iOS için gölge
+    elevation: 5,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -1163,8 +1232,6 @@ const styles = StyleSheet.create({
   genresStyle: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    //width: 80,
     height: 35,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -1187,9 +1254,6 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     borderRadius: 15,
     padding: 10,
-  },
-  characterCount: {
-    marginBottom: 10,
   },
   sendButton: {
     backgroundColor: "#ccc",

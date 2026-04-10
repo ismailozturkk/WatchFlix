@@ -6,20 +6,26 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import Feather from "@expo/vector-icons/Feather";
 import LottieView from "lottie-react-native";
 import { useAppSettings } from "../../context/AppSettingsContext";
-
+import IconBacground from "../../components/IconBacground";
 export default function SearchScreen({ navigation }) {
   const { showSnow } = useAppSettings();
   const { t } = useLanguage();
   const { theme } = useTheme();
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
-      <LottieView
-        style={[styles.lottie, { display: showSnow ? "flex" : "none" }]}
-        source={require("../../LottieJson/snow.json")}
-        autoPlay={true}
-        loop
-      />
-      <Text style={[styles.title, { color: theme.text.primary }]}>
+      {showSnow && (
+        <LottieView
+          style={styles.lottie}
+          source={require("../../LottieJson/snow.json")}
+          autoPlay={true}
+          loop
+        />
+      )}
+      <IconBacground opacity={0.3} />
+      <Text
+        allowFontScaling={false}
+        style={[styles.title, { color: theme.text.primary }]}
+      >
         {t.SearchScreen.search}
       </Text>
       <View
@@ -51,7 +57,10 @@ export default function SearchScreen({ navigation }) {
             size={24}
             color={theme.text.primary}
           />
-          <Text style={[styles.buttonText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.buttonText, { color: theme.text.primary }]}
+          >
             {t.SearchScreen.searchMovies}
           </Text>
         </TouchableOpacity>
@@ -65,7 +74,10 @@ export default function SearchScreen({ navigation }) {
           }
         >
           <Feather name="tv" size={24} color={theme.text.primary} />
-          <Text style={[styles.buttonText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.buttonText, { color: theme.text.primary }]}
+          >
             {t.SearchScreen.searchTvShows}
           </Text>
         </TouchableOpacity>
@@ -80,7 +92,10 @@ export default function SearchScreen({ navigation }) {
           }
         >
           <Feather name="user" size={24} color={theme.text.primary} />
-          <Text style={[styles.buttonText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.buttonText, { color: theme.text.primary }]}
+          >
             {t.SearchScreen.searchActrist}
           </Text>
         </TouchableOpacity>
@@ -92,7 +107,10 @@ export default function SearchScreen({ navigation }) {
           onPress={() => navigation.navigate("SearchAll", { autoFocus: true })}
         >
           <Feather name="search" size={24} color={theme.text.primary} />
-          <Text style={[styles.buttonText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.buttonText, { color: theme.text.primary }]}
+          >
             {t.SearchScreen.searchActrist}
           </Text>
         </TouchableOpacity>

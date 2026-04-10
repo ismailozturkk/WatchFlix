@@ -25,6 +25,7 @@ const { width } = Dimensions.get("window");
 export default function MovieOscar({ navigation }) {
   const { t } = useLanguage();
   const { theme } = useTheme();
+  const { imageQuality } = useAppSettings();
   const { moviesOscar, loadingOscar, errorOscar } = useMovie();
 
   // Animated import'unun eklendiğinden emin olun
@@ -61,7 +62,10 @@ export default function MovieOscar({ navigation }) {
   if (loadingOscar) {
     return (
       <View style={styles.container}>
-        <Text style={[styles.title, { color: theme.text.secondary }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.title, { color: theme.text.secondary }]}
+        >
           {t.movieScreens.oscar}
         </Text>
 
@@ -83,7 +87,7 @@ export default function MovieOscar({ navigation }) {
     return (
       <View style={styles.containerYears}>
         {metin.split("").map((karakter, index) => (
-          <Text key={index} style={styles.text}>
+          <Text allowFontScaling={false} key={index} style={styles.text}>
             {karakter}
           </Text>
         ))}
@@ -114,13 +118,13 @@ export default function MovieOscar({ navigation }) {
                 source={require("../../assets/image/pngwing.com.png")}
                 style={{ width: 10, height: 40 }}
               />
-              <DikeyMetin metin={`${2025 - index}`} />
+              <DikeyMetin metin={`${2026 - index}`} />
             </View>
             <Image
               source={
                 item.poster_path
                   ? {
-                      uri: `https://image.tmdb.org/t/p/w500${item.poster_path}`,
+                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
                     }
                   : require("../../assets/image/no_image.png")
               }
@@ -132,7 +136,7 @@ export default function MovieOscar({ navigation }) {
                 { backgroundColor: theme.secondaryt },
               ]}
             >
-              <Text style={styles.similarRatingText}>
+              <Text allowFontScaling={false} style={styles.similarRatingText}>
                 {item.vote_average.toFixed(1)}
               </Text>
             </View>
@@ -210,7 +214,10 @@ export default function MovieOscar({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.title, { color: theme.text.secondary }]}>
+      <Text
+        allowFontScaling={false}
+        style={[styles.title, { color: theme.text.secondary }]}
+      >
         {t.movieScreens.oscar}
       </Text>
       <FlatList

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Dimensions,
   ScrollView,
-  Text,
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 const { width, height } = Dimensions.get("window");

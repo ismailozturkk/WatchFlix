@@ -18,6 +18,7 @@ import RatingStars from "../../components/RatingStars";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useAppSettings } from "../../context/AppSettingsContext";
 const { width, height } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.6;
 const CARD_HEIHGT = height * 0.45;
@@ -29,7 +30,7 @@ export default function MovieTrends({ navigation }) {
   const { theme } = useTheme();
   const scrollX = React.useRef(new Animated.Value(0)).current;
   const { t } = useLanguage();
-
+  const { imageQuality } = useAppSettings();
   const {
     loadingTrends,
     movieTrends,
@@ -158,7 +159,7 @@ export default function MovieTrends({ navigation }) {
             <Image
               style={styles.poster}
               source={{
-                uri: `https://image.tmdb.org/t/p/w500${item.poster_path}`,
+                uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
               }}
             />
           </Animated.View>
@@ -196,14 +197,23 @@ export default function MovieTrends({ navigation }) {
               }}
             >
               <RatingStars rating={item.vote_average} />
-              <Text style={{ fontSize: 14, color: theme.colors.orange }}>
+              <Text
+                allowFontScaling={false}
+                style={{ fontSize: 14, color: theme.colors.orange }}
+              >
                 {rating.toFixed(1)}
               </Text>
-              <Text style={{ fontSize: 14, color: theme.text.secondary }}>
+              <Text
+                allowFontScaling={false}
+                style={{ fontSize: 14, color: theme.text.secondary }}
+              >
                 •
               </Text>
               <FontAwesome name="user" size={14} color={theme.colors.blue} />
-              <Text style={{ fontSize: 14, color: theme.colors.blue }}>
+              <Text
+                allowFontScaling={false}
+                style={{ fontSize: 14, color: theme.colors.blue }}
+              >
                 {item.vote_count}
               </Text>
             </View>
@@ -285,7 +295,7 @@ export default function MovieTrends({ navigation }) {
   };
   if (loadingTrends) {
     return (
-      <View style={{ flex: 1, marginTop: 40 }}>
+      <View style={{ flex: 1, marginTop: 10 }}>
         <StatusBar barStyle="light-content" />
         <View style={styles.header}>
           <FlatList
@@ -308,7 +318,7 @@ export default function MovieTrends({ navigation }) {
     );
   }
   return (
-    <View style={{ flex: 1, marginTop: 40 }}>
+    <View style={{ flex: 1, marginTop: 10 }}>
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
         <FlatList

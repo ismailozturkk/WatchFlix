@@ -50,7 +50,7 @@ export default function SeasonDetails({ route, navigation }) {
   const [playSeason, setPlaySeason] = useState(false);
   const [play, setPlay] = useState("");
   const { user } = useAuth();
-  const { API_KEY, showSnow } = useAppSettings();
+  const { API_KEY, showSnow, imageQuality } = useAppSettings();
   const formatDate = (timestamp) => {
     const date = new Date(timestamp);
     return new Intl.DateTimeFormat(language, {
@@ -163,7 +163,7 @@ export default function SeasonDetails({ route, navigation }) {
       },
       (error) => {
         console.error("Hata:", error);
-      }
+      },
     );
 
     return unsubscribe;
@@ -175,7 +175,10 @@ export default function SeasonDetails({ route, navigation }) {
   if (!details) {
     return (
       <View style={[styles.container, { backgroundColor: theme.primary }]}>
-        <Text style={[styles.loadingText, { color: theme.text.primary }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.loadingText, { color: theme.text.primary }]}
+        >
           {t.loading}
         </Text>
       </View>
@@ -185,7 +188,11 @@ export default function SeasonDetails({ route, navigation }) {
     return <SearchSkeleton />;
   }
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.primary }]}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.primary }]}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
       <StatusBar barStyle="light-content" />
       {isSeasonWatched == 1 && (
         <LottieView
@@ -227,40 +234,52 @@ export default function SeasonDetails({ route, navigation }) {
       </View>
       <View style={styles.content}>
         <View style={styles.header}>
-          {details.episodes.map((ep, index) => {
-            if ((index + 7) % 7 === 0 || index < 4) {
-              return (
-                <LottieView
-                  key={ep.episode_number}
-                  style={[
-                    styles.lottie,
-                    {
-                      display: showSnow ? "flex" : "none",
-                      top: 1000 * Math.floor(index < 7 ? index : index / 7),
-                    },
-                  ]}
-                  source={require("../../LottieJson/snow.json")}
-                  autoPlay={true}
-                  loop
-                />
-              );
-            }
-            return null;
-          })}
-          <Text style={[styles.showName, { color: theme.text.primary }]}>
+          {showSnow &&
+            details.episodes.map((ep, index) => {
+              if ((index + 7) % 7 === 0 || index < 4) {
+                return (
+                  <LottieView
+                    key={ep.episode_number}
+                    style={[
+                      styles.lottie,
+                      {
+                        top: 1000 * Math.floor(index < 7 ? index : index / 7),
+                      },
+                    ]}
+                    source={require("../../LottieJson/snow.json")}
+                    autoPlay={true}
+                    loop
+                  />
+                );
+              }
+              return null;
+            })}
+          <Text
+            allowFontScaling={false}
+            style={[styles.showName, { color: theme.text.primary }]}
+          >
             {showName}
           </Text>
-          <Text style={[styles.seasonName, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.seasonName, { color: theme.text.primary }]}
+          >
             {details.name}
           </Text>
-          <Text style={[styles.seasonInfo, { color: theme.text.secondary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.seasonInfo, { color: theme.text.secondary }]}
+          >
             {details.air_date ? formatDate(details.air_date) : t.dateUnknown} •{" "}
             {details.episodes.length} {t.episode}
           </Text>
         </View>
         {details.vote_average > 0 && (
           <View style={styles.rating}>
-            <Text style={[styles.ratingText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.ratingText, { color: theme.text.primary }]}
+            >
               {details.vote_average.toFixed(1)} / 10
             </Text>
             <RatingStars rating={details.vote_average} />
@@ -285,7 +304,10 @@ export default function SeasonDetails({ route, navigation }) {
         )}
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.sectionTitle, { color: theme.text.primary }]}
+          >
             {t.overview}
           </Text>
           <Text
@@ -354,7 +376,10 @@ export default function SeasonDetails({ route, navigation }) {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.sectionTitle, { color: theme.text.primary }]}
+          >
             {t.episode}
           </Text>
           {details.episodes.map((episode) => (
@@ -420,7 +445,7 @@ export default function SeasonDetails({ route, navigation }) {
                 <>
                   <Image
                     source={{
-                      uri: `https://image.tmdb.org/t/p/w500${episode.still_path}`,
+                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${episode.still_path}`,
                     }}
                     style={styles.episodeImage}
                   />

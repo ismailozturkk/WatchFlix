@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
+
 import {
   View,
   TextInput,
@@ -58,7 +59,7 @@ export default function ChatScreen({ route, navigation }) {
   const currentUser = auth.currentUser;
   const { language, t } = useLanguage();
 
-  const { API_KEY, adultContent } = useAppSettings();
+  const { API_KEY, adultContent, imageQuality } = useAppSettings();
   const [editingMessage, setEditingMessage] = useState(null);
   const [text, setText] = useState("");
   const [optionsVisible, setOptionsVisible] = useState(false);
@@ -445,7 +446,7 @@ export default function ChatScreen({ route, navigation }) {
               {item.media?.poster_path && (
                 <Image
                   source={{
-                    uri: `https://image.tmdb.org/t/p/w500${item.media.poster_path}`,
+                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.media.poster_path}`,
                   }}
                   style={{
                     width: 70,
@@ -468,7 +469,10 @@ export default function ChatScreen({ route, navigation }) {
           )}
 
           {renderMessageText(item.text) || (
-            <Text style={[styles.messageText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.messageText, { color: theme.text.primary }]}
+            >
               {item.text}
             </Text>
           )}
@@ -608,7 +612,10 @@ export default function ChatScreen({ route, navigation }) {
           backgroundColor: theme.secondaryt,
         }}
       >
-        <Text style={{ color: theme.text.primary, fontSize: 24 }}>
+        <Text
+          allowFontScaling={false}
+          style={{ color: theme.text.primary, fontSize: 24 }}
+        >
           {friendName}
         </Text>
         <Text
@@ -705,7 +712,7 @@ export default function ChatScreen({ route, navigation }) {
                     {item.poster_path || item.profile_path ? (
                       <Image
                         source={{
-                          uri: `https://image.tmdb.org/t/p/w500${item.poster_path || item.profile_path}`,
+                          uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path || item.profile_path}`,
                         }}
                         style={{
                           width: 70,
@@ -775,7 +782,10 @@ export default function ChatScreen({ route, navigation }) {
                   placeholderTextColor={theme.text.secondary}
                 />
                 <TouchableOpacity onPress={sendMessage} style={styles.sendBtn}>
-                  <Text style={{ color: "#fff", fontWeight: "600" }}>
+                  <Text
+                    allowFontScaling={false}
+                    style={{ color: "#fff", fontWeight: "600" }}
+                  >
                     {editingMessage ? "Düzenle" : "Gönder"}
                   </Text>
                 </TouchableOpacity>
@@ -834,7 +844,7 @@ export default function ChatScreen({ route, navigation }) {
                     {selectedMessage.media?.poster_path ? (
                       <Image
                         source={{
-                          uri: `https://image.tmdb.org/t/p/w500${selectedMessage.media.poster_path}`,
+                          uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${selectedMessage.media.poster_path}`,
                         }}
                         style={{
                           width: 70,
@@ -856,7 +866,10 @@ export default function ChatScreen({ route, navigation }) {
                     </Text>
                   </View>
                 )}
-                <Text style={[styles.messageText, { color: "#fff" }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.messageText, { color: "#fff" }]}
+                >
                   {selectedMessage.text}
                 </Text>
 

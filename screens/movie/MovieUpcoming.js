@@ -37,6 +37,7 @@ export default function MovieUpcoming({ navigation }) {
     valueUpcoming,
     RelaseCount,
   } = useMovie();
+  const { imageQuality } = useAppSettings();
 
   // Animated import'unun eklendiğinden emin olun
   const [scaleValues, setScaleValues] = useState({});
@@ -73,7 +74,10 @@ export default function MovieUpcoming({ navigation }) {
     return (
       <View style={{ flex: 1, paddingVertical: 10 }}>
         <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <Text style={[styles.title, { color: theme.text.secondary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.title, { color: theme.text.secondary }]}
+          >
             {t.movieScreens.movieUpcaming.upcaming}
           </Text>
           <Dropdown
@@ -131,7 +135,10 @@ export default function MovieUpcoming({ navigation }) {
             alignItems: "center",
           }}
         >
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
             ●●●
           </Text>
           {pageUpcoming > 5 && (
@@ -147,11 +154,17 @@ export default function MovieUpcoming({ navigation }) {
                   alignItems: "center",
                 }}
               >
-                <Text style={[styles.genreText, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.genreText, { color: theme.text.primary }]}
+                >
                   {pageUpcoming - 5}
                 </Text>
               </TouchableOpacity>
-              <Text style={[styles.genreText, { color: theme.text.muted }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.muted }]}
+              >
                 ●
               </Text>
             </>
@@ -169,7 +182,10 @@ export default function MovieUpcoming({ navigation }) {
                 alignItems: "center",
               }}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageUpcoming - 2}
               </Text>
             </TouchableOpacity>
@@ -187,7 +203,10 @@ export default function MovieUpcoming({ navigation }) {
                 alignItems: "center",
               }}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageUpcoming - 1}
               </Text>
             </TouchableOpacity>
@@ -216,7 +235,10 @@ export default function MovieUpcoming({ navigation }) {
               alignItems: "center",
             }}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageUpcoming + 1}
             </Text>
           </TouchableOpacity>
@@ -231,11 +253,19 @@ export default function MovieUpcoming({ navigation }) {
               alignItems: "center",
             }}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageUpcoming + 2}
             </Text>
           </TouchableOpacity>
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>●</Text>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
+            ●
+          </Text>
           <TouchableOpacity
             onPress={() => setPageUpcoming(pageUpcoming + 5)}
             style={{
@@ -247,11 +277,17 @@ export default function MovieUpcoming({ navigation }) {
               alignItems: "center",
             }}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageUpcoming + 5}
             </Text>
           </TouchableOpacity>
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
             ●●●
           </Text>
         </View>
@@ -281,7 +317,7 @@ export default function MovieUpcoming({ navigation }) {
               source={
                 item.poster_path
                   ? {
-                      uri: `https://image.tmdb.org/t/p/w500${item.poster_path}`,
+                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
                     }
                   : require("../../assets/image/no_image.png")
               }
@@ -391,7 +427,10 @@ export default function MovieUpcoming({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <Text style={[styles.title, { color: theme.text.secondary }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.title, { color: theme.text.secondary }]}
+        >
           {t.movieScreens.movieUpcaming.upcaming}
         </Text>
         <Dropdown
@@ -446,7 +485,12 @@ export default function MovieUpcoming({ navigation }) {
           alignItems: "center",
         }}
       >
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●●●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●●●
+        </Text>
         {pageUpcoming > 5 && (
           <>
             <TouchableOpacity
@@ -460,11 +504,17 @@ export default function MovieUpcoming({ navigation }) {
                 alignItems: "center",
               }}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageUpcoming - 5}
               </Text>
             </TouchableOpacity>
-            <Text style={[styles.genreText, { color: theme.text.muted }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.muted }]}
+            >
               ●
             </Text>
           </>
@@ -482,7 +532,10 @@ export default function MovieUpcoming({ navigation }) {
               alignItems: "center",
             }}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageUpcoming - 2}
             </Text>
           </TouchableOpacity>
@@ -500,7 +553,10 @@ export default function MovieUpcoming({ navigation }) {
               alignItems: "center",
             }}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageUpcoming - 1}
             </Text>
           </TouchableOpacity>
@@ -529,7 +585,10 @@ export default function MovieUpcoming({ navigation }) {
             alignItems: "center",
           }}
         >
-          <Text style={[styles.genreText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.primary }]}
+          >
             {pageUpcoming + 1}
           </Text>
         </TouchableOpacity>
@@ -544,11 +603,19 @@ export default function MovieUpcoming({ navigation }) {
             alignItems: "center",
           }}
         >
-          <Text style={[styles.genreText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.primary }]}
+          >
             {pageUpcoming + 2}
           </Text>
         </TouchableOpacity>
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●
+        </Text>
         <TouchableOpacity
           onPress={() => setPageUpcoming(pageUpcoming + 5)}
           style={{
@@ -560,11 +627,19 @@ export default function MovieUpcoming({ navigation }) {
             alignItems: "center",
           }}
         >
-          <Text style={[styles.genreText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.primary }]}
+          >
             {pageUpcoming + 5}
           </Text>
         </TouchableOpacity>
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●●●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●●●
+        </Text>
       </View>
     </View>
   );

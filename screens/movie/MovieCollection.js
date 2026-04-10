@@ -26,6 +26,7 @@ export default function MovieCollection({ navigation }) {
   const { t } = useLanguage();
   const { theme } = useTheme();
   const { moviesCollection, loadingCollection, errorCollection } = useMovie();
+  const { imageQuality } = useAppSettings();
 
   const [selectedMovieCollection, setSelectedMovieCollection] = useState(null);
   // Animated import'unun eklendiğinden emin olun
@@ -61,7 +62,10 @@ export default function MovieCollection({ navigation }) {
   if (loadingCollection) {
     return (
       <View style={styles.container}>
-        <Text style={[styles.title, { color: theme.text.secondary }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.title, { color: theme.text.secondary }]}
+        >
           {t.movieScreens.oscar}
         </Text>
 
@@ -104,7 +108,7 @@ export default function MovieCollection({ navigation }) {
               source={
                 item.poster_path
                   ? {
-                      uri: `https://image.tmdb.org/t/p/w500${item.poster_path}`,
+                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
                     }
                   : require("../../assets/image/no_image.png")
               }
@@ -119,7 +123,7 @@ export default function MovieCollection({ navigation }) {
                 { backgroundColor: theme.secondaryt },
               ]}
             >
-              <Text style={styles.similarRatingText}>
+              <Text allowFontScaling={false} style={styles.similarRatingText}>
                 {item.vote_average?.toFixed(1) ?? ""}
               </Text>
             </View>
@@ -196,7 +200,10 @@ export default function MovieCollection({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.title, { color: theme.text.secondary }]}>
+      <Text
+        allowFontScaling={false}
+        style={[styles.title, { color: theme.text.secondary }]}
+      >
         Seri Filmler
       </Text>
 
@@ -231,7 +238,7 @@ export default function MovieCollection({ navigation }) {
                     source={
                       item.poster_path
                         ? {
-                            uri: `https://image.tmdb.org/t/p/w500${item.poster_path}`,
+                            uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
                           }
                         : require("../../assets/image/no_image.png")
                     }
@@ -276,7 +283,7 @@ export default function MovieCollection({ navigation }) {
                   source={
                     selectedMovieCollection.poster_path
                       ? {
-                          uri: `https://image.tmdb.org/t/p/w500${selectedMovieCollection.poster_path}`,
+                          uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${selectedMovieCollection.poster_path}`,
                         }
                       : require("../../assets/image/no_image.png")
                   }

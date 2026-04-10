@@ -24,7 +24,7 @@ const FILTERS = [
 ];
 
 // Ortak MediaCard bileşeni (animasyonlu)
-const MediaCard = ({ item, onPress, theme }) => {
+const MediaCard = ({ item, onPress, theme, imageQuality }) => {
   const [scale] = useState(new Animated.Value(1));
 
   const onPressIn = () => {
@@ -44,7 +44,7 @@ const MediaCard = ({ item, onPress, theme }) => {
   };
 
   const imageUrl = item.poster_path
-    ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
+    ? `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`
     : null;
 
   return (
@@ -78,7 +78,10 @@ const MediaCard = ({ item, onPress, theme }) => {
             { backgroundColor: theme.secondaryt },
           ]}
         >
-          <Text style={[styles.ratingText, { color: theme.colors.orange }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.ratingText, { color: theme.colors.orange }]}
+          >
             {item.vote_average?.toFixed(1) || "0.0"}
           </Text>
         </View>
@@ -107,11 +110,11 @@ const applyFilterForList = (list, filter, type) => {
     default:
       if (type === "movie") {
         return [...list].sort(
-          (a, b) => new Date(b.release_date) - new Date(a.release_date)
+          (a, b) => new Date(b.release_date) - new Date(a.release_date),
         );
       } else if (type === "tv") {
         return [...list].sort(
-          (a, b) => new Date(b.first_air_date) - new Date(a.first_air_date)
+          (a, b) => new Date(b.first_air_date) - new Date(a.first_air_date),
         );
       }
       return list;
@@ -121,7 +124,7 @@ const applyFilterForList = (list, filter, type) => {
 const ActorViewScreen = ({ route, navigation }) => {
   const { personId } = route.params;
   const { theme } = useTheme();
-  const { API_KEY } = useAppSettings();
+  const { API_KEY, imageQuality } = useAppSettings();
   const [actor, setActor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -142,7 +145,7 @@ const ActorViewScreen = ({ route, navigation }) => {
             headers: {
               Authorization: API_KEY,
             },
-          }
+          },
         );
         setActor(response.data);
       } catch (err) {
@@ -168,7 +171,9 @@ const ActorViewScreen = ({ route, navigation }) => {
   if (error) {
     return (
       <View style={[styles.errorContainer, { backgroundColor: theme.primary }]}>
-        <Text style={{ color: theme.text.primary }}>{error}</Text>
+        <Text allowFontScaling={false} style={{ color: theme.text.primary }}>
+          {error}
+        </Text>
       </View>
     );
   }
@@ -176,15 +181,15 @@ const ActorViewScreen = ({ route, navigation }) => {
   const filteredMovies = applyFilterForList(
     actor?.movie_credits?.cast,
     filter,
-    "movie"
+    "movie",
   );
   const filteredTvShows = applyFilterForList(
     actor?.tv_credits?.cast,
     tvFilter,
-    "tv"
+    "tv",
   );
   const uniqueFilteredTvShows = Array.from(
-    new Map(filteredTvShows.map((item) => [item.id, item])).values()
+    new Map(filteredTvShows.map((item) => [item.id, item])).values(),
   );
   return (
     <ScrollView
@@ -195,7 +200,7 @@ const ActorViewScreen = ({ route, navigation }) => {
       <View style={{ alignItems: "center", paddingTop: 20, marginBottom: 50 }}>
         <Image
           source={{
-            uri: "https://image.tmdb.org/t/p/w500" + actor.profile_path,
+            uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${actor.profile_path}`,
           }}
           style={{ width: 200, height: 300, borderRadius: 25 }}
         />
@@ -304,6 +309,7 @@ const ActorViewScreen = ({ route, navigation }) => {
           <MediaCard
             item={item}
             theme={theme}
+            imageQuality={imageQuality}
             onPress={() => navigation.navigate("MovieDetails", { id: item.id })}
           />
         )}
@@ -387,6 +393,7 @@ const ActorViewScreen = ({ route, navigation }) => {
           <MediaCard
             item={item}
             theme={theme}
+            imageQuality={imageQuality}
             onPress={() =>
               navigation.navigate("TvShowsDetails", { id: item.id })
             }

@@ -23,6 +23,8 @@ import { db } from "../../firebase";
 import { useTheme } from "../../context/ThemeContext";
 import SwipeCard from "../../modules/SwipeCard";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import IconBacground from "../../components/IconBacground";
+import { SafeAreaView } from "react-native-safe-area-context";
 export default function SearchFriendsScreen() {
   const [searchTerm, setSearchTerm] = useState("");
   const [results, setResults] = useState([]);
@@ -52,7 +54,7 @@ export default function SearchFriendsScreen() {
       const q = query(
         usersRef,
         where("username", ">=", search),
-        where("username", "<=", search + "\uf8ff")
+        where("username", "<=", search + "\uf8ff"),
       );
 
       const querySnapshot = await getDocs(q);
@@ -81,7 +83,7 @@ export default function SearchFriendsScreen() {
 
       setResults(users);
     },
-    [currentUser]
+    [currentUser],
   );
 
   const sendFriendRequest = async (friend) => {
@@ -112,7 +114,7 @@ export default function SearchFriendsScreen() {
           sendRequest: arrayUnion(receivedObj),
         },
       },
-      { merge: true }
+      { merge: true },
     );
 
     await setDoc(
@@ -122,14 +124,14 @@ export default function SearchFriendsScreen() {
           receivedRequest: arrayUnion(requestObj),
         },
       },
-      { merge: true }
+      { merge: true },
     );
 
     // Arayüzü veritabanı sorgusu yapmadan güncelle
     setResults((prevResults) =>
       prevResults.map((user) =>
-        user.uid === friend.uid ? { ...user, requestSent: true } : user
-      )
+        user.uid === friend.uid ? { ...user, requestSent: true } : user,
+      ),
     );
   };
 
@@ -155,15 +157,15 @@ export default function SearchFriendsScreen() {
       "friendRequests.receivedRequest": friendDoc
         .data()
         .friendRequests.receivedRequest.filter(
-          (req) => req.uid !== currentUser.uid
+          (req) => req.uid !== currentUser.uid,
         ),
     });
 
     // Arayüzü veritabanı sorgusu yapmadan güncelle
     setResults((prevResults) =>
       prevResults.map((user) =>
-        user.uid === friend.uid ? { ...user, requestSent: false } : user
-      )
+        user.uid === friend.uid ? { ...user, requestSent: false } : user,
+      ),
     );
   };
   const handleDelete = async (friend) => {
@@ -184,13 +186,13 @@ export default function SearchFriendsScreen() {
 
       // 🔹 Kullanıcının arkadaş listesinden çıkar
       const updatedUserFriends = userData.friends.filter(
-        (f) => f.uid !== friend.uid
+        (f) => f.uid !== friend.uid,
       );
       await updateDoc(userRef, { friends: updatedUserFriends });
 
       // 🔹 Arkadaşın listesinden de çıkar
       const updatedFriendFriends = friendData.friends.filter(
-        (f) => f.uid !== currentUser.uid
+        (f) => f.uid !== currentUser.uid,
       );
       await updateDoc(friendRef, { friends: updatedFriendFriends });
     } catch (error) {
@@ -236,21 +238,38 @@ export default function SearchFriendsScreen() {
         ]}
       >
         <View style={styles.userInfo}>
-          <Text style={[styles.name, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.name, { color: theme.text.primary }]}
+          >
             {item.displayName}
           </Text>
-          <Text style={[styles.name, { color: theme.text.secondary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.name, { color: theme.text.secondary }]}
+          >
             @{item.username}
           </Text>
-          <Text style={[styles.email, { color: theme.text.muted }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.email, { color: theme.text.muted }]}
+          >
             {item.email}
           </Text>
         </View>
 
         {item.alreadyFriend ? (
-          <Text style={{ color: "#70ffb0ff", fontWeight: "600" }}>Arkadaş</Text>
+          <Text
+            allowFontScaling={false}
+            style={{ color: "#70ffb0ff", fontWeight: "600" }}
+          >
+            Arkadaş
+          </Text>
         ) : item.requestSent ? (
-          <Text style={{ color: "#ff9650ff", fontWeight: "600" }}>
+          <Text
+            allowFontScaling={false}
+            style={{ color: "#ff9650ff", fontWeight: "600" }}
+          >
             İstek Gönderildi
           </Text>
         ) : (
@@ -265,7 +284,21 @@ export default function SearchFriendsScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.primary }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.primary }]}
+    >
+      <IconBacground opacity={0.3} />
+      <Text
+        style={{
+          color: theme.text.primary,
+          fontSize: 24,
+          textAlign: "center",
+          fontWeight: 900,
+          marginBottom: 10,
+        }}
+      >
+        Arkadaşları Ara
+      </Text>
       <TextInput
         placeholder="Kullanıcı ara..."
         placeholderTextColor={theme.text.secondary}
@@ -288,7 +321,7 @@ export default function SearchFriendsScreen() {
         contentContainerStyle={{ paddingBottom: 20, paddingHorizontal: 15 }}
         keyboardShouldPersistTaps="handled"
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -296,7 +329,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f9f9f9",
-    paddingTop: 80,
+    paddingTop: 10,
   },
   input: {
     borderWidth: 1,

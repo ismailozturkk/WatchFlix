@@ -40,10 +40,16 @@ const Avatar = () => {
           style={styles.avatar}
         />
         <View style={styles.cameraBadge}>
-          <Text style={styles.cameraText}>📷</Text>
+          <Text allowFontScaling={false} style={styles.cameraText}>
+            📷
+          </Text>
         </View>
       </TouchableOpacity>
-      {loading && <Text style={styles.loadingText}>Yükleniyor...</Text>}
+      {loading && (
+        <Text allowFontScaling={false} style={styles.loadingText}>
+          Yükleniyor...
+        </Text>
+      )}
     </View>
   );
 };

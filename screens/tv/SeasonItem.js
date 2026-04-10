@@ -37,7 +37,7 @@ const SeasonItem = ({ season, details, navigation }) => {
   const [isWatched, setIsWatched] = useState(false);
   const [seasonEpisodeWatch, setSeasonEpisodeWatch] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const { API_KEY } = useAppSettings();
+  const { API_KEY, imageQuality } = useAppSettings();
   const showReleaseDateTime = new Date(season.air_date);
 
   const [scaleValue] = useState(new Animated.Value(1));
@@ -387,7 +387,7 @@ const SeasonItem = ({ season, details, navigation }) => {
             {season.poster_path ? (
               <Image
                 source={{
-                  uri: `https://image.tmdb.org/t/p/w500${season.poster_path}`,
+                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${season.poster_path}`,
                 }}
                 style={[styles.seasonPoster, { shadowColor: theme.shadow }]}
               />
@@ -532,7 +532,12 @@ const SeasonItem = ({ season, details, navigation }) => {
             >
               Yeni Sezon Geliyor
             </Text>
-            <Text style={{ color: theme.text.between }}>Tarih Belirsiz</Text>
+            <Text
+              allowFontScaling={false}
+              style={{ color: theme.text.between }}
+            >
+              Tarih Belirsiz
+            </Text>
           </View>
         )}
       </Animated.View>
@@ -573,7 +578,10 @@ const SeasonItem = ({ season, details, navigation }) => {
                   size={48}
                   color={theme.text.primary}
                 />
-                <Text style={[styles.inputText, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.inputText, { color: theme.text.primary }]}
+                >
                   {selectedDate ? formatDate(selectedDate) : "Tarih seçiniz"}
                 </Text>
               </TouchableOpacity>
@@ -582,7 +590,10 @@ const SeasonItem = ({ season, details, navigation }) => {
                 onPress={() => addSeasonToFirestore(false, new Date())}
               >
                 <Entypo name="stopwatch" size={48} color={theme.text.primary} />
-                <Text style={[styles.inputText, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.inputText, { color: theme.text.primary }]}
+                >
                   Şimdi
                 </Text>
                 <Text
@@ -603,7 +614,10 @@ const SeasonItem = ({ season, details, navigation }) => {
                   size={48}
                   color={theme.text.primary}
                 />
-                <Text style={[styles.inputText, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.inputText, { color: theme.text.primary }]}
+                >
                   Yayınlanma Tarih
                 </Text>
                 <Text

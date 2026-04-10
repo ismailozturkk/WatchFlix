@@ -22,13 +22,11 @@ export const ThemeProvider = ({ children }) => {
     loadTheme();
   }, []);
 
-  const changeTheme = async (newTheme) => {
+  const changeTheme = (newTheme) => {
     setSelectedTheme(newTheme);
-    try {
-      await AsyncStorage.setItem("selectedTheme", newTheme);
-    } catch (error) {
+    AsyncStorage.setItem("selectedTheme", newTheme).catch((error) => {
       console.error("Tema kaydedilemedi:", error);
-    }
+    });
   };
 
   const value = {

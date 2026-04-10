@@ -30,7 +30,6 @@ import { useSnow } from "../../context/SnowContext";
 import Toast from "react-native-toast-message";
 import { getDoc, doc, updateDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
-import { useAuth } from "../../context/AuthContext";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import ListView from "../../components/ListView";
 import { useAppSettings } from "../../context/AppSettingsContext";
@@ -47,10 +46,12 @@ import { useListStatus } from "../../modules/UseListStatus";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { BlurView } from "expo-blur";
 import { useListStatusContext } from "../../context/ListStatusContext";
+import IconBacground from "../../components/IconBacground";
+import { useAuth } from "../../context/AuthContext";
 
 const { width, height } = Dimensions.get("window");
 
-const SimilarMovieItem = ({ item, navigation }) => {
+const SimilarMovieItem = ({ item, navigation, imageQuality }) => {
   const { theme } = useTheme();
   const { inWatchList, inFavorites, isWatched, isInOtherLists } = useListStatus(
     item.id,
@@ -88,7 +89,9 @@ const SimilarMovieItem = ({ item, navigation }) => {
         <Image
           source={
             item.poster_path
-              ? { uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }
+              ? {
+                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                }
               : require("../../assets/image/no_image.png")
           }
           style={[styles.similarPoster, { shadowColor: theme.shadow }]}
@@ -97,7 +100,7 @@ const SimilarMovieItem = ({ item, navigation }) => {
         <View
           style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}
         >
-          <Text style={styles.similarRatingText}>
+          <Text allowFontScaling={false} style={styles.similarRatingText}>
             {item.vote_average.toFixed(1)}
           </Text>
         </View>
@@ -162,7 +165,7 @@ export default function MovieDetails({ navigation, route }) {
   const [showAllKeywords, setShowAllKeywords] = useState(false);
   const [commandModalVisible, setCommentModalVisible] = useState(false);
 
-  const { API_KEY, showSnow } = useAppSettings();
+  const { API_KEY, showSnow, imageQuality } = useAppSettings();
 
   // Modal ve tarih seçici state'leri
   const [modalVisible, setModalVisible] = useState(false);
@@ -531,15 +534,23 @@ export default function MovieDetails({ navigation, route }) {
         <Image
           source={
             item.profile_path
-              ? { uri: `https://image.tmdb.org/t/p/w500${item.profile_path}` }
+              ? {
+                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.profile_path}`,
+                }
               : require("../../assets/image/user.png")
           }
           style={[styles.castImage, { shadowColor: theme.shadow }]}
         />
-        <Text style={[styles.castName, { color: theme.text.primary }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.castName, { color: theme.text.primary }]}
+        >
           {item.name}
         </Text>
-        <Text style={[styles.castCharacter, { color: theme.text.muted }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.castCharacter, { color: theme.text.muted }]}
+        >
           {item.character}
         </Text>
       </View>
@@ -574,7 +585,10 @@ export default function MovieDetails({ navigation, route }) {
       >
         {item.name}
       </Text>
-      <Text style={[styles.videoType, { color: theme.text.muted }]}>
+      <Text
+        allowFontScaling={false}
+        style={[styles.videoType, { color: theme.text.muted }]}
+      >
         {item.type}
       </Text>
     </TouchableOpacity>
@@ -588,7 +602,9 @@ export default function MovieDetails({ navigation, route }) {
         onPress={() => Linking.openURL(url)}
       >
         <FontAwesome5 name={icon} size={20} color="#fff" />
-        <Text style={styles.externalLinkText}>{name}</Text>
+        <Text allowFontScaling={false} style={styles.externalLinkText}>
+          {name}
+        </Text>
       </TouchableOpacity>
     );
   };
@@ -599,7 +615,10 @@ export default function MovieDetails({ navigation, route }) {
   if (!details) {
     return (
       <View style={[styles.container, { backgroundColor: theme.primary }]}>
-        <Text style={[styles.loadingText, { color: theme.text.primary }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.loadingText, { color: theme.text.primary }]}
+        >
           Yükleniyor...
         </Text>
       </View>
@@ -607,11 +626,14 @@ export default function MovieDetails({ navigation, route }) {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: theme.primary }}>
+      <IconBacground opacity={0.3} />
+
       <ScrollView
-        style={[styles.container, { backgroundColor: theme.primary }]}
+        style={styles.container}
         nestedScrollEnabled={true}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         <StatusBar barStyle="light-content" />
         <View style={styles.headerContainer}>
@@ -639,38 +661,35 @@ export default function MovieDetails({ navigation, route }) {
             style={styles.gradient}
           />
         </View>
-        <View style={[styles.content, { backgroundColor: theme.primary }]}>
-          <LottieView
-            style={[styles.lottie, { display: showSnow ? "flex" : "none" }]}
-            source={require("../../LottieJson/snow.json")}
-            autoPlay={true}
-            loop
-          />
-          <LottieView
-            style={[styles.lottie0, { display: showSnow ? "flex" : "none" }]}
-            source={require("../../LottieJson/snow.json")}
-            autoPlay={true}
-            loop
-          />
-          <LottieView
-            style={[styles.lottie1, { display: showSnow ? "flex" : "none" }]}
-            source={require("../../LottieJson/snow.json")}
-            autoPlay={true}
-            loop
-          />
-          <LottieView
-            style={[styles.lottie2, { display: showSnow ? "flex" : "none" }]}
-            source={require("../../LottieJson/snow.json")}
-            autoPlay={true}
-            loop
-          />
+        <View style={styles.content}>
+          {showSnow &&
+            [0, 1, 2, 3].map((item) => {
+              return (
+                <LottieView
+                  key={item}
+                  style={
+                    item === 0
+                      ? styles.lottie
+                      : item === 1
+                        ? styles.lottie0
+                        : item === 2
+                          ? styles.lottie1
+                          : styles.lottie2
+                  }
+                  source={require("../../LottieJson/snow.json")}
+                  autoPlay
+                  loop
+                />
+              );
+            })}
+
           <View style={styles.header}>
             <View style={[styles.posterView, { shadowColor: theme.shadow }]}>
               {details.poster_path ? (
                 <TouchableOpacity onPress={() => setPosterModalVisible(true)}>
                   <Image
                     source={{
-                      uri: `https://image.tmdb.org/t/p/w500${details.poster_path}`,
+                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${details.poster_path}`,
                     }}
                     style={[
                       styles.poster,
@@ -694,7 +713,10 @@ export default function MovieDetails({ navigation, route }) {
               )}
             </View>
             <View style={styles.headerInfo}>
-              <Text style={[styles.title, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.title, { color: theme.text.primary }]}
+              >
                 {details.title}
               </Text>
               {details.alternative_titles?.titles?.length > 0 && (
@@ -707,7 +729,10 @@ export default function MovieDetails({ navigation, route }) {
                   {details.alternative_titles.titles[0].title}
                 </Text>
               )}
-              <Text style={[styles.tagline, { color: theme.text.secondary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.tagline, { color: theme.text.secondary }]}
+              >
                 {details.tagline || "Slogan bulunmuyor"}
               </Text>
               <View style={styles.genres}>
@@ -812,7 +837,10 @@ export default function MovieDetails({ navigation, route }) {
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.statValue, { color: theme.text.primary }]}
+                >
                   {details.runtime}
                 </Text>
                 <Text
@@ -822,7 +850,10 @@ export default function MovieDetails({ navigation, route }) {
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.statValue, { color: theme.text.primary }]}
+                >
                   {details.revenue > 0
                     ? `${(details.revenue / 1000000).toFixed(1)}M$`
                     : "?"}
@@ -927,7 +958,10 @@ export default function MovieDetails({ navigation, route }) {
               >
                 {t.overview}
               </Text>
-              <Text style={[styles.overview, { color: theme.text.secondary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.overview, { color: theme.text.secondary }]}
+              >
                 {details.overview || "Özet bulunmuyor."}
               </Text>
             </View>
@@ -1137,7 +1171,11 @@ export default function MovieDetails({ navigation, route }) {
                 <FlatList
                   data={details.recommendations.results.slice(0, 20)}
                   renderItem={({ item }) => (
-                    <SimilarMovieItem item={item} navigation={navigation} />
+                    <SimilarMovieItem
+                      item={item}
+                      navigation={navigation}
+                      imageQuality={imageQuality}
+                    />
                   )}
                   keyExtractor={(item) => item.id.toString()}
                   horizontal
@@ -1156,7 +1194,11 @@ export default function MovieDetails({ navigation, route }) {
                 <FlatList
                   data={details.similar.results.slice(0, 20)}
                   renderItem={({ item }) => (
-                    <SimilarMovieItem item={item} navigation={navigation} />
+                    <SimilarMovieItem
+                      item={item}
+                      navigation={navigation}
+                      imageQuality={imageQuality}
+                    />
                   )}
                   keyExtractor={(item) => item.id.toString()}
                   horizontal
@@ -1418,7 +1460,10 @@ export default function MovieDetails({ navigation, route }) {
                   size={48}
                   color={theme.text.primary}
                 />
-                <Text style={[styles.inputText, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.inputText, { color: theme.text.primary }]}
+                >
                   {selectedDate
                     ? formatDateSave(selectedDate)
                     : "Tarih seçiniz"}
@@ -1435,7 +1480,10 @@ export default function MovieDetails({ navigation, route }) {
                 }
               >
                 <Entypo name="stopwatch" size={48} color={theme.text.primary} />
-                <Text style={[styles.inputText, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.inputText, { color: theme.text.primary }]}
+                >
                   Şimdi
                 </Text>
                 <Text
@@ -1462,7 +1510,10 @@ export default function MovieDetails({ navigation, route }) {
                   size={48}
                   color={theme.text.primary}
                 />
-                <Text style={[styles.inputText, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.inputText, { color: theme.text.primary }]}
+                >
                   Yayınlanma Tarih
                 </Text>
                 <Text
@@ -1521,7 +1572,7 @@ export default function MovieDetails({ navigation, route }) {
             source={
               PosterModalVisible
                 ? {
-                    uri: `https://image.tmdb.org/t/p/w500${details.poster_path}`,
+                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${details.poster_path}`,
                   }
                 : {
                     uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,

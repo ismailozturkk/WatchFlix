@@ -16,6 +16,7 @@ import { ListsSkeleton } from "../../../components/Skeleton";
 import { LinearGradient } from "expo-linear-gradient";
 import { useProfileScreen } from "../../../context/ProfileScreenContext";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useAppSettings } from "../../../context/AppSettingsContext";
 export default function ProfileLists({ navigation }) {
   const { t } = useLanguage();
   const { theme } = useTheme();
@@ -33,7 +34,7 @@ export default function ProfileLists({ navigation }) {
   } = useProfileScreen();
   // ...existing code...
   const [scaleValues, setScaleValues] = useState({});
-
+  const { imageQuality } = useAppSettings();
   useEffect(() => {
     const newScaleValues = {};
     lists.forEach((list) => {
@@ -67,7 +68,10 @@ export default function ProfileLists({ navigation }) {
   return (
     <View style={styles.section}>
       <View style={styles.container}>
-        <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.sectionTitle, { color: theme.text.muted }]}
+        >
           {t.profileScreen.ProfileLists.lists}
         </Text>
         <View style={{ flexDirection: "row", gap: 10 }}>
@@ -157,7 +161,7 @@ export default function ProfileLists({ navigation }) {
                               <Image
                                 key={index}
                                 source={{
-                                  uri: `https://image.tmdb.org/t/p/w500${item.imagePath}`,
+                                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
                                 }}
                                 style={[
                                   styles.image,
@@ -217,7 +221,7 @@ export default function ProfileLists({ navigation }) {
                                 <Image
                                   key={index}
                                   source={{
-                                    uri: `https://image.tmdb.org/t/p/w500${item.imagePath}`,
+                                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
                                   }}
                                   style={[
                                     styles.image,
@@ -281,7 +285,7 @@ export default function ProfileLists({ navigation }) {
                                 <Image
                                   key={index}
                                   source={{
-                                    uri: `https://image.tmdb.org/t/p/w500${item.imagePath}`,
+                                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
                                   }}
                                   style={[
                                     styles.image,
@@ -355,7 +359,10 @@ export default function ProfileLists({ navigation }) {
                             size={16}
                             color={theme.colors.green}
                           />
-                          <Text style={{ color: theme.text.primary }}>
+                          <Text
+                            allowFontScaling={false}
+                            style={{ color: theme.text.primary }}
+                          >
                             {"  "}
                             {t.profileScreen.ProfileLists.watchedMovies}
                           </Text>
@@ -369,7 +376,10 @@ export default function ProfileLists({ navigation }) {
                             size={15}
                             color={theme.colors.green}
                           />
-                          <Text style={{ color: theme.text.primary }}>
+                          <Text
+                            allowFontScaling={false}
+                            style={{ color: theme.text.primary }}
+                          >
                             {"  "}
                             {t.profileScreen.ProfileLists.watchedTvSeries}
                           </Text>
@@ -383,7 +393,10 @@ export default function ProfileLists({ navigation }) {
                             size={16}
                             color={theme.colors.red}
                           />
-                          <Text style={{ color: theme.text.primary }}>
+                          <Text
+                            allowFontScaling={false}
+                            style={{ color: theme.text.primary }}
+                          >
                             {"  "}
                             {t.profileScreen.ProfileLists.favorite}
                           </Text>
@@ -397,7 +410,10 @@ export default function ProfileLists({ navigation }) {
                             size={16}
                             color={theme.colors.blue}
                           />
-                          <Text style={{ color: theme.text.primary }}>
+                          <Text
+                            allowFontScaling={false}
+                            style={{ color: theme.text.primary }}
+                          >
                             {"  "}
                             {t.profileScreen.ProfileLists.watchList}
                           </Text>
@@ -454,7 +470,10 @@ export default function ProfileLists({ navigation }) {
             onPress={() => setModalDeleteVisible(false)}
           />
           <View style={[styles.modalView, { backgroundColor: theme.primary }]}>
-            <Text style={[styles.modalText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.modalText, { color: theme.text.primary }]}
+            >
               "{selectedList}" listesini silmek istiyor musunuz?
             </Text>
             <View style={styles.modalButtons}>
@@ -462,13 +481,17 @@ export default function ProfileLists({ navigation }) {
                 style={[styles.button, styles.buttonCancel]}
                 onPress={() => setModalDeleteVisible(false)}
               >
-                <Text style={styles.textStyle}>{t.cancel}</Text>
+                <Text allowFontScaling={false} style={styles.textStyle}>
+                  {t.cancel}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.button, styles.buttonConfirm]}
                 onPress={deleteList}
               >
-                <Text style={styles.textStyle}>{t.confirm}</Text>
+                <Text allowFontScaling={false} style={styles.textStyle}>
+                  {t.confirm}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

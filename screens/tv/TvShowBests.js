@@ -18,11 +18,13 @@ import { useEffect, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { useListStatus } from "../../modules/UseListStatus";
+import { useAppSettings } from "../../context/AppSettingsContext";
 //import { API_KEY } from "@env";
 
 export default function TvShowBests({ navigation }) {
   const { theme } = useTheme();
-
+  const { t } = useLanguage();
+  const { imageQuality } = useAppSettings();
   const {
     seriesBest,
     setSelectedCategoryBest,
@@ -127,7 +129,10 @@ export default function TvShowBests({ navigation }) {
             alignItems: "center",
           }}
         >
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
             ●●●
           </Text>
           {pageBest > 5 && (
@@ -141,11 +146,17 @@ export default function TvShowBests({ navigation }) {
                   },
                 ]}
               >
-                <Text style={[styles.genreText, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.genreText, { color: theme.text.primary }]}
+                >
                   {pageBest - 5}
                 </Text>
               </TouchableOpacity>
-              <Text style={[styles.genreText, { color: theme.text.muted }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.muted }]}
+              >
                 ●
               </Text>
             </>
@@ -161,7 +172,10 @@ export default function TvShowBests({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageBest - 2}
               </Text>
             </TouchableOpacity>
@@ -176,7 +190,10 @@ export default function TvShowBests({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageBest - 1}
               </Text>
             </TouchableOpacity>
@@ -203,7 +220,10 @@ export default function TvShowBests({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageBest + 1}
             </Text>
           </TouchableOpacity>
@@ -216,11 +236,19 @@ export default function TvShowBests({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageBest + 2}
             </Text>
           </TouchableOpacity>
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>●</Text>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
+            ●
+          </Text>
           <TouchableOpacity
             onPress={() => setPageBest(pageBest + 5)}
             style={[
@@ -230,11 +258,17 @@ export default function TvShowBests({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageBest + 5}
             </Text>
           </TouchableOpacity>
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
             ●●●
           </Text>
         </View>
@@ -263,7 +297,9 @@ export default function TvShowBests({ navigation }) {
           <Image
             source={
               item.poster_path
-                ? { uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }
+                ? {
+                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                  }
                 : require("../../assets/image/no_image.png")
             }
             style={[styles.similarPoster, { shadowColor: theme.shadow }]}
@@ -398,7 +434,12 @@ export default function TvShowBests({ navigation }) {
           alignItems: "center",
         }}
       >
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●●●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●●●
+        </Text>
         {pageBest > 1 && (
           <>
             <TouchableOpacity
@@ -410,11 +451,17 @@ export default function TvShowBests({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {1}
               </Text>
             </TouchableOpacity>
-            <Text style={[styles.genreText, { color: theme.text.muted }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.muted }]}
+            >
               ●
             </Text>
           </>
@@ -430,7 +477,10 @@ export default function TvShowBests({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageBest - 2}
             </Text>
           </TouchableOpacity>
@@ -445,7 +495,10 @@ export default function TvShowBests({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageBest - 1}
             </Text>
           </TouchableOpacity>
@@ -474,7 +527,10 @@ export default function TvShowBests({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageBest + 1}
               </Text>
             </TouchableOpacity>
@@ -488,13 +544,21 @@ export default function TvShowBests({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageBest + 2}
               </Text>
             </TouchableOpacity>
           </>
         ) : null}
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●
+        </Text>
         <TouchableOpacity
           onPress={() => setPageBest(totalPagesBest)}
           style={[
@@ -504,11 +568,19 @@ export default function TvShowBests({ navigation }) {
             },
           ]}
         >
-          <Text style={[styles.genreText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.primary }]}
+          >
             {totalPagesBest}
           </Text>
         </TouchableOpacity>
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●●●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●●●
+        </Text>
       </View>
     </View>
   );

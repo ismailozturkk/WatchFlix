@@ -19,6 +19,7 @@ import RatingStars from "../../components/RatingStars";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useAppSettings } from "../../context/AppSettingsContext";
 const { width, height } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.6;
 const CARD_HEIHGT = height * 0.45;
@@ -30,7 +31,7 @@ export default function TvShowsTrends({ navigation }) {
   const scrollX = React.useRef(new Animated.Value(0)).current;
   const { t } = useLanguage();
   const { theme } = useTheme();
-
+  const { imageQuality } = useAppSettings();
   const {
     seriesTrend,
     loadingTrend,
@@ -150,7 +151,7 @@ export default function TvShowsTrends({ navigation }) {
             <Image
               style={styles.poster}
               source={{
-                uri: `https://image.tmdb.org/t/p/w500${item.poster_path}`,
+                uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
               }}
             />
           </Animated.View>
@@ -188,14 +189,23 @@ export default function TvShowsTrends({ navigation }) {
               }}
             >
               <RatingStars rating={item.vote_average} />
-              <Text style={{ fontSize: 14, color: theme.colors.orange }}>
+              <Text
+                allowFontScaling={false}
+                style={{ fontSize: 14, color: theme.colors.orange }}
+              >
                 {rating.toFixed(1)}
               </Text>
-              <Text style={{ fontSize: 14, color: theme.text.secondary }}>
+              <Text
+                allowFontScaling={false}
+                style={{ fontSize: 14, color: theme.text.secondary }}
+              >
                 •
               </Text>
               <FontAwesome name="user" size={14} color={theme.colors.blue} />
-              <Text style={{ fontSize: 14, color: theme.colors.blue }}>
+              <Text
+                allowFontScaling={false}
+                style={{ fontSize: 14, color: theme.colors.blue }}
+              >
                 {item.vote_count}
               </Text>
             </View>
@@ -339,7 +349,7 @@ export default function TvShowsTrends({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    marginTop: 40,
+    marginTop: 10,
   },
 
   cardContainer: {

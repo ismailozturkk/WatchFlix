@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  Animated,
   AppState,
   StyleSheet,
   Text,
@@ -7,9 +8,7 @@ import {
   View,
   LogBox,
 } from "react-native";
-LogBox.ignoreLogs([
-  "[Reanimated] `createAnimatedPropAdapter` is no longer necessary in Reanimated 4 and will be removed in next version. Please remove this call from your code and pass the adapter function directly.",
-]);
+
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
@@ -56,6 +55,11 @@ import FriendRequestsScreen from "./screens/tabs/profile/FriendRequestsScreen";
 import ChatScreen from "./screens/ChatScreen";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import Comment from "./components/Comment";
+import MovieSearchScreen from "./screens/search/MovieSearchScreen";
+import IconBacground from "./components/IconBacground";
+import CalendarScreen from "./screens/CalendarScreen";
+import { CalendarProvider } from "./context/CalendarContext";
+import OnGoingSeries from "./screens/tv/OnGoingSeries";
 
 // Daha sonra stack/tab navigator'larında otomatik etkili olur
 
@@ -65,12 +69,16 @@ const SplashScreen = () => {
 
   return (
     <View style={[styles.splashContainer, { backgroundColor: theme.primary }]}>
-      <LottieView
-        style={[styles.lottie, { display: showSnow ? "flex" : "none" }]}
-        source={require("./LottieJson/snow.json")}
-        autoPlay={true}
-        loop
-      />
+      <IconBacground opacity={0.5} />
+
+      {showSnow && (
+        <LottieView
+          style={styles.lottie}
+          source={require("./LottieJson/snow.json")}
+          autoPlay={true}
+          loop
+        />
+      )}
       <LottieView
         style={{ width: 350, height: 350 }}
         source={require("./LottieJson/splash.json")} // Lottie dosyanızın yolu
@@ -85,11 +93,12 @@ const SplashScreen = () => {
   );
 };
 
-function AppContent({ isVisible }) {
+function AppContent() {
   const Stack = createNativeStackNavigator();
   const [showChatModal, setShowChatModal] = useState(false); // State for modal visibility
   const [showBackButton, setShowBackButton] = useState(false);
-  const { user, initialRoute } = useAuth();
+  const { user, initialRoute, loading } = useAuth();
+
   useEffect(() => {
     if (user) {
       const createList = async () => {
@@ -106,7 +115,7 @@ function AppContent({ isVisible }) {
           }
         } catch (e) {
           Toast.show({
-            type: "succes",
+            type: "success",
             text1: `Error fetching or creating document:, ${e}`,
           });
         }
@@ -117,17 +126,23 @@ function AppContent({ isVisible }) {
   const toastConfig = {
     error: ({ text1, props }) => (
       <View style={styles.toastError}>
-        <Text style={styles.toastText}>{text1}</Text>
+        <Text allowFontScaling={false} style={styles.toastText}>
+          {text1}
+        </Text>
       </View>
     ),
     warning: ({ text1, props }) => (
       <View style={styles.toastWarning}>
-        <Text style={styles.toastText}>{text1}</Text>
+        <Text allowFontScaling={false} style={styles.toastText}>
+          {text1}
+        </Text>
       </View>
     ),
     success: ({ text1, props }) => (
       <View style={styles.toastSuccess}>
-        <Text style={styles.toastText}>{text1}</Text>
+        <Text allowFontScaling={false} style={styles.toastText}>
+          {text1}
+        </Text>
       </View>
     ),
   };
@@ -138,9 +153,9 @@ function AppContent({ isVisible }) {
       setShowChatModal(false);
     }
   }, [user]);
-  if (isVisible) {
-    return <SplashScreen />;
-  }
+
+  if (loading) return null;
+
   return (
     <NavigationContainer
       onStateChange={(state) => {
@@ -172,7 +187,7 @@ function AppContent({ isVisible }) {
         initialRouteName={initialRoute}
         screenOptions={({ navigation }) => ({
           contentStyle: { backgroundColor: "#1a1a1a" },
-          animation: "fade", // iOS benzeri geçiş
+          //animation: "fade", // iOS benzeri geçiş
           animation: "slide_from_right", // iOS benzeri geçiş
           gestureEnabled: true, // swipe-back gibi hareketleri açar
           gestureDirection: "horizontal", // yatay hareket yönü
@@ -254,6 +269,7 @@ function AppContent({ isVisible }) {
             headerTintColor: "#fff",
             headerTitle: "",
             headerShadowVisible: false,
+            animation: "slide_from_bottom",
           }}
         />
         <Stack.Screen
@@ -264,6 +280,7 @@ function AppContent({ isVisible }) {
             headerTintColor: "#fff",
             headerTitle: "",
             headerShadowVisible: false,
+            animation: "slide_from_bottom",
           }}
         />
         <Stack.Screen
@@ -417,6 +434,34 @@ function AppContent({ isVisible }) {
             headerShadowVisible: false,
           }}
         />
+        <Stack.Screen
+          name="MovieSearchScreen"
+          component={MovieSearchScreen}
+          options={{
+            headerShown: false,
+            presentation: "transparentModal",
+            animation: "fade",
+          }}
+        />
+        <Stack.Screen
+          name="CalendarScreen"
+          component={CalendarScreen}
+          options={{
+            headerShown: false,
+            animation: "slide_from_bottom",
+          }}
+        />
+        <Stack.Screen
+          name="OnGoingSeries"
+          component={OnGoingSeries}
+          options={{
+            headerTransparent: true,
+            headerTintColor: "#fff",
+            headerTitle: "",
+            headerShadowVisible: false,
+            animation: "slide_from_right",
+          }}
+        />
       </Stack.Navigator>
 
       {showChatModal && <SwipeView />}
@@ -427,16 +472,19 @@ function AppContent({ isVisible }) {
 }
 
 export default function App() {
-  const [isVisible, setIsVisible] = useState(true);
+  const [splashVisible, setSplashVisible] = useState(true);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // 3 saniye sonra splash ekranını gizle
     const timer = setTimeout(() => {
-      setIsVisible(false);
-      // Burada ana uygulamanıza yönlendirme yapabilirsiniz
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => setSplashVisible(false));
     }, 2000);
 
-    return () => clearTimeout(timer); // Temizleme işlemi
+    return () => clearTimeout(timer);
   }, []);
 
   // // Çevrimiçi/Çevrimdışı durumu yönetimi
@@ -496,11 +544,24 @@ export default function App() {
                 <AuthProvider>
                   <ListStatusProvider>
                     <ProfileScreenProvider>
-                      <TvShowProvider>
-                        <MovieProvider>
-                          <AppContent isVisible={isVisible} />
-                        </MovieProvider>
-                      </TvShowProvider>
+                      <CalendarProvider>
+                        <TvShowProvider>
+                          <MovieProvider>
+                            <AppContent />
+                            {splashVisible && (
+                              <Animated.View
+                                style={[
+                                  StyleSheet.absoluteFill,
+                                  { opacity: fadeAnim, zIndex: 9999 },
+                                ]}
+                                pointerEvents="none"
+                              >
+                                <SplashScreen />
+                              </Animated.View>
+                            )}
+                          </MovieProvider>
+                        </TvShowProvider>
+                      </CalendarProvider>
                     </ProfileScreenProvider>
                   </ListStatusProvider>
                 </AuthProvider>

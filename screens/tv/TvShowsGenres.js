@@ -14,9 +14,12 @@ import { useTvShow } from "../../context/TvShowContex";
 import { MovieSkeleton } from "../../components/Skeleton";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useAppSettings } from "../../context/AppSettingsContext";
 const { width, height } = Dimensions.get("window");
 export default function TvShowsGenres({ navigation }) {
   const { theme } = useTheme();
+  const { imageQuality } = useAppSettings();
+
   const {
     selectedGenres,
     pageGenres,
@@ -63,7 +66,7 @@ export default function TvShowsGenres({ navigation }) {
       (prev) =>
         prev.includes(genreId)
           ? prev.filter((id) => id !== genreId) // Seçiliyse kaldır
-          : [...prev, genreId] // Seçili değilse ekle
+          : [...prev, genreId], // Seçili değilse ekle
     );
   };
   if (loadingGenres || moviesGenres.length < 1) {
@@ -87,7 +90,10 @@ export default function TvShowsGenres({ navigation }) {
               ]}
               onPress={() => toggleGenre(item.id)}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {item.name}
               </Text>
             </TouchableOpacity>
@@ -108,7 +114,10 @@ export default function TvShowsGenres({ navigation }) {
             alignItems: "center",
           }}
         >
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
             ●●●
           </Text>
           {pageGenres > 5 && (
@@ -122,11 +131,17 @@ export default function TvShowsGenres({ navigation }) {
                   },
                 ]}
               >
-                <Text style={[styles.genreText, { color: theme.text.primary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.genreText, { color: theme.text.primary }]}
+                >
                   {pageGenres - 5}
                 </Text>
               </TouchableOpacity>
-              <Text style={[styles.genreText, { color: theme.text.muted }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.muted }]}
+              >
                 ●
               </Text>
             </>
@@ -142,7 +157,10 @@ export default function TvShowsGenres({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageGenres - 2}
               </Text>
             </TouchableOpacity>
@@ -157,7 +175,10 @@ export default function TvShowsGenres({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageGenres - 1}
               </Text>
             </TouchableOpacity>
@@ -184,7 +205,10 @@ export default function TvShowsGenres({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageGenres + 1}
             </Text>
           </TouchableOpacity>
@@ -197,11 +221,19 @@ export default function TvShowsGenres({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageGenres + 2}
             </Text>
           </TouchableOpacity>
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>●</Text>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
+            ●
+          </Text>
           <TouchableOpacity
             onPress={() => setPageGenres(pageGenres + 5)}
             style={[
@@ -211,11 +243,17 @@ export default function TvShowsGenres({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageGenres + 5}
             </Text>
           </TouchableOpacity>
-          <Text style={[styles.genreText, { color: theme.text.muted }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.muted }]}
+          >
             ●●●
           </Text>
         </View>
@@ -244,7 +282,9 @@ export default function TvShowsGenres({ navigation }) {
           <Image
             source={
               item.poster_path
-                ? { uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }
+                ? {
+                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                  }
                 : require("../../assets/image/no_image.png")
             }
             style={[styles.similarPoster, { shadowColor: theme.shadow }]}
@@ -256,7 +296,7 @@ export default function TvShowsGenres({ navigation }) {
               { backgroundColor: theme.secondaryt },
             ]}
           >
-            <Text style={styles.similarRatingText}>
+            <Text allowFontScaling={false} style={styles.similarRatingText}>
               {item.vote_average.toFixed(1)}
             </Text>
           </View>
@@ -349,7 +389,10 @@ export default function TvShowsGenres({ navigation }) {
             ]}
             onPress={() => toggleGenre(item.id)}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {item.name}
             </Text>
           </TouchableOpacity>
@@ -371,7 +414,12 @@ export default function TvShowsGenres({ navigation }) {
           alignItems: "center",
         }}
       >
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●●●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●●●
+        </Text>
         {pageGenres > 5 && (
           <>
             <TouchableOpacity
@@ -383,11 +431,17 @@ export default function TvShowsGenres({ navigation }) {
                 },
               ]}
             >
-              <Text style={[styles.genreText, { color: theme.text.primary }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreText, { color: theme.text.primary }]}
+              >
                 {pageGenres - 5}
               </Text>
             </TouchableOpacity>
-            <Text style={[styles.genreText, { color: theme.text.muted }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.muted }]}
+            >
               ●
             </Text>
           </>
@@ -403,7 +457,10 @@ export default function TvShowsGenres({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageGenres - 2}
             </Text>
           </TouchableOpacity>
@@ -418,7 +475,10 @@ export default function TvShowsGenres({ navigation }) {
               },
             ]}
           >
-            <Text style={[styles.genreText, { color: theme.text.primary }]}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.genreText, { color: theme.text.primary }]}
+            >
               {pageGenres - 1}
             </Text>
           </TouchableOpacity>
@@ -445,7 +505,10 @@ export default function TvShowsGenres({ navigation }) {
             },
           ]}
         >
-          <Text style={[styles.genreText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.primary }]}
+          >
             {pageGenres + 1}
           </Text>
         </TouchableOpacity>
@@ -458,11 +521,19 @@ export default function TvShowsGenres({ navigation }) {
             },
           ]}
         >
-          <Text style={[styles.genreText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.primary }]}
+          >
             {pageGenres + 2}
           </Text>
         </TouchableOpacity>
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●
+        </Text>
         <TouchableOpacity
           onPress={() => setPageGenres(pageGenres + 5)}
           style={[
@@ -472,11 +543,19 @@ export default function TvShowsGenres({ navigation }) {
             },
           ]}
         >
-          <Text style={[styles.genreText, { color: theme.text.primary }]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.genreText, { color: theme.text.primary }]}
+          >
             {pageGenres + 5}
           </Text>
         </TouchableOpacity>
-        <Text style={[styles.genreText, { color: theme.text.muted }]}>●●●</Text>
+        <Text
+          allowFontScaling={false}
+          style={[styles.genreText, { color: theme.text.muted }]}
+        >
+          ●●●
+        </Text>
       </View>
     </View>
   );
