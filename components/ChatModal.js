@@ -30,7 +30,13 @@ import axios from "axios";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { LinearGradient } from "expo-linear-gradient";
 import Markdown from "react-native-markdown-display";
-import Reanimated, { LinearTransition, FadeInDown, FadeOutDown, FadeIn, FadeOut } from "react-native-reanimated";
+import Reanimated, {
+  LinearTransition,
+  FadeInDown,
+  FadeOutDown,
+  FadeIn,
+  FadeOut,
+} from "react-native-reanimated";
 import LottieView from "lottie-react-native";
 import { useNavigation } from "@react-navigation/native";
 import Feather from "@expo/vector-icons/Feather";
@@ -260,7 +266,8 @@ export const ChatModal = () => {
 
     setLoading(true);
     try {
-      const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+      const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || "...";
+      console.log("API Key:", apiKey);
       console.log(
         "Gemini API Key Length:",
         apiKey ? apiKey.length : "UNDEFINED",

@@ -39,6 +39,7 @@ import Avatar from "./profile/Avatar";
 import { BlurView } from "expo-blur";
 import IconBacground from "../../components/IconBacground";
 import CalendarWidget from "../../components/profile/CalendarWidget";
+import StatisticsSection from "./profile/StatisticsSection";
 const ProfileScreen = ({ navigation }) => {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
@@ -322,587 +323,168 @@ const ProfileScreen = ({ navigation }) => {
               )}
             </View>
           </View>
+          {/* ── Arkadaş aksiyonları ── */}
+          {/* ── Arkadaş aksiyonları ── */}
           <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 3,
-              marginBottom: 10,
-            }}
+            style={[styles.friendBar, { backgroundColor: theme.secondary }]}
           >
+            {/* Arkadaş Ara */}
             <TouchableOpacity
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 3,
-                width: "30%",
-                paddingHorizontal: 6,
-                paddingVertical: 6,
-                borderTopLeftRadius: 10,
-                borderBottomLeftRadius: 10,
-                backgroundColor: theme.secondary,
-              }}
+              style={styles.friendBarBtnCompact}
               onPress={() => navigation.navigate("SearchFriendsScreen")}
+              activeOpacity={0.6}
             >
-              <Text
-                allowFontScaling={false}
-                style={{ color: theme.text.secondary }}
+              <View
+                style={[
+                  styles.friendBarIconWrap,
+                  { backgroundColor: theme.accent + "15" },
+                ]}
               >
-                Arama
+                <Ionicons
+                  name="search-outline"
+                  size={18}
+                  color={theme.accent}
+                />
+              </View>
+              <Text
+                allowFontScaling={false}
+                style={[styles.friendBarLabel, { color: theme.text.secondary }]}
+              >
+                Ara
               </Text>
-              <Text
-                allowFontScaling={false}
-                style={{ color: theme.text.secondary }}
-              ></Text>
             </TouchableOpacity>
+
+            {/* Dikey ayraç */}
+            <View
+              style={[
+                styles.friendBarDivider,
+                { backgroundColor: theme.text.secondary + "20" },
+              ]}
+            />
+
+            {/* Arkadaşlar — yatay */}
             <TouchableOpacity
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 3,
-                width: "30%",
-                paddingHorizontal: 6,
-                paddingVertical: 6,
-                backgroundColor: theme.secondary,
-              }}
+              style={styles.friendBarBtnWide}
               onPress={() => navigation.navigate("FriendsListScreen")}
+              activeOpacity={0.6}
             >
+              <View
+                style={[
+                  styles.friendBarIconWrap,
+                  { backgroundColor: "#64b4ff15" },
+                ]}
+              >
+                <Ionicons name="people-outline" size={18} color="#64b4ff" />
+              </View>
               <Text
                 allowFontScaling={false}
-                style={{ color: theme.text.secondary }}
+                style={[styles.friendBarLabel, { color: theme.text.secondary }]}
               >
                 Arkadaşlar
               </Text>
-              <Text
-                allowFontScaling={false}
-                style={{ color: theme.text.secondary }}
-              >
-                {friendCount}
-              </Text>
+              {friendCount > 0 && (
+                <View
+                  style={[styles.friendBarPill, { backgroundColor: "#64b4ff" }]}
+                >
+                  <Text
+                    allowFontScaling={false}
+                    style={styles.friendBarPillText}
+                  >
+                    {friendCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
-            <TouchableOpacity
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 3,
 
-                borderTopRightRadius: 10,
-                borderBottomRightRadius: 10,
-                width: "30%",
-                paddingHorizontal: 6,
-                paddingVertical: 6,
-                backgroundColor: theme.secondary,
-              }}
+            {/* Dikey ayraç */}
+            <View
+              style={[
+                styles.friendBarDivider,
+                { backgroundColor: theme.text.secondary + "20" },
+              ]}
+            />
+
+            {/* İstekler — yatay */}
+            <TouchableOpacity
+              style={styles.friendBarBtnWide}
               onPress={() => navigation.navigate("FriendRequestsScreen")}
+              activeOpacity={0.6}
             >
+              <View
+                style={[
+                  styles.friendBarIconWrap,
+                  { backgroundColor: "#29b86415" },
+                ]}
+              >
+                <Ionicons name="mail-outline" size={18} color="#29b864" />
+              </View>
               <Text
                 allowFontScaling={false}
-                style={{ color: theme.text.secondary }}
+                style={[styles.friendBarLabel, { color: theme.text.secondary }]}
               >
                 İstekler
               </Text>
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <Text
-                  allowFontScaling={false}
-                  style={{ color: theme.text.secondary }}
-                >
-                  {receivedCount}
-                </Text>
-                <MaterialCommunityIcons
-                  name="arrow-bottom-left"
-                  size={14}
-                  color="#70ffb0ff"
-                />
-                <Text
-                  allowFontScaling={false}
-                  style={{ color: theme.text.secondary }}
-                >
-                  {sendCount}
-                </Text>
-                <MaterialCommunityIcons
-                  name="arrow-top-right"
-                  size={14}
-                  color="#70baffff"
-                />
-              </View>
+              {(receivedCount > 0 || sendCount > 0) && (
+                <View style={styles.friendBarPillRow}>
+                  {receivedCount > 0 && (
+                    <View
+                      style={[
+                        styles.friendBarPill,
+                        { backgroundColor: "#29b864" },
+                      ]}
+                    >
+                      <Text
+                        allowFontScaling={false}
+                        style={styles.friendBarPillText}
+                      >
+                        {receivedCount}
+                      </Text>
+                    </View>
+                  )}
+                  {sendCount > 0 && (
+                    <View
+                      style={[
+                        styles.friendBarPill,
+                        { backgroundColor: "#64b4ff" },
+                      ]}
+                    >
+                      <Text
+                        allowFontScaling={false}
+                        style={styles.friendBarPillText}
+                      >
+                        {sendCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
             </TouchableOpacity>
           </View>
-          {/* <Avatar /> */}
-          <TouchableOpacity
-            onPress={() => handleTimeClick()}
-            activeOpacity={0.8}
-            style={[
-              styles.totalDurationContainer,
-              {
-                backgroundColor: theme.primary,
-                shadowColor: theme.shadow,
-                borderColor: theme.border,
-                borderWidth: 1,
-              },
-            ]}
-          >
-            <View style={styles.durationItem}>
-              <Ionicons
-                name="time-outline"
-                size={18}
-                color={theme.text.secondary}
-              />
-              <View>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.durationValue, { color: theme.accent }]}
-                >
-                  {formatTotalDurationTime(
-                    (totalMinutesTimeTv || 0) + (totalMinutesTime || 0),
-                    timeDisplayMode,
-                  )}
-                </Text>
-                <Text
-                  style={[styles.durationLabel, { color: theme.text.muted }]}
-                >
-                  {t.profileScreen.totalDuration}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.durationItem}>
-              <Ionicons
-                name="film-outline"
-                size={18}
-                color={theme.text.secondary}
-              />
-              <View>
-                <Text
-                  style={[styles.durationValue, { color: borderColorMovie }]}
-                >
-                  {formatTotalDurationTime(
-                    totalMinutesTime || 0,
-                    timeDisplayMode,
-                  )}
-                </Text>
-                <Text
-                  style={[styles.durationLabel, { color: theme.text.muted }]}
-                >
-                  {t.movies} {rankNameMovie}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.durationItem}>
-              <Ionicons
-                name="tv-outline"
-                size={18}
-                color={theme.text.secondary}
-              />
-              <View>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.durationValue, { color: borderColorTv }]}
-                >
-                  {formatTotalDurationTime(
-                    totalMinutesTimeTv || 0,
-                    timeDisplayMode,
-                  )}
-                </Text>
-                <Text
-                  style={[styles.durationLabel, { color: theme.text.muted }]}
-                >
-                  {t.tvShows} {rankNameTv}
-                </Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-          <View style={styles.section}>
-            <Text
-              allowFontScaling={false}
-              style={[styles.sectionTitle, { color: theme.text.muted }]}
-            >
-              {t.profileScreen.movieStatistics}
-            </Text>
-            {isloadingShowInfo ? (
-              <WatchedInfoSkeleton />
-            ) : (
-              <Animated.View style={{ transform: [{ scale: scaleAnimMovie }] }}>
-                <TouchableOpacity
-                  onPress={() => {
-                    navigation.navigate("MovieStatisticsScreen");
-                  }}
-                  onPressIn={() => onPressIn("movie")}
-                  onPressOut={() => onPressOut("movie")}
-                  activeOpacity={0.8}
-                  style={[
-                    styles.watchStats,
-                    {
-                      backgroundColor: theme.border,
-                      borderColor: theme.border,
-                      shadowColor: theme.shadow,
-                    },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.watchStatsView,
-                      {
-                        backgroundColor: theme.secondary,
-                        borderColor: theme.border,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.textSecondary,
-                        {
-                          color: theme.text.secondary,
-                        },
-                      ]}
-                    >
-                      {watchedMovieCount}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.textMuted,
-                        {
-                          color: theme.text.muted,
-                        },
-                      ]}
-                    >
-                      {t.profileScreen.movieWatched}
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.watchStatsView2,
-                      {
-                        backgroundColor: theme.secondary,
-                        borderColor: theme.border,
-                      },
-                    ]}
-                  >
-                    <View>
-                      <Text
-                        style={[
-                          styles.textSecondary,
-                          {
-                            color: theme.text.secondary,
-                          },
-                        ]}
-                      >
-                        {totalWatchedTime?.years}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.textMuted,
-                          {
-                            color: theme.text.muted,
-                          },
-                        ]}
-                      >
-                        {t.profileScreen.years}
-                      </Text>
-                    </View>
-                    <View>
-                      <Text
-                        style={[
-                          styles.textSecondary,
-                          {
-                            color: theme.text.secondary,
-                          },
-                        ]}
-                      >
-                        {totalWatchedTime?.months}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.textMuted,
-                          {
-                            color: theme.text.muted,
-                          },
-                        ]}
-                      >
-                        {t.profileScreen.months}
-                      </Text>
-                    </View>
-                    <View>
-                      <Text
-                        style={[
-                          styles.textSecondary,
-                          {
-                            color: theme.text.secondary,
-                          },
-                        ]}
-                      >
-                        {totalWatchedTime?.days}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.textMuted,
-                          {
-                            color: theme.text.muted,
-                          },
-                        ]}
-                      >
-                        {t.profileScreen.days}
-                      </Text>
-                    </View>
-                    <View>
-                      <Text
-                        style={[
-                          styles.textSecondary,
-                          {
-                            color: theme.text.secondary,
-                          },
-                        ]}
-                      >
-                        {totalWatchedTime?.hours}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.textMuted,
-                          {
-                            color: theme.text.muted,
-                          },
-                        ]}
-                      >
-                        {t.profileScreen.hours}
-                      </Text>
-                    </View>
-                    <View>
-                      <Text
-                        style={[
-                          styles.textSecondary,
-                          {
-                            color: theme.text.secondary,
-                          },
-                        ]}
-                      >
-                        {totalWatchedTime?.minutes}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.textMuted,
-                          {
-                            color: theme.text.muted,
-                          },
-                        ]}
-                      >
-                        {t.profileScreen.minutes}
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              </Animated.View>
-            )}
-          </View>
-          <View style={styles.section}>
-            <Text
-              allowFontScaling={false}
-              style={[styles.sectionTitle, { color: theme.text.muted }]}
-            >
-              {t.profileScreen.tvShowStatistics}
-            </Text>
-            {isloadingMovieInfo ? (
-              <WatchedInfoSkeleton />
-            ) : (
-              <Animated.View style={{ transform: [{ scale: scaleAnimTv }] }}>
-                <TouchableOpacity
-                  onPressIn={() => onPressIn("tv")}
-                  onPressOut={() => onPressOut("tv")}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    navigation.navigate("TvStatisticsScreen");
-                  }}
-                  style={[
-                    styles.watchStats,
-                    {
-                      backgroundColor: theme.border,
-                      borderColor: theme.border,
-                      shadowColor: theme.shadow,
-                    },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.watchStatsView,
-                      {
-                        flexDirection: "row",
-                        justifyContent: "space-around",
-                        backgroundColor: theme.secondary,
-                        borderColor: theme.border,
-                      },
-                    ]}
-                  >
-                    <View>
-                      <Text
-                        style={[
-                          styles.textSecondary,
-                          {
-                            color: theme.text.secondary,
-                          },
-                        ]}
-                      >
-                        {watchedTvCount}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.textMuted,
-                          {
-                            color: theme.text.muted,
-                          },
-                        ]}
-                      >
-                        {t.profileScreen.tvShowCount}
-                      </Text>
-                    </View>
-
-                    <View>
-                      <Text
-                        style={[
-                          styles.textSecondary,
-                          {
-                            color: theme.text.secondary,
-                          },
-                        ]}
-                      >
-                        {totalEpisodesCount}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.textMuted,
-                          {
-                            color: theme.text.muted,
-                          },
-                        ]}
-                      >
-                        {t.profileScreen.tvShowEpisodetotalCount}
-                      </Text>
-                    </View>
-                  </View>
-                  <View
-                    style={[
-                      styles.watchStatsView2,
-                      {
-                        backgroundColor: theme.secondary,
-                        borderColor: theme.border,
-                      },
-                    ]}
-                  >
-                    <View>
-                      <Text
-                        style={[
-                          styles.textSecondary,
-                          {
-                            color: theme.text.secondary,
-                          },
-                        ]}
-                      >
-                        {totalWatchedTimeTv?.years}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.textMuted,
-                          {
-                            color: theme.text.muted,
-                          },
-                        ]}
-                      >
-                        {t.profileScreen.years}
-                      </Text>
-                    </View>
-                    <View>
-                      <Text
-                        style={[
-                          styles.textSecondary,
-                          {
-                            color: theme.text.secondary,
-                          },
-                        ]}
-                      >
-                        {totalWatchedTimeTv?.months}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.textMuted,
-                          {
-                            color: theme.text.muted,
-                          },
-                        ]}
-                      >
-                        {t.profileScreen.months}
-                      </Text>
-                    </View>
-                    <View>
-                      <Text
-                        style={[
-                          styles.textSecondary,
-                          {
-                            color: theme.text.secondary,
-                          },
-                        ]}
-                      >
-                        {totalWatchedTimeTv?.days}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.textMuted,
-                          {
-                            color: theme.text.muted,
-                          },
-                        ]}
-                      >
-                        {t.profileScreen.days}
-                      </Text>
-                    </View>
-                    <View>
-                      <Text
-                        style={[
-                          styles.textSecondary,
-                          {
-                            color: theme.text.secondary,
-                          },
-                        ]}
-                      >
-                        {totalWatchedTimeTv?.hours}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.textMuted,
-                          {
-                            color: theme.text.muted,
-                          },
-                        ]}
-                      >
-                        {t.profileScreen.hours}
-                      </Text>
-                    </View>
-                    <View>
-                      <Text
-                        style={[
-                          styles.textSecondary,
-                          {
-                            color: theme.text.secondary,
-                          },
-                        ]}
-                      >
-                        {totalWatchedTimeTv?.minutes}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.textMuted,
-                          {
-                            color: theme.text.muted,
-                          },
-                        ]}
-                      >
-                        {t.profileScreen.minutes}
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              </Animated.View>
-            )}
-          </View>
+          {/* todo <Avatar /> */}
+          <StatisticsSection
+            theme={theme}
+            isloadingShowInfo={isloadingShowInfo}
+            isloadingMovieInfo={isloadingMovieInfo}
+            watchedMovieCount={watchedMovieCount}
+            watchedTvCount={watchedTvCount}
+            totalEpisodesCount={totalEpisodesCount}
+            totalWatchedTime={totalWatchedTime}
+            totalWatchedTimeTv={totalWatchedTimeTv}
+            totalMinutesTime={totalMinutesTime}
+            totalMinutesTimeTv={totalMinutesTimeTv}
+            timeDisplayMode={timeDisplayMode}
+            rankNameMovie={rankNameMovie}
+            rankNameTv={rankNameTv}
+            borderColorMovie={borderColorMovie}
+            borderColorTv={borderColorTv}
+            formatTotalDurationTime={formatTotalDurationTime}
+            onNavigateMovieStats={() =>
+              navigation.navigate("MovieStatisticsScreen")
+            }
+            onNavigateTvStats={() => navigation.navigate("TvStatisticsScreen")}
+            onTimeClick={handleTimeClick}
+            t={t}
+          />
           <ProfileLists navigation={navigation} />
           <CalendarWidget navigation={navigation} />
           <ProfileReminders navigation={navigation} />
@@ -1054,6 +636,75 @@ const ProfileScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  // ── Arkadaş bar ───────────────────────────────────────────────────────────
+  friendBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 20,
+    paddingVertical: 4,
+  },
+
+  // Ara butonu — dikey (kompakt)
+  friendBarBtnCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    gap: 7,
+  },
+
+  // Arkadaşlar & İstekler — yatay (icon sol, label+badge sağ)
+  friendBarBtnWide: {
+    flex: 1,
+    flexDirection: "row", // ← yatay düzen
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    gap: 7,
+  },
+
+  friendBarDivider: {
+    width: 1,
+    height: 32,
+    borderRadius: 1,
+  },
+  friendBarIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  friendBarLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.2,
+  },
+  friendBarPillRow: {
+    flexDirection: "row",
+    gap: 3,
+    alignItems: "center",
+  },
+  friendBarPill: {
+    minWidth: 18,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 5,
+  },
+  friendBarPillText: {
+    color: "#fff",
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+  // ───────────────────────────────────────────────────────────────────────────
+
   container: {
     flex: 1,
     //paddingTop: 0,
@@ -1161,12 +812,6 @@ const styles = StyleSheet.create({
     //marginBottom: 10,
   },
 
-  sectionTitle: {
-    fontSize: 14,
-    marginBottom: 10,
-    marginLeft: 10,
-    textTransform: "uppercase",
-  },
   logout: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1186,6 +831,12 @@ const styles = StyleSheet.create({
     shadowRadius: 10.32,
     elevation: 5,
   },
+  sectionTitle: {
+    fontSize: 14,
+    marginBottom: 10,
+    marginLeft: 10,
+    textTransform: "uppercase",
+  },
   watchStats: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -1193,7 +844,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     paddingHorizontal: 7,
     gap: 5,
-    borderRadius: 12,
+    borderRadius: 18,
     marginBottom: 10,
     shadowColor: "#000",
     //borderWidth: 1,
@@ -1209,7 +860,7 @@ const styles = StyleSheet.create({
 
     //borderWidth: 1,
     padding: 5,
-    borderRadius: 5,
+    borderRadius: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
@@ -1230,7 +881,7 @@ const styles = StyleSheet.create({
 
     //borderWidth: 1,
     padding: 5,
-    borderRadius: 5,
+    borderRadius: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
@@ -1307,7 +958,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   durationValue: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "bold",
   },
   durationLabel: {

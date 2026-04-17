@@ -63,7 +63,9 @@ const OngoingCard = ({
       onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
     >
       <Animated.View
-        style={{ transform: [{ scale: scaleValues[item.id] || 1 }] }}
+        style={{
+          transform: [{ scale: scaleValues[item.id] || 1 }],
+        }}
       >
         {/* Poster */}
         <Image

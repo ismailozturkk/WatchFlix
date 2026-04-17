@@ -152,7 +152,10 @@ export const AppSettingsProvider = ({ children }) => {
       Toast.show({ type: "error", text1: "Kalite kaydedilemedi: " + error });
     });
   };
-  const apiKey = process.env.EXPO_PUBLIC_API_KEY;
+  // ✅ YENİ — doğrudan statik referans
+  const RAW_KEY = process.env.EXPO_PUBLIC_API_KEY || "....";
+  const apiKey =
+    RAW_KEY && !RAW_KEY.startsWith("Bearer ") ? `Bearer ${RAW_KEY}` : RAW_KEY;
 
   const value = {
     showSnow,

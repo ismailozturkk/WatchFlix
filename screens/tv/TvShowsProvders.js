@@ -79,7 +79,9 @@ export default function TvShowsProvders({ navigation }) {
       onPress={() => fetchMoviesByProvider(item.provider_id)}
     >
       <Image
-        source={{ uri: `https://image.tmdb.org/t/p/w200${item.logo_path}` }}
+        source={{
+          uri: `https://image.tmdb.org/t/p/${imageQuality.logo}${item.logo_path}`,
+        }}
         style={{ width: 30, height: 30, borderRadius: 10 }}
       />
       <View

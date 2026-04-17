@@ -14,8 +14,6 @@ import { doc, onSnapshot } from "firebase/firestore";
 const CalendarContext = createContext();
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
-const { imageQuality } = useAppSettings();
-const POSTER_BASE = `https://image.tmdb.org/t/p/${imageQuality}`;
 
 // TMDB için izin verilen maksimum gün aralığı: isteğe bağlı
 export const RANGE_OPTIONS = [
@@ -35,7 +33,8 @@ function addDays(date, days) {
 }
 
 export const CalendarProvider = ({ children }) => {
-  const { API_KEY, selectedLanguage } = useAppSettings();
+  const { API_KEY, selectedLanguage, imageQuality } = useAppSettings();
+  const POSTER_BASE = `https://image.tmdb.org/t/p/${imageQuality.poster || "w185"}`;
   const { user } = useAuth();
 
   // Kullanıcı seçtiği tarih aralığı (gün)

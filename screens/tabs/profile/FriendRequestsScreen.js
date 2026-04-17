@@ -1,12 +1,19 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  Animated,
   Image,
+  Dimensions,
 } from "react-native";
+
+const { width: SCREEN_W } = Dimensions.get("window");
+// Tab bar: marginHorizontal 16 her iki yan → bar genişliği = SCREEN_W - 32
+// 2 sekme eşit bölünür
+const TAB_W = (SCREEN_W - 32) / 2;
 import {
   doc,
   onSnapshot,
@@ -21,15 +28,27 @@ import { useProfileScreen } from "../../../context/ProfileScreenContext";
 import SwipeCard from "../../../modules/SwipeCard";
 import IconBacground from "../../../components/IconBacground";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 export default function FriendRequestsScreen() {
-  const [tab, setTab] = useState("received"); // 🔹 aktif sekme
+  const [tab, setTab] = useState("received");
   const [requests, setRequests] = useState([]);
   const [sentRequests, setSentRequests] = useState([]);
   const auth = getAuth();
   const { theme } = useTheme();
   const user = auth.currentUser;
   const { avatars } = useProfileScreen();
+
+  const tabAnim = useRef(new Animated.Value(0)).current;
+  const titleAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(titleAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -44,33 +63,36 @@ export default function FriendRequestsScreen() {
     return () => unsubscribe();
   }, []);
 
+  const switchTab = (t) => {
+    setTab(t);
+    Animated.spring(tabAnim, {
+      toValue: t === "received" ? 0 : 1,
+      speed: 16,
+      bounciness: 5,
+      useNativeDriver: true,
+    }).start();
+  };
+
   const handleAccept = async (friend) => {
     const userRef = doc(db, "Users", user.uid);
     const friendRef = doc(db, "Users", friend.uid);
-
     const userSnap = await getDoc(userRef);
     const friendSnap = await getDoc(friendRef);
-
     if (!userSnap.exists() || !friendSnap.exists()) return;
-
     const userData = userSnap.data();
     const friendData = friendSnap.data();
-
     const currentUserObj = {
       uid: user.uid,
       displayName: user.displayName,
       username: userData.username || "",
       avatarIndex: userData.avatarIndex || 0,
     };
-
     const friendObj = {
       uid: friend.uid,
       displayName: friend.displayName,
       username: friend.username,
       avatarIndex: friend.avatarIndex || 0,
     };
-
-    // 🔹 Güncelle
     await updateDoc(userRef, {
       friends: arrayUnion(friendObj),
       "friendRequests.receivedRequest":
@@ -78,7 +100,6 @@ export default function FriendRequestsScreen() {
           (req) => req.uid !== friend.uid,
         ),
     });
-
     await updateDoc(friendRef, {
       friends: arrayUnion(currentUserObj),
       "friendRequests.sendRequest":
@@ -91,21 +112,17 @@ export default function FriendRequestsScreen() {
   const handleDecline = async (friend) => {
     const userRef = doc(db, "Users", user.uid);
     const friendRef = doc(db, "Users", friend.uid);
-
     const userSnap = await getDoc(userRef);
     const friendSnap = await getDoc(friendRef);
     if (!userSnap.exists() || !friendSnap.exists()) return;
-
     const userData = userSnap.data();
     const friendData = friendSnap.data();
-
     await updateDoc(userRef, {
       "friendRequests.receivedRequest":
         userData.friendRequests.receivedRequest.filter(
           (req) => req.uid !== friend.uid,
         ),
     });
-
     await updateDoc(friendRef, {
       "friendRequests.sendRequest":
         friendData.friendRequests.sendRequest.filter(
@@ -115,22 +132,18 @@ export default function FriendRequestsScreen() {
   };
 
   const handleCancelSent = async (friend) => {
-    // 🔹 Gönderilen isteği iptal et
     const userRef = doc(db, "Users", user.uid);
     const friendRef = doc(db, "Users", friend.uid);
     const userSnap = await getDoc(userRef);
     const friendSnap = await getDoc(friendRef);
     if (!userSnap.exists() || !friendSnap.exists()) return;
-
     const userData = userSnap.data();
     const friendData = friendSnap.data();
-
     await updateDoc(userRef, {
       "friendRequests.sendRequest": userData.friendRequests.sendRequest.filter(
         (req) => req.uid !== friend.uid,
       ),
     });
-
     await updateDoc(friendRef, {
       "friendRequests.receivedRequest":
         friendData.friendRequests.receivedRequest.filter(
@@ -154,26 +167,94 @@ export default function FriendRequestsScreen() {
               color: "#30a75e",
               onPress: () => handleAccept(item),
             }
-          : undefined // 'received' değilse butonu gösterme
+          : undefined
       }
     >
-      <View style={[styles.requestItem, { backgroundColor: theme.secondary }]}>
+      <View
+        style={[
+          styles.requestCard,
+          { backgroundColor: theme.secondary, borderColor: theme.border },
+        ]}
+      >
+        {/* Avatar */}
+        <View
+          style={[
+            styles.avatarWrapper,
+            {
+              borderColor:
+                tab === "received"
+                  ? (theme.colors?.green ?? "#29b864") + "88"
+                  : "#ff965088",
+            },
+          ]}
+        >
+          {avatars?.[item?.avatarIndex] ? (
+            <Image source={avatars[item.avatarIndex]} style={styles.avatar} />
+          ) : (
+            <View
+              style={[
+                styles.avatarPlaceholder,
+                { backgroundColor: theme.primary },
+              ]}
+            >
+              <Ionicons
+                name="person"
+                size={22}
+                color={theme.text?.muted ?? "#555"}
+              />
+            </View>
+          )}
+        </View>
+
+        {/* Bilgiler */}
         <View style={styles.userInfo}>
-          <Image source={avatars[item?.avatarIndex]} style={styles.avatar} />
-          <View>
-            <Text
-              allowFontScaling={false}
-              style={[styles.name, { color: theme.text.primary }]}
-            >
-              {item.displayName}
-            </Text>
-            <Text
-              allowFontScaling={false}
-              style={[styles.username, { color: theme.text.secondary }]}
-            >
-              @{item.username}
-            </Text>
-          </View>
+          <Text
+            style={[
+              styles.displayName,
+              { color: theme.text?.primary ?? "#fff" },
+            ]}
+            numberOfLines={1}
+          >
+            {item.displayName}
+          </Text>
+          <Text
+            style={[
+              styles.username,
+              { color: theme.text?.secondary ?? "#aaa" },
+            ]}
+            numberOfLines={1}
+          >
+            @{item.username}
+          </Text>
+        </View>
+
+        {/* İşlem ipucu */}
+        <View style={styles.hintWrapper}>
+          {tab === "received" ? (
+            <View style={styles.hintRow}>
+              <View
+                style={[
+                  styles.hintBtn,
+                  {
+                    backgroundColor: (theme.colors?.green ?? "#29b864") + "22",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="checkmark"
+                  size={16}
+                  color={theme.colors?.green ?? "#29b864"}
+                />
+              </View>
+              <View style={[styles.hintBtn, { backgroundColor: "#c44f4f22" }]}>
+                <Ionicons name="close" size={16} color="#c44f4f" />
+              </View>
+            </View>
+          ) : (
+            <View style={[styles.hintBtn, { backgroundColor: "#ff965022" }]}>
+              <Ionicons name="hourglass-outline" size={16} color="#ff9650" />
+            </View>
+          )}
         </View>
       </View>
     </SwipeCard>
@@ -187,62 +268,117 @@ export default function FriendRequestsScreen() {
     >
       <IconBacground opacity={0.3} />
 
-      {/* 🔹 Sekme Başlıkları */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          onPress={() => setTab("received")}
+      {/* Başlık */}
+      <Animated.Text
+        style={[
+          styles.pageTitle,
+          { color: theme.text?.primary ?? "#fff" },
+          {
+            opacity: titleAnim,
+            transform: [
+              {
+                translateY: titleAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-16, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        Arkadaşlık İstekleri
+      </Animated.Text>
+
+      {/* Sekme çubuğu */}
+      <View style={[styles.tabBar, { backgroundColor: theme.secondary }]}>
+        <Animated.View
           style={[
-            styles.tab,
+            styles.tabIndicator,
             {
-              backgroundColor:
-                tab === "received" ? theme.accent : theme.secondary,
+              backgroundColor: theme.primary,
+              width: TAB_W - 8,
+              transform: [
+                {
+                  translateX: tabAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [4, TAB_W + 4],
+                  }),
+                },
+              ],
             },
           ]}
-        >
-          <Text
-            allowFontScaling={false}
-            style={{ color: theme.text.primary, fontWeight: "600" }}
+        />
+        {[
+          { key: "received", label: "Gelen İstekler", count: requests.length },
+          { key: "sent", label: "Gönderilenler", count: sentRequests.length },
+        ].map((t) => (
+          <TouchableOpacity
+            key={t.key}
+            style={styles.tabBtn}
+            onPress={() => switchTab(t.key)}
+            activeOpacity={0.75}
           >
-            Gelen İstekler
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setTab("sent")}
-          style={[
-            styles.tab,
-            {
-              backgroundColor: tab === "sent" ? theme.accent : theme.secondary,
-            },
-          ]}
-        >
-          <Text
-            allowFontScaling={false}
-            style={{ color: theme.text.primary, fontWeight: "600" }}
-          >
-            Gönderilen İstekler
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.tabLabel,
+                {
+                  color:
+                    tab === t.key
+                      ? (theme.text?.primary ?? "#fff")
+                      : (theme.text?.secondary ?? "#aaa"),
+                },
+                tab === t.key && { fontWeight: "700" },
+              ]}
+            >
+              {t.label}
+            </Text>
+            {t.count > 0 && (
+              <View
+                style={[
+                  styles.countDot,
+                  {
+                    backgroundColor:
+                      t.key === "received"
+                        ? (theme.colors?.green ?? "#29b864")
+                        : "#ff9650",
+                  },
+                ]}
+              >
+                <Text style={styles.countDotText}>{t.count}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ))}
       </View>
 
-      {/* 🔹 Liste */}
+      {/* Liste veya boş durum */}
       {activeData.length === 0 ? (
-        <Text
-          style={{
-            textAlign: "center",
-            marginTop: 30,
-            color: theme.text.secondary,
-          }}
-        >
-          {tab === "received"
-            ? "Gelen arkadaşlık isteği yok."
-            : "Gönderilen arkadaşlık isteği yok."}
-        </Text>
+        <View style={styles.emptyState}>
+          <Ionicons
+            name={
+              tab === "received" ? "mail-open-outline" : "paper-plane-outline"
+            }
+            size={52}
+            color={theme.text?.muted ?? "#444"}
+          />
+          <Text
+            style={[
+              styles.emptyText,
+              { color: theme.text?.secondary ?? "#aaa" },
+            ]}
+          >
+            {tab === "received"
+              ? "Gelen arkadaşlık isteği yok"
+              : "Gönderilen arkadaşlık isteği yok"}
+          </Text>
+        </View>
       ) : (
         <FlatList
           data={activeData}
           keyExtractor={(item) => item.uid}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: 20, paddingHorizontal: 15 }}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
         />
       )}
     </SafeAreaView>
@@ -250,38 +386,98 @@ export default function FriendRequestsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingVertical: 15, paddingTop: 10 },
-  tabContainer: {
+  container: { flex: 1, paddingTop: 10 },
+
+  pageTitle: {
+    fontSize: 26,
+    fontWeight: "800",
+    textAlign: "center",
+    letterSpacing: -0.5,
+    marginBottom: 16,
+    marginTop: 4,
+  },
+
+  // ── Tab bar ──────────────────────────────────────────────────────────────
+  tabBar: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    marginBottom: 20,
+    marginHorizontal: 16,
+    marginBottom: 14,
+    borderRadius: 14,
+    height: 46,
+    position: "relative",
+    overflow: "hidden",
   },
-  tab: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 12,
-    elevation: 2,
-  },
-  requestItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  userInfo: { flexDirection: "row", alignItems: "center", gap: 12 },
-  avatar: { width: 50, height: 50, borderRadius: 25 },
-  name: { fontSize: 16, fontWeight: "600" },
-  username: { fontSize: 14 },
-  btn: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+  tabIndicator: {
+    position: "absolute",
+    top: 4,
+    bottom: 4,
     borderRadius: 10,
   },
+  tabBtn: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1,
+    gap: 6,
+  },
+  tabLabel: { fontSize: 13, fontWeight: "500" },
+  countDot: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  countDotText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+
+  listContent: { paddingHorizontal: 16, paddingBottom: 30 },
+
+  // ── Request card ─────────────────────────────────────────────────────────
+  requestCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    gap: 12,
+  },
+  avatarWrapper: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 2,
+    overflow: "hidden",
+  },
+  avatar: { width: "100%", height: "100%", borderRadius: 26 },
+  avatarPlaceholder: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  userInfo: { flex: 1, gap: 3 },
+  displayName: { fontSize: 15, fontWeight: "700" },
+  username: { fontSize: 13 },
+  hintWrapper: { alignItems: "center", justifyContent: "center" },
+  hintRow: { flexDirection: "row", gap: 6 },
+  hintBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // ── Empty state ──────────────────────────────────────────────────────────
+  emptyState: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 14,
+    paddingHorizontal: 32,
+  },
+  emptyText: { fontSize: 14, textAlign: "center", lineHeight: 20 },
 });

@@ -9,7 +9,12 @@ import {
 import { useTheme } from "../context/ThemeContext";
 const { width, height } = Dimensions.get("window");
 
-export default function Skeleton({ width: skeletonWidth, height, style }) {
+export default function Skeleton({
+  width: skeletonWidth,
+  height,
+  style,
+  children,
+}) {
   const { theme } = useTheme();
   const animatedValue = new Animated.Value(0);
 
@@ -47,7 +52,9 @@ export default function Skeleton({ width: skeletonWidth, height, style }) {
         },
         style,
       ]}
-    />
+    >
+      {children}
+    </Animated.View>
   );
 }
 // Ready skeleton components
@@ -318,15 +325,27 @@ export const MovieUpComingSkeleton = () => {
   );
 };
 export const AvatarSkeleton = () => {
-  return <Skeleton width={120} height={120} style={{ borderRadius: 75 }} />;
+  return <Skeleton width={140} height={140} style={{ borderRadius: 70 }} />;
 };
 export const WatchedInfoSkeleton = () => {
   return (
-    <Skeleton
-      width={"100%"}
-      height={65}
-      style={{ borderRadius: 12, marginBottom: 8 }}
-    />
+    <View style={{ gap: 10 }}>
+      <Skeleton
+        width={"100%"}
+        height={70}
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          paddingHorizontal: 8,
+          borderRadius: 12,
+          marginBottom: 8,
+        }}
+      >
+        <Skeleton width={"49%"} height={55} style={{ borderRadius: 8 }} />
+        <Skeleton width={"49%"} height={55} style={{ borderRadius: 8 }} />
+      </Skeleton>
+    </View>
   );
 };
 export const ListsSkeleton = () => {

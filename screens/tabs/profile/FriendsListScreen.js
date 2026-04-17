@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   Image,
   StyleSheet,
   TouchableOpacity,
+  Animated,
 } from "react-native";
 import {
   doc,
@@ -26,380 +27,260 @@ import IconBacground from "../../../components/IconBacground";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppSettings } from "../../../context/AppSettingsContext";
 
+const LIST_META = {
+  watchedMovies: { icon: "movie-outline", iconLib: "mci", color: "#29b864", label: "İzlenen Filmler" },
+  watchedTv:     { icon: "tv",           iconLib: "feather", color: "#29b864", label: "İzlenen Diziler" },
+  favorites:     { icon: "heart",        iconLib: "ion",  color: "#e33",     label: "Favoriler" },
+  watchList:     { icon: "bookmark",     iconLib: "ion",  color: "#64b4ff",  label: "İzlenecekler" },
+};
+
+const ListIcon = ({ name, iconLib, color, size = 14 }) => {
+  if (iconLib === "mci") return <MaterialCommunityIcons name={name} size={size} color={color} />;
+  if (iconLib === "feather") return <Feather name={name} size={size} color={color} />;
+  return <Ionicons name={name} size={size} color={color} />;
+};
+
+const protectedLists = ["watchedTv", "watchedMovies", "watchList", "favorites"];
+
 export default function FriendsListScreen({ navigation }) {
   const [friends, setFriends] = useState([]);
+  const [selectedFriend, setSelectedFriend] = useState(null);
+  const [friendLists, setFriendLists] = useState([]);
+
   const auth = getAuth();
   const user = auth.currentUser;
-  const { avatars, lists, gridStyle } = useProfileScreen(); // ProfileScreen context'inden listeleri alalım
+  const { avatars, gridStyle } = useProfileScreen();
   const { imageQuality } = useAppSettings();
   const { theme } = useTheme();
-  const { t } = useLanguage();
-  const [selectedFriend, setSelectedFriend] = useState(null); // Hangi arkadaşın listelerinin gösterileceğini tutar
-  const [friendLists, setFriendLists] = useState([]); // Seçilen arkadaşın listelerini tutar
+  useLanguage();
+
+  const titleAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(titleAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   useEffect(() => {
     if (!user) return;
     const userRef = doc(db, "Users", user.uid);
     const unsubscribe = onSnapshot(userRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setFriends(data.friends || []);
-      }
+      if (docSnap.exists()) setFriends(docSnap.data().friends || []);
     });
     return () => unsubscribe();
   }, [user]);
-  useEffect(() => {}, [selectedFriend, friendLists]);
 
-  // Seçili arkadaş değiştiğinde listelerini çek
   useEffect(() => {
-    if (!selectedFriend) {
-      setFriendLists([]);
-      return;
-    }
-
-    // 1️⃣ Hangi listeler görünür, Users DB'den al
+    if (!selectedFriend) { setFriendLists([]); return; }
     const userRef = doc(db, "Users", selectedFriend.uid);
     const unsubscribeUser = onSnapshot(userRef, (userSnap) => {
       if (!userSnap.exists()) return;
-
       const listVisible = userSnap.data().listVisible || [];
       const visibleListNames = listVisible
-        .filter((mapItem) => Object.values(mapItem)[0] === true)
-        .map((mapItem) => Object.keys(mapItem)[0]);
-
-      // 2️⃣ Görünür listelerin içeriklerini Lists DB'den al
+        .filter((m) => Object.values(m)[0] === true)
+        .map((m) => Object.keys(m)[0]);
       const listsRef = doc(db, "Lists", selectedFriend.uid);
       const unsubscribeLists = onSnapshot(listsRef, (listsSnap) => {
-        if (!listsSnap.exists()) {
-          setFriendLists([]);
-          return;
-        }
-
-        const allLists = Object.entries(listsSnap.data() || {});
-        const filteredLists = allLists.filter(([listName]) =>
-          visibleListNames.includes(listName),
-        );
-
-        setFriendLists(filteredLists);
+        if (!listsSnap.exists()) { setFriendLists([]); return; }
+        const all = Object.entries(listsSnap.data() || {});
+        setFriendLists(all.filter(([name]) => visibleListNames.includes(name)));
       });
-
       return () => unsubscribeLists();
     });
-
     return () => unsubscribeUser();
   }, [selectedFriend]);
-
-  const handleSendMessage = (friend) => {
-    navigation.navigate("ChatScreen", {
-      friendUid: friend.uid,
-      friendName: friend.displayName,
-    });
-  };
 
   const handleDelete = async (friend) => {
     try {
       const userRef = doc(db, "Users", user.uid);
       const friendRef = doc(db, "Users", friend.uid);
-
-      const userSnap = await getDoc(userRef);
-      const friendSnap = await getDoc(friendRef);
-
+      const [userSnap, friendSnap] = await Promise.all([getDoc(userRef), getDoc(friendRef)]);
       if (!userSnap.exists() || !friendSnap.exists()) return;
-
-      Toast.show({
-        type: "success",
-        text1: `${friend.displayName} arkadaş listenizden silindi`,
-      });
-
-      // 🔹 Kullanıcının arkadaş listesinden çıkar
-      await updateDoc(userRef, {
-        friends: arrayRemove(friend),
-      });
-
-      // 🔹 Arkadaşın listesinden de çıkar
-      const currentUserDataForFriend = friendSnap
-        .data()
-        .friends.find((f) => f.uid === user.uid);
-      if (currentUserDataForFriend) {
-        await updateDoc(friendRef, {
-          friends: arrayRemove(currentUserDataForFriend),
-        });
-      }
+      Toast.show({ type: "success", text1: `${friend.displayName} arkadaş listenizden silindi` });
+      await updateDoc(userRef, { friends: arrayRemove(friend) });
+      const currentUserInFriend = friendSnap.data().friends?.find((f) => f.uid === user.uid);
+      if (currentUserInFriend) await updateDoc(friendRef, { friends: arrayRemove(currentUserInFriend) });
     } catch (error) {
       console.error("Arkadaş silme hatası:", error);
-      Toast.show({
-        type: "error",
-        text1: "Silme işlemi başarısız",
-        text2: error.message,
-      });
+      Toast.show({ type: "error", text1: "Silme işlemi başarısız", text2: error.message });
     }
   };
 
-  const protectedLists = [
-    "watchedTv",
-    "watchedMovies",
-    "watchList",
-    "favorites",
+  const handleSendMessage = (friend) => {
+    navigation.navigate("ChatScreen", { friendUid: friend.uid, friendName: friend.displayName });
+  };
+
+  const sortedLists = (lists) => [
+    ...protectedLists.map((n) => lists.find(([ln]) => ln === n)).filter(Boolean),
+    ...lists.filter(([ln]) => !protectedLists.includes(ln)).sort((a, b) => a[0].localeCompare(b[0])),
   ];
-  const renderFriend = ({ item }) => (
-    <SwipeCard
-      leftButton={{
-        label: "Sil",
-        color: "#e53935",
-        onPress: () => handleDelete(item),
-      }}
-      rightButton={{
-        label: "Mesaj",
-        color: "#5aacf0ff",
-        onPress: () => handleSendMessage(item),
-      }}
-    >
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() =>
-          setSelectedFriend(selectedFriend?.uid === item.uid ? null : item)
-        }
-        style={[styles.friendItem, { backgroundColor: theme.secondary }]}
+
+  const renderFriend = ({ item }) => {
+    const isExpanded = selectedFriend?.uid === item.uid;
+    return (
+      <SwipeCard
+        leftButton={{ label: "Sil", color: "#e53935", onPress: () => handleDelete(item) }}
+        rightButton={{ label: "Mesaj", color: "#5aacf0", onPress: () => handleSendMessage(item) }}
       >
-        <View style={styles.userInfo}>
-          <Image source={avatars[item.avatarIndex]} style={styles.avatar} />
-          <View>
-            <Text
-              allowFontScaling={false}
-              style={[styles.name, { color: theme.text.primary }]}
-            >
+        {/* Arkadaş satırı */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setSelectedFriend(isExpanded ? null : item)}
+          style={[styles.friendCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+        >
+          <View style={[styles.avatarWrapper, { borderColor: theme.accent + "66" }]}>
+            {avatars?.[item.avatarIndex] ? (
+              <Image source={avatars[item.avatarIndex]} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatarPlaceholder, { backgroundColor: theme.primary }]}>
+                <Ionicons name="person" size={22} color={theme.text?.muted ?? "#555"} />
+              </View>
+            )}
+          </View>
+          <View style={styles.friendInfo}>
+            <Text style={[styles.friendName, { color: theme.text?.primary ?? "#fff" }]} numberOfLines={1}>
               {item.displayName}
             </Text>
-            <Text
-              allowFontScaling={false}
-              style={[styles.username, { color: theme.text.secondary }]}
-            >
+            <Text style={[styles.friendUsername, { color: theme.text?.secondary ?? "#aaa" }]} numberOfLines={1}>
               @{item.username}
             </Text>
           </View>
-        </View>
-      </TouchableOpacity>
+          <Ionicons
+            name={isExpanded ? "chevron-up" : "chevron-down"}
+            size={18}
+            color={theme.text?.muted ?? "#555"}
+          />
+        </TouchableOpacity>
 
-      {selectedFriend?.uid === item.uid && (
-        <FlatList
-          data={[
-            ...protectedLists
-              .map((name) =>
-                friendLists.find(([listName]) => listName === name),
-              )
-              .filter(Boolean),
-            ...friendLists
-              .filter(([listName]) => !protectedLists.includes(listName))
-              .sort((a, b) => a[0].localeCompare(b[0])),
-          ]}
-          keyExtractor={([listName]) => listName}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 5 }}
-          renderItem={({ item: listItem }) => {
-            const [listName, items] = listItem;
+        {/* Açılır liste kartları */}
+        {isExpanded && (
+          <View style={styles.listsSection}>
+            {friendLists.length === 0 ? (
+              <Text style={[styles.noListsText, { color: theme.text?.muted ?? "#666" }]}>
+                Paylaşılan liste yok
+              </Text>
+            ) : (
+              <FlatList
+                horizontal
+                data={sortedLists(friendLists)}
+                keyExtractor={([listName]) => listName}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.listCardsRow}
+                renderItem={({ item: listItem }) => {
+                  const [listName, items] = listItem;
+                  const meta = LIST_META[listName];
+                  const cols = gridStyle ? 2 : 4;
+                  const imgW = gridStyle ? 52 : 36;
+                  const imgH = gridStyle ? 78 : 54;
 
-            return (
-              <TouchableOpacity
-                activeOpacity={1}
-                onPress={() =>
-                  console.log("Navigate to friend's list:", listName)
-                }
-              >
-                <View
-                  style={[
-                    styles.listContainer,
-                    {
-                      backgroundColor: theme.secondary,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                >
-                  {/* Grid style */}
-                  <View style={{ flexDirection: "row" }}>
-                    {(gridStyle ? [0, 1] : [0, 1, 2, 3]).map((index) => {
-                      const contentItem = items && items[index];
-                      if (contentItem && contentItem.imagePath) {
-                        return (
-                          <Image
-                            key={index}
-                            source={{
-                              uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${contentItem.imagePath}`,
-                            }}
-                            style={[
-                              styles.listImage,
-                              {
-                                width: gridStyle ? 60 : 40,
-                                height: gridStyle ? 90 : 60,
-                                borderTopLeftRadius: index === 0 ? 10 : 0,
-                                borderBottomLeftRadius: index === 0 ? 10 : 0,
-                                borderTopRightRadius:
-                                  index === 1
-                                    ? gridStyle
-                                      ? 10
-                                      : 0
-                                    : index === 3
-                                      ? 10
-                                      : 0,
-                                borderBottomRightRadius:
-                                  index === 1
-                                    ? gridStyle
-                                      ? 10
-                                      : 0
-                                    : index === 3
-                                      ? 10
-                                      : 0,
-                              },
-                            ]}
-                          />
-                        );
-                      }
-                      return (
-                        <View
-                          key={index}
-                          style={[
-                            styles.placeholder,
-                            {
-                              width: gridStyle ? 60 : 40,
-                              height: gridStyle ? 90 : 60,
-                              borderTopLeftRadius: index === 0 ? 10 : 0,
-                              borderBottomLeftRadius: index === 0 ? 10 : 0,
-                              borderTopRightRadius:
-                                index === 1
-                                  ? gridStyle
-                                    ? 10
-                                    : 0
-                                  : index === 3
-                                    ? 10
-                                    : 0,
-                              borderBottomRightRadius:
-                                index === 1
-                                  ? gridStyle
-                                    ? 10
-                                    : 0
-                                  : index === 3
-                                    ? 10
-                                    : 0,
-                              backgroundColor: theme.primary,
-                            },
-                          ]}
-                        />
-                      );
-                    })}
-                  </View>
+                  return (
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      style={[styles.listCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+                    >
+                      {/* Poster grid */}
+                      <View style={styles.posterGrid}>
+                        {Array.from({ length: cols }).map((_, idx) => {
+                          const ci = items?.[idx];
+                          return ci?.imagePath ? (
+                            <Image
+                              key={idx}
+                              source={{ uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${ci.imagePath}` }}
+                              style={[
+                                styles.posterImg,
+                                { width: imgW, height: imgH },
+                                idx === 0 && styles.roundLeft,
+                                idx === cols - 1 && styles.roundRight,
+                              ]}
+                            />
+                          ) : (
+                            <View
+                              key={idx}
+                              style={[
+                                styles.posterPlaceholder,
+                                { width: imgW, height: imgH, backgroundColor: theme.primary },
+                                idx === 0 && styles.roundLeft,
+                                idx === cols - 1 && styles.roundRight,
+                              ]}
+                            />
+                          );
+                        })}
+                      </View>
 
-                  {/* List label */}
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      marginTop: 3,
-                    }}
-                  >
-                    {listName === "watchedMovies" && (
-                      <>
-                        <MaterialCommunityIcons
-                          name="movie-outline"
-                          size={16}
-                          color={theme.colors.green}
-                        />
+                      {/* Liste etiketi */}
+                      <View style={styles.listLabel}>
+                        {meta ? (
+                          <ListIcon name={meta.icon} iconLib={meta.iconLib} color={meta.color} />
+                        ) : (
+                          <Ionicons name="grid" size={13} color={theme.colors?.orange ?? "#ff6400"} />
+                        )}
                         <Text
-                          allowFontScaling={false}
-                          style={{ color: theme.text.primary }}
-                        >
-                          İzlenen Filmler
-                        </Text>
-                      </>
-                    )}
-                    {listName === "watchedTv" && (
-                      <>
-                        <Feather
-                          name="tv"
-                          size={15}
-                          color={theme.colors.green}
-                        />
-                        <Text
-                          allowFontScaling={false}
-                          style={{ color: theme.text.primary }}
-                        >
-                          İzlenen Diziler
-                        </Text>
-                      </>
-                    )}
-                    {listName === "favorites" && (
-                      <>
-                        <Ionicons
-                          name="heart"
-                          size={16}
-                          color={theme.colors.red}
-                        />
-                        <Text
-                          allowFontScaling={false}
-                          style={{ color: theme.text.primary }}
-                        >
-                          Favoriler
-                        </Text>
-                      </>
-                    )}
-                    {listName === "watchList" && (
-                      <>
-                        <Ionicons
-                          name="bookmark"
-                          size={16}
-                          color={theme.colors.blue}
-                        />
-                        <Text
-                          allowFontScaling={false}
-                          style={{ color: theme.text.primary }}
-                        >
-                          İzlenecekler
-                        </Text>
-                      </>
-                    )}
-                    {![
-                      "watchedMovies",
-                      "watchedTv",
-                      "favorites",
-                      "watchList",
-                    ].includes(listName) && (
-                      <>
-                        <Ionicons
-                          name="grid"
-                          size={16}
-                          color={theme.colors.orange}
-                        />
-                        <Text
-                          style={{ color: theme.text.primary, fontSize: 10 }}
+                          style={[styles.listLabelText, { color: theme.text?.primary ?? "#fff" }]}
                           numberOfLines={1}
                         >
-                          {listName}
+                          {meta?.label ?? listName}
                         </Text>
-                      </>
-                    )}
-                  </View>
-                </View>
-              </TouchableOpacity>
-            );
-          }}
-        />
-      )}
-    </SwipeCard>
-  );
+                        <Text style={[styles.listCount, { color: theme.text?.muted ?? "#666" }]}>
+                          {items?.length ?? 0}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
+          </View>
+        )}
+      </SwipeCard>
+    );
+  };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.primary }]}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
       <IconBacground opacity={0.3} />
-      {friends.length === 0 && !user ? (
-        <Text>Henüz arkadaşınız yok.</Text>
+
+      {/* Başlık + arkadaş sayısı */}
+      <Animated.View
+        style={[
+          styles.headerRow,
+          {
+            opacity: titleAnim,
+            transform: [{
+              translateY: titleAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }),
+            }],
+          },
+        ]}
+      >
+        <Text style={[styles.pageTitle, { color: theme.text?.primary ?? "#fff" }]}>
+          Arkadaşlar
+        </Text>
+        {friends.length > 0 && (
+          <View style={[styles.countBadge, { backgroundColor: theme.secondary }]}>
+            <Text style={[styles.countBadgeText, { color: theme.text?.secondary ?? "#aaa" }]}>
+              {friends.length}
+            </Text>
+          </View>
+        )}
+      </Animated.View>
+
+      {/* Liste */}
+      {friends.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="people-outline" size={56} color={theme.text?.muted ?? "#444"} />
+          <Text style={[styles.emptyText, { color: theme.text?.secondary ?? "#aaa" }]}>
+            Henüz hiç arkadaşın yok
+          </Text>
+        </View>
       ) : (
         <FlatList
           data={friends}
           keyExtractor={(item) => item.uid}
           renderItem={renderFriend}
-          contentContainerStyle={{ paddingBottom: 20, paddingHorizontal: 15 }}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
         />
       )}
     </SafeAreaView>
@@ -407,50 +288,93 @@ export default function FriendsListScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingVertical: 15,
-    paddingTop: 40,
-  },
-  friendItem: {
+  container: { flex: 1, paddingTop: 10 },
+
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#fff",
-    padding: 14,
+    justifyContent: "center",
+    gap: 10,
+    marginBottom: 14,
+    marginTop: 4,
+  },
+  pageTitle: {
+    fontSize: 26,
+    fontWeight: "800",
+    textAlign: "center",
+    letterSpacing: -0.5,
+  },
+  countBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 12,
-    marginBottom: 5,
-    marginTop: 5,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 2,
   },
-  userInfo: { flexDirection: "row", alignItems: "center", gap: 12 },
-  avatar: { width: 50, height: 50, borderRadius: 25, marginRight: 12 },
-  name: { fontSize: 16, fontWeight: "600" },
-  username: { fontSize: 14, color: "#666" },
-  messageBtn: {
-    backgroundColor: "#4a90e2",
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-  },
-  messageBtnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
-  listContainer: {
-    padding: 5,
+  countBadgeText: { fontSize: 14, fontWeight: "700" },
+
+  listContent: { paddingHorizontal: 16, paddingBottom: 30 },
+
+  // ── Friend card ───────────────────────────────────────────────────────────
+  friendCard: {
+    flexDirection: "row",
     alignItems: "center",
-    borderRadius: 15,
-    gap: 2,
+    padding: 12,
+    borderRadius: 16,
+    marginBottom: 2,
     borderWidth: 1,
+    gap: 12,
   },
-  listImage: {
-    width: 40,
-    height: 60,
+  avatarWrapper: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 2,
+    overflow: "hidden",
   },
-  placeholder: {
-    width: 40,
-    height: 60,
+  avatar: { width: "100%", height: "100%", borderRadius: 26 },
+  avatarPlaceholder: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
   },
+  friendInfo: { flex: 1, gap: 3 },
+  friendName: { fontSize: 15, fontWeight: "700" },
+  friendUsername: { fontSize: 13 },
+
+  // ── Expanded lists ────────────────────────────────────────────────────────
+  listsSection: { marginBottom: 10 },
+  noListsText: { fontSize: 13, textAlign: "center", paddingVertical: 14 },
+  listCardsRow: { paddingHorizontal: 4, paddingVertical: 10, gap: 8 },
+
+  listCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: "hidden",
+    alignItems: "center",
+  },
+  posterGrid: { flexDirection: "row" },
+  posterImg: { resizeMode: "cover" },
+  posterPlaceholder: {},
+  roundLeft: { borderTopLeftRadius: 14, borderBottomLeftRadius: 14 },
+  roundRight: { borderTopRightRadius: 14, borderBottomRightRadius: 14 },
+
+  listLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  listLabelText: { fontSize: 11, fontWeight: "600", flex: 1 },
+  listCount: { fontSize: 10 },
+
+  // ── Empty state ───────────────────────────────────────────────────────────
+  emptyState: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 14,
+    paddingHorizontal: 32,
+  },
+  emptyText: { fontSize: 14, textAlign: "center", lineHeight: 20 },
 });

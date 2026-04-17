@@ -12,15 +12,12 @@ import {
   Linking,
   Modal,
   Animated,
-  KeyboardAvoidingView,
   Platform,
-  TextInput,
 } from "react-native";
 import axios from "axios";
 import { DetailsSkeleton } from "../../components/Skeleton";
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { LinearGradient } from "expo-linear-gradient";
-import { WebView } from "react-native-webview";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -34,13 +31,10 @@ import DateTimePickerModal from "react-native-modal-datetime-picker";
 import ListView from "../../components/ListView";
 import { useAppSettings } from "../../context/AppSettingsContext";
 import RatingStars from "../../components/RatingStars";
-import Reminder from "../../components/Reminder";
-
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import AntDesign from "@expo/vector-icons/AntDesign";
 import Entypo from "@expo/vector-icons/Entypo";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import Comment from "../../components/Comment";
-import ReactNativeModal from "react-native-modal";
 import SwipeCard from "../../modules/SwipeCard";
 import { useListStatus } from "../../modules/UseListStatus";
 import YoutubePlayer from "react-native-youtube-iframe";
@@ -48,41 +42,43 @@ import { BlurView } from "expo-blur";
 import { useListStatusContext } from "../../context/ListStatusContext";
 import IconBacground from "../../components/IconBacground";
 import { useAuth } from "../../context/AuthContext";
+import CommentSheetModal from "../../components/CommentSheetModal";
 
 const { width, height } = Dimensions.get("window");
+const BACKDROP_HEIGHT = width * (9 / 16);
 
+/* ─────────────────────────────────────────
+   SimilarMovieItem
+───────────────────────────────────────── */
 const SimilarMovieItem = ({ item, navigation, imageQuality }) => {
   const { theme } = useTheme();
   const { inWatchList, inFavorites, isWatched, isInOtherLists } = useListStatus(
     item.id,
     "movie",
   );
-  const scaleValue = React.useRef(new Animated.Value(1)).current;
+  const scale = React.useRef(new Animated.Value(1)).current;
 
-  const onPressIn = () => {
-    Animated.timing(scaleValue, {
-      toValue: 0.9,
-      duration: 200,
+  const onPressIn = () =>
+    Animated.spring(scale, {
+      toValue: 0.93,
+      friction: 4,
       useNativeDriver: true,
     }).start();
-  };
-
-  const onPressOut = () => {
-    Animated.timing(scaleValue, {
+  const onPressOut = () =>
+    Animated.spring(scale, {
       toValue: 1,
-      duration: 200,
+      friction: 4,
       useNativeDriver: true,
     }).start();
-  };
 
   const isInAnyList = inWatchList || isWatched || inFavorites || isInOtherLists;
 
   return (
-    <Animated.View style={{ transform: [{ scale: scaleValue }] }}>
+    <Animated.View style={{ transform: [{ scale }] }}>
       <TouchableOpacity
         onPressIn={onPressIn}
         onPressOut={onPressOut}
-        activeOpacity={0.8}
+        activeOpacity={0.9}
         style={styles.similarItem}
         onPress={() => navigation.push("MovieDetails", { id: item.id })}
       >
@@ -94,22 +90,24 @@ const SimilarMovieItem = ({ item, navigation, imageQuality }) => {
                 }
               : require("../../assets/image/no_image.png")
           }
-          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+          style={[styles.similarPoster, { borderColor: theme.border + "55" }]}
         />
-
+        {/* Rating pill */}
         <View
-          style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}
+          style={[styles.ratingPill, { backgroundColor: "rgba(0,0,0,0.72)" }]}
         >
-          <Text allowFontScaling={false} style={styles.similarRatingText}>
+          <Ionicons name="star" size={9} color="#FFD700" />
+          <Text allowFontScaling={false} style={styles.ratingPillText}>
             {item.vote_average.toFixed(1)}
           </Text>
         </View>
+        {/* List indicators */}
         {isInAnyList && (
-          <View style={[styles.stats1]}>
+          <View style={[styles.stats]}>
             <View
               style={{
                 gap: 3,
-                backgroundColor: theme.secondaryt,
+                backgroundColor: "rgba(0,0,0,0.72)",
                 paddingVertical: 4,
                 paddingHorizontal: 2,
                 borderRadius: 10,
@@ -126,11 +124,7 @@ const SimilarMovieItem = ({ item, navigation, imageQuality }) => {
               )}
               {isWatched && (
                 <View>
-                  <Ionicons
-                    name="eye-off"
-                    size={12}
-                    color={theme.colors.green}
-                  />
+                  <Ionicons name="eye" size={12} color={theme.colors.green} />
                 </View>
               )}
               {inFavorites && (
@@ -151,6 +145,22 @@ const SimilarMovieItem = ({ item, navigation, imageQuality }) => {
   );
 };
 
+/* ─────────────────────────────────────────
+   Section header
+───────────────────────────────────────── */
+const SectionHeader = ({ title, right, theme }) => (
+  <View style={styles.sectionHeaderRow}>
+    <View style={[styles.sectionAccent, { backgroundColor: theme.accent }]} />
+    <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
+      {title}
+    </Text>
+    {right}
+  </View>
+);
+
+/* ─────────────────────────────────────────
+   Main screen
+───────────────────────────────────────── */
 export default function MovieDetails({ navigation, route }) {
   const { id } = route.params;
   const { user } = useAuth();
@@ -160,37 +170,58 @@ export default function MovieDetails({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [showFullCast, setShowFullCast] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState(null);
-  const [reviewLenght, setReviewLenght] = useState(5);
-  const [reviewTextLenght, setReviewTextLenght] = useState(null);
-  const [showAllKeywords, setShowAllKeywords] = useState(false);
+  const [reviewLength, setReviewLength] = useState(5);
+  const [reviewTextLength, setReviewTextLength] = useState(null);
   const [commandModalVisible, setCommentModalVisible] = useState(false);
+  const [headerScale] = useState(new Animated.Value(1));
+
+  // Overview accordion (sadece özet, tam genişlik)
+  const [expandedCard, setExpandedCard] = useState(null);
+  const overviewAnim = React.useRef(new Animated.Value(0)).current;
+
+  const toggleCard = (card) => {
+    const isOpening = expandedCard !== card;
+    if (isOpening) {
+      Animated.timing(overviewAnim, {
+        toValue: 1,
+        duration: 260,
+        useNativeDriver: false,
+      }).start();
+      setExpandedCard(card);
+    } else {
+      Animated.timing(overviewAnim, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: false,
+      }).start();
+      setExpandedCard(null);
+    }
+  };
 
   const { API_KEY, showSnow, imageQuality } = useAppSettings();
 
-  // Modal ve tarih seçici state'leri
   const [modalVisible, setModalVisible] = useState(false);
   const [PosterModalVisible, setPosterModalVisible] = useState(false);
   const [backdropModalVisible, setBacdropModalVisible] = useState(false);
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
-
   const [isLoading, setIsLoading] = useState(false);
-  // Modal aç
+  const [isReminderSet, setIsReminderSet] = useState(false);
+
   const openModal = () => setModalVisible(true);
   const closeModal = () => {
     setModalVisible(false);
     setSelectedDate(null);
   };
-
-  // Tarih seçici aç/kapat
   const showDatePicker = () => setDatePickerVisibility(true);
   const hideDatePicker = () => setDatePickerVisibility(false);
 
-  // Tarih seçilince
-  const handleConfirm = (date) => {
-    setSelectedDate(formatDateSave(date));
-    updateMovieList("watchedMovies", "movie", formatDateSave(date));
-    hideDatePicker();
+  const formatDateSave = (timestamp) => {
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return "";
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    return `${date.getFullYear()}-${month}-${day}`;
   };
 
   const formatDate = (timestamp) => {
@@ -203,119 +234,73 @@ export default function MovieDetails({ navigation, route }) {
       year: "numeric",
     }).format(date);
   };
+
   const calculateDateDifference = (airDate) => {
     if (!airDate) return null;
-
-    const airDateTime = new Date(airDate).getTime();
-    const currentTime = Date.now();
-    const difference = airDateTime - currentTime;
-
-    // If air date is in the past
-    if (difference < 0) {
-      return {
-        text: formatDate(airDate),
-        isRemaining: false,
-      };
-    }
-
-    // If air date is in the future
-    const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+    const diff = new Date(airDate).getTime() - Date.now();
+    if (diff < 0) return { text: formatDate(airDate), isRemaining: false };
+    const days = Math.floor(diff / 86400000);
     const months = Math.floor(days / 30);
-    const remainingDays = days % 30;
+    const rem = days % 30;
+    const text =
+      months > 0
+        ? rem > 0
+          ? `${months} ${t.month} ${rem} ${t.days}`
+          : `${months} ${t.month}`
+        : days > 0
+          ? `${days} ${t.days}`
+          : t.today;
+    return { text, isRemaining: true };
+  };
 
-    let text;
-    if (months > 0) {
-      text =
-        remainingDays > 0
-          ? `${months} ${months === 1 ? t.month : t.month} ${remainingDays} ${remainingDays === 1 ? t.days : t.days}`
-          : `${months} ${months === 1 ? t.month : t.month}`;
-    } else if (days > 0) {
-      text = `${days} ${days === 1 ? t.days : t.days}`;
-    } else {
-      text = t.today;
-    }
-
-    return {
-      text,
-      isRemaining: true,
-    };
+  const handleConfirm = (date) => {
+    setSelectedDate(formatDateSave(date));
+    updateMovieList("watchedMovies", "movie", formatDateSave(date));
+    hideDatePicker();
   };
 
   useEffect(() => {
     const fetchDetails = async () => {
       setLoading(true);
-      const options = {
-        method: "GET",
-        url: `https://api.themoviedb.org/3/movie/${id}`,
-        params: {
-          language: language === "tr" ? "tr-TR" : "en-US",
-          append_to_response:
-            "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,release_dates,reviews,similar,translations,videos,watch/providers",
-        },
-        headers: {
-          accept: "application/json",
-          Authorization: API_KEY,
-        },
-      };
-
       try {
-        const response = await axios.request(options);
+        const response = await axios.request({
+          method: "GET",
+          url: `https://api.themoviedb.org/3/movie/${id}`,
+          params: {
+            language: language === "tr" ? "tr-TR" : "en-US",
+            append_to_response:
+              "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,release_dates,reviews,similar,translations,videos,watch/providers",
+          },
+          headers: { accept: "application/json", Authorization: API_KEY },
+        });
         setDetails(response.data);
       } catch (error) {
-        Toast.show({
-          type: "error",
-          text1: "error:" + error,
-        });
+        Toast.show({ type: "error", text1: "error:" + error });
       } finally {
         setLoading(false);
       }
     };
-
     fetchDetails();
   }, [id, language]);
-  //!
-
-  const [isReminderSet, setIsReminderSet] = useState(false);
-  const uid = user?.uid;
-  const formatDateSave = (timestamp) => {
-    const date = new Date(timestamp);
-    if (isNaN(date.getTime())) return "";
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-    return `${year}-${month}-${day}`;
-  };
 
   useEffect(() => {
     if (!user.uid || !id) return;
-
-    const docRef = doc(db, "Reminders", user.uid);
-
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const movieReminders = data.movieReminders || [];
+    const unsub = onSnapshot(doc(db, "Reminders", user.uid), (snap) => {
+      if (snap.exists()) {
+        const reminders = snap.data().movieReminders || [];
         setIsReminderSet(
-          movieReminders.some(
-            (movie) => movie.movieId === id && movie.type === "movie",
-          ),
+          reminders.some((m) => m.movieId === id && m.type === "movie"),
         );
-      } else {
-        setIsReminderSet(false);
-      }
+      } else setIsReminderSet(false);
     });
-
-    return () => unsubscribe();
+    return () => unsub();
   }, [user.uid, id]);
 
   const addReminder = async () => {
     try {
       if (!user) return;
-
-      const reminderRef = doc(db, "Reminders", uid);
-      const reminderDoc = await getDoc(reminderRef);
-
-      // Movie için
+      const ref = doc(db, "Reminders", user.uid);
+      const snap = await getDoc(ref);
       const movieData = {
         movieId: details.id || "",
         movieName: details.title || "",
@@ -325,210 +310,105 @@ export default function MovieDetails({ navigation, route }) {
         type: "movie",
         createdAt: formatDateSave(new Date()),
       };
-
-      let movieReminders = [];
-      if (reminderDoc.exists()) {
-        movieReminders = reminderDoc.data().movieReminders || [];
-      }
-
-      const movieIndex = movieReminders.findIndex(
-        (item) => item.movieId === details.id,
-      );
-
-      if (movieIndex === -1 && !isReminderSet) {
-        movieReminders.push(movieData);
-      } else if (movieIndex !== -1 && isReminderSet) {
-        movieReminders.splice(movieIndex, 1);
-      }
-
-      if (!reminderDoc.exists()) {
-        await setDoc(reminderRef, {
+      let reminders = snap.exists() ? snap.data().movieReminders || [] : [];
+      const idx = reminders.findIndex((i) => i.movieId === details.id);
+      if (idx === -1 && !isReminderSet) reminders.push(movieData);
+      else if (idx !== -1 && isReminderSet) reminders.splice(idx, 1);
+      if (!snap.exists())
+        await setDoc(ref, {
           tvReminders: [],
-          movieReminders,
+          movieReminders: reminders,
           updatedAt: formatDateSave(new Date()),
         });
-      } else {
-        await updateDoc(reminderRef, {
-          movieReminders,
+      else
+        await updateDoc(ref, {
+          movieReminders: reminders,
           updatedAt: formatDateSave(new Date()),
         });
-      }
-
       setIsReminderSet(!isReminderSet);
       Toast.show({
         type: isReminderSet ? "warning" : "success",
-        text1: isReminderSet
-          ? "Hatırlatma kaldırıldı"
-          : "Hatırlatma başarıyla eklendi",
+        text1: isReminderSet ? "Hatırlatma kaldırıldı" : "Hatırlatma eklendi",
       });
     } catch (error) {
-      console.error("Error adding reminder:", error);
-      Toast.show({
-        type: "error",
-        text1: "Hatırlatma eklenirken bir hata oluştu",
-      });
+      Toast.show({ type: "error", text1: "Hata: " + error.message });
     }
   };
-  //!
+
   const updateMovieList = async (listType, type, date = null) => {
-    setIsLoading(listType === "watchedMovies" && true);
-    if (!user.uid || !details) {
-      Toast.show({
-        type: "error",
-        text1: "Kullanıcı veya içerik bilgisi eksik!",
-      });
-      return;
-    }
-
-    const docRef = doc(db, "Lists", user.uid);
-
+    setIsLoading(listType === "watchedMovies");
+    if (!user.uid || !details) return;
+    const ref = doc(db, "Lists", user.uid);
     try {
       closeModal();
-
-      const docSnap = await getDoc(docRef);
-
-      let data = {
-        watchedTv: [],
-        favorites: [],
-        watchList: [],
-        watchedMovies: [],
-      };
-
-      if (docSnap.exists()) {
-        data = docSnap.data();
-      } else {
-        await setDoc(docRef, data);
-      }
-
-      let selectedList = data[listType] || [];
-
-      const movieIndex = selectedList.findIndex(
-        (item) => item.id === details.id && item.type === type,
-      );
-      const getListTypeName = (list) => {
-        switch (list) {
-          case "favorites":
-            return t.favorites;
-          case "watchList":
-            return t.watchList;
-          case "watchedMovies":
-            return t.watchedMovies;
-          case "watchedTv":
-            return t.watchedTv;
-          default:
-            return listType;
-        }
-      };
-      if (movieIndex !== -1) {
-        selectedList.splice(movieIndex, 1);
+      const snap = await getDoc(ref);
+      let data = snap.exists()
+        ? snap.data()
+        : { watchedTv: [], favorites: [], watchList: [], watchedMovies: [] };
+      if (!snap.exists()) await setDoc(ref, data);
+      let list = data[listType] || [];
+      const idx = list.findIndex((i) => i.id === details.id && i.type === type);
+      const getName = (l) =>
+        ({
+          favorites: t.favorites,
+          watchList: t.watchList,
+          watchedMovies: t.watchedMovies,
+          watchedTv: t.watchedTv,
+        })[l] || l;
+      if (idx !== -1) {
+        list.splice(idx, 1);
         Toast.show({
           type: "warning",
-          text1: `${
-            type === "movie" ? "Film" : "Dizi"
-          } ${getListTypeName(listType)} listesinden kaldırıldı!`,
+          text1: `${type === "movie" ? "Film" : "Dizi"} ${getName(listType)} listesinden kaldırıldı!`,
         });
       } else {
-        // Tarih seçilmeden ekleme yapılmasın
         if (!date) {
-          Toast.show({
-            type: "warning",
-            text1: "Lütfen bir tarih seçin.",
-          });
+          Toast.show({ type: "warning", text1: "Lütfen bir tarih seçin." });
           return;
         }
-        const newItem = {
+        list.push({
           id: details.id,
           imagePath: details.poster_path,
-          dateAdded: date, // <-- Tarih burada kaydediliyor
+          dateAdded: date,
           name: type === "movie" ? details.title : details.name,
           minutes: type === "movie" ? details.runtime : undefined,
-          type: type,
-          genres: details.genres ? details.genres.map((g) => g.name) : [], // <-- EKLENDİ
-        };
-        selectedList.push(newItem);
+          type,
+          genres: details.genres?.map((g) => g.name) || [],
+        });
         Toast.show({
           type: "success",
-          text1: `${
-            type === "movie" ? "Film" : "Dizi"
-          } ${getListTypeName(listType)} listesine eklendi!`,
+          text1: `${type === "movie" ? "Film" : "Dizi"} ${getName(listType)} listesine eklendi!`,
         });
       }
-      await updateDoc(docRef, { [listType]: selectedList });
-      setIsLoading(listType === "watchedMovies" && false);
+      await updateDoc(ref, { [listType]: list });
+      setIsLoading(false);
     } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "Hata: " + error.message,
-      });
+      Toast.show({ type: "error", text1: "Hata: " + error.message });
     }
   };
-  //?--------------------------------------------------------------------------------
-  //?--------------------------------------------------------------------------------
-  //?--------------------------------------------------------------------------------
-  //!bir özellik eklemek için kullanırsın
-  // const updateGenres = async ({ showId, genres }) => {
-  //   try {
-  //     const userRef = doc(db, "Lists", user.uid);
-  //     const docSnap = await getDoc(userRef);
 
-  //     let data = docSnap.exists() ? docSnap.data() : { watchedTv: [] };
-  //     let watchedMovies = data.watchedMovies || [];
-
-  //     let tvShowIndex = watchedMovies.findIndex((show) => show.id === showId);
-  //     console.log("tvShowIndex", tvShowIndex);
-  //     console.log("showId", showId);
-
-  //     // Eğer dizi içinde show bulunursa güncelle
-  //     if (tvShowIndex !== -1) {
-  //       watchedMovies[tvShowIndex].genres = genres
-  //         ? genres.map((g) => g.name)
-  //         : [];
-  //     } else {
-  //       // Yoksa yeni bir kayıt olarak ekle
-  //       watchedMovies.push({
-  //         id: showId,
-  //         genres: genres ? genres.map((g) => g.name) : [],
-  //       });
-  //     }
-
-  //     await updateDoc(userRef, { watchedMovies });
-  //   } catch (error) {
-  //     console.error("Hata:", error);
-  //   }
-  // };
-  //?--------------------------------------------------------------------------------
-  //?--------------------------------------------------------------------------------
-  //?--------------------------------------------------------------------------------
-
-  /*   const [listStates, setListStates] = useState({});
-   */
   const { allLists } = useListStatusContext();
   const [listStates, setListStates] = useState({});
-
   useEffect(() => {
     if (!allLists) {
       setListStates({});
       return;
     }
-
-    const newStates = {};
-    Object.entries(allLists).forEach(([listName, listItems]) => {
-      newStates[listName] = Array.isArray(listItems)
-        ? listItems.some((item) => item.id === id && item.type === "movie")
+    const s = {};
+    Object.entries(allLists).forEach(([k, v]) => {
+      s[k] = Array.isArray(v)
+        ? v.some((i) => i.id === id && i.type === "movie")
         : false;
     });
-
-    setListStates(newStates);
+    setListStates(s);
   }, [allLists, id]);
 
   const renderCastMember = ({ item }) => (
     <TouchableOpacity
-      key={item.id}
-      onPress={() => {
-        navigation.navigate("ActorViewScreen", {
-          personId: item.id,
-        });
-      }}
+      onPress={() =>
+        navigation.navigate("ActorViewScreen", { personId: item.id })
+      }
+      activeOpacity={0.8}
     >
       <View style={styles.castItem}>
         <Image
@@ -539,17 +419,19 @@ export default function MovieDetails({ navigation, route }) {
                 }
               : require("../../assets/image/user.png")
           }
-          style={[styles.castImage, { shadowColor: theme.shadow }]}
+          style={[styles.castImage, { borderColor: theme.border }]}
         />
         <Text
           allowFontScaling={false}
           style={[styles.castName, { color: theme.text.primary }]}
+          numberOfLines={2}
         >
           {item.name}
         </Text>
         <Text
           allowFontScaling={false}
           style={[styles.castCharacter, { color: theme.text.muted }]}
+          numberOfLines={1}
         >
           {item.character}
         </Text>
@@ -561,84 +443,85 @@ export default function MovieDetails({ navigation, route }) {
     <TouchableOpacity
       style={styles.videoItem}
       onPress={() => setSelectedVideo(item.key)}
+      activeOpacity={0.88}
     >
-      <View style={[styles.videoThumbnail, { shadowColor: theme.shadow }]}>
+      <View style={styles.videoThumbnail}>
         <Image
           source={{
             uri: `https://img.youtube.com/vi/${item.key}/hqdefault.jpg`,
           }}
           style={styles.videoImage}
         />
+        <LinearGradient
+          colors={["transparent", "rgba(0,0,0,0.6)"]}
+          style={StyleSheet.absoluteFill}
+        />
         <View style={styles.playIconContainer}>
           <LottieView
-            style={{ width: 80, height: 80 }}
+            style={{ width: 56, height: 56 }}
             source={require("../../LottieJson/play")}
-            opacity={0.4}
+            opacity={0.9}
             autoPlay
             loop
           />
         </View>
+        <View style={styles.videoTypeBadge}>
+          <Text allowFontScaling={false} style={styles.videoTypeBadgeText}>
+            {item.type}
+          </Text>
+        </View>
       </View>
       <Text
+        allowFontScaling={false}
         style={[styles.videoTitle, { color: theme.text.primary }]}
         numberOfLines={2}
       >
         {item.name}
       </Text>
-      <Text
-        allowFontScaling={false}
-        style={[styles.videoType, { color: theme.text.muted }]}
-      >
-        {item.type}
-      </Text>
     </TouchableOpacity>
   );
 
-  const renderExternalLink = (url, icon, name) => {
-    if (!url) return null;
+  if (loading) return <DetailsSkeleton />;
+  if (!details)
     return (
-      <TouchableOpacity
-        style={[styles.externalLink, { backgroundColor: theme.accent }]}
-        onPress={() => Linking.openURL(url)}
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.primary,
+            justifyContent: "center",
+            alignItems: "center",
+          },
+        ]}
       >
-        <FontAwesome5 name={icon} size={20} color="#fff" />
-        <Text allowFontScaling={false} style={styles.externalLinkText}>
-          {name}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
-  if (loading) {
-    return <DetailsSkeleton />;
-  }
-  if (!details) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.primary }]}>
-        <Text
-          allowFontScaling={false}
-          style={[styles.loadingText, { color: theme.text.primary }]}
-        >
-          Yükleniyor...
-        </Text>
+        <Text style={{ color: theme.text.primary }}>Yükleniyor...</Text>
       </View>
     );
-  }
+
+  const dateInfo = calculateDateDifference(details.release_date);
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
-      <IconBacground opacity={0.3} />
+      <IconBacground opacity={0.25} />
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
 
       <ScrollView
         style={styles.container}
-        nestedScrollEnabled={true}
+        nestedScrollEnabled
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <StatusBar barStyle="light-content" />
-        <View style={styles.headerContainer}>
+        {/* ─── HERO / BACKDROP ─── */}
+        <View style={styles.heroContainer}>
           {details.backdrop_path ? (
-            <TouchableOpacity onPress={() => setBacdropModalVisible(true)}>
+            <TouchableOpacity
+              activeOpacity={0.95}
+              onPress={() => setBacdropModalVisible(true)}
+            >
               <Image
                 source={{
                   uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,
@@ -648,829 +531,806 @@ export default function MovieDetails({ navigation, route }) {
             </TouchableOpacity>
           ) : (
             <View
-              style={[
-                styles.noImageContainer,
-                { backgroundColor: theme.secondary },
-              ]}
+              style={[styles.noBackdrop, { backgroundColor: theme.secondary }]}
             >
-              <Ionicons name="image" size={180} color={theme.text.muted} />
+              <Ionicons
+                name="film-outline"
+                size={64}
+                color={theme.text.muted}
+              />
             </View>
           )}
+          {/* Deep gradient */}
           <LinearGradient
-            colors={["transparent", theme.primary]}
-            style={styles.gradient}
+            colors={["transparent", "rgba(0,0,0,0.15)", theme.primary]}
+            locations={[0.3, 0.65, 1]}
+            style={styles.heroGradient}
           />
-        </View>
-        <View style={styles.content}>
-          {showSnow &&
-            [0, 1, 2, 3].map((item) => {
-              return (
-                <LottieView
-                  key={item}
-                  style={
-                    item === 0
-                      ? styles.lottie
-                      : item === 1
-                        ? styles.lottie0
-                        : item === 2
-                          ? styles.lottie1
-                          : styles.lottie2
-                  }
-                  source={require("../../LottieJson/snow.json")}
-                  autoPlay
-                  loop
-                />
-              );
-            })}
+          {/* Back button */}
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.8}
+          >
+            <BlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
+              <Ionicons name="chevron-back" size={22} color="#fff" />
+            </BlurView>
+          </TouchableOpacity>
 
-          <View style={styles.header}>
-            <View style={[styles.posterView, { shadowColor: theme.shadow }]}>
-              {details.poster_path ? (
-                <TouchableOpacity onPress={() => setPosterModalVisible(true)}>
-                  <Image
-                    source={{
-                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${details.poster_path}`,
-                    }}
-                    style={[
-                      styles.poster,
-                      {
-                        borderColor: theme.border,
-                        borderWidth: 1,
-                        shadowColor: theme.shadow,
-                      },
-                    ]}
-                  />
-                </TouchableOpacity>
-              ) : (
-                <View
-                  style={[
-                    styles.noPosterContainer,
-                    { backgroundColor: theme.secondary },
-                  ]}
-                >
-                  <Ionicons name="image" size={80} color={theme.text.muted} />
-                </View>
-              )}
-            </View>
-            <View style={styles.headerInfo}>
-              <Text
-                allowFontScaling={false}
-                style={[styles.title, { color: theme.text.primary }]}
+          {showSnow &&
+            [0, 1, 2, 3].map((i) => (
+              <LottieView
+                key={i}
+                style={[styles.lottie, { top: i * 1000 }]}
+                source={require("../../LottieJson/snow.json")}
+                autoPlay
+                loop
+              />
+            ))}
+        </View>
+
+        {/* ─── POSTER + INFO HEADER ─── */}
+        <View style={styles.infoHeader}>
+          {/* Poster */}
+          <TouchableOpacity
+            style={styles.posterShadow}
+            onPress={() => setPosterModalVisible(true)}
+            activeOpacity={0.92}
+          >
+            {details.poster_path ? (
+              <Image
+                source={{
+                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${details.poster_path}`,
+                }}
+                style={[styles.poster, { borderColor: theme.border + "80" }]}
+              />
+            ) : (
+              <View
+                style={[styles.noPoster, { backgroundColor: theme.secondary }]}
               >
-                {details.title}
-              </Text>
-              {details.alternative_titles?.titles?.length > 0 && (
-                <Text
-                  style={[
-                    styles.alternativeTitle,
-                    { color: theme.text.secondary },
-                  ]}
-                >
-                  {details.alternative_titles.titles[0].title}
-                </Text>
-              )}
-              <Text
-                allowFontScaling={false}
-                style={[styles.tagline, { color: theme.text.secondary }]}
-              >
-                {details.tagline || "Slogan bulunmuyor"}
-              </Text>
-              <View style={styles.genres}>
-                {details.genres.map((genre) => (
-                  <View
-                    key={genre.id}
-                    style={[styles.genreTag, { backgroundColor: theme.accent }]}
-                  >
-                    <Text
-                      style={[styles.genreText, { color: theme.text.primary }]}
-                    >
-                      {genre.name}
-                    </Text>
-                  </View>
-                ))}
+                <Ionicons
+                  name="image-outline"
+                  size={40}
+                  color={theme.text.muted}
+                />
               </View>
-              <View style={styles.mainRating}>
-                <RatingStars rating={details.vote_average} />
-                <Text
-                  style={[styles.ratingText, { color: theme.colors.orange }]}
-                >
-                  {" "}
-                  {details.vote_average.toFixed(1)}{" "}
-                </Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Title block */}
+          <View style={styles.titleBlock}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.title, { color: theme.text.primary }]}
+            >
+              {details.title}
+            </Text>
+            {details.alternative_titles?.titles?.length > 0 && (
+              <Text
+                allowFontScaling={false}
+                style={[styles.altTitle, { color: theme.text.muted }]}
+              >
+                {details.alternative_titles.titles[0].title}
+              </Text>
+            )}
+            {details.tagline ? (
+              <Text
+                allowFontScaling={false}
+                style={[styles.tagline, { color: theme.accent }]}
+                numberOfLines={2}
+              >
+                "{details.tagline}"
+              </Text>
+            ) : null}
+
+            {/* Genres */}
+            <View style={styles.genreRow}>
+              {details.genres.slice(0, 3).map((g) => (
                 <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "center",
-                    alignItems: "baseline",
-                    gap: 3,
-                  }}
+                  key={g.id}
+                  style={[
+                    styles.genreChip,
+                    {
+                      backgroundColor: theme.accent + "22",
+                      borderColor: theme.accent + "44",
+                    },
+                  ]}
                 >
-                  <FontAwesome
-                    name="user"
-                    size={14}
-                    color={theme.colors.blue}
-                  />
                   <Text
-                    style={[styles.ratingText, { color: theme.colors.blue }]}
+                    allowFontScaling={false}
+                    style={[styles.genreChipText, { color: theme.accent }]}
                   >
-                    {" "}
-                    {details.vote_count || 0}
+                    {g.name}
                   </Text>
                 </View>
+              ))}
+            </View>
+
+            {/* Rating row */}
+            <View style={styles.ratingRow}>
+              <RatingStars rating={details.vote_average} />
+              <Text style={[styles.ratingNum, { color: theme.colors.orange }]}>
+                {details.vote_average.toFixed(1)}
+              </Text>
+              <View style={styles.voteRow}>
+                <FontAwesome name="user" size={11} color={theme.colors.blue} />
+                <Text style={[styles.voteCount, { color: theme.colors.blue }]}>
+                  {details.vote_count?.toLocaleString() || 0}
+                </Text>
               </View>
             </View>
           </View>
-          <View style={{ top: -90 }}>
-            <ListView
-              isRemaining={
-                calculateDateDifference(details.release_date)?.isRemaining
-              }
-              isReminderSet={isReminderSet}
-              updateList={updateMovieList}
-              updateWatchedList={openModal}
-              addReminder={addReminder}
-              navigation={navigation}
-              listStates={listStates}
-              isLoading={isLoading}
-              type={"movie"}
-            />
+        </View>
 
-            <View
-              style={[
-                styles.stats,
-                { backgroundColor: theme.secondary, shadowColor: theme.shadow },
-              ]}
-            >
-              <View style={styles.statItem}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "center",
-                    gap: 10,
-                  }}
-                >
-                  {/* Tarih kontrolü eklendi */}
-                  {details.release_date &&
-                  calculateDateDifference(details.release_date) ? (
-                    <>
-                      <Text
-                        style={[
-                          styles.statValue,
-                          { color: theme.text.primary },
-                        ]}
-                      >
-                        {calculateDateDifference(details.release_date).text}
-                      </Text>
-                    </>
-                  ) : (
-                    <Text
-                      style={[styles.statValue, { color: theme.text.primary }]}
-                    >
-                      {t.dateUnknown || "Tarih belirsiz"}
-                    </Text>
-                  )}
-                </View>
-                <Text
-                  style={[styles.statLabel, { color: theme.text.secondary }]}
-                >
-                  {t.date}
-                </Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.statValue, { color: theme.text.primary }]}
-                >
-                  {details.runtime}
-                </Text>
-                <Text
-                  style={[styles.statLabel, { color: theme.text.secondary }]}
-                >
-                  {t.duration}
-                </Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.statValue, { color: theme.text.primary }]}
-                >
-                  {details.revenue > 0
-                    ? `${(details.revenue / 1000000).toFixed(1)}M$`
-                    : "?"}
-                </Text>
-                <Text
-                  style={[styles.statLabel, { color: theme.text.secondary }]}
-                >
-                  {t.revenue}
-                </Text>
-              </View>
-            </View>
-            <SwipeCard
-              leftButton={{
-                label: "Sil",
-                color: "#e53935",
-                onPress: () => {
-                  handleHeartPress();
-                },
-              }}
-              rightButton={{
-                label: "Yanıtla",
-                color: "#5aacf0ff",
-                onPress: () => {},
-              }}
-            >
-              <TouchableOpacity
-                onPress={() => setCommentModalVisible(!commandModalVisible)}
+        {/* ─── BODY ─── */}
+        <View style={styles.body}>
+          {/* ListView */}
+          <ListView
+            isRemaining={dateInfo?.isRemaining}
+            isReminderSet={isReminderSet}
+            updateList={updateMovieList}
+            updateWatchedList={openModal}
+            addReminder={addReminder}
+            navigation={navigation}
+            listStates={listStates}
+            isLoading={isLoading}
+            type={"movie"}
+          />
+
+          {/* ── STAT PILLS ── */}
+          <View
+            style={[
+              styles.statRow,
+              { backgroundColor: theme.secondary, borderColor: theme.border },
+            ]}
+          >
+            <View style={styles.statPill}>
+              <View
                 style={[
-                  styles.stats,
-                  {
-                    backgroundColor: theme.secondary,
-                    shadowColor: theme.shadow,
-                  },
+                  styles.statIconWrap,
+                  { backgroundColor: theme.accent + "18" },
                 ]}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "center",
-                    gap: 10,
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.statLabel,
-                      {
-                        color: theme.text.secondary,
-                        fontSize: 18,
-                        fontWeight: "bold",
-                      },
-                    ]}
-                  >
-                    Yorumlar
-                  </Text>
-                  <MaterialCommunityIcons
-                    name="comment-text-multiple-outline"
-                    size={24}
-                    color={theme.text.secondary}
-                  />
-                </View>
-              </TouchableOpacity>
-            </SwipeCard>
-
-            {details.external_ids && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.externalLinks}>
-                  {renderExternalLink(
-                    details.external_ids.imdb_id
-                      ? `https://www.imdb.com/title/${details.external_ids.imdb_id}`
-                      : null,
-                    "imdb",
-                    "IMDb",
-                  )}
-                  {renderExternalLink(
-                    details.external_ids.facebook_id
-                      ? `https://www.facebook.com/${details.external_ids.facebook_id}`
-                      : null,
-                    "facebook",
-                    "Facebook",
-                  )}
-                  {renderExternalLink(
-                    details.external_ids.instagram_id
-                      ? `https://www.instagram.com/${details.external_ids.instagram_id}`
-                      : null,
-                    "instagram",
-                    "Instagram",
-                  )}
-                  {renderExternalLink(
-                    details.external_ids.twitter_id
-                      ? `https://twitter.com/${details.external_ids.twitter_id}`
-                      : null,
-                    "twitter",
-                    "Twitter",
-                  )}
-                </View>
-              </ScrollView>
-            )}
-
-            <View style={styles.section}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={16}
+                  color={theme.accent}
+                />
+              </View>
               <Text
-                style={[styles.sectionTitle, { color: theme.text.primary }]}
+                allowFontScaling={false}
+                style={[styles.statVal, { color: theme.text.primary }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
               >
-                {t.overview}
+                {dateInfo?.text || "?"}
               </Text>
               <Text
                 allowFontScaling={false}
-                style={[styles.overview, { color: theme.text.secondary }]}
+                style={[styles.statLbl, { color: theme.text.muted }]}
               >
-                {details.overview || "Özet bulunmuyor."}
+                {t.date}
               </Text>
             </View>
-            {"watch/providers" in details &&
-              details["watch/providers"].results.TR && (
-                <View style={styles.section}>
-                  <Text
-                    style={[styles.sectionTitle, { color: theme.text.primary }]}
-                  >
-                    {t.watchProviders}
-                  </Text>
-                  <View style={styles.watchProviders}>
+
+            <View
+              style={[styles.statDivider, { backgroundColor: theme.border }]}
+            />
+
+            <View style={styles.statPill}>
+              <View
+                style={[
+                  styles.statIconWrap,
+                  {
+                    backgroundColor:
+                      (theme.colors?.blue || theme.accent) + "18",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="time-outline"
+                  size={16}
+                  color={theme.colors?.blue || theme.accent}
+                />
+              </View>
+              <Text
+                allowFontScaling={false}
+                style={[styles.statVal, { color: theme.text.primary }]}
+              >
+                {details.runtime ? `${details.runtime} dk` : "?"}
+              </Text>
+              <Text
+                allowFontScaling={false}
+                style={[styles.statLbl, { color: theme.text.muted }]}
+              >
+                {t.duration}
+              </Text>
+            </View>
+
+            <View
+              style={[styles.statDivider, { backgroundColor: theme.border }]}
+            />
+
+            <View style={styles.statPill}>
+              <View
+                style={[
+                  styles.statIconWrap,
+                  {
+                    backgroundColor:
+                      (theme.colors?.green || theme.accent) + "18",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="cash-outline"
+                  size={16}
+                  color={theme.colors?.green || theme.accent}
+                />
+              </View>
+              <Text
+                allowFontScaling={false}
+                style={[styles.statVal, { color: theme.text.primary }]}
+              >
+                {details.revenue > 0
+                  ? `${(details.revenue / 1_000_000).toFixed(0)}M$`
+                  : "?"}
+              </Text>
+              <Text
+                allowFontScaling={false}
+                style={[styles.statLbl, { color: theme.text.muted }]}
+              >
+                {t.revenue}
+              </Text>
+            </View>
+          </View>
+
+          {/* ── YORUMLAR BUTONU ── */}
+          <SwipeCard
+            leftButton={{ label: "Sil", color: "#e53935" }}
+            rightButton={{ label: "Yanıtla", color: "#5aacf0" }}
+          >
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setCommentModalVisible(!commandModalVisible)}
+              style={[
+                styles.commentsBtn,
+                { backgroundColor: theme.secondary, borderColor: theme.border },
+              ]}
+            >
+              <View
+                style={[
+                  styles.commentsIconWrap,
+                  { backgroundColor: theme.accent + "20" },
+                ]}
+              >
+                <AntDesign name="comment" size={18} color={theme.accent} />
+              </View>
+              <Text
+                allowFontScaling={false}
+                style={[styles.commentsBtnText, { color: theme.text.primary }]}
+              >
+                {t.comments || "Yorumlar"}
+              </Text>
+              <View style={styles.commentsRight}>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={theme.text.muted}
+                />
+              </View>
+            </TouchableOpacity>
+          </SwipeCard>
+
+          {/* ── EKSTERNAl LİNKLER ── */}
+          {details.external_ids && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginBottom: 24 }}
+            >
+              <View style={styles.externalLinks}>
+                {[
+                  {
+                    key: "imdb_id",
+                    url: (v) => `https://www.imdb.com/title/${v}`,
+                    icon: "imdb",
+                    label: "IMDb",
+                  },
+                  {
+                    key: "facebook_id",
+                    url: (v) => `https://www.facebook.com/${v}`,
+                    icon: "facebook",
+                    label: "Facebook",
+                  },
+                  {
+                    key: "instagram_id",
+                    url: (v) => `https://www.instagram.com/${v}`,
+                    icon: "instagram",
+                    label: "Instagram",
+                  },
+                  {
+                    key: "twitter_id",
+                    url: (v) => `https://twitter.com/${v}`,
+                    icon: "twitter",
+                    label: "Twitter",
+                  },
+                ].map(({ key, url, icon, label }) =>
+                  details.external_ids[key] ? (
+                    <TouchableOpacity
+                      key={key}
+                      style={[
+                        styles.extLink,
+                        {
+                          backgroundColor: theme.secondary,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                      onPress={() =>
+                        Linking.openURL(url(details.external_ids[key]))
+                      }
+                      activeOpacity={0.8}
+                    >
+                      <FontAwesome5
+                        name={icon}
+                        size={15}
+                        color={theme.accent}
+                      />
+                      <Text
+                        allowFontScaling={false}
+                        style={[
+                          styles.extLinkText,
+                          { color: theme.text.primary },
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null,
+                )}
+              </View>
+            </ScrollView>
+          )}
+
+          {/* ── ÖZET ACCORDION ── */}
+          <View style={{ marginBottom: 24 }}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => toggleCard("overview")}
+              style={[
+                styles.accordionCard,
+                {
+                  backgroundColor: theme.secondary,
+                  borderColor:
+                    expandedCard === "overview"
+                      ? theme.accent + "88"
+                      : theme.border,
+                },
+              ]}
+            >
+              <View style={styles.accordionHeader}>
+                <View
+                  style={[
+                    styles.sectionAccent,
+                    { backgroundColor: theme.accent },
+                  ]}
+                />
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.accordionTitle, { color: theme.text.primary }]}
+                >
+                  {t.overview || "Özet"}
+                </Text>
+                <Ionicons
+                  name={
+                    expandedCard === "overview" ? "chevron-up" : "chevron-down"
+                  }
+                  size={14}
+                  color={
+                    expandedCard === "overview"
+                      ? theme.accent
+                      : theme.text.muted
+                  }
+                />
+              </View>
+              <Animated.View
+                style={{
+                  maxHeight: overviewAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [52, 400],
+                  }),
+                  overflow: "hidden",
+                }}
+              >
+                <Text
+                  allowFontScaling={false}
+                  style={[
+                    styles.accordionBody,
+                    { color: theme.text.secondary },
+                  ]}
+                  numberOfLines={expandedCard === "overview" ? null : 2}
+                >
+                  {details.overview || "Özet bulunmuyor."}
+                </Text>
+              </Animated.View>
+              {expandedCard !== "overview" && (
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.accordionMore, { color: theme.accent }]}
+                >
+                  devamı...
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* ── İZLEME PLATFORMLARI ── */}
+          {"watch/providers" in details &&
+            details["watch/providers"].results.TR && (
+              <View style={styles.section}>
+                <SectionHeader title={t.watchProviders} theme={theme} />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.providersRow}>
                     {details["watch/providers"].results.TR.flatrate?.map(
-                      (provider) => (
+                      (p) => (
                         <View
-                          key={provider.provider_id}
-                          style={styles.providerItem}
+                          key={p.provider_id}
+                          style={[
+                            styles.providerCard,
+                            {
+                              backgroundColor: theme.secondary,
+                              borderColor: theme.border,
+                            },
+                          ]}
                         >
                           <Image
                             source={{
-                              uri: `https://image.tmdb.org/t/p/original${provider.logo_path}`,
+                              uri: `https://image.tmdb.org/t/p/original${p.logo_path}`,
                             }}
                             style={styles.providerLogo}
                           />
                           <Text
+                            allowFontScaling={false}
                             style={[
                               styles.providerName,
-                              { color: theme.text.primary },
+                              { color: theme.text.secondary },
                             ]}
+                            numberOfLines={1}
                           >
-                            {provider.provider_name}
+                            {p.provider_name}
                           </Text>
                         </View>
                       ),
                     )}
                   </View>
-                </View>
-              )}
-            {details.videos?.results.length > 0 && (
-              <View style={styles.section}>
-                <Text
-                  style={[styles.sectionTitle, { color: theme.text.primary }]}
-                >
-                  {t.videos}
-                </Text>
-
-                <FlatList
-                  data={details.videos.results.filter(
-                    (video) => video.site === "YouTube",
-                  )}
-                  renderItem={renderVideo}
-                  keyExtractor={(item) => item.id}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.videosList}
-                />
+                </ScrollView>
               </View>
             )}
 
-            {details.credits?.cast.length > 0 && (
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text
-                    style={[styles.sectionTitle, { color: theme.text.primary }]}
-                  >
-                    {t.cast}
-                  </Text>
-                  {details.credits.cast.length > 6 && (
+          {/* ── VİDEOLAR ── */}
+          {details.videos?.results.length > 0 && (
+            <View style={styles.section}>
+              <SectionHeader title={t.videos} theme={theme} />
+              <FlatList
+                data={details.videos.results.filter(
+                  (v) => v.site === "YouTube",
+                )}
+                renderItem={renderVideo}
+                keyExtractor={(item) => item.id}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingVertical: 4, gap: 14 }}
+              />
+            </View>
+          )}
+
+          {/* ── OYUNCULAR ── */}
+          {details.credits?.cast.length > 0 && (
+            <View style={styles.section}>
+              <SectionHeader
+                title={t.cast}
+                theme={theme}
+                right={
+                  details.credits.cast.length > 6 && (
                     <TouchableOpacity
                       onPress={() => setShowFullCast(!showFullCast)}
+                      style={styles.seeAllBtn}
                     >
                       <Text
-                        style={[
-                          styles.expandButton,
-                          { color: theme.text.primary },
-                        ]}
+                        style={[styles.seeAllText, { color: theme.accent }]}
                       >
                         {showFullCast ? t.collapse : t.showAll}
                       </Text>
                     </TouchableOpacity>
-                  )}
-                </View>
-                <FlatList
-                  data={
-                    showFullCast
-                      ? details.credits.cast
-                      : details.credits.cast.slice(0, 6)
-                  }
-                  renderItem={renderCastMember}
-                  keyExtractor={(item) => item.id.toString()}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.castList}
-                />
-              </View>
-            )}
+                  )
+                }
+              />
+              <FlatList
+                data={
+                  showFullCast
+                    ? details.credits.cast
+                    : details.credits.cast.slice(0, 10)
+                }
+                renderItem={renderCastMember}
+                keyExtractor={(item) => item.id.toString()}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingVertical: 4, gap: 12 }}
+              />
+            </View>
+          )}
 
-            {details.keywords?.keywords.length > 0 && (
-              <View style={styles.section}>
-                <Text
-                  style={[styles.sectionTitle, { color: theme.text.primary }]}
-                >
-                  {t.keywords}
-                </Text>
-                <View style={styles.keywords}>
-                  {details.keywords.keywords.map((keyword, index) =>
-                    index < 10 ? (
-                      <View
-                        key={keyword.id}
-                        style={[
-                          styles.keywordTag,
-                          { backgroundColor: theme.accent },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.keywordText,
-                            { color: theme.text.primary },
-                          ]}
-                        >
-                          {keyword.name}
-                        </Text>
-                      </View>
-                    ) : (
-                      showAllKeywords && (
-                        <View
-                          key={keyword.id}
-                          style={[
-                            styles.keywordTag,
-                            { backgroundColor: theme.accent },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.keywordText,
-                              { color: theme.text.primary },
-                            ]}
-                          >
-                            {keyword.name}
-                          </Text>
-                        </View>
-                      )
-                    ),
-                  )}
-                </View>
-                {details.keywords?.keywords.length > 10 && (
-                  <TouchableOpacity
-                    onPress={() => setShowAllKeywords(!showAllKeywords)}
-                    style={{
-                      width: "100%",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      marginTop: 10,
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    {showAllKeywords ? (
-                      <MaterialIcons
-                        name="keyboard-arrow-up"
-                        size={40}
-                        color={theme.text.primary}
-                        style={{
-                          width: 40,
-                          backgroundColor: theme.secondary,
-                          borderRadius: 15,
-                          shadowColor: theme.shadow,
-                          shadowOffset: {
-                            width: 0,
-                            height: 8,
-                          },
-                          shadowOpacity: 0.94,
-                          shadowRadius: 10.32,
-                          elevation: 5,
-                        }}
-                      />
-                    ) : (
-                      <MaterialIcons
-                        name="keyboard-arrow-down"
-                        size={40}
-                        color={theme.text.primary}
-                        style={{
-                          width: 40,
-                          backgroundColor: theme.secondary,
-                          borderRadius: 15,
-                          shadowColor: theme.shadow,
-                          shadowOffset: {
-                            width: 0,
-                            height: 8,
-                          },
-                          shadowOpacity: 0.94,
-                          shadowRadius: 10.32,
-                          elevation: 5,
-                        }}
-                      />
-                    )}
-                  </TouchableOpacity>
+          {/* ── ÖNERİLEN FİLMLER ── */}
+          {details.recommendations?.results.length > 0 && (
+            <View style={styles.section}>
+              <SectionHeader title={t.recommendedMovies} theme={theme} />
+              <FlatList
+                data={details.recommendations.results.slice(0, 20)}
+                renderItem={({ item }) => (
+                  <SimilarMovieItem
+                    item={item}
+                    navigation={navigation}
+                    imageQuality={imageQuality}
+                  />
                 )}
-              </View>
-            )}
-            {details.recommendations?.results.length > 0 && (
-              <View style={styles.section}>
-                <Text
-                  style={[styles.sectionTitle, { color: theme.text.primary }]}
-                >
-                  {t.recommendedMovies}
-                </Text>
-                <FlatList
-                  data={details.recommendations.results.slice(0, 20)}
-                  renderItem={({ item }) => (
-                    <SimilarMovieItem
-                      item={item}
-                      navigation={navigation}
-                      imageQuality={imageQuality}
-                    />
-                  )}
-                  keyExtractor={(item) => item.id.toString()}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.similarList}
-                />
-              </View>
-            )}
-            {details.similar?.results.length > 0 && (
-              <View style={styles.section}>
-                <Text
-                  style={[styles.sectionTitle, { color: theme.text.primary }]}
-                >
-                  {t.similarMovies}
-                </Text>
-                <FlatList
-                  data={details.similar.results.slice(0, 20)}
-                  renderItem={({ item }) => (
-                    <SimilarMovieItem
-                      item={item}
-                      navigation={navigation}
-                      imageQuality={imageQuality}
-                    />
-                  )}
-                  keyExtractor={(item) => item.id.toString()}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.similarList}
-                />
-              </View>
-            )}
+                keyExtractor={(item) => item.id.toString()}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingVertical: 4, gap: 10 }}
+              />
+            </View>
+          )}
 
-            {details.reviews?.results.length > 0 && (
-              <View style={styles.section}>
-                <Text
-                  style={[styles.sectionTitle, { color: theme.text.primary }]}
+          {/* ── BENZER FİLMLER ── */}
+          {details.similar?.results.length > 0 && (
+            <View style={styles.section}>
+              <SectionHeader title={t.similarMovies} theme={theme} />
+              <FlatList
+                data={details.similar.results.slice(0, 20)}
+                renderItem={({ item }) => (
+                  <SimilarMovieItem
+                    item={item}
+                    navigation={navigation}
+                    imageQuality={imageQuality}
+                  />
+                )}
+                keyExtractor={(item) => item.id.toString()}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingVertical: 4, gap: 10 }}
+              />
+            </View>
+          )}
+
+          {/* ── KRİTİKLER ── */}
+          {details.reviews?.results.length > 0 && (
+            <View style={[styles.section, { marginBottom: 40 }]}>
+              <SectionHeader title={t.reviews} theme={theme} />
+              {details.reviews.results.slice(0, reviewLength).map((review) => (
+                <TouchableOpacity
+                  key={review.id}
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    setReviewTextLength(
+                      review.id === reviewTextLength ? null : review.id,
+                    )
+                  }
+                  style={[
+                    styles.reviewCard,
+                    {
+                      backgroundColor: theme.secondary,
+                      borderColor: theme.border,
+                    },
+                  ]}
                 >
-                  {t.reviews}
-                </Text>
-                {details.reviews.results
-                  .slice(0, reviewLenght)
-                  .map((review) => (
+                  <View style={styles.reviewTop}>
                     <View
-                      key={review.id}
                       style={[
-                        styles.reviewItem,
-                        {
-                          backgroundColor: theme.secondary,
-                          shadowColor: theme.shadow,
-                        },
+                        styles.reviewAvatar,
+                        { backgroundColor: theme.accent + "28" },
                       ]}
                     >
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={() =>
-                          setReviewTextLenght(
-                            review.id == reviewTextLenght ? null : review.id,
-                          )
-                        }
-                      >
-                        <View style={styles.reviewHeader}>
-                          <Text
-                            style={[
-                              styles.reviewAuthor,
-                              { color: theme.text.primary },
-                            ]}
-                          >
-                            {review.author}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.reviewDate,
-                              { color: theme.text.secondary },
-                            ]}
-                          >
-                            {review.created_at &&
-                            !isNaN(new Date(review.created_at).getTime())
-                              ? new Date(review.created_at).toLocaleDateString()
-                              : ""}
-                          </Text>
-                        </View>
-                        <Text
-                          style={[
-                            styles.reviewContent,
-                            { color: theme.text.secondary },
-                          ]}
-                          numberOfLines={
-                            review.id === reviewTextLenght ? null : 2
-                          }
-                        >
-                          {review.content}
-                        </Text>
-                      </TouchableOpacity>
+                      <Ionicons name="person" size={13} color={theme.accent} />
                     </View>
-                  ))}
-                {details.reviews?.results.length > 5 ? (
-                  <TouchableOpacity
-                    onPress={() =>
-                      setReviewLenght(
-                        details.reviews?.results.length === reviewLenght
-                          ? 5
-                          : details.reviews?.results.length,
-                      )
-                    }
-                    style={{
-                      width: "100%",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      marginTop: 10,
-                    }}
-                    activeOpacity={0.8}
+                    <Text
+                      allowFontScaling={false}
+                      style={[
+                        styles.reviewAuthor,
+                        { color: theme.text.primary },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {review.author}
+                    </Text>
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.reviewDate, { color: theme.text.muted }]}
+                    >
+                      {review.created_at
+                        ? new Date(review.created_at).toLocaleDateString()
+                        : ""}
+                    </Text>
+                  </View>
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.reviewBody, { color: theme.text.secondary }]}
+                    numberOfLines={review.id === reviewTextLength ? null : 3}
                   >
-                    {reviewLenght > 5 ? (
-                      <MaterialIcons
-                        name="keyboard-arrow-up"
-                        size={40}
-                        color={theme.text.primary}
-                        style={{
-                          width: 40,
-                          backgroundColor: theme.secondary,
-                          borderRadius: 15,
-                          shadowColor: theme.shadow,
-                          shadowOffset: {
-                            width: 0,
-                            height: 8,
-                          },
-                          shadowOpacity: 0.94,
-                          shadowRadius: 10.32,
-                          elevation: 5,
-                        }}
-                      />
-                    ) : (
-                      <MaterialIcons
-                        name="keyboard-arrow-down"
-                        size={40}
-                        color={theme.text.primary}
-                        style={{
-                          width: 40,
-                          backgroundColor: theme.secondary,
-                          borderRadius: 15,
-                          shadowColor: theme.shadow,
-                          shadowOffset: {
-                            width: 0,
-                            height: 8,
-                          },
-                          shadowOpacity: 0.94,
-                          shadowRadius: 10.32,
-                          elevation: 5,
-                        }}
-                      />
-                    )}
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            )}
-          </View>
+                    {review.content}
+                  </Text>
+                  {review.id !== reviewTextLength && (
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.readMore, { color: theme.accent }]}
+                    >
+                      Devamını oku
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+              {details.reviews.results.length > 5 && (
+                <TouchableOpacity
+                  onPress={() =>
+                    setReviewLength(
+                      details.reviews.results.length === reviewLength
+                        ? 5
+                        : details.reviews.results.length,
+                    )
+                  }
+                  style={[styles.expandBtn, { marginTop: 4 }]}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons
+                    name={
+                      reviewLength > 5
+                        ? "keyboard-arrow-up"
+                        : "keyboard-arrow-down"
+                    }
+                    size={22}
+                    color={theme.accent}
+                  />
+                  <Text style={[styles.expandBtnText, { color: theme.accent }]}>
+                    {reviewLength > 5 ? "Daha az" : "Tüm yorumlar"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </View>
-        {/* <Comment contextId={id} /> */}
       </ScrollView>
+
+      {/* ═══════ MODALS ═══════ */}
+
+      {/* Yorumlar */}
       <Modal
-        animationType="slide"
-        transparent={true}
+        animationType="none"
+        transparent
         visible={commandModalVisible}
+        onRequestClose={() => setCommentModalVisible(false)}
+        statusBarTranslucent
       >
-        <KeyboardAvoidingView
-          style={{
-            flex: 1,
-            justifyContent: "flex-end",
-          }}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-          <LinearGradient
-            colors={[
-              "rgba(0,0,0,0)",
-              "rgba(0,0,0,0.3)",
-              "rgba(0,0,0,0.3)",
-              "rgba(0,0,0,0.6)",
-              "rgba(0,0,0,0.9)",
-            ]}
-            style={{
-              position: "absolute",
-              top: 0,
-              right: 0,
-              left: 0,
-              bottom: 0,
-            }}
-          />
-          <TouchableOpacity
-            style={{ flex: 1 }}
-            activeOpacity={1}
-            onPress={() => setCommentModalVisible(!commandModalVisible)}
-          />
-          <Comment contextId={id} />
-        </KeyboardAvoidingView>
+        <CommentSheetModal
+          visible={commandModalVisible}
+          onClose={() => setCommentModalVisible(false)}
+          movieId={id}
+          details={details}
+        />
       </Modal>
 
+      {/* Video player */}
       <Modal
         visible={selectedVideo !== null}
         onRequestClose={() => setSelectedVideo(null)}
-        animationType="slide"
-        transparent={true}
+        animationType="fade"
+        transparent
       >
-        <View style={styles.modalContainerVideo}>
+        <View style={styles.videoModal}>
           <BlurView
             tint="dark"
-            intensity={50}
-            experimentalBlurMethod="dimezisBlurView" // Android için sihirli kod
+            intensity={60}
+            experimentalBlurMethod="dimezisBlurView"
             style={StyleSheet.absoluteFill}
           />
           <TouchableOpacity
-            style={{
-              position: "absolute",
-              top: 0,
-              right: 0,
-              left: 0,
-              bottom: 0,
-            }}
+            style={StyleSheet.absoluteFill}
             onPress={() => setSelectedVideo(null)}
           />
-          <View style={styles.modalContentVideo}>
+          <View style={styles.videoModalContent}>
             <TouchableOpacity
-              style={styles.closeButton}
+              style={styles.videoCloseBtn}
               onPress={() => setSelectedVideo(null)}
             >
-              <FontAwesome5 name="times" size={24} color="#fff" />
+              <BlurView
+                tint="dark"
+                intensity={50}
+                style={styles.videoCloseBtnBlur}
+              >
+                <Ionicons name="close" size={20} color="#fff" />
+              </BlurView>
             </TouchableOpacity>
             {selectedVideo && (
-              <YoutubePlayer height={250} videoId={selectedVideo} play={true} />
+              <YoutubePlayer height={220} videoId={selectedVideo} play />
             )}
           </View>
         </View>
       </Modal>
+
+      {/* İzleme tarihi */}
       <Modal
-        visible={modalVisible} // artık state'e bağlı
+        visible={modalVisible}
         onRequestClose={closeModal}
         animationType="slide"
-        transparent={true}
+        transparent
       >
-        <View style={styles.modalContainer}>
+        <View style={styles.dateModalWrap}>
           <LinearGradient
-            colors={[
-              "rgba(0,0,0,0)",
-              "rgba(0,0,0,0)",
-              "rgba(0,0,0,0.7)",
-              "rgba(0,0,0,0.9)",
-            ]}
-            style={{
-              position: "absolute",
-              top: 0,
-              right: 0,
-              left: 0,
-              bottom: 0,
-            }}
+            colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.85)"]}
+            style={StyleSheet.absoluteFill}
           />
           <TouchableOpacity
-            style={{
-              position: "absolute",
-              top: 0,
-              right: 0,
-              left: 0,
-              bottom: 0,
-            }}
+            style={StyleSheet.absoluteFill}
             onPress={closeModal}
           />
           <View
-            style={[styles.modalContent, { backgroundColor: theme.secondary }]}
+            style={[
+              styles.dateSheet,
+              { backgroundColor: theme.secondary, borderColor: theme.border },
+            ]}
           >
             <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                gap: 5,
-              }}
+              style={[styles.sheetHandle, { backgroundColor: theme.border }]}
+            />
+            <Text
+              allowFontScaling={false}
+              style={[styles.sheetTitle, { color: theme.text.primary }]}
             >
-              {/* İleride başka seçenekler de ekleyebilirsin */}
+              İzleme Tarihi
+            </Text>
+            <Text
+              allowFontScaling={false}
+              style={[styles.sheetSubtitle, { color: theme.text.muted }]}
+            >
+              Bu filmi ne zaman izlediniz?
+            </Text>
+            <View style={styles.dateOptions}>
               <TouchableOpacity
-                style={[styles.input, { backgroundColor: theme.primary }]}
+                style={[
+                  styles.dateOption,
+                  {
+                    backgroundColor: theme.primary,
+                    borderColor: selectedDate ? theme.accent : theme.border,
+                  },
+                ]}
                 onPress={showDatePicker}
+                activeOpacity={0.85}
               >
-                <Ionicons
-                  name="calendar-outline"
-                  size={48}
-                  color={theme.text.primary}
-                />
+                <View
+                  style={[
+                    styles.dateOptionIcon,
+                    { backgroundColor: theme.accent + "20" },
+                  ]}
+                >
+                  <Ionicons
+                    name="calendar-outline"
+                    size={24}
+                    color={theme.accent}
+                  />
+                </View>
                 <Text
                   allowFontScaling={false}
-                  style={[styles.inputText, { color: theme.text.primary }]}
+                  style={[
+                    styles.dateOptionLabel,
+                    { color: selectedDate ? theme.accent : theme.text.primary },
+                  ]}
                 >
-                  {selectedDate
-                    ? formatDateSave(selectedDate)
-                    : "Tarih seçiniz"}
+                  {selectedDate || "Tarih Seç"}
                 </Text>
               </TouchableOpacity>
+
               <TouchableOpacity
-                style={[styles.input, { backgroundColor: theme.primary }]}
+                style={[
+                  styles.dateOption,
+                  { backgroundColor: theme.primary, borderColor: theme.border },
+                ]}
                 onPress={() =>
                   updateMovieList(
                     "watchedMovies",
@@ -1478,25 +1338,45 @@ export default function MovieDetails({ navigation, route }) {
                     formatDateSave(new Date()),
                   )
                 }
+                activeOpacity={0.85}
               >
-                <Entypo name="stopwatch" size={48} color={theme.text.primary} />
+                <View
+                  style={[
+                    styles.dateOptionIcon,
+                    {
+                      backgroundColor:
+                        (theme.colors?.blue || theme.accent) + "20",
+                    },
+                  ]}
+                >
+                  <Entypo
+                    name="stopwatch"
+                    size={24}
+                    color={theme.colors?.blue || theme.accent}
+                  />
+                </View>
                 <Text
                   allowFontScaling={false}
-                  style={[styles.inputText, { color: theme.text.primary }]}
+                  style={[
+                    styles.dateOptionLabel,
+                    { color: theme.text.primary },
+                  ]}
                 >
                   Şimdi
                 </Text>
                 <Text
-                  style={[
-                    styles.inputTextDate,
-                    { color: theme.text.secondary },
-                  ]}
+                  allowFontScaling={false}
+                  style={[styles.dateOptionSub, { color: theme.text.muted }]}
                 >
                   {formatDate(new Date())}
                 </Text>
               </TouchableOpacity>
+
               <TouchableOpacity
-                style={[styles.input, { backgroundColor: theme.primary }]}
+                style={[
+                  styles.dateOption,
+                  { backgroundColor: theme.primary, borderColor: theme.border },
+                ]}
                 onPress={() =>
                   updateMovieList(
                     "watchedMovies",
@@ -1504,65 +1384,73 @@ export default function MovieDetails({ navigation, route }) {
                     formatDateSave(new Date(details.release_date)),
                   )
                 }
+                activeOpacity={0.85}
               >
-                <MaterialCommunityIcons
-                  name="movie-play-outline"
-                  size={48}
-                  color={theme.text.primary}
-                />
+                <View
+                  style={[
+                    styles.dateOptionIcon,
+                    {
+                      backgroundColor:
+                        (theme.colors?.orange || theme.accent) + "20",
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="film-outline"
+                    size={24}
+                    color={theme.colors?.orange || theme.accent}
+                  />
+                </View>
                 <Text
                   allowFontScaling={false}
-                  style={[styles.inputText, { color: theme.text.primary }]}
+                  style={[
+                    styles.dateOptionLabel,
+                    { color: theme.text.primary },
+                  ]}
                 >
-                  Yayınlanma Tarih
+                  Yayın Tarihi
                 </Text>
                 <Text
-                  style={[
-                    styles.inputTextDate,
-                    { color: theme.text.secondary },
-                  ]}
+                  allowFontScaling={false}
+                  style={[styles.dateOptionSub, { color: theme.text.muted }]}
                 >
                   {formatDate(details.release_date)}
                 </Text>
               </TouchableOpacity>
-              <DateTimePickerModal
-                isVisible={isDatePickerVisible}
-                mode="date"
-                onConfirm={handleConfirm}
-                onCancel={hideDatePicker}
-                minimumDate={new Date(details.release_date)} // 1 Ocak 2000'den önce seçilemez
-                maximumDate={new Date()} // Bugünden ileri seçilemez
-              />
-
-              {/* Buraya başka butonlar veya seçenekler ekleyebilirsin */}
             </View>
+            <DateTimePickerModal
+              isVisible={isDatePickerVisible}
+              mode="date"
+              onConfirm={handleConfirm}
+              onCancel={hideDatePicker}
+              minimumDate={new Date(details.release_date)}
+              maximumDate={new Date()}
+            />
           </View>
         </View>
       </Modal>
+
+      {/* Poster / Backdrop büyük görüntü */}
       <Modal
-        visible={PosterModalVisible || backdropModalVisible} // artık state'e bağlı
+        visible={PosterModalVisible || backdropModalVisible}
         onRequestClose={() => {
-          (setPosterModalVisible(false), setBacdropModalVisible(false));
+          setPosterModalVisible(false);
+          setBacdropModalVisible(false);
         }}
         animationType="fade"
-        transparent={true}
+        transparent
       >
         <BlurView
           tint="dark"
-          intensity={50}
-          experimentalBlurMethod="dimezisBlurView" // Android için sihirli kod
+          intensity={60}
+          experimentalBlurMethod="dimezisBlurView"
           style={StyleSheet.absoluteFill}
         />
         <TouchableOpacity
-          style={{
-            position: "absolute",
-            top: 0,
-            right: 0,
-            left: 0,
-            bottom: 0,
-          }}
+          style={StyleSheet.absoluteFill}
           onPress={() => {
-            (setPosterModalVisible(false), setBacdropModalVisible(false));
+            setPosterModalVisible(false);
+            setBacdropModalVisible(false);
           }}
         />
         <View
@@ -1578,13 +1466,11 @@ export default function MovieDetails({ navigation, route }) {
                     uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,
                   }
             }
-            style={[
-              {
-                width: PosterModalVisible ? 360 : 380,
-                height: PosterModalVisible ? 540 : 300,
-                borderRadius: 20,
-              },
-            ]}
+            style={{
+              width: PosterModalVisible ? 300 : 380,
+              height: PosterModalVisible ? 450 : 380 * (9 / 16),
+              borderRadius: 20,
+            }}
           />
         </View>
       </Modal>
@@ -1592,487 +1478,400 @@ export default function MovieDetails({ navigation, route }) {
   );
 }
 
+/* ─────────────────────────────────────────
+   Styles
+───────────────────────────────────────── */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingText: {
-    fontSize: 16,
-    textAlign: "center",
-    marginTop: 20,
-  },
-  headerContainer: {
-    height: 300,
-    position: "relative",
-  },
-  backdrop: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-    borderBottomRightRadius: 20,
-    borderBottomLeftRadius: 20,
-  },
-  noImageContainer: {
+  container: { flex: 1 },
+
+  /* Hero */
+  heroContainer: { height: BACKDROP_HEIGHT, position: "relative" },
+  backdrop: { width: "100%", height: "100%", resizeMode: "cover" },
+  noBackdrop: {
     width: "100%",
     height: "100%",
     justifyContent: "center",
     alignItems: "center",
   },
-  gradient: {
+  heroGradient: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: 80,
+    height: BACKDROP_HEIGHT * 0.7,
   },
-  playButton: {
+  backBtn: {
     position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: [{ translateX: -25 }, { translateY: -25 }],
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    justifyContent: "center",
+    top: Platform.OS === "ios" ? 52 : 36,
+    left: 16,
+    zIndex: 10,
+  },
+  backBtnBlur: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 15,
-    paddingTop: 20,
-  },
+
+  /* Lottie snow */
   lottie: {
     position: "absolute",
     height: 1000,
-    top: 0,
     left: -60,
     right: -60,
     zIndex: 0,
   },
-  lottie0: {
-    position: "absolute",
-    height: 1000,
-    top: 1000,
-    left: -60,
-    right: -60,
-    zIndex: 0,
-  },
-  lottie1: {
-    position: "absolute",
-    height: 1000,
-    top: 2000,
-    left: -60,
-    right: -60,
-    zIndex: 0,
-  },
-  lottie2: {
-    position: "absolute",
-    height: 1000,
-    top: 3000,
-    left: -60,
-    right: -60,
-    zIndex: 0,
-  },
-  header: {
+
+  /* Info header */
+  infoHeader: {
     flexDirection: "row",
-    top: -100,
-    left: 0,
-    right: 0,
+    paddingHorizontal: 16,
+    marginTop: -BACKDROP_HEIGHT * 0.28,
+    gap: 14,
+    alignItems: "flex-end",
+    marginBottom: 20,
   },
-  posterView: {
-    width: 120,
-    height: 180,
-    marginRight: 15,
+  posterShadow: {
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12,
   },
-  poster: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 10,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 10,
-  },
-  noPosterContainer: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 10,
+  poster: { width: 110, height: 110 * 1.5, borderRadius: 14, borderWidth: 1.5 },
+  noPoster: {
+    width: 110,
+    height: 110 * 1.5,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
   },
-  headerInfo: {
-    flex: 1,
-    justifyContent: "center",
-  },
+  titleBlock: { flex: 1, paddingBottom: 4, gap: 4 },
   title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 5,
+    fontSize: 22,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+    lineHeight: 26,
   },
-  tagline: {
-    fontSize: 14,
-    marginBottom: 10,
+  altTitle: { fontSize: 12, fontStyle: "italic" },
+  tagline: { fontSize: 12, fontStyle: "italic", lineHeight: 17 },
+  genreRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 },
+  genreChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  genres: {
+  genreChipText: { fontSize: 11, fontWeight: "600" },
+  ratingRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    marginBottom: 10,
-    gap: 5,
-  },
-  genreTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
-  },
-  genreText: {
-    fontSize: 12,
-  },
-  mainRating: {
     alignItems: "center",
-    flexDirection: "row",
+    gap: 6,
+    marginTop: 4,
   },
-  ratingText: {
-    fontSize: 18,
-    fontWeight: "500",
-  },
-  voteCount: {
-    fontSize: 14,
-    marginTop: 5,
-  },
-  stats: {
+  ratingNum: { fontSize: 16, fontWeight: "700" },
+  voteRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  voteCount: { fontSize: 12, fontWeight: "500" },
+
+  /* Body */
+  body: { paddingHorizontal: 15 },
+
+  /* Stat row */
+  statRow: {
     flexDirection: "row",
     justifyContent: "space-around",
-    paddingVertical: 15,
-
-    borderRadius: 10,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
-  },
-  stats1: {
     alignItems: "center",
-    position: "absolute",
-    left: 3,
-    bottom: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingVertical: 16,
+    marginBottom: 16,
+  },
+  statPill: { flex: 1, alignItems: "center", gap: 5 },
+  statIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
     justifyContent: "center",
   },
-  statItem: {
-    alignItems: "center",
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 5,
-  },
-  statLabel: {
-    fontSize: 12,
-  },
-  section: {},
-  sectionHeader: {
+  statVal: { fontSize: 15, fontWeight: "700" },
+  statLbl: { fontSize: 11 },
+  statDivider: { width: 1, height: 44, opacity: 0.4 },
+
+  /* Comments btn */
+  commentsBtn: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    marginBottom: 16,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
   },
+  commentsIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  commentsBtnText: { fontSize: 15, fontWeight: "600" },
+  commentsRight: { marginLeft: "auto" },
+
+  /* External links */
+  externalLinks: { flexDirection: "row", gap: 8, paddingVertical: 2 },
+  extLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 22,
+    borderWidth: 1,
+  },
+  extLinkText: { fontSize: 13, fontWeight: "600" },
+
+  /* Sections */
+  section: { marginBottom: 28 },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 14,
+  },
+  sectionAccent: { width: 3, height: 18, borderRadius: 2 },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 10,
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+    flex: 1,
   },
-  expandButton: {
-    fontSize: 14,
+  seeAllBtn: { paddingHorizontal: 4 },
+  seeAllText: { fontSize: 13, fontWeight: "600" },
+  overview: { fontSize: 15, lineHeight: 24 },
+
+  /* Accordion */
+  accordionCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 12,
   },
-  overview: {
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 15,
-  },
-  keywords: {
+  accordionHeader: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 5,
-  },
-  keywordTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
-  },
-  keywordText: {
-    fontSize: 12,
-  },
-  castList: {
-    paddingVertical: 10,
-  },
-  castItem: {
-    width: width * 0.25,
-    marginRight: 15,
     alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
   },
+  accordionTitle: { fontSize: 13, fontWeight: "700", flex: 1 },
+  accordionBody: { fontSize: 13, lineHeight: 20 },
+  accordionMore: { fontSize: 11, fontWeight: "600", marginTop: 6 },
+
+  /* Tags */
+  tagsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
+  tag: {
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  tagText: { fontSize: 12, fontWeight: "500" },
+  expandBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "center",
+    marginTop: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  expandBtnText: { fontSize: 13, fontWeight: "600" },
+
+  /* Cast */
+  castItem: { width: width * 0.26, alignItems: "center" },
   castImage: {
-    width: width * 0.2,
-    height: width * 0.2,
-    borderRadius: width * 0.1,
-    marginBottom: 5,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
+    width: width * 0.26,
+    height: width * 0.26 * 1.5,
+    borderRadius: 12,
+    marginBottom: 7,
+    borderWidth: 1.5,
   },
   castName: {
-    color: "#fff",
-    fontSize: 12,
+    fontSize: 11.5,
     textAlign: "center",
-    marginBottom: 2,
+    fontWeight: "700",
+    lineHeight: 15,
   },
-  castCharacter: {
-    color: "#999",
-    fontSize: 11,
-    textAlign: "center",
-  },
-  similarList: {
-    paddingVertical: 10,
-  },
-  similarItem: {
-    width: width * 0.4,
-    marginRight: 10,
-  },
+  castCharacter: { fontSize: 10.5, textAlign: "center", lineHeight: 14 },
+
+  /* Similar */
+  similarItem: { width: width * 0.38 },
   similarPoster: {
-    width: width * 0.4,
-    height: width * 0.6,
-    borderRadius: 10,
-    marginBottom: 5,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
+    width: "100%",
+    aspectRatio: 2 / 3,
+    borderRadius: 14,
+    borderWidth: 1,
   },
-  similarTitle: {
-    color: "#fff",
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  similarRating: {
+  ratingPill: {
     position: "absolute",
-    bottom: 6,
-    right: 3,
-    width: 30,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  similarRatingText: {
-    color: "#ffd700",
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  reviewItem: {
-    backgroundColor: "#2a2a2a",
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
-  },
-  reviewHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 5,
-  },
-  reviewAuthor: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "bold",
-  },
-  reviewDate: {
-    color: "#999",
-    fontSize: 12,
-  },
-  ratingContainer: {
+    bottom: 8,
+    right: 6,
     flexDirection: "row",
     alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
-  reviewContent: {
-    color: "#bbb",
-    fontSize: 13,
-    lineHeight: 18,
+  ratingPillText: { color: "#FFD700", fontSize: 11, fontWeight: "700" },
+  listIndicators: {
+    position: "absolute",
+    top: 7,
+    left: 7,
+    flexDirection: "row",
+    gap: 4,
   },
-  alternativeTitle: {
-    color: "#999",
-    fontSize: 14,
-    marginBottom: 5,
+  stats: {
+    position: "absolute",
+    bottom: 8,
+    left: 6,
+    zIndex: 10,
   },
-  videosList: {
-    paddingVertical: 10,
-  },
-  videoItem: {
-    height: height * 0.2,
-    width: width * 0.5,
-    marginRight: 15,
-  },
+  /* Videos */
+  videoItem: { width: width * 0.62 },
   videoThumbnail: {
-    position: "relative",
     width: "100%",
-    height: "65%",
-    borderRadius: 10,
+    aspectRatio: 16 / 9,
+    borderRadius: 14,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
   },
-  videoImage: {
-    width: "100%",
-    height: "100%",
-  },
+  videoImage: { width: "100%", height: "100%" },
   playIconContainer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
   },
-  videoTitle: {
+  videoTypeBadge: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  videoTypeBadgeText: {
     color: "#fff",
-    fontSize: 14,
-    marginTop: 5,
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  videoType: {
-    color: "#999",
-    fontSize: 12,
-    marginTop: 2,
+  videoTitle: { fontSize: 13, marginTop: 9, fontWeight: "600", lineHeight: 18 },
+
+  /* Providers */
+  providersRow: { flexDirection: "row", gap: 12, paddingVertical: 4 },
+  providerCard: {
+    alignItems: "center",
+    width: 72,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 7,
   },
-  externalLinks: {
+  providerLogo: { width: 44, height: 44, borderRadius: 10 },
+  providerName: { fontSize: 10, textAlign: "center", fontWeight: "500" },
+
+  /* Reviews */
+  reviewCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  reviewTop: {
     flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    marginBottom: 10,
+  },
+  reviewAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    alignItems: "center",
     justifyContent: "center",
-    gap: 20,
+  },
+  reviewAuthor: { fontSize: 13, fontWeight: "700", flex: 1 },
+  reviewDate: { fontSize: 11 },
+  reviewBody: { fontSize: 13, lineHeight: 20 },
+  readMore: { fontSize: 12, fontWeight: "600", marginTop: 8 },
+
+  /* Video modal */
+  videoModal: { flex: 1, justifyContent: "center" },
+  videoModalContent: { backgroundColor: "#000", position: "relative" },
+  videoCloseBtn: { position: "absolute", top: -52, right: 12, zIndex: 10 },
+  videoCloseBtnBlur: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+
+  /* Date modal */
+  dateModalWrap: { flex: 1, justifyContent: "flex-end" },
+  dateSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
     marginBottom: 20,
   },
-  externalLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "#333",
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  externalLinkText: {
-    color: "#fff",
-    fontSize: 14,
-  },
-  watchProviders: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 15,
-  },
-  providerItem: {
-    alignItems: "center",
-    width: width * 0.2,
-  },
-  providerLogo: {
-    width: width * 0.15,
-    height: width * 0.15,
-    borderRadius: 10,
-  },
-  providerName: {
-    color: "#fff",
-    fontSize: 12,
+  sheetTitle: {
+    fontSize: 17,
+    fontWeight: "800",
     textAlign: "center",
-    marginTop: 5,
+    letterSpacing: -0.3,
+    marginBottom: 4,
   },
-  modalContainerVideo: {
+  sheetSubtitle: { fontSize: 13, textAlign: "center", marginBottom: 20 },
+  dateOptions: { flexDirection: "row", gap: 10 },
+  dateOption: {
     flex: 1,
-    //backgroundColor: "rgba(0, 0, 0, 0.9)",
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    gap: 8,
+    alignItems: "center",
+    borderWidth: 1,
+  },
+  dateOptionIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    alignItems: "center",
     justifyContent: "center",
   },
-  modalContentVideo: {
-    height: width * 0.5625, // 16:9 aspect ratio
-    backgroundColor: "#000",
-    position: "relative",
-  },
-  webview: {
-    flex: 1,
-  },
-  closeButton: {
-    position: "absolute",
-    top: -40,
-    right: 10,
-    zIndex: 1,
-    padding: 10,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "#222",
-    borderTopRightRadius: 16,
-    borderTopLeftRadius: 16,
-    padding: 18,
-
-    alignItems: "center",
-  },
-  input: {
-    backgroundColor: "#333",
-    borderRadius: 8,
-    padding: 12,
-    marginVertical: 8,
-    minWidth: 100,
-    gap: 5,
-    alignItems: "center",
-  },
-
-  inputText: {
-    fontSize: 14,
-    color: "#fff",
-  },
-  inputTextDate: {
-    fontSize: 12,
-    color: "#999",
-  },
+  dateOptionLabel: { fontSize: 12, fontWeight: "700", textAlign: "center" },
+  dateOptionSub: { fontSize: 10.5, textAlign: "center" },
 });

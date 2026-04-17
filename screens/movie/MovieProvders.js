@@ -6,18 +6,12 @@ import {
   FlatList,
   Image,
   Dimensions,
-  ActivityIndicator,
   StyleSheet,
   Animated,
 } from "react-native";
-import axios from "axios";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
-import {
-  MovieSkeleton,
-  MovieProviderSkeleton,
-} from "../../components/Skeleton";
-//import { API_KEY } from "@env";
+import { MovieSkeleton } from "../../components/Skeleton";
 import { useAppSettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import { useListStatus } from "../../modules/UseListStatus";
@@ -87,7 +81,9 @@ export default function MovieProviders({ navigation }) {
       onPress={() => fetchMoviesByProvider(item.provider_id)}
     >
       <Image
-        source={{ uri: `https://image.tmdb.org/t/p/w200${item.logo_path}` }}
+        source={{
+          uri: `https://image.tmdb.org/t/p/${imageQuality.logo}${item.logo_path}`,
+        }}
         style={{ width: 30, height: 30, borderRadius: 10 }}
       />
       <View

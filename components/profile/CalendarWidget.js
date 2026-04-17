@@ -64,7 +64,7 @@ export default function CalendarWidget({ navigation }) {
     <View style={{ width: "90%" }}>
       <Text
         style={{
-          color: theme.text.secondary,
+          color: theme.text.muted,
           marginVertical: 15,
         }}
       >

@@ -1,16 +1,13 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import {
   StyleSheet,
   View,
   Text,
   TouchableOpacity,
-  Switch,
   ScrollView,
   Alert,
   Modal,
   TextInput,
-  Animated,
-  Dimensions,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -21,8 +18,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../context/ThemeContext";
 import LottieView from "lottie-react-native";
 import SettingsTheme from "./setting/SettingsTheme";
-import { useSnow } from "../../context/SnowContext";
-import { LinearGradient } from "expo-linear-gradient";
 import { useAppSettings } from "../../context/AppSettingsContext";
 import SwitchToggle from "../../modules/SwitchToggle";
 import SwipeCard from "../../modules/SwipeCard";
@@ -30,32 +25,124 @@ import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import CountryFlag from "react-native-country-flag";
 import IconBacground from "../../components/IconBacground";
+import { alpha } from "../../theme/colors";
+
 const LANGUAGES = [
   { code: "tr", name: "Türkçe", nativeName: "Türkçe", flag: "tr" },
   { code: "en", name: "English", nativeName: "English", flag: "us" },
-  // İleride daha fazla dil eklenebilir:
-  // { code: "de", name: "German", nativeName: "Deutsch", flag: "de" },
-  // { code: "fr", name: "French", nativeName: "Français", flag: "fr" },
-  // { code: "es", name: "Spanish", nativeName: "Español", flag: "es" },
 ];
 
 const IMAGE_QUALITIES = [
-  { label: "Düşük", value: "low", icon: "image-outline" },
-  { label: "Orta", value: "medium", icon: "image" },
-  { label: "İyi", value: "good", icon: "image" },
-  { label: "Çok İyi", value: "high", icon: "images-outline" },
-  { label: "Orijinal", value: "original", icon: "diamond-outline" },
+  { label: "Düşük", value: "low" },
+  { label: "Orta", value: "medium" },
+  { label: "İyi", value: "good" },
+  { label: "Yüksek", value: "high" },
+  { label: "Orijinal", value: "original" },
 ];
 
+function buildUiColors(theme) {
+  return {
+    bg: theme.primary,
+    card: theme.secondary,
+    cardAlt: theme.between,
+    border: theme.border,
+    borderMuted: alpha(theme.border, 0.55),
+    text: theme.text.primary,
+    muted: theme.text.muted,
+    accent: theme.accent,
+    accentStrong: theme.bold,
+    accentDim: alpha(theme.accent, 0.16),
+    danger: theme.colors.red,
+    dangerDim: alpha(theme.colors.red, 0.12),
+    blue: theme.colors.blue,
+    purple: theme.colors.purple,
+    green: theme.colors.green,
+    amber: theme.colors.orange,
+    teal: theme.accent,
+    iconBlue: alpha(theme.colors.blue, 0.14),
+    iconPurple: alpha(theme.colors.purple, 0.14),
+    iconGreen: alpha(theme.colors.green, 0.14),
+    iconAmber: alpha(theme.colors.orange, 0.14),
+    iconTeal: alpha(theme.accent, 0.14),
+    white: "#FFFFFF",
+    handle: alpha(theme.text.muted, 0.45),
+    closeBg: alpha(theme.border, 0.7),
+  };
+}
+
+function SectionLabel({ children, color }) {
+  return (
+    <Text allowFontScaling={false} style={[s.sectionLabel, { color }]}>
+      {children}
+    </Text>
+  );
+}
+
+function Chevron({ color }) {
+  return <Ionicons name="chevron-forward" size={14} color={color} />;
+}
+
+function SettingRow({
+  colors,
+  iconBg,
+  iconColor,
+  iconName,
+  iconLib = "ion",
+  title,
+  subtitle,
+  right,
+  onPress,
+  danger,
+  last,
+}) {
+  const Icon =
+    iconLib === "mc"
+      ? MaterialCommunityIcons
+      : iconLib === "mi"
+        ? MaterialIcons
+        : Ionicons;
+
+  return (
+    <TouchableOpacity
+      style={[
+        s.row,
+        { borderBottomColor: colors.borderMuted },
+        last && { borderBottomWidth: 0 },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.65}
+    >
+      <View style={s.rowLeft}>
+        <View style={[s.iconWrap, { backgroundColor: iconBg }]}>
+          <Icon name={iconName} size={15} color={iconColor} />
+        </View>
+        <View style={s.rowTexts}>
+          <Text
+            allowFontScaling={false}
+            style={[s.rowTitle, { color: danger ? colors.danger : colors.text }]}
+          >
+            {title}
+          </Text>
+          {subtitle ? (
+            <Text allowFontScaling={false} style={[s.rowSub, { color: colors.muted }]}>
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+      <View style={s.rowRight}>{right}</View>
+    </TouchableOpacity>
+  );
+}
+
 export default function SettingsScreen() {
-  const [enabled, setEnabled] = useState(false);
-  //const { showSnow, changeShowSnow } = useSnow();
-  const { t, language, toggleLanguage } = useLanguage();
-  const { theme } = useTheme();
   const [notifications, setNotifications] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [langSearch, setLangSearch] = useState("");
+
+  const { t, language, toggleLanguage } = useLanguage();
+  const { theme } = useTheme();
   const {
     chaneAdultContent,
     adultContent,
@@ -66,504 +153,304 @@ export default function SettingsScreen() {
     changeImageQuality,
   } = useAppSettings();
 
-  const filteredLanguages = LANGUAGES.filter(
-    (lang) =>
-      lang.name.toLowerCase().includes(langSearch.toLowerCase()) ||
-      lang.nativeName.toLowerCase().includes(langSearch.toLowerCase()),
-  );
+  const C = buildUiColors(theme);
 
+  const filteredLanguages = LANGUAGES.filter(
+    (l) =>
+      l.name.toLowerCase().includes(langSearch.toLowerCase()) ||
+      l.nativeName.toLowerCase().includes(langSearch.toLowerCase()),
+  );
   const currentLang =
-    LANGUAGES.find((l) => l.code === language) || LANGUAGES[0];
+    LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0];
 
   const handleClearCache = async () => {
     try {
       await AsyncStorage.clear();
       Alert.alert(t.success, t.cacheCleared);
-    } catch (error) {
+    } catch {
       Alert.alert(t.error, t.errorClearingCache);
     }
   };
 
-  const handleSelectLanguage = (langCode) => {
-    toggleLanguage(langCode);
+  const handleSelectLanguage = (code) => {
+    toggleLanguage(code);
     setLangModalVisible(false);
     setLangSearch("");
   };
 
+  const currentQualityLabel =
+    IMAGE_QUALITIES.find((q) => q.value === imageQualityLevel)?.label ?? "—";
+
   return (
-    <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
-      <IconBacground opacity={0.3} />
+    <View style={[s.root, { backgroundColor: C.bg }]}>
+      <IconBacground opacity={0.15} />
+
       <ScrollView
-        style={[styles.container, { backgroundColor: "transparent" }]}
-        contentContainerStyle={styles.contentContainer}
+        style={s.scroll}
+        contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         {showSnow && (
           <>
             <LottieView
-              style={styles.lottie}
+              style={s.lottie}
               source={require("../../LottieJson/snow.json")}
-              autoPlay={true}
+              autoPlay
               loop
             />
             <LottieView
-              style={styles.lottie1}
+              style={s.lottie1}
               source={require("../../LottieJson/snow.json")}
-              autoPlay={true}
+              autoPlay
               loop
             />
           </>
         )}
-        <Text
-          allowFontScaling={false}
-          style={[styles.title, { color: theme.text.primary }]}
-        >
+
+        <Text allowFontScaling={false} style={[s.pageTitle, { color: C.text }]}>
           {t.settings}
         </Text>
 
-        <View style={styles.section}>
-          <Text
-            allowFontScaling={false}
-            style={[styles.sectionTitle, { color: theme.text.muted }]}
-          >
-            {t.language}
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.langCard,
-              {
-                backgroundColor: theme.secondary,
-                borderColor: theme.border,
-                shadowColor: theme.shadow,
-              },
-            ]}
-            onPress={() => {
-              setLangSearch("");
-              setLangModalVisible(true);
-            }}
-            activeOpacity={0.75}
-          >
-            <View style={styles.langCardLeft}>
-              <View
-                style={[
-                  styles.langCardIconWrap,
-                  { backgroundColor: theme.notesColor.blueBackground },
-                ]}
-              >
-                <Ionicons
-                  name="language-outline"
-                  size={22}
-                  color={theme.notesColor.blue}
-                />
-              </View>
-              <View style={{ gap: 2 }}>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.langCardSubLabel, { color: theme.text.muted }]}
-                >
-                  {t.language}
-                </Text>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.langCardValue, { color: theme.text.primary }]}
-                >
-                  {currentLang.nativeName}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.langCardRight}>
-              <View
-                style={[styles.langFlagWrap, { borderColor: theme.border }]}
-              >
-                <CountryFlag
-                  isoCode={currentLang.flag}
-                  size={28}
-                  style={{ borderRadius: 6 }}
-                />
-              </View>
-              <View
-                style={[
-                  styles.langChevronWrap,
-                  { backgroundColor: theme.primary },
-                ]}
-              >
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={theme.text.muted}
-                />
-              </View>
-            </View>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.section}>
-          <Text
-            allowFontScaling={false}
-            style={[styles.sectionTitle, { color: theme.text.muted }]}
-          >
-            {t.theme}
-          </Text>
-          <SettingsTheme />
-        </View>
-        <View style={styles.section}>
-          <Text
-            allowFontScaling={false}
-            style={[styles.sectionTitle, { color: theme.text.muted }]}
-          >
-            {t.content}
-          </Text>
-          <View
-            style={[
-              styles.context,
-              {
-                backgroundColor: theme.secondary,
-                borderColor: theme.border,
-                shadowColor: theme.shadow,
-              },
-            ]}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 15,
-              }}
-            >
-              <Ionicons
-                name={"snow-sharp"}
-                size={24}
-                color={theme.text.primary}
-              />
-              <Text
-                allowFontScaling={false}
-                style={[styles.settingText, { color: theme.text.primary }]}
-              >
-                {t.snow}
-              </Text>
+        <SectionLabel color={C.muted}>{t.language.toUpperCase()}</SectionLabel>
+        <TouchableOpacity
+          style={[s.langCard, { backgroundColor: C.card, borderColor: C.border }]}
+          onPress={() => {
+            setLangSearch("");
+            setLangModalVisible(true);
+          }}
+          activeOpacity={0.7}
+        >
+          <View style={s.langLeft}>
+            <View style={[s.iconWrap, { backgroundColor: C.iconBlue }]}>
+              <Ionicons name="language-outline" size={16} color={C.blue} />
             </View>
             <View>
+              <Text allowFontScaling={false} style={[s.langSubLabel, { color: C.muted }]}>
+                {t.language.toUpperCase()}
+              </Text>
+              <Text allowFontScaling={false} style={[s.langValue, { color: C.text }]}>
+                {currentLang.nativeName}
+              </Text>
+            </View>
+          </View>
+          <View style={s.langRight}>
+            <View style={[s.flagWrap, { borderColor: C.border }]}>
+              <CountryFlag
+                isoCode={currentLang.flag}
+                size={24}
+                style={{ borderRadius: 5 }}
+              />
+            </View>
+            <Chevron color={C.muted} />
+          </View>
+        </TouchableOpacity>
+
+        <SectionLabel color={C.muted}>{t.theme.toUpperCase()}</SectionLabel>
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <View style={[s.themeHeader, { borderBottomColor: C.borderMuted }]}>
+            <View style={[s.iconWrap, { backgroundColor: C.iconAmber }]}>
+              <Ionicons name="sunny-outline" size={15} color={C.amber} />
+            </View>
+            <Text allowFontScaling={false} style={[s.rowTitle, { color: C.text }]}>
+              Görünüm
+            </Text>
+          </View>
+          <SettingsTheme />
+        </View>
+
+        <SectionLabel color={C.muted}>KALITE</SectionLabel>
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <View style={s.qualityHeader}>
+            <View style={[s.iconWrap, { backgroundColor: C.iconPurple }]}>
+              <MaterialIcons name="high-quality" size={16} color={C.purple} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text allowFontScaling={false} style={[s.rowTitle, { color: C.text }]}>
+                Poster Kalitesi
+              </Text>
+              <Text allowFontScaling={false} style={[s.rowSub, { color: C.muted }]}>
+                {currentQualityLabel} · poster:{imageQuality.poster} · backdrop:
+                {imageQuality.backdrop}
+              </Text>
+            </View>
+            <View style={[s.qualityBadge, { backgroundColor: C.accentDim }]}>
+              <Text
+                allowFontScaling={false}
+                style={[s.qualityBadgeText, { color: C.accentStrong }]}
+              >
+                {currentQualityLabel}
+              </Text>
+            </View>
+          </View>
+          <View
+            style={[
+              s.segment,
+              { backgroundColor: C.cardAlt, borderTopColor: C.border },
+            ]}
+          >
+            {IMAGE_QUALITIES.map((q) => {
+              const active = imageQualityLevel === q.value;
+              return (
+                <TouchableOpacity
+                  key={q.value}
+                  style={[s.segOpt, active && { backgroundColor: C.accent }]}
+                  onPress={() => changeImageQuality(q.value)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    allowFontScaling={false}
+                    style={[
+                      s.segText,
+                      { color: active ? C.white : C.muted, fontWeight: active ? "700" : "500" },
+                    ]}
+                  >
+                    {q.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <SectionLabel color={C.muted}>{t.content.toUpperCase()}</SectionLabel>
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <SettingRow
+            colors={C}
+            iconBg={C.iconTeal}
+            iconColor={C.teal}
+            iconName={showSnow ? "snow-sharp" : "snow-outline"}
+            title={t.snow}
+            subtitle="Animasyonlu kar taneleri"
+            right={
               <SwitchToggle
                 value={showSnow}
                 onValueChange={changeShowSnow}
                 size={36}
               />
-            </View>
-          </View>
-          <View
-            style={[
-              styles.context,
-              {
-                backgroundColor: theme.secondary,
-                borderColor: theme.border,
-                shadowColor: theme.shadow,
-              },
-            ]}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 15,
-              }}
-            >
-              <MaterialCommunityIcons
-                name="database-arrow-down"
-                size={24}
-                color={theme.text.primary}
-              />
-
-              <Text
-                allowFontScaling={false}
-                style={[styles.settingText, { color: theme.text.primary }]}
-              >
-                Verileri İndir
-              </Text>
-            </View>
-            <View>
-              <SwitchToggle
-                value={() => {}}
-                onValueChange={() => {}}
-                size={36}
-              />
-            </View>
-          </View>
-          {/* Poster Kalitesi Seçici */}
-          <View
-            style={[
-              styles.qualityCard,
-              {
-                backgroundColor: theme.secondary,
-                borderColor: theme.border,
-                shadowColor: theme.shadow,
-              },
-            ]}
-          >
-            <View style={styles.qualityHeader}>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
-              >
-                <MaterialIcons
-                  name="high-quality"
-                  size={24}
-                  color={theme.text.primary}
-                />
-                <View>
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.settingText, { color: theme.text.primary }]}
-                  >
-                    Poster Kalitesi
-                  </Text>
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.qualitySubText, { color: theme.text.muted }]}
-                  >
-                    {
-                      IMAGE_QUALITIES.find((q) => q.value === imageQualityLevel)
-                        ?.label
-                    }{" "}
-                    · poster:{imageQuality.poster} · backdrop:
-                    {imageQuality.backdrop}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Segmented Selector */}
-            <View
-              style={[
-                styles.qualitySegment,
-                { backgroundColor: theme.primary, borderColor: theme.border },
-              ]}
-            >
-              {IMAGE_QUALITIES.map((q, index) => {
-                const isSelected = imageQualityLevel === q.value;
-                return (
-                  <TouchableOpacity
-                    key={q.value}
-                    style={[
-                      styles.qualityOption,
-                      {
-                        backgroundColor: isSelected
-                          ? theme.accent
-                          : "transparent",
-                        borderRadius: 10,
-                      },
-                    ]}
-                    onPress={() => changeImageQuality(q.value)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      allowFontScaling={false}
-                      style={[
-                        styles.qualityOptionText,
-                        {
-                          color: isSelected ? "#fff" : theme.text.muted,
-                          fontWeight: isSelected ? "700" : "400",
-                        },
-                      ]}
-                    >
-                      {q.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Progress dots */}
-            <View style={styles.qualityDots}>
-              {IMAGE_QUALITIES.map((q) => (
-                <View
-                  key={q.value}
-                  style={[
-                    styles.qualityDot,
-                    {
-                      backgroundColor:
-                        imageQualityLevel === q.value
-                          ? theme.accent
-                          : theme.border,
-                      width: imageQualityLevel === q.value ? 18 : 6,
-                    },
-                  ]}
-                />
-              ))}
-            </View>
-          </View>
-          <View
-            style={[
-              styles.context,
-              {
-                backgroundColor: theme.secondary,
-                borderColor: theme.border,
-                shadowColor: theme.shadow,
-              },
-            ]}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 15,
-              }}
-            >
-              <Ionicons name={"eye-off"} size={24} color={theme.text.primary} />
-              <Text
-                allowFontScaling={false}
-                style={[styles.settingText, { color: theme.text.primary }]}
-              >
-                {t.adultContent}
-              </Text>
-            </View>
-            <View>
+            }
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconAmber}
+            iconColor={C.amber}
+            iconName="cloud-download-outline"
+            title="Verileri İndir"
+            subtitle="Çevrimdışı kullanım için"
+            right={
+              <SwitchToggle value={false} onValueChange={() => {}} size={36} />
+            }
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconPurple}
+            iconColor={C.purple}
+            iconName={adultContent ? "eye-outline" : "eye-off-outline"}
+            title={t.adultContent}
+            subtitle="18+ içerikleri göster"
+            right={
               <SwitchToggle
                 value={adultContent}
                 onValueChange={() => chaneAdultContent(!adultContent)}
                 size={36}
               />
-            </View>
-          </View>
-          <View
-            style={[
-              styles.context,
-              {
-                backgroundColor: theme.secondary,
-                borderColor: theme.border,
-                shadowColor: theme.shadow,
-              },
-            ]}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 15,
-              }}
-            >
-              <Ionicons
-                name={"notifications"}
-                size={24}
-                color={theme.text.primary}
-              />
-              <Text
-                allowFontScaling={false}
-                style={[styles.settingText, { color: theme.text.primary }]}
-              >
-                {t.notifications}
-              </Text>
-            </View>
-            <View>
+            }
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconBlue}
+            iconColor={C.blue}
+            iconName={
+              notifications
+                ? "notifications-outline"
+                : "notifications-off-outline"
+            }
+            title={t.notifications}
+            subtitle="Yeni içerik bildirimleri"
+            last
+            right={
               <SwitchToggle
                 value={notifications}
                 onValueChange={setNotifications}
                 size={36}
-                disabled={true}
               />
-            </View>
-          </View>
+            }
+          />
         </View>
-        <View style={styles.section}>
-          <Text
-            allowFontScaling={false}
-            style={[styles.sectionTitle, { color: theme.text.muted }]}
-          >
-            {t.data}
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.context,
-              {
-                backgroundColor: theme.secondary,
-                borderColor: theme.border,
-                shadowColor: theme.shadow,
-                justifyContent: "center",
-              },
-            ]}
+
+        <SectionLabel color={C.muted}>{t.data.toUpperCase()}</SectionLabel>
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <SettingRow
+            colors={C}
+            iconBg={C.dangerDim}
+            iconColor={C.danger}
+            iconName="trash-outline"
+            title={t.clearCache}
+            subtitle="Tüm geçici veriler silinir"
+            danger
+            last
             onPress={() => setModalVisible(true)}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 15,
-              }}
-            >
-              <Ionicons name={"trash-outline"} size={24} color={"red"} />
-              <Text
-                allowFontScaling={false}
-                style={[styles.settingText, { color: theme.text.primary }]}
-              >
-                {t.clearCache}
-              </Text>
-            </View>
-          </TouchableOpacity>
+            right={<Chevron color={C.danger} />}
+          />
         </View>
+
         <SwipeCard>
-          <View style={styles.section}>
-            <Text
-              allowFontScaling={false}
-              style={[styles.sectionTitle, { color: theme.text.muted }]}
-            >
-              {t.about}
-            </Text>
+          <SectionLabel color={C.muted}>{t.about.toUpperCase()}</SectionLabel>
+          <View
+            style={[
+              s.aboutCard,
+              { backgroundColor: C.card, borderColor: C.border },
+            ]}
+          >
             <View
               style={[
-                styles.context,
+                s.appIcon,
                 {
-                  backgroundColor: theme.secondary,
-                  borderColor: theme.border,
-                  shadowColor: theme.shadow,
-                  justifyContent: "center",
-                  flexDirection: "column",
-                  gap: 5,
+                  backgroundColor: C.iconGreen,
+                  borderColor: alpha(C.green, 0.24),
                 },
               ]}
             >
-              <Text
-                allowFontScaling={false}
-                style={[styles.version, { color: theme.text.primary }]}
-              >
-                Watch Flix {"     "}Version: 1.1.0
+              <MaterialCommunityIcons
+                name="movie-open"
+                size={24}
+                color={C.teal}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text allowFontScaling={false} style={[s.aboutName, { color: C.text }]}>
+                Watch Flix
               </Text>
-
+              <Text allowFontScaling={false} style={[s.aboutMeta, { color: C.muted }]}>
+                created by ismail ozturk · © 2025
+              </Text>
               <Text
                 allowFontScaling={false}
-                style={[styles.copyright, { color: theme.text.secondary }]}
+                style={[s.aboutMeta, { marginTop: 2, fontSize: 10, color: C.muted }]}
               >
                 Veriler TMDB API'sinden alınmıştır.
               </Text>
+            </View>
+            <View style={[s.versionBadge, { backgroundColor: C.accentDim }]}>
               <Text
                 allowFontScaling={false}
-                style={[styles.copyright, { color: theme.text.secondary }]}
+                style={[s.versionText, { color: C.accentStrong }]}
               >
-                created by ismail ozturk{" "}
-              </Text>
-              <Text
-                allowFontScaling={false}
-                style={[styles.copyright, { color: theme.text.secondary }]}
-              >
-                © 2025 Watch Flix
+                v1.1.0
               </Text>
             </View>
           </View>
         </SwipeCard>
 
-        {/* Cache Temizle Modal */}
         <Modal
           animationType="fade"
-          transparent={true}
+          transparent
           visible={modalVisible}
           onRequestClose={() => setModalVisible(false)}
         >
-          <View style={styles.modalContainer}>
+          <View style={s.modalOverlay}>
             <TouchableOpacity
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-              }}
+              style={StyleSheet.absoluteFill}
               onPress={() => setModalVisible(false)}
             />
             <BlurView
@@ -572,33 +459,50 @@ export default function SettingsScreen() {
               experimentalBlurMethod="dimezisBlurView"
               style={StyleSheet.absoluteFill}
             />
-
             <View
-              style={[styles.modalView, { backgroundColor: theme.primary }]}
+              style={[
+                s.modalBox,
+                { backgroundColor: C.card, borderColor: C.border },
+              ]}
             >
-              <Text
-                allowFontScaling={false}
-                style={[styles.modalText, { color: theme.text.primary }]}
+              <View
+                style={[
+                  s.iconWrap,
+                  {
+                    backgroundColor: C.dangerDim,
+                    alignSelf: "center",
+                    width: 52,
+                    height: 52,
+                    borderRadius: 16,
+                    marginBottom: 14,
+                  },
+                ]}
               >
+                <Ionicons name="trash-outline" size={24} color={C.danger} />
+              </View>
+              <Text allowFontScaling={false} style={[s.modalTitle, { color: C.text }]}>
                 {t.clearCacheMessage}
               </Text>
-              <View style={styles.modalButtons}>
+              <View style={s.modalButtons}>
                 <TouchableOpacity
-                  style={[styles.button, styles.buttonCancel]}
+                  style={[
+                    s.btnCancel,
+                    { backgroundColor: C.cardAlt, borderColor: C.border },
+                  ]}
                   onPress={() => setModalVisible(false)}
                 >
-                  <Text allowFontScaling={false} style={styles.textStyle}>
+                  <Text allowFontScaling={false} style={[s.btnText, { color: C.text }]}>
                     {t.cancel}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.button, styles.buttonConfirm]}
+                  style={[s.btnConfirm, { backgroundColor: C.danger }]}
                   onPress={() => {
                     handleClearCache();
                     setModalVisible(false);
                   }}
                 >
-                  <Text allowFontScaling={false} style={styles.textStyle}>
+                  <Text allowFontScaling={false} style={[s.btnText, { color: C.white }]}>
                     {t.confirm}
                   </Text>
                 </TouchableOpacity>
@@ -607,10 +511,9 @@ export default function SettingsScreen() {
           </View>
         </Modal>
 
-        {/* Dil Seçim Modal - Bottom Sheet */}
         <Modal
           animationType="slide"
-          transparent={true}
+          transparent
           visible={langModalVisible}
           onRequestClose={() => {
             setLangModalVisible(false);
@@ -621,7 +524,7 @@ export default function SettingsScreen() {
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={{ flex: 1 }}
           >
-            <View style={styles.langModalOverlay}>
+            <View style={s.sheetOverlay}>
               <TouchableOpacity
                 style={StyleSheet.absoluteFill}
                 activeOpacity={1}
@@ -636,74 +539,47 @@ export default function SettingsScreen() {
                 experimentalBlurMethod="dimezisBlurView"
                 style={StyleSheet.absoluteFill}
               />
-
               <View
                 style={[
-                  styles.langModalSheet,
-                  {
-                    backgroundColor: theme.secondary,
-                    borderColor: theme.border,
-                  },
+                  s.sheet,
+                  { backgroundColor: C.card, borderColor: C.border },
                 ]}
               >
-                {/* Handle Bar */}
-                <View style={styles.langHandleBar} />
-
-                {/* Başlık */}
-                <View style={styles.langModalHeader}>
-                  <View style={styles.langModalTitleRow}>
+                <View style={[s.sheetHandle, { backgroundColor: C.handle }]} />
+                <View style={s.sheetHeader}>
+                  <View style={s.sheetTitleRow}>
                     <Ionicons
                       name="language-outline"
-                      size={22}
-                      color={theme.text.primary}
+                      size={20}
+                      color={C.text}
                     />
-                    <Text
-                      allowFontScaling={false}
-                      style={[
-                        styles.langModalTitle,
-                        { color: theme.text.primary },
-                      ]}
-                    >
+                    <Text allowFontScaling={false} style={[s.sheetTitle, { color: C.text }]}>
                       {t.language}
                     </Text>
                   </View>
                   <TouchableOpacity
+                    style={[s.closeBtn, { backgroundColor: C.closeBg }]}
                     onPress={() => {
                       setLangModalVisible(false);
                       setLangSearch("");
                     }}
-                    style={[
-                      styles.langCloseBtn,
-                      { backgroundColor: theme.primary },
-                    ]}
                   >
-                    <Ionicons name="close" size={18} color={theme.text.muted} />
+                    <Ionicons name="close" size={16} color={C.muted} />
                   </TouchableOpacity>
                 </View>
 
-                {/* Arama */}
                 <View
                   style={[
-                    styles.langSearchBox,
-                    {
-                      backgroundColor: theme.primary,
-                      borderColor: theme.border,
-                    },
+                    s.searchBox,
+                    { borderColor: C.border, backgroundColor: C.cardAlt },
                   ]}
                 >
-                  <Ionicons
-                    name="search-outline"
-                    size={18}
-                    color={theme.text.muted}
-                  />
+                  <Ionicons name="search-outline" size={16} color={C.muted} />
                   <TextInput
                     allowFontScaling={false}
-                    style={[
-                      styles.langSearchInput,
-                      { color: theme.text.primary },
-                    ]}
+                    style={[s.searchInput, { color: C.text }]}
                     placeholder="Dil ara..."
-                    placeholderTextColor={theme.text.muted}
+                    placeholderTextColor={C.muted}
                     value={langSearch}
                     onChangeText={setLangSearch}
                     autoCorrect={false}
@@ -711,94 +587,68 @@ export default function SettingsScreen() {
                   />
                   {langSearch.length > 0 && (
                     <TouchableOpacity onPress={() => setLangSearch("")}>
-                      <Ionicons
-                        name="close-circle"
-                        size={18}
-                        color={theme.text.muted}
-                      />
+                      <Ionicons name="close-circle" size={16} color={C.muted} />
                     </TouchableOpacity>
                   )}
                 </View>
 
-                {/* Dil Listesi */}
                 <FlatList
                   data={filteredLanguages}
-                  keyExtractor={(item) => item.code}
+                  keyExtractor={(i) => i.code}
                   style={{ maxHeight: 320 }}
                   showsVerticalScrollIndicator={false}
                   ListEmptyComponent={
-                    <View style={styles.langEmptyContainer}>
+                    <View style={s.emptyContainer}>
                       <Ionicons
                         name="search-outline"
-                        size={32}
-                        color={theme.text.muted}
+                        size={28}
+                        color={C.muted}
                       />
-                      <Text
-                        allowFontScaling={false}
-                        style={[
-                          styles.langEmptyText,
-                          { color: theme.text.muted },
-                        ]}
-                      >
+                      <Text allowFontScaling={false} style={[s.emptyText, { color: C.muted }]}>
                         Dil bulunamadı
                       </Text>
                     </View>
                   }
                   renderItem={({ item }) => {
-                    const isSelected = item.code === language;
+                    const sel = item.code === language;
                     return (
                       <TouchableOpacity
                         style={[
-                          styles.langItem,
-                          {
-                            backgroundColor: isSelected
-                              ? theme.accent + "22"
-                              : "transparent",
-                            borderColor: isSelected
-                              ? theme.accent
-                              : "transparent",
+                          s.langItem,
+                          sel && {
+                            backgroundColor: C.accentDim,
+                            borderColor: C.accent,
                           },
                         ]}
                         onPress={() => handleSelectLanguage(item.code)}
                         activeOpacity={0.7}
                       >
-                        <View style={styles.langItemLeft}>
+                        <View style={s.langItemLeft}>
                           <CountryFlag
                             isoCode={item.flag}
-                            size={30}
+                            size={28}
                             style={{ borderRadius: 6 }}
                           />
-                          <View style={styles.langItemTextGroup}>
+                          <View>
                             <Text
                               allowFontScaling={false}
                               style={[
-                                styles.langItemName,
-                                {
-                                  color: isSelected
-                                    ? theme.accent
-                                    : theme.text.primary,
-                                  fontWeight: isSelected ? "700" : "500",
-                                },
+                                s.langItemName,
+                                { color: sel ? C.accent : C.text, fontWeight: sel ? "700" : "500" },
                               ]}
                             >
                               {item.nativeName}
                             </Text>
-                            <Text
-                              allowFontScaling={false}
-                              style={[
-                                styles.langItemSub,
-                                { color: theme.text.muted },
-                              ]}
-                            >
+                            <Text allowFontScaling={false} style={[s.rowSub, { color: C.muted }]}>
                               {item.name}
                             </Text>
                           </View>
                         </View>
-                        {isSelected && (
+                        {sel && (
                           <Ionicons
                             name="checkmark-circle"
-                            size={22}
-                            color={theme.accent}
+                            size={20}
+                            color={C.accent}
                           />
                         )}
                       </TouchableOpacity>
@@ -814,13 +664,16 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
+const s = StyleSheet.create({
+  root: {
     flex: 1,
-    paddingHorizontal: 15,
   },
-  contentContainer: {
-    paddingBottom: 100,
+  scroll: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  scrollContent: {
+    paddingBottom: 110,
   },
   lottie: {
     position: "absolute",
@@ -838,214 +691,261 @@ const styles = StyleSheet.create({
     right: -60,
     zIndex: 0,
   },
-  title: {
-    fontSize: 24,
+  pageTitle: {
+    fontSize: 26,
+    fontWeight: "700",
     textAlign: "center",
-    fontWeight: "bold",
     marginTop: 40,
     marginBottom: 20,
+    letterSpacing: -0.5,
   },
-  section: {
+  sectionLabel: {
+    fontSize: 10.5,
+    fontWeight: "600",
+    letterSpacing: 1.2,
     marginBottom: 10,
+    marginLeft: 4,
+    marginTop: 22,
   },
-  sectionTitle: {
-    fontSize: 14,
-    marginBottom: 10,
-    marginLeft: 10,
-    textTransform: "uppercase",
+  card: {
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: "hidden",
   },
-  settingLeft: {
+  row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 15,
+    justifyContent: "space-between",
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
   },
-  settingText: {
-    fontSize: 16,
+  rowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
   },
-  languageButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 15,
+  rowRight: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  languageButtonText: {
-    color: "white",
-    fontWeight: "bold",
+  rowTexts: {
+    flex: 1,
+  },
+  rowTitle: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  rowSub: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  iconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
   },
   langCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
     borderRadius: 18,
     borderWidth: 1,
-    marginBottom: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
-  langCardLeft: {
+  langLeft: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
     flex: 1,
   },
-  langCardIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
+  langSubLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 0.8,
   },
-  langCardSubLabel: {
-    fontSize: 11,
-    fontWeight: "500",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  langCardValue: {
-    fontSize: 16,
+  langValue: {
+    fontSize: 15,
     fontWeight: "700",
-  },
-  langCardRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  langFlagWrap: {
-    borderRadius: 10,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  langChevronWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  context: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 15,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 15,
-    marginBottom: 8,
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
-  },
-  // Poster Kalitesi Stiller
-  qualityCard: {
-    borderRadius: 15,
-    marginBottom: 8,
-    borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
-    gap: 12,
-  },
-  qualityHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  qualitySubText: {
-    fontSize: 11,
     marginTop: 2,
   },
-  qualitySegment: {
-    flexDirection: "row",
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 4,
-    gap: 2,
-  },
-  qualityOption: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  qualityOptionText: {
-    fontSize: 12,
-    textAlign: "center",
-  },
-  qualityDots: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 2,
-  },
-  qualityDot: {
-    height: 6,
-    borderRadius: 3,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  // Dil Modal Stilleri
-  langModalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  langModalSheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    paddingHorizontal: 16,
-    paddingBottom: 30,
-    paddingTop: 12,
-  },
-  langHandleBar: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#555",
-    alignSelf: "center",
-    marginBottom: 16,
-  },
-  langModalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  langModalTitleRow: {
+  langRight: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  langModalTitle: {
+  flagWrap: {
+    borderRadius: 6,
+    overflow: "hidden",
+    borderWidth: 1,
+  },
+  themeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+  },
+  qualityHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingTop: 14,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  qualityBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  qualityBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  segment: {
+    flexDirection: "row",
+    borderTopWidth: 1,
+    padding: 4,
+    gap: 2,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+  },
+  segOpt: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    borderRadius: 10,
+  },
+  segText: {
+    fontSize: 11,
+    textAlign: "center",
+  },
+  aboutCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 16,
+  },
+  appIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    flexShrink: 0,
+  },
+  aboutName: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  aboutMeta: {
+    fontSize: 11.5,
+    marginTop: 3,
+  },
+  versionBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  versionText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    borderRadius: 22,
+    padding: 28,
+    marginHorizontal: 32,
+    width: "85%",
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 16,
+    textAlign: "center",
+    fontWeight: "500",
+    marginBottom: 22,
+    lineHeight: 22,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: 10,
+    width: "100%",
+  },
+  btnCancel: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+    borderWidth: 1,
+  },
+  btnConfirm: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+  btnText: {
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  sheetOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    paddingHorizontal: 16,
+    paddingBottom: 34,
+    paddingTop: 12,
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  sheetTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  sheetTitle: {
     fontSize: 18,
     fontWeight: "700",
   },
-  langCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  closeBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
   },
-  langSearchBox: {
+  searchBox: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
@@ -1055,9 +955,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 12,
   },
-  langSearchInput: {
+  searchInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     paddingVertical: 0,
   },
   langItem: {
@@ -1068,6 +968,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 14,
     borderWidth: 1.5,
+    borderColor: "transparent",
     marginBottom: 8,
   },
   langItemLeft: {
@@ -1075,63 +976,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
-  langItemTextGroup: {
-    gap: 2,
-  },
   langItemName: {
     fontSize: 15,
   },
-  langItemSub: {
-    fontSize: 12,
-  },
-  langEmptyContainer: {
+  emptyContainer: {
     alignItems: "center",
     paddingVertical: 30,
     gap: 10,
   },
-  langEmptyText: {
-    fontSize: 14,
-  },
-  modalView: {
-    margin: 20,
-    borderRadius: 20,
-    padding: 35,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  modalText: {
-    marginBottom: 15,
-    textAlign: "center",
-    fontSize: 18,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
-  },
-  button: {
-    borderRadius: 20,
-    padding: 10,
-    elevation: 2,
-    width: "45%",
-    alignItems: "center",
-  },
-  buttonCancel: {
-    backgroundColor: "#f44336",
-  },
-  buttonConfirm: {
-    backgroundColor: "#4CAF50",
-  },
-  textStyle: {
-    color: "white",
-    fontWeight: "bold",
-    textAlign: "center",
+  emptyText: {
+    fontSize: 13,
   },
 });

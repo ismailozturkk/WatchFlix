@@ -10,6 +10,8 @@ import {
   Image,
   Animated,
   ActivityIndicator,
+  StyleSheet,
+  Dimensions,
 } from "react-native";
 import { db } from "../firebase";
 import {
@@ -23,23 +25,23 @@ import {
   arrayRemove,
   doc,
   updateDoc,
-  getDocs,
   deleteDoc,
+  getDocs,
 } from "firebase/firestore";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
-import SwitchToggle from "../modules/SwitchToggle";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { AntDesign, Entypo, Feather, Ionicons } from "@expo/vector-icons";
-import SwipeCard from "../modules/SwipeCard";
+import { alpha } from "../theme/colors";
+import { BlurView } from "expo-blur";
+import { MaterialCommunityIcons, Ionicons, Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import LottieView from "lottie-react-native";
 
-// ==========================
-// Comment Item Component
-// ==========================
+const { height: SCREEN_H } = Dimensions.get("window");
+
+// ── Yorum Satırı Bileşeni ──────────────────────────────────
 const CommentItem = memo(
   ({
     item,
-    theme,
     currentUser,
     contextId,
     replies = [],
@@ -47,365 +49,218 @@ const CommentItem = memo(
     handleLikeToggle,
     isReply = false,
     setCommentInputState,
-    openReplyBox,
-    setOpenReplyBox,
+    handleDeleteComment,
+    handleDeleteReply,
+    isVisible,
+    theme,
   }) => {
+    const styles = getStyles(theme);
     const [showSpoiler, setShowSpoiler] = useState(false);
-    const [likeAnim] = useState(new Animated.Value(1));
+    const scaleAnim = useRef(new Animated.Value(1)).current;
 
-    const handleHeartPress = () => {
+    const onLikePress = () => {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch (e) {}
       Animated.sequence([
-        Animated.spring(likeAnim, { toValue: 1.5, useNativeDriver: true }),
-        Animated.spring(likeAnim, { toValue: 1, useNativeDriver: true }),
+        Animated.timing(scaleAnim, {
+          toValue: 1.2,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 4,
+          useNativeDriver: true,
+        }),
       ]).start();
       handleLikeToggle(item.id, item.likes?.includes(currentUser.uid));
     };
 
-    const timeLabel = item.timestamp
-      ? typeof item.timestamp.toDate === "function"
-        ? item.timestamp.toDate().toLocaleString()
-        : new Date(item.timestamp).toLocaleString()
-      : "";
-
-    const handleDeleteComment = async (commentId) => {
-      try {
-        const commentRef = doc(
-          db,
-          "MovieComment",
-          contextId,
-          "comments",
-          commentId,
-        );
-        await deleteDoc(commentRef);
-
-        const repliesRef = collection(
-          db,
-          "MovieComment",
-          contextId,
-          "comments",
-          commentId,
-          "replies",
-        );
-        const repliesSnapshot = await getDocs(repliesRef);
-        repliesSnapshot.forEach(async (repDoc) => {
-          await deleteDoc(repDoc.ref);
-        });
-      } catch (err) {
-        console.error("Yorum silinirken hata:", err);
-      }
-    };
-
-    const handleDeleteReply = async (parentId, replyId) => {
-      try {
-        const replyRef = doc(
-          db,
-          "MovieComment",
-          contextId,
-          "comments",
-          parentId,
-          "replies",
-          replyId,
-        );
-        await deleteDoc(replyRef);
-      } catch (err) {
-        console.error("Yanıt silinirken hata:", err);
-      }
-    };
-
     return (
       <View
-        style={{
-          marginVertical: 5,
-          padding: 8,
-          backgroundColor: theme.primary,
-          borderLeftWidth: 0.5,
-          borderLeftColor:
-            item.userId === currentUser.uid ? theme.colors.green : theme.border,
-          borderRadius: 10,
-          marginLeft: isReply ? 30 : 0,
-          shadowOffset: {
-            width: 0,
-            height: 8,
-          },
-          shadowOpacity: 0.94,
-          shadowRadius: 10.32,
-          elevation: 5,
-        }}
+        style={[
+          styles.itemContainer,
+          isReply && styles.replyMargin,
+          item.userId === currentUser.uid && styles.ownComment,
+        ]}
       >
-        <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-          {item.avatar && (
-            <Image
-              source={{ uri: item.avatar }}
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                marginRight: 8,
-              }}
-            />
-          )}
-          <View style={{ flex: 1 }}>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Text
-                allowFontScaling={false}
-                style={{ fontWeight: "bold", color: theme.text.primary }}
-              >
+        <View style={styles.itemHeader}>
+          <View style={styles.userInfo}>
+            {(item.avatar && (
+              <Image
+                source={
+                  item.avatar
+                    ? { uri: item.avatar }
+                    : require("../assets/avatar/0.png")
+                }
+                style={styles.avatar}
+              />
+            )) || <Feather name="user" size={32} color="#fff" />}
+            <View>
+              <Text allowFontScaling={false} style={styles.username}>
                 {item.username}
               </Text>
-              <Text
-                style={{ fontSize: 10, color: theme.text.muted, marginTop: 4 }}
-              >
-                {timeLabel}
+              <Text allowFontScaling={false} style={styles.timestamp}>
+                {item.timestamp?.toDate
+                  ? item.timestamp.toDate().toLocaleString()
+                  : "Az önce"}
               </Text>
             </View>
+          </View>
 
-            {item.isSpoiler && !showSpoiler ? (
+          {/* Düzenle / Sil Aksiyonları */}
+          {item.userId === currentUser.uid && (
+            <View style={styles.ownerActions}>
               <TouchableOpacity
-                onPress={() => setShowSpoiler(true)}
-                style={{
-                  marginTop: 4,
-                  padding: 6,
-                  backgroundColor: theme.secondary,
-                  borderRadius: 6,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
+                onPress={() =>
+                  setCommentInputState({
+                    text: item.text,
+                    isSpoiler: item.isSpoiler,
+                    parentId: isReply ? item.parentId : null,
+                    editId: item.id,
+                    isReply: isReply,
+                    replieName: item.username,
+                    replieText: item.text,
+                  })
+                }
               >
-                <Text
-                  allowFontScaling={false}
-                  style={{ fontStyle: "italic", color: "#ccc" }}
-                >
-                  Spoiler içerik – görmek için tıkla
-                </Text>
+                <Feather
+                  name="edit-2"
+                  size={14}
+                  color={theme.colors.green}
+                  style={{ marginRight: 10 }}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() =>
+                  isReply
+                    ? handleDeleteReply(item.parentId, item.id)
+                    : handleDeleteComment(item.id)
+                }
+              >
+                <Feather name="trash-2" size={14} color={theme.colors.red} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.contentBody}>
+          {item.isSpoiler && !showSpoiler ? (
+            <TouchableOpacity
+              onPress={() => setShowSpoiler(true)}
+              style={styles.spoilerCover}
+            >
+              <BlurView intensity={25} tint="dark" style={styles.spoilerBlur}>
                 <Ionicons
-                  name="eye-off-sharp"
+                  name="eye-off"
                   size={16}
                   color={theme.text.secondary}
                 />
-              </TouchableOpacity>
-            ) : (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={{ marginTop: 4, color: theme.text.primary }}
-                >
-                  {item.text}
+                <Text allowFontScaling={false} style={styles.spoilerText}>
+                  Spoiler içeriği gör
                 </Text>
-
-                {item.isSpoiler && (
-                  <TouchableOpacity
-                    onPress={() => setShowSpoiler(false)}
-                    style={{
-                      marginTop: 4,
-                      padding: 6,
-                      backgroundColor: theme.secondary,
-                      borderRadius: 6,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <Ionicons
-                      name="eye-sharp"
-                      size={16}
-                      color={theme.text.secondary}
-                    />
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-
-            {/* Like / Reply Row */}
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginTop: 6,
-              }}
-            >
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 3 }}
-              >
-                <TouchableOpacity onPress={handleHeartPress}>
-                  <Animated.Text
-                    style={{
-                      transform: [{ scale: likeAnim }],
-                      color: theme.text.secondary,
-                      backgroundColor: theme.secondary,
-                      borderTopLeftRadius: 10,
-                      borderBottomLeftRadius: 10,
-                      paddingVertical: 1,
-                      paddingHorizontal: 4,
-                    }}
-                  >
-                    {item.likes?.includes(currentUser.uid) ? (
-                      <MaterialCommunityIcons
-                        name="cards-heart"
-                        size={16}
-                        color={theme.colors?.red || "red"}
-                      />
-                    ) : (
-                      <MaterialCommunityIcons
-                        name="cards-heart-outline"
-                        size={16}
-                        color={theme.text.secondary}
-                      />
-                    )}{" "}
-                    {item.likes ? item.likes.length : 0}
-                  </Animated.Text>
+              </BlurView>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.commentContentWrapper}>
+              <Text allowFontScaling={false} style={styles.commentText}>
+                {item.text}
+              </Text>
+              {item.isSpoiler && (
+                <TouchableOpacity
+                  onPress={() => setShowSpoiler(false)}
+                  style={styles.eyeIconSmall}
+                >
+                  <Ionicons name="eye" size={14} color={theme.accent} />
                 </TouchableOpacity>
-
-                {!isReply && (
-                  <>
-                    {replies.length > 0 && (
-                      <TouchableOpacity
-                        onPress={() => toggleReplyVisibility(item.id)}
-                        style={{
-                          backgroundColor: theme.secondary,
-                          paddingVertical: 1,
-                          paddingHorizontal: 4,
-                        }}
-                      >
-                        <Text
-                          style={{ color: theme.text.secondary, fontSize: 14 }}
-                        >
-                          <MaterialCommunityIcons
-                            name="comment-text-multiple-outline"
-                            size={16}
-                            color={theme.text.secondary}
-                          />
-                          {"  "}
-                          {replies.length} yanıtı gör
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                    <TouchableOpacity
-                      onPress={() =>
-                        setCommentInputState({
-                          text: "",
-                          replieText: item.text,
-                          isSpoiler: false,
-                          parentId: item.id,
-                          editId: null,
-                          isReply: true,
-                          replieName: item.username,
-                        })
-                      }
-                      style={{
-                        backgroundColor: theme.secondary,
-                        paddingVertical: 1,
-                        paddingHorizontal: 4,
-                      }}
-                    >
-                      <Text
-                        style={{ color: theme.text.secondary, fontSize: 14 }}
-                      >
-                        Yanıtla
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-
-                {item.userId === currentUser.uid && (
-                  <>
-                    <TouchableOpacity
-                      onPress={() => {
-                        isReply
-                          ? handleDeleteReply(item.parentId, item.id)
-                          : handleDeleteComment(item.id);
-                      }}
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 5,
-                        backgroundColor: theme.secondary,
-                        paddingVertical: 1,
-                        paddingHorizontal: 4,
-                      }}
-                    >
-                      <Feather name="trash-2" size={16} color="red" />
-                      <Text
-                        style={{ color: theme.text.secondary, fontSize: 14 }}
-                      >
-                        Sil
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      onPress={() =>
-                        setCommentInputState({
-                          text: item.text,
-                          replieText: item.text,
-
-                          isSpoiler: item.isSpoiler,
-                          parentId: isReply ? item.parentId : null,
-                          editId: item.id,
-                          isReply: isReply,
-                          replieName: null,
-                        })
-                      }
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 5,
-                        backgroundColor: theme.secondary,
-                        borderTopRightRadius: 10,
-                        borderBottomRightRadius: 10,
-                        paddingVertical: 1,
-                        paddingHorizontal: 4,
-                      }}
-                    >
-                      <MaterialCommunityIcons
-                        name="pencil"
-                        size={16}
-                        color="green"
-                      />
-                      <Text
-                        style={{ color: theme.text.secondary, fontSize: 14 }}
-                      >
-                        Düzenle
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
+              )}
             </View>
+          )}
+        </View>
+
+        <View style={styles.actionsRow}>
+          <View style={styles.leftActions}>
+            <TouchableOpacity onPress={onLikePress} style={styles.actionButton}>
+              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                <MaterialCommunityIcons
+                  name={
+                    item.likes?.includes(currentUser.uid)
+                      ? "heart"
+                      : "heart-outline"
+                  }
+                  size={18}
+                  color={
+                    item.likes?.includes(currentUser.uid)
+                      ? theme.colors.red
+                      : theme.text.secondary
+                  }
+                />
+              </Animated.View>
+              <Text
+                allowFontScaling={false}
+                style={[
+                  styles.actionLabel,
+                  item.likes?.includes(currentUser.uid) && {
+                    color: theme.colors.red,
+                  },
+                ]}
+              >
+                {item.likes?.length || 0}
+              </Text>
+            </TouchableOpacity>
+
+            {!isReply && (
+              <TouchableOpacity
+                onPress={() =>
+                  setCommentInputState((p) => ({
+                    ...p,
+                    parentId: item.id,
+                    isReply: true,
+                    replieName: item.username,
+                    replieText: item.text,
+                    editId: null,
+                  }))
+                }
+                style={styles.actionButton}
+              >
+                <MaterialCommunityIcons
+                  name="reply-outline"
+                  size={18}
+                  color={theme.text.secondary}
+                />
+                <Text allowFontScaling={false} style={styles.actionLabel}>
+                  Yanıtla
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
+
+          {!isReply && replies.length > 0 && (
+            <TouchableOpacity
+              onPress={() => toggleReplyVisibility(item.id)}
+              style={styles.repliesToggle}
+            >
+              <Text allowFontScaling={false} style={styles.repliesToggleText}>
+                {replies.length} Yanıt {isVisible ? "Gizle" : "Gör"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
   },
 );
 
-// ==========================
-// Main Comment Component
-// ==========================
+// ── Ana Bileşen ───────────────────────────────────────────
 const Comment = ({ contextId }) => {
   const { theme } = useTheme();
-  const { user } = useAuth();
-  const currentUser = user;
-  const contextIdConvert = contextId.toString();
-
+  const styles = getStyles(theme);
+  const { user: currentUser } = useAuth();
   const [comments, setComments] = useState([]);
   const [isSending, setIsSending] = useState(false);
-  const [replyVisibility, setReplyVisibility] = useState({});
   const [repliesMap, setRepliesMap] = useState({});
-  const replyListenersRef = useRef({});
-
+  const [replyVisibility, setReplyVisibility] = useState({});
   const [commentInputState, setCommentInputState] = useState({
     text: "",
     isSpoiler: false,
@@ -416,123 +271,74 @@ const Comment = ({ contextId }) => {
     replieText: null,
   });
 
-  // --------------------------
-  // Fetch comments
-  // --------------------------
+  // Firestore Dinleyicileri (Orijinal Mantık Korundu)
   useEffect(() => {
-    if (!contextIdConvert) return;
-    const commentsRef = collection(
-      db,
-      "MovieComment",
-      contextIdConvert,
-      "comments",
+    if (!contextId) return;
+    const cid = contextId.toString();
+    const q = query(
+      collection(db, "MovieComment", cid, "comments"),
+      orderBy("timestamp", "desc"),
     );
-    const q = query(commentsRef, orderBy("timestamp", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsub = onSnapshot(q, (snapshot) => {
       const loaded = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
       setComments(loaded);
     });
-    return () => unsubscribe();
-  }, [contextIdConvert]);
+    return () => unsub();
+  }, [contextId]);
 
-  // --------------------------
-  // Manage reply listeners
-  // --------------------------
+  // Yanıt Dinleyicileri
   useEffect(() => {
-    if (!contextIdConvert) return;
-
+    if (!contextId) return;
+    const cid = contextId.toString();
     comments.forEach((comment) => {
-      if (replyListenersRef.current[comment.id]) return;
-      const repliesRef = collection(
-        db,
-        "MovieComment",
-        contextIdConvert,
-        "comments",
-        comment.id,
-        "replies",
+      const rq = query(
+        collection(db, "MovieComment", cid, "comments", comment.id, "replies"),
+        orderBy("timestamp", "asc"),
       );
-      const q = query(repliesRef, orderBy("timestamp", "asc"));
-      replyListenersRef.current[comment.id] = onSnapshot(q, (snap) => {
-        const loaded = snap.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-          parentId: comment.id,
+      onSnapshot(rq, (snap) => {
+        setRepliesMap((prev) => ({
+          ...prev,
+          [comment.id]: snap.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+            parentId: comment.id,
+          })),
         }));
-        setRepliesMap((prev) => ({ ...prev, [comment.id]: loaded }));
       });
     });
-
-    return () => {
-      Object.values(replyListenersRef.current).forEach((unsub) => unsub());
-      replyListenersRef.current = {};
-    };
   }, [comments]);
 
-  // --------------------------
-  // Toggle reply visibility
-  // --------------------------
-  const toggleReplyVisibility = (commentId) => {
-    setReplyVisibility((prev) => ({ ...prev, [commentId]: !prev[commentId] }));
-  };
-
-  // --------------------------
-  // Like toggle
-  // --------------------------
-  const handleLikeToggle = async (id, liked) => {
-    try {
-      const ref = doc(db, "MovieComment", contextIdConvert, "comments", id);
-      await updateDoc(ref, {
-        likes: liked
-          ? arrayRemove(currentUser.uid)
-          : arrayUnion(currentUser.uid),
-      });
-    } catch (err) {
-      console.error("Beğeni işlemi hata:", err);
-    }
-  };
-
-  // --------------------------
-  // Add or edit comment/reply
-  // --------------------------
   const handleAddOrEdit = async () => {
     const { text, isSpoiler, parentId, editId, isReply } = commentInputState;
     if (!text.trim() || isSending) return;
     setIsSending(true);
+    const cid = contextId.toString();
 
     try {
       if (editId) {
-        // Düzenleme
-        const editRef = isReply
+        const ref = isReply
           ? doc(
               db,
               "MovieComment",
-              contextIdConvert,
+              cid,
               "comments",
               parentId,
               "replies",
               editId,
             )
-          : doc(db, "MovieComment", contextIdConvert, "comments", editId);
-        await updateDoc(editRef, { text: text.trim(), isSpoiler });
+          : doc(db, "MovieComment", cid, "comments", editId);
+        await updateDoc(ref, { text: text.trim(), isSpoiler });
       } else {
-        // Yeni
-        const collectionPath = isReply
-          ? collection(
-              db,
-              "MovieComment",
-              contextIdConvert,
-              "comments",
-              parentId,
-              "replies",
-            )
-          : collection(db, "MovieComment", contextIdConvert, "comments");
-        await addDoc(collectionPath, {
+        const col = isReply
+          ? collection(db, "MovieComment", cid, "comments", parentId, "replies")
+          : collection(db, "MovieComment", cid, "comments");
+        await addDoc(col, {
           userId: currentUser.uid,
           username: currentUser.displayName || "Anonim",
-          avatar: currentUser.photoURL || null,
+          avatar: currentUser.photoURL,
           text: text.trim(),
           isSpoiler,
           parentId: isReply ? parentId : null,
@@ -540,7 +346,6 @@ const Comment = ({ contextId }) => {
           timestamp: serverTimestamp(),
         });
       }
-
       setCommentInputState({
         text: "",
         isSpoiler: false,
@@ -550,161 +355,105 @@ const Comment = ({ contextId }) => {
         replieName: null,
         replieText: null,
       });
-    } catch (err) {
-      console.error("Yorum/reply ekleme/düzenleme hatası:", err);
     } finally {
       setIsSending(false);
     }
   };
 
+  const handleDelete = async (id, pid = null) => {
+    const cid = contextId.toString();
+    if (pid)
+      await deleteDoc(
+        doc(db, "MovieComment", cid, "comments", pid, "replies", id),
+      );
+    else await deleteDoc(doc(db, "MovieComment", cid, "comments", id));
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : null}
-      style={{
-        backgroundColor: theme.secondary,
-        paddingTop: 10,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        maxHeight: 600,
-        //overflow: "hidden",
-      }}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      style={styles.container}
     >
-      <View
-        style={{
-          justifyContent: "center",
-          alignItems: "center",
-          gap: 5,
-          paddingBottom: 10,
-          borderBottomWidth: 1,
-          borderColor: theme.border,
-        }}
-      >
-        <View
-          style={{
-            width: 30,
-            height: 5,
-            backgroundColor: theme.border,
-            borderRadius: 10,
-          }}
-        />
-        <Text allowFontScaling={false} style={{ color: theme.text.secondary }}>
-          YORUMLAR
-        </Text>
-      </View>
       <FlatList
         data={comments}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 10 }}
-        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
           <View>
             <CommentItem
               item={item}
-              theme={theme}
               currentUser={currentUser}
-              contextId={contextIdConvert}
+              contextId={contextId}
+              theme={theme}
               replies={repliesMap[item.id] || []}
-              toggleReplyVisibility={toggleReplyVisibility}
-              handleLikeToggle={handleLikeToggle}
+              isVisible={replyVisibility[item.id]}
+              toggleReplyVisibility={(id) =>
+                setReplyVisibility((p) => ({ ...p, [id]: !p[id] }))
+              }
+              handleLikeToggle={(id, liked) => {
+                const ref = doc(
+                  db,
+                  "MovieComment",
+                  contextId.toString(),
+                  "comments",
+                  id,
+                );
+                updateDoc(ref, {
+                  likes: liked
+                    ? arrayRemove(currentUser.uid)
+                    : arrayUnion(currentUser.uid),
+                });
+              }}
               setCommentInputState={setCommentInputState}
+              handleDeleteComment={(id) => handleDelete(id)}
+              handleDeleteReply={(pid, id) => handleDelete(id, pid)}
             />
             {replyVisibility[item.id] &&
               repliesMap[item.id]?.map((rep) => (
                 <CommentItem
                   key={rep.id}
                   item={rep}
-                  theme={theme}
                   currentUser={currentUser}
-                  contextId={contextIdConvert}
                   isReply
+                  theme={theme}
                   setCommentInputState={setCommentInputState}
+                  handleDeleteReply={(pid, id) => handleDelete(id, pid)}
+                  handleLikeToggle={(id, liked) => {
+                    const ref = doc(
+                      db,
+                      "MovieComment",
+                      contextId.toString(),
+                      "comments",
+                      item.id,
+                      "replies",
+                      id,
+                    );
+                    updateDoc(ref, {
+                      likes: liked
+                        ? arrayRemove(currentUser.uid)
+                        : arrayUnion(currentUser.uid),
+                    });
+                  }}
                 />
               ))}
           </View>
         )}
       />
 
-      {/* ===================== */}
       {/* Input Section */}
-      {/* ===================== */}
-      <View
-        style={{
-          padding: 10,
-          borderTopWidth: 1,
-          borderTopColor: theme.border,
-          backgroundColor: theme.primary,
-        }}
-      >
+      <View style={styles.inputWrapper}>
         {(commentInputState.isReply || commentInputState.editId) && (
-          <View
-            style={{
-              width: "100%",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 10,
-            }}
-          >
-            {!commentInputState.isReply && commentInputState.editId && (
-              <View
-                style={{
-                  justifyContent: "center",
-                  alignItems: "center",
-                  backgroundColor: theme.secondary,
-                  paddingVertical: 5,
-                  borderRadius: 10,
-                  paddingHorizontal: 10,
-                }}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={{ color: theme.text.secondary }}
-                >
-                  {commentInputState.replieName} yorum Düzenleniyor
-                </Text>
-              </View>
-            )}
-            {commentInputState.isReply && !commentInputState.editId && (
-              <View
-                style={{
-                  justifyContent: "center",
-                  alignItems: "center",
-                  backgroundColor: theme.secondary,
-                  paddingVertical: 5,
-                  borderRadius: 10,
-                  paddingHorizontal: 10,
-                }}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={{ color: theme.text.secondary }}
-                >
-                  {commentInputState.replieName} ün{" "}
-                  {commentInputState.replieText} yazısına cevap yazılıyor...
-                </Text>
-              </View>
-            )}
-            {commentInputState.isReply && commentInputState.editId && (
-              <View
-                style={{
-                  justifyContent: "center",
-                  alignItems: "center",
-                  backgroundColor: theme.secondary,
-                  paddingVertical: 5,
-                  borderRadius: 10,
-                  paddingHorizontal: 10,
-                }}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={{ color: theme.text.secondary }}
-                >
-                  cevap düzenleniyor...
-                </Text>
-              </View>
-            )}
+          <View style={styles.activeModeIndicator}>
+            <View style={styles.indicatorBadge}>
+              <Text allowFontScaling={false} style={styles.indicatorText}>
+                {commentInputState.editId
+                  ? "Düzenleniyor"
+                  : `${commentInputState.replieName} kişisine yanıt`}
+              </Text>
+            </View>
             <TouchableOpacity
-              onPress={() => {
+              onPress={() =>
                 setCommentInputState({
                   text: "",
                   isSpoiler: false,
@@ -713,91 +462,263 @@ const Comment = ({ contextId }) => {
                   isReply: false,
                   replieName: null,
                   replieText: null,
-                });
-              }}
+                })
+              }
             >
-              <Entypo name="cross" size={24} color={theme.text.secondary} />
+              <Ionicons
+                name="close-circle"
+                size={20}
+                color={theme.colors.red}
+              />
             </TouchableOpacity>
           </View>
         )}
 
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 10,
-          }}
-        >
-          <View
-            style={{
-              flex: 1,
-              flexDirection: "row",
-              alignItems: "center",
-            }}
-          >
-            <TextInput
-              style={{
-                flex: 1,
-                paddingHorizontal: 15,
-                paddingVertical: 10,
-                color: theme.text.primary,
-                borderWidth: 1,
-                borderColor: theme.border,
-                borderRadius: 25,
-              }}
-              placeholder={
-                commentInputState.isReply
-                  ? "Yanıtınızı yazın…"
-                  : "Yorumunuzu yazın…"
-              }
-              placeholderTextColor={theme.text.muted}
-              multiline
-              value={commentInputState.text}
-              onChangeText={(txt) =>
-                setCommentInputState((prev) => ({ ...prev, text: txt }))
-              }
-            />
-            <TouchableOpacity
-              onPress={handleAddOrEdit}
-              style={{
-                padding: 8,
-                borderRadius: 20,
-                backgroundColor: theme.accent,
-                marginLeft: 5,
-                marginRight: 5,
-              }}
-            >
-              {isSending ? (
-                <ActivityIndicator color={theme.text.secondary} />
-              ) : (
-                <MaterialCommunityIcons
-                  name="send-outline"
-                  size={20}
-                  color={theme.text.secondary}
-                />
-              )}
-            </TouchableOpacity>
-          </View>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <View style={styles.inputRow}>
+          {commentInputState.isSpoiler && (
             <Text
               allowFontScaling={false}
-              style={{ color: theme.text.secondary, marginRight: 8 }}
+              style={[
+                styles.spoilerBtnText,
+                commentInputState.isSpoiler && {
+                  color: theme.colors.red,
+                },
+              ]}
             >
               Spoiler
             </Text>
-            <SwitchToggle
-              size={24}
-              value={commentInputState.isSpoiler}
-              onValueChange={(val) =>
-                setCommentInputState((prev) => ({ ...prev, isSpoiler: val }))
+          )}
+          <TextInput
+            style={[
+              styles.input,
+              commentInputState.isSpoiler && styles.spoilerCoverInput,
+            ]}
+            placeholder="Yorum yap..."
+            placeholderTextColor="rgba(255,255,255,0.3)"
+            value={commentInputState.text}
+            onChangeText={(t) =>
+              setCommentInputState((p) => ({ ...p, text: t }))
+            }
+            multiline
+          />
+
+          <View style={styles.inputFooter}>
+            <TouchableOpacity
+              onPress={() =>
+                setCommentInputState((p) => ({
+                  ...p,
+                  isSpoiler: !p.isSpoiler,
+                }))
               }
-            />
+              style={[
+                styles.spoilerButton,
+                commentInputState.isSpoiler && styles.spoilerActive,
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="alert-decagram"
+                size={16}
+                color={
+                  commentInputState.isSpoiler
+                    ? theme.colors.red
+                    : theme.text.muted
+                }
+              />
+            </TouchableOpacity>
           </View>
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              !commentInputState.text.trim() && styles.disabledBtn,
+            ]}
+            onPress={handleAddOrEdit}
+            disabled={isSending}
+          >
+            {isSending ? (
+              <LottieView
+                source={require("../LottieJson/loading15.json")}
+                autoPlay
+                loop
+                style={{ width: 35, height: 35 }}
+              />
+            ) : (
+              <Feather name="arrow-up" size={22} color="#fff" />
+            )}
+          </TouchableOpacity>
         </View>
       </View>
     </KeyboardAvoidingView>
   );
 };
+
+const getStyles = (theme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.primary },
+    listContent: { padding: 15, paddingBottom: 160 },
+
+    itemContainer: {
+      marginBottom: 18,
+      backgroundColor: theme.primary,
+      borderRadius: 20,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    ownComment: {
+      borderColor: alpha(theme.accent, 0.3),
+      backgroundColor: alpha(theme.accent, 0.5),
+      borderWidth: 1,
+      borderLeftWidth: 3,
+      borderLeftColor: theme.accent,
+    },
+    replyMargin: {
+      marginLeft: 35,
+      borderLeftWidth: 2,
+      borderLeftColor: theme.accent,
+    },
+
+    itemHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 10,
+    },
+    userInfo: { flexDirection: "row", alignItems: "center", gap: 10 },
+    ownerActions: { flexDirection: "row", alignItems: "center" },
+    avatar: {
+      width: 34,
+      height: 34,
+    },
+    username: { color: theme.text.primary, fontSize: 13, fontWeight: "700" },
+    timestamp: { color: theme.text.muted, fontSize: 10 },
+
+    contentBody: { marginVertical: 8 },
+    commentText: {
+      color: theme.text.primary,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    commentContentWrapper: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+    },
+    eyeIconSmall: { padding: 4 },
+
+    spoilerCover: { borderRadius: 12, overflow: "hidden" },
+    spoilerBlur: {
+      padding: 15,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+    },
+    spoilerText: {
+      color: theme.text.secondary,
+      fontSize: 12,
+      fontWeight: "600",
+    },
+
+    actionsRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginTop: 10,
+    },
+    leftActions: { flexDirection: "row", gap: 18 },
+    actionButton: { flexDirection: "row", alignItems: "center", gap: 5 },
+    actionLabel: {
+      color: theme.text.secondary,
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    repliesToggle: { paddingVertical: 4 },
+    repliesToggleText: {
+      color: theme.text.secondary,
+      fontSize: 12,
+      fontWeight: "700",
+    },
+
+    inputWrapper: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      padding: 15,
+      borderTopWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.primary,
+    },
+    inputRow: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      gap: 6,
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    input: {
+      flex: 1,
+      minHeight: 45,
+      maxHeight: 100,
+      backgroundColor: theme.secondary,
+      borderRadius: 22,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 12,
+      color: theme.text.primary,
+    },
+    spoilerCoverInput: {
+      borderWidth: 1,
+      borderColor: theme.notesColor.redBackground,
+      overflow: "hidden",
+    },
+
+    sendButton: {
+      width: 45,
+      height: 45,
+      borderRadius: 22.5,
+      backgroundColor: theme.accent,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    disabledBtn: { backgroundColor: theme.secondaryt, opacity: 0.5 },
+
+    inputFooter: {
+      flexDirection: "row",
+      justifyContent: "flex-start",
+    },
+    spoilerButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: 24,
+      backgroundColor: theme.secondary,
+    },
+    spoilerActive: { backgroundColor: alpha(theme.colors.red, 0.1) },
+    spoilerBtnText: {
+      position: "absolute",
+      top: -10,
+      left: 15,
+      color: theme.text.muted,
+      fontSize: 12,
+      fontWeight: "600",
+      zIndex: 1,
+    },
+
+    activeModeIndicator: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    indicatorBadge: {
+      backgroundColor: alpha(theme.accent, 0.15),
+      paddingVertical: 4,
+      paddingHorizontal: 10,
+      borderRadius: 8,
+    },
+    indicatorText: { color: theme.accent, fontSize: 11, fontWeight: "700" },
+  });
 
 export default Comment;

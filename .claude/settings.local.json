@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"require\\('fs'\\).writeFileSync\\('c:/Users/ismail/Desktop/projeler/MainProject/WhatchFlix/screens/ChatScreen.js', require\\('fs'\\).readFileSync\\('c:/Users/ismail/Desktop/projeler/MainProject/WhatchFlix/screens/ChatScreen.js.bak','utf8'\\), 'utf8'\\); console.log\\('restored'\\);\")"
+    ]
+  }
+}

@@ -1,3 +1,4 @@
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   StyleSheet,
   Text,
@@ -10,10 +11,9 @@ import {
   ScrollView,
   Dimensions,
   Animated,
+  PanResponder,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-import React, { useEffect, useState } from "react";
 import { useTheme } from "../context/ThemeContext";
 import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
@@ -25,13 +25,14 @@ import Toast from "react-native-toast-message";
 import SwipeCard from "../modules/SwipeCard";
 import { BlurView } from "expo-blur";
 import { useAppSettings } from "../context/AppSettingsContext";
+import CaseOpeningModal from "../components/CaseOpeningModal";
+import Feather from "@expo/vector-icons/Feather";
 const { width, height } = Dimensions.get("window");
 export default function ListsScreen({ route, navigation }) {
   const { theme } = useTheme();
   const { listName } = route.params;
   const [listItems, setListItems] = useState([]);
   const [listModalItems, setListModalItems] = useState([]);
-  const [randomModalItems, setRandomModalItems] = useState({});
   const [searchQuery, setSearchQuery] = useState(""); // Arama için state
   const { t, language } = useLanguage();
   const { user } = useAuth();
@@ -41,6 +42,8 @@ export default function ListsScreen({ route, navigation }) {
   const [index, setIndex] = useState(0);
   const [reorderItems, setReorderItems] = useState(null);
   const [randomModalVisible, setRandomModalVisible] = useState(false);
+  const [filterType, setFilterType] = useState("mixed");
+  // Gesture tracking removed in favor of a cleaner 3-way segmented toggle.
   const [value, setValue] = useState("");
   const { imageQuality } = useAppSettings();
 
@@ -50,6 +53,39 @@ export default function ListsScreen({ route, navigation }) {
     setValue(numericValue - 1);
   };
   const [tvShowStatus, setTvShowStatus] = useState(null);
+
+  // ── Tab pill boyutları (mesafe hesabı) ─────────────────────────────────────
+  const TAB_PADDING = 3;
+  const [tabPillWidth, setTabPillWidth] = useState(0);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let toValue = 0;
+    if (tvShowStatus === true) toValue = 1;
+    if (tvShowStatus === false) toValue = 2;
+    slideAnim.setValue(toValue);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleTvTabPress = useCallback(
+    (status) => {
+      setTvShowStatus(status);
+      let toValue = 0;
+      if (status === true) toValue = 1;
+      if (status === false) toValue = 2;
+      Animated.spring(slideAnim, {
+        toValue,
+        useNativeDriver: true,
+        speed: 18,
+        bounciness: 0,
+      }).start();
+    },
+    [setTvShowStatus, slideAnim],
+  );
+
+  const sliderTranslateX = slideAnim.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: [0, tabPillWidth / 3, (tabPillWidth / 3) * 2],
+  });
 
   // Animated import'unun eklendiğinden emin olun
   const formatDate = (timestamp) => {
@@ -219,28 +255,30 @@ export default function ListsScreen({ route, navigation }) {
 
     return `${hours} saat ${minutes} dakika`;
   }
-  const chooseRandomly = (type) => {
-    if (filteredItems.length === 0) {
-      // Hiç içerik yoksa
+  const chooseRandomly = (selectedType) => {
+    const pool =
+      selectedType === "mixed"
+        ? filteredItems
+        : filteredItems.filter((item) => item.type === selectedType);
+    if (pool.length === 0) {
       Toast.show({
         type: "warning",
-        text1: "İzleme listesi boş lütfen içerik ekleyiniz",
+        text1:
+          selectedType === "movie"
+            ? "Listede hiç film yok!"
+            : selectedType === "tv"
+              ? "Listede hiç dizi yok!"
+              : "Liste boş, lütfen içerik ekleyiniz",
       });
       return;
     }
-    const chooseItem = filteredItems.filter((item) => item.type == type);
-    if (chooseItem.length === 0) {
-      // İstenen türde içerik yoksa
-      Toast.show({
-        type: "warning",
-        text1: `${type === "movie" ? "Hiç film yok!" : "Hiç dizi yok!"} `,
-      });
-      return;
-    }
-    const randomIndex = Math.floor(Math.random() * chooseItem.length);
-    setRandomModalItems(chooseItem[randomIndex]);
+    setFilterType(selectedType);
     setRandomModalVisible(true);
   };
+
+  // List counts
+  const movieCount = filteredItems.filter((i) => i.type === "movie").length;
+  const tvCount = filteredItems.filter((i) => i.type === "tv").length;
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.primary }]}
@@ -286,108 +324,292 @@ export default function ListsScreen({ route, navigation }) {
             />
           )}
           {listName == "watchList" && (
-            <View style={{ flexDirection: "row", marginBottom: 5, gap: 10 }}>
-              <TouchableOpacity
-                style={{
-                  backgroundColor: theme.notesColor.greenBackground,
-                  paddingVertical: 5,
-                  paddingHorizontal: 10,
-                  borderRadius: 5,
-                  marginBottom: 5,
+            <View style={{ marginBottom: 95, marginHorizontal: 15 }}>
+              {/* Interactive 3-Way Random Selector & Stats */}
+              <SwipeCard
+                leftButton={{
+                  label: "📺 Sadece\nDizi",
+                  color: "#8847ff",
+                  onPress: () => chooseRandomly("tv"),
                 }}
-                onPress={() => {
-                  chooseRandomly("tv");
-                }}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={{ color: theme.text.primary }}
-                >
-                  Rastgele Dizi
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{
-                  backgroundColor: theme.notesColor.blueBackground,
-                  paddingVertical: 5,
-                  paddingHorizontal: 10,
-                  borderRadius: 5,
-                  marginBottom: 5,
-                }}
-                onPress={() => {
-                  chooseRandomly("movie");
+                rightButton={{
+                  label: "🎬 Sadece\nFilm",
+                  color: "#4b69ff",
+                  onPress: () => chooseRandomly("movie"),
                 }}
               >
-                <Text
-                  allowFontScaling={false}
-                  style={{ color: theme.text.primary }}
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => chooseRandomly("mixed")}
+                  style={{
+                    width: "100%",
+                    height: 90,
+                    backgroundColor: theme.secondary,
+                    borderColor: theme.border,
+                    borderWidth: 1,
+                    borderRadius: 24,
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    overflow: "hidden",
+                  }}
                 >
-                  Rastgele Film
-                </Text>
-              </TouchableOpacity>
+                  <LinearGradient
+                    colors={["#396fe415", "transparent"]}
+                    style={StyleSheet.absoluteFill}
+                  />
+
+                  {/* Main Call to Action */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 6,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 22,
+                        backgroundColor: "#3961e433",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        borderWidth: 1,
+                        borderColor: "#3961e466",
+                      }}
+                    >
+                      <Text style={{ fontSize: 16 }}>🎲</Text>
+                    </View>
+                    <View>
+                      <Text
+                        style={{
+                          color: "#3983e4ff",
+                          fontSize: 14,
+                          fontWeight: "bold",
+                          letterSpacing: 0.5,
+                        }}
+                      >
+                        Rastgele Ne İzlesem?
+                      </Text>
+                      <Text
+                        style={{
+                          color: "#3983e4aa",
+                          fontSize: 10,
+                          marginTop: 2,
+                          fontWeight: "500",
+                        }}
+                      >
+                        Karışık için bas, Dizi/Film için kaydır
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Context Stats (Count chips) wrapped inside */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      width: "100%",
+                      justifyContent: "space-between",
+                      gap: 8,
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.countChip,
+                        {
+                          flex: 1,
+                          paddingVertical: 3,
+                          borderColor: "#4b69ff44",
+                          backgroundColor: "#4b69ff15",
+                        },
+                      ]}
+                    >
+                      <Feather name="chevron-left" size={14} color="#4b69ff" />
+                      <Text
+                        style={[styles.countChipTextBlue, { fontSize: 14 }]}
+                      >
+                        {movieCount}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          color: "#4b69ff88",
+                          fontWeight: "600",
+                          marginTop: 2,
+                        }}
+                      >
+                        FİLM
+                      </Text>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.countChip,
+                        {
+                          flex: 1,
+                          paddingVertical: 3,
+                          borderColor: "#e4ae3944",
+                          backgroundColor: "#e4ae3915",
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.countChipTextGold, { fontSize: 14 }]}
+                      >
+                        ∑ {filteredItems.length}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          color: "#e4ae3988",
+                          fontWeight: "600",
+                          marginTop: 2,
+                        }}
+                      >
+                        TOPLAM
+                      </Text>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.countChip,
+                        {
+                          flex: 1,
+                          paddingVertical: 3,
+                          borderColor: "#8847ff44",
+                          backgroundColor: "#8847ff15",
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.countChipTextPurple, { fontSize: 14 }]}
+                      >
+                        📺 {tvCount}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          color: "#8847ff88",
+                          fontWeight: "600",
+                          marginTop: 2,
+                        }}
+                      >
+                        DİZİ
+                      </Text>
+                      <Feather name="chevron-right" size={14} color="#8847ff" />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </SwipeCard>
             </View>
           )}
           {listName == "watchedTv" && (
-            <View style={{ flexDirection: "row", marginBottom: 5, gap: 10 }}>
-              <TouchableOpacity
-                onPress={() => {
-                  setTvShowStatus(null);
-                }}
+            <View
+              style={{
+                flexDirection: "row",
+                marginHorizontal: 15,
+                marginBottom: 12,
+                borderRadius: 14,
+                borderWidth: 1,
+                overflow: "hidden",
+                position: "relative",
+                padding: TAB_PADDING,
+                height: 40,
+                backgroundColor: theme.secondary,
+                borderColor: theme.border,
+              }}
+              onLayout={(e) => {
+                const w = e.nativeEvent.layout.width - TAB_PADDING * 2;
+                if (tabPillWidth !== w) setTabPillWidth(w);
+              }}
+            >
+              {/* Sliding indicator – translateX ile kasma yok */}
+              <Animated.View
                 style={{
-                  backgroundColor:
-                    tvShowStatus === null ? theme.colors.blue : theme.border,
-                  paddingVertical: 5,
-                  paddingHorizontal: 10,
-                  borderRadius: 10,
+                  position: "absolute",
+                  top: TAB_PADDING,
+                  bottom: TAB_PADDING,
+                  left: TAB_PADDING,
+                  width: "33.33%",
+                  borderRadius: 11,
+                  zIndex: 0,
+                  backgroundColor: theme.accent,
+                  transform: [{ translateX: sliderTranslateX }],
                 }}
+              />
+
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 5,
+                  zIndex: 1,
+                  borderRadius: 11,
+                }}
+                onPress={() => handleTvTabPress(null)}
+                activeOpacity={0.8}
               >
                 <Text
                   style={{
-                    color: tvShowStatus === null ? "black" : theme.text.primary,
+                    fontSize: 12,
+                    fontWeight: "600",
+                    color: tvShowStatus === null ? "#fff" : theme.text.muted,
                   }}
                 >
-                  Bütün Diziler
+                  Tümü
                 </Text>
               </TouchableOpacity>
+
               <TouchableOpacity
-                onPress={() => {
-                  setTvShowStatus(true);
-                }}
                 style={{
-                  backgroundColor:
-                    tvShowStatus === true ? theme.colors.green : theme.border,
-                  paddingVertical: 5,
-                  paddingHorizontal: 10,
-                  borderRadius: 10,
+                  flex: 1,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 5,
+                  zIndex: 1,
+                  borderRadius: 11,
                 }}
+                onPress={() => handleTvTabPress(true)}
+                activeOpacity={0.8}
               >
                 <Text
                   style={{
-                    color: tvShowStatus === true ? "black" : theme.text.primary,
+                    fontSize: 12,
+                    fontWeight: "600",
+                    color: tvShowStatus === true ? "#fff" : theme.text.muted,
                   }}
                 >
-                  Bitirlen diziler
+                  Bitirilen
                 </Text>
               </TouchableOpacity>
+
               <TouchableOpacity
-                onPress={() => {
-                  setTvShowStatus(false);
-                }}
                 style={{
-                  backgroundColor:
-                    tvShowStatus === false ? theme.colors.orange : theme.border,
-                  paddingVertical: 5,
-                  paddingHorizontal: 10,
-                  borderRadius: 10,
+                  flex: 1,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 5,
+                  zIndex: 1,
+                  borderRadius: 11,
                 }}
+                onPress={() => handleTvTabPress(false)}
+                activeOpacity={0.8}
               >
                 <Text
                   style={{
-                    color:
-                      tvShowStatus === false ? "black" : theme.text.primary,
+                    fontSize: 12,
+                    fontWeight: "600",
+                    color: tvShowStatus === false ? "#fff" : theme.text.muted,
                   }}
                 >
-                  Devam edilen diziler
+                  Devam Eden
                 </Text>
               </TouchableOpacity>
             </View>
@@ -731,136 +953,18 @@ export default function ListsScreen({ route, navigation }) {
               )}
         </View>
       </Modal>
-      <Modal
-        animationType="fade"
-        transparent={true}
+      <CaseOpeningModal
         visible={randomModalVisible}
-        onRequestClose={() => setRandomModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <BlurView
-            tint="dark"
-            intensity={50}
-            experimentalBlurMethod="dimezisBlurView"
-            style={StyleSheet.absoluteFill}
-          />
-          <TouchableOpacity
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-            }}
-            activeOpacity={1}
-            onPress={() => setRandomModalVisible(false)}
-          />
-
-          <View
-            style={{
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <TouchableOpacity
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-              }}
-              activeOpacity={1}
-              onPress={() => setRandomModalVisible(false)}
-            />
-            {isLoading
-              ? renderSkeleton()
-              : Object.keys(randomModalItems).length > 0 && (
-                  <View
-                    style={{
-                      justifyContent: "center",
-                      alignItems: "center",
-                    }}
-                  >
-                    <TouchableOpacity
-                      onPress={() => {
-                        (setRandomModalVisible(false),
-                          navigation.navigate(
-                            randomModalItems.type === "movie"
-                              ? "MovieDetails"
-                              : "TvShowsDetails",
-                            {
-                              id: randomModalItems.id,
-                            },
-                          ));
-                      }}
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        gap: 10,
-                      }}
-                    >
-                      <Image
-                        source={
-                          randomModalItems.imagePath
-                            ? {
-                                uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${randomModalItems.imagePath}`,
-                                cache: "force-cache",
-                              }
-                            : require("../assets/image/no_image.png")
-                        }
-                        style={styles.imageSelected}
-                      />
-                      <View style={{ gap: 5 }}>
-                        <Text
-                          style={[styles.title, { color: theme.text.primary }]}
-                        >
-                          {randomModalItems.name}
-                        </Text>
-
-                        <Text
-                          style={[
-                            styles.detail,
-                            { color: theme.text.secondary },
-                          ]}
-                        >
-                          Tür: {randomModalItems.type}
-                        </Text>
-                        {randomModalItems.dateAdded && (
-                          <Text
-                            style={[
-                              styles.detail,
-                              { color: theme.text.secondary },
-                            ]}
-                          >
-                            eklenme tarihi:{" "}
-                            {formatDate(randomModalItems.dateAdded)}
-                          </Text>
-                        )}
-                        <View style={{ flexDirection: "row", gap: 5 }}>
-                          {randomModalItems?.genres?.map((genres) => (
-                            <Text
-                              key={genres}
-                              style={[
-                                styles.detailGenres,
-                                {
-                                  color: theme.text.secondary,
-                                  backgroundColor: theme.primary,
-                                },
-                              ]}
-                            >
-                              {genres}
-                            </Text>
-                          ))}
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  </View>
-                )}
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setRandomModalVisible(false)}
+        items={filteredItems}
+        filterType={filterType}
+        onNavigate={(item) => {
+          navigation.navigate(
+            item.type === "movie" ? "MovieDetails" : "TvShowsDetails",
+            { id: item.id },
+          );
+        }}
+      />
       <Modal
         animationType="fade"
         transparent={true}
@@ -1147,5 +1251,55 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.94,
     shadowRadius: 10.32,
     elevation: 5,
+  },
+
+  // Count chips
+  countRow: {
+    flexDirection: "row",
+    gap: 7,
+    marginBottom: 8,
+    flexWrap: "wrap",
+  },
+  countChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    paddingHorizontal: 5,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  countChipTextBlue: { color: "#4b69ff", fontWeight: "700", fontSize: 12 },
+  countChipTextPurple: { color: "#8847ff", fontWeight: "700", fontSize: 12 },
+  countChipTextGold: { color: "#e4ae39", fontWeight: "700", fontSize: 12 },
+
+  // Interactive Segmented Buttons
+  segmentContainer: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderRadius: 24,
+    padding: 4,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  segmentBtnCenter: {
+    flex: 1.4,
+    marginHorizontal: 4,
+  },
+  segmentText: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.3,
   },
 });
