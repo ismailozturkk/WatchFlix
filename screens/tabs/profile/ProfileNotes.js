@@ -17,7 +17,7 @@ import { useTheme } from "../../../context/ThemeContext";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useProfileScreen } from "../../../context/ProfileScreenContext";
+import { useProfileNotes } from "../../../context/ProfileNotesContext";
 import { BlurView } from "expo-blur";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 
@@ -118,7 +118,7 @@ export default function ProfileNotes() {
     setScheduledDate,
     handleToggleTodoItem,
     handleUpdateTodoNote,
-  } = useProfileScreen();
+  } = useProfileNotes();
 
   /* ── Tab ── */
   const [activeTab, setActiveTab] = useState("note");

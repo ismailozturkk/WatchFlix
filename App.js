@@ -1,4 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
+import ErrorBoundary from "./components/ErrorBoundary";
+
+// Production'da gereksiz console çıktılarını kapat
+// console.error korunuyor → Sentry/Crashlytics için kullanılabilir
+if (!__DEV__) {
+  console.log  = () => {};
+  console.info = () => {};
+  console.warn = () => {};
+}
 import {
   Animated,
   AppState,
@@ -7,12 +16,12 @@ import {
   TouchableOpacity,
   View,
   LogBox,
+  InteractionManager,
 } from "react-native";
 
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
-import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { LanguageProvider } from "./context/LanguageContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import TabScreen from "./screens/TabScreen";
@@ -40,9 +49,11 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import ListsViewScreen from "./screens/ListsViewScreen";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import SwipeView from "./screens/SwipeView";
-import { ProfileScreenProvider } from "./context/ProfileScreenContext";
+import { ProfileStatsProvider }     from "./context/ProfileStatsContext";
+import { ProfileNotesProvider }     from "./context/ProfileNotesContext";
+import { ProfileRemindersProvider } from "./context/ProfileRemindersContext";
+import { ProfileUiProvider }        from "./context/ProfileUiContext";
 import { TvShowProvider } from "./context/TvShowContex";
-import { MovieProvider } from "./context/MovieContex";
 import ActorSearch from "./screens/search/ActorSearch";
 import ActorViewScreen from "./screens/actor/ActorViewScreen";
 import MovieStatisticsScreen from "./screens/tabs/profile/MovieStatisticsScreen";
@@ -54,12 +65,44 @@ import SearchFriendsScreen from "./screens/search/SearchFriendsScreen";
 import FriendRequestsScreen from "./screens/tabs/profile/FriendRequestsScreen";
 import ChatScreen from "./screens/ChatScreen";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { enableFreeze } from "react-native-screens";
 import Comment from "./components/Comment";
 import MovieSearchScreen from "./screens/search/MovieSearchScreen";
 import IconBacground from "./components/IconBacground";
 import CalendarScreen from "./screens/CalendarScreen";
 import { CalendarProvider } from "./context/CalendarContext";
 import OnGoingSeries from "./screens/tv/OnGoingSeries";
+import { preloadAllCache } from "./utils/apiCache";
+import * as ExpoSplashScreen from "expo-splash-screen";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
+import Feather from "@expo/vector-icons/Feather";
+import Octicons from "@expo/vector-icons/Octicons";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+
+enableFreeze(true);
+ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
+
+const preloadIconFont = (IconSet) => {
+  if (typeof IconSet?.loadFont === "function") {
+    return IconSet.loadFont();
+  }
+  return Promise.resolve();
+};
+
+// Uygulama modülü yüklendiği anda cache ve ikon font preload'u başlat.
+// Provider'lar mount olmadan önce cache belleğe alınır; tab ikonları da
+// ilk TV ekranı açıldıktan sonra font beklemez.
+const startupPreloadPromise = Promise.allSettled([
+  preloadAllCache(),
+  preloadIconFont(Ionicons),
+  preloadIconFont(MaterialCommunityIcons),
+  preloadIconFont(FontAwesome),
+  preloadIconFont(Feather),
+  preloadIconFont(Octicons),
+  preloadIconFont(MaterialIcons),
+]);
 
 // Daha sonra stack/tab navigator'larında otomatik etkili olur
 
@@ -96,6 +139,7 @@ const SplashScreen = () => {
 function AppContent() {
   const Stack = createNativeStackNavigator();
   const [showChatModal, setShowChatModal] = useState(false); // State for modal visibility
+  const [swipeViewReady, setSwipeViewReady] = useState(false);
   const [showBackButton, setShowBackButton] = useState(false);
   const { user, initialRoute, loading } = useAuth();
 
@@ -153,6 +197,23 @@ function AppContent() {
       setShowChatModal(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!showChatModal) {
+      setSwipeViewReady(false);
+      return undefined;
+    }
+
+    let timer = null;
+    const task = InteractionManager.runAfterInteractions(() => {
+      timer = setTimeout(() => setSwipeViewReady(true), 1200);
+    });
+
+    return () => {
+      task.cancel?.();
+      if (timer) clearTimeout(timer);
+    };
+  }, [showChatModal]);
 
   if (loading) return null;
 
@@ -336,14 +397,19 @@ function AppContent() {
         />
         <Stack.Screen
           name="ProfileScreen"
-          component={ProfileScreen}
           options={{
             headerTransparent: true,
             headerTintColor: "#fff",
             headerTitle: "",
             headerShadowVisible: false,
           }}
-        />
+        >
+          {(props) => (
+            <CalendarProvider>
+              <ProfileScreen {...props} />
+            </CalendarProvider>
+          )}
+        </Stack.Screen>
         <Stack.Screen
           name="ListsScreen"
           component={ListsScreen}
@@ -445,12 +511,17 @@ function AppContent() {
         />
         <Stack.Screen
           name="CalendarScreen"
-          component={CalendarScreen}
           options={{
             headerShown: false,
             animation: "slide_from_bottom",
           }}
-        />
+        >
+          {(props) => (
+            <CalendarProvider>
+              <CalendarScreen {...props} />
+            </CalendarProvider>
+          )}
+        </Stack.Screen>
         <Stack.Screen
           name="OnGoingSeries"
           component={OnGoingSeries}
@@ -464,7 +535,7 @@ function AppContent() {
         />
       </Stack.Navigator>
 
-      {showChatModal && <SwipeView />}
+      {showChatModal && swipeViewReady && <SwipeView />}
       <Toast visibilityTime={5000} config={toastConfig} position="top" />
       <StatusBar style="dark" />
     </NavigationContainer>
@@ -476,77 +547,79 @@ export default function App() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    // Özel Lottie splash screen'imiz render edildiğinde yerel (beyaz) splash'i kapat.
+    ExpoSplashScreen.hideAsync().catch(() => {});
+
+    // Preload zaten modül yüklenirken başladı (yukarıda).
+    // Minimum 600 ms göster; preload bitince (genellikle < 50 ms) kapat.
+    const MIN_MS = 600;
+    const startedAt = Date.now();
+
+    const hideSplash = () => {
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 500,
+        duration: 350,
         useNativeDriver: true,
       }).start(() => setSplashVisible(false));
-    }, 2000);
+    };
 
-    return () => clearTimeout(timer);
+    startupPreloadPromise.then(() => {
+      const elapsed = Date.now() - startedAt;
+      const wait = Math.max(0, MIN_MS - elapsed);
+      if (wait > 0) {
+        setTimeout(hideSplash, wait);
+      } else {
+        hideSplash();
+      }
+    });
   }, []);
 
-  // // Çevrimiçi/Çevrimdışı durumu yönetimi
-  // useEffect(() => {
-  //   let currentUserUID = null;
+  // Çevrimiçi/Çevrimdışı durumu yönetimi
+  useEffect(() => {
+    let currentUserUID = null;
 
-  //   const updateStatus = async (isOnline) => {
-  //     if (currentUserUID) {
-  //       const userRef = doc(db, "Users", currentUserUID);
-  //       try {
-  //         await updateDoc(userRef, { isOnline });
-  //       } catch (error) {
-  //         console.error("Kullanıcı durumu güncellenirken hata:", error);
-  //       }
-  //     }
-  //   };
+    const updateStatus = async (isOnline) => {
+      if (!currentUserUID) return;
+      try {
+        await updateDoc(doc(db, "Users", currentUserUID), { isOnline });
+      } catch (_) {}
+    };
 
-  //   // Kullanıcı giriş/çıkış yaptığında dinle
-  //   const authUnsubscribe = auth.onAuthStateChanged((user) => {
-  //     if (user) {
-  //       currentUserUID = user.uid;
-  //       updateStatus(true);
-  //     } else if (currentUserUID) {
-  //       // Kullanıcı çıkış yaptıysa
-  //       updateStatus(false);
-  //       currentUserUID = null;
-  //     }
-  //   });
+    const authUnsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        currentUserUID = user.uid;
+        updateStatus(true);
+      } else if (currentUserUID) {
+        updateStatus(false);
+        currentUserUID = null;
+      }
+    });
 
-  //   // Uygulama durumunu dinle (aktif, arka plan, vb.)
-  //   const appStateSubscription = AppState.addEventListener(
-  //     "change",
-  //     (nextAppState) => {
-  //       if (nextAppState === "active") {
-  //         updateStatus(true);
-  //       } else {
-  //         updateStatus(false);
-  //       }
-  //     }
-  //   );
+    const appStateSubscription = AppState.addEventListener("change", (next) => {
+      updateStatus(next === "active");
+    });
 
-  //   // Component kaldırıldığında (unmount) tüm listener'ları temizle
-  //   return () => {
-  //     authUnsubscribe();
-  //     appStateSubscription.remove();
-  //     // Son bir kez offline olarak işaretle
-  //     updateStatus(false);
-  //   };
-  // }, []);
+    return () => {
+      authUnsubscribe();
+      appStateSubscription.remove();
+      updateStatus(false);
+    };
+  }, []);
   return (
-    <GestureHandlerRootView>
-      <SafeAreaProvider>
-        <LanguageProvider>
-          <ThemeProvider>
-            <SnowProvider>
-              <AppSettingsProvider>
+    <ErrorBoundary>
+      <GestureHandlerRootView>
+        <SafeAreaProvider>
+          <AppSettingsProvider>
+          <LanguageProvider>
+            <ThemeProvider>
+              <SnowProvider>
                 <AuthProvider>
                   <ListStatusProvider>
-                    <ProfileScreenProvider>
-                      <CalendarProvider>
+                    <ProfileStatsProvider>
+                      <ProfileNotesProvider>
+                        <ProfileRemindersProvider>
+                          <ProfileUiProvider>
                         <TvShowProvider>
-                          <MovieProvider>
                             <AppContent />
                             {splashVisible && (
                               <Animated.View
@@ -559,18 +632,20 @@ export default function App() {
                                 <SplashScreen />
                               </Animated.View>
                             )}
-                          </MovieProvider>
                         </TvShowProvider>
-                      </CalendarProvider>
-                    </ProfileScreenProvider>
+                          </ProfileUiProvider>
+                        </ProfileRemindersProvider>
+                      </ProfileNotesProvider>
+                    </ProfileStatsProvider>
                   </ListStatusProvider>
                 </AuthProvider>
-              </AppSettingsProvider>
-            </SnowProvider>
-          </ThemeProvider>
-        </LanguageProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+              </SnowProvider>
+            </ThemeProvider>
+          </LanguageProvider>
+        </AppSettingsProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
 

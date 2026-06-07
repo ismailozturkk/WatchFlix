@@ -15,7 +15,10 @@ import {
 } from "react-native";
 import axios from "axios";
 import { useTheme } from "../../context/ThemeContext";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import {
+  useApiSettings,
+  useImageQualitySettings,
+} from "../../context/AppSettingsContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -113,7 +116,7 @@ const FilterChips = ({ filters, active, onSelect, theme }) => (
 );
 
 // ─── Media Card ───────────────────────────────────────────────────────────────
-const MediaCard = ({ item, onPress, theme, imageQuality }) => {
+const MediaCard = ({ item, onPress, theme, imageQuality, getTmdbUrl }) => {
   const scale = useRef(new Animated.Value(1)).current;
   const rating = item.vote_average ?? 0;
   const ratingColor = getRatingColor(rating);
@@ -143,7 +146,7 @@ const MediaCard = ({ item, onPress, theme, imageQuality }) => {
         {item.poster_path ? (
           <Image
             source={{
-              uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+              uri: getTmdbUrl(item.poster_path, 'poster', 200),
             }}
             style={styles.mediaPoster}
           />
@@ -245,7 +248,8 @@ const applyFilter = (list, filter, type) => {
 const ActorViewScreen = ({ route, navigation }) => {
   const { personId } = route.params;
   const { theme } = useTheme();
-  const { API_KEY, imageQuality } = useAppSettings();
+  const { API_KEY } = useApiSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const { language } = useLanguage();
   const [actor, setActor] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -314,8 +318,6 @@ const ActorViewScreen = ({ route, navigation }) => {
     ).values(),
   );
 
-  const IMAGE_URL = `https://image.tmdb.org/t/p/${imageQuality.poster}`;
-
   const formatDate = (d) => {
     if (!d) return null;
     try {
@@ -374,7 +376,7 @@ const ActorViewScreen = ({ route, navigation }) => {
         <View style={{ height: HERO_HEIGHT }}>
           {actor.profile_path ? (
             <Image
-              source={{ uri: `${IMAGE_URL}${actor.profile_path}` }}
+              source={{ uri: `getTmdbUrl(actor.profile_path, 'profile', 200)` }}
               style={StyleSheet.absoluteFill}
               resizeMode="cover"
             />
@@ -523,6 +525,7 @@ const ActorViewScreen = ({ route, navigation }) => {
                     item={item}
                     theme={theme}
                     imageQuality={imageQuality}
+                    getTmdbUrl={getTmdbUrl}
                     onPress={() =>
                       navigation.navigate("MovieDetails", { id: item.id })
                     }
@@ -576,6 +579,7 @@ const ActorViewScreen = ({ route, navigation }) => {
                     item={item}
                     theme={theme}
                     imageQuality={imageQuality}
+                    getTmdbUrl={getTmdbUrl}
                     onPress={() =>
                       navigation.navigate("TvShowsDetails", { id: item.id })
                     }

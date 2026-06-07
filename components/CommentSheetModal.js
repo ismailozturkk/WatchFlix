@@ -49,9 +49,8 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import Comment from "./Comment"; // kendi Comment bileşenin
 import { useTheme } from "../context/ThemeContext";
-import { useAppSettings } from "../context/AppSettingsContext";
+import { useImageQualitySettings } from "../context/AppSettingsContext";
 
-const SHEET_HEIGHT = SCREEN_H * 0.82;
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get("window");
 
 // ── Renk sabitleri ───────────────────────────────────────
@@ -65,7 +64,7 @@ export default function CommentSheetModal({
   movieId,
   details,
 }) {
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const { theme } = useTheme();
 
   // Sheet slide-up animasyonu
@@ -174,7 +173,7 @@ export default function CommentSheetModal({
             {details?.poster_path ? (
               <Image
                 source={{
-                  uri: `https://image.tmdb.org/t/p/${imageQuality?.poster || "w185"}${details.poster_path}`,
+                  uri: getTmdbUrl(details.poster_path, 'poster', 200),
                 }}
                 style={styles.moviePillPoster}
               />

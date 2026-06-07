@@ -14,27 +14,22 @@ import { useTheme } from "../../../context/ThemeContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { ListsSkeleton } from "../../../components/Skeleton";
 import { LinearGradient } from "expo-linear-gradient";
-import { useProfileScreen } from "../../../context/ProfileScreenContext";
+import { useProfileStats } from "../../../context/ProfileStatsContext";
+import { useProfileUi }    from "../../../context/ProfileUiContext";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useAppSettings } from "../../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 export default function ProfileLists({ navigation }) {
   const { t } = useLanguage();
   const { theme } = useTheme();
   const {
-    lists,
-    isLoadingLists,
-    selectedList,
-    setSelectedList,
-    modalDeleteVisible,
-    setModalDeleteVisible,
-    deleteList,
-    gridStyle,
-    setGridStyle,
-    saveListGridStyle,
-  } = useProfileScreen();
+    lists, isLoading: isLoadingLists,
+    selectedList, setSelectedList,
+    modalDeleteVisible, setModalDeleteVisible, deleteList,
+  } = useProfileStats();
+  const { gridStyle, setGridStyle, saveListGridStyle } = useProfileUi();
   // ...existing code...
   const [scaleValues, setScaleValues] = useState({});
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   useEffect(() => {
     const newScaleValues = {};
     lists.forEach((list) => {
@@ -161,7 +156,7 @@ export default function ProfileLists({ navigation }) {
                               <Image
                                 key={index}
                                 source={{
-                                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
+                                  uri: getTmdbUrl(item.imagePath, 'poster', 200),
                                 }}
                                 style={[
                                   styles.image,
@@ -221,7 +216,7 @@ export default function ProfileLists({ navigation }) {
                                 <Image
                                   key={index}
                                   source={{
-                                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
+                                    uri: getTmdbUrl(item.imagePath, 'poster', 200),
                                   }}
                                   style={[
                                     styles.image,
@@ -285,7 +280,7 @@ export default function ProfileLists({ navigation }) {
                                 <Image
                                   key={index}
                                   source={{
-                                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
+                                    uri: getTmdbUrl(item.imagePath, 'poster', 200),
                                   }}
                                   style={[
                                     styles.image,

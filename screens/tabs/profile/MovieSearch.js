@@ -14,22 +14,27 @@ import {
   Keyboard,
 } from "react-native";
 import axios from "axios";
-import { useLanguage } from "../../context/LanguageContext";
-import { useTheme } from "../../context/ThemeContext";
-import { SearchSkeleton } from "../../components/Skeleton";
+import { useLanguage } from "../../../context/LanguageContext";
+import { useTheme } from "../../../context/ThemeContext";
+import { SearchSkeleton } from "../../../components/Skeleton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import LottieView from "lottie-react-native";
-import { useSnow } from "../../context/SnowContext";
+import { useSnow } from "../../../context/SnowContext";
 import Toast from "react-native-toast-message";
 import { doc, getDoc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
-import { db } from "../../firebase";
-import { useAuth } from "../../context/AuthContext";
+import { db } from "../../../firebase";
+import { useAuth } from "../../../context/AuthContext";
 //import { API_KEY } from "@env";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import {
+  useApiSettings,
+  useContentSettings,
+  useImageQualitySettings,
+  useSnowSettings,
+} from "../../../context/AppSettingsContext";
 import { useFocusEffect } from "@react-navigation/native";
-import { useListStatus } from "../../modules/UseListStatus";
+import { useListStatus } from "../../../modules/UseListStatus";
 import { SafeAreaView } from "react-native-safe-area-context";
-import IconBacground from "../../components/IconBacground";
+import IconBacground from "../../../components/IconBacground";
 export default function MovieSearch({ navigation, route }) {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState([]);
@@ -39,7 +44,10 @@ export default function MovieSearch({ navigation, route }) {
   const { theme } = useTheme();
   const searchTimeout = useRef(null);
   const [lastSearch, setLastSearch] = useState([]);
-  const { API_KEY, adultContent, imageQuality, showSnow } = useAppSettings();
+  const { API_KEY } = useApiSettings();
+  const { adultContent } = useContentSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { showSnow } = useSnowSettings();
 
   const [scaleValues, setScaleValues] = useState({});
 
@@ -189,7 +197,7 @@ export default function MovieSearch({ navigation, route }) {
           {item.backdrop_path && (
             <Image
               source={{
-                uri: `https://image.tmdb.org/t/p/${imageQuality.backdrop}${item.backdrop_path}`,
+                uri: getTmdbUrl(item.backdrop_path, 'backdrop', 1000),
               }}
               style={[
                 styles.backDrop,
@@ -202,7 +210,7 @@ export default function MovieSearch({ navigation, route }) {
           {item.poster_path ? (
             <Image
               source={{
-                uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                uri: getTmdbUrl(item.poster_path, 'poster', 200),
               }}
               style={[styles.posterTvRating, { shadowColor: theme.shadow }]}
             />
@@ -420,7 +428,7 @@ export default function MovieSearch({ navigation, route }) {
       {showSnow && (
         <LottieView
           style={styles.lottie}
-          source={require("../../LottieJson/snow.json")}
+          source={require("../../../LottieJson/snow.json")}
           autoPlay={true}
           loop
         />
@@ -499,7 +507,7 @@ export default function MovieSearch({ navigation, route }) {
         >
           <LottieView
             style={{ width: 350, height: 350 }}
-            source={require("../../LottieJson/search12.json")}
+            source={require("../../../LottieJson/search12.json")}
             autoPlay
             loop
           />
@@ -524,7 +532,7 @@ export default function MovieSearch({ navigation, route }) {
               >
                 <LottieView
                   style={{ width: 350, height: 350 }}
-                  source={require("../../LottieJson/search_notfound.json")}
+                  source={require("../../../LottieJson/search_notfound.json")}
                   autoPlay
                   loop
                 />

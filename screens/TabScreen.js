@@ -6,6 +6,7 @@ import {
   Text,
   Dimensions,
   Animated,
+  InteractionManager,
 } from "react-native";
 import { useLanguage } from "../context/LanguageContext";
 import { useTheme } from "../context/ThemeContext";
@@ -18,29 +19,60 @@ import Octicons from "@expo/vector-icons/Octicons";
 import ProfileScreen from "./tabs/ProfileScreen";
 import MovieScreen from "./tabs/MovieScreen";
 import TvShowScreen from "./tabs/TvShowScreen";
-import PagerView from "react-native-pager-view";
-import { useAuth } from "../context/AuthContext";
-import { useProfileScreen } from "../context/ProfileScreenContext";
+import { MovieProvider } from "../context/MovieContex";
+import { CalendarProvider } from "../context/CalendarContext";
+import { Screen, ScreenContainer } from "react-native-screens";
 const { width } = Dimensions.get("window");
+const TAB_NAMES = ["tvshows", "movies", "search", "settings", "profile"];
+const BACKGROUND_WARMUP_DELAY = 6000;
+const BACKGROUND_WARMUP_STEP = 1200;
 
 function TabScreen({ navigation }) {
   const [activeTab, setActiveTab] = useState("tvshows");
+  const [mountedTabs, setMountedTabs] = useState(() => new Set(["tvshows"]));
   const { t, language, toggleLanguage } = useLanguage();
   const { theme } = useTheme();
   // Ekranları memoize edelim
   const screens = useMemo(
     () => ({
       tvshows: <TvShowScreen navigation={navigation} />,
-      movies: <MovieScreen navigation={navigation} />,
+      movies: (
+        <MovieProvider>
+          <MovieScreen navigation={navigation} />
+        </MovieProvider>
+      ),
       search: <SearchScreen navigation={navigation} />,
       settings: <SettingsScreen navigation={navigation} />,
-      profile: <ProfileScreen navigation={navigation} />,
+      profile: (
+        <CalendarProvider>
+          <ProfileScreen navigation={navigation} />
+        </CalendarProvider>
+      ),
     }),
     [navigation]
   );
 
-  // renderScreen fonksiyonunu basitleştirelim
-  const renderScreen = () => screens[activeTab];
+  useEffect(() => {
+    const timers = [];
+    const task = InteractionManager.runAfterInteractions(() => {
+      TAB_NAMES.filter((name) => name !== "tvshows").forEach((name, index) => {
+        const timer = setTimeout(() => {
+          setMountedTabs((current) => {
+            if (current.has(name)) return current;
+            const next = new Set(current);
+            next.add(name);
+            return next;
+          });
+        }, BACKGROUND_WARMUP_DELAY + BACKGROUND_WARMUP_STEP * index);
+        timers.push(timer);
+      });
+    });
+
+    return () => {
+      task.cancel?.();
+      timers.forEach(clearTimeout);
+    };
+  }, []);
 
   const tabs = [
     {
@@ -169,11 +201,14 @@ function TabScreen({ navigation }) {
       </TouchableOpacity>
     );
   });
-  const pagerRef = React.useRef(null);
-
   const handleTabPress = (index, name) => {
+    setMountedTabs((current) => {
+      if (current.has(name)) return current;
+      const next = new Set(current);
+      next.add(name);
+      return next;
+    });
     setActiveTab(name);
-    pagerRef.current?.setPage(index); // animasyonlu kaydır
   };
 
   return (
@@ -192,25 +227,24 @@ function TabScreen({ navigation }) {
           </Text>
         </TouchableOpacity>
       )}
-      <PagerView
-        style={{ flex: 1 }}
-        initialPage={0}
-        scrollEnabled={true} // elle swipe kapatabilirsin
-        ref={pagerRef}
-        overdrag={true}
-        overScrollMode="never"
-        nestedScrollEnabled={true}
-        onPageSelected={(e) => {
-          const pageIndex = e.nativeEvent.position;
-          setActiveTab(tabs[pageIndex].name);
-        }}
-      >
-        <View key="1">{screens.tvshows}</View>
-        <View key="2">{screens.movies}</View>
-        <View key="3">{screens.search}</View>
-        <View key="4">{screens.settings}</View>
-        <View key="5">{screens.profile}</View>
-      </PagerView>
+      <ScreenContainer style={styles.screenSlot} hasTwoStates>
+        {TAB_NAMES.map((name) => {
+          if (!mountedTabs.has(name)) return null;
+          const isActive = activeTab === name;
+
+          return (
+            <Screen
+              key={name}
+              activityState={isActive ? 2 : 0}
+              freezeOnBlur
+              shouldFreeze={!isActive}
+              style={styles.screen}
+            >
+              {screens[name]}
+            </Screen>
+          );
+        })}
+      </ScreenContainer>
 
       <View style={[styles.bottomTabs]}>
         <View
@@ -252,6 +286,12 @@ function TabScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  screenSlot: {
+    flex: 1,
+  },
+  screen: {
+    ...StyleSheet.absoluteFillObject,
   },
   languageButton: {
     position: "absolute",

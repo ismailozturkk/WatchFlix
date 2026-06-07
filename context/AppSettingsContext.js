@@ -4,27 +4,36 @@ import React, {
   useEffect,
   useContext,
   useMemo,
+  useCallback,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Toast from "react-native-toast-message";
+import { buildTmdbUrl } from "../utils/tmdbImageUtils";
 
 const AppSettingsContext = createContext();
+const LanguageSettingsContext = createContext();
+const ThemeSettingsContext = createContext();
+const SnowSettingsContext = createContext();
+const ContentSettingsContext = createContext();
+const OngoingTvShowsSettingsContext = createContext();
+const ImageQualitySettingsContext = createContext();
+const IconBackgroundSettingsContext = createContext();
+const AvatarSettingsContext = createContext();
+const ApiSettingsContext = createContext();
 
 /**
  * TMDB Image Quality Presets
- * poster_sizes: w92, w154, w185, w342, w500, w780, original
- * backdrop_sizes: w300, w780, w1280, original
- * logo_sizes: w45, w92, w154, w185, w300, w500, original
+ * Legacy map kept for UI labels only. The actual resolutions are now calculated dynamically
+ * in `utils/tmdbImageUtils.js` based on component width.
  */
 export const IMAGE_QUALITY_PRESETS = {
-  low: { poster: "w185", backdrop: "w300", logo: "w92" },
-  medium: { poster: "w342", backdrop: "w300", logo: "w154" },
-  good: { poster: "w500", backdrop: "w780", logo: "w300" },
-  high: { poster: "w780", backdrop: "w1280", logo: "w500" },
+  low: { poster: "low", backdrop: "low", logo: "low" },
+  medium: { poster: "medium", backdrop: "medium", logo: "medium" },
+  good: { poster: "good", backdrop: "good", logo: "good" },
+  high: { poster: "high", backdrop: "high", logo: "high" },
   original: { poster: "original", backdrop: "original", logo: "original" },
 };
 
-/** Eski string formatından yeni level key'e migration */
 const LEGACY_TO_LEVEL = {
   w300: "low",
   w500: "good",
@@ -33,162 +42,325 @@ const LEGACY_TO_LEVEL = {
   original: "original",
 };
 
+const RAW_KEY = process.env.EXPO_PUBLIC_API_KEY || "";
+const API_KEY = RAW_KEY && !RAW_KEY.startsWith("Bearer ") ? `Bearer ${RAW_KEY}` : RAW_KEY;
+
 export const AppSettingsProvider = ({ children }) => {
   const [showSnow, setShowSnow] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState("en");
   const [selectedTheme, setSelectedTheme] = useState("dark");
   const [adultContent, setAdultContent] = useState(false);
+  const [showOngoingTvShows, setShowOngoingTvShows] = useState(true);
+  const [showIconBackground, setShowIconBackground] = useState(true);
   const [imageQualityLevel, setImageQualityLevel] = useState("good");
-
   const [selectedAvatar, setSelectedAvatar] = useState(null);
 
+  // Single multiGet reads all persisted settings in one AsyncStorage round-trip.
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const savedShowSnow = await AsyncStorage.getItem("showSnow");
-        const savedLanguage = await AsyncStorage.getItem("selectedLanguage");
-        const savedTheme = await AsyncStorage.getItem("selectedTheme");
-        const savedAvatar = await AsyncStorage.getItem("selectedAvatar");
-        const savedAdultContent = await AsyncStorage.getItem("adultContent");
+        const [
+          [, savedShowSnow],
+          [, savedLanguage],
+          [, savedTheme],
+          [, savedAvatar],
+          [, savedAdultContent],
+          [, savedOngoingTvShows],
+          [, savedIconBackground],
+          [, savedLevel],
+          [, savedLegacy],
+        ] = await AsyncStorage.multiGet([
+          "showSnow",
+          "selectedLanguage",
+          "selectedTheme",
+          "selectedAvatar",
+          "adultContent",
+          "showOngoingTvShows",
+          "showIconBackground",
+          "imageQualityLevel",
+          "imageQuality", // legacy key — migrated on first read
+        ]);
 
-        // Yeni format: level key (low, medium, good, high, original)
-        const savedLevel = await AsyncStorage.getItem("imageQualityLevel");
-        // Eski format: tmdb size string (w500, w780 vb.)
-        const savedLegacy = await AsyncStorage.getItem("imageQuality");
-
-        if (savedAdultContent !== null) {
+        if (savedAdultContent !== null)
           setAdultContent(JSON.parse(savedAdultContent));
-        }
+
+        if (savedOngoingTvShows !== null)
+          setShowOngoingTvShows(JSON.parse(savedOngoingTvShows));
+
+        if (savedIconBackground !== null)
+          setShowIconBackground(JSON.parse(savedIconBackground));
 
         if (savedLevel !== null && IMAGE_QUALITY_PRESETS[savedLevel]) {
-          // Yeni format
           setImageQualityLevel(savedLevel);
         } else if (savedLegacy !== null) {
-          // Eski format — migrate
           const level = LEGACY_TO_LEVEL[savedLegacy] || "good";
           setImageQualityLevel(level);
           await AsyncStorage.setItem("imageQualityLevel", level);
           await AsyncStorage.removeItem("imageQuality");
         }
 
-        if (savedShowSnow !== null) {
-          setShowSnow(JSON.parse(savedShowSnow));
-        }
-        if (savedLanguage !== null) {
-          setSelectedLanguage(savedLanguage);
-        }
-        if (savedTheme !== null) {
-          setSelectedTheme(savedTheme);
-        }
-        if (savedAvatar !== null) {
-          setSelectedAvatar(JSON.parse(savedAvatar));
-        }
+        if (savedShowSnow !== null) setShowSnow(JSON.parse(savedShowSnow));
+        if (savedLanguage !== null) setSelectedLanguage(savedLanguage);
+        if (savedTheme !== null) setSelectedTheme(savedTheme);
+        if (savedAvatar !== null) setSelectedAvatar(JSON.parse(savedAvatar));
       } catch (error) {
-        Toast.show({
-          type: "error",
-          text1: "Ayarlar yüklenemedi: " + error,
-        });
+        Toast.show({ type: "error", text1: "Ayarlar yüklenemedi: " + error });
       }
     };
     loadSettings();
   }, []);
 
-  /** imageQuality artık { poster, backdrop, logo } objesi */
   const imageQuality = useMemo(
-    () =>
-      IMAGE_QUALITY_PRESETS[imageQualityLevel] ?? IMAGE_QUALITY_PRESETS.good,
+    () => IMAGE_QUALITY_PRESETS[imageQualityLevel] ?? IMAGE_QUALITY_PRESETS.good,
     [imageQualityLevel],
   );
 
-  const changeShowSnow = (newShowSnow) => {
-    setShowSnow(newShowSnow);
-    AsyncStorage.setItem("showSnow", JSON.stringify(newShowSnow)).catch(
-      (error) => {
-        Toast.show({ type: "error", text1: "ShowSnow kaydedilmedi: " + error });
-      },
+  // Stable setters — only close over React's stable setState refs.
+  const changeShowSnow = useCallback((newVal) => {
+    setShowSnow(newVal);
+    AsyncStorage.setItem("showSnow", JSON.stringify(newVal)).catch((e) =>
+      Toast.show({ type: "error", text1: "ShowSnow kaydedilmedi: " + e }),
     );
-  };
+  }, []);
 
-  const changeLanguage = (newLanguage) => {
-    setSelectedLanguage(newLanguage);
-    AsyncStorage.setItem("selectedLanguage", newLanguage).catch((error) => {
-      Toast.show({ type: "error", text1: "Dil kaydedilemedi: " + error });
-    });
-  };
+  const changeLanguage = useCallback((newVal) => {
+    setSelectedLanguage(newVal);
+    AsyncStorage.setItem("selectedLanguage", newVal).catch((e) =>
+      Toast.show({ type: "error", text1: "Dil kaydedilemedi: " + e }),
+    );
+  }, []);
 
-  const changeTheme = (newTheme) => {
-    setSelectedTheme(newTheme);
-    AsyncStorage.setItem("selectedTheme", newTheme).catch((error) => {
-      Toast.show({ type: "error", text1: "Tema kaydedilemedi: " + error });
-    });
-  };
+  const changeTheme = useCallback((newVal) => {
+    setSelectedTheme(newVal);
+    AsyncStorage.setItem("selectedTheme", newVal).catch((e) =>
+      Toast.show({ type: "error", text1: "Tema kaydedilemedi: " + e }),
+    );
+  }, []);
 
-  const changeAvatar = (userId, newAvatar) => {
+  const changeAvatar = useCallback((userId, newAvatar) => {
     setSelectedAvatar(newAvatar);
-    AsyncStorage.setItem(`avatar_${userId}`, JSON.stringify(newAvatar)).catch(
-      (error) => {
-        Toast.show({ type: "error", text1: "Avatar kaydedilemedi: " + error });
-      },
+    AsyncStorage.setItem(
+      `avatar_${userId}`,
+      JSON.stringify(newAvatar),
+    ).catch((e) =>
+      Toast.show({ type: "error", text1: "Avatar kaydedilemedi: " + e }),
     );
-  };
+  }, []);
 
-  const chaneAdultContent = (newContent) => {
-    setAdultContent(newContent);
-    AsyncStorage.setItem("adultContent", JSON.stringify(newContent)).catch(
-      (error) => {
-        Toast.show({ type: "error", text1: "Content kaydedilemedi: " + error });
-      },
+  const chaneAdultContent = useCallback((newVal) => {
+    setAdultContent(newVal);
+    AsyncStorage.setItem("adultContent", JSON.stringify(newVal)).catch((e) =>
+      Toast.show({ type: "error", text1: "Content kaydedilemedi: " + e }),
     );
-  };
+  }, []);
 
-  /**
-   * @param {string} level - "low" | "medium" | "good" | "high" | "original"
-   */
-  const changeImageQuality = (level) => {
+  const changeShowOngoingTvShows = useCallback((newVal) => {
+    setShowOngoingTvShows(newVal);
+    AsyncStorage.setItem("showOngoingTvShows", JSON.stringify(newVal)).catch((e) =>
+      Toast.show({ type: "error", text1: "Devam eden diziler ayarı kaydedilemedi: " + e }),
+    );
+  }, []);
+
+  const changeShowIconBackground = useCallback((newVal) => {
+    setShowIconBackground(newVal);
+    AsyncStorage.setItem("showIconBackground", JSON.stringify(newVal)).catch((e) =>
+      Toast.show({ type: "error", text1: "İkon arka plan ayarı kaydedilemedi: " + e }),
+    );
+  }, []);
+
+  const changeImageQuality = useCallback((level) => {
     if (!IMAGE_QUALITY_PRESETS[level]) return;
-
     setImageQualityLevel(level);
-    AsyncStorage.setItem("imageQualityLevel", level).catch((error) => {
-      Toast.show({ type: "error", text1: "Kalite kaydedilemedi: " + error });
-    });
-  };
-  // ✅ YENİ — doğrudan statik referans
-  const RAW_KEY = process.env.EXPO_PUBLIC_API_KEY || "....";
-  const apiKey =
-    RAW_KEY && !RAW_KEY.startsWith("Bearer ") ? `Bearer ${RAW_KEY}` : RAW_KEY;
+    AsyncStorage.setItem("imageQualityLevel", level).catch((e) =>
+      Toast.show({ type: "error", text1: "Kalite kaydedilemedi: " + e }),
+    );
+  }, []);
 
-  const value = {
-    showSnow,
-    changeShowSnow,
-    selectedLanguage,
-    changeLanguage,
-    selectedTheme,
-    changeTheme,
-    selectedAvatar,
-    changeAvatar,
-    adultContent,
-    chaneAdultContent,
-    /** { poster: string, backdrop: string, logo: string } */
-    imageQuality,
-    /** "low" | "medium" | "good" | "high" | "original" */
-    imageQualityLevel,
-    changeImageQuality,
-    API_KEY: apiKey,
-  };
+  const value = useMemo(
+    () => ({
+      showSnow,
+      changeShowSnow,
+      selectedLanguage,
+      changeLanguage,
+      selectedTheme,
+      changeTheme,
+      selectedAvatar,
+      changeAvatar,
+      adultContent,
+      chaneAdultContent,
+      showOngoingTvShows,
+      changeShowOngoingTvShows,
+      imageQuality,
+      imageQualityLevel,
+      changeImageQuality,
+      API_KEY,
+    }),
+    [
+      showSnow,
+      selectedLanguage,
+      selectedTheme,
+      selectedAvatar,
+      adultContent,
+      imageQuality,
+      imageQualityLevel,
+      changeShowSnow,
+      changeLanguage,
+      changeTheme,
+      changeAvatar,
+      chaneAdultContent,
+      showOngoingTvShows,
+      changeShowOngoingTvShows,
+      showIconBackground,
+      changeShowIconBackground,
+      changeImageQuality,
+    ],
+  );
+
+  const languageValue = useMemo(
+    () => ({
+      selectedLanguage,
+      changeLanguage,
+    }),
+    [selectedLanguage, changeLanguage],
+  );
+
+  const themeValue = useMemo(
+    () => ({
+      selectedTheme,
+      changeTheme,
+    }),
+    [selectedTheme, changeTheme],
+  );
+
+  const snowValue = useMemo(
+    () => ({
+      showSnow,
+      changeShowSnow,
+    }),
+    [showSnow, changeShowSnow],
+  );
+
+  const contentValue = useMemo(
+    () => ({
+      adultContent,
+      chaneAdultContent,
+    }),
+    [adultContent, chaneAdultContent],
+  );
+
+  const ongoingTvShowsValue = useMemo(
+    () => ({
+      showOngoingTvShows,
+      changeShowOngoingTvShows,
+    }),
+    [showOngoingTvShows, changeShowOngoingTvShows],
+  );
+
+  const iconBackgroundValue = useMemo(
+    () => ({
+      showIconBackground,
+      changeShowIconBackground,
+    }),
+    [showIconBackground, changeShowIconBackground],
+  );
+
+  const getTmdbUrl = useCallback(
+    (path, type, expectedWidth) => {
+      return buildTmdbUrl(path, type, expectedWidth, imageQualityLevel);
+    },
+    [imageQualityLevel]
+  );
+
+  const imageQualityValue = useMemo(
+    () => ({
+      imageQuality,
+      imageQualityLevel,
+      changeImageQuality,
+      getTmdbUrl,
+    }),
+    [imageQuality, imageQualityLevel, changeImageQuality, getTmdbUrl],
+  );
+
+  const avatarValue = useMemo(
+    () => ({
+      selectedAvatar,
+      changeAvatar,
+    }),
+    [selectedAvatar, changeAvatar],
+  );
+
+  const apiValue = useMemo(() => ({ API_KEY }), []);
 
   return (
-    <AppSettingsContext.Provider value={value}>
-      {children}
-    </AppSettingsContext.Provider>
+    <ApiSettingsContext.Provider value={apiValue}>
+      <LanguageSettingsContext.Provider value={languageValue}>
+        <ThemeSettingsContext.Provider value={themeValue}>
+          <SnowSettingsContext.Provider value={snowValue}>
+            <ContentSettingsContext.Provider value={contentValue}>
+              <OngoingTvShowsSettingsContext.Provider value={ongoingTvShowsValue}>
+                <IconBackgroundSettingsContext.Provider value={iconBackgroundValue}>
+                  <ImageQualitySettingsContext.Provider value={imageQualityValue}>
+                    <AvatarSettingsContext.Provider value={avatarValue}>
+                      <AppSettingsContext.Provider value={value}>
+                        {children}
+                      </AppSettingsContext.Provider>
+                    </AvatarSettingsContext.Provider>
+                  </ImageQualitySettingsContext.Provider>
+                </IconBackgroundSettingsContext.Provider>
+              </OngoingTvShowsSettingsContext.Provider>
+            </ContentSettingsContext.Provider>
+          </SnowSettingsContext.Provider>
+        </ThemeSettingsContext.Provider>
+      </LanguageSettingsContext.Provider>
+    </ApiSettingsContext.Provider>
   );
 };
 
 export const useAppSettings = () => {
   const context = useContext(AppSettingsContext);
   if (context === undefined) {
-    throw new Error(
-      "useAppSettings must be used within an AppSettingsProvider",
-    );
+    throw new Error("useAppSettings must be used within an AppSettingsProvider");
   }
   return context;
 };
+
+const useRequiredContext = (context, name) => {
+  const value = useContext(context);
+  if (value === undefined) {
+    throw new Error(`${name} must be used within an AppSettingsProvider`);
+  }
+  return value;
+};
+
+export const useLanguageSettings = () =>
+  useRequiredContext(LanguageSettingsContext, "useLanguageSettings");
+
+export const useThemeSettings = () =>
+  useRequiredContext(ThemeSettingsContext, "useThemeSettings");
+
+export const useSnowSettings = () =>
+  useRequiredContext(SnowSettingsContext, "useSnowSettings");
+
+export const useContentSettings = () =>
+  useRequiredContext(ContentSettingsContext, "useContentSettings");
+
+export const useOngoingTvShowsSettings = () =>
+  useRequiredContext(
+    OngoingTvShowsSettingsContext,
+    "useOngoingTvShowsSettings",
+  );
+
+export const useIconBackgroundSettings = () =>
+  useRequiredContext(
+    IconBackgroundSettingsContext,
+    "useIconBackgroundSettings",
+  );
+
+export const useImageQualitySettings = () =>
+  useRequiredContext(ImageQualitySettingsContext, "useImageQualitySettings");
+
+export const useAvatarSettings = () =>
+  useRequiredContext(AvatarSettingsContext, "useAvatarSettings");
+
+export const useApiSettings = () =>
+  useRequiredContext(ApiSettingsContext, "useApiSettings");

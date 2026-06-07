@@ -1,15 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   StyleSheet,
   View,
   Text,
   FlatList,
-  Image,
   Dimensions,
   Animated,
   TouchableOpacity,
   StatusBar,
 } from "react-native";
+import { Image } from "expo-image";
 import { MovieCardSkeleton } from "../../components/Skeleton";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -19,19 +19,20 @@ import RatingStars from "../../components/RatingStars";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../context/AppSettingsContext";
 const { width, height } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.6;
 const CARD_HEIHGT = height * 0.45;
 const SPACING = width * 0.02;
 const ITEM_SIZE = CARD_WIDTH;
 const EMPTY_ITEM_SIZE = (width - CARD_WIDTH) / 2;
+const INITIAL_CARD_RENDER_COUNT = 4;
 
 export default function TvShowsTrends({ navigation }) {
   const scrollX = React.useRef(new Animated.Value(0)).current;
   const { t } = useLanguage();
   const { theme } = useTheme();
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const {
     seriesTrend,
     loadingTrend,
@@ -39,24 +40,24 @@ export default function TvShowsTrends({ navigation }) {
     selectedCategoryTrend,
     getCategoryTitleTrends,
     categoriesTrends,
+    activateTvSection,
   } = useTvShow();
 
-  // Animated import'unun eklendiğinden emin olun
-  const [scaleValues, setScaleValues] = useState({});
-
   useEffect(() => {
-    const newScaleValues = {};
-    if (seriesTrend && seriesTrend.length > 0) {
-      seriesTrend.forEach((item) => {
-        newScaleValues[item.id] = new Animated.Value(1);
-      });
-      setScaleValues(newScaleValues);
+    activateTvSection("trends");
+  }, [activateTvSection]);
+
+  // Animated import'unun eklendiğinden emin olun
+  const scaleValuesRef = useRef({});
+  const getScaleValue = (itemId) => {
+    if (!scaleValuesRef.current[itemId]) {
+      scaleValuesRef.current[itemId] = new Animated.Value(1);
     }
-  }, [seriesTrend]);
+    return scaleValuesRef.current[itemId];
+  };
 
   const onPressIn = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
+    Animated.timing(getScaleValue(itemId), {
       toValue: 0.9,
       duration: 200,
       useNativeDriver: true,
@@ -64,8 +65,7 @@ export default function TvShowsTrends({ navigation }) {
   };
 
   const onPressOut = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
+    Animated.timing(getScaleValue(itemId), {
       toValue: 1,
       duration: 200,
       useNativeDriver: true,
@@ -128,7 +128,7 @@ export default function TvShowsTrends({ navigation }) {
         style={{
           width: ITEM_SIZE,
           height: CARD_HEIHGT,
-          transform: [{ scale: scaleValues[item.id] || 1 }],
+          transform: [{ scale: getScaleValue(item.id) }],
         }}
       >
         <TouchableOpacity
@@ -151,8 +151,10 @@ export default function TvShowsTrends({ navigation }) {
             <Image
               style={styles.poster}
               source={{
-                uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                uri: getTmdbUrl(item.poster_path, 'poster', 200),
               }}
+              cachePolicy="memory-disk"
+              transition={120}
             />
           </Animated.View>
           <Animated.View
@@ -302,11 +304,15 @@ export default function TvShowsTrends({ navigation }) {
           />
         </View>
         <Animated.FlatList
-          data={[1, 2, 3, 4, 5]}
+          data={[1, 2, 3]}
           renderItem={(index) => <MovieCardSkeleton index={index} />}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: EMPTY_ITEM_SIZE }}
+          initialNumToRender={3}
+          maxToRenderPerBatch={3}
+          windowSize={3}
+          removeClippedSubviews
         />
       </View>
     );
@@ -336,6 +342,11 @@ export default function TvShowsTrends({ navigation }) {
         snapToAlignment="start"
         decelerationRate="normal"
         bounces={true}
+        initialNumToRender={INITIAL_CARD_RENDER_COUNT}
+        maxToRenderPerBatch={INITIAL_CARD_RENDER_COUNT}
+        updateCellsBatchingPeriod={80}
+        windowSize={5}
+        removeClippedSubviews
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
           { useNativeDriver: true },

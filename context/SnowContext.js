@@ -1,47 +1,20 @@
-import React, { createContext, useState, useEffect, useContext } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import Toast from "react-native-toast-message";
+import React, { createContext, useContext, useMemo } from "react";
+import { useSnowSettings } from "./AppSettingsContext";
 
 const SnowContext = createContext();
 
 export const SnowProvider = ({ children }) => {
-  const [showSnow, setShowSnow] = useState(false);
+  const { showSnow, changeShowSnow } = useSnowSettings();
+  const value = useMemo(
+    () => ({ showSnow, changeShowSnow }),
+    [showSnow, changeShowSnow],
+  );
 
-  useEffect(() => {
-    const loadShowSnow = async () => {
-      try {
-        const savedShowSnow = await AsyncStorage.getItem("showSnow");
-        if (savedShowSnow !== null) {
-          setShowSnow(JSON.parse(savedShowSnow));
-        }
-      } catch (error) {
-        Toast.show({
-          type: "error",
-          text1: "ShowSnow yüklenemedi:" + error,
-        });
-      }
-    };
-    loadShowSnow();
-  }, []);
-
-  const changeShowSnow = async (newShowSnow) => {
-    setShowSnow(newShowSnow);
-    try {
-      await AsyncStorage.setItem("showSnow", JSON.stringify(newShowSnow));
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "ShowSnow kaydedilmedi:" + error,
-      });
-    }
-  };
-
-  const value = {
-    showSnow,
-    changeShowSnow,
-  };
-
-  return <SnowContext.Provider value={value}>{children}</SnowContext.Provider>;
+  return (
+    <SnowContext.Provider value={value}>
+      {children}
+    </SnowContext.Provider>
+  );
 };
 
 export const useSnow = () => {

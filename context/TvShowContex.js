@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState, useRef, useMemo } from "react";
-import { useAppSettings } from "./AppSettingsContext";
+import { createContext, useContext, useCallback, useEffect, useState, useRef, useMemo } from "react";
+import { useApiSettings } from "./AppSettingsContext";
 import Toast from "react-native-toast-message";
 import { useLanguage } from "./LanguageContext";
 import { useAuth } from "./AuthContext";
@@ -7,17 +7,31 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
+import { getCachedValue, setCachedValue, TTL } from "../utils/apiCache";
 
 const TvShowContext = createContext();
 export const useTvShow = () => useContext(TvShowContext);
 
+const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const setIfChanged = (setter, next) => {
+  setter((current) => (sameJson(current, next) ? current : next));
+};
+
 export const TvShowProvider = ({ children }) => {
+  const [activeSections, setActiveSections] = useState({});
+  const activateTvSection = useCallback((section) => {
+    setActiveSections((current) => {
+      if (current[section]) return current;
+      return { ...current, [section]: true };
+    });
+  }, []);
+
   const [seriesTrend, setSeriesTrend] = useState([]);
   const [loadingTrend, setLoadingTren] = useState(true);
   const [selectedCategoryTrend, setSelectedCategoryTrend] = useState("week");
   const [selectedCategoryTrendShow, setSelectedCategoryTrendShow] =
     useState("trending");
-  const { API_KEY } = useAppSettings();
+  const { API_KEY } = useApiSettings();
   const { language } = useLanguage();
   const { t } = useLanguage();
   const { user } = useAuth();
@@ -48,7 +62,7 @@ export const TvShowProvider = ({ children }) => {
     const docRef = doc(db, "Lists", uid);
     unsubRef.current = onSnapshot(docRef, (snap) => {
       const raw = processShows(snap.exists() ? snap.data().watchedTv || [] : []);
-      setWatchedTvShows(raw);
+      setIfChanged(setWatchedTvShows, raw);
       setLoadingWatchedTv(false);
       AsyncStorage.setItem(WATCHED_TV_CACHE, JSON.stringify(raw)).catch(() => {});
     });
@@ -61,7 +75,7 @@ export const TvShowProvider = ({ children }) => {
       AsyncStorage.getItem("cachedUserId"),
     ]).then(([cached, cachedUid]) => {
       if (cached) {
-        setWatchedTvShows(JSON.parse(cached));
+        setIfChanged(setWatchedTvShows, JSON.parse(cached));
         setLoadingWatchedTv(false);
       }
       if (cachedUid) startListener(cachedUid);
@@ -95,6 +109,15 @@ export const TvShowProvider = ({ children }) => {
   };
 
   const fetchSeriesTrends = async () => {
+    const lang = language === "tr" ? "tr-TR" : "en-US";
+    const cacheKey = `tv_trends_${lang}_${selectedCategoryTrend}_${selectedCategoryTrendShow}`;
+    const cached = await getCachedValue(cacheKey, TTL.TREND);
+    if (cached) {
+      setIfChanged(setSeriesTrend, cached);
+      setLoadingTren(false);
+      return;
+    }
+
     setLoadingTren(true);
     const options = {
       method: "GET",
@@ -102,34 +125,31 @@ export const TvShowProvider = ({ children }) => {
       params: {
         include_adult: "false",
         include_null_first_air_dates: "false",
-        language: language === "tr" ? "tr-TR" : "en-US",
+        language: lang,
         page: "1",
       },
-      headers: {
-        accept: "application/json",
-        Authorization: API_KEY,
-      },
+      headers: { accept: "application/json", Authorization: API_KEY },
     };
 
     try {
       const response = await axios.request(options);
-      setSeriesTrend([
+      const data = [
         { id: "left-spacer" },
         ...response.data.results,
         { id: "right-spacer" },
-      ]);
+      ];
+      setIfChanged(setSeriesTrend, data);
+      setCachedValue(cacheKey, data);
     } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "error:" + error,
-      });
+      Toast.show({ type: "error", text1: "error:" + error });
     } finally {
       setLoadingTren(false);
     }
   };
   useEffect(() => {
+    if (!activeSections.trends) return;
     fetchSeriesTrends();
-  }, [selectedCategoryTrend, selectedCategoryTrendShow, language]);
+  }, [activeSections.trends, selectedCategoryTrend, selectedCategoryTrendShow, language]);
 
   const [seriesBest, setSeriesBest] = useState([]);
   const [loadingBest, setLoadingBest] = useState(true);
@@ -152,6 +172,16 @@ export const TvShowProvider = ({ children }) => {
   };
 
   const fetchSeriesBest = async () => {
+    const lang = language === "tr" ? "tr-TR" : "en-US";
+    const cacheKey = `tv_bests_${lang}_${selectedCategoryBestShow}_${selectedCategoryBest}_page_${pageBest}`;
+    const cached = await getCachedValue(cacheKey, TTL.TREND);
+    if (cached) {
+      setIfChanged(setSeriesBest, cached.results);
+      setTotalPagesBest(cached.total_pages);
+      setLoadingBest(false);
+      return;
+    }
+
     setLoadingBest(true);
     const options = {
       method: "GET",
@@ -159,33 +189,32 @@ export const TvShowProvider = ({ children }) => {
       params: {
         include_adult: "false",
         include_null_first_air_dates: "false",
-        language: language === "tr" ? "tr-TR" : "en-US",
+        language: lang,
         page: pageBest,
         sort_by: `${selectedCategoryBest}.desc`,
         "vote_count.gte": "500",
       },
-      headers: {
-        accept: "application/json",
-        Authorization: API_KEY,
-      },
+      headers: { accept: "application/json", Authorization: API_KEY },
     };
 
     try {
       const response = await axios.request(options);
-      setSeriesBest(response.data.results);
-      setTotalPagesBest(response.data.total_pages); // Filmleri ekrana yazdır
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "error:" + error,
+      setIfChanged(setSeriesBest, response.data.results);
+      setTotalPagesBest(response.data.total_pages);
+      setCachedValue(cacheKey, {
+        results: response.data.results,
+        total_pages: response.data.total_pages,
       });
+    } catch (error) {
+      Toast.show({ type: "error", text1: "error:" + error });
     } finally {
       setLoadingBest(false);
     }
   };
   useEffect(() => {
+    if (!activeSections.best) return;
     fetchSeriesBest();
-  }, [selectedCategoryBest, selectedCategoryBestShow, language, pageBest]);
+  }, [activeSections.best, selectedCategoryBest, selectedCategoryBestShow, language, pageBest]);
 
   const [moviesAiringToday, setMoviesAiringToday] = useState([]); // Filmler için yeni durum ekleyin
   const [totalPagesAiringToday, setTotalPagesAiringToday] = useState([]); // Filmler için yeni durum ekleyin
@@ -193,25 +222,35 @@ export const TvShowProvider = ({ children }) => {
   const [pageAiringToday, setPageAiringToday] = useState(1); // loading durumu ekleyin
 
   const fetchAiringToday = async () => {
+    const cacheKey = `tv_airing_today_${language}_page_${pageAiringToday}`;
+    const cached = await getCachedValue(cacheKey, TTL.NOW_PLAYING);
+    if (cached) {
+      setIfChanged(setMoviesAiringToday, cached.results);
+      setTotalPagesAiringToday(cached.total_pages);
+      setLoadingAiringToday(false);
+      return;
+    }
+
     setLoadingAiringToday(true);
     try {
-      const url = `https://api.themoviedb.org/3/tv/airing_today?include_adult=false&include_video=false&language=${language}&region=${language == "tr-TR" ? "tr" : "us"}&page=${pageAiringToday}&sort_by=popularity.desc`; // API'den filmleri çekmek için URL
-      const headers = {
-        Authorization: API_KEY,
-      };
-
-      const response = await axios.get(url, { headers });
-      setMoviesAiringToday(response.data.results); // Filmleri ekrana yazdır
-      setTotalPagesAiringToday(response.data.total_pages); // Filmleri ekrana yazdır
+      const url = `https://api.themoviedb.org/3/tv/airing_today?include_adult=false&include_video=false&language=${language}&region=${language == "tr-TR" ? "tr" : "us"}&page=${pageAiringToday}&sort_by=popularity.desc`;
+      const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+      setIfChanged(setMoviesAiringToday, response.data.results);
+      setTotalPagesAiringToday(response.data.total_pages);
+      setCachedValue(cacheKey, {
+        results: response.data.results,
+        total_pages: response.data.total_pages,
+      });
     } catch (err) {
-      console.error("Yakında çıkacak filmleri çekerken hata:", err.message);
+      if (__DEV__) console.error("Yakında çıkacak filmleri çekerken hata:", err.message);
     } finally {
       setLoadingAiringToday(false);
     }
   };
   useEffect(() => {
+    if (!activeSections.airingToday) return;
     fetchAiringToday();
-  }, [language, pageAiringToday]);
+  }, [activeSections.airingToday, language, pageAiringToday]);
 
   const [providers, setProviders] = useState([]);
   const [selectedProvider, setSelectedProvider] = useState(null);
@@ -222,46 +261,60 @@ export const TvShowProvider = ({ children }) => {
 
   // Sağlayıcıları çek
   useEffect(() => {
+    if (!activeSections.providers) return;
     fetchProviders();
-  }, [language]);
+  }, [activeSections.providers, language]);
 
   const fetchProviders = async () => {
+    const cacheKey = `tv_providers_${language}`;
+    const cached = await getCachedValue(cacheKey, TTL.PROVIDERS);
+    if (cached) {
+      setIfChanged(setProviders, cached);
+      if (cached.length > 0) {
+        setSelectedProvider(cached[0].provider_id);
+        fetchMoviesByProvider(cached[0].provider_id);
+      }
+      setLoadingProvider(false);
+      return;
+    }
+
     setLoadingProvider(true);
     try {
       const url = `https://api.themoviedb.org/3/watch/providers/tv?language=${language}&watch_region=${language == "tr-TR" ? "tr" : "us"}`;
-      const headers = {
-        Authorization: API_KEY,
-      };
-      const response = await axios.get(url, { headers });
-      setProviders(response.data.results);
-      if (response.data.results.length > 0) {
-        const firstProvider = response.data.results[0];
-        setSelectedProvider(firstProvider.provider_id);
-        fetchMoviesByProvider(firstProvider.provider_id);
+      const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+      const results = response.data.results;
+      setIfChanged(setProviders, results);
+      setCachedValue(cacheKey, results);
+      if (results.length > 0) {
+        setSelectedProvider(results[0].provider_id);
+        fetchMoviesByProvider(results[0].provider_id);
       }
     } catch (err) {
-      console.error("Sağlayıcıları çekerken hata:", err.message);
+      if (__DEV__) console.error("Sağlayıcıları çekerken hata:", err.message);
     } finally {
       setLoadingProvider(false);
     }
   };
 
-  // Seçilen sağlayıcıya göre filmleri çek
+  // Seçilen sağlayıcıya göre dizileri çek
   const fetchMoviesByProvider = async (providerId) => {
+    const cacheKey = `tv_provider_${language}_${providerId}`;
+    const cached = await getCachedValue(cacheKey, TTL.PROVIDERS);
+    if (cached) {
+      setIfChanged(setMoviesProviders, cached);
+      setLoadingMoviesByProvider(false);
+      return;
+    }
+
     setLoadingMoviesByProvider(true);
     setSelectedProvider(providerId);
-
     try {
-      let url = `https://api.themoviedb.org/3/discover/tv?watch_region=${language == "tr-TR" ? "TR" : "US"}&with_watch_providers=${providerId}&sort_by=vote_count.desc`;
-
-      const headers = {
-        Authorization: API_KEY, // Buraya kendi API keyini koy
-      };
-
-      const response = await axios.get(url, { headers });
-      setMoviesProviders(response.data.results);
+      const url = `https://api.themoviedb.org/3/discover/tv?watch_region=${language == "tr-TR" ? "TR" : "US"}&with_watch_providers=${providerId}&sort_by=vote_count.desc`;
+      const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+      setIfChanged(setMoviesProviders, response.data.results);
+      setCachedValue(cacheKey, response.data.results);
     } catch (err) {
-      console.error("Filmleri çekerken hata:", err.message);
+      if (__DEV__) console.error("Filmleri çekerken hata:", err.message);
     } finally {
       setLoadingMoviesByProvider(false);
     }
@@ -273,19 +326,22 @@ export const TvShowProvider = ({ children }) => {
   const [loadingGenres, setLoadingGenres] = useState(true); // loading durumu ekleyin
   const [pageGenres, setPageGenres] = useState(1); // loading durumu ekleyin
 
-  // Film türlerini API'den almak
   const tvGenres = async () => {
-    setLoadingGenres(true);
+    const cacheKey = `tv_genres_${language}`;
+    const cached = await getCachedValue(cacheKey, TTL.GENRES);
+    if (cached) {
+      setIfChanged(setGenres, cached);
+      setLoadingGenres(false);
+      return;
+    }
+
     try {
       const url = `https://api.themoviedb.org/3/genre/tv/list?language=${language}`;
-      const headers = {
-        Authorization: API_KEY,
-      };
-      const response = await axios.get(url, { headers });
-      const genres = response.data.genres;
-      setGenres(genres);
+      const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+      setIfChanged(setGenres, response.data.genres);
+      setCachedValue(cacheKey, response.data.genres);
     } catch (err) {
-      console.error(err.message);
+      if (__DEV__) console.error(err.message);
     } finally {
       setLoadingGenres(false);
     }
@@ -294,31 +350,35 @@ export const TvShowProvider = ({ children }) => {
   // Seçilen türlere göre filmleri almak
 
   const fetchTvByGenres = async () => {
+    const genresKey = [...selectedGenres].sort().join(",");
+    const cacheKey = `tv_genres_content_${language}_p${pageGenres}_g${genresKey}`;
+    const cached = await getCachedValue(cacheKey, TTL.TREND);
+    if (cached) {
+      setIfChanged(setMoviesGenres, cached);
+      setLoadingGenres(false);
+      return;
+    }
+
     setLoadingGenres(true);
     try {
       let url = `https://api.themoviedb.org/3/discover/tv?language=${language}&page=${pageGenres}`;
-
       if (selectedGenres.length > 0) {
-        const genreIds = selectedGenres.join(",");
-        url += `&with_genres=${genreIds}`;
+        url += `&with_genres=${genresKey}`;
       }
-
-      const headers = {
-        Authorization: API_KEY,
-      };
-
-      const response = await axios.get(url, { headers });
-      setMoviesGenres(response.data.results);
+      const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+      setIfChanged(setMoviesGenres, response.data.results);
+      setCachedValue(cacheKey, response.data.results);
     } catch (err) {
-      console.error(err.message);
+      if (__DEV__) console.error(err.message);
     } finally {
       setLoadingGenres(false);
     }
   };
   useEffect(() => {
+    if (!activeSections.genres) return;
     tvGenres();
     fetchTvByGenres();
-  }, [language, pageGenres, selectedGenres]);
+  }, [activeSections.genres, language, pageGenres, selectedGenres]);
 
   const [moviesOnTheAir, setMoviesOnTheAir] = useState([]); // Filmler için yeni durum ekleyin
   const [totalPagesOnTheAir, setTotalPagesOnTheAir] = useState([]); // Filmler için yeni durum ekleyin
@@ -328,25 +388,35 @@ export const TvShowProvider = ({ children }) => {
   // Film türlerini API'den almak
 
   const fetchOnTheAir = async () => {
+    const cacheKey = `tv_on_the_air_${language}_page_${pageOnTheAir}`;
+    const cached = await getCachedValue(cacheKey, TTL.NOW_PLAYING);
+    if (cached) {
+      setIfChanged(setMoviesOnTheAir, cached.results);
+      setTotalPagesOnTheAir(cached.total_pages);
+      setLoadingOnTheAir(false);
+      return;
+    }
+
     setLoadingOnTheAir(true);
     try {
-      const url = `https://api.themoviedb.org/3/tv/on_the_air?include_adult=false&include_video=false&language=${language}&region=${language == "tr-TR" ? "tr" : "us"}&page=${pageOnTheAir}&sort_by=popularity.desc`; // API'den filmleri çekmek için URL
-      const headers = {
-        Authorization: API_KEY,
-      };
-
-      const response = await axios.get(url, { headers });
-      setMoviesOnTheAir(response.data.results); // Filmleri ekrana yazdır
-      setTotalPagesOnTheAir(response.data.total_pages); // Filmleri ekrana yazdır
+      const url = `https://api.themoviedb.org/3/tv/on_the_air?include_adult=false&include_video=false&language=${language}&region=${language == "tr-TR" ? "tr" : "us"}&page=${pageOnTheAir}&sort_by=popularity.desc`;
+      const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+      setIfChanged(setMoviesOnTheAir, response.data.results);
+      setTotalPagesOnTheAir(response.data.total_pages);
+      setCachedValue(cacheKey, {
+        results: response.data.results,
+        total_pages: response.data.total_pages,
+      });
     } catch (err) {
-      console.error("Yakında çıkacak filmleri çekerken hata:", err.message);
+      if (__DEV__) console.error("Yakında çıkacak filmleri çekerken hata:", err.message);
     } finally {
       setLoadingOnTheAir(false);
     }
   };
   useEffect(() => {
+    if (!activeSections.onTheAir) return;
     fetchOnTheAir();
-  }, [language, pageOnTheAir]);
+  }, [activeSections.onTheAir, language, pageOnTheAir]);
 
   const contextValue = useMemo(() => ({
     seriesTrend,
@@ -390,6 +460,7 @@ export const TvShowProvider = ({ children }) => {
     setSelectedGenres,
     setPageGenres,
     setPageOnTheAir,
+    activateTvSection,
     getCategoryTitleBest,
     getCategoryTitleTrends,
     watchedTvShows,
@@ -408,7 +479,7 @@ export const TvShowProvider = ({ children }) => {
     selectedProvider, moviesProviders, loadingMoviesByProvider, loadingProvider,
     genres, selectedGenres, pageGenres, moviesGenres, loadingGenres, pageOnTheAir,
     moviesOnTheAir, totalPagesOnTheAir, loadingOnTheAir, categoriesBest,
-    categoriesTrends, refreshing, watchedTvShows, loadingWatchedTv
+    categoriesTrends, refreshing, watchedTvShows, loadingWatchedTv, activateTvSection
   ]);
 
   return (

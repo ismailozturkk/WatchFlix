@@ -4,18 +4,18 @@ import {
   Text,
   TouchableOpacity,
   FlatList,
-  Image,
   Dimensions,
   ActivityIndicator,
   StyleSheet,
   Animated,
 } from "react-native";
+import { Image } from "expo-image";
 import axios from "axios";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { MovieSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -24,8 +24,12 @@ const { width } = Dimensions.get("window");
 export default function MovieNowPlaying({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
-  const { moviesNowPlaying, loadingNowPlaying } = useMovie();
-  const { imageQuality } = useAppSettings();
+  const { moviesNowPlaying, loadingNowPlaying, activateMovieSection } = useMovie();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+
+  useEffect(() => {
+    activateMovieSection("nowPlaying");
+  }, [activateMovieSection]);
 
   // Animated import'unun eklendiğinden emin olun
   const [scaleValues, setScaleValues] = useState({});
@@ -69,11 +73,15 @@ export default function MovieNowPlaying({ navigation }) {
         </Text>
 
         <FlatList
-          data={[1, 2, 3, 4, 5, 6, 7, 8, 9]}
+          data={[1, 2, 3]}
           renderItem={() => <MovieSkeleton />}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 15 }}
+          initialNumToRender={3}
+          maxToRenderPerBatch={3}
+          windowSize={3}
+          removeClippedSubviews
         />
       </View>
     );
@@ -100,11 +108,13 @@ export default function MovieNowPlaying({ navigation }) {
             source={
               item.poster_path
                 ? {
-                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                    uri: getTmdbUrl(item.poster_path, 'poster', 200),
                   }
                 : require("../../assets/image/no_image.png")
             }
             style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+            cachePolicy="memory-disk"
+            transition={120}
           />
 
           <View
@@ -201,6 +211,11 @@ export default function MovieNowPlaying({ navigation }) {
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderMovieItem}
         contentContainerStyle={{ paddingHorizontal: 15 }}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        updateCellsBatchingPeriod={80}
+        windowSize={5}
+        removeClippedSubviews
       />
     </View>
   );

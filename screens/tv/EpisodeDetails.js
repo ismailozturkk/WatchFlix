@@ -19,7 +19,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import LottieView from "lottie-react-native";
 import { useSnow } from "../../context/SnowContext";
 import WatchedAdd from "./WatchedAdd";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import {
+  useApiSettings,
+  useImageQualitySettings,
+  useSnowSettings,
+} from "../../context/AppSettingsContext";
 
 const { width } = Dimensions.get("window");
 
@@ -34,7 +38,7 @@ const PersonCard = memo(({ person, role, imageQuality, theme, onPress }) => (
       {person.profile_path ? (
         <Image
           source={{
-            uri: `https://image.tmdb.org/t/p/${imageQuality}${person.profile_path}`,
+            uri: getTmdbUrl(person.profile_path, 'profile', 200),
           }}
           style={styles.personImage}
         />
@@ -140,7 +144,9 @@ export default function EpisodeDetails({ route, navigation }) {
 
   const { t, language } = useLanguage();
   const { theme } = useTheme();
-  const { API_KEY, showSnow, imageQuality } = useAppSettings();
+  const { API_KEY } = useApiSettings();
+  const { showSnow } = useSnowSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
 
   const formatDate = useCallback(
     (timestamp) =>
@@ -219,7 +225,7 @@ export default function EpisodeDetails({ route, navigation }) {
         {details.still_path ? (
           <Image
             source={{
-              uri: `https://image.tmdb.org/t/p/original${details.still_path}`,
+              uri: getTmdbUrl(details.still_path, 'backdrop', 1000),
             }}
             style={styles.heroImage}
           />

@@ -6,7 +6,6 @@ import Animated, {
   withSpring,
   interpolateColor,
 } from "react-native-reanimated";
-import { useTheme } from "../context/ThemeContext";
 
 export default function SwitchToggle({
   value = false,
@@ -18,8 +17,6 @@ export default function SwitchToggle({
   disabledColor = "#757575ad",
   disabled = false,
 }) {
-  const { theme } = useTheme();
-
   // Reanimated shared value: represents 0 for off, 1 for on
   const progress = useSharedValue(value ? 1 : 0);
 
@@ -35,7 +32,16 @@ export default function SwitchToggle({
 
   const toggle = () => {
     if (!disabled) {
-      onValueChange(!value);
+      const nextValue = !value;
+      // Anında (optimistic) animasyonu başlat
+      progress.value = withSpring(nextValue ? 1 : 0, {
+        mass: 0.5,
+        damping: 12,
+        stiffness: 150,
+        overshootClamping: false,
+      });
+      // Daha sonra state'i güncelle (gecikmeyi önler)
+      onValueChange(nextValue);
     }
   };
 

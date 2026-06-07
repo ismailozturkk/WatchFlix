@@ -4,15 +4,15 @@ import {
   Text,
   TouchableOpacity,
   FlatList,
-  Image,
   Dimensions,
   StyleSheet,
   Animated,
 } from "react-native";
+import { Image } from "expo-image";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { MovieSkeleton } from "../../components/Skeleton";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -21,7 +21,7 @@ const { width } = Dimensions.get("window");
 export default function MovieProviders({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   // Sağlayıcıları çek
   const {
     selectedProvider,
@@ -30,7 +30,12 @@ export default function MovieProviders({ navigation }) {
     loadingMovieProvider,
     moviesProvider,
     fetchMoviesByProvider,
+    activateMovieSection,
   } = useMovie();
+
+  useEffect(() => {
+    activateMovieSection("providers");
+  }, [activateMovieSection]);
 
   // Animated import'unun eklendiğinden emin olun
   const [scaleValues, setScaleValues] = useState({});
@@ -82,9 +87,11 @@ export default function MovieProviders({ navigation }) {
     >
       <Image
         source={{
-          uri: `https://image.tmdb.org/t/p/${imageQuality.logo}${item.logo_path}`,
+          uri: getTmdbUrl(item.logo_path, 'logo', 150),
         }}
         style={{ width: 30, height: 30, borderRadius: 10 }}
+        cachePolicy="memory-disk"
+        transition={120}
       />
       <View
         style={{
@@ -128,11 +135,13 @@ export default function MovieProviders({ navigation }) {
             source={
               item.poster_path
                 ? {
-                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                    uri: getTmdbUrl(item.poster_path, 'poster', 200),
                   }
                 : require("../../assets/image/no_image.png")
             }
             style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+            cachePolicy="memory-disk"
+            transition={120}
           />
 
           <View
@@ -229,11 +238,15 @@ export default function MovieProviders({ navigation }) {
           }}
         />
         <FlatList
-          data={[1, 2, 3, 4, 5, 6, 7, 8, 9]}
+          data={[1, 2, 3]}
           renderItem={() => <MovieSkeleton />}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 15 }}
+          initialNumToRender={3}
+          maxToRenderPerBatch={3}
+          windowSize={3}
+          removeClippedSubviews
         />
       </View>
     );
@@ -259,6 +272,11 @@ export default function MovieProviders({ navigation }) {
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderMovieItem}
         contentContainerStyle={{ paddingHorizontal: 15, marginTop: 20 }}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        updateCellsBatchingPeriod={80}
+        windowSize={5}
+        removeClippedSubviews
       />
     </View>
   );

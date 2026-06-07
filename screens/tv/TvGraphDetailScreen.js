@@ -21,7 +21,11 @@ import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import LottieView from "lottie-react-native";
 import { useTheme } from "../../context/ThemeContext";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import {
+  useApiSettings,
+  useImageQualitySettings,
+  useSnowSettings,
+} from "../../context/AppSettingsContext";
 
 // ─── Rating Renk Sistemi ──────────────────────────────────────────────────────
 const RATING_TIERS = [
@@ -151,7 +155,9 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
 
   const { t, language } = useLanguage();
   const { theme } = useTheme();
-  const { showSnow, imageQuality, API_KEY } = useAppSettings();
+  const { showSnow } = useSnowSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { API_KEY } = useApiSettings();
 
   // Animasyon ref'i – panel geçişi için
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -348,8 +354,8 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
         <Image
           source={{
             uri: selectedEpisodeData?.still_path
-              ? `https://image.tmdb.org/t/p/${imageQuality.backdrop}${selectedEpisodeData.still_path}`
-              : `https://image.tmdb.org/t/p/${imageQuality.backdrop}${showDetail.backdrop_path}`,
+              ? getTmdbUrl(selectedEpisodeData.still_path, 'backdrop', 1000)
+              : getTmdbUrl(showDetail.backdrop_path, 'backdrop', 1000),
           }}
           style={styles.panelBackdrop}
           blurRadius={1}
@@ -363,8 +369,8 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
           <Image
             source={{
               uri: selectedEpisodeData?.still_path
-                ? `https://image.tmdb.org/t/p/${imageQuality.poster}${selectedEpisodeData.still_path}`
-                : `https://image.tmdb.org/t/p/${imageQuality.poster}${showDetail.poster_path}`,
+                ? getTmdbUrl(selectedEpisodeData.still_path, 'poster', 200)
+                : getTmdbUrl(showDetail.poster_path, 'poster', 200),
             }}
             style={selectedEpisodeData ? styles.panelStill : styles.panelPoster}
           />

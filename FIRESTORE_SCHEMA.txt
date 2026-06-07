@@ -1,0 +1,582 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║              WhatchFlix — Firestore Veritabanı Yapısı (Mevcut)             ║
+║                           Tarih: 2026-04-30                                ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Firestore Root
+│
+├── Lists/
+│   └── {uid}                              ← TEK DÖKÜMAN / kullanıcı başı
+│       ├── watchedMovies: array           ⚠ Büyük array — tüm izlenen filmler
+│       │   └── {
+│       │         id: number,
+│       │         type: "movie",
+│       │         title: string,
+│       │         minutes: number,
+│       │         imagePath: string,
+│       │         posterPath: string,
+│       │         genres: string[],
+│       │         dateAdded: timestamp | string
+│       │       }
+│       │
+│       ├── watchedTv: array               ⚠ En ağır array — iç içe sezon/bölüm
+│       │   └── {
+│       │         id: number,
+│       │         name: string,
+│       │         type: "tv",
+│       │         imagePath: string,
+│       │         showEpisodeCount: number,
+│       │         showSeasonCount: number,
+│       │         addedShowDate: timestamp,
+│       │         genres: string[],
+│       │         seasons: [                ⚠⚠ Derin iç içe yapı
+│       │           {
+│       │             seasonNumber: number,
+│       │             seasonPosterPath: string,
+│       │             seasonEpisodes: number,
+│       │             addedSeasonDate: timestamp,
+│       │             episodes: [
+│       │               {
+│       │                 episodeNumber: number,
+│       │                 episodePosterPath: string,
+│       │                 episodeName: string,
+│       │                 episodeRatings: number,
+│       │                 episodeMinutes: number,
+│       │                 episodeWatchTime: string | timestamp
+│       │               }
+│       │             ]
+│       │           }
+│       │         ]
+│       │       }
+│       │
+│       ├── favorites: array
+│       │   └── { id: number, type: "movie" | "tv", imagePath: string }
+│       │
+│       ├── watchList: array
+│       │   └── { id: number, type: "movie" | "tv", imagePath: string }
+│       │
+│       └── {customListName}: array        ← Kullanıcı tanımlı listeler
+│           └── { id: number, type: "movie" | "tv", imagePath: string }
+│
+│
+├── Users/
+│   └── {uid}
+│       ├── email: string
+│       ├── displayName: string
+│       ├── username: string               ← Arama için index gerektirir
+│       ├── avatarIndex: number
+│       ├── isOnline: boolean
+│       ├── information: object
+│       ├── listVisible: array             ← [{listName: boolean}, ...]
+│       │
+│       ├── friends: array                 ⚠ Array — büyüyebilir
+│       │   └── { uid, displayName, username, avatarIndex }
+│       │
+│       └── friendRequests: object
+│           ├── receivedRequest: array
+│           │   └── { uid, displayName, username, avatarIndex }
+│           └── sendRequest: array
+│               └── { uid, displayName, username, avatarIndex }
+│
+│
+├── Notes/
+│   └── {uid}                              ← Üst döküman (legacy field artık boş)
+│       │
+│       └── items/                         ← SUBCOLLECTION (yeni yapı ✓)
+│           └── {noteId}
+│               ├── id: string
+│               ├── type: "note" | "todo"
+│               ├── title: string          ← todo için
+│               ├── content: string        ← note için
+│               ├── todos: array           ← todo type için
+│               │   └── { id: string, text: string, done: boolean }
+│               ├── color: string          ← hex
+│               ├── backgroundColor: string
+│               ├── scheduledDate: string | null
+│               ├── createdAt: timestamp
+│               └── updatedAt: timestamp
+│
+│
+├── Reminders/
+│   └── {uid}                              ← Üst döküman (legacy arrays artık boş)
+│       │
+│       ├── movies/                        ← SUBCOLLECTION (yeni yapı ✓)
+│       │   └── {movieId}
+│       │       ├── movieId: number
+│       │       ├── movieName: string
+│       │       ├── posterPath: string
+│       │       └── releaseDate: string    ← "YYYY-MM-DD"
+│       │
+│       └── tvShows/                       ← SUBCOLLECTION
+│           └── {showId}
+│               ├── showId: number
+│               ├── showName: string
+│               ├── showPosterPath: string
+│               │
+│               └── episodes/              ← SUBCOLLECTION (3 seviye derinlik)
+│                   └── {episodeKey}       ← "s{season}e{episode}" formatı
+│                       ├── episodeId: string
+│                       ├── showId: number
+│                       ├── showName: string
+│                       ├── showPosterPath: string
+│                       ├── seasonNumber: number
+│                       ├── seasonPosterPath: string
+│                       ├── episodeNumber: number
+│                       ├── episodeName: string
+│                       └── airDate: string
+│
+│
+├── MovieComment/
+│   └── {movieId}                          ← TMDB movie ID
+│       │
+│       └── comments/                      ← SUBCOLLECTION
+│           └── {commentId}
+│               ├── id: string
+│               ├── userId: string
+│               ├── username: string
+│               ├── avatar: string         ← URL
+│               ├── text: string
+│               ├── isSpoiler: boolean
+│               ├── timestamp: serverTimestamp
+│               ├── likes: string[]        ← uid array ⚠ unbounded
+│               ├── replyCount: number
+│               │
+│               └── replies/               ← SUBCOLLECTION
+│                   └── {replyId}
+│                       ├── id: string
+│                       ├── userId: string
+│                       ├── username: string
+│                       ├── avatar: string
+│                       ├── text: string
+│                       ├── isSpoiler: boolean
+│                       ├── timestamp: serverTimestamp
+│                       ├── likes: string[] ⚠ unbounded
+│                       └── parentId: string
+│
+│
+└── chats/
+    └── {chatId}                           ← "{uid1}_{uid2}" formatı
+        ├── participants: string[]         ← [uid1, uid2]
+        ├── lastMessage: string
+        ├── lastMessageTime: timestamp
+        ├── information: object
+        │   ├── name: string
+        │   └── participants: object
+        │       └── {uid}: { displayName, isOnline, information }
+        │
+        └── messages/                      ← SUBCOLLECTION
+            └── {messageId}
+                ├── senderId: string
+                ├── senderName: string
+                ├── senderAvatar: string
+                ├── text: string
+                ├── timestamp: serverTimestamp
+                ├── status: "sent" | "delivered" | "seen"
+                ├── edited: boolean
+                └── media?: {              ← Opsiyonel paylaşılan içerik
+                      id: number,
+                      media_type: "movie" | "tv" | "person",
+                      poster_path: string,
+                      title | name: string,
+                      overview: string,
+                      vote_average: number
+                    }
+
+
+══════════════════════════════════════════════════════════════════════════════
+  MEVCUT YAPIYLA İLGİLİ KRİTİK SORUNLAR
+══════════════════════════════════════════════════════════════════════════════
+
+[1] Lists/{uid} — TEK DEVASA DÖKÜMAN
+    ● Firestore döküman limiti: 1 MB
+    ● watchedTv dizisi: her dizi için sezonlar + bölümler iç içe saklanıyor
+      → 50 dizi × 5 sezon × 20 bölüm = 5000 nesne TEK DÖKÜMANDA
+    ● Her liste güncellemesinde TÜM döküman yeniden yazılıyor
+    ● onSnapshot tüm array'i her değişimde istemciye gönderiyor
+    ● Liste sayısı arttıkça veri büyüme sınırına yaklaşılıyor
+
+[2] Users/{uid} — GÖMÜLÜ ARRAY'LER
+    ● friends: array — sınırsız büyüyebilir, güncelleme atomic değil
+    ● friendRequests.receivedRequest / sendRequest — aynı problem
+    ● listVisible array — nesne dizisi yerine map daha verimli olurdu
+
+[3] MovieComment/{movieId}/comments — UNBOUNDED LIKES ARRAY
+    ● likes: string[] — her beğeni tüm array'i yeniden yazar
+    ● 1000 beğenili yorumda 1000 uid saklanıyor aynı alanda
+    ● Aynı problem replies'da da mevcut
+
+[4] Lists/{uid}.watchedTv — DERİN İÇ İÇE YAPI
+    ● 3 seviye iç içe array (show > seasons > episodes)
+    ● Tek bir bölüm eklemek için tüm array read+write yapılıyor
+    ● Firestore array operasyonları bu derinlikte güvenilmez
+
+[5] chats/{chatId} — KATILIMCı BİLGİSİ GECİKMESİ
+    ● information.participants'taki isOnline gibi veriler denormalize
+    ● Kullanıcı adı değişirse tüm chat dökümanları güncellenmez
+
+══════════════════════════════════════════════════════════════════════════════
+  SORGU KAPASİTESİ EKSİKLİKLERİ
+══════════════════════════════════════════════════════════════════════════════
+
+● Kullanıcının "son eklenen 10 filmi" çekilemiyor (array'de sıralama yok)
+● Belirli bir türdeki filmler filtrelenemez (genres array + query = composite index)
+● Arkadaşların listeleri tek sorguda alınamıyor (N+1 problem)
+● İstatistikler her seferinde client-side hesaplanıyor (CPU israfı)
+● Full-text search yok (username "contains" yapılamaz, sadece prefix)
+
+══════════════════════════════════════════════════════════════════════════════
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║              GELİŞTİRME PLANI — Adım Adım Yol Haritası                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Her adım bağımsız olarak uygulanabilir. Risk seviyesi ve kazanç belirtilmiştir.
+Adımlar öncelik sırasına göre sıralanmıştır — en yüksek kazanç en başta.
+
+
+──────────────────────────────────────────────────────────────────────────────
+ ADIM 1 ★★★  Lists/{uid}.watchedMovies → Subcollection'a Taşı
+ Risk: ORTA  |  Kazanç: ÇOK YÜKSEK  |  Süre: ~2 gün
+──────────────────────────────────────────────────────────────────────────────
+
+NEDEN:
+  watchedMovies array'i kullanıcı başına yüzlerce-binlerce nesne içerebilir.
+  Her film eklendiğinde/silindiğinde TÜM liste okunup yeniden yazılır.
+  Döküman büyüdükçe her onSnapshot tüm payload'ı istemciye gönderir.
+
+HEDEF YAPI:
+  Lists/{uid}/watchedMovies/{movieId}   ← her film ayrı döküman
+    ├── id: number
+    ├── title: string
+    ├── minutes: number
+    ├── imagePath: string
+    ├── genres: string[]
+    └── dateAdded: Timestamp            ← serverTimestamp() ile
+
+ADIMLAR:
+  1. Firebase Console'da veya migration scriptiyle mevcut array'i oku.
+  2. Her film için subcollection'a ayrı döküman yaz (batch writes, 500'lü gruplar).
+  3. MovieContex.js / ListStatusContext.js'de okuma kodunu güncelle:
+       collection(db, "Lists", uid, "watchedMovies")
+       orderBy("dateAdded", "desc") + limit(20)  → pagination mümkün
+  4. Film ekleme/silme: setDoc / deleteDoc → array manipülasyonu yok.
+  5. Migration tamamlandıktan sonra eski watchedMovies array alanını sil.
+
+KAZANÇ:
+  ✓ Film eklemek: 1 write (eski: read+write tüm array)
+  ✓ Sayfalama (pagination) mümkün — ilk 20 film, scroll edince 20 daha
+  ✓ "Son eklenen filmler" sorgusu trivial: orderBy("dateAdded", "desc")
+  ✓ Tür filtresi: where("genres", "array-contains", "Action")
+  ✓ Döküman boyutu sorununu tamamen çözer
+
+
+──────────────────────────────────────────────────────────────────────────────
+ ADIM 2 ★★★  Lists/{uid}.watchedTv → Hiyerarşik Subcollection'a Taşı
+ Risk: YÜKSEK  |  Kazanç: ÇOK YÜKSEK  |  Süre: ~3-4 gün
+──────────────────────────────────────────────────────────────────────────────
+
+NEDEN:
+  Bu yapı tüm sorunların en kritik kaynağı. 3 seviye iç içe array
+  (show > seasons > episodes) tek dökümanda saklanıyor.
+  Tek bölüm eklemek için tüm diziyi (tüm sezonlar + tüm bölümler) okuyup
+  yeniden yazmak gerekiyor. Büyük bir kullanıcı için bu işlem saniyeler sürer.
+
+HEDEF YAPI:
+  Lists/{uid}/watchedTv/{showId}
+    ├── id: number
+    ├── name: string
+    ├── imagePath: string
+    ├── showEpisodeCount: number         ← denormalize counter (increment)
+    ├── showSeasonCount: number          ← denormalize counter
+    ├── totalMinutes: number             ← denormalize (istatistik için)
+    ├── genres: string[]
+    └── addedShowDate: Timestamp
+    │
+    └── seasons/{seasonNumber}
+          ├── seasonNumber: number
+          ├── seasonPosterPath: string
+          ├── seasonEpisodes: number     ← denormalize counter
+          ├── addedSeasonDate: Timestamp
+          │
+          └── episodes/{episodeNumber}
+                ├── episodeNumber: number
+                ├── episodeName: string
+                ├── episodePosterPath: string
+                ├── episodeRatings: number
+                ├── episodeMinutes: number
+                └── episodeWatchTime: Timestamp
+
+ADIMLAR:
+  1. Migration scripti: mevcut watchedTv array'ini oku, her show/season/episode
+     için subcollection dökümanı yaz (batch writes, dikkatli sıra).
+  2. Bölüm ekleme kodu:
+       setDoc(doc(db,"Lists",uid,"watchedTv",showId,"seasons",sNo,"episodes",eNo), data)
+       updateDoc(showRef, { showEpisodeCount: increment(1), totalMinutes: increment(min) })
+  3. Bölüm silme: deleteDoc + increment(-1) ile counter güncelle.
+  4. TvShowsDetails.js / ListStatusContext.js / ProfileStatsContext.js güncelle.
+  5. Eski watchedTv array alanını migration sonrası sil.
+
+KAZANÇ:
+  ✓ Tek bölüm eklemek: 2 write (bölüm + counter güncelleme)
+  ✓ Belirli sezon sorgusu: collection("seasons") → sadece o sezon okunur
+  ✓ Döküman boyutu sorunu tamamen ortadan kalkar
+  ✓ Paralel write güvenli (eski yöntemde race condition vardı)
+
+
+──────────────────────────────────────────────────────────────────────────────
+ ADIM 3 ★★★  favorites ve watchList → Subcollection'a Taşı
+ Risk: DÜŞÜK  |  Kazanç: YÜKSEK  |  Süre: ~1 gün
+──────────────────────────────────────────────────────────────────────────────
+
+NEDEN:
+  Bu iki liste de aynı şemada büyüyen array'ler. Özellikle watchList
+  aktif kullanıcılarda hızla şişebilir.
+
+HEDEF YAPI:
+  Lists/{uid}/favorites/{mediaId}
+    ├── id: number
+    ├── type: "movie" | "tv"
+    ├── imagePath: string
+    └── addedAt: Timestamp
+
+  Lists/{uid}/watchList/{mediaId}
+    ├── id: number
+    ├── type: "movie" | "tv"
+    ├── imagePath: string
+    └── addedAt: Timestamp
+
+ADIMLAR:
+  1. Migration: mevcut array → subcollection.
+  2. ListStatusContext'te okuma: getDocs(collection(..., "favorites"))
+     → O(1) lookup için local Map oluştur (mevcut O(1) index mantığı korunur).
+  3. Ekleme: setDoc  |  Silme: deleteDoc
+  4. Eski favorites ve watchList array alanlarını sil.
+
+KAZANÇ:
+  ✓ Ekle/sil: 1 write
+  ✓ "Favorilerim" sayfalanabilir
+  ✓ type filtresiyle sadece filmler veya sadece diziler çekilebilir
+
+
+──────────────────────────────────────────────────────────────────────────────
+ ADIM 4 ★★  MovieComment likes → Counter + Map Pattern
+ Risk: DÜŞÜK  |  Kazanç: ORTA  |  Süre: ~4 saat
+──────────────────────────────────────────────────────────────────────────────
+
+NEDEN:
+  likes: string[] → her beğenide tüm array okunup yeniden yazılıyor.
+  Popüler bir yorumda bu array binlerce uid içerebilir.
+  Ayrıca "kullanıcı beğendi mi?" sorusu için tüm array istemciye indirilmek
+  zorunda.
+
+HEDEF YAPI:
+  MovieComment/{movieId}/comments/{commentId}
+    ├── likeCount: number                ← increment() ile güncellenir
+    ├── likedBy: map                     ← { [uid]: true }
+    └── ...diğer alanlar aynı
+
+  Beğeni ekle:
+    updateDoc(ref, { likeCount: increment(1), [`likedBy.${uid}`]: true })
+
+  Beğeni geri al:
+    updateDoc(ref, { likeCount: increment(-1), [`likedBy.${uid}`]: deleteField() })
+
+  "Beğendim mi?" kontrolü:
+    likedBy?.[currentUid] === true  (client-side, ekstra read yok)
+
+ADIMLAR:
+  1. Comment.js beğeni kodunu güncelle.
+  2. Mevcut likes array'ini likedBy map + likeCount'a migrate et.
+  3. Aynı pattern'i replies/{replyId} için de uygula.
+
+KAZANÇ:
+  ✓ Beğeni işlemi: tek targeted field update
+  ✓ "Beğendi mi?" kontrolü: tek field okuma, array download yok
+  ✓ Büyük yorum popülerliğinde performans düşmez
+
+
+──────────────────────────────────────────────────────────────────────────────
+ ADIM 5 ★★  Users/{uid}.friends → Subcollection'a Taşı
+ Risk: ORTA  |  Kazanç: ORTA  |  Süre: ~1 gün
+──────────────────────────────────────────────────────────────────────────────
+
+NEDEN:
+  friends: array büyüyebilir, sorgulanamaz, atomic değil.
+  İki kullanıcı aynı anda birbirini silerse race condition oluşabilir.
+
+HEDEF YAPI:
+  Users/{uid}/friends/{friendUid}
+    ├── uid: string
+    ├── displayName: string
+    ├── username: string
+    ├── avatarIndex: number
+    └── addedAt: Timestamp
+
+  Users/{uid}/friendRequests/{requestUid}
+    ├── uid: string
+    ├── displayName: string
+    ├── username: string
+    ├── avatarIndex: number
+    ├── direction: "incoming" | "outgoing"
+    └── sentAt: Timestamp
+
+ADIMLAR:
+  1. FriendsListScreen.js, FriendRequestsScreen.js, SearchFriendsScreen.js
+     okuma kodlarını subcollection query'e çevir.
+  2. Arkadaş ekleme/silme: setDoc/deleteDoc (iki tarafta da).
+  3. Arkadaş sayısı için Users/{uid}.friendCount: number counter tut
+     (badge gösterimi için tüm subcollection'ı çekmek gerekmez).
+  4. Migration: mevcut friends array → subcollection.
+
+KAZANÇ:
+  ✓ "Kaç arkadaşım var?" → friendCount tek field okuma
+  ✓ Arkadaş sorgulanabilir (kullanıcı adına göre filtrelenebilir)
+  ✓ Arkadaşlık isteği durumu kolayca sorgulanabilir
+
+
+──────────────────────────────────────────────────────────────────────────────
+ ADIM 6 ★  Users/{uid}.listVisible → Map'e Dönüştür
+ Risk: ÇOK DÜŞÜK  |  Kazanç: DÜŞÜK  |  Süre: ~2 saat
+──────────────────────────────────────────────────────────────────────────────
+
+NEDEN:
+  listVisible: [{watchedMovies: true}, {favorites: false}, ...]
+  Array'i taramak gerekiyor. Map çok daha verimli ve okunabilir.
+
+HEDEF YAPI:
+  listVisible: {
+    watchedMovies: true,
+    watchedTv: false,
+    favorites: true,
+    watchList: true
+  }
+
+ADIMLAR:
+  1. FriendsListScreen.js'de listVisible okumasını güncelle:
+       const listVisible = userSnap.data().listVisible || {};
+       const visibleListNames = Object.entries(listVisible)
+         .filter(([_, v]) => v === true)
+         .map(([k]) => k);
+  2. Görünürlük kaydetme kodunu map formatına çevir.
+  3. Migration: eski array formatındaki dökümanları güncelle.
+
+
+──────────────────────────────────────────────────────────────────────────────
+ ADIM 7 ★  UserStats Denormalize Collection Ekle
+ Risk: DÜŞÜK  |  Kazanç: ORTA  |  Süre: ~1 gün
+──────────────────────────────────────────────────────────────────────────────
+
+NEDEN:
+  Şu an toplam izleme süresi, film sayısı, tür dağılımı gibi istatistikler
+  her uygulama açılışında client-side hesaplanıyor. Kullanıcının 200 filmi
+  varsa her açılışta 200 döküman okunup hesap yapılıyor.
+
+HEDEF YAPI:  (YENİ KOLEKSİYON)
+  UserStats/{uid}
+    ├── movieCount: number               ← increment() ile güncellenir
+    ├── tvCount: number
+    ├── totalMovieMinutes: number
+    ├── totalTvEpisodes: number
+    ├── genreCounts: map                 ← { "Action": 12, "Drama": 8, ... }
+    ├── lastUpdated: Timestamp
+    └── rank: string                     ← hesaplanıp cache'lenir
+
+ADIMLAR:
+  1. Film eklendiğinde: UserStats/{uid} dökümanına increment() yaz.
+  2. ProfileStatsContext.js'de ağır hesaplamalar yerine bu dökümanı oku.
+  3. İlk kurulum için migration scripti: mevcut listelerden stats hesapla.
+
+KAZANÇ:
+  ✓ İstatistik ekranı açılışı: 1 döküman okuma (şu an: N döküman + CPU)
+  ✓ ProfileStatsContext çok daha hafifler
+
+
+──────────────────────────────────────────────────────────────────────────────
+ ADIM 8 ★  Firestore Security Rules Sıkılaştır
+ Risk: ÇOK DÜŞÜK  |  Kazanç: GÜVENLİK  |  Süre: ~3 saat
+──────────────────────────────────────────────────────────────────────────────
+
+NEDEN:
+  Subcollection yapısına geçince security rules da güncellenmeli.
+  Aksi halde başka kullanıcılar birbirinin listelerini yazabilir.
+
+ÖNERİLEN RULES PATTERN:
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+
+      match /Lists/{uid}/{document=**} {
+        allow read: if request.auth != null;         // arkadaşlar okuyabilir
+        allow write: if request.auth.uid == uid;     // sadece sahibi yazabilir
+      }
+
+      match /Users/{uid} {
+        allow read: if request.auth != null;
+        allow write: if request.auth.uid == uid;
+      }
+
+      match /Notes/{uid}/{document=**} {
+        allow read, write: if request.auth.uid == uid;
+      }
+
+      match /Reminders/{uid}/{document=**} {
+        allow read, write: if request.auth.uid == uid;
+      }
+
+      match /MovieComment/{movieId}/comments/{commentId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        allow update, delete: if request.auth.uid == resource.data.userId;
+      }
+    }
+  }
+
+ADIMLAR:
+  1. Firebase Console → Firestore → Rules sekmesine git.
+  2. Yukarıdaki rules'ı uygula ve Rules Playground ile test et.
+  3. Her yeni subcollection için ilgili rule'ı ekle.
+
+
+──────────────────────────────────────────────────────────────────────────────
+ MİGRASYON STRATEJİSİ (TÜM ADIMLAR İÇİN)
+──────────────────────────────────────────────────────────────────────────────
+
+Canlı uygulamada veri kaybı yaşamamak için önerilen yaklaşım:
+
+  AŞAMA 1 — Çift Yazma (Dual Write)
+    Yeni kod hem eski hem yeni yapıya yazar.
+    Uygulama eski yapıdan okur. Veri kaybı riski sıfır.
+
+  AŞAMA 2 — Migration
+    Arka planda (veya toplu script ile) eski veriyi yeni yapıya kopyala.
+    Firestore batch write kullan (500 döküman/batch limiti var).
+
+  AŞAMA 3 — Okuma Geçişi
+    Yeni kod yeni yapıdan okumaya başlar. Eski yapı hâlâ duruyor.
+    Test et, sorun yoksa devam et.
+
+  AŞAMA 4 — Eski Veriyi Temizle
+    Eski array alanlarını deleteField() ile kaldır.
+    Çift yazma kodunu sil.
+
+  ÖNEMLİ: Her adımda önce geliştirme ortamında (ayrı Firebase projesi) test et.
+
+
+──────────────────────────────────────────────────────────────────────────────
+ ÖNERİLEN UYGULAMA SIRASI (risk/kazanç dengesine göre)
+──────────────────────────────────────────────────────────────────────────────
+
+  [1] ADIM 6  → listVisible map          (2 saat,   sıfır risk, hemen yap)
+  [2] ADIM 4  → likes counter+map        (4 saat,   düşük risk, hemen kazanç)
+  [3] ADIM 3  → favorites + watchList    (1 gün,    düşük risk)
+  [4] ADIM 1  → watchedMovies sub.       (2 gün,    en somut kazanç)
+  [5] ADIM 2  → watchedTv hiyerarşik     (3-4 gün,  en kritik geliştirme)
+  [6] ADIM 5  → friends subcollection   (1 gün)
+  [7] ADIM 8  → security rules          (3 saat)
+  [8] ADIM 7  → UserStats denorm.       (isteğe bağlı, uygulama büyüyünce)
+
+  Toplam tahmini süre: ~10-12 gün (tam zamanlı çalışmayla)
+  Bu değişiklikler sonunda uygulama Firestore best practice'lerini tam karşılar.
+
+══════════════════════════════════════════════════════════════════════════════

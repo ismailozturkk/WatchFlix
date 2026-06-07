@@ -1,0 +1,457 @@
+================================================================================
+  WATCHFLIX — MASTER GÖREV LİSTESİ
+  Oluşturuldu: 2026-05-17
+  Kaynak: 6 ayrı geliştirme/performans dosyası birleştirildi
+  (GELISTIRME_PLANI, PERFORMANS_OPTIMIZASYON_PLANI, performance_optimization,
+   PERFORMANS_INCELEME_RAPORU, PERFORMANS_GUNCELLEME_ADIMLARI, FIRESTORE_SCHEMA)
+================================================================================
+
+Kullanım:
+  [ ] = yapılmadı
+  [x] = tamamlandı
+  [~] = kısmen yapıldı / devam ediyor
+
+Görev başlarken: [ ] → [~]
+Görev bitince:   [~] → [x]
+
+================================================================================
+  BÖLÜM 0 — TAMAMLANANLAR
+================================================================================
+
+[x] FAZ 6  — Notes veri modeli: Notes/{uid}/items/{noteId} subcollection
+             Dosya: context/ProfileNotesContext.js
+[x] FAZ 7  — Reminders veri modeli: subcollection yapısına geçiş
+             Dosyalar: context/ProfileRemindersContext.js, context/CalendarContext.js,
+                       components/Reminder.js, screens/movie/MovieDetail.js
+[x] FAZ 12 — Chat & Comment yazma maliyeti azaltıldı
+             Dosyalar: screens/ChatScreen.js, components/Comment.js
+[x] FAZ 3  — TMDB API cache katmanı (in-memory + AsyncStorage, TTL'li)
+             Dosya: utils/apiCache.js
+[x] FAZ 5  — ProfileScreenContext 4 parçaya bölündü
+             Dosyalar: context/ProfileStatsContext.js, context/ProfileNotesContext.js,
+                       context/ProfileRemindersContext.js, context/ProfileUiContext.js
+             NOT: formatDate ve t() bug'ları hâlâ bekliyor (Bölüm 1, madde 1 ve 4)
+
+================================================================================
+  BÖLÜM 1 — 🟢 KOLAY (5 dk – 4 saat | düşük/sıfır risk)
+================================================================================
+
+─────────────────────────────────────────────────────────────────────────────
+1. formatDate "is not a function" bug'ı
+─────────────────────────────────────────────────────────────────────────────
+[x] 1. formatDate bug   ⏱ 30 dk   🟢   ✅ TAMAMLANDI
+       Dosya  : context/ProfileNotesContext.js
+       Sonuç  : useLanguage import'u, formatDate fonksiyonu, value objesi ve
+                deps dizisi önceki oturumda doğru şekilde eklendi.
+
+─────────────────────────────────────────────────────────────────────────────
+2. Toast typo
+─────────────────────────────────────────────────────────────────────────────
+[x] 2. Toast typo   ⏱ 5 dk   🟢   ✅ TAMAMLANDI
+       Dosya  : App.js satır ~112
+       Sonuç  : "success" olarak zaten düzeltilmişti.
+
+─────────────────────────────────────────────────────────────────────────────
+3. Çift animasyon tanımı
+─────────────────────────────────────────────────────────────────────────────
+[x] 3. Çift animasyon   ⏱ 5 dk   🟢   ✅ TAMAMLANDI
+       Dosya  : App.js satır ~193
+       Sonuç  : animation: "fade" zaten yorum satırına alınmış, sadece
+                "slide_from_right" aktif.
+
+─────────────────────────────────────────────────────────────────────────────
+4. t() undefined — MovieStatisticsScreen ve TvStatisticsScreen
+─────────────────────────────────────────────────────────────────────────────
+[x] 4. t() undefined   ⏱ 15 dk   🟢   ✅ TAMAMLANDI
+       Dosya  : context/ProfileStatsContext.js
+       Sonuç  : t, useMemo value objesine ve deps dizisine eklendi.
+                MovieStatisticsScreen ve TvStatisticsScreen (her iki yerdeki)
+                artık t'yi useProfileStats() üzerinden doğru alıyor.
+
+─────────────────────────────────────────────────────────────────────────────
+5. setLoading bug — genres fetch
+─────────────────────────────────────────────────────────────────────────────
+[x] 5. setLoading bug   ⏱ 15 dk   🟢   ✅ TAMAMLANDI
+       Dosyalar: context/MovieContex.js, context/TvShowContex.js
+       Sonuç  : setLoadingGenres(false) olarak zaten düzeltilmişti.
+
+─────────────────────────────────────────────────────────────────────────────
+6. Skeleton Animated.Value — useRef'e taşı
+─────────────────────────────────────────────────────────────────────────────
+[x] 6. Skeleton animasyon   ⏱ 20 dk   🟢   ✅ TAMAMLANDI
+       Dosya  : components/Skeleton.js
+       Sonuç  : useRef import edildi, animatedValue useRef ile sabitlendi.
+
+[x] 6b. Skeleton typo   ⏱ 2 dk   🟢   ✅ TAMAMLANDI
+        Dosya  : components/Skeleton.js satır 138
+        Sonuç  : mmarginBottom → marginBottom düzeltildi.
+
+─────────────────────────────────────────────────────────────────────────────
+7. console.log temizliği
+─────────────────────────────────────────────────────────────────────────────
+[x] 7. console.log sil   ⏱ 5 dk   🟢   ✅ TAMAMLANDI
+       Dosya  : screens/ChatScreen.js
+       Sonuç  : Zaten silinmişti.
+
+─────────────────────────────────────────────────────────────────────────────
+8. Unused imports temizle
+─────────────────────────────────────────────────────────────────────────────
+[x] 8. Unused imports   ⏱ 20 dk   🟢   ✅ TAMAMLANDI
+       Dosyalar: App.js, screens/ChatScreen.js
+       Sonuç  : AppState ve FontAwesome5 App.js'ten silindi.
+                ChatScreen.js'teki FeOffset ve KeyboardAwareScrollView
+                zaten temizlenmişti.
+
+─────────────────────────────────────────────────────────────────────────────
+9. LottieView conditional render
+─────────────────────────────────────────────────────────────────────────────
+[x] 9. LottieView   ⏱ 30 dk   🟢   ✅ TAMAMLANDI
+       Dosyalar: screens/tabs/MovieScreen.js, screens/tabs/TvShowScreen.js
+       Sonuç  : 4 LottieView → 1 LottieView. ScrollView dışına taşındı,
+                position:absolute overlay, pointerEvents="none". useSnow importları silindi.
+
+─────────────────────────────────────────────────────────────────────────────
+10. listVisible array → map (Firestore ADIM 6)
+─────────────────────────────────────────────────────────────────────────────
+[x] 10. listVisible map   ⏱ 2 saat   🟢   ✅ TAMAMLANDI
+        Dosyalar: screens/ListsViewScreen.js, screens/tabs/profile/FriendsListScreen.js
+        Sonuç  : ListsViewScreen'de state {} map'e döndü, addToListVisible tek satır,
+                 isListVisible O(1) lookup. Eski array format okunurken otomatik map'e
+                 migrate ediliyor (dual-read). FriendsListScreen'de de dual-read var.
+
+─────────────────────────────────────────────────────────────────────────────
+11. likes string[] → likeCount + likedBy map (Firestore ADIM 4)
+─────────────────────────────────────────────────────────────────────────────
+[x] 11. likes pattern   ⏱ 4 saat   🟢   ✅ TAMAMLANDI
+        Dosya  : components/Comment.js
+        Sonuç  : arrayUnion/arrayRemove kaldırıldı, deleteField eklendi.
+                 Yeni yorumlar likeCount:0 + likedBy:{} ile oluşuyor.
+                 UI: isLiked = likedBy[uid] ?? likes.includes(uid).
+                 Sayı: likeCount ?? likes.length (eski yorumlar için fallback).
+                 Hem yorum hem reply'da aynı pattern uygulandı.
+
+================================================================================
+  BÖLÜM 2 — 🟡 ORTA (Yarım gün – 1 gün)
+================================================================================
+
+─────────────────────────────────────────────────────────────────────────────
+12. O(1) statusIndex — ListStatusContext + UseListStatus (FAZ 1)
+─────────────────────────────────────────────────────────────────────────────
+[x] 12. O(1) statusIndex   ⏱ 4-6 saat   🟡   ✅ TAMAMLANDI (önceki oturumda)
+        Dosyalar: context/ListStatusContext.js, modules/UseListStatus.js
+        Sonuç  : statusIndex useMemo ile tek seferde üretiliyor.
+                   movie: { [id]: { inWatchList, inFavorites, isWatched, isInOtherLists } }
+                   tv:    { [id]: { ... } }
+                 UseListStatus.js: bucket[mediaId] ?? EMPTY → tek satır O(1) lookup.
+                 some/filter döngüsü yok. Provider value useMemo ile sarılı.
+
+─────────────────────────────────────────────────────────────────────────────
+13. ChatScreen duplicate onSnapshot birleştir
+─────────────────────────────────────────────────────────────────────────────
+[x] 13. Duplicate onSnapshot   ⏱ 2 saat   🟡   ✅ TAMAMLANDI (önceki oturumda)
+        Dosya  : screens/ChatScreen.js satır ~451
+        Sonuç  : Tek onSnapshot içinde hem messages state hem batch
+                 seen/delivered güncellemesi yapılıyor. processedMsgIds
+                 ref ile aynı mesaj iki kez işlenmiyor.
+
+─────────────────────────────────────────────────────────────────────────────
+14. AppSettingsContext AsyncStorage → Promise.all
+─────────────────────────────────────────────────────────────────────────────
+[x] 14. AsyncStorage Promise.all   ⏱ 1 saat   🟡   ✅ TAMAMLANDI (önceki oturumda)
+        Dosya  : context/AppSettingsContext.js
+        Sonuç  : AsyncStorage.multiGet ile 7 ayar tek round-trip'te okunuyor.
+                 Promise.all'dan bile verimli (tek native bridge çağrısı).
+                 value useMemo + useCallback ile tamamen stabil.
+
+─────────────────────────────────────────────────────────────────────────────
+15. Animated.Value useState → useRef (ListView, ListViewTv)
+─────────────────────────────────────────────────────────────────────────────
+[x] 15. Animated.Value useRef   ⏱ 1 saat   🟡   ✅ TAMAMLANDI
+        Dosyalar: components/ListView.js, components/ListViewTv.js
+        Sonuç  : useState({}) → useRef({}). useEffect kaldırıldı.
+                 Render sırasında yalnızca eksik anahtarlar için Animated.Value
+                 oluşturuluyor, mevcutlar korunuyor. useEffect import'u silindi.
+
+─────────────────────────────────────────────────────────────────────────────
+16. FlatList optimizasyonları
+─────────────────────────────────────────────────────────────────────────────
+[x] 16. FlatList performans   ⏱ 1 gün   🟡   ✅ TAMAMLANDI
+        Dosyalar: screens/movie/MovieBests.js, screens/movie/MovieTrends.js
+        Sonuç  : MovieBests ve MovieTrends'te scaleValues useState→useRef.
+                 useEffect kaldırıldı, render sırasında lazy init.
+                 onPressIn/onPressOut useCallback ile stabil.
+                 MovieBests FlatList: removeClippedSubviews, maxToRenderPerBatch,
+                 windowSize, initialNumToRender eklendi.
+                 MovieTrends Animated.FlatList: aynı props + getItemLayout.
+
+─────────────────────────────────────────────────────────────────────────────
+17. expo-linear-gradient standardize et
+─────────────────────────────────────────────────────────────────────────────
+[x] 17. Gradient standart   ⏱ 2 saat   🟡   ✅ TAMAMLANDI (zaten yapılmıştı)
+        Sonuç  : Tüm kaynak dosyalarda react-native-linear-gradient import'u
+                 bulunamadı. Proje zaten yalnızca expo-linear-gradient kullanıyor.
+
+─────────────────────────────────────────────────────────────────────────────
+18. Online status kodunu aktif hale getir
+─────────────────────────────────────────────────────────────────────────────
+[x] 18. Online status   ⏱ 2 saat   🟡   ✅ TAMAMLANDI
+        Dosya  : App.js
+        Sonuç  : AppState import eklendi. Yorum satırı kaldırılıp temizlendi.
+                 auth.onAuthStateChanged + AppState.addEventListener ile
+                 giriş/çıkış ve arka plan/ön plan geçişlerinde isOnline
+                 Firestore'a yazılıyor. Cleanup'ta updateStatus(false).
+
+─────────────────────────────────────────────────────────────────────────────
+19. FAZ 2 — Ayarları tek kaynağa indir
+─────────────────────────────────────────────────────────────────────────────
+[x] 19. Ayar konsolidasyonu   ⏱ 1 gün   🟡   ✅ TAMAMLANDI (zaten yapılmıştı)
+        Sonuç  : LanguageContext, ThemeContext, SnowContext'in hiçbirinde
+                 AsyncStorage okuma/yazma yok. Hepsi AppSettingsContext'ten
+                 veri alıyor. AppSettingsContext multiGet + useMemo + useCallback
+                 ile tam optimize.
+
+─────────────────────────────────────────────────────────────────────────────
+20. favorites + watchList → subcollection (Firestore ADIM 3)
+─────────────────────────────────────────────────────────────────────────────
+[x] 20. favorites + watchList subcollection   ⏱ 1 gün   🟡   ✅ TAMAMLANDI
+        Dosyalar: context/ListStatusContext.js, screens/movie/MovieDetail.js,
+                  screens/tv/TvShowsDetails.js
+        Sonuç  : ListStatusContext: favoritesMap + watchListMap subcollection
+                 listener'ları eklendi. statusIndex subcollection veriyi öncelikli
+                 okur, eski root-doc array'i fallback olarak kullanır (kayıpsız
+                 migrasyon). MovieDetail ve TvShowsDetails: favorites/watchList
+                 işlemleri setDoc/deleteDoc ile subcollection'a yazıyor.
+
+================================================================================
+  BÖLÜM 3 — 🔴 ZOR (1-4 gün | Migration / Büyük refactor)
+================================================================================
+
+─────────────────────────────────────────────────────────────────────────────
+21. watchedMovies → subcollection (Firestore ADIM 1)
+─────────────────────────────────────────────────────────────────────────────
+[x] 21. watchedMovies subcollection   ⏱ 2 gün   🔴   ✅ TAMAMLANDI
+        Dosyalar: context/ListStatusContext.js, screens/movie/MovieDetail.js
+        Sonuç  : ListStatusContext: watchedMoviesMap subcollection listener'ı
+                 eklendi. statusIndex fallback logic ile eski array'i de okur.
+                 MovieDetail: watchedMovies işlemleri SUBCOL_LISTS kapsamında
+                 setDoc/deleteDoc ile subcollection'a yazılıyor.
+
+─────────────────────────────────────────────────────────────────────────────
+22. watchedTv → hiyerarşik subcollection (FAZ 8 / Firestore ADIM 2)
+─────────────────────────────────────────────────────────────────────────────
+[x] 22. watchedTv subcollection   ⏱ 3-4 gün   🔴   ✅ TAMAMLANDI
+        Sonuç  : ListStatusContext: watchedTvMap listener eklendi. statusIndex
+                 fallback ile eski root-doc array'i de okur.
+                 TvShowsDetails: addShowToFirestore writeBatch ile subcollection'a
+                 yazar (show + seasons). SeasonItem: markEpisodeAsWatched +
+                 addSeasonToFirestore subcollection'a yazar. Local onSnapshot ile
+                 sezon verisi canlı dinleniyor. ProfileStatsContext: subcollection
+                 listenerları eklendi, denormalized sayılardan istatistik hesaplanıyor.
+        NOT    : En büyük performans sorunu. 3 seviye iç içe array
+                 (show > seasons > episodes) tek dökümanda. Tek bölüm
+                 eklemek için tüm diziyi okuyup yeniden yazmak gerekiyor.
+        Hedef  :
+          Lists/{uid}/watchedTv/{showId}
+            ├── show özet alanları
+            ├── showEpisodeCount: number (increment)
+            ├── totalMinutes: number (increment)
+            └── seasons/{seasonNumber}
+                  ├── sezon özet alanları
+                  └── episodes/{episodeNumber}
+        Adımlar:
+          1. Repository katmanı: addShowSummary, addSeason, addEpisodes, removeSeason
+          2. Dual write aşaması
+          3. Migration (batch write)
+          4. Okuma geçişi
+          5. Eski array temizle
+
+─────────────────────────────────────────────────────────────────────────────
+23. friends array → subcollection (Firestore ADIM 5)
+─────────────────────────────────────────────────────────────────────────────
+[x] 23. friends subcollection   ⏱ 1 gün   🔴   ✅ TAMAMLANDI
+        Dosyalar: FriendsListScreen.js, FriendRequestsScreen.js,
+                  SearchFriendsScreen.js
+        Sonuç  : handleAccept → setDoc subcollection + arrayUnion root-doc (dual-write).
+                 FriendsListScreen listener subcollection'ı önce dener.
+                 handleDelete → subcollection + root-doc array temizle.
+                 SearchFriendsScreen handleDelete aynı strateji.
+        Önceki : friends: array büyüyebilir, sorgulanamaz, atomic değil.
+        Hedef  :
+          Users/{uid}/friends/{friendUid}
+          Users/{uid}/friendRequests/{requestUid} + direction: "incoming"|"outgoing"
+          Users/{uid}.friendCount: number (badge için)
+        Adımlar:
+          1. Ekranların okuma kodunu subcollection query'e çevir
+          2. Ekleme: setDoc | Silme: deleteDoc
+          3. Migration: friends array → subcollection
+
+─────────────────────────────────────────────────────────────────────────────
+24. MovieContex.js useMemo context value
+─────────────────────────────────────────────────────────────────────────────
+[x] 24. MovieContext useMemo   ⏱ 2 saat   🔴   ✅ TAMAMLANDI (önceki oturumda)
+        Dosya  : context/MovieContex.js satır ~503-576
+        Sonuç  : const contextValue = useMemo(() => ({...}), [...]) ile
+                 tüm state ve fonksiyonlar zaten memoize edilmiş.
+
+─────────────────────────────────────────────────────────────────────────────
+25. TvShowContex.js useMemo context value
+─────────────────────────────────────────────────────────────────────────────
+[x] 25. TvShowContext useMemo   ⏱ 2 saat   🔴   ✅ TAMAMLANDI (önceki oturumda)
+        Dosya  : context/TvShowContex.js satır ~396-480
+        Sonuç  : const contextValue = useMemo(() => ({...}), [...]) ile
+                 zaten memoize edilmiş.
+
+─────────────────────────────────────────────────────────────────────────────
+26. UserStats denormalize collection (Firestore ADIM 7)
+─────────────────────────────────────────────────────────────────────────────
+[x] 26. UserStats collection   ⏱ 1 gün   🔴   ✅ TAMAMLANDI
+        Sonuç  : MovieDetail updateMovieList: watchedMovies ekle/sil işleminde
+                 UserStats/{uid} dökümanına increment()/decrement() yazılıyor.
+                 movieCount, totalMovieMinutes, genreCounts map güncelleniyor.
+        Önceki : İstatistikler (film sayısı, toplam süre, tür dağılımı) her
+                 açılışta client-side hesaplanıyor. 200 filmde 200 döküman
+                 okunup hesap yapılıyor.
+        Hedef  : UserStats/{uid}
+                   movieCount, tvCount, totalMovieMinutes,
+                   totalTvEpisodes, genreCounts: map, rank
+        Çözüm  : Film/dizi eklendiğinde increment(), istatistik ekranı
+                 bu tek dökümanı okur.
+
+─────────────────────────────────────────────────────────────────────────────
+27. Firestore Security Rules sıkılaştır (Firestore ADIM 8)
+─────────────────────────────────────────────────────────────────────────────
+[x] 27. Security Rules   ⏱ 3 saat   🔴   ✅ HAZIR — Firebase Console'a uygula
+        Yer    : Firebase Console → Firestore Database → Rules
+        Aşağıdaki kuralları kopyala ve "Publish" et:
+
+        rules_version = '2';
+        service cloud.firestore {
+          match /databases/{database}/documents {
+
+            // Listeler: kendi yazan, arkadaşlar okur
+            match /Lists/{uid}/{document=**} {
+              allow read:  if request.auth != null;
+              allow write: if request.auth.uid == uid;
+            }
+
+            // Kullanıcı profili
+            match /Users/{uid} {
+              allow read:  if request.auth != null;
+              allow write: if request.auth.uid == uid;
+            }
+            match /Users/{uid}/friends/{fid} {
+              allow read:  if request.auth != null;
+              allow write: if request.auth.uid == uid;
+            }
+            match /Users/{uid}/friendRequests/{rid} {
+              allow read:  if request.auth.uid == uid;
+              allow write: if request.auth != null;
+            }
+
+            // Notlar ve Hatırlatıcılar — sadece sahibi
+            match /Notes/{uid}/{document=**} {
+              allow read, write: if request.auth.uid == uid;
+            }
+            match /Reminders/{uid}/{document=**} {
+              allow read, write: if request.auth.uid == uid;
+            }
+
+            // İstatistikler — sadece sahibi
+            match /UserStats/{uid} {
+              allow read, write: if request.auth.uid == uid;
+            }
+
+            // Film yorumları — okuma herkese açık, yazma giriş yapanlara
+            match /MovieComment/{movieId}/comments/{commentId} {
+              allow read:   if request.auth != null;
+              allow create: if request.auth != null;
+              allow update, delete: if request.auth.uid == resource.data.userId;
+            }
+            match /MovieComment/{movieId}/comments/{commentId}/replies/{replyId} {
+              allow read:   if request.auth != null;
+              allow create: if request.auth != null;
+              allow update, delete: if request.auth.uid == resource.data.userId;
+            }
+
+            // Sohbetler — katılımcılar erişebilir
+            match /chats/{chatId} {
+              allow read, write: if request.auth.uid in resource.data.participants;
+            }
+            match /chats/{chatId}/messages/{msgId} {
+              allow read, write: if request.auth.uid in
+                get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+            }
+          }
+        }
+
+─────────────────────────────────────────────────────────────────────────────
+28. MovieDetail + TvShowsDetails bileşen parçalama
+─────────────────────────────────────────────────────────────────────────────
+[~] 28. Detay ekran refactor   ⏱ 1 hafta   🔴   🔄 KISMİ — devam ediyor
+        Dosyalar: screens/movie/MovieDetail.js (62 KB!)
+                  screens/tv/TvShowsDetails.js (61 KB!)
+        Yapılan: MovieCastItem.js + MovieVideoItem.js ayrı bileşenler oluşturuldu.
+                 MovieDetail.js bunları useCallback renderItem ile kullanıyor.
+                 Kalan: MovieHeader, MovieSimilar, MovieActions, TvShowsDetails bölme.
+        Önceki : Tek dosyada header, trailer, oyuncu listesi, benzer içerik,
+                 yorum, liste işlemleri — bakımı imkânsız.
+        Hedef  :
+          MovieDetail/
+            index.js, MovieHeader.js, MovieTrailer.js,
+            MovieCast.js, MovieSimilar.js, MovieActions.js
+        NOT    : Sekmeli yapıya geçince içerik lazily yüklenecek.
+
+================================================================================
+  BÖLÜM 4 — 💡 BONUS (Yeni özellikler — backlog)
+================================================================================
+
+[ ] B1. Gemini AI film/dizi önerileri (ChatModal'a AI modu)
+[ ] B2. expo-notifications ile push bildirim (Reminder'lar için)
+[ ] B3. Deep link desteği — watchflix://movie/123 (expo-linking)
+[ ] B4. expo-image ile image caching (Image bileşenini değiştir)
+[ ] B5. Uygulama içi film/dizi puanlama sistemi (1-10 kendi puanı)
+[ ] B6. Grup sohbet (groups koleksiyonu + davet sistemi)
+[ ] B7. WatchParty — arkadaşlarla eşzamanlı izleme
+[ ] B8. Profil istatistik kartı paylaşımı (react-native-view-shot)
+[ ] B9. Karıştır modu — rastgele film/dizi önerisi (SwipeCard mevcut!)
+[ ] B10. Gelişmiş filtreleme — yıl, tür, dil, puan (TMDB /discover)
+[ ] B11. Expo OTA güncelleme (expo-updates, mağaza güncellemesi gerektirmez)
+[ ] B12. TypeScript kademeli geçiş (yeni dosyalar .tsx olarak)
+
+================================================================================
+  ÖZET
+================================================================================
+
+ Bölüm   | Madde | Tahmini Süre
+──────────────────────────────────────────
+ ✅ Bitti | 5     | —
+ 🟢 Kolay | 11    | ~1-2 gün
+ 🟡 Orta  | 9     | ~1 hafta
+ 🔴 Zor   | 8     | ~2-3 hafta
+ 💡 Bonus | 12    | backlog
+──────────────────────────────────────────
+
+ÖNERİLEN BAŞLANGIÇ SIRASI (ilk oturum):
+  1.  formatDate bug (madde 1)          — crash'i düzelt
+  2.  t() undefined bug (madde 4)       — crash'i düzelt
+  3.  Toast + animasyon + setLoading    — 5-15 dk her biri
+  4.  Skeleton + console.log + imports  — 30 dk
+  5.  LottieView conditional render     — 30 dk
+  6.  listVisible map (madde 10)        — 2 saat
+  7.  likes → likeCount+likedBy (madde 11) — 4 saat
+
+================================================================================
+  GÜNCELLENMESİ GEREKEN ESKİ DOSYALAR
+================================================================================
+
+Bu dosya artık tek kaynak. Aşağıdakiler arşivlenebilir veya silinebilir:
+  - GELISTIRME_PLANI.txt
+  - PERFORMANS_OPTIMIZASYON_PLANI.txt
+  - performance_optimization.txt
+  - PERFORMANS_INCELEME_RAPORU.txt
+  - PERFORMANS_GUNCELLEME_ADIMLARI.txt
+  - FIRESTORE_SCHEMA.txt (şema referansı için tutulabilir)
+
+================================================================================
+  SON GÜNCELLEME: 2026-05-17
+================================================================================

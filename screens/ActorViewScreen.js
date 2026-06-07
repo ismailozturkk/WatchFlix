@@ -11,9 +11,9 @@ import {
   ActivityIndicator,
 } from "react-native";
 import axios from "axios";
-import { useTheme } from "../../context/ThemeContext";
-import { useAppSettings } from "../../context/AppSettingsContext";
-import { useLanguage } from "../../context/LanguageContext";
+import { useTheme } from "../context/ThemeContext";
+import { useApiSettings, useImageQualitySettings } from "../context/AppSettingsContext";
+import { useLanguage } from "../context/LanguageContext";
 
 const FILTERS = [
   { key: "popular", label: "Popüler" },
@@ -24,7 +24,7 @@ const FILTERS = [
 ];
 
 // Ortak MediaCard bileşeni (animasyonlu)
-const MediaCard = ({ item, onPress, theme }) => {
+const MediaCard = ({ item, onPress, theme, getTmdbUrl }) => {
   const [scale] = useState(new Animated.Value(1));
 
   const onPressIn = () => {
@@ -44,7 +44,7 @@ const MediaCard = ({ item, onPress, theme }) => {
   };
 
   const imageUrl = item.poster_path
-    ? `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`
+    ? getTmdbUrl(item.poster_path, 'poster', 200)
     : null;
 
   return (
@@ -124,7 +124,8 @@ const applyFilterForList = (list, filter, type) => {
 const ActorViewScreen = ({ route, navigation }) => {
   const { personId } = route.params;
   const { theme } = useTheme();
-  const { API_KEY } = useAppSettings();
+  const { API_KEY } = useApiSettings();
+  const { getTmdbUrl } = useImageQualitySettings();
   const [actor, setActor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -200,8 +201,7 @@ const ActorViewScreen = ({ route, navigation }) => {
       <View style={{ alignItems: "center", paddingTop: 20, marginBottom: 50 }}>
         <Image
           source={{
-            uri:
-              `https://image.tmdb.org/t/p/${imageQuality.poster}` + actor.profile_path,
+            uri: getTmdbUrl(actor.profile_path, 'profile', 200)
           }}
           style={{ width: 200, height: 300, borderRadius: 25 }}
         />
@@ -310,6 +310,7 @@ const ActorViewScreen = ({ route, navigation }) => {
           <MediaCard
             item={item}
             theme={theme}
+            getTmdbUrl={getTmdbUrl}
             onPress={() => navigation.navigate("MovieDetails", { id: item.id })}
           />
         )}
@@ -393,6 +394,7 @@ const ActorViewScreen = ({ route, navigation }) => {
           <MediaCard
             item={item}
             theme={theme}
+            getTmdbUrl={getTmdbUrl}
             onPress={() =>
               navigation.navigate("TvShowsDetails", { id: item.id })
             }

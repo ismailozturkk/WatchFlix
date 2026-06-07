@@ -3,28 +3,28 @@ import {
   View,
   Text,
   FlatList,
-  Image,
   Dimensions,
   TouchableOpacity,
   Animated,
 } from "react-native";
+import { Image } from "expo-image";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 //import { API_KEY } from "@env";
 const { width, height } = Dimensions.get("window");
 import { MovieUpComingSkeleton } from "../../components/Skeleton";
 import { useTvShow } from "../../context/TvShowContex";
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { useListStatus } from "../../modules/UseListStatus";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../context/AppSettingsContext";
 //import { API_KEY } from "@env";
 
 export default function TvShowBests({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const {
     seriesBest,
     setSelectedCategoryBest,
@@ -35,24 +35,24 @@ export default function TvShowBests({ navigation }) {
     loadingBest,
     categoriesBest,
     getCategoryTitleBest,
+    activateTvSection,
   } = useTvShow();
 
-  // Animated import'unun eklendiğinden emin olun
-  const [scaleValues, setScaleValues] = useState({});
-
   useEffect(() => {
-    const newScaleValues = {};
-    if (seriesBest && seriesBest.length > 0) {
-      seriesBest.forEach((item) => {
-        newScaleValues[item.id] = new Animated.Value(1);
-      });
-      setScaleValues(newScaleValues);
+    activateTvSection("best");
+  }, [activateTvSection]);
+
+  // Animated import'unun eklendiğinden emin olun
+  const scaleValuesRef = useRef({});
+  const getScaleValue = (itemId) => {
+    if (!scaleValuesRef.current[itemId]) {
+      scaleValuesRef.current[itemId] = new Animated.Value(1);
     }
-  }, [seriesBest]);
+    return scaleValuesRef.current[itemId];
+  };
 
   const onPressIn = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
+    Animated.timing(getScaleValue(itemId), {
       toValue: 0.9,
       duration: 200,
       useNativeDriver: true,
@@ -60,8 +60,7 @@ export default function TvShowBests({ navigation }) {
   };
 
   const onPressOut = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
+    Animated.timing(getScaleValue(itemId), {
       toValue: 1,
       duration: 200,
       useNativeDriver: true,
@@ -115,7 +114,7 @@ export default function TvShowBests({ navigation }) {
         />
 
         <FlatList
-          data={[1, 2, 3, 4, 5, 6, 7, 8, 9]}
+          data={[1, 2, 3]}
           renderItem={() => <MovieUpComingSkeleton />}
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -290,7 +289,7 @@ export default function TvShowBests({ navigation }) {
         <Animated.View
           style={[
             {
-              transform: [{ scale: scaleValues[item.id] || 1 }],
+              transform: [{ scale: getScaleValue(item.id) }],
             },
           ]}
         >
@@ -298,11 +297,13 @@ export default function TvShowBests({ navigation }) {
             source={
               item.poster_path
                 ? {
-                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                    uri: getTmdbUrl(item.poster_path, 'poster', 200),
                   }
                 : require("../../assets/image/no_image.png")
             }
             style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+            cachePolicy="memory-disk"
+            transition={120}
           />
           <View
             style={[
@@ -424,6 +425,11 @@ export default function TvShowBests({ navigation }) {
         contentContainerStyle={{ paddingHorizontal: 15 }}
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id.toString()}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        updateCellsBatchingPeriod={80}
+        windowSize={5}
+        removeClippedSubviews
         renderItem={renderMovieItem}
       />
       <View

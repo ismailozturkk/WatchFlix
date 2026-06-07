@@ -21,12 +21,11 @@ import {
   serverTimestamp,
   query,
   orderBy,
-  arrayUnion,
-  arrayRemove,
   doc,
   updateDoc,
   deleteDoc,
-  getDocs,
+  deleteField,
+  increment,
 } from "firebase/firestore";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
@@ -58,6 +57,10 @@ const CommentItem = memo(
     const [showSpoiler, setShowSpoiler] = useState(false);
     const scaleAnim = useRef(new Animated.Value(1)).current;
 
+    // Yeni likedBy map formatı, eski likes array'ine fallback
+    const isLiked = item.likedBy?.[currentUser.uid] ?? item.likes?.includes(currentUser.uid) ?? false;
+    const likeCount = item.likeCount ?? item.likes?.length ?? 0;
+
     const onLikePress = () => {
       try {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -74,8 +77,11 @@ const CommentItem = memo(
           useNativeDriver: true,
         }),
       ]).start();
-      handleLikeToggle(item.id, item.likes?.includes(currentUser.uid));
+      handleLikeToggle(item.id, isLiked);
     };
+
+    // Show the reply count: prefer server-tracked field, fall back to loaded list length
+    const totalReplies = Math.max(0, item.replyCount ?? 0) || replies.length;
 
     return (
       <View
@@ -184,29 +190,16 @@ const CommentItem = memo(
             <TouchableOpacity onPress={onLikePress} style={styles.actionButton}>
               <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
                 <MaterialCommunityIcons
-                  name={
-                    item.likes?.includes(currentUser.uid)
-                      ? "heart"
-                      : "heart-outline"
-                  }
+                  name={isLiked ? "heart" : "heart-outline"}
                   size={18}
-                  color={
-                    item.likes?.includes(currentUser.uid)
-                      ? theme.colors.red
-                      : theme.text.secondary
-                  }
+                  color={isLiked ? theme.colors.red : theme.text.secondary}
                 />
               </Animated.View>
               <Text
                 allowFontScaling={false}
-                style={[
-                  styles.actionLabel,
-                  item.likes?.includes(currentUser.uid) && {
-                    color: theme.colors.red,
-                  },
-                ]}
+                style={[styles.actionLabel, isLiked && { color: theme.colors.red }]}
               >
-                {item.likes?.length || 0}
+                {likeCount}
               </Text>
             </TouchableOpacity>
 
@@ -236,13 +229,14 @@ const CommentItem = memo(
             )}
           </View>
 
-          {!isReply && replies.length > 0 && (
+          {/* Only show toggle when there are (or were) replies */}
+          {!isReply && totalReplies > 0 && (
             <TouchableOpacity
               onPress={() => toggleReplyVisibility(item.id)}
               style={styles.repliesToggle}
             >
               <Text allowFontScaling={false} style={styles.repliesToggleText}>
-                {replies.length} Yanıt {isVisible ? "Gizle" : "Gör"}
+                {totalReplies} Yanıt {isVisible ? "Gizle" : "Gör"}
               </Text>
             </TouchableOpacity>
           )}
@@ -271,7 +265,10 @@ const Comment = ({ contextId }) => {
     replieText: null,
   });
 
-  // Firestore Dinleyicileri (Orijinal Mantık Korundu)
+  // One ref per comment — stores its active onSnapshot unsubscribe fn
+  const replyUnsubsRef = useRef({});
+
+  // ── Comments listener ────────────────────────────────────
   useEffect(() => {
     if (!contextId) return;
     const cid = contextId.toString();
@@ -280,37 +277,54 @@ const Comment = ({ contextId }) => {
       orderBy("timestamp", "desc"),
     );
     const unsub = onSnapshot(q, (snapshot) => {
-      const loaded = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const loaded = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
       setComments(loaded);
     });
     return () => unsub();
   }, [contextId]);
 
-  // Yanıt Dinleyicileri
+  // ── Cleanup all reply subscriptions on unmount ───────────
   useEffect(() => {
-    if (!contextId) return;
-    const cid = contextId.toString();
-    comments.forEach((comment) => {
-      const rq = query(
-        collection(db, "MovieComment", cid, "comments", comment.id, "replies"),
-        orderBy("timestamp", "asc"),
-      );
-      onSnapshot(rq, (snap) => {
-        setRepliesMap((prev) => ({
-          ...prev,
-          [comment.id]: snap.docs.map((d) => ({
-            id: d.id,
-            ...d.data(),
-            parentId: comment.id,
-          })),
-        }));
-      });
-    });
-  }, [comments]);
+    return () => {
+      Object.values(replyUnsubsRef.current).forEach((u) => u());
+      replyUnsubsRef.current = {};
+    };
+  }, []);
 
+  // ── Lazy reply subscription: open on expand, close on collapse ──
+  const toggleReplyVisibility = useCallback(
+    (id) => {
+      setReplyVisibility((prev) => {
+        const willBeVisible = !prev[id];
+
+        if (willBeVisible && !replyUnsubsRef.current[id]) {
+          const cid = contextId.toString();
+          const rq = query(
+            collection(db, "MovieComment", cid, "comments", id, "replies"),
+            orderBy("timestamp", "asc"),
+          );
+          replyUnsubsRef.current[id] = onSnapshot(rq, (snap) => {
+            setRepliesMap((rm) => ({
+              ...rm,
+              [id]: snap.docs.map((d) => ({
+                id: d.id,
+                ...d.data(),
+                parentId: id,
+              })),
+            }));
+          });
+        } else if (!willBeVisible && replyUnsubsRef.current[id]) {
+          replyUnsubsRef.current[id]();
+          delete replyUnsubsRef.current[id];
+        }
+
+        return { ...prev, [id]: willBeVisible };
+      });
+    },
+    [contextId],
+  );
+
+  // ── Add / Edit ───────────────────────────────────────────
   const handleAddOrEdit = async () => {
     const { text, isSpoiler, parentId, editId, isReply } = commentInputState;
     if (!text.trim() || isSending) return;
@@ -320,53 +334,74 @@ const Comment = ({ contextId }) => {
     try {
       if (editId) {
         const ref = isReply
-          ? doc(
-              db,
-              "MovieComment",
-              cid,
-              "comments",
-              parentId,
-              "replies",
-              editId,
-            )
+          ? doc(db, "MovieComment", cid, "comments", parentId, "replies", editId)
           : doc(db, "MovieComment", cid, "comments", editId);
         await updateDoc(ref, { text: text.trim(), isSpoiler });
-      } else {
-        const col = isReply
-          ? collection(db, "MovieComment", cid, "comments", parentId, "replies")
-          : collection(db, "MovieComment", cid, "comments");
-        await addDoc(col, {
-          userId: currentUser.uid,
-          username: currentUser.displayName || "Anonim",
-          avatar: currentUser.photoURL,
-          text: text.trim(),
-          isSpoiler,
-          parentId: isReply ? parentId : null,
-          likes: [],
-          timestamp: serverTimestamp(),
+      } else if (isReply) {
+        await addDoc(
+          collection(db, "MovieComment", cid, "comments", parentId, "replies"),
+          {
+            userId:    currentUser.uid,
+            username:  currentUser.displayName || "Anonim",
+            avatar:    currentUser.photoURL,
+            text:      text.trim(),
+            isSpoiler,
+            parentId,
+            likeCount: 0,
+            likedBy:   {},
+            timestamp: serverTimestamp(),
+          },
+        );
+        // Increment replyCount on parent comment
+        await updateDoc(doc(db, "MovieComment", cid, "comments", parentId), {
+          replyCount: increment(1),
         });
+      } else {
+        await addDoc(
+          collection(db, "MovieComment", cid, "comments"),
+          {
+            userId:     currentUser.uid,
+            username:   currentUser.displayName || "Anonim",
+            avatar:     currentUser.photoURL,
+            text:       text.trim(),
+            isSpoiler,
+            parentId:   null,
+            likeCount:  0,
+            likedBy:    {},
+            replyCount: 0,
+            timestamp:  serverTimestamp(),
+          },
+        );
       }
+
       setCommentInputState({
-        text: "",
-        isSpoiler: false,
-        parentId: null,
-        editId: null,
-        isReply: false,
-        replieName: null,
-        replieText: null,
+        text: "", isSpoiler: false, parentId: null,
+        editId: null, isReply: false, replieName: null, replieText: null,
       });
     } finally {
       setIsSending(false);
     }
   };
 
+  // ── Delete ───────────────────────────────────────────────
   const handleDelete = async (id, pid = null) => {
     const cid = contextId.toString();
-    if (pid)
+    if (pid) {
       await deleteDoc(
         doc(db, "MovieComment", cid, "comments", pid, "replies", id),
       );
-    else await deleteDoc(doc(db, "MovieComment", cid, "comments", id));
+      // Decrement replyCount (guard against going below 0)
+      await updateDoc(doc(db, "MovieComment", cid, "comments", pid), {
+        replyCount: increment(-1),
+      });
+    } else {
+      // Close any open reply subscription before deleting the comment
+      if (replyUnsubsRef.current[id]) {
+        replyUnsubsRef.current[id]();
+        delete replyUnsubsRef.current[id];
+      }
+      await deleteDoc(doc(db, "MovieComment", cid, "comments", id));
+    }
   };
 
   return (
@@ -388,22 +423,20 @@ const Comment = ({ contextId }) => {
               theme={theme}
               replies={repliesMap[item.id] || []}
               isVisible={replyVisibility[item.id]}
-              toggleReplyVisibility={(id) =>
-                setReplyVisibility((p) => ({ ...p, [id]: !p[id] }))
-              }
+              toggleReplyVisibility={toggleReplyVisibility}
               handleLikeToggle={(id, liked) => {
-                const ref = doc(
-                  db,
-                  "MovieComment",
-                  contextId.toString(),
-                  "comments",
-                  id,
-                );
-                updateDoc(ref, {
-                  likes: liked
-                    ? arrayRemove(currentUser.uid)
-                    : arrayUnion(currentUser.uid),
-                });
+                const ref = doc(db, "MovieComment", contextId.toString(), "comments", id);
+                if (liked) {
+                  updateDoc(ref, {
+                    likeCount: increment(-1),
+                    [`likedBy.${currentUser.uid}`]: deleteField(),
+                  });
+                } else {
+                  updateDoc(ref, {
+                    likeCount: increment(1),
+                    [`likedBy.${currentUser.uid}`]: true,
+                  });
+                }
               }}
               setCommentInputState={setCommentInputState}
               handleDeleteComment={(id) => handleDelete(id)}
@@ -421,19 +454,20 @@ const Comment = ({ contextId }) => {
                   handleDeleteReply={(pid, id) => handleDelete(id, pid)}
                   handleLikeToggle={(id, liked) => {
                     const ref = doc(
-                      db,
-                      "MovieComment",
-                      contextId.toString(),
-                      "comments",
-                      item.id,
-                      "replies",
-                      id,
+                      db, "MovieComment", contextId.toString(),
+                      "comments", item.id, "replies", id,
                     );
-                    updateDoc(ref, {
-                      likes: liked
-                        ? arrayRemove(currentUser.uid)
-                        : arrayUnion(currentUser.uid),
-                    });
+                    if (liked) {
+                      updateDoc(ref, {
+                        likeCount: increment(-1),
+                        [`likedBy.${currentUser.uid}`]: deleteField(),
+                      });
+                    } else {
+                      updateDoc(ref, {
+                        likeCount: increment(1),
+                        [`likedBy.${currentUser.uid}`]: true,
+                      });
+                    }
                   }}
                 />
               ))}
@@ -455,21 +489,12 @@ const Comment = ({ contextId }) => {
             <TouchableOpacity
               onPress={() =>
                 setCommentInputState({
-                  text: "",
-                  isSpoiler: false,
-                  parentId: null,
-                  editId: null,
-                  isReply: false,
-                  replieName: null,
-                  replieText: null,
+                  text: "", isSpoiler: false, parentId: null,
+                  editId: null, isReply: false, replieName: null, replieText: null,
                 })
               }
             >
-              <Ionicons
-                name="close-circle"
-                size={20}
-                color={theme.colors.red}
-              />
+              <Ionicons name="close-circle" size={20} color={theme.colors.red} />
             </TouchableOpacity>
           </View>
         )}
@@ -480,9 +505,7 @@ const Comment = ({ contextId }) => {
               allowFontScaling={false}
               style={[
                 styles.spoilerBtnText,
-                commentInputState.isSpoiler && {
-                  color: theme.colors.red,
-                },
+                commentInputState.isSpoiler && { color: theme.colors.red },
               ]}
             >
               Spoiler
@@ -505,10 +528,7 @@ const Comment = ({ contextId }) => {
           <View style={styles.inputFooter}>
             <TouchableOpacity
               onPress={() =>
-                setCommentInputState((p) => ({
-                  ...p,
-                  isSpoiler: !p.isSpoiler,
-                }))
+                setCommentInputState((p) => ({ ...p, isSpoiler: !p.isSpoiler }))
               }
               style={[
                 styles.spoilerButton,
@@ -584,19 +604,12 @@ const getStyles = (theme) =>
     },
     userInfo: { flexDirection: "row", alignItems: "center", gap: 10 },
     ownerActions: { flexDirection: "row", alignItems: "center" },
-    avatar: {
-      width: 34,
-      height: 34,
-    },
+    avatar: { width: 34, height: 34 },
     username: { color: theme.text.primary, fontSize: 13, fontWeight: "700" },
     timestamp: { color: theme.text.muted, fontSize: 10 },
 
     contentBody: { marginVertical: 8 },
-    commentText: {
-      color: theme.text.primary,
-      fontSize: 14,
-      lineHeight: 20,
-    },
+    commentText: { color: theme.text.primary, fontSize: 14, lineHeight: 20 },
     commentContentWrapper: {
       flexDirection: "row",
       justifyContent: "space-between",
@@ -612,11 +625,7 @@ const getStyles = (theme) =>
       justifyContent: "center",
       gap: 8,
     },
-    spoilerText: {
-      color: theme.text.secondary,
-      fontSize: 12,
-      fontWeight: "600",
-    },
+    spoilerText: { color: theme.text.secondary, fontSize: 12, fontWeight: "600" },
 
     actionsRow: {
       flexDirection: "row",
@@ -626,17 +635,9 @@ const getStyles = (theme) =>
     },
     leftActions: { flexDirection: "row", gap: 18 },
     actionButton: { flexDirection: "row", alignItems: "center", gap: 5 },
-    actionLabel: {
-      color: theme.text.secondary,
-      fontSize: 12,
-      fontWeight: "600",
-    },
+    actionLabel: { color: theme.text.secondary, fontSize: 12, fontWeight: "600" },
     repliesToggle: { paddingVertical: 4 },
-    repliesToggleText: {
-      color: theme.text.secondary,
-      fontSize: 12,
-      fontWeight: "700",
-    },
+    repliesToggleText: { color: theme.text.secondary, fontSize: 12, fontWeight: "700" },
 
     inputWrapper: {
       position: "absolute",
@@ -650,9 +651,8 @@ const getStyles = (theme) =>
     },
     inputRow: {
       flexDirection: "row",
-      alignItems: "flex-end",
-      gap: 6,
       alignItems: "center",
+      gap: 6,
       justifyContent: "space-between",
     },
     input: {
@@ -682,10 +682,7 @@ const getStyles = (theme) =>
     },
     disabledBtn: { backgroundColor: theme.secondaryt, opacity: 0.5 },
 
-    inputFooter: {
-      flexDirection: "row",
-      justifyContent: "flex-start",
-    },
+    inputFooter: { flexDirection: "row", justifyContent: "flex-start" },
     spoilerButton: {
       flexDirection: "row",
       alignItems: "center",

@@ -11,7 +11,7 @@ import { useNavigation } from "@react-navigation/native";
 import { WatchedInfoSkeleton } from "../../../components/Skeleton";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
-import { useProfileScreen } from "../../../context/ProfileScreenContext";
+import { useProfileStats } from "../../../context/ProfileStatsContext";
 import { LinearGradient } from "expo-linear-gradient";
 
 const StatisticsSection = () => {
@@ -35,7 +35,7 @@ const StatisticsSection = () => {
     borderColorMovie,
     rankNameTv,
     rankNameMovie,
-  } = useProfileScreen();
+  } = useProfileStats();
 
   const scaleAnimTv = useRef(new Animated.Value(1)).current;
   const scaleAnimMovie = useRef(new Animated.Value(1)).current;

@@ -16,15 +16,18 @@ const { width: SCREEN_W } = Dimensions.get("window");
 const TAB_W = (SCREEN_W - 32) / 2;
 import {
   doc,
+  collection,
   onSnapshot,
   updateDoc,
   arrayUnion,
+  setDoc,
+  deleteDoc,
   getDoc,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { db } from "../../../firebase";
 import { useTheme } from "../../../context/ThemeContext";
-import { useProfileScreen } from "../../../context/ProfileScreenContext";
+import { useProfileUi } from "../../../context/ProfileUiContext";
 import SwipeCard from "../../../modules/SwipeCard";
 import IconBacground from "../../../components/IconBacground";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -37,7 +40,7 @@ export default function FriendRequestsScreen() {
   const auth = getAuth();
   const { theme } = useTheme();
   const user = auth.currentUser;
-  const { avatars } = useProfileScreen();
+  const { avatars } = useProfileUi();
 
   const tabAnim = useRef(new Animated.Value(0)).current;
   const titleAnim = useRef(new Animated.Value(0)).current;
@@ -74,39 +77,35 @@ export default function FriendRequestsScreen() {
   };
 
   const handleAccept = async (friend) => {
-    const userRef = doc(db, "Users", user.uid);
+    const userRef   = doc(db, "Users", user.uid);
     const friendRef = doc(db, "Users", friend.uid);
-    const userSnap = await getDoc(userRef);
-    const friendSnap = await getDoc(friendRef);
+    const [userSnap, friendSnap] = await Promise.all([getDoc(userRef), getDoc(friendRef)]);
     if (!userSnap.exists() || !friendSnap.exists()) return;
-    const userData = userSnap.data();
+    const userData   = userSnap.data();
     const friendData = friendSnap.data();
     const currentUserObj = {
-      uid: user.uid,
-      displayName: user.displayName,
-      username: userData.username || "",
-      avatarIndex: userData.avatarIndex || 0,
+      uid: user.uid, displayName: user.displayName,
+      username: userData.username || "", avatarIndex: userData.avatarIndex || 0,
     };
     const friendObj = {
-      uid: friend.uid,
-      displayName: friend.displayName,
-      username: friend.username,
-      avatarIndex: friend.avatarIndex || 0,
+      uid: friend.uid, displayName: friend.displayName,
+      username: friend.username, avatarIndex: friend.avatarIndex || 0,
     };
-    await updateDoc(userRef, {
-      friends: arrayUnion(friendObj),
-      "friendRequests.receivedRequest":
-        userData.friendRequests.receivedRequest.filter(
-          (req) => req.uid !== friend.uid,
-        ),
-    });
-    await updateDoc(friendRef, {
-      friends: arrayUnion(currentUserObj),
-      "friendRequests.sendRequest":
-        friendData.friendRequests.sendRequest.filter(
-          (req) => req.uid !== user.uid,
-        ),
-    });
+    // Subcollection'a yaz + root-doc array güncelle (dual-write)
+    await Promise.all([
+      setDoc(doc(db, "Users", user.uid,   "friends", friend.uid),  friendObj),
+      setDoc(doc(db, "Users", friend.uid, "friends", user.uid),    currentUserObj),
+      updateDoc(userRef, {
+        friends: arrayUnion(friendObj),
+        "friendRequests.receivedRequest":
+          (userData.friendRequests?.receivedRequest || []).filter((r) => r.uid !== friend.uid),
+      }),
+      updateDoc(friendRef, {
+        friends: arrayUnion(currentUserObj),
+        "friendRequests.sendRequest":
+          (friendData.friendRequests?.sendRequest || []).filter((r) => r.uid !== user.uid),
+      }),
+    ]);
   };
 
   const handleDecline = async (friend) => {

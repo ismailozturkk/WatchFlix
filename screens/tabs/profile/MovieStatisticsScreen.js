@@ -10,13 +10,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useProfileScreen } from "../../../context/ProfileScreenContext";
+import { useProfileStats } from "../../../context/ProfileStatsContext";
 import { useTheme } from "../../../context/ThemeContext";
 import { Picker } from "@react-native-picker/picker"; // veya başka bir dropdown kütüphanesi
 import Fontisto from "@expo/vector-icons/Fontisto";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
-import { useAppSettings } from "../../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 const MovieStatisticsScreen = ({ navigation }) => {
   const {
     watchedMovieCount,
@@ -37,11 +37,11 @@ const MovieStatisticsScreen = ({ navigation }) => {
     timeDisplayMode,
     totalMinutesTime,
     handleTimeClick,
-  } = useProfileScreen();
+  } = useProfileStats();
   const { theme } = useTheme();
   const [searchVisible, setSearchVisible] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const [search, setSearch] = useState("");
   const filteredGroupedData = groupedData
     .map((section) => ({
@@ -652,7 +652,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
                               source={
                                 item.imagePath
                                   ? {
-                                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
+                                      uri: getTmdbUrl(item.imagePath, 'poster', 200),
                                     }
                                   : require("../../../assets/image/no_image.png")
                               }

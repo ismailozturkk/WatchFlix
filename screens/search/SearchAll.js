@@ -13,7 +13,7 @@ import {
 import axios from "axios";
 import { Ionicons } from "@expo/vector-icons";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useAppSettings, useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import LottieView from "lottie-react-native";
@@ -22,7 +22,7 @@ const SearchAll = ({ navigation }) => {
   const { theme } = useTheme();
   const { t } = useLanguage();
   const { API_KEY, language, adultContent, imageQuality } = useAppSettings();
-  const IMAGE_URL = `https://image.tmdb.org/t/p/${imageQuality.poster}`;
+  const { getTmdbUrl } = useImageQualitySettings();
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
@@ -149,7 +149,7 @@ const SearchAll = ({ navigation }) => {
           >
             {image ? (
               <Image
-                source={{ uri: `${IMAGE_URL}${image}` }}
+                source={{ uri: getTmdbUrl(image, 'poster', 200) }}
                 style={{
                   width: 70,
                   height: 105,

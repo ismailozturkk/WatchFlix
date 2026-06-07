@@ -24,7 +24,11 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
 import AntDesign from "@expo/vector-icons/AntDesign";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import {
+  useApiSettings,
+  useImageQualitySettings,
+  useSnowSettings,
+} from "../../context/AppSettingsContext";
 import Reminder from "../../components/Reminder";
 
 const { width } = Dimensions.get("window");
@@ -98,7 +102,7 @@ const EpisodeCard = memo(
             <>
               <Image
                 source={{
-                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${episode.still_path}`,
+                  uri: getTmdbUrl(episode.still_path, 'poster', 200),
                 }}
                 style={styles.episodeThumbnail}
               />
@@ -309,7 +313,9 @@ export default function SeasonDetails({ route, navigation }) {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { API_KEY, showSnow, imageQuality } = useAppSettings();
+  const { API_KEY } = useApiSettings();
+  const { showSnow } = useSnowSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
 
   // ── Yardımcılar ───────────────────────────────────────────────────────────
   const formatDate = useCallback(
@@ -447,7 +453,7 @@ export default function SeasonDetails({ route, navigation }) {
         {details.poster_path ? (
           <Image
             source={{
-              uri: `https://image.tmdb.org/t/p/original${details.poster_path}`,
+              uri: getTmdbUrl(details.poster_path, 'poster', 200),
             }}
             style={styles.heroPoster}
           />

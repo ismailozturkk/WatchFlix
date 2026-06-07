@@ -10,13 +10,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useProfileScreen } from "../../../context/ProfileScreenContext";
+import { useProfileStats } from "../../../context/ProfileStatsContext";
 import { useTheme } from "../../../context/ThemeContext";
 import { Picker } from "@react-native-picker/picker"; // veya başka bir dropdown kütüphanesi
 import Fontisto from "@expo/vector-icons/Fontisto";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
-import { useAppSettings } from "../../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 
 const TvStatisticsScreen = ({ navigation }) => {
   const {
@@ -42,8 +42,8 @@ const TvStatisticsScreen = ({ navigation }) => {
     setSelectedDateTv,
     flatEpisodesTv,
     totalSeasonsCount,
-  } = useProfileScreen();
-  const { imageQuality } = useAppSettings();
+  } = useProfileStats();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const { theme } = useTheme();
   const [searchVisible, setSearchVisible] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -772,7 +772,7 @@ const TvStatisticsScreen = ({ navigation }) => {
                               source={
                                 item.showImage
                                   ? {
-                                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.seasonPosterPath}`,
+                                      uri: getTmdbUrl(item.seasonPosterPath, 'poster', 200),
                                     }
                                   : require("../../../assets/image/no_image.png")
                               }

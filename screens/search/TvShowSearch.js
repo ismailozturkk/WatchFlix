@@ -24,7 +24,7 @@ import Toast from "react-native-toast-message";
 import { useAuth } from "../../context/AuthContext";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useAppSettings, useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useListStatus } from "../../modules/UseListStatus";
 import { useFocusEffect } from "@react-navigation/native";
 import IconBacground from "../../components/IconBacground";
@@ -181,6 +181,7 @@ const ListBadge = memo(
 
 // ─── ROW KART ─────────────────────────────────────────────────────────────────
 const TvRowItem = memo(({ item, navigation, imageQuality, theme, index }) => {
+  const { getTmdbUrl } = useImageQualitySettings();
   const { inWatchList, inFavorites, isWatched, isInOtherLists } = useListStatus(
     item.id,
     "tv",
@@ -216,7 +217,7 @@ const TvRowItem = memo(({ item, navigation, imageQuality, theme, index }) => {
             <>
               <Image
                 source={{
-                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.backdrop_path}`,
+                  uri: getTmdbUrl(item.backdrop_path, 'poster', 200),
                 }}
                 style={styles.rowBackdrop}
               />
@@ -233,7 +234,7 @@ const TvRowItem = memo(({ item, navigation, imageQuality, theme, index }) => {
             <View style={styles.rowPosterWrapper}>
               <Image
                 source={{
-                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                  uri: getTmdbUrl(item.poster_path, 'poster', 200),
                 }}
                 style={styles.rowPoster}
               />
@@ -317,6 +318,7 @@ const TvRowItem = memo(({ item, navigation, imageQuality, theme, index }) => {
 
 // ─── GRID POSTER KART ─────────────────────────────────────────────────────────
 const TvGridItem = memo(({ item, navigation, imageQuality, theme, index }) => {
+  const { getTmdbUrl } = useImageQualitySettings();
   const { inWatchList, inFavorites, isWatched, isInOtherLists } = useListStatus(
     item.id,
     "tv",
@@ -342,7 +344,7 @@ const TvGridItem = memo(({ item, navigation, imageQuality, theme, index }) => {
           {item.poster_path ? (
             <Image
               source={{
-                uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                uri: getTmdbUrl(item.poster_path, 'poster', 200),
               }}
               style={styles.gridPoster}
             />

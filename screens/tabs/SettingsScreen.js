@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
   View,
@@ -11,6 +11,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  InteractionManager,
 } from "react-native";
 import { useLanguage } from "../../context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -18,7 +19,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../context/ThemeContext";
 import LottieView from "lottie-react-native";
 import SettingsTheme from "./setting/SettingsTheme";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import {
+  useContentSettings,
+  useImageQualitySettings,
+  useOngoingTvShowsSettings,
+  useSnowSettings,
+  useIconBackgroundSettings,
+} from "../../context/AppSettingsContext";
 import SwitchToggle from "../../modules/SwitchToggle";
 import SwipeCard from "../../modules/SwipeCard";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
@@ -140,18 +147,30 @@ export default function SettingsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [langSearch, setLangSearch] = useState("");
+  const [renderSnow, setRenderSnow] = useState(false);
 
   const { t, language, toggleLanguage } = useLanguage();
   const { theme } = useTheme();
-  const {
-    chaneAdultContent,
-    adultContent,
-    showSnow,
-    changeShowSnow,
-    imageQuality,
-    imageQualityLevel,
-    changeImageQuality,
-  } = useAppSettings();
+  const { adultContent, chaneAdultContent } = useContentSettings();
+  const { showSnow, changeShowSnow } = useSnowSettings();
+  const { showIconBackground, changeShowIconBackground } = useIconBackgroundSettings();
+  const { showOngoingTvShows, changeShowOngoingTvShows } =
+    useOngoingTvShowsSettings();
+  const { imageQuality, imageQualityLevel, changeImageQuality } =
+    useImageQualitySettings();
+
+  useEffect(() => {
+    if (!showSnow) {
+      setRenderSnow(false);
+      return undefined;
+    }
+
+    const task = InteractionManager.runAfterInteractions(() => {
+      setRenderSnow(true);
+    });
+
+    return () => task.cancel?.();
+  }, [showSnow]);
 
   const C = buildUiColors(theme);
 
@@ -191,21 +210,13 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {showSnow && (
-          <>
-            <LottieView
-              style={s.lottie}
-              source={require("../../LottieJson/snow.json")}
-              autoPlay
-              loop
-            />
-            <LottieView
-              style={s.lottie1}
-              source={require("../../LottieJson/snow.json")}
-              autoPlay
-              loop
-            />
-          </>
+        {renderSnow && (
+          <LottieView
+            style={s.lottie}
+            source={require("../../LottieJson/snow.json")}
+            autoPlay
+            loop
+          />
         )}
 
         <Text allowFontScaling={false} style={[s.pageTitle, { color: C.text }]}>
@@ -332,6 +343,21 @@ export default function SettingsScreen() {
           />
           <SettingRow
             colors={C}
+            iconBg={C.iconBlue}
+            iconColor={C.blue}
+            iconName={showIconBackground ? "image-outline" : "image-sharp"}
+            title="İkon Arka Plan"
+            subtitle="Sayfalardaki desenli arka plan"
+            right={
+              <SwitchToggle
+                value={showIconBackground}
+                onValueChange={changeShowIconBackground}
+                size={36}
+              />
+            }
+          />
+          <SettingRow
+            colors={C}
             iconBg={C.iconAmber}
             iconColor={C.amber}
             iconName="cloud-download-outline"
@@ -352,6 +378,21 @@ export default function SettingsScreen() {
               <SwitchToggle
                 value={adultContent}
                 onValueChange={() => chaneAdultContent(!adultContent)}
+                size={36}
+              />
+            }
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconGreen}
+            iconColor={C.green}
+            iconName={showOngoingTvShows ? "play-circle-outline" : "pause-circle-outline"}
+            title={t.showOngoingTvShows}
+            subtitle="Devam eden diziler sekmesini göster"
+            right={
+              <SwitchToggle
+                value={showOngoingTvShows}
+                onValueChange={changeShowOngoingTvShows}
                 size={36}
               />
             }
@@ -678,15 +719,7 @@ const s = StyleSheet.create({
   lottie: {
     position: "absolute",
     top: 0,
-    height: 1000,
-    left: -60,
-    right: -60,
-    zIndex: 0,
-  },
-  lottie1: {
-    position: "absolute",
-    top: 1000,
-    height: 1000,
+    height: 1600,
     left: -60,
     right: -60,
     zIndex: 0,

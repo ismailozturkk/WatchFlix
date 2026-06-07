@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   Text,
   TouchableOpacity,
   StyleSheet,
   FlatList,
   View,
-  Image,
   Dimensions,
   Animated,
 } from "react-native";
+import { Image } from "expo-image";
 import { useTheme } from "../../context/ThemeContext";
 import { MovieUpComingSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
@@ -16,37 +16,37 @@ import { useTvShow } from "../../context/TvShowContex";
 import { useLanguage } from "../../context/LanguageContext";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../context/AppSettingsContext";
 const { width } = Dimensions.get("window");
 
 export default function TvShowsOnTheAir({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const {
     pageOnTheAir,
     setPageOnTheAir,
     moviesOnTheAir,
     totalPagesOnTheAir,
     loadingOnTheAir,
+    activateTvSection,
   } = useTvShow();
 
-  // Animated import'unun eklendiğinden emin olun
-  const [scaleValues, setScaleValues] = useState({});
-
   useEffect(() => {
-    const newScaleValues = {};
-    if (moviesOnTheAir && moviesOnTheAir.length > 0) {
-      moviesOnTheAir.forEach((item) => {
-        newScaleValues[item.id] = new Animated.Value(1);
-      });
-      setScaleValues(newScaleValues);
+    activateTvSection("onTheAir");
+  }, [activateTvSection]);
+
+  // Animated import'unun eklendiğinden emin olun
+  const scaleValuesRef = useRef({});
+  const getScaleValue = (itemId) => {
+    if (!scaleValuesRef.current[itemId]) {
+      scaleValuesRef.current[itemId] = new Animated.Value(1);
     }
-  }, [moviesOnTheAir]);
+    return scaleValuesRef.current[itemId];
+  };
 
   const onPressIn = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
+    Animated.timing(getScaleValue(itemId), {
       toValue: 0.9,
       duration: 200,
       useNativeDriver: true,
@@ -54,8 +54,7 @@ export default function TvShowsOnTheAir({ navigation }) {
   };
 
   const onPressOut = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
+    Animated.timing(getScaleValue(itemId), {
       toValue: 1,
       duration: 200,
       useNativeDriver: true,
@@ -75,7 +74,7 @@ export default function TvShowsOnTheAir({ navigation }) {
         </View>
 
         <FlatList
-          data={[1, 2, 3, 4, 5, 6, 7, 8, 9]}
+          data={[1, 2, 3]}
           renderItem={() => <MovieUpComingSkeleton />}
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -250,7 +249,7 @@ export default function TvShowsOnTheAir({ navigation }) {
           <Animated.View
             style={[
               {
-                transform: [{ scale: scaleValues[item.id] || 1 }],
+                transform: [{ scale: getScaleValue(item.id) }],
               },
             ]}
           >
@@ -258,11 +257,13 @@ export default function TvShowsOnTheAir({ navigation }) {
               source={
                 item.poster_path
                   ? {
-                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                      uri: getTmdbUrl(item.poster_path, 'poster', 200),
                     }
                   : require("../../assets/image/no_image.png")
               }
               style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+              cachePolicy="memory-disk"
+              transition={120}
             />
 
             <View
@@ -381,6 +382,11 @@ export default function TvShowsOnTheAir({ navigation }) {
         contentContainerStyle={{ paddingHorizontal: 15 }}
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id.toString()}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        updateCellsBatchingPeriod={80}
+        windowSize={5}
+        removeClippedSubviews
         renderItem={renderMovieItem}
       />
       <View

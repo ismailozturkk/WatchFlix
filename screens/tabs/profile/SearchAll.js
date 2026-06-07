@@ -22,7 +22,7 @@ const SearchAll = ({ navigation }) => {
   const { theme } = useTheme();
   const { t } = useLanguage();
   const { API_KEY, language, adultContent, imageQuality } = useAppSettings();
-  const IMAGE_URL = `https://image.tmdb.org/t/p/${imageQuality.poster}`;
+  const { getTmdbUrl } = useImageQualitySettings();
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
@@ -149,7 +149,7 @@ const SearchAll = ({ navigation }) => {
           >
             {image ? (
               <Image
-                source={{ uri: `${IMAGE_URL}${image}` }}
+                source={{ uri: `getTmdbUrl(image, 'poster', 200)` }}
                 style={{
                   width: 70,
                   height: 105,

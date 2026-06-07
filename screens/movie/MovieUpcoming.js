@@ -5,10 +5,10 @@ import {
   StyleSheet,
   FlatList,
   View,
-  Image,
   Dimensions,
   Animated,
 } from "react-native";
+import { Image } from "expo-image";
 import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -16,7 +16,7 @@ import { Dropdown } from "react-native-element-dropdown";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { MovieUpComingSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import { useListStatus } from "../../modules/UseListStatus";
 const { width } = Dimensions.get("window");
@@ -36,8 +36,13 @@ export default function MovieUpcoming({ navigation }) {
     setIsFocusUpcoming,
     valueUpcoming,
     RelaseCount,
+    activateMovieSection,
   } = useMovie();
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+
+  useEffect(() => {
+    activateMovieSection("upcoming");
+  }, [activateMovieSection]);
 
   // Animated import'unun eklendiğinden emin olun
   const [scaleValues, setScaleValues] = useState({});
@@ -121,7 +126,7 @@ export default function MovieUpcoming({ navigation }) {
         </View>
 
         <FlatList
-          data={[1, 2, 3, 4, 5, 6, 7, 8, 9]}
+          data={[1, 2, 3]}
           renderItem={() => <MovieUpComingSkeleton />}
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -317,11 +322,13 @@ export default function MovieUpcoming({ navigation }) {
               source={
                 item.poster_path
                   ? {
-                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                      uri: getTmdbUrl(item.poster_path, 'poster', 200),
                     }
                   : require("../../assets/image/no_image.png")
               }
               style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+              cachePolicy="memory-disk"
+              transition={120}
             />
 
             <View
@@ -475,6 +482,11 @@ export default function MovieUpcoming({ navigation }) {
         contentContainerStyle={{ paddingHorizontal: 15 }}
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id.toString()}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        updateCellsBatchingPeriod={80}
+        windowSize={5}
+        removeClippedSubviews
         renderItem={renderMovieItem}
       />
       <View

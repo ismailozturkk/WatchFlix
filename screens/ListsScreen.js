@@ -15,8 +15,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../context/ThemeContext";
-import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { useListStatusContext } from "../context/ListStatusContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import SkeletonPlaceholder from "react-native-skeleton-placeholder";
@@ -24,7 +25,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Toast from "react-native-toast-message";
 import SwipeCard from "../modules/SwipeCard";
 import { BlurView } from "expo-blur";
-import { useAppSettings } from "../context/AppSettingsContext";
+import { useImageQualitySettings } from "../context/AppSettingsContext";
 import CaseOpeningModal from "../components/CaseOpeningModal";
 import Feather from "@expo/vector-icons/Feather";
 const { width, height } = Dimensions.get("window");
@@ -36,7 +37,8 @@ export default function ListsScreen({ route, navigation }) {
   const [searchQuery, setSearchQuery] = useState(""); // Arama için state
   const { t, language } = useLanguage();
   const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
+  const { allLists, loading: listsLoading } = useListStatusContext();
+  const [isLoading, setIsLoading] = useState(listsLoading);
   const [modalVisible, setModalVisible] = useState(false);
   const [reorderModalVisible, setReorderModalVisible] = useState(false);
   const [index, setIndex] = useState(0);
@@ -45,7 +47,7 @@ export default function ListsScreen({ route, navigation }) {
   const [filterType, setFilterType] = useState("mixed");
   // Gesture tracking removed in favor of a cleaner 3-way segmented toggle.
   const [value, setValue] = useState("");
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
 
   const handleChange = (text) => {
     // Sadece rakamları al
@@ -98,13 +100,18 @@ export default function ListsScreen({ route, navigation }) {
   };
   const [scaleValues, setScaleValues] = useState({});
   useEffect(() => {
-    const newScaleValues = {};
-    if (listItems && listItems.length > 0) {
+    if (!listItems?.length) return;
+    setScaleValues((prev) => {
+      let changed = false;
+      const next = { ...prev };
       listItems.forEach((item) => {
-        newScaleValues[item.id] = new Animated.Value(1);
+        if (!next[item.id]) {
+          next[item.id] = new Animated.Value(1);
+          changed = true;
+        }
       });
-      setScaleValues(newScaleValues);
-    }
+      return changed ? next : prev;
+    });
   }, [listItems]);
 
   const onPressIn = (itemId) => {
@@ -126,22 +133,11 @@ export default function ListsScreen({ route, navigation }) {
   };
 
   useEffect(() => {
-    if (!user.uid || !listName) return;
-    setIsLoading(true);
-    const docRef = doc(db, "Lists", user.uid);
-
-    // Firestore'dan veriyi dinamik olarak çek
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setListItems(data[listName] || []);
-      } else {
-        setListItems([]);
-      }
-    });
-    setIsLoading(false);
-    return () => unsubscribe();
-  }, [user.uid, listName]);
+    setIsLoading(listsLoading);
+    if (!listsLoading) {
+      setListItems(allLists?.[listName] || []);
+    }
+  }, [allLists, listName, listsLoading]);
 
   const reorderWatchedTv = async (fromIndex, toIndex, listName) => {
     try {
@@ -695,7 +691,7 @@ export default function ListsScreen({ route, navigation }) {
                       source={
                         item.imagePath
                           ? {
-                              uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
+                              uri: getTmdbUrl(item.imagePath, 'poster', 200),
                             }
                           : require("../assets/image/no_image.png")
                       }
@@ -815,7 +811,7 @@ export default function ListsScreen({ route, navigation }) {
                             source={
                               item.imagePath
                                 ? {
-                                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
+                                    uri: getTmdbUrl(item.imagePath, 'poster', 200),
                                     cache: "force-cache",
                                   }
                                 : require("../assets/image/no_image.png")
@@ -883,7 +879,7 @@ export default function ListsScreen({ route, navigation }) {
                                     >
                                       <Image
                                         source={{
-                                          uri: `https://image.tmdb.org/t/p/original${season.seasonPosterPath}`,
+                                          uri: getTmdbUrl(season.seasonPosterPath, 'poster', 200),
                                           cache: "force-cache",
                                         }}
                                         style={{
@@ -1017,7 +1013,7 @@ export default function ListsScreen({ route, navigation }) {
               source={
                 reorderItems?.imagePath
                   ? {
-                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${reorderItems.imagePath}`,
+                      uri: getTmdbUrl(reorderItems.imagePath, 'poster', 200),
                     }
                   : require("../assets/image/no_image.png")
               }

@@ -5,10 +5,10 @@ import { useTheme } from "../../context/ThemeContext";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import Feather from "@expo/vector-icons/Feather";
 import LottieView from "lottie-react-native";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useSnowSettings } from "../../context/AppSettingsContext";
 import IconBacground from "../../components/IconBacground";
 export default function SearchScreen({ navigation }) {
-  const { showSnow } = useAppSettings();
+  const { showSnow } = useSnowSettings();
   const { t } = useLanguage();
   const { theme } = useTheme();
   return (

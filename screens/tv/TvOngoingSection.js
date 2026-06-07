@@ -1,20 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   FlatList,
-  Image,
   StyleSheet,
   Dimensions,
   Animated,
 } from "react-native";
+import { Image } from "expo-image";
 import { useTheme } from "../../context/ThemeContext";
 import { useTvShow } from "../../context/TvShowContex";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Progress from "react-native-progress";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../context/AppSettingsContext";
 
 const { width } = Dimensions.get("window");
 const CARD_W = width * 0.4;
@@ -25,7 +25,7 @@ const OngoingCard = ({
   item,
   navigation,
   theme,
-  scaleValues,
+  scaleValue,
   onPressIn,
   onPressOut,
 }) => {
@@ -33,7 +33,7 @@ const OngoingCard = ({
     (acc, s) => acc + (s.episodes ? s.episodes.length : 0),
     0,
   );
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const totalEps = item.showEpisodeCount || 1;
   const progress = Math.min(watchedEps / totalEps, 1);
   const isCompleted = progress >= 1;
@@ -64,7 +64,7 @@ const OngoingCard = ({
     >
       <Animated.View
         style={{
-          transform: [{ scale: scaleValues[item.id] || 1 }],
+          transform: [{ scale: scaleValue }],
         }}
       >
         {/* Poster */}
@@ -72,12 +72,14 @@ const OngoingCard = ({
           source={
             item.imagePath
               ? {
-                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
+                  uri: getTmdbUrl(item.imagePath, 'poster', 200),
                 }
               : require("../../assets/image/no_image.png")
           }
           style={[styles.similarPoster, { shadowColor: theme.shadow }]}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={120}
         />
 
         {/* Gradient alt karartma */}
@@ -148,28 +150,23 @@ export default function TvOngoingSection({ navigation }) {
   const { watchedTvShows: shows } = useTvShow();
 
   const [activeFilter, setActiveFilter] = useState("ongoing"); // all | ongoing | completed
-  const [scaleValues, setScaleValues] = useState({});
-
-  // ── Scale animasyonları ────────────────────────────────────────────────────
-  useEffect(() => {
-    const vals = {};
-    shows.forEach((s) => {
-      vals[s.id] = new Animated.Value(1);
-    });
-    setScaleValues(vals);
-  }, [shows]);
+  const scaleValuesRef = useRef({});
+  const getScaleValue = (id) => {
+    if (!scaleValuesRef.current[id]) {
+      scaleValuesRef.current[id] = new Animated.Value(1);
+    }
+    return scaleValuesRef.current[id];
+  };
 
   const onPressIn = (id) => {
-    if (!scaleValues[id]) return;
-    Animated.timing(scaleValues[id], {
+    Animated.timing(getScaleValue(id), {
       toValue: 0.9,
       duration: 150,
       useNativeDriver: true,
     }).start();
   };
   const onPressOut = (id) => {
-    if (!scaleValues[id]) return;
-    Animated.timing(scaleValues[id], {
+    Animated.timing(getScaleValue(id), {
       toValue: 1,
       duration: 150,
       useNativeDriver: true,
@@ -275,12 +272,17 @@ export default function TvOngoingSection({ navigation }) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 15 }}
         keyExtractor={(item) => item.id.toString()}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        updateCellsBatchingPeriod={80}
+        windowSize={5}
+        removeClippedSubviews
         renderItem={({ item }) => (
           <OngoingCard
             item={item}
             navigation={navigation}
             theme={theme}
-            scaleValues={scaleValues}
+            scaleValue={getScaleValue(item.id)}
             onPressIn={onPressIn}
             onPressOut={onPressOut}
           />

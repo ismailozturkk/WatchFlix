@@ -5,21 +5,21 @@ import {
   StyleSheet,
   FlatList,
   View,
-  Image,
   Dimensions,
   Animated,
 } from "react-native";
+import { Image } from "expo-image";
 import { useTheme } from "../../context/ThemeContext";
 import { MovieGenreSkeleton, MovieSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
 import { useMovie } from "../../context/MovieContex";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../context/AppSettingsContext";
 const { width, height } = Dimensions.get("window");
 export default function MovieGenres({ navigation }) {
   const { theme } = useTheme();
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
 
   const {
     genres,
@@ -29,7 +29,12 @@ export default function MovieGenres({ navigation }) {
     setPageGenres,
     pageGenres,
     selectedGenres,
+    activateMovieSection,
   } = useMovie();
+
+  useEffect(() => {
+    activateMovieSection("genres");
+  }, [activateMovieSection]);
 
   // Animated import'unun eklendiğinden emin olun
   const [scaleValues, setScaleValues] = useState({});
@@ -93,7 +98,7 @@ export default function MovieGenres({ navigation }) {
           )}
         />
         <FlatList
-          data={[1, 2, 3, 4, 5, 6, 7, 8, 9]}
+          data={[1, 2, 3]}
           renderItem={() => <MovieSkeleton />}
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -289,11 +294,13 @@ export default function MovieGenres({ navigation }) {
             source={
               item.poster_path
                 ? {
-                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                    uri: getTmdbUrl(item.poster_path, 'poster', 200),
                   }
                 : require("../../assets/image/no_image.png")
             }
             style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+            cachePolicy="memory-disk"
+            transition={120}
           />
 
           <View
@@ -409,6 +416,11 @@ export default function MovieGenres({ navigation }) {
         contentContainerStyle={{ paddingHorizontal: 15 }}
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id.toString()}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        updateCellsBatchingPeriod={80}
+        windowSize={5}
+        removeClippedSubviews
         renderItem={renderMovieItem}
       />
       <View

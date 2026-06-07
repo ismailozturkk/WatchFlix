@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   TouchableOpacity,
@@ -132,43 +132,27 @@ const ListView = ({
 }) => {
   const { t } = useLanguage();
   const { theme } = useTheme();
-  const { allLists } = useListStatusContext();
+  const { otherListKeys, allListKeys } = useListStatusContext();
 
   const [modalVisible, setModalVisible] = useState(false);
-  const [otherLists, setOtherLists] = useState([]);
-  const [fullLists, setFullLists] = useState([]);
-  const [scaleValues, setScaleValues] = useState({});
 
   const slideAnim = useRef(new Animated.Value(300)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleValuesRef = useRef({});
 
-  const trueCount = otherLists?.filter((list) => listStates[list]).length;
-
-  /* ── liste verisi ── */
-  useEffect(() => {
-    if (!allLists) {
-      setFullLists([]);
-      setOtherLists([]);
-      return;
+  // Yeni liste anahtarları için Animated.Value oluştur, mevcutları koru
+  allListKeys.forEach((name) => {
+    if (!scaleValuesRef.current[name]) {
+      scaleValuesRef.current[name] = new Animated.Value(1);
     }
-    const predefined = ["watchedTv", "favorites", "watchList", "watchedMovies"];
-    const keys = Object.keys(allLists);
-    setFullLists(keys);
-    setOtherLists(keys.filter((l) => !predefined.includes(l)));
-  }, [allLists]);
+  });
 
-  /* ── animasyon değerleri ── */
-  useEffect(() => {
-    const vals = {};
-    (fullLists || []).forEach((name) => {
-      vals[name] = new Animated.Value(1);
-    });
-    setScaleValues(vals);
-  }, [fullLists]);
+  const trueCount = otherListKeys.filter((list) => listStates[list]).length;
 
   const onPressIn = (name) => {
-    if (!scaleValues[name]) return;
-    Animated.spring(scaleValues[name], {
+    const anim = scaleValuesRef.current[name];
+    if (!anim) return;
+    Animated.spring(anim, {
       toValue: 0.65,
       friction: 4,
       tension: 220,
@@ -176,8 +160,9 @@ const ListView = ({
     }).start();
   };
   const onPressOut = (name) => {
-    if (!scaleValues[name]) return;
-    Animated.spring(scaleValues[name], {
+    const anim = scaleValuesRef.current[name];
+    if (!anim) return;
+    Animated.spring(anim, {
       toValue: 1,
       friction: 4,
       tension: 220,
@@ -253,7 +238,7 @@ const ListView = ({
           return (
             <View key={key} style={styles.iconCol}>
               <ActionButton
-                scale={scaleValues[key]}
+                scale={scaleValuesRef.current[key]}
                 onPressIn={() => onPressIn(key)}
                 onPressOut={() => onPressOut(key)}
                 onPress={
@@ -306,7 +291,7 @@ const ListView = ({
         return (
           <View key={key} style={styles.iconCol}>
             <ActionButton
-              scale={scaleValues[key]}
+              scale={scaleValuesRef.current[key]}
               onPressIn={() => onPressIn(key)}
               onPressOut={() => onPressOut(key)}
               onPress={onPress}
@@ -330,7 +315,7 @@ const ListView = ({
           badge={
             trueCount > 0
               ? trueCount
-              : otherLists?.length > 0
+              : otherListKeys?.length > 0
                 ? trueCount
                 : null
           }
@@ -342,13 +327,13 @@ const ListView = ({
                 backgroundColor:
                   trueCount > 0
                     ? theme.colors.orange + "18"
-                    : otherLists?.length > 0
+                    : otherListKeys?.length > 0
                       ? theme.accent + "15"
                       : theme.primary,
                 borderColor:
                   trueCount > 0
                     ? theme.colors.orange + "55"
-                    : otherLists?.length > 0
+                    : otherListKeys?.length > 0
                       ? theme.accent + "40"
                       : theme.border,
               },
@@ -360,7 +345,7 @@ const ListView = ({
               color={
                 trueCount > 0
                   ? theme.colors.orange
-                  : otherLists?.length > 0
+                  : otherListKeys?.length > 0
                     ? theme.accent
                     : theme.text.secondary
               }
@@ -371,7 +356,7 @@ const ListView = ({
           allowFontScaling={false}
           style={[styles.iconLabel, { color: theme.text.muted }]}
         >
-          {t.otherLists || "Diğerleri"}
+          {t.otherListKeys || "Diğerleri"}
         </Text>
       </View>
 
@@ -417,9 +402,9 @@ const ListView = ({
                     allowFontScaling={false}
                     style={[styles.sheetTitle, { color: theme.text.primary }]}
                   >
-                    {t.otherLists || "Diğer Listeler"}
+                    {t.otherListKeys || "Diğer Listeler"}
                   </Text>
-                  {otherLists?.length > 0 && (
+                  {otherListKeys?.length > 0 && (
                     <Text
                       allowFontScaling={false}
                       style={[
@@ -427,7 +412,7 @@ const ListView = ({
                         { color: theme.text.muted },
                       ]}
                     >
-                      {otherLists.length} liste · {trueCount} seçili
+                      {otherListKeys.length} liste · {trueCount} seçili
                     </Text>
                   )}
                 </View>
@@ -445,10 +430,10 @@ const ListView = ({
               style={[styles.separator, { backgroundColor: theme.border }]}
             />
 
-            {otherLists?.length > 0 ? (
+            {otherListKeys?.length > 0 ? (
               <>
                 <FlatList
-                  data={otherLists}
+                  data={otherListKeys}
                   keyExtractor={(item) => item}
                   numColumns={3}
                   contentContainerStyle={styles.gridContainer}
@@ -459,7 +444,7 @@ const ListView = ({
                     <GridCard
                       item={item}
                       isIn={!!listStates[item]}
-                      scale={scaleValues[item]}
+                      scale={scaleValuesRef.current[item]}
                       theme={theme}
                       onPress={() =>
                         updateList(item, type, formatDateSave(new Date()))

@@ -11,14 +11,18 @@ import {
   Keyboard,
 } from "react-native";
 import axios from "axios";
-import { useAppSettings } from "../../context/AppSettingsContext";
-import { useTheme } from "../../context/ThemeContext";
+import {
+  useApiSettings,
+  useContentSettings,
+  useImageQualitySettings,
+} from "../../../context/AppSettingsContext";
+import { useTheme } from "../../../context/ThemeContext";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { Ionicons } from "@expo/vector-icons";
-import { useLanguage } from "../../context/LanguageContext";
+import { useLanguage } from "../../../context/LanguageContext";
 import LottieView from "lottie-react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import IconBacground from "../../components/IconBacground";
+import IconBacground from "../../../components/IconBacground";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const ActorSearch = ({ navigation, route }) => {
@@ -27,10 +31,12 @@ const ActorSearch = ({ navigation, route }) => {
   const [actors, setActors] = useState([]);
   const [loading, setLoading] = useState(false);
   const searchTimeout = useRef(null);
-  const { t } = useLanguage();
-  const { API_KEY, language, adultContent, imageQuality } = useAppSettings(); // language ekledik
+  const { t, language } = useLanguage();
+  const { API_KEY } = useApiSettings();
+  const { adultContent } = useContentSettings();
+  const { imageQuality } = useImageQualitySettings();
   const [scaleValues, setScaleValues] = useState({});
-  const IMAGE_URL = `https://image.tmdb.org/t/p/${imageQuality.poster}`;
+  const { getTmdbUrl } = useImageQualitySettings();
 
   const inputRef = useRef(null);
 
@@ -160,7 +166,7 @@ const ActorSearch = ({ navigation, route }) => {
           {item.profile_path ? (
             <Image
               source={{
-                uri: `${IMAGE_URL}${item.profile_path}`,
+                uri: `getTmdbUrl(item.profile_path, 'profile', 200)`,
               }}
               style={{
                 width: 70,
@@ -202,7 +208,7 @@ const ActorSearch = ({ navigation, route }) => {
             <Image
               key={index}
               source={{
-                uri: `${IMAGE_URL}${known_for.poster_path}`,
+                uri: `getTmdbUrl(known_for.poster_path, 'poster', 200)`,
               }}
               style={{
                 width: 50,
@@ -278,7 +284,7 @@ const ActorSearch = ({ navigation, route }) => {
         >
           <LottieView
             style={{ width: 350, height: 350 }}
-            source={require("../../LottieJson/search12.json")}
+            source={require("../../../LottieJson/search12.json")}
             autoPlay
             loop
           />

@@ -22,6 +22,7 @@ if (Platform.OS === "android") {
     UIManager.setLayoutAnimationEnabledExperimental(true);
   }
 }
+import Toast from "react-native-toast-message";
 import { useLanguage } from "../context/LanguageContext";
 import { useTheme } from "../context/ThemeContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -40,7 +41,7 @@ import Reanimated, {
 import LottieView from "lottie-react-native";
 import { useNavigation } from "@react-navigation/native";
 import Feather from "@expo/vector-icons/Feather";
-import { useProfileScreen } from "../context/ProfileScreenContext";
+import { useProfileStats } from "../context/ProfileStatsContext";
 import { BlurView } from "expo-blur";
 
 export const ChatModal = () => {
@@ -69,7 +70,7 @@ export const ChatModal = () => {
     mostWatchedGenreTv,
     secondWatchedGenreTv,
     thirdWatchedGenreTv,
-  } = useProfileScreen();
+  } = useProfileStats();
   const [genres, setGenres] = useState([]);
   const [genresTv, setGenresTv] = useState([]);
   const [movies, setMovies] = useState([]);
@@ -266,14 +267,12 @@ export const ChatModal = () => {
 
     setLoading(true);
     try {
-      const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || "...";
-      console.log("API Key:", apiKey);
-      console.log(
-        "Gemini API Key Length:",
-        apiKey ? apiKey.length : "UNDEFINED",
-      );
+      const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
+      if (!apiKey) {
+        Toast.show({ type: "error", text1: "Gemini API anahtarı bulunamadı" });
+        return;
+      }
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-      console.log("Request URL:", url);
 
       const updatedHistory = [
         ...conversationHistory,
@@ -327,7 +326,6 @@ export const ChatModal = () => {
 
       if (!responseObj.ok) {
         const errorText = await responseObj.text();
-        console.error("Fetch API error:", responseObj.status, errorText);
         throw new Error(`API Error: ${responseObj.status} - ${errorText}`);
       }
 
@@ -352,7 +350,7 @@ export const ChatModal = () => {
       setMessage("");
       setLoading(false);
     } catch (err) {
-      console.error("API Error in ChatModal:", err.message);
+      Toast.show({ type: "error", text1: "AI yanıt veremiyor", text2: err.message });
       setError(err);
       setLoading(false);
     }

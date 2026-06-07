@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  StatusBar,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { useTheme } from "../../context/ThemeContext";
@@ -16,6 +17,8 @@ import {
   getAuth,
   sendEmailVerification,
   updateProfile,
+  GoogleAuthProvider,
+  signInWithCredential,
 } from "firebase/auth";
 import Toast from "react-native-toast-message";
 import { useLanguage } from "../../context/LanguageContext";
@@ -23,6 +26,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   doc,
   setDoc,
+  getDoc,
   collection,
   query,
   where,
@@ -30,27 +34,39 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import IconBacground from "../../components/IconBacground";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Google from "expo-auth-session/providers/google";
+import * as WebBrowser from "expo-web-browser";
+
+WebBrowser.maybeCompleteAuthSession();
 
 const { width, height } = Dimensions.get("window");
+
+const GREEN = "#1a6b3c";
+const GREEN_LIGHT = "#1e8449";
+const SUCCESS = "rgb(37, 211, 102)";
+const ERROR = "rgb(189, 8, 28)";
 
 export default function RegisterScreen({ navigation }) {
   const { theme } = useTheme();
   const { showSnow } = useSnow();
-  const [email, setEmail] = useState();
-  const [username, setUsername] = useState();
-  const [text, setText] = useState();
-  const [usernameAvailable, setUsernameAvailable] = useState(null); // null: bilinmiyor, true: kullanılabilir, false: alınmış
-  const [name, setName] = useState();
-  const [lastname, setLastname] = useState();
-  const [password, setPassword] = useState();
-  const [passwordAgain, setPasswordAgain] = useState();
+  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [usernameAvailable, setUsernameAvailable] = useState(null);
+  const [name, setName] = useState("");
+  const [lastname, setLastname] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordAgain, setPasswordAgain] = useState("");
   const [isloading, setIsloading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordAgain, setShowPasswordAgain] = useState(false);
+  const [focusedField, setFocusedField] = useState(null);
   const { t } = useLanguage();
-  let border = theme.border;
-  const [passwordCorrect, setPasswordCorrect] = useState(border);
-  const [passwordCorrectAgain, setPasswordCorrectAgain] = useState(border);
 
-  // Debounce mekanizması için timeout
+  let border = theme.border;
+  const [passwordCorrect, setPasswordCorrect] = useState(null);
+  const [passwordCorrectAgain, setPasswordCorrectAgain] = useState(null);
+
   let usernameTimeout;
 
   const checkUsername = async (name) => {
@@ -60,52 +76,40 @@ export default function RegisterScreen({ navigation }) {
   };
 
   const validateUsername = (text) => {
-    // Sadece harf, rakam ve alt çizgi (_) olabilir, boşluk yok
     const regex = /^[a-z0-9_]+$/;
     return regex.test(text);
   };
 
-  // Kullanım örneği
   const handleUsernameChange = (text) => {
     setUsername(text);
-
     if (!text || text.length < 3) {
-      setUsernameAvailable(null); // geçersiz username
-      return;
-    } else if (text.length > 20) {
-      setUsernameAvailable(false); // geçerli ama henüz kontrol edilmedi
-      return;
-    } else if (!validateUsername(text)) {
-      setUsernameAvailable(false); // geçerli ama henüz kontrol edilmedi
+      setUsernameAvailable(null);
       return;
     }
-
-    setUsernameAvailable(null); // geçerli ama henüz kontrol edilmedi
-
+    if (text.length > 20 || !validateUsername(text)) {
+      setUsernameAvailable(false);
+      return;
+    }
+    setUsernameAvailable(null);
     if (usernameTimeout) clearTimeout(usernameTimeout);
     usernameTimeout = setTimeout(() => {
-      checkUsername(text.toLowerCase()); // Firestore kontrolü
+      checkUsername(text.toLowerCase());
     }, 500);
   };
 
   const inputPassword = (text) => {
-    if (text.length >= 6) {
-      setPasswordCorrect("rgb(37, 211, 102)");
-    } else if (text.length == 0) {
-      setPasswordCorrect(border);
-    } else {
-      setPasswordCorrect("rgb(189, 8, 28)");
-    }
+    if (text.length === 0) setPasswordCorrect(null);
+    else if (text.length >= 6) setPasswordCorrect(true);
+    else setPasswordCorrect(false);
     setPassword(text);
-  };
-  const inputPasswordAgain = (text) => {
-    if (text.length == 0) {
-      setPasswordCorrectAgain(border);
-    } else if (text == password) {
-      setPasswordCorrectAgain("rgb(37, 211, 102)");
-    } else {
-      setPasswordCorrectAgain("rgb(189, 8, 28)");
+    if (passwordAgain) {
+      setPasswordCorrectAgain(text === passwordAgain || passwordAgain === "");
     }
+  };
+
+  const inputPasswordAgain = (text) => {
+    if (text.length === 0) setPasswordCorrectAgain(null);
+    else setPasswordCorrectAgain(text === password);
     setPasswordAgain(text);
   };
 
@@ -117,24 +121,19 @@ export default function RegisterScreen({ navigation }) {
       });
       return;
     }
-
     if (usernameAvailable === false) {
       Toast.show({ type: "error", text1: "Bu kullanıcı adı alınmış!" });
       return;
     }
-
     if (!name || !lastname) {
       Toast.show({ type: "error", text1: "Lütfen isim ve soyisim giriniz!" });
       return;
     }
-
     if (password !== passwordAgain) {
       Toast.show({ type: "error", text1: "Şifreler eşleşmiyor!" });
       return;
     }
-
     setIsloading(true);
-
     try {
       const auth = getAuth();
       const userCredential = await createUserWithEmailAndPassword(
@@ -143,13 +142,11 @@ export default function RegisterScreen({ navigation }) {
         password,
       );
       const user = userCredential.user;
-
       await updateProfile(user, {
         displayName: name + " " + lastname,
-        username: username,
+        username,
       });
       await sendEmailVerification(user);
-
       const userRef = doc(db, "Users", user.uid);
       await setDoc(userRef, {
         username,
@@ -160,7 +157,6 @@ export default function RegisterScreen({ navigation }) {
         friends: [],
         friendRequests: { sendRequest: [], receivedRequest: [] },
       });
-
       Toast.show({
         type: "success",
         text1: `${username} olarak kayıt başarılı! Email doğrulaması gönderildi: ${email}`,
@@ -176,244 +172,575 @@ export default function RegisterScreen({ navigation }) {
     }
   };
 
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  // ⚠️ clientId değerlerini kendi Google Cloud Console'unuzdan alın
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    iosClientId: "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
+    androidClientId: "YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com",
+    webClientId: "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+  });
+
+  useEffect(() => {
+    if (response?.type === "success") {
+      const { id_token } = response.params;
+      handleGoogleCredential(id_token);
+    }
+  }, [response]);
+
+  const handleGoogleCredential = async (idToken) => {
+    setIsGoogleLoading(true);
+    try {
+      const credential = GoogleAuthProvider.credential(idToken);
+      const auth = getAuth();
+      const userCredential = await signInWithCredential(auth, credential);
+      const user = userCredential.user;
+
+      const userRef = doc(db, "Users", user.uid);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) {
+        const emailPrefix = user.email?.split("@")[0] || "user";
+        await setDoc(userRef, {
+          username: emailPrefix,
+          email: user.email,
+          displayName: user.displayName,
+          avatar: user.photoURL,
+          createdAt: new Date(),
+          friends: [],
+          friendRequests: { sendRequest: [], receivedRequest: [] },
+        });
+      }
+
+      Toast.show({
+        type: "success",
+        text1: "Hoş geldin, " + (user.displayName || user.email),
+      });
+      navigation.navigate("TabScreen", user);
+    } catch (error) {
+      Toast.show({ type: "error", text1: "Google ile giriş başarısız." });
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const signInWithGoogle = () => {
+    promptAsync();
+  };
+
+  const getBorderColor = (field, validState) => {
+    const isFocused = focusedField === field;
+    if (validState === true) return SUCCESS;
+    if (validState === false) return ERROR;
+    if (isFocused) return GREEN;
+    return "rgba(255,255,255,0.07)";
+  };
+
+  const getIconColor = (field, validState) => {
+    if (validState === true) return SUCCESS;
+    if (validState === false) return ERROR;
+    if (focusedField === field) return GREEN;
+    return theme.text.muted;
+  };
+
+  const getUsernameBorderColor = () => {
+    if (usernameAvailable === true) return SUCCESS;
+    if (usernameAvailable === false) return ERROR;
+    if (focusedField === "username") return GREEN;
+    return "rgba(255,255,255,0.07)";
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
-      <IconBacground opacity={0.3} />
-      <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
-        <View style={styles.container}>
-          {showSnow && (
-            <LottieView
-              style={styles.lottie}
-              source={require("../../LottieJson/snow.json")}
-              autoPlay
-              loop
-            />
-          )}
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
+      <IconBacground opacity={0.08} />
+
+      {/* Ambient blob */}
+      <View style={styles.gradientBlob} pointerEvents="none">
+        <LinearGradient
+          colors={["rgba(26,107,60,0.3)", "transparent"]}
+          style={{ width: 280, height: 280, borderRadius: 140 }}
+        />
+      </View>
+
+      <ScrollView
+        style={{ flex: 1 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Back button */}
+        <TouchableOpacity
+          style={[
+            styles.backButton,
+            {
+              backgroundColor: theme.secondary,
+              borderColor: "rgba(255,255,255,0.08)",
+            },
+          ]}
+          onPress={() => navigation.navigate("LoginScreen")}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={18} color={theme.text.primary} />
+        </TouchableOpacity>
+
+        {showSnow && (
           <LottieView
-            source={require("../../LottieJson/register.json")}
-            style={{ width: 300, height: 300 }}
+            style={styles.lottie}
+            source={require("../../LottieJson/snow.json")}
             autoPlay
             loop
           />
-          <Text
-            allowFontScaling={false}
-            style={[styles.title, { color: theme.text.primary }]}
-          >
+        )}
+
+        {/* Logo */}
+        <View style={styles.logoContainer}>
+          <LottieView
+            source={require("../../LottieJson/register.json")}
+            style={{ width: 180, height: 180 }}
+            autoPlay
+            loop
+          />
+        </View>
+
+        {/* Card */}
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: theme.secondary,
+              borderColor: "rgba(255,255,255,0.07)",
+            },
+          ]}
+        >
+          <Text style={[styles.title, { color: theme.text.primary }]}>
             {t.RegisterScreen.registerButton}
           </Text>
+          <Text style={[styles.subtitle, { color: theme.text.muted }]}>
+            Yeni bir hesap oluşturun
+          </Text>
 
+          {/* Section: Kimlik */}
+          <Text style={[styles.sectionLabel, { color: theme.text.muted }]}>
+            KİŞİSEL BİLGİLER
+          </Text>
+
+          {/* İsim + Soyisim - yan yana */}
+          <View style={styles.rowInputs}>
+            <View
+              style={[
+                styles.inputWrapper,
+                styles.halfInput,
+                {
+                  backgroundColor: theme.primary,
+                  borderColor: getBorderColor("name", null),
+                },
+              ]}
+            >
+              <Ionicons
+                name="person-outline"
+                size={18}
+                color={getIconColor("name", null)}
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={[styles.textInput, { color: theme.text.primary }]}
+                placeholder={t.RegisterScreen.name}
+                placeholderTextColor={theme.text.muted}
+                onChangeText={setName}
+                onFocus={() => setFocusedField("name")}
+                onBlur={() => setFocusedField(null)}
+              />
+            </View>
+            <View
+              style={[
+                styles.inputWrapper,
+                styles.halfInput,
+                {
+                  backgroundColor: theme.primary,
+                  borderColor: getBorderColor("lastname", null),
+                },
+              ]}
+            >
+              <Ionicons
+                name="person"
+                size={18}
+                color={getIconColor("lastname", null)}
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={[styles.textInput, { color: theme.text.primary }]}
+                placeholder={t.RegisterScreen.lastName}
+                placeholderTextColor={theme.text.muted}
+                onChangeText={setLastname}
+                onFocus={() => setFocusedField("lastname")}
+                onBlur={() => setFocusedField(null)}
+              />
+            </View>
+          </View>
+
+          {/* Section: Hesap */}
+          <Text
+            style={[
+              styles.sectionLabel,
+              { color: theme.text.muted, marginTop: 8 },
+            ]}
+          >
+            HESAP BİLGİLERİ
+          </Text>
+
+          {/* Kullanıcı adı */}
           <View
             style={[
-              styles.input,
+              styles.inputWrapper,
               {
-                backgroundColor: theme.secondary,
-                borderColor:
-                  usernameAvailable === null
-                    ? theme.border
-                    : usernameAvailable
-                      ? "rgb(37, 211, 102)"
-                      : "rgb(189, 8, 28)",
+                backgroundColor: theme.primary,
+                borderColor: getUsernameBorderColor(),
               },
             ]}
           >
-            <Ionicons name="at-outline" size={24} color={theme.border} />
+            <Ionicons
+              name="at-outline"
+              size={18}
+              color={
+                usernameAvailable === true
+                  ? SUCCESS
+                  : usernameAvailable === false
+                    ? ERROR
+                    : focusedField === "username"
+                      ? GREEN
+                      : theme.text.muted
+              }
+              style={styles.inputIcon}
+            />
             <TextInput
               style={[
+                styles.textInput,
                 {
-                  width: "90%",
-                  height: "100%",
                   color:
-                    usernameAvailable === false ? "red" : theme.text.primary,
-                },
-                {
+                    usernameAvailable === false ? ERROR : theme.text.primary,
                   textDecorationLine:
                     usernameAvailable === false ? "line-through" : "none",
+                  flex: 1,
                 },
               ]}
-              placeholderTextColor={theme.text.secondary}
+              placeholderTextColor={theme.text.muted}
               placeholder="Kullanıcı Adı"
               onChangeText={handleUsernameChange}
               autoCapitalize="none"
+              onFocus={() => setFocusedField("username")}
+              onBlur={() => setFocusedField(null)}
             />
+            {usernameAvailable === true && (
+              <View style={styles.statusBadge}>
+                <Ionicons name="checkmark-circle" size={18} color={SUCCESS} />
+              </View>
+            )}
             {usernameAvailable === false && (
-              <Text
-                allowFontScaling={false}
-                style={{ position: "absolute", right: 10, color: "red" }}
-              >
-                Bu kullanıcı adı alınamaz!
-              </Text>
-            )}
-            {usernameAvailable === null && (
-              <Text
-                style={{
-                  position: "absolute",
-                  left: 15,
-                  bottom: 0,
-                  color: theme.text.muted,
-                  fontSize: 10,
-                }}
-              >
-                (3-20 karakter, boşluk yok, sadece harf, rakam ve _, büyük
-                harfler ve ı,ü,ö,ç,ğ,ş kullanılamaz )
-              </Text>
+              <View style={styles.statusBadge}>
+                <Ionicons name="close-circle" size={18} color={ERROR} />
+              </View>
             )}
           </View>
+          {usernameAvailable === null &&
+            username.length > 0 &&
+            username.length < 3 && (
+              <Text style={[styles.hintText, { color: theme.text.muted }]}>
+                En az 3 karakter · yalnızca a–z, 0–9, _
+              </Text>
+            )}
 
+          {/* Email */}
           <View
             style={[
-              styles.input,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
+              styles.inputWrapper,
+              {
+                backgroundColor: theme.primary,
+                borderColor: getBorderColor("email", null),
+              },
             ]}
           >
-            <Ionicons name="person-outline" size={24} color={theme.border} />
-            <TextInput
-              style={{
-                width: "90%",
-                height: "100%",
-                color: theme.text.primary,
-              }}
-              placeholderTextColor={theme.text.secondary}
-              placeholder={t.RegisterScreen.name}
-              onChangeText={(text) => setName(text)}
+            <Ionicons
+              name="mail-outline"
+              size={18}
+              color={getIconColor("email", null)}
+              style={styles.inputIcon}
             />
-          </View>
-
-          <View
-            style={[
-              styles.input,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
-            ]}
-          >
-            <Ionicons name="person" size={24} color={theme.border} />
             <TextInput
-              style={{
-                width: "90%",
-                height: "100%",
-                color: theme.text.primary,
-              }}
-              placeholderTextColor={theme.text.secondary}
-              placeholder={t.RegisterScreen.lastName}
-              onChangeText={(text) => setLastname(text)}
-            />
-          </View>
-
-          <View
-            style={[
-              styles.input,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
-            ]}
-          >
-            <Ionicons name="mail-outline" size={24} color={theme.border} />
-            <TextInput
-              style={{
-                width: "90%",
-                height: "100%",
-                color: theme.text.primary,
-              }}
-              placeholderTextColor={theme.text.secondary}
+              style={[styles.textInput, { color: theme.text.primary }]}
+              placeholderTextColor={theme.text.muted}
               placeholder={t.RegisterScreen.email}
               keyboardType="email-address"
-              onChangeText={(text) => setEmail(text)}
+              autoCapitalize="none"
+              onChangeText={setEmail}
+              onFocus={() => setFocusedField("email")}
+              onBlur={() => setFocusedField(null)}
             />
           </View>
 
+          {/* Şifre */}
           <View
             style={[
-              styles.input,
+              styles.inputWrapper,
               {
-                backgroundColor: theme.secondary,
-                borderColor: passwordCorrect,
+                backgroundColor: theme.primary,
+                borderColor: getBorderColor("password", passwordCorrect),
               },
             ]}
           >
             <Ionicons
               name="lock-closed-outline"
-              size={24}
-              color={theme.border}
+              size={18}
+              color={getIconColor("password", passwordCorrect)}
+              style={styles.inputIcon}
             />
             <TextInput
-              style={{
-                width: "90%",
-                height: "100%",
-                color: theme.text.primary,
-              }}
-              placeholderTextColor={theme.text.secondary}
+              style={[styles.textInput, { color: theme.text.primary }]}
+              placeholderTextColor={theme.text.muted}
               placeholder={t.RegisterScreen.password}
-              secureTextEntry
-              onChangeText={(text) => inputPassword(text)}
+              secureTextEntry={!showPassword}
+              onChangeText={inputPassword}
+              onFocus={() => setFocusedField("password")}
+              onBlur={() => setFocusedField(null)}
             />
+            <TouchableOpacity
+              onPress={() => setShowPassword(!showPassword)}
+              style={styles.eyeButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={showPassword ? "eye-outline" : "eye-off-outline"}
+                size={18}
+                color={theme.text.muted}
+              />
+            </TouchableOpacity>
           </View>
 
+          {/* Şifre Tekrar */}
           <View
             style={[
-              styles.input,
+              styles.inputWrapper,
               {
-                backgroundColor: theme.secondary,
-                borderColor: passwordCorrectAgain,
+                backgroundColor: theme.primary,
+                borderColor: getBorderColor(
+                  "passwordAgain",
+                  passwordCorrectAgain,
+                ),
               },
             ]}
           >
-            <Ionicons name="lock-closed" size={24} color={theme.border} />
+            <Ionicons
+              name="lock-closed"
+              size={18}
+              color={getIconColor("passwordAgain", passwordCorrectAgain)}
+              style={styles.inputIcon}
+            />
             <TextInput
-              style={{
-                width: "90%",
-                height: "100%",
-                color: theme.text.primary,
-              }}
-              placeholderTextColor={theme.text.secondary}
+              style={[styles.textInput, { color: theme.text.primary }]}
+              placeholderTextColor={theme.text.muted}
               placeholder={t.RegisterScreen.passwordAgain}
-              secureTextEntry
-              onChangeText={(text) => inputPasswordAgain(text)}
+              secureTextEntry={!showPasswordAgain}
+              onChangeText={inputPasswordAgain}
+              onFocus={() => setFocusedField("passwordAgain")}
+              onBlur={() => setFocusedField(null)}
+            />
+            <TouchableOpacity
+              onPress={() => setShowPasswordAgain(!showPasswordAgain)}
+              style={styles.eyeButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={showPasswordAgain ? "eye-outline" : "eye-off-outline"}
+                size={18}
+                color={theme.text.muted}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Password strength indicator */}
+          {password.length > 0 && (
+            <View style={styles.strengthRow}>
+              {[...Array(4)].map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.strengthBar,
+                    {
+                      backgroundColor:
+                        password.length >= (i + 1) * 3
+                          ? i < 2
+                            ? ERROR
+                            : i < 3
+                              ? "#f39c12"
+                              : SUCCESS
+                          : "rgba(255,255,255,0.1)",
+                    },
+                  ]}
+                />
+              ))}
+              <Text style={[styles.strengthLabel, { color: theme.text.muted }]}>
+                {password.length < 6
+                  ? "Zayıf"
+                  : password.length < 9
+                    ? "Orta"
+                    : password.length < 12
+                      ? "İyi"
+                      : "Güçlü"}
+              </Text>
+            </View>
+          )}
+
+          {/* Register button */}
+          <TouchableOpacity
+            style={[
+              styles.registerButton,
+              usernameAvailable === false && { opacity: 0.5 },
+            ]}
+            onPress={createAccount}
+            disabled={usernameAvailable === false}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={[GREEN_LIGHT, GREEN]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.registerGradient}
+            >
+              {isloading ? (
+                <LottieView
+                  source={require("../../LottieJson/loading15.json")}
+                  style={{ width: 36, height: 36 }}
+                  autoPlay
+                  loop
+                />
+              ) : (
+                <>
+                  <Text
+                    allowFontScaling={false}
+                    style={styles.registerButtonText}
+                  >
+                    {t.RegisterScreen.registerButton}
+                  </Text>
+                  <Ionicons name="checkmark" size={18} color="#fff" />
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Login link */}
+          {/* OR divider */}
+          <View style={styles.orRow}>
+            <View
+              style={[
+                styles.orLine,
+                { backgroundColor: "rgba(255,255,255,0.08)" },
+              ]}
+            />
+            <Text style={[styles.orText, { color: theme.text.muted }]}>
+              veya
+            </Text>
+            <View
+              style={[
+                styles.orLine,
+                { backgroundColor: "rgba(255,255,255,0.08)" },
+              ]}
             />
           </View>
 
+          {/* Google Sign-In button */}
           <TouchableOpacity
-            style={[styles.button, { backgroundColor: theme.accent }]}
-            onPress={() => createAccount()}
-            disabled={usernameAvailable === false}
+            style={[
+              styles.googleButton,
+              {
+                backgroundColor: theme.primary,
+                borderColor: "rgba(255,255,255,0.1)",
+              },
+            ]}
+            onPress={signInWithGoogle}
+            activeOpacity={0.8}
+            disabled={isGoogleLoading}
           >
-            {isloading ? (
+            {isGoogleLoading ? (
               <LottieView
                 source={require("../../LottieJson/loading15.json")}
-                style={{ width: 40, height: 40 }}
+                style={{ width: 28, height: 28 }}
                 autoPlay
                 loop
               />
             ) : (
-              <Text
-                allowFontScaling={false}
-                style={[styles.buttonText, { color: theme.text.primary }]}
-              >
-                {t.RegisterScreen.registerButton}
-              </Text>
+              <>
+                <View style={styles.googleIconWrapper}>
+                  <Text style={styles.googleIconText}>G</Text>
+                </View>
+                <Text
+                  allowFontScaling={false}
+                  style={[
+                    styles.googleButtonText,
+                    { color: theme.text.primary },
+                  ]}
+                >
+                  Google ile kayıt ol
+                </Text>
+              </>
             )}
           </TouchableOpacity>
 
+          {/* Login link */}
           <TouchableOpacity
-            style={[styles.button, { backgroundColor: theme.secondary }]}
+            style={[
+              styles.loginLink,
+              { borderColor: "rgba(255,255,255,0.09)" },
+            ]}
             onPress={() => navigation.navigate("LoginScreen")}
+            activeOpacity={0.75}
           >
             <Text
-              allowFontScaling={false}
-              style={[styles.buttonText, { color: theme.text.primary }]}
+              style={[styles.loginLinkText, { color: theme.text.secondary }]}
+            >
+              Zaten hesabın var mı?{" "}
+            </Text>
+            <Text
+              style={[
+                styles.loginLinkText,
+                { color: GREEN, fontWeight: "700" },
+              ]}
             >
               {t.RegisterScreen.loginButton}
             </Text>
           </TouchableOpacity>
         </View>
+
+        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    width: width,
-    height: height,
-    justifyContent: "center",
+  scrollContent: {
     alignItems: "center",
-    padding: 20,
+    paddingTop: 60,
+  },
+  gradientBlob: {
+    position: "absolute",
+    top: -40,
+    right: -60,
+    zIndex: 0,
+  },
+  backButton: {
+    position: "absolute",
+    top: 52,
+    left: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
   },
   lottie: {
     position: "absolute",
@@ -423,36 +750,164 @@ const styles = StyleSheet.create({
     right: -60,
     zIndex: 0,
   },
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  card: {
+    width: width - 32,
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 24,
+    paddingBottom: 28,
+  },
   title: {
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 26,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
     marginBottom: 20,
   },
-  input: {
-    width: "100%",
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+    marginBottom: 10,
+  },
+  rowInputs: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 14,
+  },
+  halfInput: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 50,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 12,
+    overflow: "hidden",
+  },
+  inputIcon: {
+    paddingHorizontal: 12,
+  },
+  textInput: {
+    flex: 1,
+    height: "100%",
+    fontSize: 14,
+  },
+  eyeButton: {
+    paddingHorizontal: 12,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+  },
+  hintText: {
+    fontSize: 11,
+    marginTop: -8,
+    marginBottom: 10,
+    marginLeft: 4,
+  },
+  strengthRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: -4,
+    marginBottom: 16,
+  },
+  strengthBar: {
+    flex: 1,
+    height: 3,
+    borderRadius: 2,
+  },
+  strengthLabel: {
+    fontSize: 11,
+    marginLeft: 4,
+    minWidth: 32,
+  },
+  registerButton: {
+    borderRadius: 14,
+    overflow: "hidden",
+    marginTop: 8,
+    marginBottom: 12,
+    shadowColor: GREEN,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  registerGradient: {
+    height: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  registerButtonText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: 0.3,
+  },
+  loginLink: {
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loginLinkText: {
+    fontSize: 15,
+  },
+  orRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    height: 50,
+    marginBottom: 12,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+  },
+  orText: {
+    fontSize: 12,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+  },
+  googleButton: {
+    height: 52,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    backgroundColor: "white",
-    marginBottom: 15,
-  },
-  button: {
-    width: "100%",
-    height: 50,
-    backgroundColor: "#007bff",
-    justifyContent: "center",
+    flexDirection: "row",
     alignItems: "center",
-    borderRadius: 10,
-    marginTop: 10,
+    justifyContent: "center",
+    gap: 10,
+    marginBottom: 12,
   },
-  buttonText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
+  googleIconWrapper: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  googleIconText: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#4285F4",
+    lineHeight: 16,
+  },
+  googleButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
   },
 });

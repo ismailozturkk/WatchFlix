@@ -17,11 +17,11 @@ import { useTheme } from "../context/ThemeContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import SkeletonPlaceholder from "react-native-skeleton-placeholder";
-import { useAppSettings } from "../context/AppSettingsContext";
+import { useImageQualitySettings } from "../context/AppSettingsContext";
 export default function ListsTvShowScreen({ navigation }) {
   const { theme, selectedTheme } = useTheme();
   const { user } = useAuth();
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const [watchedTv, setWatchedTv] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedShows, setExpandedShows] = useState({});
@@ -211,7 +211,7 @@ export default function ListsTvShowScreen({ navigation }) {
                     source={
                       item.imagePath
                         ? {
-                            uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
+                            uri: getTmdbUrl(item.imagePath, 'poster', 200),
                             cache: "force-cache",
                           }
                         : require("../assets/image/no_image.png")
@@ -342,7 +342,7 @@ export default function ListsTvShowScreen({ navigation }) {
                                 >
                                   {/* <Image
                                     source={{
-                                      uri: `https://image.tmdb.org/t/p/original${episode.episodePosterPath}`,
+                                      uri: getTmdbUrl(episode.episodePosterPath, 'poster', 200),
                                     }}
                                     style={{
                                       width: 90,
@@ -429,7 +429,7 @@ export default function ListsTvShowScreen({ navigation }) {
                                   >
                                     {/* <Image
                                       source={{
-                                        uri: `https://image.tmdb.org/t/p/original${season.seasonPosterPath}`,
+                                        uri: getTmdbUrl(season.seasonPosterPath, 'poster', 200),
                                       }}
                                       style={{
                                         width: 50,

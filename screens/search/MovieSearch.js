@@ -24,7 +24,7 @@ import Toast from "react-native-toast-message";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useAppSettings, useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useFocusEffect } from "@react-navigation/native";
 import { useListStatus } from "../../modules/UseListStatus";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -180,6 +180,7 @@ const ListBadge = memo(
 // ─── ROW KART ─────────────────────────────────────────────────────────────────
 const MovieRowItem = memo(
   ({ item, navigation, imageQuality, theme, index }) => {
+    const { getTmdbUrl } = useImageQualitySettings();
     const { inWatchList, inFavorites, isWatched, isInOtherLists } =
       useListStatus(item.id, "movie");
     const { scale, onIn, onOut } = usePressAnim();
@@ -215,7 +216,7 @@ const MovieRowItem = memo(
               <>
                 <Image
                   source={{
-                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.backdrop_path}`,
+                    uri: getTmdbUrl(item.backdrop_path, 'poster', 200),
                   }}
                   style={styles.rowBackdrop}
                 />
@@ -232,7 +233,7 @@ const MovieRowItem = memo(
               <View style={styles.rowPosterWrapper}>
                 <Image
                   source={{
-                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                    uri: getTmdbUrl(item.poster_path, 'poster', 200),
                   }}
                   style={styles.rowPoster}
                 />
@@ -318,6 +319,7 @@ const MovieRowItem = memo(
 // ─── GRID POSTER KART ─────────────────────────────────────────────────────────
 const MovieGridItem = memo(
   ({ item, navigation, imageQuality, theme, index }) => {
+    const { getTmdbUrl } = useImageQualitySettings();
     const { inWatchList, inFavorites, isWatched, isInOtherLists } =
       useListStatus(item.id, "movie");
     const { scale, onIn, onOut } = usePressAnim();
@@ -343,7 +345,7 @@ const MovieGridItem = memo(
             {item.poster_path ? (
               <Image
                 source={{
-                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                  uri: getTmdbUrl(item.poster_path, 'poster', 200),
                 }}
                 style={styles.gridPoster}
               />

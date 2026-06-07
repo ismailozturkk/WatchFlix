@@ -20,7 +20,11 @@ import { SearchSkeleton } from "../../components/Skeleton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import LottieView from "lottie-react-native";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import {
+  useApiSettings,
+  useContentSettings,
+  useImageQualitySettings,
+} from "../../context/AppSettingsContext";
 import { useFocusEffect } from "@react-navigation/native";
 import IconBacground from "../../components/IconBacground";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -106,7 +110,7 @@ const ActorRowItem = memo(
     const { opacity, translateY } = useEnterAnim(index);
     const popularity = item.popularity ?? 0;
     const popColor = getPopularityColor(popularity);
-    const IMAGE_URL = `https://image.tmdb.org/t/p/${imageQuality.poster}`;
+    const { getTmdbUrl } = useImageQualitySettings();
 
     const knownForMovies = (item.known_for || [])
       .filter((k) => k.poster_path)
@@ -139,7 +143,7 @@ const ActorRowItem = memo(
             {item.profile_path ? (
               <View style={styles.rowPhotoWrapper}>
                 <Image
-                  source={{ uri: `${IMAGE_URL}${item.profile_path}` }}
+                  source={{ uri: getTmdbUrl(item.profile_path, 'profile', 200) }}
                   style={styles.rowPhoto}
                 />
               </View>
@@ -201,7 +205,7 @@ const ActorRowItem = memo(
                 {knownForMovies.map((k, i) => (
                   <Image
                     key={i}
-                    source={{ uri: `${IMAGE_URL}${k.poster_path}` }}
+                    source={{ uri: getTmdbUrl(k.poster_path, 'poster', 200) }}
                     style={styles.knownPoster}
                   />
                 ))}
@@ -219,7 +223,7 @@ const ActorGridItem = memo(
   ({ item, navigation, imageQuality, theme, index }) => {
     const { scale, onIn, onOut } = usePressAnim();
     const { opacity, translateY } = useEnterAnim(index);
-    const IMAGE_URL = `https://image.tmdb.org/t/p/${imageQuality.poster}`;
+    const { getTmdbUrl } = useImageQualitySettings();
 
     return (
       <Animated.View
@@ -237,7 +241,7 @@ const ActorGridItem = memo(
           <View style={styles.gridCard}>
             {item.profile_path ? (
               <Image
-                source={{ uri: `${IMAGE_URL}${item.profile_path}` }}
+                source={{ uri: getTmdbUrl(item.profile_path, 'profile', 200) }}
                 style={styles.gridPhoto}
               />
             ) : (
@@ -486,7 +490,9 @@ export default function ActorSearch({ navigation, route }) {
 
   const { language, t } = useLanguage();
   const { theme } = useTheme();
-  const { API_KEY, adultContent, imageQuality } = useAppSettings();
+  const { API_KEY } = useApiSettings();
+  const { adultContent } = useContentSettings();
+  const { imageQuality } = useImageQualitySettings();
   const searchTimeout = useRef(null);
   const inputRef = useRef(null);
 

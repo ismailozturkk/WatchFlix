@@ -38,6 +38,7 @@ import {
   updateDoc,
   deleteDoc,
   setDoc,
+  writeBatch,
   limit,
 } from "firebase/firestore";
 import { useTheme } from "../context/ThemeContext";
@@ -45,7 +46,11 @@ import LottieView from "lottie-react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAppSettings } from "../context/AppSettingsContext";
+import {
+  useApiSettings,
+  useContentSettings,
+  useImageQualitySettings,
+} from "../context/AppSettingsContext";
 import { useLanguage } from "../context/LanguageContext";
 import axios from "axios";
 import {
@@ -75,7 +80,7 @@ const MessageBubble = memo(
     currentUser,
     theme,
     navigation,
-    imageQuality,
+    getTmdbUrl,
     onLongPress,
     renderMessageText,
   }) => {
@@ -167,10 +172,7 @@ const MessageBubble = memo(
                 <View style={styles.mediaPosterWrapper}>
                   <Image
                     source={{
-                      uri:
-                        "https://image.tmdb.org/t/p/" +
-                        imageQuality.poster +
-                        item.media.poster_path,
+                      uri: getTmdbUrl(item.media.poster_path, 'poster', 200),
                     }}
                     style={styles.mediaPoster}
                   />
@@ -265,7 +267,7 @@ const MessageBubble = memo(
 );
 
 // ─── Arama Sonuç Kartı ──────────────────────────────────────────────────────
-const SearchResultCard = memo(({ item, onPress, imageQuality, theme }) => {
+const SearchResultCard = memo(({ item, onPress, getTmdbUrl, theme }) => {
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
   useEffect(() => {
@@ -299,10 +301,7 @@ const SearchResultCard = memo(({ item, onPress, imageQuality, theme }) => {
         {item.poster_path || item.profile_path ? (
           <Image
             source={{
-              uri:
-                "https://image.tmdb.org/t/p/" +
-                imageQuality.poster +
-                (item.poster_path || item.profile_path),
+              uri: getTmdbUrl(item.poster_path || item.profile_path, 'poster', 200),
             }}
             style={styles.searchCardImage}
           />
@@ -356,7 +355,9 @@ export default function ChatScreen({ route, navigation }) {
   const currentUser = auth.currentUser;
   const { language, t } = useLanguage();
 
-  const { API_KEY, adultContent, imageQuality } = useAppSettings();
+  const { API_KEY } = useApiSettings();
+  const { adultContent } = useContentSettings();
+  const { getTmdbUrl } = useImageQualitySettings();
   const [editingMessage, setEditingMessage] = useState(null);
   const [text, setText] = useState("");
   const [searchText, setSearchText] = useState("");
@@ -376,6 +377,8 @@ export default function ChatScreen({ route, navigation }) {
   const inputBorderAnim = useRef(new Animated.Value(0)).current;
 
   const flatListRef = useRef();
+  const typingTimerRef   = useRef(null);   // debounce typing writes
+  const processedMsgIds  = useRef(new Set()); // guard against redundant seen/delivered writes
   const { theme } = useTheme();
 
   const [chatData, setChatData] = useState({
@@ -435,6 +438,9 @@ export default function ChatScreen({ route, navigation }) {
     return () => goOffline();
   }, [chatId]);
 
+  // Clear processed-message guard when switching chats
+  useEffect(() => { processedMsgIds.current.clear(); }, [chatId]);
+
   useEffect(() => {
     const q = query(
       messagesRef,
@@ -449,23 +455,25 @@ export default function ChatScreen({ route, navigation }) {
       }));
       setChatData((prev) => ({ ...prev, messages: msgs }));
 
-      // Toplu güncelleme — her mesaj için ayrı await yerine Promise.all
-      const updates = snapshot.docs.reduce((acc, docSnap) => {
+      // Batch seen/delivered updates; skip messages we've already processed
+      const batch = writeBatch(db);
+      let hasBatch = false;
+      snapshot.docs.forEach((docSnap) => {
+        if (processedMsgIds.current.has(docSnap.id)) return;
         const msg = docSnap.data();
         if (msg.senderId === currentUser.uid && msg.status === "sent") {
-          acc.push(
-            updateDoc(doc(messagesRef, docSnap.id), {
-              status: "delivered",
-              deliveredAt: serverTimestamp(),
-            }),
-          );
+          batch.update(doc(messagesRef, docSnap.id), {
+            status: "delivered",
+            deliveredAt: serverTimestamp(),
+          });
+          hasBatch = true;
+        } else if (msg.senderId !== currentUser.uid && msg.status !== "seen") {
+          batch.update(doc(messagesRef, docSnap.id), { status: "seen" });
+          hasBatch = true;
         }
-        if (msg.senderId !== currentUser.uid && msg.status !== "seen") {
-          acc.push(updateDoc(doc(messagesRef, docSnap.id), { status: "seen" }));
-        }
-        return acc;
-      }, []);
-      if (updates.length) Promise.all(updates).catch(console.error);
+        processedMsgIds.current.add(docSnap.id);
+      });
+      if (hasBatch) batch.commit().catch(console.error);
     });
 
     const unsubscribeChat = onSnapshot(chatRef, (docSnap) => {
@@ -528,20 +536,26 @@ export default function ChatScreen({ route, navigation }) {
   );
 
   const handleTyping = useCallback(
-    async (value) => {
+    (value) => {
       setText(value);
       setTextLink(isLink(value));
-      await setDoc(
-        chatRef,
-        { information: { typing: { [currentUser.uid]: value.length > 0 } } },
-        { merge: true },
-      );
+      // Debounce: write typing status at most once per 600 ms
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = setTimeout(() => {
+        setDoc(
+          chatRef,
+          { information: { typing: { [currentUser.uid]: value.length > 0 } } },
+          { merge: true },
+        ).catch(console.error);
+      }, 600);
     },
-    [isLink, chatId, currentUser.uid, chatRef],
+    [isLink, chatRef, currentUser.uid],
   );
 
   const sendMessage = useCallback(async () => {
     if (text.trim() === "") return;
+    // Cancel any pending debounced typing write; the setDoc below resets typing anyway
+    if (typingTimerRef.current) { clearTimeout(typingTimerRef.current); typingTimerRef.current = null; }
     try {
       if (editingMessage) {
         await updateDoc(
@@ -688,7 +702,7 @@ export default function ChatScreen({ route, navigation }) {
         currentUser={currentUser}
         theme={theme}
         navigation={navigation}
-        imageQuality={imageQuality}
+        getTmdbUrl={getTmdbUrl}
         onLongPress={handleLongPress}
         renderMessageText={renderMessageText}
       />
@@ -699,7 +713,7 @@ export default function ChatScreen({ route, navigation }) {
       currentUser,
       renderMessageText,
       handleLongPress,
-      imageQuality,
+      getTmdbUrl,
     ],
   );
 
@@ -876,7 +890,11 @@ export default function ChatScreen({ route, navigation }) {
         edges={["bottom"]}
         style={[styles.container, { backgroundColor: "transparent" }]}
       >
-        <View style={{ flex: 1 }}>
+        <KeyboardAvoidingView
+          style={styles.chatKeyboardView}
+          behavior="padding"
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : StatusBar.currentHeight || 0}
+        >
           {/* ── MESAJ LİSTESİ ── */}
           {/* Arka plan dekor ikonu */}
           <View style={styles.iconBgWrapper} pointerEvents="none">
@@ -912,11 +930,7 @@ export default function ChatScreen({ route, navigation }) {
           />
 
           {/* ── INPUT ALANI ── */}
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-          >
-            <View style={styles.inputContainer}>
+          <View style={styles.inputContainer}>
               {/* Arka plan blur katmanı */}
               <View style={styles.inputBlurBg} />
 
@@ -1018,8 +1032,7 @@ export default function ChatScreen({ route, navigation }) {
                 </TouchableOpacity>
               </View>
             </View>
-          </KeyboardAvoidingView>
-        </View>
+        </KeyboardAvoidingView>
 
         {/* ── # ARAMA MODALİ ── */}
         <Modal
@@ -1174,7 +1187,7 @@ export default function ChatScreen({ route, navigation }) {
                           onPress={(selected) =>
                             handleSendSearchResult(selected)
                           }
-                          imageQuality={imageQuality}
+                          getTmdbUrl={getTmdbUrl}
                           theme={theme}
                         />
                       )}
@@ -1219,11 +1232,8 @@ export default function ChatScreen({ route, navigation }) {
                   {selectedMessage.media?.poster_path && (
                     <Image
                       source={{
-                        uri:
-                          "https://image.tmdb.org/t/p/" +
-                          imageQuality.poster +
-                          selectedMessage.media.poster_path,
-                      }}
+                      uri: getTmdbUrl(selectedMessage.media.poster_path, 'poster', 200),
+                    }}
                       style={styles.previewPoster}
                     />
                   )}
@@ -1352,6 +1362,9 @@ export default function ChatScreen({ route, navigation }) {
 // ─── Stiller ────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  chatKeyboardView: {
+    flex: 1,
+  },
 
   // ── Header ──────────────────────────────────────────────
   header: {
@@ -1568,6 +1581,8 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === "ios" ? 8 : 12,
     backgroundColor: "rgba(13,13,22,0.97)",
     overflow: "hidden",
+    zIndex: 20,
+    elevation: 20,
   },
   inputBlurBg: {
     ...StyleSheet.absoluteFillObject,

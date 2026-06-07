@@ -1,39 +1,17 @@
-import React, { createContext, useState, useContext, useEffect } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { createContext, useContext, useMemo } from "react";
 import { getThemeColors } from "../theme/colors";
+import { useThemeSettings } from "./AppSettingsContext";
 
 const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
-  const [selectedTheme, setSelectedTheme] = useState("gray");
-  const currentTheme = getThemeColors(selectedTheme);
+  const { selectedTheme, changeTheme } = useThemeSettings();
 
-  useEffect(() => {
-    const loadTheme = async () => {
-      try {
-        const savedTheme = await AsyncStorage.getItem("selectedTheme");
-        if (savedTheme) {
-          setSelectedTheme(savedTheme);
-        }
-      } catch (error) {
-        console.error("Tema yüklenemedi:", error);
-      }
-    };
-    loadTheme();
-  }, []);
-
-  const changeTheme = (newTheme) => {
-    setSelectedTheme(newTheme);
-    AsyncStorage.setItem("selectedTheme", newTheme).catch((error) => {
-      console.error("Tema kaydedilemedi:", error);
-    });
-  };
-
-  const value = {
-    theme: currentTheme,
+  const value = useMemo(() => ({
+    theme: getThemeColors(selectedTheme),
     selectedTheme,
     changeTheme,
-  };
+  }), [selectedTheme, changeTheme]);
 
   return (
     <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>

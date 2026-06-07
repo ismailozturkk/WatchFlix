@@ -6,10 +6,15 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { useAppSettings } from "./AppSettingsContext";
+import {
+  useApiSettings,
+  useImageQualitySettings,
+  useLanguageSettings,
+} from "./AppSettingsContext";
 import { useAuth } from "./AuthContext";
 import { db } from "../firebase";
-import { doc, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
+import { getCachedValue, setCachedValue, TTL } from "../utils/apiCache";
 
 const CalendarContext = createContext();
 
@@ -33,8 +38,10 @@ function addDays(date, days) {
 }
 
 export const CalendarProvider = ({ children }) => {
-  const { API_KEY, selectedLanguage, imageQuality } = useAppSettings();
-  const POSTER_BASE = `https://image.tmdb.org/t/p/${imageQuality.poster || "w185"}`;
+  const { API_KEY } = useApiSettings();
+  const { selectedLanguage } = useLanguageSettings();
+  const { imageQuality } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
   const { user } = useAuth();
 
   // Kullanıcı seçtiği tarih aralığı (gün)
@@ -45,81 +52,116 @@ export const CalendarProvider = ({ children }) => {
   const [tvEvents, setTvEvents] = useState({});
 
   // Kullanıcı verileri (widget için)
-  const [noteEvents, setNoteEvents] = useState({}); // from Notes/{uid}
-  const [reminderEvents, setReminderEvents] = useState({}); // from Reminders/{uid}
+  const [noteEvents,          setNoteEvents]          = useState({});
+  const [movieReminderEvents, setMovieReminderEvents] = useState({});
+  const [tvReminderEpisodes,  setTvReminderEpisodes]  = useState([]); // flat list of all episode docs
+
+  // Merge movie + tv reminder events into one date-keyed map
+  const reminderEvents = useMemo(() => {
+    const rMap = { ...movieReminderEvents };
+    tvReminderEpisodes.forEach((ep) => {
+      const d = ep.airDate;
+      if (!d) return;
+      if (!rMap[d]) rMap[d] = [];
+      rMap[d].push({
+        id:        ep.showId,
+        title:     `${ep.showName} - Bölüm ${ep.episodeNumber}`,
+        poster: ep.seasonPosterPath ? getTmdbUrl(ep.seasonPosterPath, 'poster', 200) : null,
+        type:      "tv",
+        eventType: "reminder_tv",
+        date:      d,
+      });
+    });
+    return rMap;
+  }, [movieReminderEvents, tvReminderEpisodes]);
 
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [lastFetch, setLastFetch] = useState(null);
   const [lastRangeDays, setLastRangeDays] = useState(null);
 
-  /* ── Firebase: Notes dinleyici ── */
+  /* ── Firebase: Notes dinleyici (Notes/{uid}/items subcollection) ── */
   useEffect(() => {
     if (!user) return;
-    const docRef = doc(db, "Notes", user.uid);
-    const unsub = onSnapshot(docRef, (snap) => {
-      if (!snap.exists()) return;
-      const allNotes = snap.data().notes || [];
+    const unsub = onSnapshot(collection(db, "Notes", user.uid, "items"), (snap) => {
       const nMap = {};
-      allNotes.forEach((n) => {
+      snap.docs.forEach((d) => {
+        const n = d.data();
         if (!n.scheduledDate) return;
-        const d = n.scheduledDate;
-        if (!nMap[d]) nMap[d] = [];
-        nMap[d].push({ ...n, eventType: "note" });
+        if (!nMap[n.scheduledDate]) nMap[n.scheduledDate] = [];
+        nMap[n.scheduledDate].push({ ...n, eventType: "note" });
       });
       setNoteEvents(nMap);
     });
     return unsub;
   }, [user]);
 
-  /* ── Firebase: Reminders dinleyici ── */
+  /* ── Firebase: Reminders dinleyici (subcollections) ── */
   useEffect(() => {
     if (!user) return;
-    const docRef = doc(db, "Reminders", user.uid);
-    const unsub = onSnapshot(docRef, (snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data();
+    const uid = user.uid;
 
-      const rMap = {};
-
-      // Film hatırlatıcıları
-      (data.movieReminders || []).forEach((m) => {
-        const d = m.releaseDate;
-        if (!d) return;
-        if (!rMap[d]) rMap[d] = [];
-        rMap[d].push({
-          id: m.movieId,
-          title: m.movieName,
-          poster: m.posterPath ? POSTER_BASE + m.posterPath : null,
-          type: "movie",
-          eventType: "reminder_movie",
-          date: d,
-        });
-      });
-
-      // Dizi hatırlatıcıları (tüm bölümler düzleştirilerek)
-      (data.tvReminders || []).forEach((show) => {
-        (show.seasons || []).forEach((season) => {
-          (season.episodes || []).forEach((ep) => {
-            const d = ep.airDate;
-            if (!d) return;
-            if (!rMap[d]) rMap[d] = [];
-            rMap[d].push({
-              id: show.showId,
-              title: `${show.showName} - Bölüm ${ep.episodeNumber}`,
-              poster: season.seasonPosterPath
-                ? `https://image.tmdb.org/t/p/w185${season.seasonPosterPath}`
-                : null,
-              type: "tv",
-              eventType: "reminder_tv",
-              date: d,
-            });
+    // Movie reminders subcollection
+    const movieUnsub = onSnapshot(
+      collection(db, "Reminders", uid, "movies"),
+      (snap) => {
+        const mMap = {};
+        snap.docs.forEach((d) => {
+          const m = d.data();
+          const date = m.releaseDate;
+          if (!date) return;
+          if (!mMap[date]) mMap[date] = [];
+          mMap[date].push({
+            id:        m.movieId,
+            title:     m.movieName,
+            poster:    m.posterPath ? POSTER_BASE + m.posterPath : null,
+            type:      "movie",
+            eventType: "reminder_movie",
+            date,
           });
         });
-      });
+        setMovieReminderEvents(mMap);
+      },
+    );
 
-      setReminderEvents(rMap);
-    });
-    return unsub;
+    // TV show subcollection → dynamic per-show episode subscriptions
+    const epUnsubs  = {};
+    const epDataMap = {}; // showId → episode[]
+
+    const showsUnsub = onSnapshot(
+      collection(db, "Reminders", uid, "tvShows"),
+      (showsSnap) => {
+        const activeShowIds = new Set(showsSnap.docs.map((d) => d.id));
+
+        // Remove stale episode listeners
+        Object.keys(epUnsubs).forEach((sid) => {
+          if (!activeShowIds.has(sid)) {
+            epUnsubs[sid]();
+            delete epUnsubs[sid];
+            delete epDataMap[sid];
+          }
+        });
+
+        if (showsSnap.empty) { setTvReminderEpisodes([]); return; }
+
+        showsSnap.docs.forEach((showDoc) => {
+          const sid = showDoc.id;
+          if (epUnsubs[sid]) return;
+          epUnsubs[sid] = onSnapshot(
+            collection(db, "Reminders", uid, "tvShows", sid, "episodes"),
+            (epSnap) => {
+              epDataMap[sid] = epSnap.docs.map((d) => d.data());
+              setTvReminderEpisodes(Object.values(epDataMap).flat());
+            },
+          );
+        });
+      },
+    );
+
+    return () => {
+      movieUnsub();
+      showsUnsub();
+      Object.values(epUnsubs).forEach((u) => u());
+    };
   }, [user]);
 
   /* ── TMDB fetch ── */
@@ -128,13 +170,20 @@ export const CalendarProvider = ({ children }) => {
       if (!API_KEY) return;
       const days = forceDays ?? rangeDays;
 
-      // Cache: aynı rangeDays ve 1 saat içindeyse tekrar çekme
-      if (
-        lastFetch &&
-        Date.now() - lastFetch < 60 * 60 * 1000 &&
-        lastRangeDays === days
-      )
+      // In-memory guard: same range, within TTL
+      if (lastFetch && Date.now() - lastFetch < TTL.CALENDAR && lastRangeDays === days)
         return;
+
+      // Persistent cache: survives app restarts
+      const cacheKey = `calendar_tmdb_${selectedLanguage}_${days}`;
+      const cached = await getCachedValue(cacheKey, TTL.CALENDAR);
+      if (cached) {
+        setMovieEvents(cached.movieEvents);
+        setTvEvents(cached.tvEvents);
+        setLastFetch(Date.now());
+        setLastRangeDays(days);
+        return;
+      }
 
       setIsLoadingEvents(true);
       const now = new Date();
@@ -231,6 +280,8 @@ export const CalendarProvider = ({ children }) => {
         setTvEvents(tMap);
         setLastFetch(Date.now());
         setLastRangeDays(days);
+        const cacheKey = `calendar_tmdb_${selectedLanguage}_${days}`;
+        setCachedValue(cacheKey, { movieEvents: mMap, tvEvents: tMap });
       } catch (e) {
         console.warn("TMDB fetch error:", e);
       } finally {

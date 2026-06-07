@@ -6,8 +6,12 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { useAppSettings } from "./AppSettingsContext";
-import { useAuth } from "./AuthContext";
+import {
+  useApiSettings,
+  useImageQualitySettings,
+  useLanguageSettings,
+} from "../context/AppSettingsContext";
+import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 
@@ -33,8 +37,9 @@ function addDays(date, days) {
 }
 
 export const CalendarProvider = ({ children }) => {
-  const { API_KEY, selectedLanguage, imageQuality } = useAppSettings();
-  const POSTER_BASE = `https://image.tmdb.org/t/p/${imageQuality.poster}`;
+  const { API_KEY } = useApiSettings();
+  const { selectedLanguage } = useLanguageSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const { user } = useAuth();
 
   // Kullanıcı seçtiği tarih aralığı (gün)
@@ -89,7 +94,7 @@ export const CalendarProvider = ({ children }) => {
         rMap[d].push({
           id: m.movieId,
           title: m.movieName,
-          poster: m.posterPath ? POSTER_BASE + m.posterPath : null,
+          poster: m.posterPath ? getTmdbUrl(m.posterPath, 'poster', 200) : null,
           type: "movie",
           eventType: "reminder_movie",
           date: d,
@@ -107,7 +112,7 @@ export const CalendarProvider = ({ children }) => {
               id: show.showId,
               title: `${show.showName} - Bölüm ${ep.episodeNumber}`,
               poster: season.seasonPosterPath
-                ? `https://image.tmdb.org/t/p/${imageQuality.poster}${season.seasonPosterPath}`
+                ? getTmdbUrl(season.seasonPosterPath, 'poster', 200)
                 : null,
               type: "tv",
               eventType: "reminder_tv",
@@ -203,7 +208,7 @@ export const CalendarProvider = ({ children }) => {
           mMap[d].push({
             id: m.id,
             title: m.title,
-            poster: m.poster_path ? POSTER_BASE + m.poster_path : null,
+            poster: m.poster_path ? getTmdbUrl(m.poster_path, 'poster', 200) : null,
             type: "movie",
             eventType: "movie",
             date: d,
@@ -219,7 +224,7 @@ export const CalendarProvider = ({ children }) => {
           tMap[d].push({
             id: t.id,
             title: t.name,
-            poster: t.poster_path ? POSTER_BASE + t.poster_path : null,
+            poster: t.poster_path ? getTmdbUrl(t.poster_path, 'poster', 200) : null,
             type: "tv",
             eventType: "tv",
             date: d,

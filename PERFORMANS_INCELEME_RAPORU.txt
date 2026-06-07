@@ -1,0 +1,266 @@
+WATCHFLIX PERFORMANS INCELEME RAPORU
+Tarih: 2026-04-17
+
+Bu rapor proje icindeki calisan kaynak kod dosyalari taranarak hazirlandi.
+Odak:
+- yavas veri kaydetme
+- yavas veri yukleme
+- scroll ve render kasmalari
+- gereksiz network ve Firestore maliyeti
+
+Not:
+- Kaynak kod dosyalari incelendi.
+- Binary asset dosyalari (png vb.) tek tek icerik olarak okunmadi; performans etkileri kullanim yerlerinden degerlendirildi.
+
+GENEL SONUC
+Uygulamadaki yavaslik tek bir noktadan gelmiyor. Asil problem su kombinasyondan olusuyor:
+- buyuk Firestore dokumanlari
+- ayni veriye birden fazla listener baglanmasi
+- acilista cok fazla TMDB istegi atilmasi
+- her item kartinda tekrar tekrar liste durumu hesaplanmasi
+- agir ScrollView/Lottie/Animated kullanimlari
+
+#region EN KRITIK SORUNLAR
+1. AYARLAR BIRDEN FAZLA YERDE OKUNUYOR VE YAZILIYOR
+- Dosyalar:
+  - context/AppSettingsContext.js:48,49,50,51,52,55,57
+  - context/LanguageContext.js:16,31
+  - context/ThemeContext.js:14,27
+  - context/SnowContext.js:13,30
+  - translations/index.js:15,27
+- Etki:
+  - Ayni selectedLanguage, selectedTheme ve showSnow verileri birden fazla provider tarafindan okunuyor.
+  - App acilisinda gereksiz AsyncStorage I/O olusuyor.
+  - State kaynagi daginik oldugu icin gereksiz render ve tutarsizlik riski artiyor.
+- Oneri:
+  - Theme/Language/Snow/AppSettings yapisini tek provider altinda topla.
+  - AsyncStorage okumalarini Promise.all veya multiGet ile yap.
+  - Mumkunse MMKV kullan.
+  - Provider value'larini useMemo ile sabitle.
+
+2. UYGULAMA GIRISTE COK FAZLA VERI CEKIYOR
+- Dosyalar:
+  - context/MovieContex.js:33,88,127,137,165,169,195,228,239,288,337,437
+  - context/TvShowContex.js:97,131,225
+  - screens/TabScreenNavigator.js:175-193
+- Etki:
+  - MovieProvider ve TvShowProvider uygulama genelinde mount oluyor.
+  - PagerView tum tab ekranlarini ayni anda olusturuyor.
+  - Oscar listesi icin 30+ istek, collection icin 19 istek, buna ek provider/genre/upcoming vb. istekler acilista basliyor.
+- Oneri:
+  - Veriyi sadece ilgili tab acildiginda cek.
+  - Ekran gorunur oldugunda fetch et.
+  - TMDB icin TTL cache ekle.
+  - React Query/TanStack Query veya merkezi cache katmani kullan.
+#endregion
+3. LISTS DOKUMANI ASIRI BUYUK VE COK KEZ DINLENIYOR
+- Dosyalar:
+  - context/ListStatusContext.js:25
+  - context/ProfileScreenContext.js:189
+  - context/TvShowContex.js:48-53
+  - hooks/useListData.js:12-17
+  - screens/ListsScreen.js:131-142
+  - screens/ListsViewScreen.js:346-353
+- Etki:
+  - Ayni Lists/{uid} dokumani birden fazla yerden dinleniyor.
+  - watchedTv icinde sezon/bolum bazli buyuk nested array'ler tutuluyor.
+  - Kucuk bir degisiklikte bile buyuk obje tekrar geliyor ve cok sayida consumer render oluyor.
+- Oneri:
+  - Firestore semasini bol:
+    - Lists/{uid}/lists/{listName}
+    - WatchedTv/{uid}/shows/{showId}
+    - Notes/{uid}/items/{noteId}
+  - Ozet veri ile detay veriyi ayir.
+  - Ayni dokumana tek merkezden subscribe ol, diger yerler context'ten okusun.
+
+4. HER KARTTA useListStatus ILE TUM LISTELER TEKRAR TARANIYOR
+- Dosyalar:
+  - modules/UseListStatus.js:13-58
+  - screens/search/MovieSearch.js:184,322
+  - screens/search/TvShowSearch.js:184,320
+  - screens/movie/MovieDetail.js:55
+  - screens/tv/TvShowsDetails.js:71
+- Etki:
+  - Arama ve benzer icerik listelerinde her item icin tum listeler taraniyor.
+  - Liste buyudukce scroll sirasinda kasma artiyor.
+- Oneri:
+  - ListStatusContext icinde bir kez index uret:
+    - statusIndex.movie[id]
+    - statusIndex.tv[id]
+  - Kartlar O(1) lookup yapsin.
+  - useListStatus icindeki useEffect ve some/filter dongulerini item bazindan kaldir.
+
+5. ProfileScreenContext COK BUYUK VE COK SEY YAPIYOR
+- Dosyalar:
+  - context/ProfileScreenContext.js:189,415,463,488,513,535,558,594,628,874,937
+  - components/ChatModal.js:66-72
+- Etki:
+  - Tek context icinde avatar, listeler, istatistikler, notes, reminders, grid state ve animasyon state'leri var.
+  - Provider value useMemo ile sabitlenmemis.
+  - Buradaki herhangi bir state degisimi tum consumer'lari etkiliyor.
+  - ChatModal bile sadece genre bilgisi icin buyuk context'e bagli.
+- Oneri:
+  - En az 4 parcaya bol:
+    - ProfileStatsContext
+    - ProfileNotesContext
+    - ProfileRemindersContext
+    - ProfileUiContext
+  - Provider value'larini useMemo ile sarmala.
+  - ChatModal'a yalniz gerekli genre ozetini ver.
+
+6. NOTES VE REMINDERS KAYDETME AKISI TAM DOKUMAN OKUYUP TUM ARRAY'I GERI YAZIYOR
+- Dosyalar:
+  - context/ProfileScreenContext.js:415-638
+  - components/Reminder.js:50,88,167,173,206,212
+  - screens/movie/MovieDetail.js:302-324
+- Etki:
+  - Not ekleme/guncelleme/silmede getDoc + tum notes array guncelleme + fetchNotes tekrar cagrisi var.
+  - Reminder tarafinda da ayni pattern mevcut.
+  - Veri buyudukce yazma ve okuma belirgin sekilde yavaslar.
+- Oneri:
+  - Notes'i subcollection yap: Notes/{uid}/items/{noteId}
+  - Reminders'i item bazli yap:
+    - Reminders/{uid}/movie/{movieId}
+    - Reminders/{uid}/tv/{showId}/episodes/{episodeId}
+  - Yalniz degisen kaydi yaz.
+  - Yazidan sonra tekrar fetch etmek yerine optimistic update kullan.
+
+7. Comment YAPISINDA REPLY LISTENER BIRIKIMI RISKI VAR
+- Dosya:
+  - components/Comment.js:296-305
+- Etki:
+  - comments.forEach icinde her yorum icin onSnapshot aciliyor.
+  - Unsubscribe referanslari tutulmadigi icin yorum listesi degistikce listener birikme riski var.
+  - Bu durum hem performans hem Firestore maliyetini artirir.
+- Oneri:
+  - Reply'lari sadece acildiginda cek.
+  - Ya da unsubscribe map tutup cleanup yap.
+  - replyCount'i ana yorumda tut, reply icerigini lazy-load et.
+
+8. DIZI IZLEME KAYDI COK AGIR
+- Dosyalar:
+  - screens/tv/TvShowsDetails.js:394-455
+  - screens/tv/SeasonItem.js:342-491
+  - components/FirestoreShowAddFunction.js
+- Etki:
+  - Tum diziyi izlendi yapmak her sezon icin ayri TMDB istegi atiyor.
+  - Sonra watchedTv array'i komple yeniden yaziliyor.
+  - Buyuk dizilerde bu belirgin gecikme yaratir.
+- Oneri:
+  - Tum diziyi tek seferde degil sezon sezon kaydet.
+  - Ilk asamada sadece show summary kaydet, sezon/bolum detayini background'da doldur.
+  - Gerekirse Promise.all ile kontrollu paralellik kullan.
+  - Firestore'da show bazli ayri belge kullan.
+
+9. MovieDetail VE TvShowsDetails AGIR RENDER YAPIYOR
+- Dosyalar:
+  - screens/movie/MovieDetail.js:512,826,971,1013,1047,1066,1087
+  - screens/tv/TvShowsDetails.js:542,1016,1072,1097
+- Etki:
+  - ScrollView icinde birden fazla FlatList ve yatay ScrollView var.
+  - Benzer/recommendations kartlari da useListStatus kullaniyor.
+  - Detay sayfasina girislerde ilk render agirlasiyor.
+- Oneri:
+  - Benzer icerikleri tek SectionList/FlashList mantigina yaklastir.
+  - Similar/Recommendation bolumlerinde ilk asamada daha az item goster.
+  - Alt bolumleri lazy render yap.
+  - Kartlarda React.memo ve sabit prop yapisi koru.
+
+10. ANA SAYFALARDA COK FAZLA LOTTIE VE NESTED LISTE VAR
+- Dosyalar:
+  - screens/tabs/MovieScreen.js:81-137
+  - screens/tabs/TvShowScreen.js:54-107
+  - screens/tabs/ProfileScreen.js:182-190
+  - screens/movie/MovieDetail.js:560-562
+  - screens/tv/TvShowsDetails.js:585-589
+- Etki:
+  - ScrollView icine birden fazla agir section eklenmis.
+  - showSnow aktifken ayni ekranda birden fazla sonsuz Lottie caliyor.
+  - Dusuk/orta cihazlarda GPU ve JS thread baskilanir.
+- Oneri:
+  - Her ekranda maksimum 1 snow animation kullan.
+  - Dikey ScrollView icine gereksiz animasyon eklerini azalt.
+  - Dusuk cihazlarda animasyonu kapat.
+  - Mumkunse statik gradient/PNG arka plan kullan.
+
+11. ListsScreen ICINDE BAZI HESAPLAMALAR HER RENDER'DA TEKRARLANIYOR
+- Dosya:
+  - screens/ListsScreen.js:99-142,159-194,617,779,846
+- Etki:
+  - filteredItems her render'da sezon/bolum reduce ile hesaplanıyor.
+  - scaleValues her item icin tekrar olusturuluyor.
+  - setIsLoading(false) snapshot gelmeden once cagriliyor.
+  - Modal icinde FlatList + ScrollView kombinasyonu var.
+- Oneri:
+  - filteredItems'i useMemo ile hesapla.
+  - item status hesaplarini normalize et.
+  - loading durumunu snapshot callback icinde kapat.
+  - Nested ScrollView yerine FlatList veya SectionList kullan.
+
+12. CHAT TARAFINDA YAZMA COGALMASI VAR
+- Dosya:
+  - screens/ChatScreen.js:445-468
+- Etki:
+  - Mesaj snapshot'i geldiginde birden fazla updateDoc tetikleniyor.
+  - seen/delivered bilgisi cok sayida write olusturuyor.
+- Oneri:
+  - Son gorulen mesaj seviyesinde yaz.
+  - Her mesaji tek tek update etmek yerine batch mantigi kur.
+  - typing write'larini debounce et.
+
+13. ChatModal GEREKSIZ AGIR BAGIMLILIKLARA SAHIP
+- Dosya:
+  - components/ChatModal.js:66-72,324,583,619,662,1127
+- Etki:
+  - Buyuk ProfileScreenContext'e bagli.
+  - Modal icinde Markdown + ScrollView + birden fazla FlatList + Lottie var.
+  - Profil stat'i degistikce modal da render olabilir.
+- Oneri:
+  - ChatModal icin ayri hafif bir recommendation seed hook'u kullan.
+  - markdownStyles'i useMemo ile uret.
+  - history ve result listelerini ayri memoize bilesenlere bol.
+
+14. KULLANILMAYAN DUPLICATE DOSYA VAR
+- Dosya:
+  - screens/CalendarContext.js
+- Etki:
+  - Runtime maliyeti dusuk, ama bakim maliyeti ve hata riski yuksek.
+- Oneri:
+  - Kullanilmiyorsa sil.
+  - Tek kaynak context/CalendarContext.js olsun.
+
+HIZLI KAZANC SAGLAYACAK 7 ADIM
+1. AppSettings/Theme/Language/Snow yapisini tek storage katmanina indir.
+2. TMDB verileri icin TTL cache ekle.
+3. useListStatus yerine merkezi statusIndex yapisi kur.
+4. ProfileScreenContext'i parcala ve provider value'larini memoize et.
+5. Notes/Reminders/WatchedTv verisini buyuk array yerine belge/subcollection bazli sakla.
+6. Movie/Tv tablarinda lazy load kullan; aktif olmayan tabin verisini cekme.
+7. Snow/Lottie sayisini azalt, detay ekranlarindaki nested listeleri sadeleştir.
+
+ORNEK HEDEF MIMARI
+- settingsStore: tek yerden okuma/yazma
+- query/cache layer: TMDB icin TTL
+- firestore repositories:
+  - listsRepo
+  - watchedTvRepo
+  - notesRepo
+  - remindersRepo
+- ui:
+  - item kartlari yalnizca O(1) liste durumu alir
+  - buyuk ekranlar bolum bazli lazy render olur
+
+TAHMINI ETKI
+- Acilis hizi: yuksek iyilesme
+- Kaydetme hizi: cok yuksek iyilesme
+- Scroll akiciligi: cok yuksek iyilesme
+- Firestore okuma/yazma maliyeti: yuksek iyilesme
+
+ONCELIK SIRASI
+1. useListStatus indeksleme
+2. TMDB cache
+3. ProfileScreenContext parcalama
+4. Notes/Reminders schema degisimi
+5. WatchedTv schema degisimi
+6. Lottie ve nested list azaltma
+7. Duplicate context/provider temizligi

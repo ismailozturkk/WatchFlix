@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   StyleSheet,
   View,
   Text,
   FlatList,
-  Image,
   Dimensions,
   TouchableOpacity,
   Animated,
 } from "react-native";
+import { Image } from "expo-image";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 const { width, height } = Dimensions.get("window");
@@ -16,12 +16,12 @@ import { MovieBestsSkeleton } from "../../components/Skeleton";
 import { useMovie } from "../../context/MovieContex";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../context/AppSettingsContext";
 
 export default function MovieBests({ navigation }) {
   const { t } = useLanguage();
   const { theme } = useTheme();
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
 
   const {
     loadingBests,
@@ -33,38 +33,33 @@ export default function MovieBests({ navigation }) {
     pageBest,
     setPageBest,
     totalPagesBest,
+    activateMovieSection,
   } = useMovie();
 
-  // Animated import'unun eklendiğinden emin olun
-  const [scaleValues, setScaleValues] = useState({});
-
   useEffect(() => {
-    const newScaleValues = {};
-    if (movieBests && movieBests.length > 0) {
-      movieBests.forEach((item) => {
-        newScaleValues[item.id] = new Animated.Value(1);
-      });
-      setScaleValues(newScaleValues);
+    activateMovieSection("bests");
+  }, [activateMovieSection]);
+
+  const scaleValuesRef = useRef({});
+
+  // Render sırasında eksik anahtarları oluştur, mevcutları koru
+  (movieBests || []).forEach((item) => {
+    if (!scaleValuesRef.current[item.id]) {
+      scaleValuesRef.current[item.id] = new Animated.Value(1);
     }
-  }, [movieBests]);
+  });
 
-  const onPressIn = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 0.9,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
+  const onPressIn = useCallback((itemId) => {
+    const anim = scaleValuesRef.current[itemId];
+    if (!anim) return;
+    Animated.timing(anim, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
+  }, []);
 
-  const onPressOut = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
+  const onPressOut = useCallback((itemId) => {
+    const anim = scaleValuesRef.current[itemId];
+    if (!anim) return;
+    Animated.timing(anim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+  }, []);
 
   const renderCategory = ({ item }) => (
     <TouchableOpacity
@@ -123,7 +118,7 @@ export default function MovieBests({ navigation }) {
         </View>
 
         <FlatList
-          data={[1, 2, 3, 4, 5, 6, 7, 8, 9]}
+          data={[1, 2, 3]}
           renderItem={() => <MovieBestsSkeleton />}
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -312,7 +307,7 @@ export default function MovieBests({ navigation }) {
         <Animated.View
           style={[
             {
-              transform: [{ scale: scaleValues[item.id] || 1 }],
+              transform: [{ scale: scaleValuesRef.current[item.id] || 1 }],
             },
           ]}
         >
@@ -320,11 +315,13 @@ export default function MovieBests({ navigation }) {
             source={
               item.poster_path
                 ? {
-                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                    uri: getTmdbUrl(item.poster_path, 'poster', 200),
                   }
                 : require("../../assets/image/no_image.png")
             }
             style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+            cachePolicy="memory-disk"
+            transition={120}
           />
 
           <View
@@ -433,6 +430,10 @@ export default function MovieBests({ navigation }) {
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderMovieItem}
+        removeClippedSubviews
+        maxToRenderPerBatch={3}
+        windowSize={5}
+        initialNumToRender={3}
       />
       <View
         style={{

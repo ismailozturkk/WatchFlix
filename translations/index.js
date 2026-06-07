@@ -1,7 +1,5 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import en from "./en.json";
 import tr from "./tr.json";
 
@@ -22,13 +20,8 @@ const languageDetector = {
     }
   },
   init: () => {},
-  cacheUserLanguage: async (language) => {
-    try {
-      await AsyncStorage.setItem(STORE_LANGUAGE_KEY, language);
-    } catch (error) {
-      console.error("Dil kaydedilemedi:", error);
-    }
-  },
+  // Write is owned by AppSettingsContext — no-op here to avoid double writes.
+  cacheUserLanguage: () => {},
 };
 
 const resources = {

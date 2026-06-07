@@ -1,13 +1,15 @@
 import React from "react";
 import { View, Text, Image, TouchableOpacity } from "react-native";
+import { useImageQualitySettings } from "../../context/AppSettingsContext";
 
-export default function ListItemCard({ item, imageQuality, theme, onPress }) {
+export default function ListItemCard({ item, theme, onPress }) {
+  const { getTmdbUrl } = useImageQualitySettings();
   return (
     <TouchableOpacity onPress={onPress} style={{ flex: 1, margin: 5 }}>
       <View>
         <Image
           source={{
-            uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
+            uri: getTmdbUrl(item.imagePath, 'poster', 200),
           }}
           style={{
             width: "100%",

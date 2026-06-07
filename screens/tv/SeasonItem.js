@@ -12,7 +12,7 @@ import {
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc, collection, onSnapshot, increment, writeBatch } from "firebase/firestore";
 import { db } from "../../firebase";
 import axios from "axios";
 import LottieView from "lottie-react-native";
@@ -20,7 +20,10 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import Octicons from "@expo/vector-icons/Octicons";
 import RatingStars from "../../components/RatingStars";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import {
+  useApiSettings,
+  useImageQualitySettings,
+} from "../../context/AppSettingsContext";
 import { LinearGradient } from "expo-linear-gradient";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -230,7 +233,8 @@ const SeasonItem = ({ season, details, navigation }) => {
   const { theme } = useTheme();
   const { t, language } = useLanguage();
   const { user } = useAuth();
-  const { API_KEY, imageQuality } = useAppSettings();
+  const { API_KEY } = useApiSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const { allLists } = useListStatusContext();
 
   const [play, setPlay] = useState("");
@@ -241,6 +245,8 @@ const SeasonItem = ({ season, details, navigation }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
+  // Subcollection'dan canlı sezon verisi
+  const [seasonData, setSeasonData] = useState(null);
 
   const scaleValue = React.useRef(new Animated.Value(1)).current;
   const showReleaseDateTime = new Date(season.air_date);
@@ -297,159 +303,154 @@ const SeasonItem = ({ season, details, navigation }) => {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }, []);
 
-  // ── İzlenme durumu (context'ten) ─────────────────────────────────────────
+  // ── Subcollection: sezon dokümanını canlı dinle ──────────────────────────
   useEffect(() => {
-    if (!allLists) {
-      setIsWatched(false);
-      setWatchStatus("none");
-      setSeasonEpisodeWatch(0);
-      return;
-    }
-    const watchedTv = allLists.watchedTv || [];
-    const tvShow = watchedTv.find((s) => s.id === details.id);
-    if (!tvShow) {
-      setIsWatched(false);
-      setWatchStatus("none");
-      setSeasonEpisodeWatch(0);
-      return;
-    }
-    const seasonWatched = tvShow.seasons.find(
-      (s) => s.seasonNumber === season.season_number,
+    if (!user?.uid || !details?.id || !season?.season_number) return;
+    const seasonRef = doc(
+      db, "Lists", user.uid,
+      "watchedTv", String(details.id),
+      "seasons", String(season.season_number)
     );
+    const unsub = onSnapshot(seasonRef, (snap) => {
+      setSeasonData(snap.exists() ? snap.data() : null);
+    });
+    return () => unsub();
+  }, [user?.uid, details?.id, season?.season_number]);
+
+  // ── İzlenme durumu — subcollection öncelikli, root-doc fallback ───────────
+  useEffect(() => {
+    // Subcollection'da veri varsa onu kullan
+    if (seasonData !== null) {
+      const watchedCount = (seasonData.episodes || []).length;
+      const totalCount   = season.episode_count || 0;
+      if (watchedCount >= totalCount && totalCount > 0) {
+        setIsWatched(true); setWatchStatus("full");
+      } else if (watchedCount > 0) {
+        setIsWatched(true); setWatchStatus("partial");
+      } else {
+        setIsWatched(false); setWatchStatus("none"); setSeasonEpisodeWatch(0);
+      }
+      setSeasonEpisodeWatch(totalCount > 0 ? watchedCount / totalCount : 0);
+      return;
+    }
+    // Subcollection boşsa eski root-doc array'ini fallback olarak kullan
+    const watchedTv   = allLists?.watchedTv || [];
+    const tvShow      = watchedTv.find((s) => s.id === details.id);
+    const seasonWatched = tvShow?.seasons?.find((s) => s.seasonNumber === season.season_number);
     if (!seasonWatched) {
-      setIsWatched(false);
-      setWatchStatus("none");
-      setSeasonEpisodeWatch(0);
+      setIsWatched(false); setWatchStatus("none"); setSeasonEpisodeWatch(0);
       return;
     }
     const watchedCount = seasonWatched.episodes.length;
-    const totalCount = season.episode_count;
-    if (watchedCount === totalCount) {
-      setIsWatched(true);
-      setWatchStatus("full");
+    const totalCount   = season.episode_count;
+    if (watchedCount >= totalCount) {
+      setIsWatched(true); setWatchStatus("full");
     } else if (watchedCount > 0) {
-      setIsWatched(true);
-      setWatchStatus("partial");
+      setIsWatched(true); setWatchStatus("partial");
     } else {
-      setIsWatched(false);
-      setWatchStatus("none");
-      setSeasonEpisodeWatch(0);
+      setIsWatched(false); setWatchStatus("none"); setSeasonEpisodeWatch(0);
     }
-    setSeasonEpisodeWatch(watchedCount / totalCount);
-  }, [allLists, details.id, season.season_number, season.episode_count]);
+    setSeasonEpisodeWatch(totalCount > 0 ? watchedCount / totalCount : 0);
+  }, [seasonData, allLists, details.id, season.season_number, season.episode_count]);
 
-  // ── Firestore: bölüm ekle ─────────────────────────────────────────────────
+  // ── Firestore: bölüm ekle — subcollection ────────────────────────────────
   const markEpisodeAsWatched = useCallback(
     async ({
-      showId,
-      showName,
-      showEpisodeCount,
-      showSeasonCount,
-      showPosterPath,
-      seasonNumber,
-      seasonPosterPath,
-      seasonEpisodes,
-      showReleaseDate,
-      genres,
+      showId, showName, showEpisodeCount, showSeasonCount, showPosterPath,
+      seasonNumber, seasonPosterPath, seasonEpisodes, showReleaseDate, genres,
       episodesData = [],
     }) => {
       try {
-        const userRef = doc(db, "Lists", user.uid);
-        const docSnap = await getDoc(userRef);
-        let data = docSnap.exists() ? docSnap.data() : { watchedTv: [] };
-        let watchedTv = data.watchedTv || [];
-        let tvShowIndex = watchedTv.findIndex((s) => s.id === showId);
+        const uid       = user.uid;
+        const showRef   = doc(db, "Lists", uid, "watchedTv", String(showId));
+        const seasonRef = doc(db, "Lists", uid, "watchedTv", String(showId), "seasons", String(seasonNumber));
 
         const newEpisodes = episodesData.map((ep) => ({
-          episodeNumber: ep.episodeNumber,
+          episodeNumber:     ep.episodeNumber,
           episodePosterPath: ep.episodePosterPath || null,
-          episodeName: ep.episodeName || "Unknown",
-          episodeRatings: ep.episodeRatings || 0,
-          episodeMinutes: ep.episodeMinutes || 0,
-          episodeWatchTime: showReleaseDate || 0,
+          episodeName:       ep.episodeName || "Unknown",
+          episodeRatings:    ep.episodeRatings || 0,
+          episodeMinutes:    ep.episodeMinutes || 0,
+          episodeWatchTime:  showReleaseDate || 0,
         }));
 
-        if (tvShowIndex === -1) {
-          watchedTv.push({
-            id: showId,
-            name: showName,
-            showEpisodeCount,
-            showSeasonCount,
-            imagePath: showPosterPath,
-            addedShowDate: showReleaseDate,
-            genres,
-            type: "tv",
-            seasons: [
-              {
-                seasonNumber,
-                seasonPosterPath: seasonPosterPath || null,
-                seasonEpisodes,
-                addedSeasonDate: showReleaseDate,
-                episodes: newEpisodes,
-              },
-            ],
+        const [showSnap, seasonSnap] = await Promise.all([getDoc(showRef), getDoc(seasonRef)]);
+
+        const newEpisodesMinutes = newEpisodes.reduce((s, e) => s + (e.episodeMinutes || 0), 0);
+
+        if (!showSnap.exists()) {
+          // Show dokümanı yok → oluştur
+          await setDoc(showRef, {
+            id: showId, name: showName, showEpisodeCount, showSeasonCount,
+            imagePath: showPosterPath, addedShowDate: showReleaseDate,
+            genres: genres || [], type: "tv",
+            watchedSeasonCount: 1, watchedEpisodeCount: newEpisodes.length,
+            totalMinutes: newEpisodesMinutes,
           });
         } else {
-          let show = watchedTv[tvShowIndex];
-          let seasons = show.seasons || [];
-          let sIdx = seasons.findIndex((s) => s.seasonNumber === seasonNumber);
-
-          if (sIdx === -1) {
-            seasons.push({
-              seasonNumber,
-              seasonPosterPath: seasonPosterPath || null,
-              seasonEpisodes,
-              addedSeasonDate: showReleaseDate,
-              episodes: newEpisodes,
-            });
-          } else {
-            const existing = seasons[sIdx].episodes || [];
-            seasons[sIdx].episodes = [
-              ...existing,
-              ...newEpisodes.filter(
-                (ne) =>
-                  !existing.some((ee) => ee.episodeNumber === ne.episodeNumber),
-              ),
-            ].sort((a, b) => a.episodeNumber - b.episodeNumber);
-          }
-          watchedTv[tvShowIndex].seasons = seasons.sort(
-            (a, b) => a.seasonNumber - b.seasonNumber,
-          );
+          // Mevcut show'u güncelle
+          const seasonExists = seasonSnap.exists();
+          await updateDoc(showRef, {
+            watchedSeasonCount:  increment(seasonExists ? 0 : 1),
+            watchedEpisodeCount: increment(newEpisodes.length),
+            totalMinutes:        increment(newEpisodesMinutes),
+          });
         }
-        await updateDoc(userRef, { watchedTv });
+
+        if (!seasonSnap.exists()) {
+          await setDoc(seasonRef, {
+            seasonNumber, seasonPosterPath: seasonPosterPath || null,
+            seasonEpisodes, addedSeasonDate: showReleaseDate,
+            episodes: newEpisodes,
+          });
+        } else {
+          const existing = seasonSnap.data().episodes || [];
+          const existingNums = new Set(existing.map((e) => e.episodeNumber));
+          const toAdd = newEpisodes.filter((e) => !existingNums.has(e.episodeNumber));
+          if (toAdd.length > 0) {
+            await updateDoc(seasonRef, {
+              episodes: [...existing, ...toAdd].sort((a, b) => a.episodeNumber - b.episodeNumber),
+            });
+          }
+        }
       } catch (e) {
-        console.error("Hata:", e);
+        if (__DEV__) console.error("Hata:", e);
       }
     },
     [user],
   );
 
-  // ── Firestore: sezon ekle / sil ───────────────────────────────────────────
+  // ── Firestore: sezon ekle / sil — subcollection ──────────────────────────
   const addSeasonToFirestore = useCallback(
     async (isDelete = false, selectedDate = null) => {
       if (!user) return;
+      const uid       = user.uid;
+      const showId    = String(details.id);
+      const seasonNum = String(season.season_number);
+      const showRef   = doc(db, "Lists", uid, "watchedTv", showId);
+      const seasonRef = doc(db, "Lists", uid, "watchedTv", showId, "seasons", seasonNum);
       try {
         setIsLoading(true);
         setModalVisible(false);
 
-        const userRef = doc(db, "Lists", user.uid);
-        const docSnap = await getDoc(userRef);
-        let data = docSnap.exists() ? docSnap.data() : { watchedTv: [] };
-        let watchedTv = data.watchedTv || [];
-        let tvShowIndex = watchedTv.findIndex((s) => s.id === details.id);
-
         if (isDelete) {
-          if (tvShowIndex !== -1) {
-            let show = watchedTv[tvShowIndex];
-            let seasons = show.seasons || [];
-            let sIdx = seasons.findIndex(
-              (s) => s.seasonNumber === season.season_number,
-            );
-            if (sIdx !== -1) {
-              seasons.splice(sIdx, 1);
-              if (seasons.length === 0) watchedTv.splice(tvShowIndex, 1);
+          const [showSnap, seasonSnap] = await Promise.all([getDoc(showRef), getDoc(seasonRef)]);
+          if (seasonSnap.exists()) {
+            const eps     = seasonSnap.data().episodes || [];
+            const delMins = eps.reduce((s, e) => s + (e.episodeMinutes || 0), 0);
+            await deleteDoc(seasonRef);
+
+            // Kalan sezon var mı kontrol et
+            const remaining = await getDocs(collection(db, "Lists", uid, "watchedTv", showId, "seasons"));
+            if (remaining.empty) {
+              await deleteDoc(showRef);
+            } else if (showSnap.exists()) {
+              await updateDoc(showRef, {
+                watchedSeasonCount:  increment(-1),
+                watchedEpisodeCount: increment(-eps.length),
+                totalMinutes:        increment(-delMins),
+              });
             }
-            await updateDoc(userRef, { watchedTv });
             setIsWatched(false);
           }
           return;
@@ -463,43 +464,35 @@ const SeasonItem = ({ season, details, navigation }) => {
             headers: { accept: "application/json", Authorization: API_KEY },
           },
         );
-        const episodeDate = formatDateSave(selectedDate);
+        const episodeDate  = formatDateSave(selectedDate);
         const episodesData = response.data.episodes.map((ep) => ({
-          episodeNumber: ep.episode_number,
+          episodeNumber:     ep.episode_number,
           episodePosterPath: ep.still_path,
-          episodeName: ep.name,
-          episodeRatings: parseFloat(ep.vote_average?.toFixed(1)) || 0,
-          episodeMinutes: ep.runtime,
+          episodeName:       ep.name,
+          episodeRatings:    parseFloat(ep.vote_average?.toFixed(1)) || 0,
+          episodeMinutes:    ep.runtime,
         }));
         await markEpisodeAsWatched({
-          showId: details.id,
+          showId:          details.id,
           showReleaseDate: episodeDate,
-          seasonNumber: season.season_number,
-          showName: details.name,
+          seasonNumber:    season.season_number,
+          showName:        details.name,
           showEpisodeCount: details.number_of_episodes,
-          showSeasonCount: details.number_of_seasons,
-          showPosterPath: details.poster_path,
+          showSeasonCount:  details.number_of_seasons,
+          showPosterPath:   details.poster_path,
           seasonPosterPath: season.poster_path,
-          seasonEpisodes: season.episode_count,
-          genres: details.genres ? details.genres.map((g) => g.name) : [],
+          seasonEpisodes:   season.episode_count,
+          genres:           details.genres ? details.genres.map((g) => g.name) : [],
           episodesData,
         });
         setIsWatched(true);
       } catch (e) {
-        console.error("Sezon eklenirken hata:", e);
+        if (__DEV__) console.error("Sezon eklenirken hata:", e);
       } finally {
         setIsLoading(false);
       }
     },
-    [
-      user,
-      details,
-      season,
-      language,
-      API_KEY,
-      formatDateSave,
-      markEpisodeAsWatched,
-    ],
+    [user, details, season, language, API_KEY, formatDateSave, markEpisodeAsWatched],
   );
 
   // ── İzlenme buton rengi ───────────────────────────────────────────────────
@@ -570,7 +563,7 @@ const SeasonItem = ({ season, details, navigation }) => {
                 <View style={styles.posterWrapper}>
                   <Image
                     source={{
-                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${season.poster_path}`,
+                      uri: getTmdbUrl(season.poster_path, 'poster', 200),
                     }}
                     style={styles.seasonPoster}
                   />

@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   View,
   Animated,
@@ -16,7 +16,7 @@ export default function Skeleton({
   children,
 }) {
   const { theme } = useTheme();
-  const animatedValue = new Animated.Value(0);
+  const animatedValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.loop(
@@ -135,7 +135,7 @@ export const MovieOscarSkeleton = () => {
           style={{
             marginRight: 15,
             borderRadius: 15,
-            mmarginBottom: 5,
+            marginBottom: 5,
             shadowColor: "#000",
             shadowOffset: {
               width: 0,

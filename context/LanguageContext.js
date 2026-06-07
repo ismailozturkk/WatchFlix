@@ -1,43 +1,32 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { createContext, useContext, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import "../translations"; // i18next yapılandırmasını başlatır
+import { useLanguageSettings } from "./AppSettingsContext";
 
 const LanguageContext = createContext();
 
 export const LanguageProvider = ({ children }) => {
-  const { t, i18n } = useTranslation();
-  const [language, setLanguage] = useState(i18n.language || "tr");
+  const { selectedLanguage, changeLanguage } = useLanguageSettings();
+  const { i18n } = useTranslation();
 
-  // React Native açıldığında i18n default dil atamasını bekle ve state'e eşitle
+  // Keep i18n in sync with AppSettings (covers the initial load case where
+  // AppSettings resolves after i18n has already initialized with its default).
   useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const savedLanguage = await AsyncStorage.getItem("selectedLanguage");
-        if (savedLanguage && savedLanguage !== i18n.language) {
-          setLanguage(savedLanguage);
-          i18n.changeLanguage(savedLanguage);
-        }
-      } catch (error) {
-        console.error("Language load error:", error);
-      }
-    };
-    loadSettings();
-  }, [i18n]);
+    if (selectedLanguage && selectedLanguage !== i18n.language) {
+      i18n.changeLanguage(selectedLanguage);
+    }
+  }, [selectedLanguage, i18n]);
 
-  const toggleLanguage = (newLanguage) => {
-    setLanguage(newLanguage);
-    i18n.changeLanguage(newLanguage);
-    AsyncStorage.setItem("selectedLanguage", newLanguage).catch((error) => {
-      console.error("Language save error:", error);
-    });
-  };
+  const toggleLanguage = useCallback((newLanguage) => {
+    changeLanguage(newLanguage);      // writes to AsyncStorage via AppSettings
+    i18n.changeLanguage(newLanguage); // immediate UI update
+  }, [changeLanguage, i18n]);
 
-  const value = {
-    language,
+  const value = useMemo(() => ({
+    language: selectedLanguage,
     toggleLanguage,
-    t: i18n.getResourceBundle(language, 'translation') || {},
-  };
+    t: i18n.getResourceBundle(selectedLanguage, "translation") || {},
+  }), [selectedLanguage, toggleLanguage, i18n]);
 
   return (
     <LanguageContext.Provider value={value}>
@@ -53,4 +42,3 @@ export const useLanguage = () => {
   }
   return context;
 };
-

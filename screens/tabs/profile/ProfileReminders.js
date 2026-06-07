@@ -12,10 +12,10 @@ import {
 import React, { useRef, useEffect, useCallback } from "react";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
-import { useProfileScreen } from "../../../context/ProfileScreenContext";
+import { useProfileReminders } from "../../../context/ProfileRemindersContext";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useAppSettings } from "../../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 
 const { width } = Dimensions.get("window");
 
@@ -78,7 +78,7 @@ function MovieCard({
   formatDate,
   calculateDateDifference,
 }) {
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const diff = calculateDateDifference(reminder.releaseDate);
   const countdown = getCountdownStyle(diff, theme.notesColor);
@@ -128,7 +128,7 @@ function MovieCard({
         <View style={styles.posterWrapper}>
           <Image
             source={{
-              uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${reminder.posterPath}`,
+              uri: getTmdbUrl(reminder.posterPath, 'poster', 200),
             }}
             style={styles.poster}
             resizeMode="cover"
@@ -222,7 +222,7 @@ function EpisodeCard({
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const diff = calculateDateDifference(episode.airDate);
   const countdown = getCountdownStyle(diff, theme.colors);
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
 
   const pressIn = useCallback(
     () =>
@@ -267,7 +267,7 @@ function EpisodeCard({
         <View style={styles.posterWrapper}>
           <Image
             source={{
-              uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${season.seasonPosterPath}`,
+              uri: getTmdbUrl(season.seasonPosterPath, 'poster', 200),
             }}
             style={styles.poster}
             resizeMode="cover"
@@ -373,7 +373,7 @@ export default function ProfileReminders({ navigation }) {
     setActiveTab,
     formatDate,
     calculateDateDifference,
-  } = useProfileScreen();
+  } = useProfileReminders();
 
   // ── Tab geçiş animasyonu: translateX ile (useNativeDriver: true) ──────────
   // Tab pill genişliği yaklaşık ekran - 32px padding; her tab yarısı.

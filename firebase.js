@@ -7,7 +7,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getFirestore } from "firebase/firestore";
 const firebaseConfig = {
-  apiKey: "AIzaSyDoooqZO4XPh8ExhpHsDap9GCW8jyGKvuI",
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
   authDomain: "movieandtv-2832a.firebaseapp.com",
   projectId: "movieandtv-2832a",
   storageBucket: "movieandtv-2832a.firebasestorage.app",

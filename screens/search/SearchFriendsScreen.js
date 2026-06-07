@@ -19,6 +19,7 @@ import {
   arrayUnion,
   getDoc,
   setDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { db } from "../../firebase";
@@ -28,7 +29,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import IconBacground from "../../components/IconBacground";
 import { SafeAreaView } from "react-native-safe-area-context";
 import LottieView from "lottie-react-native";
-import { useProfileScreen } from "../../context/ProfileScreenContext";
+import { useProfileUi } from "../../context/ProfileUiContext";
 import { Image } from "react-native";
 
 export default function SearchFriendsScreen() {
@@ -37,7 +38,7 @@ export default function SearchFriendsScreen() {
   const auth = getAuth();
   const { theme } = useTheme();
   const currentUser = auth.currentUser;
-  const { avatars } = useProfileScreen();
+  const { avatars } = useProfileUi();
 
   const titleAnim = useRef(new Animated.Value(0)).current;
   const searchBarAnim = useRef(new Animated.Value(0)).current;
@@ -158,23 +159,27 @@ export default function SearchFriendsScreen() {
 
   const handleDelete = async (friend) => {
     try {
-      const userRef = doc(db, "Users", currentUser.uid);
-      const friendRef = doc(db, "Users", friend.uid);
-      const userSnap = await getDoc(userRef);
-      const friendSnap = await getDoc(friendRef);
-      if (!userSnap.exists() || !friendSnap.exists()) return;
-      const userData = userSnap.data();
-      const friendData = friendSnap.data();
-      await updateDoc(userRef, {
-        friends: userData.friends.filter((f) => f.uid !== friend.uid),
-      });
-      await updateDoc(friendRef, {
-        friends: friendData.friends.filter((f) => f.uid !== currentUser.uid),
-      });
+      // Subcollection sil + root-doc array temizle
+      await Promise.all([
+        deleteDoc(doc(db, "Users", currentUser.uid, "friends", friend.uid)),
+        deleteDoc(doc(db, "Users", friend.uid,      "friends", currentUser.uid)),
+      ]);
+      const [userSnap, friendSnap] = await Promise.all([
+        getDoc(doc(db, "Users", currentUser.uid)),
+        getDoc(doc(db, "Users", friend.uid)),
+      ]);
+      const legacyU = userSnap.data()?.friends?.find((f) => f.uid === friend.uid);
+      const legacyF = friendSnap.data()?.friends?.find((f) => f.uid === currentUser.uid);
+      const updates = [];
+      if (legacyU) updates.push(updateDoc(doc(db, "Users", currentUser.uid), {
+        friends: userSnap.data().friends.filter((f) => f.uid !== friend.uid),
+      }));
+      if (legacyF) updates.push(updateDoc(doc(db, "Users", friend.uid), {
+        friends: friendSnap.data().friends.filter((f) => f.uid !== currentUser.uid),
+      }));
+      if (updates.length) await Promise.all(updates);
       setResults((prev) =>
-        prev.map((u) =>
-          u.uid === friend.uid ? { ...u, alreadyFriend: false } : u,
-        ),
+        prev.map((u) => u.uid === friend.uid ? { ...u, alreadyFriend: false } : u),
       );
     } catch (error) {
       console.error("Arkadaş silme hatası:", error);

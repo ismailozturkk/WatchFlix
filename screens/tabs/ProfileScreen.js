@@ -23,11 +23,12 @@ import ProfileLists from "./profile/ProfileLists";
 import { useAuth } from "../../context/AuthContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { AvatarSkeleton, WatchedInfoSkeleton } from "../../components/Skeleton";
-import { useProfileScreen } from "../../context/ProfileScreenContext";
+import { useProfileStats } from "../../context/ProfileStatsContext";
+import { useProfileUi } from "../../context/ProfileUiContext";
 import * as Progress from "react-native-progress";
 import ProfileNotes from "./profile/ProfileNotes";
 import ProfileReminders from "./profile/ProfileReminders";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useSnowSettings } from "../../context/AppSettingsContext";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import CircularProgress, {
   CircularProgressBase,
@@ -43,7 +44,7 @@ import StatisticsSection from "./profile/StatisticsSection";
 const ProfileScreen = ({ navigation }) => {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
-  const { showSnow } = useAppSettings();
+  const { showSnow } = useSnowSettings();
   const [isloading, setIsLoading] = useState(false);
   const [modalVisibleLogout, setModalVisibleLogout] = useState(false);
   const { user } = useAuth();
@@ -52,6 +53,10 @@ const ProfileScreen = ({ navigation }) => {
     avatars,
     modalVisible,
     setModalVisible,
+    isloadingAvatar,
+    setSelectAvatarIndex,
+  } = useProfileUi();
+  const {
     watchedMovieCount,
     totalWatchedTime,
     watchedTvCount,
@@ -60,30 +65,22 @@ const ProfileScreen = ({ navigation }) => {
     totalWatchedTimeTv,
     totalMinutesTime,
     totalMinutesTimeTv,
-    borderColor,
-    borderColor2,
-    shadowColor,
-    isloadingAvatar,
     isloadingShowInfo,
     isloadingMovieInfo,
     timeDisplayMode,
-    // Fonksiyonlar
-    setSelectAvatarIndex,
     handleTimeClick,
     formatTotalDurationTime,
-
     borderColorTv,
     shadowColorTv,
     borderColor2Tv,
     borderColorMovie,
     shadowColorMovie,
     borderColor2Movie,
-
     rankNameTv,
     rankLevelTv,
     rankNameMovie,
     rankLevelMovie,
-  } = useProfileScreen();
+  } = useProfileStats();
   const SingOut = async () => {
     setIsLoading(true);
 
@@ -203,8 +200,8 @@ const ProfileScreen = ({ navigation }) => {
               style={[
                 styles.profilImageTouch,
                 {
-                  borderColor: borderColor || "#000",
-                  shadowColor: shadowColor || "#000",
+                  borderColor: borderColorMovie || "#000",
+                  shadowColor: shadowColorMovie || "#000",
                   padding: 9,
                 },
               ]}
@@ -265,10 +262,7 @@ const ProfileScreen = ({ navigation }) => {
                   >
                     <Image
                       source={avatar || require("../../assets/avatar/3.png")}
-                      style={[
-                        styles.profilImage,
-                        { backgroundColor: borderColor },
-                      ]}
+                      style={[styles.profilImage]}
                     />
                   </View>
                 </View>

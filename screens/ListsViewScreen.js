@@ -30,7 +30,7 @@ import { db } from "../firebase";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useAppSettings } from "../context/AppSettingsContext";
+import { useImageQualitySettings } from "../context/AppSettingsContext";
 import { BlurView } from "expo-blur";
 
 const { width } = Dimensions.get("window");
@@ -112,7 +112,7 @@ const PosterStack = ({ items, accent, imageQuality }) => {
             {item?.imagePath ? (
               <Image
                 source={{
-                  uri: `https://image.tmdb.org/t/p/${imageQuality?.poster ?? "w185"}${item.imagePath}`,
+                  uri: getTmdbUrl(item.imagePath, 'poster', 200),
                 }}
                 style={stackStyles.posterImage}
               />
@@ -290,13 +290,13 @@ export default function ListsViewScreen({ navigation }) {
   const { t } = useLanguage();
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const [isLoading, setIsLoading] = useState(false);
 
   const [lists, setLists] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedList, setSelectedList] = useState(null);
-  const [listVisible, setListVisible] = useState([]);
+  const [listVisible, setListVisible] = useState({});
   const [newListName, setNewListName] = useState("");
   const [inputFocused, setInputFocused] = useState(false);
 
@@ -310,14 +310,22 @@ export default function ListsViewScreen({ navigation }) {
     }).start();
   }, []);
 
-  // Firestore'dan listVisible çek
+  // Firestore'dan listVisible çek (eski array formatını map'e dönüştürür)
   useEffect(() => {
     const fetchListVisible = async () => {
       if (!user) return;
       const userRef = doc(db, "Users", user.uid);
       const userSnap = await getDoc(userRef);
-      if (userSnap.exists()) {
-        setListVisible(userSnap.data().listVisible || []);
+      if (!userSnap.exists()) return;
+      const raw = userSnap.data().listVisible;
+      if (Array.isArray(raw)) {
+        // Eski format: [{listName: true}, ...] → map'e çevir ve kaydet
+        const map = {};
+        raw.forEach((item) => Object.assign(map, item));
+        setListVisible(map);
+        setDoc(userRef, { listVisible: map }, { merge: true });
+      } else {
+        setListVisible(raw || {});
       }
     };
     fetchListVisible();
@@ -326,18 +334,9 @@ export default function ListsViewScreen({ navigation }) {
   const addToListVisible = async (listName) => {
     if (!user) return;
     const userRef = doc(db, "Users", user.uid);
-    const updatedList = [...listVisible];
-    let found = false;
-    for (let i = 0; i < updatedList.length; i++) {
-      if (listName in updatedList[i]) {
-        updatedList[i][listName] = !updatedList[i][listName];
-        found = true;
-        break;
-      }
-    }
-    if (!found) updatedList.push({ [listName]: true });
-    await setDoc(userRef, { listVisible: updatedList }, { merge: true });
-    setListVisible(updatedList);
+    const updated = { ...listVisible, [listName]: !listVisible[listName] };
+    await setDoc(userRef, { listVisible: updated }, { merge: true });
+    setListVisible(updated);
   };
 
   // Firestore listeleri dinle
@@ -395,8 +394,7 @@ export default function ListsViewScreen({ navigation }) {
     "watchedMovies",
   ];
 
-  const isListVisible = (listName) =>
-    listVisible.some((list) => list[listName] === true);
+  const isListVisible = (listName) => listVisible[listName] === true;
 
   const renderItem = useCallback(
     ({ item, index }) => {

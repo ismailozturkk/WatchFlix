@@ -35,7 +35,7 @@ import * as Progress from "react-native-progress";
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import Entypo from "@expo/vector-icons/Entypo";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useAppSettings, useImageQualitySettings } from "../../context/AppSettingsContext";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import ListViewTv from "../../components/ListViewTv";
 import { BlurView } from "expo-blur";
@@ -68,6 +68,7 @@ const SimilarTvShow = ({
   imageQuality,
   theme,
 }) => {
+  const { getTmdbUrl } = useImageQualitySettings();
   const { inWatchList, inFavorites, isWatched, isInOtherLists } = useListStatus(
     item.id,
     "tv",
@@ -89,7 +90,7 @@ const SimilarTvShow = ({
           source={
             item.poster_path
               ? {
-                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                  uri: getTmdbUrl(item.poster_path, 'poster', 200),
                 }
               : require("../../assets/image/no_image.png")
           }
@@ -155,6 +156,7 @@ export default function TvShowsDetails({ route, navigation }) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { API_KEY, showSnow, imageQuality } = useAppSettings();
+  const { getTmdbUrl } = useImageQualitySettings();
   const { allLists } = useListStatusContext();
 
   const [overviewExpanded, setOverviewExpanded] = useState(false);
@@ -553,7 +555,7 @@ export default function TvShowsDetails({ route, navigation }) {
             >
               <Image
                 source={{
-                  uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,
+                  uri: getTmdbUrl(details.backdrop_path, 'backdrop', 1000),
                 }}
                 style={styles.backdrop}
               />
@@ -610,7 +612,7 @@ export default function TvShowsDetails({ route, navigation }) {
             {details.poster_path ? (
               <Image
                 source={{
-                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${details.poster_path}`,
+                  uri: getTmdbUrl(details.poster_path, 'poster', 200),
                 }}
                 style={[styles.poster, { borderColor: theme.border + "80" }]}
               />
@@ -848,7 +850,7 @@ export default function TvShowsDetails({ route, navigation }) {
                 {details.backdrop_path && (
                   <Image
                     source={{
-                      uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,
+                      uri: getTmdbUrl(details.backdrop_path, 'backdrop', 1000),
                     }}
                     style={styles.graphBackdrop}
                     blurRadius={2}
@@ -862,7 +864,7 @@ export default function TvShowsDetails({ route, navigation }) {
                   {details.poster_path && (
                     <Image
                       source={{
-                        uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${details.poster_path}`,
+                        uri: getTmdbUrl(details.poster_path, 'poster', 200),
                       }}
                       style={styles.graphPoster}
                     />
@@ -1448,10 +1450,10 @@ export default function TvShowsDetails({ route, navigation }) {
             source={
               PosterModalVisible
                 ? {
-                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${details.poster_path}`,
+                    uri: getTmdbUrl(details.poster_path, 'poster', 200),
                   }
                 : {
-                    uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,
+                    uri: getTmdbUrl(details.backdrop_path, 'backdrop', 1000),
                   }
             }
             style={{

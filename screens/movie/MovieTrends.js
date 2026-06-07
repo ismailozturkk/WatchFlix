@@ -1,15 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   StyleSheet,
   View,
   Text,
   FlatList,
-  Image,
   Dimensions,
   Animated,
   TouchableOpacity,
   StatusBar,
 } from "react-native";
+import { Image } from "expo-image";
 import { MovieCardSkeleton } from "../../components/Skeleton";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -18,19 +18,20 @@ import RatingStars from "../../components/RatingStars";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../context/AppSettingsContext";
 const { width, height } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.6;
 const CARD_HEIHGT = height * 0.45;
 const SPACING = width * 0.02;
 const ITEM_SIZE = CARD_WIDTH;
 const EMPTY_ITEM_SIZE = (width - CARD_WIDTH) / 2;
+const INITIAL_CARD_RENDER_COUNT = 4;
 
 export default function MovieTrends({ navigation }) {
   const { theme } = useTheme();
   const scrollX = React.useRef(new Animated.Value(0)).current;
   const { t } = useLanguage();
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const {
     loadingTrends,
     movieTrends,
@@ -38,38 +39,32 @@ export default function MovieTrends({ navigation }) {
     setSelectedCategoryTrends,
     getCategoryTitleTrends,
     categoriesTrends,
+    activateMovieSection,
   } = useMovie();
 
-  // Animated import'unun eklendiğinden emin olun
-  const [scaleValues, setScaleValues] = useState({});
-
   useEffect(() => {
-    const newScaleValues = {};
-    if (movieTrends && movieTrends.length > 0) {
-      movieTrends.forEach((item) => {
-        newScaleValues[item.id] = new Animated.Value(1);
-      });
-      setScaleValues(newScaleValues);
+    activateMovieSection("trends");
+  }, [activateMovieSection]);
+
+  const scaleValuesRef = useRef({});
+
+  (movieTrends || []).forEach((item) => {
+    if (!scaleValuesRef.current[item.id]) {
+      scaleValuesRef.current[item.id] = new Animated.Value(1);
     }
-  }, [movieTrends]);
+  });
 
-  const onPressIn = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 0.9,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
+  const onPressIn = useCallback((itemId) => {
+    const anim = scaleValuesRef.current[itemId];
+    if (!anim) return;
+    Animated.timing(anim, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
+  }, []);
 
-  const onPressOut = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
+  const onPressOut = useCallback((itemId) => {
+    const anim = scaleValuesRef.current[itemId];
+    if (!anim) return;
+    Animated.timing(anim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+  }, []);
 
   const renderCategory = ({ item }) => (
     <TouchableOpacity
@@ -133,7 +128,7 @@ export default function MovieTrends({ navigation }) {
         style={{
           width: ITEM_SIZE,
           height: CARD_HEIHGT,
-          transform: [{ scale: scaleValues[item.id] || 1 }],
+          transform: [{ scale: scaleValuesRef.current[item.id] || 1 }],
         }}
       >
         <TouchableOpacity
@@ -159,8 +154,10 @@ export default function MovieTrends({ navigation }) {
             <Image
               style={styles.poster}
               source={{
-                uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                uri: getTmdbUrl(item.poster_path, 'poster', 200),
               }}
+              cachePolicy="memory-disk"
+              transition={120}
             />
           </Animated.View>
           <Animated.View
@@ -308,11 +305,15 @@ export default function MovieTrends({ navigation }) {
           />
         </View>
         <Animated.FlatList
-          data={[1, 2, 3, 4, 5]}
+          data={[1, 2, 3]}
           renderItem={(index) => <MovieCardSkeleton index={index} />}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: EMPTY_ITEM_SIZE }}
+          initialNumToRender={3}
+          maxToRenderPerBatch={3}
+          windowSize={3}
+          removeClippedSubviews
         />
       </View>
     );
@@ -345,6 +346,15 @@ export default function MovieTrends({ navigation }) {
           { useNativeDriver: true },
         )}
         scrollEventThrottle={16}
+        removeClippedSubviews
+        maxToRenderPerBatch={INITIAL_CARD_RENDER_COUNT}
+        windowSize={5}
+        initialNumToRender={INITIAL_CARD_RENDER_COUNT}
+        getItemLayout={(_, index) => ({
+          length: ITEM_SIZE,
+          offset: ITEM_SIZE * index,
+          index,
+        })}
       />
     </View>
   );

@@ -15,7 +15,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import {
+  useApiSettings,
+  useImageQualitySettings,
+} from "../../context/AppSettingsContext";
 import { useTvShow } from "../../context/TvShowContex";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -29,7 +32,7 @@ const POSTER_H = POSTER_W * 1.5;
 
 // ─── Tek kart ─────────────────────────────────────────────────────────────────
 function SeriesCard({ show, navigation, theme, language, API_KEY, imageQuality }) {
-  const TMDB_IMG = `https://image.tmdb.org/t/p/${imageQuality.poster}`;
+  const { getTmdbUrl } = useImageQualitySettings();
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   // İlerleme hesabı
@@ -101,7 +104,7 @@ function SeriesCard({ show, navigation, theme, language, API_KEY, imageQuality }
           <Image
             source={
               show.imagePath
-                ? { uri: `${TMDB_IMG}${show.imagePath}` }
+                ? { uri: getTmdbUrl(show.imagePath, 'poster', 200) }
                 : require("../../assets/image/no_image.png")
             }
             style={styles.poster}
@@ -204,7 +207,8 @@ function SeriesCard({ show, navigation, theme, language, API_KEY, imageQuality }
 export default function OnGoingSeries({ navigation }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const { API_KEY, imageQuality } = useAppSettings();
+  const { API_KEY } = useApiSettings();
+  const { imageQuality } = useImageQualitySettings();
   const { watchedTvShows: shows, loadingWatchedTv: loading } = useTvShow();
 
   const [searchQuery, setSearchQuery] = useState("");

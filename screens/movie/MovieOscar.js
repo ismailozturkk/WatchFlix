@@ -6,9 +6,9 @@ import {
   ActivityIndicator,
   Dimensions,
   TouchableOpacity,
-  Image,
   Animated,
 } from "react-native";
+import { Image } from "expo-image";
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useTheme } from "../../context/ThemeContext";
@@ -16,7 +16,7 @@ import RatingStars from "../../components/RatingStars";
 import { useLanguage } from "../../context/LanguageContext";
 import { MovieOscarSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -25,8 +25,12 @@ const { width } = Dimensions.get("window");
 export default function MovieOscar({ navigation }) {
   const { t } = useLanguage();
   const { theme } = useTheme();
-  const { imageQuality } = useAppSettings();
-  const { moviesOscar, loadingOscar, errorOscar } = useMovie();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { moviesOscar, loadingOscar, errorOscar, activateMovieSection } = useMovie();
+
+  useEffect(() => {
+    activateMovieSection("oscar");
+  }, [activateMovieSection]);
 
   // Animated import'unun eklendiğinden emin olun
   const [scaleValues, setScaleValues] = useState({});
@@ -70,11 +74,15 @@ export default function MovieOscar({ navigation }) {
         </Text>
 
         <FlatList
-          data={[1, 2, 3, 4, 5, 6, 7, 8, 9]}
+          data={[1, 2, 3]}
           renderItem={() => <MovieOscarSkeleton />}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 15 }}
+          initialNumToRender={3}
+          maxToRenderPerBatch={3}
+          windowSize={3}
+          removeClippedSubviews
         />
       </View>
     );
@@ -117,6 +125,8 @@ export default function MovieOscar({ navigation }) {
               <Image
                 source={require("../../assets/image/pngwing.com.png")}
                 style={{ width: 10, height: 40 }}
+                cachePolicy="memory-disk"
+                transition={120}
               />
               <DikeyMetin metin={`${2026 - index}`} />
             </View>
@@ -124,11 +134,13 @@ export default function MovieOscar({ navigation }) {
               source={
                 item.poster_path
                   ? {
-                      uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                      uri: getTmdbUrl(item.poster_path, 'poster', 200),
                     }
                   : require("../../assets/image/no_image.png")
               }
               style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+              cachePolicy="memory-disk"
+              transition={120}
             />
             <View
               style={[
@@ -227,6 +239,11 @@ export default function MovieOscar({ navigation }) {
         renderItem={renderMovieItem}
         keyExtractor={(item) => item.id.toString()}
         horizontal
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        updateCellsBatchingPeriod={80}
+        windowSize={5}
+        removeClippedSubviews
       />
     </View>
   );

@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Watch Flix",
-    "slug": "WatchFlix",
-    "version": "1.1.0",
+    "name": "Watchify",
+    "slug": "Watchify",
+    "version": "1.4.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -12,6 +12,7 @@
       "resizeMode": "cover",
       "backgroundColor": "#00000000"
     },
+    "scheme": "watchify",
     "ios": {
       "supportsTablet": true
     },
@@ -27,25 +28,29 @@
         "resizeMode": "cover",
         "backgroundColor": "#00000000"
       },
-      "package": "com.smlztrk.WatchFlix",
-      "softwareKeyboardLayoutMode": "pan"
+      "package": "com.smlztrkk.Watchify",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "extra": {
       "eas": {
-        "projectId": "3bbd3b81-8382-4788-bfc9-dbde13043eaf"
+        "projectId": "b0ff17ab-04b9-4e70-8e3d-588770bfdc5c"
+        //   "projectId": "3bbd3b81-8382-4788-bfc9-dbde13043eaf"
       }
     },
     "plugins": [
+      "@react-native-google-signin/google-signin",
       [
         "expo-video",
         {
           "supportsBackgroundPlayback": true,
           "supportsPictureInPicture": true
         }
-      ]
-    ]
+      ],
+      "expo-web-browser"
+    ],
+    "owner": "smlztrkk"
   }
 }

@@ -1,26 +1,26 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   FlatList,
-  Image,
   Dimensions,
   StyleSheet,
   Animated,
 } from "react-native";
+import { Image } from "expo-image";
 import { useTheme } from "../../context/ThemeContext";
 import { MovieSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
 import { useTvShow } from "../../context/TvShowContex";
 import { useListStatus } from "../../modules/UseListStatus";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../context/AppSettingsContext";
 const { width } = Dimensions.get("window");
 
 export default function TvShowsProvders({ navigation }) {
   const { theme } = useTheme();
-  const { imageQuality } = useAppSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const {
     providers,
     selectedProvider,
@@ -28,24 +28,24 @@ export default function TvShowsProvders({ navigation }) {
     loadingMoviesByProvider,
     loadingProvider,
     fetchMoviesByProvider,
+    activateTvSection,
   } = useTvShow();
 
-  // Animated import'unun eklendiğinden emin olun
-  const [scaleValues, setScaleValues] = useState({});
-
   useEffect(() => {
-    const newScaleValues = {};
-    if (moviesProviders && moviesProviders.length > 0) {
-      moviesProviders.forEach((item) => {
-        newScaleValues[item.id] = new Animated.Value(1);
-      });
-      setScaleValues(newScaleValues);
+    activateTvSection("providers");
+  }, [activateTvSection]);
+
+  // Animated import'unun eklendiğinden emin olun
+  const scaleValuesRef = useRef({});
+  const getScaleValue = (itemId) => {
+    if (!scaleValuesRef.current[itemId]) {
+      scaleValuesRef.current[itemId] = new Animated.Value(1);
     }
-  }, [moviesProviders]);
+    return scaleValuesRef.current[itemId];
+  };
 
   const onPressIn = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
+    Animated.timing(getScaleValue(itemId), {
       toValue: 0.9,
       duration: 200,
       useNativeDriver: true,
@@ -53,8 +53,7 @@ export default function TvShowsProvders({ navigation }) {
   };
 
   const onPressOut = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
+    Animated.timing(getScaleValue(itemId), {
       toValue: 1,
       duration: 200,
       useNativeDriver: true,
@@ -80,9 +79,11 @@ export default function TvShowsProvders({ navigation }) {
     >
       <Image
         source={{
-          uri: `https://image.tmdb.org/t/p/${imageQuality.logo}${item.logo_path}`,
+          uri: getTmdbUrl(item.logo_path, 'logo', 150),
         }}
         style={{ width: 30, height: 30, borderRadius: 10 }}
+        cachePolicy="memory-disk"
+        transition={120}
       />
       <View
         style={{
@@ -118,7 +119,7 @@ export default function TvShowsProvders({ navigation }) {
         <Animated.View
           style={[
             {
-              transform: [{ scale: scaleValues[item.id] || 1 }],
+              transform: [{ scale: getScaleValue(item.id) }],
             },
           ]}
         >
@@ -126,11 +127,13 @@ export default function TvShowsProvders({ navigation }) {
             source={
               item.poster_path
                 ? {
-                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                    uri: getTmdbUrl(item.poster_path, 'poster', 200),
                   }
                 : require("../../assets/image/no_image.png")
             }
             style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+            cachePolicy="memory-disk"
+            transition={120}
           />
 
           <View
@@ -228,11 +231,15 @@ export default function TvShowsProvders({ navigation }) {
           }}
         />
         <FlatList
-          data={[1, 2, 3, 4, 5, 6, 7, 8, 9]}
+          data={[1, 2, 3]}
           renderItem={() => <MovieSkeleton />}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 15 }}
+          initialNumToRender={3}
+          maxToRenderPerBatch={3}
+          windowSize={3}
+          removeClippedSubviews
         />
       </View>
     );
@@ -258,6 +265,11 @@ export default function TvShowsProvders({ navigation }) {
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderMovieItem}
         contentContainerStyle={{ paddingHorizontal: 15, marginTop: 20 }}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        updateCellsBatchingPeriod={80}
+        windowSize={5}
+        removeClippedSubviews
       />
     </View>
   );

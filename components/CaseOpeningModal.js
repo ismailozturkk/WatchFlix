@@ -18,7 +18,7 @@ import {
 } from "react-native";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
-import { useAppSettings } from "../context/AppSettingsContext";
+import { useImageQualitySettings } from "../context/AppSettingsContext";
 
 const { width, height } = Dimensions.get("window");
 
@@ -165,8 +165,8 @@ export default function CaseOpeningModal({
   filterType, // "movie" | "tv" | "mixed"
   onNavigate,
 }) {
-  const { imageQuality } = useAppSettings();
-  const posterBase = `https://image.tmdb.org/t/p/${imageQuality?.poster || "w185"}`;
+  const { imageQuality } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
 
   const {
     accent,
@@ -578,7 +578,7 @@ export default function CaseOpeningModal({
                     <Image
                       source={
                         item.imagePath
-                          ? { uri: `${posterBase}${item.imagePath}` }
+                          ? { uri: getTmdbUrl(item.imagePath, 'poster', 200) }
                           : require("../assets/image/no_image.png")
                       }
                       style={styles.reelCardImage}

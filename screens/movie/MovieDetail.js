@@ -29,7 +29,7 @@ import { getDoc, doc, updateDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import ListView from "../../components/ListView";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useAppSettings, useImageQualitySettings } from "../../context/AppSettingsContext";
 import RatingStars from "../../components/RatingStars";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import Entypo from "@expo/vector-icons/Entypo";
@@ -52,6 +52,7 @@ const BACKDROP_HEIGHT = width * (9 / 16);
 ───────────────────────────────────────── */
 const SimilarMovieItem = ({ item, navigation, imageQuality }) => {
   const { theme } = useTheme();
+  const { getTmdbUrl } = useImageQualitySettings();
   const { inWatchList, inFavorites, isWatched, isInOtherLists } = useListStatus(
     item.id,
     "movie",
@@ -86,7 +87,7 @@ const SimilarMovieItem = ({ item, navigation, imageQuality }) => {
           source={
             item.poster_path
               ? {
-                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+                  uri: getTmdbUrl(item.poster_path, 'poster', 200),
                 }
               : require("../../assets/image/no_image.png")
           }
@@ -199,6 +200,7 @@ export default function MovieDetails({ navigation, route }) {
   };
 
   const { API_KEY, showSnow, imageQuality } = useAppSettings();
+  const { getTmdbUrl } = useImageQualitySettings();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [PosterModalVisible, setPosterModalVisible] = useState(false);
@@ -415,7 +417,7 @@ export default function MovieDetails({ navigation, route }) {
           source={
             item.profile_path
               ? {
-                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.profile_path}`,
+                  uri: getTmdbUrl(item.profile_path, 'poster', 200),
                 }
               : require("../../assets/image/user.png")
           }
@@ -524,7 +526,7 @@ export default function MovieDetails({ navigation, route }) {
             >
               <Image
                 source={{
-                  uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,
+                  uri: getTmdbUrl(details.backdrop_path, 'backdrop', 1000),
                 }}
                 style={styles.backdrop}
               />
@@ -580,7 +582,7 @@ export default function MovieDetails({ navigation, route }) {
             {details.poster_path ? (
               <Image
                 source={{
-                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${details.poster_path}`,
+                  uri: getTmdbUrl(details.poster_path, 'poster', 200),
                 }}
                 style={[styles.poster, { borderColor: theme.border + "80" }]}
               />
@@ -984,7 +986,7 @@ export default function MovieDetails({ navigation, route }) {
                         >
                           <Image
                             source={{
-                              uri: `https://image.tmdb.org/t/p/original${p.logo_path}`,
+                              uri: getTmdbUrl(p.logo_path, 'poster', 200),
                             }}
                             style={styles.providerLogo}
                           />
@@ -1460,10 +1462,10 @@ export default function MovieDetails({ navigation, route }) {
             source={
               PosterModalVisible
                 ? {
-                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${details.poster_path}`,
+                    uri: getTmdbUrl(details.poster_path, 'poster', 200),
                   }
                 : {
-                    uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,
+                    uri: getTmdbUrl(details.backdrop_path, 'backdrop', 1000),
                   }
             }
             style={{

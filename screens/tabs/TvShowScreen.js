@@ -1,13 +1,12 @@
 import {
+  FlatList,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Pressable,
   Text,
   View,
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
-import { useSnow } from "../../context/SnowContext";
 import LottieView from "lottie-react-native";
 import TvShowsOnTheAir from "../tv/TvShowsOnTheAir";
 import TvShowsAiringToday from "../tv/TvShowsAiringToday";
@@ -16,16 +15,22 @@ import TvShowsProvders from "../tv/TvShowsProvders";
 import TvShowsTrends from "../tv/TvShowsTrends";
 import TvShowBests from "../tv/TvShowBests";
 import TvOngoingSection from "../tv/TvOngoingSection";
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTvShow } from "../../context/TvShowContex";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import {
+  useOngoingTvShowsSettings,
+  useSnowSettings,
+} from "../../context/AppSettingsContext";
 import { useLanguage } from "../../context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import IconBacground from "../../components/IconBacground";
 
+const INITIAL_SECTION_COUNT = 3;
+
 export default function TvShowScreen({ navigation }) {
   const { theme } = useTheme();
-  const { showSnow } = useAppSettings();
+  const { showSnow } = useSnowSettings();
+  const { showOngoingTvShows } = useOngoingTvShowsSettings();
   const { t } = useLanguage();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -38,73 +43,128 @@ export default function TvShowScreen({ navigation }) {
     fetchOnTheAir,
   } = useTvShow();
 
+  const sections = useMemo(() => {
+    const items = [
+      { key: "trends", Component: TvShowsTrends },
+      showOngoingTvShows
+        ? { key: "ongoing", Component: TvOngoingSection }
+        : null,
+      { key: "best", Component: TvShowBests },
+      { key: "providers", Component: TvShowsProvders },
+      { key: "genres", Component: TvShowsGenres },
+      { key: "onTheAir", Component: TvShowsOnTheAir },
+      { key: "airingToday", Component: TvShowsAiringToday },
+    ];
+
+    return items.filter(Boolean);
+  }, [showOngoingTvShows]);
+
+  const [visibleSectionCount, setVisibleSectionCount] = useState(
+    Math.min(INITIAL_SECTION_COUNT, sections.length),
+  );
+
+  const visibleSections = useMemo(
+    () => sections.slice(0, visibleSectionCount),
+    [sections, visibleSectionCount],
+  );
+
+  const renderSection = useCallback(
+    ({ item }) => {
+      const SectionComponent = item.Component;
+      return <SectionComponent navigation={navigation} />;
+    },
+    [navigation],
+  );
+
+  const renderHeader = useCallback(
+    () => (
+      <Pressable
+        onPress={() =>
+          navigation.navigate("TvShowSearch", { autoFocus: true })
+        }
+        style={styles.fakeSearchContainer}
+      >
+        <View
+          style={[styles.searchInput, { backgroundColor: theme.secondary }]}
+          placeholderTextColor={theme.text.muted}
+          placeholder={t.SearchScreen.searchTvShows}
+        >
+          <Ionicons name="search" size={20} color={theme.text.muted} />
+          <Text allowFontScaling={false} style={{ color: theme.text.muted }}>
+            {t.SearchScreen.searchTvShows}
+          </Text>
+        </View>
+      </Pressable>
+    ),
+    [navigation, t.SearchScreen.searchTvShows, theme.secondary, theme.text.muted],
+  );
+
+  const revealNextSection = useCallback(() => {
+    setVisibleSectionCount((current) =>
+      Math.min(current + 1, sections.length),
+    );
+  }, [sections.length]);
+
   const onRefresh = async () => {
     setRefreshing(true);
-    (await fetchSeriesTrends(),
-      await fetchSeriesBest(),
-      await fetchAiringToday(),
-      await fetchProviders(),
-      await fetchTvByGenres(),
-      await fetchOnTheAir(),
-      setRefreshing(false));
+    try {
+      const refreshTasks = visibleSections
+        .map(({ key }) => {
+          switch (key) {
+            case "trends":
+              return fetchSeriesTrends();
+            case "best":
+              return fetchSeriesBest();
+            case "providers":
+              return fetchProviders();
+            case "genres":
+              return fetchTvByGenres();
+            case "onTheAir":
+              return fetchOnTheAir();
+            case "airingToday":
+              return fetchAiringToday();
+            default:
+              return null;
+          }
+        })
+        .filter(Boolean);
+      await Promise.allSettled(refreshTasks);
+    } finally {
+      setRefreshing(false);
+    }
   };
   return (
     <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
       <IconBacground opacity={0.3} />
-      <ScrollView
+      <FlatList
+        data={visibleSections}
+        keyExtractor={(item) => item.key}
+        renderItem={renderSection}
+        ListHeaderComponent={renderHeader}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.container]}
+        contentContainerStyle={styles.container}
+        initialNumToRender={INITIAL_SECTION_COUNT}
+        maxToRenderPerBatch={1}
+        updateCellsBatchingPeriod={80}
+        windowSize={5}
+        onEndReached={revealNextSection}
+        onEndReachedThreshold={0.6}
+        removeClippedSubviews
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-      >
-        {/* Snow */}
-        {showSnow &&
-          [0, 1, 2, 3].map((item, index) => (
-            <LottieView
-              key={index}
-              style={[
-                index === 0
-                  ? styles.lottie
-                  : index === 1
-                    ? styles.lottie0
-                    : styles.lottie1,
-              ]}
-              source={require("../../LottieJson/snow.json")}
-              autoPlay={true}
-              loop
-            />
-          ))}
+      />
 
-        {/* Arama çubuğu */}
-        <Pressable
-          onPress={() =>
-            navigation.navigate("TvShowSearch", { autoFocus: true })
-          }
-          style={styles.fakeSearchContainer}
-        >
-          <View
-            style={[styles.searchInput, { backgroundColor: theme.secondary }]}
-            placeholderTextColor={theme.text.muted}
-            placeholder={t.SearchScreen.searchTvShows}
-          >
-            <Ionicons name="search" size={20} color={theme.text.muted} />
-            <Text allowFontScaling={false} style={{ color: theme.text.muted }}>
-              {t.SearchScreen.searchTvShows}
-            </Text>
-          </View>
-        </Pressable>
-
-        {/* Devam Eden Dizilerim — TvShowBests/TvShowsGenres ile aynı görünüm */}
-
-        <TvShowsTrends navigation={navigation} />
-        <TvOngoingSection navigation={navigation} />
-        <TvShowBests navigation={navigation} />
-        <TvShowsProvders navigation={navigation} />
-        <TvShowsGenres navigation={navigation} />
-        <TvShowsOnTheAir navigation={navigation} />
-        <TvShowsAiringToday navigation={navigation} />
-      </ScrollView>
+      {showSnow && (
+        <View style={styles.snowOverlay} pointerEvents="none">
+          <LottieView
+            style={{ flex: 1 }}
+            source={require("../../LottieJson/snow.json")}
+            autoPlay
+            loop
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -113,29 +173,13 @@ const styles = StyleSheet.create({
   container: {
     paddingBottom: 75,
   },
-  lottie: {
+  snowOverlay: {
     position: "absolute",
-    height: 1000,
     top: 0,
-    left: -60,
-    right: -60,
-    zIndex: 0,
-  },
-  lottie0: {
-    position: "absolute",
-    height: 1000,
-    top: 1000,
-    left: -60,
-    right: -60,
-    zIndex: 0,
-  },
-  lottie1: {
-    position: "absolute",
-    height: 1000,
-    top: 2000,
-    left: -60,
-    right: -60,
-    zIndex: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
   },
   fakeSearchContainer: {
     paddingTop: 50,

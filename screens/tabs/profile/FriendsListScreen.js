@@ -11,13 +11,15 @@ import {
 import {
   doc,
   getDoc,
+  collection,
   onSnapshot,
   updateDoc,
+  deleteDoc,
   arrayRemove,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { db } from "../../../firebase";
-import { useProfileScreen } from "../../../context/ProfileScreenContext";
+import { useProfileUi } from "../../../context/ProfileUiContext";
 import { useTheme } from "../../../context/ThemeContext";
 import SwipeCard from "../../../modules/SwipeCard";
 import Toast from "react-native-toast-message";
@@ -25,7 +27,7 @@ import { useLanguage } from "../../../context/LanguageContext";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import IconBacground from "../../../components/IconBacground";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAppSettings } from "../../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 
 const LIST_META = {
   watchedMovies: { icon: "movie-outline", iconLib: "mci", color: "#29b864", label: "İzlenen Filmler" },
@@ -49,8 +51,8 @@ export default function FriendsListScreen({ navigation }) {
 
   const auth = getAuth();
   const user = auth.currentUser;
-  const { avatars, gridStyle } = useProfileScreen();
-  const { imageQuality } = useAppSettings();
+  const { avatars, gridStyle } = useProfileUi();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const { theme } = useTheme();
   useLanguage();
 
@@ -66,11 +68,28 @@ export default function FriendsListScreen({ navigation }) {
 
   useEffect(() => {
     if (!user) return;
-    const userRef = doc(db, "Users", user.uid);
-    const unsubscribe = onSnapshot(userRef, (docSnap) => {
-      if (docSnap.exists()) setFriends(docSnap.data().friends || []);
-    });
-    return () => unsubscribe();
+    let legacyUnsub = null;
+
+    const unsubSub = onSnapshot(
+      collection(db, "Users", user.uid, "friends"),
+      (snap) => {
+        if (!snap.empty) {
+          // Subcollection'da veri var → eski listener'ı kapat
+          if (legacyUnsub) { legacyUnsub(); legacyUnsub = null; }
+          setFriends(snap.docs.map((d) => d.data()));
+        } else if (!legacyUnsub) {
+          // Subcollection boş → root-doc array fallback (sadece bir kez aç)
+          legacyUnsub = onSnapshot(doc(db, "Users", user.uid), (docSnap) => {
+            if (docSnap.exists()) setFriends(docSnap.data().friends || []);
+          });
+        }
+      }
+    );
+
+    return () => {
+      unsubSub();
+      if (legacyUnsub) legacyUnsub();
+    };
   }, [user]);
 
   useEffect(() => {
@@ -78,10 +97,10 @@ export default function FriendsListScreen({ navigation }) {
     const userRef = doc(db, "Users", selectedFriend.uid);
     const unsubscribeUser = onSnapshot(userRef, (userSnap) => {
       if (!userSnap.exists()) return;
-      const listVisible = userSnap.data().listVisible || [];
-      const visibleListNames = listVisible
-        .filter((m) => Object.values(m)[0] === true)
-        .map((m) => Object.keys(m)[0]);
+      const rawVisible = userSnap.data().listVisible;
+      const visibleListNames = Array.isArray(rawVisible)
+        ? rawVisible.filter((m) => Object.values(m)[0] === true).map((m) => Object.keys(m)[0])
+        : Object.entries(rawVisible || {}).filter(([, v]) => v === true).map(([k]) => k);
       const listsRef = doc(db, "Lists", selectedFriend.uid);
       const unsubscribeLists = onSnapshot(listsRef, (listsSnap) => {
         if (!listsSnap.exists()) { setFriendLists([]); return; }
@@ -95,14 +114,25 @@ export default function FriendsListScreen({ navigation }) {
 
   const handleDelete = async (friend) => {
     try {
-      const userRef = doc(db, "Users", user.uid);
-      const friendRef = doc(db, "Users", friend.uid);
-      const [userSnap, friendSnap] = await Promise.all([getDoc(userRef), getDoc(friendRef)]);
-      if (!userSnap.exists() || !friendSnap.exists()) return;
       Toast.show({ type: "success", text1: `${friend.displayName} arkadaş listenizden silindi` });
-      await updateDoc(userRef, { friends: arrayRemove(friend) });
-      const currentUserInFriend = friendSnap.data().friends?.find((f) => f.uid === user.uid);
-      if (currentUserInFriend) await updateDoc(friendRef, { friends: arrayRemove(currentUserInFriend) });
+      // Subcollection sil
+      await Promise.all([
+        deleteDoc(doc(db, "Users", user.uid,   "friends", friend.uid)),
+        deleteDoc(doc(db, "Users", friend.uid, "friends", user.uid)),
+      ]);
+      // Eski format root-doc array'i de temizle (varsa)
+      const [userSnap, friendSnap] = await Promise.all([
+        getDoc(doc(db, "Users", user.uid)),
+        getDoc(doc(db, "Users", friend.uid)),
+      ]);
+      const legacyUserFriends   = userSnap.data()?.friends || [];
+      const legacyFriendFriends = friendSnap.data()?.friends || [];
+      const userEntry   = legacyUserFriends.find((f) => f.uid === friend.uid);
+      const friendEntry = legacyFriendFriends.find((f) => f.uid === user.uid);
+      const updates = [];
+      if (userEntry)   updates.push(updateDoc(doc(db, "Users", user.uid),   { friends: arrayRemove(userEntry) }));
+      if (friendEntry) updates.push(updateDoc(doc(db, "Users", friend.uid), { friends: arrayRemove(friendEntry) }));
+      if (updates.length) await Promise.all(updates);
     } catch (error) {
       console.error("Arkadaş silme hatası:", error);
       Toast.show({ type: "error", text1: "Silme işlemi başarısız", text2: error.message });
@@ -188,7 +218,7 @@ export default function FriendsListScreen({ navigation }) {
                           return ci?.imagePath ? (
                             <Image
                               key={idx}
-                              source={{ uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${ci.imagePath}` }}
+                              source={{ uri: getTmdbUrl(ci.imagePath, 'poster', 200) }}
                               style={[
                                 styles.posterImg,
                                 { width: imgW, height: imgH },

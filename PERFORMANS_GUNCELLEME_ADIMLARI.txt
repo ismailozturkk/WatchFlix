@@ -1,0 +1,609 @@
+WATCHFLIX PERFORMANS GUNCELLEME ADIMLARI
+Tarih: 2026-04-17
+Kaynak: PERFORMANS_INCELEME_RAPORU.txt
+
+AMAC
+Bu dosya, performans raporundaki bulgulara gore uygulamayi adim adim nasil guncellemen gerektigini anlatir.
+Hedef:
+- veri kaydetme hizini artirmak
+- ilk acilis suresini dusurmek
+- scroll ve ekran gecis kasmalarini azaltmak
+- Firestore ve network yukunu dusurmek
+
+ONEMLI CALISMA KURALI
+- Her fazi ayri bir commit ile yap.
+- Bir faz bitmeden sonraki fazla ilgilenme.
+- Her faz sonunda elle test yap.
+- Buyuk schema degisimlerinde once "dual read" sonra "migration" sonra "old path cleanup" uygula.
+
+OZEL ONCELIK SIRASI
+1. useListStatus indeksleme
+2. ayarlarin tek kaynaga indirilmesi
+3. TMDB cache + lazy load
+4. ProfileScreenContext parcalama
+5. Notes ve Reminders veri modelinin degistirilmesi
+6. WatchedTv veri modelinin degistirilmesi
+7. agir ekranlarin sadeleştirilmesi
+8. chat ve comment yazma maliyetinin azaltilmasi
+9. duplicate ve artik dosyalarin temizlenmesi
+
+--------------------------------------------------------------------------------
+FAZ 0 - BASELINE OLCUMU AL
+--------------------------------------------------------------------------------
+HEDEF
+Degisiklikten once mevcut durumu olc. Aksi halde yaptigin isin gercek etkisini anlayamazsin.
+
+YAPILACAKLAR
+1. Su senaryolari cihazda veya emulator'de olc:
+   - uygulama ilk acilis suresi
+   - Movie tab ilk yuklenme suresi
+   - Tv tab ilk yuklenme suresi
+   - MovieSearch sonuclari acilirken scroll akiciligi
+   - watchedTv'ye dizi ekleme suresi
+   - note ekleme suresi
+2. Gecici olarak log ekle:
+   - console.time / console.timeEnd
+   - onSnapshot sayisi
+   - fetch sayisi
+3. Su dosyalarda nerede olcum alacagini isaretle:
+   - context/MovieContex.js
+   - context/TvShowContex.js
+   - context/ProfileScreenContext.js
+   - screens/movie/MovieDetail.js
+   - screens/tv/TvShowsDetails.js
+   - screens/tv/SeasonItem.js
+
+BITIS KRITERI
+- Elinde "once" degerleri olsun.
+- Hangi ekranin ne kadar gec acildigini not et.
+
+--------------------------------------------------------------------------------
+FAZ 1 - LIST STATUS ICIN O(1) INDEKS YAPISI KUR
+--------------------------------------------------------------------------------
+ONCELIK
+En yuksek kisa vadeli kazanc.
+
+HEDEF
+Her kartin tum listeleri tekrar taramasini durdurmak.
+
+HEDEF DOSYALAR
+- context/ListStatusContext.js
+- modules/UseListStatus.js
+- screens/search/MovieSearch.js
+- screens/search/TvShowSearch.js
+- screens/movie/MovieDetail.js
+- screens/tv/TvShowsDetails.js
+- components/ListView.js
+- components/ListViewTv.js
+
+YAPILACAKLAR
+1. context/ListStatusContext.js icinde allLists geldikten sonra useMemo ile statusIndex uret.
+2. statusIndex yapisi su sekilde olsun:
+   - movie: { [id]: { inWatchList, inFavorites, isWatched, isInOtherLists } }
+   - tv: { [id]: { inWatchList, inFavorites, isWatched, isInOtherLists } }
+3. Tanimli listeler:
+   - watchedMovies
+   - watchedTv
+   - favorites
+   - watchList
+   - bunlar disindakiler "other lists"
+4. Provider value'sunu useMemo ile don.
+5. modules/UseListStatus.js icindeki local state ve useEffect'i kaldir.
+6. useListStatus direkt statusIndex uzerinden sonuc dondursun.
+7. Kart bilesenleri icinde tekrar array tarama kalmasin.
+
+ORNEK MANTIK
+- Bir kez index uret.
+- Kartlar sadece statusIndex.movie[id] veya statusIndex.tv[id] okusun.
+
+BITIS KRITERI
+- MovieSearch ve TvShowSearch ekranlarinda item sayisi arttiginda scroll daha akici olmali.
+- useListStatus icinde some/filter/reduce kalmamis olmali.
+- ListStatusContext value useMemo ile sabitlenmis olmali.
+
+TEST
+- Arama ekraninda 20+ sonuc cikar.
+- Scroll yap.
+- Daha onceki kasmayla karsilastir.
+
+--------------------------------------------------------------------------------
+FAZ 2 - AYARLARI TEK KAYNAKTA TOPLA
+--------------------------------------------------------------------------------
+HEDEF
+selectedLanguage, selectedTheme, showSnow ve imageQuality gibi ayarlar tek storage ve tek state akisi ile yonetilsin.
+
+HEDEF DOSYALAR
+- context/AppSettingsContext.js
+- context/LanguageContext.js
+- context/ThemeContext.js
+- context/SnowContext.js
+- translations/index.js
+- App.js
+
+YAPILACAKLAR
+1. AppSettingsContext'i ana ayar kaynagi yap.
+2. Ilk yuklemede AsyncStorage okumalarini Promise.all veya multiGet ile yap.
+3. context/LanguageContext.js, context/ThemeContext.js ve context/SnowContext.js icindeki duplicate AsyncStorage okumalarini kaldir veya bunlari sadece AppSettingsContext'ten veri okuyan ince wrapper'lara cevir.
+4. AppSettingsContext value'sunu useMemo ile sarmala.
+5. Migrate edilmesi gereken eski key varsa tek yerde yap.
+6. translations/index.js tarafinda dil detector kalsin, ama ikinci kez storage write yapan mantigi sadeleştir.
+
+TERCIH EDILEN SON DURUM
+- Storage okuma:
+  - sadece AppSettingsContext
+- LanguageContext:
+  - dili AppSettingsContext'ten alir
+- ThemeContext:
+  - temayi AppSettingsContext'ten alir
+- SnowContext:
+  - showSnow'u AppSettingsContext'ten alir
+
+BITIS KRITERI
+- selectedLanguage, selectedTheme ve showSnow icin birden fazla yerde storage get/set kalmamis olmali.
+- Uygulama acilisinda ayarlar tek seferde okunuyor olmali.
+
+TEST
+- Tema degistir.
+- Dili degistir.
+- Snow ac/kapat.
+- Uygulamayi kapatip ac.
+- Tum ayarlar dogru yukleniyor mu bak.
+
+--------------------------------------------------------------------------------
+FAZ 3 - TMDB CACHE KATI EKLE
+--------------------------------------------------------------------------------
+HEDEF
+Ayni veriyi uygulama her acildiginda tekrar cekmemek.
+
+HEDEF DOSYALAR
+- yeni dosya: utils/apiCache.js
+- context/MovieContex.js
+- context/TvShowContex.js
+- context/CalendarContext.js
+
+YAPILACAKLAR
+1. utils/apiCache.js olustur.
+2. Icinde su fonksiyonlar olsun:
+   - getCachedValue(key, ttlMs)
+   - setCachedValue(key, data)
+   - removeCachedValue(key)
+3. Cache objesi su sekilde kaydedilsin:
+   - { data, ts }
+4. TTL onerisi:
+   - trends: 1 saat
+   - providers: 24 saat
+   - genres: 7 gun
+   - oscar: 7 gun
+   - collection: 7 gun
+   - now playing / airing today / on the air: 6 saat
+   - calendar tmdb events: 1 saat
+5. fetch fonksiyonlarinda akisi su sekle cevir:
+   - once cache kontrol
+   - varsa state'i cache ile doldur
+   - sonra gerekirse network istegi at
+6. Her cache key language ve page gibi parametreleri icersin.
+   - ornek:
+     - movie_trends_tr_week
+     - tv_best_en_vote_count_page_1
+     - movie_collection_tr
+
+BITIS KRITERI
+- MovieContex ve TvShowContex icinde ayni istekler her mount'ta tekrar atilmiyor olmali.
+- Oscar ve collection ekranlari ikinci acilista hissedilir sekilde hizli olmali.
+
+TEST
+- Uygulamayi ac.
+- Movie tabina gir.
+- Kapatici olmadan tekrar ayni tabi ac.
+- Network log sayisi dusmus olmali.
+
+--------------------------------------------------------------------------------
+FAZ 4 - LAZY LOAD VE TAB BAZLI FETCH YAP !!!!bu atlandı!!!!!
+--------------------------------------------------------------------------------
+HEDEF
+Kullanici daha o ekrana girmeden tum verilerin cekilmesini durdurmak.
+
+HEDEF DOSYALAR
+- screens/TabScreenNavigator.js
+- screens/tabs/MovieScreen.js
+- screens/tabs/TvShowScreen.js
+- context/MovieContex.js
+- context/TvShowContex.js
+
+YAPILACAKLAR
+1. MovieProvider ve TvShowProvider icindeki otomatik fetch useEffect'lerini gozden gecir.
+2. Her veri seti icin "ilk kez acildi mi" mantigi ekle.
+3. Ekran gorunur oldugunda fetch et:
+   - MovieScreen mount veya focus
+   - TvShowScreen mount veya focus
+4. Movie ve Tv tab ekranlarinda bolum bolum lazy fetch dusun:
+   - ilk render:
+     - trends
+     - bests
+   - sonra:
+     - oscar
+     - collection
+     - genres
+     - providers
+5. TabScreenNavigator icinde tum ekranlar ilk anda agir veri cekmesin.
+6. Eger lazimsa her section bilesenine "loaded" prop'u gec.
+
+BITIS KRITERI
+- Uygulama ilk acilista Movie ve Tv tarafinin tum verisini ayni anda cekmiyor olmali.
+- Ilk girilen tab daha hizli acilmali.
+
+TEST
+- Login sonrasi ilk acilisi olc.
+- Movie ve Tv tablarina ilk kez tek tek gir.
+- Request sayilarini karsilastir.
+
+--------------------------------------------------------------------------------
+FAZ 5 - ProfileScreenContext'I PARCALA -----
+--------------------------------------------------------------------------------
+HEDEF
+Tek dev context'in tum profile ekranini gereksiz render etmesini durdurmak.
+
+HEDEF DOSYALAR
+- context/ProfileScreenContext.js
+- App.js
+- components/ChatModal.js
+- screens/tabs/ProfileScreen.js
+- screens/tabs/profile/ProfileNotes.js
+- screens/tabs/profile/ProfileReminders.js
+- screens/tabs/profile/ProfileLists.js
+- screens/tabs/profile/MovieStatisticsScreen.js
+- screens/tabs/profile/TvStatisticsScreen.js
+
+YAPILACAKLAR
+1. Mevcut ProfileScreenContext sorumluluklarini ayir:
+   - ProfileStatsContext
+   - ProfileNotesContext
+   - ProfileRemindersContext
+   - ProfileUiContext
+2. once sadece stats kismini ayir.
+3. sonra notes kismini ayir.
+4. sonra reminders kismini ayir.
+5. en son avatar / modal / gridStyle gibi UI state'lerini ayir.
+6. Her provider value'sunu useMemo ile dondur.
+7. ChatModal'i dev profile context yerine yalniz genre summary veren hafif bir kaynakla besle.
+
+BITIS KRITERI
+- Note eklemek ProfileScreen genelini tekrar render etmemeli.
+- Reminder degisimi Movie/Tv istatistik state'ini tetiklememeli.
+
+TEST
+- React DevTools veya console log ile re-render sayisini kontrol et.
+- Sadece not ekle.
+- Sadece avatar degistir.
+- Hangi ekranlarin render olduguna bak.
+
+--------------------------------------------------------------------------------
+FAZ 6 - NOTES VERI MODELINI DEGISTIR
+--------------------------------------------------------------------------------
+HEDEF
+Tum notes array'ini her degisiklikte bastan okuyup yazmayi bitirmek.
+
+HEDEF DOSYALAR
+- context/ProfileScreenContext.js veya yeni ProfileNotesContext
+- screens/tabs/profile/ProfileNotes.js
+
+YENI VERI MODELI
+- Notes/{uid}/items/{noteId}
+
+NOTE BELGE ORNEGI
+- id
+- type
+- title
+- content
+- todos
+- color
+- backgroundColor
+- scheduledDate
+- createdAt
+- updatedAt
+
+YAPILACAKLAR
+1. Yeni repo mantigi kur:
+   - createNote
+   - updateNote
+   - deleteNote
+   - subscribeNotes
+2. Ilk asamada dual read yap:
+   - yeni subcollection varsa onu kullan
+   - yoksa eski notes array'i oku
+3. Yeni kayitlari yeni semaya yaz.
+4. Migration helper yaz:
+   - eski Notes/{uid}.notes array'ini tek tek alt koleksiyona kopyala
+5. fetchNotes -> onSnapshot(subcollection) yap.
+6. Yazidan sonra fetchNotes tekrar cagirma yapisini kaldir.
+7. UI tarafinda optimistic update kullan.
+
+BITIS KRITERI
+- Note ekleme/guncelleme aninda hizlanmali.
+- Tum notes array'i update edilmiyor olmali.
+
+TEST
+- 10+ note olustur.
+- Bir note duzenle.
+- Bir todo maddesi ekle/sil.
+- Gecikme hissi azalmis olmali.
+
+--------------------------------------------------------------------------------
+FAZ 7 - REMINDERS VERI MODELINI DEGISTIR
+--------------------------------------------------------------------------------
+HEDEF
+Reminder ekleme ve silmede tam dokuman rewrite'i kaldirmak.
+
+HEDEF DOSYALAR
+- components/Reminder.js
+- screens/movie/MovieDetail.js
+- context/CalendarContext.js
+- yeni repo dosyalari
+
+YENI VERI MODELI
+- Reminders/{uid}/movies/{movieId}
+- Reminders/{uid}/tvShows/{showId}
+- Reminders/{uid}/tvShows/{showId}/episodes/{episodeId}
+
+YAPILACAKLAR
+1. Movie reminder ayri belge olsun.
+2. TV reminder show bazli belge olsun.
+3. Episode reminder alt koleksiyon olsun.
+4. checkExistingReminder icin tum dokumani cekmek yerine dogrudan ilgili belgeye bak.
+5. CalendarContext tarafinda reminder verisini tek dev array yerine subcollection snapshot ile birlestir.
+6. Eski modelden yeni modele migration dusun.
+
+BITIS KRITERI
+- Reminder ekleme/silme hizlanmali.
+- MovieDetail ve Reminder component'inde tam doc get/update kalmamali.
+
+TEST
+- Film reminder ekle/sil.
+- TV episode reminder ekle/sil.
+- Calendar'da hala gozukuyor mu kontrol et.
+
+--------------------------------------------------------------------------------
+FAZ 8 - WATCHED TV SEMASINI BOL
+--------------------------------------------------------------------------------
+HEDEF
+watchedTv dev nested array'ini kucultmek ve yazma maliyetini dusurmek.
+
+HEDEF DOSYALAR
+- context/TvShowContex.js
+- screens/tv/TvShowsDetails.js
+- screens/tv/SeasonItem.js
+- components/FirestoreShowAddFunction.js
+- context/ProfileScreenContext.js
+- screens/tabs/profile/TvStatisticsScreen.js
+
+YENI VERI MODELI ONERISI
+- WatchedTv/{uid}/shows/{showId}
+  - show summary
+- WatchedTv/{uid}/shows/{showId}/seasons/{seasonNumber}
+  - season summary
+- WatchedTv/{uid}/shows/{showId}/seasons/{seasonNumber}/episodes/{episodeId}
+  - episode detail
+
+YAPILACAKLAR
+1. Ilk once repository katmani yaz:
+   - addShowSummary
+   - addSeason
+   - addEpisodes
+   - removeSeason
+   - getWatchedShowSummary
+2. TvShowsDetails icindeki "tum diziyi ekle" akisini tek dev updateDoc yerine parcalara bol.
+3. Ilk asamada show summary kaydet.
+4. Sezon/bolumleri arka planda veya kontrollu parallel olarak yaz.
+5. Profile stats ekrani sadece summary veriyi kullanacak sekilde refactor et.
+6. Dual read asamasi uygula:
+   - yeni koleksiyon varsa onu kullan
+   - yoksa eski Lists.watchedTv fallback
+
+BITIS KRITERI
+- Buyuk dizilerde watchedTv ekleme daha hizli olmali.
+- Tek bolum veya tek sezon islemleri tum listeyi rewrite etmemeli.
+
+TEST
+- Kisa dizi ekle.
+- Buyuk sezon sayili dizi ekle.
+- Profil istatistikleri hala dogru hesaplaniyor mu kontrol et.
+
+--------------------------------------------------------------------------------
+FAZ 9 - AGIR DETAY EKRANLARINI SADELESTIR
+--------------------------------------------------------------------------------
+HEDEF
+MovieDetail ve TvShowsDetails ekranlarinda ilk render agirligini azaltmak.
+
+HEDEF DOSYALAR
+- screens/movie/MovieDetail.js
+- screens/tv/TvShowsDetails.js
+- screens/tv/SeasonItem.js
+
+YAPILACAKLAR
+1. ScrollView icindeki yatay listeleri gozden gecir.
+2. Her section icin ilk asamada gosterilecek item sayisini dusur:
+   - cast
+   - similar
+   - recommendations
+   - reviews
+3. "Daha fazla goster" davranisi ekle.
+4. Similar item bilesenlerini React.memo ile stabilize et.
+5. useListStatus indexed oldugu icin artik kartlar daha hafif olmali.
+6. overview / review / cast bolumlerini lazy ac.
+7. SeasonItem icinde agir axios + Firestore akisini kullanici butona basana kadar baslatma.
+
+BITIS KRITERI
+- Detay ekranlari daha cabuk acilmali.
+- ScrollView icinde alt section'lar lazily gorunmeli.
+
+TEST
+- MovieDetails ve TvShowsDetails'e ilk giris hissini karsilastir.
+- Similar/recommendations scroll akiciligini kontrol et.
+
+--------------------------------------------------------------------------------
+FAZ 10 - ANA EKRANLARDA LOTTIE VE LISTE YUKUNU AZALT
+--------------------------------------------------------------------------------
+HEDEF
+GPU ve JS thread baskisini azaltmak.
+
+HEDEF DOSYALAR
+- screens/tabs/MovieScreen.js
+- screens/tabs/TvShowScreen.js
+- screens/tabs/ProfileScreen.js
+- screens/movie/MovieDetail.js
+- screens/tv/TvShowsDetails.js
+- components/ChatModal.js
+
+YAPILACAKLAR
+1. showSnow acikken her ekranda birden fazla Lottie calistirma.
+2. 4 adet snow yerine 1 veya en fazla 2 adet kullan.
+3. Uzun ScrollView ekranlarinda gereksiz dekoratif animasyonlari azalt.
+4. ChatModal icindeki Lottie ve animasyonlari sadeleştir.
+5. Profil ekranindaki gereksiz surekli animasyonlari gozden gecir.
+
+BITIS KRITERI
+- Orta cihazlarda scroll ve tab gecisi daha pürüzsuz hissettirmeli.
+
+TEST
+- Snow acik iken Movie, Tv ve Profile ekranlari arasinda gecis yap.
+- FPS dususu hissediliyor mu bak.
+
+--------------------------------------------------------------------------------
+FAZ 11 - LISTSCREEN VE BENZERI EKRANLARI TEMIZLE
+--------------------------------------------------------------------------------
+HEDEF
+Gereksiz hesaplari ve nested liste yapilarini azaltmak.
+
+HEDEF DOSYALAR
+- screens/ListsScreen.js
+- screens/ListsViewScreen.js
+- hooks/useListFilters.js
+- hooks/useListData.js
+
+YAPILACAKLAR
+1. filteredItems hesaplarini useMemo ile sar.
+2. TV completed / incomplete hesabini normalize et:
+   - item uzerinde hazir summary alan kullan
+   - ya da tek bir helper'da hesapla
+3. scaleValues her render'da tekrar kuruluyorsa azalt.
+4. snapshot gelmeden once loading kapatma hatasini duzelt.
+5. Modal icindeki ScrollView + FlatList birlesimlerini sadeleştir.
+6. useListData kullaniyorsan ayni belgeye tekrar listener acma ihtiyacini azalt.
+
+BITIS KRITERI
+- ListsScreen ilk acilista daha stabil olmali.
+- Liste icinde arama ve filtreleme anlik kalmali.
+
+TEST
+- Buyuk bir listede arama yap.
+- Filter degistir.
+- Reorder modalini ac/kapat.
+
+--------------------------------------------------------------------------------
+------   FAZ 12 - CHAT VE COMMENT YAZMA MALIYETINI AZALT
+--------------------------------------------------------------------------------
+HEDEF
+Her olayda cok fazla Firestore write ve listener olusmasini azaltmak.
+
+HEDEF DOSYALAR
+- screens/ChatScreen.js
+- components/Comment.js
+
+YAPILACAKLAR
+1. ChatScreen'de seen/delivered update'larini mesaja tek tek yazmak yerine toplu mantiga cevir.
+2. Typing update'larini debounce et.
+3. Son gorulen mesaj id seviyesinde ilerle.
+4. Comment tarafinda her yorum icin reply listener acma mantigini lazy hale getir.
+5. Reply acildiginda subscribe ol, kapandiginda unsubscribe et.
+6. replyCount'i ana comment belge yapisina eklemeyi dusun.
+
+BITIS KRITERI
+- Sohbette fazla write azalir.
+- Comment ekraninda listener birikmez.
+
+TEST
+- Mesajlasma ekraninda uzun sohbet ac.
+- Yorum ekraninda reply ac/kapat.
+- Firestore yazma sayisi gozle gorulur sekilde azalir.
+
+--------------------------------------------------------------------------------
+FAZ 13 - DUPLICATE VE ARTIK DOSYALARI TEMIZLE
+--------------------------------------------------------------------------------
+HEDEF
+Bakim maliyetini dusurmek ve yanlis dosyayi duzenleme riskini bitirmek.
+
+HEDEF DOSYALAR
+- screens/CalendarContext.js
+- context/CalendarContext.js
+- benzer duplicate veya kullanilmayan helper dosyalari
+
+YAPILACAKLAR
+1. screens/CalendarContext.js kullaniliyor mu kontrol et.
+2. Kullanilmiyorsa sil.
+3. Import path'lerini tekrar tara.
+4. Artık kullanilmayan eski helper veya eski storage key migration kodlarini temizle.
+
+BITIS KRITERI
+- Tek kaynak truth kalmali.
+- Kullanilmayan duplicate dosya kalmamali.
+
+--------------------------------------------------------------------------------
+FAZ 14 - SON OPTIMIZASYON VE TEMIZLIK
+--------------------------------------------------------------------------------
+HEDEF
+Refactor sonrasi son duzenlemeleri yapmak.
+
+YAPILACAKLAR
+1. Tum provider value'larini kontrol et:
+   - useMemo var mi
+   - gereksiz object recreation var mi
+2. Tum agir callback'leri kontrol et:
+   - gereksiz useEffect var mi
+   - race condition var mi
+3. console.log ve gecici debug kodlarini sil.
+4. Gerekirse repository katmanlarini ortaklas:
+   - repositories/listsRepo.js
+   - repositories/notesRepo.js
+   - repositories/remindersRepo.js
+   - repositories/tmdbRepo.js
+
+BITIS KRITERI
+- Kod daha moduler olmali.
+- performans refactor'u okunabilir kalmali.
+
+--------------------------------------------------------------------------------
+HER FAZ SONUNDA KONTROL LISTESI
+--------------------------------------------------------------------------------
+- Elle test yapildi mi
+- Console hatasi var mi
+- Toast ve UI davranislari bozuldu mu
+- Login/logout sonrasi veri akisi calisiyor mu
+- language/theme ayarlari korunuyor mu
+- eski veriler hala okunabiliyor mu
+- yeni veriler dogru yaziliyor mu
+
+--------------------------------------------------------------------------------
+TAVSIYE EDILEN COMMIT SIRASI
+--------------------------------------------------------------------------------
+1. perf: build status index for list lookups
+2. perf: centralize app settings storage reads
+3. perf: add tmdb ttl cache layer
+4. perf: lazy load movie and tv tab data
+5. refactor: split profile screen context
+6. refactor: move notes to subcollection model
+7. refactor: move reminders to item based model
+8. refactor: split watched tv storage model
+9. perf: reduce heavy detail screen rendering
+10. perf: reduce lottie and nested scroll overhead
+11. perf: optimize list and chat flows
+12. chore: remove duplicate calendar context
+
+--------------------------------------------------------------------------------
+EN DOGRU BASLANGIC NOKTASI
+--------------------------------------------------------------------------------
+Eger hepsini bir anda yapmak istemiyorsan su uc sirayla basla:
+1. useListStatus indeksleme
+2. ayarlarin tek kaynaga indirilmesi
+3. TMDB cache + lazy load
+
+Bu ilk uc faz, kod tabanini bozmadan en hizli gorulebilir performans kazancini verir.
