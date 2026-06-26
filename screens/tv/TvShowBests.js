@@ -13,13 +13,71 @@ import { useTheme } from "../../context/ThemeContext";
 //import { API_KEY } from "@env";
 const { width, height } = Dimensions.get("window");
 import { MovieUpComingSkeleton } from "../../components/Skeleton";
+import PaginatedRail from "../../components/PaginatedRail";
 import { useTvShow } from "../../context/TvShowContex";
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { useListStatus } from "../../modules/UseListStatus";
+import ListBadges from "../../components/ListBadges";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
 //import { API_KEY } from "@env";
+
+// Stable, module-scope item component. Hoisted out of the parent so its
+// component type never changes between renders → FlatList re-renders cells
+// instead of unmounting/remounting them → no poster flicker.
+const TvBestCard = memo(function TvBestCard({ item, navigation, theme, getTmdbUrl }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const onPressIn = () =>
+    Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
+  const onPressOut = () =>
+    Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+
+  const source = useMemo(
+    () =>
+      item.poster_path
+        ? { uri: getTmdbUrl(item.poster_path, "poster", 200) }
+        : require("../../assets/image/no_image.png"),
+    [item.poster_path, getTmdbUrl]
+  );
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={styles.similarItem}
+      onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
+    >
+      <Animated.View style={[{ transform: [{ scale }] }]}>
+        <Image
+          source={source}
+          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+          cachePolicy="memory-disk"
+          recyclingKey={`tvbest-${item.id}`}
+          transition={120}
+        />
+        <View
+          style={[styles.relaseDateCount, { backgroundColor: theme.secondaryt }]}
+        >
+          <Text style={[styles.similarRatingText, { color: theme.text.secondary }]}>
+            {item.first_air_date}
+          </Text>
+        </View>
+        <View style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}>
+          <Text style={[styles.similarRatingText, { color: theme.colors.orange }]}>
+            {item.vote_average.toFixed(1)}
+          </Text>
+        </View>
+        <ListBadges
+          mediaId={item.id}
+          mediaType="tv"
+          theme={theme}
+          style={{ position: "absolute", left: 2, bottom: 8 }}
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+});
 
 export default function TvShowBests({ navigation }) {
   const { theme } = useTheme();
@@ -29,10 +87,11 @@ export default function TvShowBests({ navigation }) {
     seriesBest,
     setSelectedCategoryBest,
     selectedCategoryBest,
-    setPageBest,
     pageBest,
     totalPagesBest,
     loadingBest,
+    loadMoreBest,
+    loadingMoreBest,
     categoriesBest,
     getCategoryTitleBest,
     activateTvSection,
@@ -41,31 +100,6 @@ export default function TvShowBests({ navigation }) {
   useEffect(() => {
     activateTvSection("best");
   }, [activateTvSection]);
-
-  // Animated import'unun eklendiğinden emin olun
-  const scaleValuesRef = useRef({});
-  const getScaleValue = (itemId) => {
-    if (!scaleValuesRef.current[itemId]) {
-      scaleValuesRef.current[itemId] = new Animated.Value(1);
-    }
-    return scaleValuesRef.current[itemId];
-  };
-
-  const onPressIn = (itemId) => {
-    Animated.timing(getScaleValue(itemId), {
-      toValue: 0.9,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const onPressOut = (itemId) => {
-    Animated.timing(getScaleValue(itemId), {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
 
   const renderCategory = ({ item }) => (
     <TouchableOpacity
@@ -120,283 +154,20 @@ export default function TvShowBests({ navigation }) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 15 }}
         />
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 5,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.muted }]}
-          >
-            ●●●
-          </Text>
-          {pageBest > 5 && (
-            <>
-              <TouchableOpacity
-                onPress={() => setPageBest(pageBest - 5)}
-                style={[
-                  styles.pageButton,
-                  {
-                    backgroundColor: theme.secondary,
-                  },
-                ]}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.genreText, { color: theme.text.primary }]}
-                >
-                  {pageBest - 5}
-                </Text>
-              </TouchableOpacity>
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.muted }]}
-              >
-                ●
-              </Text>
-            </>
-          )}
-
-          {pageBest > 2 && (
-            <TouchableOpacity
-              onPress={() => setPageBest(pageBest - 2)}
-              style={[
-                styles.pageButton,
-                {
-                  backgroundColor: theme.secondary,
-                },
-              ]}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageBest - 2}
-              </Text>
-            </TouchableOpacity>
-          )}
-          {pageBest > 1 && (
-            <TouchableOpacity
-              onPress={() => setPageBest(pageBest - 1)}
-              style={[
-                styles.pageButton,
-                {
-                  backgroundColor: theme.secondary,
-                },
-              ]}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageBest - 1}
-              </Text>
-            </TouchableOpacity>
-          )}
-          <Text
-            style={[
-              styles.genreText,
-              {
-                color: theme.text.secondary,
-                width: 25,
-                height: 20,
-                textAlign: "center",
-              },
-            ]}
-          >
-            {pageBest}
-          </Text>
-          <TouchableOpacity
-            onPress={() => setPageBest(pageBest + 1)}
-            style={[
-              styles.pageButton,
-              {
-                backgroundColor: theme.secondary,
-              },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageBest + 1}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setPageBest(pageBest + 2)}
-            style={[
-              styles.pageButton,
-              {
-                backgroundColor: theme.secondary,
-              },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageBest + 2}
-            </Text>
-          </TouchableOpacity>
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.muted }]}
-          >
-            ●
-          </Text>
-          <TouchableOpacity
-            onPress={() => setPageBest(pageBest + 5)}
-            style={[
-              styles.pageButton,
-              {
-                backgroundColor: theme.secondary,
-              },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageBest + 5}
-            </Text>
-          </TouchableOpacity>
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.muted }]}
-          >
-            ●●●
-          </Text>
-        </View>
       </View>
     );
   }
 
-  const MovieItem = ({ item }) => {
-    const { inWatchList, inFavorites, isWatched, isInOtherLists } =
-      useListStatus(item.id, "tv");
-    return (
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPressIn={() => onPressIn(item.id)}
-        onPressOut={() => onPressOut(item.id)}
-        style={styles.similarItem}
-        onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
-      >
-        <Animated.View
-          style={[
-            {
-              transform: [{ scale: getScaleValue(item.id) }],
-            },
-          ]}
-        >
-          <Image
-            source={
-              item.poster_path
-                ? {
-                    uri: getTmdbUrl(item.poster_path, 'poster', 200),
-                  }
-                : require("../../assets/image/no_image.png")
-            }
-            style={[styles.similarPoster, { shadowColor: theme.shadow }]}
-            cachePolicy="memory-disk"
-            transition={120}
-          />
-          <View
-            style={[
-              styles.relaseDateCount,
-              { backgroundColor: theme.secondaryt },
-            ]}
-          >
-            <Text
-              style={[
-                styles.similarRatingText,
-                { color: theme.text.secondary },
-              ]}
-            >
-              {item.first_air_date}
-            </Text>
-          </View>
-          <View
-            style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}
-          >
-            <Text
-              style={[styles.similarRatingText, { color: theme.colors.orange }]}
-            >
-              {item.vote_average.toFixed(1)}
-            </Text>
-          </View>
-          <View
-            style={{
-              justifyContent: "center",
-              alignItems: "center",
-              position: "absolute",
-              left: 2,
-              bottom: 8,
-            }}
-          >
-            <View
-              style={{
-                gap: 3,
-                backgroundColor: theme.secondaryt,
-                paddingVertical: 3,
-                paddingHorizontal: 1,
-                borderRadius: 7,
-              }}
-            >
-              {inWatchList && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("watchList", "tv");
-                  }}
-                >
-                  <Ionicons
-                    name="bookmark"
-                    size={12}
-                    color={theme.colors.blue}
-                  />
-                </TouchableOpacity>
-              )}
-              {isWatched && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("watchedTv", "tv");
-                  }}
-                >
-                  <Ionicons name="eye" size={12} color={theme.colors.green} />
-                </TouchableOpacity>
-              )}
-              {inFavorites && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("favorites", "tv");
-                  }}
-                >
-                  <Ionicons name="heart" size={12} color={theme.colors.red} />
-                </TouchableOpacity>
-              )}
-              {isInOtherLists && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateMovieList("favorites", "movie");
-                  }}
-                >
-                  <Ionicons name="grid" size={12} color={theme.colors.orange} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </Animated.View>
-      </TouchableOpacity>
-    );
-  };
-
   const renderMovieItem = ({ item }) => {
     if (!item.poster_path) return null;
-    return <MovieItem item={item} navigation={navigation} />;
+    return (
+      <TvBestCard
+        item={item}
+        navigation={navigation}
+        theme={theme}
+        getTmdbUrl={getTmdbUrl}
+      />
+    );
   };
 
   return (
@@ -419,175 +190,19 @@ export default function TvShowBests({ navigation }) {
           ]}
         />
       </View>
-      <FlatList
+      <PaginatedRail
         data={seriesBest}
-        horizontal
         contentContainerStyle={{ paddingHorizontal: 15 }}
-        showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id.toString()}
+        renderItem={renderMovieItem}
+        onLoadMore={loadMoreBest}
+        loadingMore={loadingMoreBest}
+        hasMore={pageBest < totalPagesBest}
         initialNumToRender={3}
         maxToRenderPerBatch={3}
         updateCellsBatchingPeriod={80}
         windowSize={5}
-        removeClippedSubviews
-        renderItem={renderMovieItem}
       />
-      <View
-        style={{
-          flexDirection: "row",
-          gap: 5,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <Text
-          allowFontScaling={false}
-          style={[styles.genreText, { color: theme.text.muted }]}
-        >
-          ●●●
-        </Text>
-        {pageBest > 1 && (
-          <>
-            <TouchableOpacity
-              onPress={() => setPageBest(1)}
-              style={[
-                styles.pageButton,
-                {
-                  backgroundColor: theme.secondary,
-                },
-              ]}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {1}
-              </Text>
-            </TouchableOpacity>
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.muted }]}
-            >
-              ●
-            </Text>
-          </>
-        )}
-
-        {pageBest > 2 && (
-          <TouchableOpacity
-            onPress={() => setPageBest(pageBest - 2)}
-            style={[
-              styles.pageButton,
-              {
-                backgroundColor: theme.secondary,
-              },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageBest - 2}
-            </Text>
-          </TouchableOpacity>
-        )}
-        {pageBest > 1 && (
-          <TouchableOpacity
-            onPress={() => setPageBest(pageBest - 1)}
-            style={[
-              styles.pageButton,
-              {
-                backgroundColor: theme.secondary,
-              },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageBest - 1}
-            </Text>
-          </TouchableOpacity>
-        )}
-        <Text
-          style={[
-            styles.genreText,
-            {
-              color: theme.text.secondary,
-              width: 25,
-              height: 20,
-              textAlign: "center",
-            },
-          ]}
-        >
-          {pageBest}
-        </Text>
-        {pageBest < totalPagesBest - 2 ? (
-          <>
-            <TouchableOpacity
-              onPress={() => setPageBest(pageBest + 1)}
-              style={[
-                styles.pageButton,
-                {
-                  backgroundColor: theme.secondary,
-                },
-              ]}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageBest + 1}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setPageBest(pageBest + 2)}
-              style={[
-                styles.pageButton,
-                {
-                  backgroundColor: theme.secondary,
-                },
-              ]}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageBest + 2}
-              </Text>
-            </TouchableOpacity>
-          </>
-        ) : null}
-        <Text
-          allowFontScaling={false}
-          style={[styles.genreText, { color: theme.text.muted }]}
-        >
-          ●
-        </Text>
-        <TouchableOpacity
-          onPress={() => setPageBest(totalPagesBest)}
-          style={[
-            styles.pageButton,
-            {
-              backgroundColor: theme.secondary,
-            },
-          ]}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.primary }]}
-          >
-            {totalPagesBest}
-          </Text>
-        </TouchableOpacity>
-        <Text
-          allowFontScaling={false}
-          style={[styles.genreText, { color: theme.text.muted }]}
-        >
-          ●●●
-        </Text>
-      </View>
     </View>
   );
 }

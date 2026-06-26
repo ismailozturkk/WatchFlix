@@ -1,22 +1,21 @@
-import {
-  Animated,
-  FlatList,
-  Image,
-  ScrollView,
-  SectionList,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import React, { useCallback, useMemo, useState } from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useProfileStats } from "../../../context/ProfileStatsContext";
 import { useTheme } from "../../../context/ThemeContext";
-import { Picker } from "@react-native-picker/picker"; // veya başka bir dropdown kütüphanesi
-import Fontisto from "@expo/vector-icons/Fontisto";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { useState } from "react";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
+import { i18nText } from "../../../utils/i18nText";
+import BackButton from "../../../components/BackButton";
+import {
+  StatsHeroCard,
+  StatsFilterBar,
+  StatsDateSection,
+  StatsEmptyState,
+  StatsCollapsingList,
+} from "../../../components/profile/StatsComponents";
+
+const sectionKeyExtractor = (_item, index) => `m-${index}`;
+
 const MovieStatisticsScreen = ({ navigation }) => {
   const {
     watchedMovieCount,
@@ -27,9 +26,6 @@ const MovieStatisticsScreen = ({ navigation }) => {
     t,
     selectedDate,
     setSelectedDate,
-    onPressIn,
-    onPressOut,
-    scaleValues,
     mostWatchedGenre,
     secondWatchedGenre,
     threeWatchedGenre,
@@ -37,667 +33,151 @@ const MovieStatisticsScreen = ({ navigation }) => {
     timeDisplayMode,
     totalMinutesTime,
     handleTimeClick,
+    borderColorMovie,
+    rankLevelMovie,
+    rankNameMovie,
   } = useProfileStats();
+
   const { theme } = useTheme();
+  const { getTmdbUrl } = useImageQualitySettings();
+  const insets = useSafeAreaInsets();
+
   const [searchVisible, setSearchVisible] = useState(false);
-  const [infoOpen, setInfoOpen] = useState(false);
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const [search, setSearch] = useState("");
-  const filteredGroupedData = groupedData
-    .map((section) => ({
-      ...section,
-      data: section.data.filter(
-        (item) =>
-          !search || item.name?.toLowerCase().includes(search.toLowerCase()),
-      ),
-    }))
-    .filter((section) => section.data.length > 0);
+  const [expanded, setExpanded] = useState(false);
+
+  const timeLabels = useMemo(
+    () => ({
+      years: t.profileScreen.years,
+      months: t.profileScreen.months,
+      days: t.profileScreen.days,
+      hours: t.profileScreen.hours,
+      minutes: t.profileScreen.minutes,
+    }),
+    [t],
+  );
+
+  const heroGenres = useMemo(
+    () => [mostWatchedGenre, secondWatchedGenre, threeWatchedGenre],
+    [mostWatchedGenre, secondWatchedGenre, threeWatchedGenre],
+  );
+
+  // Tek geçişte filtrele + bölüm meta'sını (tür/dk) ve normalize poster'ları
+  // önceden hesapla. Dış liste yalnızca başlık render eder (data: []).
+  const sections = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return (groupedData || [])
+      .map((section) => ({
+        title: section.title,
+        items: q
+          ? section.data.filter((item) => item.name?.toLowerCase().includes(q))
+          : section.data,
+      }))
+      .filter((s) => s.items.length > 0)
+      .filter((s) => selectedDate == null || s.title === selectedDate)
+      .map((s) => ({
+        title: s.title,
+        data: [],
+        genres: [...new Set(s.items.flatMap((m) => m.genres || []).filter(Boolean))],
+        totalMinutes: s.items.reduce((acc, item) => acc + (item.minutes || 0), 0),
+        posters: s.items.map((item) => ({
+          key: String(item.id),
+          imageUri: item.imagePath ? getTmdbUrl(item.imagePath, "poster", 200) : null,
+          title: item.name,
+          minutes: item.minutes,
+          onPress: () => navigation.navigate("MovieDetails", { id: item.id }),
+        })),
+      }));
+  }, [groupedData, search, selectedDate, getTmdbUrl, navigation]);
+
+  const renderSectionHeader = useCallback(
+    ({ section }) => (
+      <StatsDateSection
+        theme={theme}
+        title={section.title}
+        posters={section.posters}
+        genres={section.genres}
+        totalMinutes={section.totalMinutes}
+        minutesLabel={t.minutes}
+        formatDate={formatDate}
+        rankColor={borderColorMovie}
+      />
+    ),
+    [theme, t.minutes, formatDate, borderColorMovie],
+  );
+
+  const onToggleSearch = useCallback(() => setSearchVisible((v) => !v), []);
+  const onToggleExpand = useCallback(() => setExpanded((v) => !v), []);
+  const onSelectDate = useCallback(
+    (d) => {
+      setSearchVisible(false);
+      setSelectedDate(d);
+    },
+    [setSelectedDate],
+  );
+
+  const collapsing = (
+    <>
+      <View style={styles.titleBar}>
+        <Text allowFontScaling={false} style={[styles.titleText, { color: theme.text.primary }]}>
+          {i18nText("autoI18n.film_istatistikleri", "Film İstatistikleri")}
+        </Text>
+      </View>
+
+      <StatsHeroCard
+        theme={theme}
+        primaryCount={watchedMovieCount}
+        primaryLabel={t.profileScreen.movieWatched}
+        time={totalWatchedTime || {}}
+        timeLabels={timeLabels}
+        expanded={expanded}
+        onToggleExpand={onToggleExpand}
+        rankColor={borderColorMovie}
+        rankLevel={rankLevelMovie}
+        rankName={rankNameMovie}
+        totalMinutes={totalMinutesTime}
+        timeDisplayMode={timeDisplayMode}
+        onTimePress={handleTimeClick}
+        formatDuration={formatTotalDurationTime}
+        genres={heroGenres}
+      />
+    </>
+  );
+
+  const pinned = (
+    <StatsFilterBar
+      theme={theme}
+      searchVisible={searchVisible}
+      onToggleSearch={onToggleSearch}
+      searchValue={search}
+      onSearchChange={setSearch}
+      searchPlaceholder={t.searchMovies}
+      dates={uniqueDates}
+      selectedDate={selectedDate}
+      onSelectDate={onSelectDate}
+      formatDate={formatDate}
+    />
+  );
 
   return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: theme.primary,
-      }}
-    >
-      <TouchableOpacity onPress={() => setInfoOpen(!infoOpen)}>
-        <View
-          style={[
-            styles.watchStats,
-            {
-              backgroundColor: theme.border,
-              borderColor: theme.border,
-              shadowColor: theme.shadow,
-            },
-          ]}
-        >
-          <View
-            style={[
-              {
-                flexDirection: "row",
-                justifyContent: "space-around",
-                alignItems: "center",
-                gap: 5,
-              },
-            ]}
-          >
-            <View
-              style={{
-                width: "43%",
-                justifyContent: "center",
-                alignItems: "center",
-                backgroundColor: theme.secondary,
-                borderColor: theme.border,
-                //borderWidth: 1,
-                padding: 5,
-                borderRadius: 5,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 1,
-                shadowRadius: 5,
-                elevation: 10, // Android için güçlü gölge efekti
-              }}
-            >
-              <Text
-                style={{
-                  textAlign: "center",
-                  color: theme.text.secondary,
-                  fontSize: 22,
-                  fontWeight: "bold",
-                }}
-              >
-                {watchedMovieCount}
-              </Text>
-              <Text
-                style={{
-                  textAlign: "center",
-                  color: theme.text.muted,
-                  fontSize: 12,
-                }}
-              >
-                {t.profileScreen.movieWatched}
-              </Text>
-            </View>
-            <View
-              style={{
-                width: "55%",
-
-                flexDirection: "row",
-                justifyContent: "space-around",
-                alignItems: "center",
-                backgroundColor: theme.secondary,
-                borderColor: theme.border,
-                //borderWidth: 1,
-                padding: 5,
-                borderRadius: 5,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 1,
-                shadowRadius: 5,
-                elevation: 10, // Android için güçlü gölge efekti
-              }}
-            >
-              <View>
-                <Text
-                  style={{
-                    textAlign: "center",
-                    color: theme.text.secondary,
-                    fontSize: 22,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {totalWatchedTime?.years}
-                </Text>
-                <Text
-                  style={{
-                    textAlign: "center",
-                    color: theme.text.muted,
-                    fontSize: 12,
-                  }}
-                >
-                  {t.profileScreen.years}
-                </Text>
-              </View>
-              <View>
-                <Text
-                  style={{
-                    textAlign: "center",
-                    color: theme.text.secondary,
-                    fontSize: 22,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {totalWatchedTime?.months}
-                </Text>
-                <Text
-                  style={{
-                    textAlign: "center",
-                    color: theme.text.muted,
-                    fontSize: 12,
-                  }}
-                >
-                  {t.profileScreen.months}
-                </Text>
-              </View>
-              <View>
-                <Text
-                  style={{
-                    textAlign: "center",
-                    color: theme.text.secondary,
-                    fontSize: 22,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {totalWatchedTime?.days}
-                </Text>
-                <Text
-                  style={{
-                    textAlign: "center",
-                    color: theme.text.muted,
-                    fontSize: 12,
-                  }}
-                >
-                  {t.profileScreen.days}
-                </Text>
-              </View>
-              <View>
-                <Text
-                  style={{
-                    textAlign: "center",
-                    color: theme.text.secondary,
-                    fontSize: 22,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {totalWatchedTime?.hours}
-                </Text>
-                <Text
-                  style={{
-                    textAlign: "center",
-                    color: theme.text.muted,
-                    fontSize: 12,
-                  }}
-                >
-                  {t.profileScreen.hours}
-                </Text>
-              </View>
-              <View>
-                <Text
-                  style={{
-                    textAlign: "center",
-                    color: theme.text.secondary,
-                    fontSize: 22,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {totalWatchedTime?.minutes}
-                </Text>
-                <Text
-                  style={{
-                    textAlign: "center",
-                    color: theme.text.muted,
-                    fontSize: 12,
-                  }}
-                >
-                  {t.profileScreen.minutes}
-                </Text>
-              </View>
-            </View>
-          </View>
-          {infoOpen && (
-            <>
-              <View
-                style={[
-                  {
-                    flexDirection: "row",
-                    justifyContent: "space-around",
-                    alignItems: "center",
-                    gap: 5,
-                  },
-                ]}
-              >
-                <View
-                  style={{
-                    width: "43%",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    paddingVertical: 3,
-                    paddingHorizontal: 6,
-                    borderRadius: 5,
-                    backgroundColor: theme.secondary,
-                    flexDirection: "row",
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 1,
-                    shadowRadius: 5,
-                    elevation: 10, // Android için güçlü gölge efekti
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: theme.text.muted,
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    Toplam izlenme:
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={{
-                    width: "55%",
-
-                    justifyContent: "center",
-                    alignItems: "center",
-                    paddingVertical: 3,
-                    paddingHorizontal: 6,
-                    borderRadius: 5,
-                    backgroundColor: theme.secondary,
-                    flexDirection: "row",
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 1,
-                    shadowRadius: 5,
-                    elevation: 10, // Android için güçlü gölge efekti
-                  }}
-                  onPress={() => handleTimeClick()}
-                  activeOpacity={0.8}
-                >
-                  <View style={{ flexDirection: "row" }}>
-                    <Text
-                      style={{
-                        color: theme.text.muted,
-                        fontWeight: "bold",
-                        textAlign: "center",
-                      }}
-                    >
-                      {formatTotalDurationTime(
-                        totalMinutesTime || 0,
-                        timeDisplayMode,
-                      )}
-                    </Text>
-                    <Fontisto
-                      name="arrow-v"
-                      size={16}
-                      color={theme.text.muted}
-                    />
-                  </View>
-                </TouchableOpacity>
-              </View>
-              <View
-                style={[
-                  {
-                    flexDirection: "row",
-                    justifyContent: "space-around",
-                    alignItems: "center",
-                    gap: 5,
-                  },
-                ]}
-              >
-                <View
-                  style={{
-                    width: "43%",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    backgroundColor: theme.secondary,
-                    borderColor: theme.border,
-                    //borderWidth: 1,
-                    padding: 5,
-                    borderRadius: 5,
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 1,
-                    shadowRadius: 5,
-                    elevation: 10, // Android için güçlü gölge efekti
-                  }}
-                >
-                  <Text
-                    style={{
-                      borderRadius: 10,
-                      color: theme.text.muted,
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    En Çok İzlenen Türeler
-                  </Text>
-                </View>
-
-                <View
-                  style={{
-                    width: "55%",
-                    flexDirection: "row",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    backgroundColor: theme.secondary,
-                    borderColor: theme.border,
-                    //borderWidth: 1,
-                    padding: 5,
-                    borderRadius: 5,
-                    gap: 5,
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 1,
-                    shadowRadius: 5,
-                    elevation: 10,
-                  }}
-                >
-                  <Text
-                    style={{
-                      borderRadius: 10,
-                      color: theme.text.muted,
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {mostWatchedGenre}
-                  </Text>
-
-                  <Text
-                    style={{
-                      borderRadius: 10,
-                      color: theme.text.muted,
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {secondWatchedGenre}
-                  </Text>
-                  <Text
-                    style={{
-                      borderRadius: 10,
-                      color: theme.text.muted,
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    {threeWatchedGenre}
-                  </Text>
-                </View>
-              </View>
-            </>
-          )}
-        </View>
-      </TouchableOpacity>
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "center",
-          alignItems: "center",
-          gap: 10,
-          marginBottom: 10,
-        }}
-      >
-        <View
-          style={{
-            //width: searchVisible ? "70%" : "15%",
-            paddingHorizontal: 10,
-            paddingVertical: 5,
-            backgroundColor: theme.secondary,
-            borderRadius: 15,
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexDirection: "row",
-          }}
-        >
-          {searchVisible && (
-            <TextInput
-              style={{ color: theme.text.primary, width: "60%" }}
-              placeholder={t.searchMovies}
-              placeholderTextColor={theme.text.muted}
-              value={search}
-              onChangeText={(text) => setSearch(text)}
-            />
-          )}
-          <TouchableOpacity
-            style={{
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-            onPress={() => {
-              setSearchVisible(!searchVisible);
-            }}
-          >
-            <Ionicons name="search" size={24} color={theme.text.primary} />
-          </TouchableOpacity>
-        </View>
-        <View
-          style={{
-            width: searchVisible ? "15%" : "70%",
-            backgroundColor: theme.secondary,
-            borderRadius: 15,
-          }}
-        >
-          <Picker
-            selectedValue={selectedDate}
-            onValueChange={(itemValue) => {
-              (setSearchVisible(false), setSelectedDate(itemValue));
-            }}
-            style={{
-              color: theme.text.primary,
-              fontWeight: "bold",
-              fontSize: 14,
-              // paddingHorizontal: 10, // iOS'ta çalışmaz
-            }}
-            itemStyle={{
-              color: theme.text.primary,
-              fontSize: 14,
-              fontWeight: "bold",
-            }}
-            dropdownIconRippleColor={theme.secondary}
-            dropdownIconColor={theme.text.secondary}
-          >
-            <Picker.Item label="Tüm Tarihler" value={null} />
-            {uniqueDates.map((date) => (
-              <Picker.Item key={date} label={formatDate(date)} value={date} />
-            ))}
-          </Picker>
-        </View>
-      </View>
-      <SectionList
-        sections={filteredGroupedData}
-        keyExtractor={(item, index) => item.id.toString() + index}
-        style={{
-          width: "100%",
-          paddingLeft: 15,
-          paddingVertical: 10,
-        }}
-        renderSectionHeader={({ section: { title, data } }) => {
-          const uniqueGenres = [
-            ...new Set(
-              data.flatMap((film) => film.genres || []).filter(Boolean),
-            ),
-          ];
-          const totalMinutes = data.reduce(
-            (acc, item) => acc + (item.minutes ? item.minutes : 0),
-            0,
-          );
-
-          return title === selectedDate || selectedDate == null ? (
-            <View>
-              <View
-                style={{
-                  paddingVertical: 8,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 10,
-                }}
-              >
-                <View
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderWidth: 1,
-                    borderRadius: 10,
-                    borderColor: theme.between,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <View
-                    style={{
-                      width: 5,
-                      height: 5,
-                      borderRadius: 5,
-                      backgroundColor: theme.between,
-                    }}
-                  />
-                </View>
-                <Text
-                  style={{
-                    width: 120,
-                    paddingVertical: 3,
-                    paddingHorizontal: 6,
-                    borderRadius: 10,
-                    color: theme.text.primary,
-                    fontWeight: "bold",
-                    backgroundColor: theme.secondary,
-                    textAlign: "center",
-                  }}
-                >
-                  {title && !isNaN(new Date(title).getTime())
-                    ? formatDate(title)
-                    : "Eski Kayıtlar"}
-                </Text>
-
-                {totalMinutes > 0 && (
-                  <Text
-                    style={{
-                      paddingVertical: 3,
-                      paddingHorizontal: 6,
-                      borderRadius: 10,
-                      fontSize: 12,
-                      color: theme.notesColor.yellow,
-                      fontWeight: "500",
-                      backgroundColor: theme.notesColor.yellowBackground,
-                      textAlign: "center",
-                    }}
-                  >
-                    {totalMinutes} {t.minutes}
-                  </Text>
-                )}
-
-                {uniqueGenres.length > 0 && (
-                  <FlatList
-                    data={uniqueGenres}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    keyExtractor={(genre, idx) => genre + idx}
-                    style={{ paddingVertical: 0 }}
-                    renderItem={({ item }) => (
-                      <Text
-                        style={{
-                          paddingVertical: 3,
-                          paddingHorizontal: 6,
-                          borderRadius: 10,
-                          fontSize: 10,
-                          color: theme.text.primary,
-                          fontWeight: "500",
-                          backgroundColor: theme.secondary,
-                          textAlign: "center",
-                          marginRight: 5,
-                        }}
-                      >
-                        {item}
-                      </Text>
-                    )}
-                  />
-                )}
-              </View>
-              <View
-                style={{
-                  paddingVertical: 0,
-                  paddingLeft: 10,
-                }}
-              >
-                <View
-                  style={{
-                    borderLeftWidth: 1,
-                    borderColor: theme.border,
-                  }}
-                >
-                  <FlatList
-                    data={data}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    keyExtractor={(item) => item.id.toString()}
-                    style={{ marginBottom: 10, paddingHorizontal: 15 }}
-                    renderItem={({ item, index }) => (
-                      <Animated.View
-                        style={[
-                          {
-                            transform: [{ scale: scaleValues[item.id] || 1 }],
-                            marginRight: index === data.length - 1 ? 25 : 0, // Son öğeye ekstra margin
-                          },
-                        ]}
-                      >
-                        <TouchableOpacity
-                          onPressIn={() => onPressIn(item.id)}
-                          onPressOut={() => onPressOut(item.id)}
-                          activeOpacity={0.8}
-                          onPress={() =>
-                            navigation.navigate("MovieDetails", { id: item.id })
-                          }
-                        >
-                          <View
-                            style={{
-                              marginRight: 10,
-                              marginTop: 15,
-                              alignItems: "center",
-                            }}
-                          >
-                            <Image
-                              source={
-                                item.imagePath
-                                  ? {
-                                      uri: getTmdbUrl(item.imagePath, 'poster', 200),
-                                    }
-                                  : require("../../../assets/image/no_image.png")
-                              }
-                              style={styles.image}
-                            />
-                            <Text
-                              style={{
-                                color: theme.text.primary,
-                                width: 100,
-                                textAlign: "center",
-                              }}
-                            >
-                              {item.name}
-                            </Text>
-                            {item.minutes > 0 && (
-                              <Text
-                                style={{
-                                  position: "absolute",
-                                  top: 2,
-                                  right: 2,
-                                  fontSize: 9,
-                                  fontWeight: "500",
-                                  color: theme.text.primary,
-                                  paddingVertical: 2,
-                                  paddingHorizontal: 4,
-                                  borderRadius: 10,
-                                  textAlign: "center",
-                                  backgroundColor: theme.secondaryt,
-                                }}
-                              >
-                                {item.minutes} {t.minutes}
-                              </Text>
-                            )}
-                          </View>
-                        </TouchableOpacity>
-                      </Animated.View>
-                    )}
-                  />
-                </View>
-              </View>
-            </View>
-          ) : null;
-        }}
-        renderItem={() => null} // renderItem'ı boş bırak!
+    <View style={[styles.root, { backgroundColor: theme.primary }]}>
+      <StatsCollapsingList
+        theme={theme}
+        topInset={insets.top + 6}
+        sections={sections}
+        keyExtractor={sectionKeyExtractor}
+        renderSectionHeader={renderSectionHeader}
+        collapsing={collapsing}
+        pinned={pinned}
+        ListEmptyComponent={
+          <StatsEmptyState
+            theme={theme}
+            icon="film-outline"
+            title={i18nText("autoI18n.henuz_film_yok", "Henüz izlenen film yok")}
+          />
+        }
       />
+      <BackButton />
     </View>
   );
 };
@@ -705,31 +185,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
 export default MovieStatisticsScreen;
 
 const styles = StyleSheet.create({
-  watchStats: {
-    marginTop: 40,
-    justifyContent: "space-around",
-    alignItems: "center",
-    paddingVertical: 7,
-    paddingHorizontal: 7,
-    marginHorizontal: 15,
-    gap: 5,
-    borderRadius: 12,
-    marginBottom: 10,
-    shadowColor: "#000",
-    //borderWidth: 1,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 5,
-    elevation: 10, // Android için güçlü gölge efekti
-  },
-  image: {
-    width: 100,
-    height: 150,
-    borderRadius: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
-  },
+  root: { flex: 1 },
+  titleBar: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 4, alignItems: "center" },
+  titleText: { fontSize: 17, fontWeight: "800", letterSpacing: -0.3 },
 });

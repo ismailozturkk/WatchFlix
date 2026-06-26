@@ -1,0 +1,131 @@
+// utils/wrappedStrings.js
+//
+// Watchify Wrapped için iki dilli (TR/EN) UI etiketleri. Büyük çeviri JSON'larını
+// riske atmamak için özelliğe ait metinler burada merkezi tutulur. Ekran/bileşenler
+// getWrappedStrings(language) ile alıp prop olarak alt bileşenlere geçirir.
+
+const STRINGS = {
+  tr: {
+    brand: "Watchify Wrapped",
+    // Giriş kartı (profil)
+    entryTitle: "Watchify Wrapped",
+    entrySubtitle: "Yıllık izleme özetin hazır",
+    entryCta: "Özetini gör",
+    // Genel
+    minutes: "dakika",
+    hours: "saat",
+    days: "gün",
+    close: "Kapat",
+    save: "Kaydet",
+    saving: "Kaydediliyor…",
+    share: "Paylaş",
+    otherYears: "Diğer yıllar",
+    // Intro
+    introHello: "Bu yıl neler izledin?",
+    introTap: "Başlamak için dokun",
+    pickYear: "Bir yıl seç",
+    // Toplam süre
+    totalTitle: "Toplam izleme süren",
+    totalThatsAbout: "Yani yaklaşık",
+    // Film
+    moviesTitle: "Film dünyan",
+    moviesWatched: "film izledin",
+    moviesTime: "film süresi",
+    // Dizi
+    tvTitle: "Dizi maratonun",
+    tvEpisodes: "bölüm",
+    tvShows: "dizi",
+    tvTime: "dizi süresi",
+    // Türler
+    genresTitle: "En çok izlediğin türler",
+    genresEmpty: "Henüz tür verisi yok",
+    // Diziler
+    topShowsTitle: "Zirvedeki dizilerin",
+    episodesShort: "bölüm",
+    // Yoğunluk
+    busiestTitle: "En yoğun zamanların",
+    busiestMonth: "En çok izlediğin ay",
+    busiestDay: "En yoğun günün",
+    itemsShort: "içerik",
+    minutesShort: "dk",
+    perMonthMinutes: "aylık izlenen dakika",
+    // En yoğun ay detay
+    busiestMonthTitle: "En yoğun ayın",
+    inThatMonth: "O ay neler oldu",
+    moviesShort: "film",
+    // Kişilik
+    personalityTitle: "İzleyici kişiliğin",
+    personalityBased: "En çok izlediğin türe göre",
+    // Özet kartı
+    summaryTitle: "Yılın özeti",
+    summaryMovies: "Film",
+    summaryEpisodes: "Bölüm",
+    summaryShows: "Dizi",
+    summaryMinutes: "Dakika",
+    summaryTopGenres: "Türler",
+    // Boş durum
+    emptyTitle: "Bu yıl henüz veri yok",
+    emptySubtitle: "İzlediklerini ekledikçe yıllık özetin burada oluşur",
+    // Toast
+    savedToast: "Galeriye kaydedildi",
+    galleryPermission: "Galeri izni gerekli",
+    shareUnavailable: "Paylaşım kullanılamıyor",
+    errorPrefix: "Hata: ",
+  },
+  en: {
+    brand: "Watchify Wrapped",
+    entryTitle: "Watchify Wrapped",
+    entrySubtitle: "Your yearly watch recap is ready",
+    entryCta: "See your recap",
+    minutes: "minutes",
+    hours: "hours",
+    days: "days",
+    close: "Close",
+    save: "Save",
+    saving: "Saving…",
+    share: "Share",
+    otherYears: "Other years",
+    introHello: "What did you watch this year?",
+    introTap: "Tap to begin",
+    pickYear: "Pick a year",
+    totalTitle: "Your total watch time",
+    totalThatsAbout: "That's about",
+    moviesTitle: "Your movie world",
+    moviesWatched: "movies watched",
+    moviesTime: "of movies",
+    tvTitle: "Your binge marathon",
+    tvEpisodes: "episodes",
+    tvShows: "shows",
+    tvTime: "of shows",
+    genresTitle: "Your most-watched genres",
+    genresEmpty: "No genre data yet",
+    topShowsTitle: "Your top shows",
+    episodesShort: "eps",
+    busiestTitle: "Your busiest times",
+    busiestMonth: "Your top month",
+    busiestDay: "Your busiest day",
+    itemsShort: "items",
+    minutesShort: "min",
+    perMonthMinutes: "minutes watched / month",
+    busiestMonthTitle: "Your biggest month",
+    inThatMonth: "What happened that month",
+    moviesShort: "movies",
+    personalityTitle: "Your viewer personality",
+    personalityBased: "Based on your most-watched genre",
+    summaryTitle: "Year in review",
+    summaryMovies: "Movies",
+    summaryEpisodes: "Episodes",
+    summaryShows: "Shows",
+    summaryMinutes: "Minutes",
+    summaryTopGenres: "Genres",
+    emptyTitle: "No data for this year yet",
+    emptySubtitle: "Your recap builds up as you log what you watch",
+    savedToast: "Saved to gallery",
+    galleryPermission: "Gallery permission required",
+    shareUnavailable: "Sharing unavailable",
+    errorPrefix: "Error: ",
+  },
+};
+
+export const getWrappedStrings = (language = "tr") =>
+  STRINGS[language === "tr" ? "tr" : "en"];

@@ -18,7 +18,7 @@ const MovieVideoItem = memo(({ item, onPress }) => {
         <View style={styles.playIconContainer}>
           <LottieView
             style={{ width: 56, height: 56 }}
-            source={require("../../../LottieJson/play")}
+            source={require("@lottie/play")}
             opacity={0.9}
             autoPlay
             loop

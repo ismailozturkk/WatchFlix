@@ -1,0 +1,317 @@
+import React, { useCallback, useMemo, useState } from "react";
+import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaView } from "react-native-safe-area-context";
+import AppIcon from "@components/AppIcon";
+import Skeleton from "@components/Skeleton";
+import { useAuth } from "@context/AuthContext";
+import { useLanguage } from "@context/LanguageContext";
+import { useTheme } from "@context/ThemeContext";
+import { loadSceneGamePreferences } from "@services/sceneGamePreferences";
+import { loadGameData } from "@services/sceneGameService";
+import { i18nText } from "@utils/i18nText";
+import { GameScreenShell, gameSharedStyles } from "./GameScreenShell";
+import {
+  DEFAULT_DIFFICULTY_ID,
+  DEFAULT_MODE_ID,
+  getDifficultyConfig,
+  getLocalizedGameLabel,
+  getModeConfig,
+  SCENE_GAME_ID,
+  SCENE_GAME_SOURCES,
+} from "./gameConfig";
+
+const MODE_CARDS = [
+  {
+    id: "classic",
+    icon: "albums-outline",
+    titleKey: "autoI18n.klasik_mod",
+    descriptionKey: "autoI18n.klasik_mod_detay",
+    metaKey: "autoI18n.klasik_mod_meta",
+    available: getModeConfig("classic").available,
+  },
+  {
+    id: "time_attack",
+    icon: "timer-outline",
+    titleKey: "autoI18n.zamana_karsi",
+    descriptionKey: "autoI18n.zamana_karsi_detay",
+    metaKey: "autoI18n.zamana_karsi_meta",
+    available: getModeConfig("time_attack").available,
+  },
+  {
+    id: "survival",
+    icon: "heart-half-outline",
+    titleKey: "autoI18n.hayatta_kalma",
+    descriptionKey: "autoI18n.hayatta_kalma_detay",
+    metaKey: "autoI18n.hayatta_kalma_meta",
+    available: getModeConfig("survival").available,
+  },
+];
+
+const RULES = [
+  { icon: "images-outline", textKey: "autoI18n.kural_sahneyi_incele" },
+  { icon: "list-outline", textKey: "autoI18n.kural_dort_secenek" },
+  { icon: "timer-outline", textKey: "autoI18n.kural_sure_bonus" },
+  { icon: "sparkles-outline", textKey: "autoI18n.kural_joker" },
+  { icon: "trophy-outline", textKey: "autoI18n.kural_rekor" },
+];
+
+export default function SceneGameDetailScreen({ navigation, route }) {
+  const { theme } = useTheme();
+  const { language } = useLanguage();
+  const { user } = useAuth();
+  const [state, setState] = useState({ loading: true, stats: null, preferences: null });
+  const [rulesVisible, setRulesVisible] = useState(false);
+  const gameId = route.params?.gameId || SCENE_GAME_ID;
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      setState((current) => ({ ...current, loading: true }));
+
+      Promise.all([
+        user?.uid ? loadGameData(user.uid) : Promise.resolve(null),
+        loadSceneGamePreferences(user?.uid),
+      ]).then(([stats, preferences]) => {
+        if (!active) return;
+        const fallbackPreferences = stats ? {
+          modeId: stats.lastModeId || DEFAULT_MODE_ID,
+          difficultyId: stats.lastDifficultyId || DEFAULT_DIFFICULTY_ID,
+          sourceId: stats.lastSourceId || "popular",
+        } : null;
+        setState({ loading: false, stats, preferences: preferences || fallbackPreferences });
+      }).catch(() => {
+        if (active) setState({ loading: false, stats: null, preferences: null });
+      });
+
+      return () => { active = false; };
+    }, [user?.uid]),
+  );
+
+  const totalQuestions = (Number(state.stats?.totalCorrect) || 0) + (Number(state.stats?.totalWrong) || 0);
+  const accuracy = totalQuestions
+    ? Math.round(((Number(state.stats?.totalCorrect) || 0) / totalQuestions) * 100)
+    : 0;
+  const hasPlayed = (Number(state.stats?.totalPlayed) || 0) > 0;
+  const lastSource = useMemo(
+    () => SCENE_GAME_SOURCES.find((source) => source.id === (state.preferences?.sourceId || state.stats?.lastSourceId)),
+    [state.preferences?.sourceId, state.stats?.lastSourceId],
+  );
+  const lastMode = useMemo(
+    () => getModeConfig(state.preferences?.modeId || state.stats?.lastModeId || DEFAULT_MODE_ID),
+    [state.preferences?.modeId, state.stats?.lastModeId],
+  );
+  const lastDifficulty = useMemo(
+    () => getDifficultyConfig(state.preferences?.difficultyId || state.stats?.lastDifficultyId || DEFAULT_DIFFICULTY_ID),
+    [state.preferences?.difficultyId, state.stats?.lastDifficultyId],
+  );
+
+  const openSetup = (modeId = DEFAULT_MODE_ID) => navigation.navigate("SceneGameSetupScreen", {
+    gameId,
+    modeId,
+    difficultyId: state.preferences?.difficultyId || DEFAULT_DIFFICULTY_ID,
+    sourceId: state.preferences?.sourceId,
+  });
+
+  const quickPlay = () => {
+    const preferences = state.preferences || {
+      modeId: DEFAULT_MODE_ID,
+      difficultyId: DEFAULT_DIFFICULTY_ID,
+      sourceId: "popular",
+    };
+    navigation.navigate("SceneGamePlayScreen", {
+      gameId,
+      modeId: preferences.modeId,
+      difficultyId: preferences.difficultyId,
+      sourceId: preferences.sourceId,
+    });
+  };
+
+  return (
+    <GameScreenShell navigation={navigation} title={i18nText("autoI18n.sahne_tahmin_oyunu_title", "Sahne Tahmin")} subtitle={i18nText("autoI18n.sahne_tahmin_detay_alt", "Sahneden filmi veya diziyi bul")}>
+      <LinearGradient colors={[theme.bold || theme.accent, theme.accent]} style={styles.hero}>
+        <View style={styles.heroGlowOne} />
+        <View style={styles.heroGlowTwo} />
+        <View style={styles.heroArtwork}><AppIcon family="Ionicons" name="scan-outline" size={132} color="rgba(255,255,255,0.08)" /></View>
+        <View style={styles.heroBadge}><AppIcon family="Ionicons" name="film-outline" size={15} color="#fff" /><Text style={styles.heroBadgeText}>{i18nText("autoI18n.sahne_tahmin_oyunu_title", "Sahne Tahmin")}</Text></View>
+        <Text style={styles.heroTitle}>{i18nText("autoI18n.sinema_bilgini_test_et", "Sinema bilgini sahnelerle test et")}</Text>
+        <Text style={styles.heroText}>{i18nText("autoI18n.sahne_tahmin_detay_aciklama", "Doğru yapımı seçenekler arasından bul, hızlı cevaplarla skorunu ve serini geliştir.")}</Text>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={i18nText("autoI18n.kurallari_gor", "Kuralları gör")} onPress={() => setRulesVisible(true)} style={styles.rulesButton}><AppIcon family="Ionicons" name="information-circle-outline" size={17} color="#fff" /><Text style={styles.rulesButtonText}>{i18nText("autoI18n.nasil_oynanir", "Nasıl Oynanır?")}</Text></TouchableOpacity>
+      </LinearGradient>
+
+      {state.loading ? (
+        <DetailSkeleton theme={theme} />
+      ) : (
+        <>
+          <View style={gameSharedStyles.metricRow}>
+            <Metric label={i18nText("autoI18n.en_iyi_skor", "En İyi Skor")} value={state.stats?.bestScore || 0} color="#E8B931" theme={theme} />
+            <Metric label={i18nText("autoI18n.dogruluk", "Doğruluk")} value={`${accuracy}%`} color="#56CCF2" theme={theme} />
+            <Metric label={i18nText("autoI18n.en_iyi_seri", "En İyi Seri")} value={state.stats?.bestStreak || 0} color="#FF6B6B" theme={theme} />
+          </View>
+
+          <SectionHeader title={i18nText("autoI18n.oyun_modlari", "Oyun Modları")} theme={theme} />
+          <View style={styles.modeList}>
+            {MODE_CARDS.map((mode) => <ModeCard key={mode.id} mode={mode} theme={theme} onPress={() => openSetup(mode.id)} />)}
+          </View>
+
+          <SectionHeader title={i18nText("autoI18n.son_oyun", "Son Oyun")} theme={theme} />
+          <LastGameCard stats={state.stats} hasPlayed={hasPlayed} lastSource={lastSource} lastMode={lastMode} lastDifficulty={lastDifficulty} language={language} theme={theme} onStart={() => openSetup()} />
+
+          <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate("GameLeaderboardScreen", { gameId })} style={[styles.leaderboardCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+            <View style={styles.leaderboardIcon}><AppIcon family="Ionicons" name="trophy" size={22} color="#E8B931" /></View>
+            <View style={styles.leaderboardCopy}><Text style={[styles.leaderboardTitle, { color: theme.text.primary }]}>{i18nText("autoI18n.liderlik_tablosu", "Liderlik Tablosu")}</Text><Text style={[styles.leaderboardText, { color: theme.text.muted }]}>{i18nText("autoI18n.skorunu_karsilastir", "Skorunu diğer oyuncularla karşılaştır")}</Text></View>
+            <AppIcon family="Ionicons" name="chevron-forward" size={19} color={theme.text.muted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={i18nText("autoI18n.oyuna_basla", "Oyuna Başla")} style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent, marginTop: 5 }]} onPress={() => openSetup()}>
+            <AppIcon family="Ionicons" name="options-outline" size={20} color="#fff" />
+            <Text style={gameSharedStyles.primaryButtonText}>{i18nText("autoI18n.oyuna_basla", "Oyuna Başla")}</Text>
+          </TouchableOpacity>
+          {hasPlayed && state.preferences ? (
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={i18nText("autoI18n.hizli_oyna", "Hızlı Oyna")} style={[styles.quickButton, { backgroundColor: theme.secondary, borderColor: theme.border }]} onPress={quickPlay}>
+              <AppIcon family="Ionicons" name="flash" size={18} color={theme.accent} />
+              <View style={styles.quickCopy}><Text style={[styles.quickTitle, { color: theme.text.primary }]}>{i18nText("autoI18n.hizli_oyna", "Hızlı Oyna")}</Text><Text style={[styles.quickMeta, { color: theme.text.muted }]}>{formatPreferenceSummary(state.preferences, lastSource, language)}</Text></View>
+              <AppIcon family="Ionicons" name="play-circle" size={24} color={theme.accent} />
+            </TouchableOpacity>
+          ) : null}
+        </>
+      )}
+
+      <RulesSheet visible={rulesVisible} onClose={() => setRulesVisible(false)} theme={theme} />
+    </GameScreenShell>
+  );
+}
+
+function Metric({ label, value, color, theme }) {
+  return <View style={[gameSharedStyles.metric, styles.metric, { backgroundColor: theme.secondary, borderColor: theme.border }]}><Text style={[gameSharedStyles.metricValue, { color }]}>{value}</Text><Text style={[gameSharedStyles.metricLabel, { color: theme.text.muted }]} numberOfLines={2}>{label}</Text></View>;
+}
+
+function SectionHeader({ title, theme }) {
+  return <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>{title}</Text>;
+}
+
+function ModeCard({ mode, theme, onPress }) {
+  return (
+    <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: !mode.available }} disabled={!mode.available} activeOpacity={0.8} onPress={onPress} style={[styles.modeCard, { backgroundColor: theme.secondary, borderColor: mode.available ? theme.accent : theme.border, opacity: mode.available ? 1 : 0.58 }]}>
+      <View style={[styles.modeIcon, { backgroundColor: mode.available ? `${theme.accent}20` : theme.primary }]}><AppIcon family="Ionicons" name={mode.icon} size={23} color={mode.available ? theme.accent : theme.text.muted} /></View>
+      <View style={styles.modeCopy}><View style={styles.modeTitleRow}><Text style={[styles.modeTitle, { color: theme.text.primary }]}>{i18nText(mode.titleKey, mode.id)}</Text>{!mode.available ? <View style={[styles.soonBadge, { borderColor: theme.border }]}><Text style={[styles.soonText, { color: theme.text.muted }]}>{i18nText("autoI18n.yakinda", "Yakında")}</Text></View> : null}</View><Text style={[styles.modeDescription, { color: theme.text.muted }]}>{i18nText(mode.descriptionKey, "")}</Text><Text style={[styles.modeMeta, { color: mode.available ? theme.accent : theme.text.muted }]}>{i18nText(mode.metaKey, "")}</Text></View>
+      {mode.available ? <AppIcon family="Ionicons" name="chevron-forward" size={18} color={theme.text.muted} /> : <AppIcon family="Ionicons" name="lock-closed-outline" size={17} color={theme.text.muted} />}
+    </TouchableOpacity>
+  );
+}
+
+function LastGameCard({ stats, hasPlayed, lastSource, lastMode, lastDifficulty, language, theme, onStart }) {
+  if (!hasPlayed) {
+    return <View style={[styles.emptyLastGame, { backgroundColor: theme.secondary, borderColor: theme.border }]}><View style={[styles.emptyLastIcon, { backgroundColor: `${theme.accent}18` }]}><AppIcon family="Ionicons" name="play-outline" size={24} color={theme.accent} /></View><View style={styles.emptyLastCopy}><Text style={[styles.emptyLastTitle, { color: theme.text.primary }]}>{i18nText("autoI18n.henuz_oyun_oynanmadi", "Henüz oyun oynanmadı")}</Text><Text style={[styles.emptyLastText, { color: theme.text.muted }]}>{i18nText("autoI18n.ilk_skorunu_olustur", "İlk skorunu oluşturmak için bir oyun başlat.")}</Text></View><TouchableOpacity onPress={onStart} style={[styles.emptyLastButton, { backgroundColor: theme.accent }]}><AppIcon family="Ionicons" name="arrow-forward" size={17} color="#fff" /></TouchableOpacity></View>;
+  }
+
+  return (
+    <View style={[styles.lastGameCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+      <View style={styles.lastGameTop}><View><Text style={[styles.lastGameDate, { color: theme.text.muted }]}>{formatLastPlayed(stats?.lastPlayedAt, language)}</Text><Text style={[styles.lastGameMode, { color: theme.text.primary }]}>{lastMode ? getLocalizedGameLabel(lastMode, language) : i18nText("autoI18n.klasik_mod", "Klasik Mod")}</Text></View><View style={[styles.lastScoreBadge, { backgroundColor: `${theme.accent}18` }]}><Text style={[styles.lastScoreValue, { color: theme.accent }]}>{Number(stats?.score) || 0}</Text><Text style={[styles.lastScoreLabel, { color: theme.text.muted }]}>{i18nText("autoI18n.son_skor", "Son skor")}</Text></View></View>
+      <View style={[styles.lastGameDivider, { backgroundColor: theme.border }]} />
+      <View style={styles.lastGameMeta}><View style={styles.lastMetaItem}><AppIcon family="Ionicons" name="albums-outline" size={15} color={theme.text.muted} /><Text style={[styles.lastMetaText, { color: theme.text.secondary }]}>{lastSource ? getLocalizedGameLabel(lastSource, language) : i18nText("autoI18n.populer", "Popüler")}</Text></View><View style={styles.lastMetaItem}><AppIcon family="Ionicons" name="speedometer-outline" size={15} color={theme.text.muted} /><Text style={[styles.lastMetaText, { color: theme.text.secondary }]}>{lastDifficulty ? getLocalizedGameLabel(lastDifficulty, language) : i18nText("autoI18n.normal", "Normal")}</Text></View></View>
+    </View>
+  );
+}
+
+function RulesSheet({ visible, onClose, theme }) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalRoot}>
+        <Pressable accessibilityRole="button" accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")} onPress={onClose} style={StyleSheet.absoluteFill} />
+        <SafeAreaView edges={["bottom"]} style={[styles.rulesSheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+          <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
+          <View style={styles.sheetHeader}><View><Text style={[styles.sheetTitle, { color: theme.text.primary }]}>{i18nText("autoI18n.nasil_oynanir", "Nasıl Oynanır?")}</Text><Text style={[styles.sheetSubtitle, { color: theme.text.muted }]}>{i18nText("autoI18n.sahne_tahmin_kurallari", "Sahne Tahmin kuralları")}</Text></View><TouchableOpacity accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")} onPress={onClose} style={[styles.closeButton, { backgroundColor: theme.primary }]}><AppIcon family="Ionicons" name="close" size={20} color={theme.text.primary} /></TouchableOpacity></View>
+          <View style={styles.rulesList}>{RULES.map((rule, index) => <View key={rule.textKey} style={styles.ruleRow}><View style={[styles.ruleNumber, { backgroundColor: `${theme.accent}18` }]}><Text style={[styles.ruleNumberText, { color: theme.accent }]}>{index + 1}</Text></View><AppIcon family="Ionicons" name={rule.icon} size={19} color={theme.text.secondary} /><Text style={[styles.ruleText, { color: theme.text.secondary }]}>{i18nText(rule.textKey, "")}</Text></View>)}</View>
+          <TouchableOpacity onPress={onClose} style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent }]}><Text style={gameSharedStyles.primaryButtonText}>{i18nText("autoI18n.anladim", "Anladım")}</Text></TouchableOpacity>
+        </SafeAreaView>
+      </View>
+    </Modal>
+  );
+}
+
+function DetailSkeleton({ theme }) {
+  return <View style={styles.skeletonWrap}><View style={styles.skeletonMetrics}><Skeleton height={82} style={[styles.skeletonMetric, { backgroundColor: theme.secondary }]} /><Skeleton height={82} style={[styles.skeletonMetric, { backgroundColor: theme.secondary }]} /><Skeleton height={82} style={[styles.skeletonMetric, { backgroundColor: theme.secondary }]} /></View><Skeleton height={104} style={[styles.skeletonBlock, { backgroundColor: theme.secondary }]} /><Skeleton height={104} style={[styles.skeletonBlock, { backgroundColor: theme.secondary }]} /></View>;
+}
+
+function formatPreferenceSummary(preferences, source, language) {
+  const sourceLabel = source ? getLocalizedGameLabel(source, language) : i18nText("autoI18n.populer", "Popüler");
+  const mode = getModeConfig(preferences?.modeId || DEFAULT_MODE_ID);
+  const difficulty = getDifficultyConfig(preferences?.difficultyId || DEFAULT_DIFFICULTY_ID);
+  return `${getLocalizedGameLabel(mode, language)} · ${getLocalizedGameLabel(difficulty, language)} · ${sourceLabel}`;
+}
+
+function formatLastPlayed(value, language) {
+  if (!value) return i18nText("autoI18n.son_oynanma", "Son oynama");
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return i18nText("autoI18n.son_oynanma", "Son oynama");
+  return new Intl.DateTimeFormat(language === "en" ? "en-US" : "tr-TR", { day: "numeric", month: "short", year: "numeric" }).format(date);
+}
+
+const styles = StyleSheet.create({
+  hero: { minHeight: 256, borderRadius: 25, padding: 20, overflow: "hidden", justifyContent: "flex-end" },
+  heroGlowOne: { position: "absolute", width: 190, height: 190, borderRadius: 95, right: -58, top: -72, backgroundColor: "rgba(255,255,255,0.1)" },
+  heroGlowTwo: { position: "absolute", width: 110, height: 110, borderRadius: 55, left: -42, bottom: -35, backgroundColor: "rgba(255,255,255,0.07)" },
+  heroArtwork: { position: "absolute", right: -2, top: 48, transform: [{ rotate: "-8deg" }] },
+  heroBadge: { alignSelf: "flex-start", borderRadius: 10, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: "rgba(255,255,255,0.15)", flexDirection: "row", alignItems: "center", gap: 6 },
+  heroBadgeText: { color: "#fff", fontSize: 9, fontWeight: "850" },
+  heroTitle: { color: "#fff", fontSize: 24, lineHeight: 29, fontWeight: "900", maxWidth: "82%", marginTop: 18 },
+  heroText: { color: "rgba(255,255,255,0.8)", fontSize: 11, lineHeight: 16, fontWeight: "650", maxWidth: "88%", marginTop: 7 },
+  rulesButton: { alignSelf: "flex-start", minHeight: 36, borderRadius: 11, paddingHorizontal: 10, backgroundColor: "rgba(0,0,0,0.16)", flexDirection: "row", alignItems: "center", gap: 6, marginTop: 13 },
+  rulesButtonText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+  metric: { minHeight: 83 },
+  sectionTitle: { color: "#fff", fontSize: 12, fontWeight: "900", letterSpacing: 0.8, textTransform: "uppercase", marginTop: 10, marginBottom: 1 },
+  modeList: { gap: 9 },
+  modeCard: { minHeight: 104, borderRadius: 19, borderWidth: 1, padding: 13, flexDirection: "row", alignItems: "center", gap: 12 },
+  modeIcon: { width: 48, height: 48, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  modeCopy: { flex: 1 },
+  modeTitleRow: { flexDirection: "row", alignItems: "center", gap: 7 },
+  modeTitle: { fontSize: 14, fontWeight: "900" },
+  modeDescription: { fontSize: 10, lineHeight: 14, fontWeight: "650", marginTop: 4 },
+  modeMeta: { fontSize: 9, fontWeight: "800", marginTop: 5 },
+  soonBadge: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 },
+  soonText: { fontSize: 7, fontWeight: "800" },
+  emptyLastGame: { minHeight: 92, borderRadius: 19, borderWidth: 1, padding: 13, flexDirection: "row", alignItems: "center", gap: 11 },
+  emptyLastIcon: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  emptyLastCopy: { flex: 1 },
+  emptyLastTitle: { fontSize: 12, fontWeight: "850" },
+  emptyLastText: { fontSize: 9, lineHeight: 13, fontWeight: "650", marginTop: 3 },
+  emptyLastButton: { width: 37, height: 37, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  lastGameCard: { borderRadius: 19, borderWidth: 1, padding: 14 },
+  lastGameTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  lastGameDate: { fontSize: 9, fontWeight: "700" },
+  lastGameMode: { fontSize: 14, fontWeight: "900", marginTop: 4 },
+  lastScoreBadge: { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 7, alignItems: "center" },
+  lastScoreValue: { fontSize: 18, fontWeight: "900" },
+  lastScoreLabel: { fontSize: 7, fontWeight: "750", marginTop: 1 },
+  lastGameDivider: { height: StyleSheet.hairlineWidth, marginVertical: 12 },
+  lastGameMeta: { flexDirection: "row", gap: 16 },
+  lastMetaItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  lastMetaText: { fontSize: 9, fontWeight: "700" },
+  leaderboardCard: { minHeight: 78, borderRadius: 19, borderWidth: 1, padding: 13, flexDirection: "row", alignItems: "center", gap: 11, marginTop: 4 },
+  leaderboardIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: "rgba(232,185,49,0.14)", alignItems: "center", justifyContent: "center" },
+  leaderboardCopy: { flex: 1 },
+  leaderboardTitle: { fontSize: 13, fontWeight: "850" },
+  leaderboardText: { fontSize: 9, fontWeight: "650", marginTop: 3 },
+  quickButton: { minHeight: 62, borderRadius: 17, borderWidth: 1, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 10 },
+  quickCopy: { flex: 1 },
+  quickTitle: { fontSize: 12, fontWeight: "850" },
+  quickMeta: { fontSize: 8, fontWeight: "650", marginTop: 3 },
+  modalRoot: { flex: 1, backgroundColor: "rgba(0,0,0,0.58)", justifyContent: "flex-end" },
+  rulesSheet: { borderTopLeftRadius: 27, borderTopRightRadius: 27, borderWidth: 1, paddingHorizontal: 18, paddingTop: 9, paddingBottom: 12 },
+  sheetHandle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
+  sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  sheetTitle: { fontSize: 20, fontWeight: "900" },
+  sheetSubtitle: { fontSize: 10, fontWeight: "650", marginTop: 3 },
+  closeButton: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  rulesList: { marginVertical: 15, gap: 11 },
+  ruleRow: { minHeight: 35, flexDirection: "row", alignItems: "center", gap: 9 },
+  ruleNumber: { width: 27, height: 27, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  ruleNumberText: { fontSize: 10, fontWeight: "900" },
+  ruleText: { flex: 1, fontSize: 10, lineHeight: 14, fontWeight: "650" },
+  skeletonWrap: { gap: 12 },
+  skeletonMetrics: { flexDirection: "row", gap: 10 },
+  skeletonMetric: { flex: 1, borderRadius: 16 },
+  skeletonBlock: { borderRadius: 19 },
+});

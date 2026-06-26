@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { memo, useEffect, useMemo, useRef } from "react";
 import {
   Text,
   TouchableOpacity,
@@ -11,13 +11,68 @@ import {
 import { Image } from "expo-image";
 import { useTheme } from "../../context/ThemeContext";
 import { MovieUpComingSkeleton } from "../../components/Skeleton";
+import PaginatedRail from "../../components/PaginatedRail";
 //import { API_KEY } from "@env";
 import { useTvShow } from "../../context/TvShowContex";
 import { useLanguage } from "../../context/LanguageContext";
-import { useListStatus } from "../../modules/UseListStatus";
+import ListBadges from "../../components/ListBadges";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
 const { width } = Dimensions.get("window");
+
+// Stable, module-scope item component → no remount → no flicker.
+const TvOnTheAirCard = memo(function TvOnTheAirCard({ item, navigation, theme, getTmdbUrl }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const onPressIn = () =>
+    Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
+  const onPressOut = () =>
+    Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+
+  const source = useMemo(
+    () =>
+      item.poster_path
+        ? { uri: getTmdbUrl(item.poster_path, "poster", 200) }
+        : require("../../assets/image/no_image.png"),
+    [item.poster_path, getTmdbUrl]
+  );
+
+  return (
+    <TouchableOpacity
+      style={styles.similarItem}
+      activeOpacity={0.8}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
+    >
+      <Animated.View style={[{ transform: [{ scale }] }]}>
+        <Image
+          source={source}
+          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+          cachePolicy="memory-disk"
+          recyclingKey={`tvontheair-${item.id}`}
+          transition={120}
+        />
+
+        <View style={[styles.relaseDateCount, { backgroundColor: theme.secondaryt }]}>
+          <Text style={[styles.similarRatingText, { color: theme.text.secondary }]}>
+            {item.first_air_date}
+          </Text>
+        </View>
+        <View style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}>
+          <Text style={[styles.similarRatingText, { color: theme.colors.orange }]}>
+            {item.vote_average}
+          </Text>
+        </View>
+        <ListBadges
+          mediaId={item.id}
+          mediaType="tv"
+          theme={theme}
+          style={{ position: "absolute", left: 2, bottom: 8 }}
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+});
 
 export default function TvShowsOnTheAir({ navigation }) {
   const { theme } = useTheme();
@@ -25,10 +80,11 @@ export default function TvShowsOnTheAir({ navigation }) {
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const {
     pageOnTheAir,
-    setPageOnTheAir,
     moviesOnTheAir,
     totalPagesOnTheAir,
     loadingOnTheAir,
+    loadMoreOnTheAir,
+    loadingMoreOnTheAir,
     activateTvSection,
   } = useTvShow();
 
@@ -36,30 +92,6 @@ export default function TvShowsOnTheAir({ navigation }) {
     activateTvSection("onTheAir");
   }, [activateTvSection]);
 
-  // Animated import'unun eklendiğinden emin olun
-  const scaleValuesRef = useRef({});
-  const getScaleValue = (itemId) => {
-    if (!scaleValuesRef.current[itemId]) {
-      scaleValuesRef.current[itemId] = new Animated.Value(1);
-    }
-    return scaleValuesRef.current[itemId];
-  };
-
-  const onPressIn = (itemId) => {
-    Animated.timing(getScaleValue(itemId), {
-      toValue: 0.9,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const onPressOut = (itemId) => {
-    Animated.timing(getScaleValue(itemId), {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
 
   if (loadingOnTheAir) {
     return (
@@ -80,291 +112,19 @@ export default function TvShowsOnTheAir({ navigation }) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 15 }}
         />
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 5,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.muted }]}
-          >
-            ●●●
-          </Text>
-          {pageOnTheAir > 5 && (
-            <>
-              <TouchableOpacity
-                onPress={() => setPageOnTheAir(pageOnTheAir - 5)}
-                style={[
-                  styles.pageButton,
-                  {
-                    backgroundColor: theme.secondary,
-                  },
-                ]}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.genreText, { color: theme.text.primary }]}
-                >
-                  {pageOnTheAir - 5}
-                </Text>
-              </TouchableOpacity>
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.muted }]}
-              >
-                ●
-              </Text>
-            </>
-          )}
-
-          {pageOnTheAir > 2 && (
-            <TouchableOpacity
-              onPress={() => setPageOnTheAir(pageOnTheAir - 2)}
-              style={[
-                styles.pageButton,
-                {
-                  backgroundColor: theme.secondary,
-                },
-              ]}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageOnTheAir - 2}
-              </Text>
-            </TouchableOpacity>
-          )}
-          {pageOnTheAir > 1 && (
-            <TouchableOpacity
-              onPress={() => setPageOnTheAir(pageOnTheAir - 1)}
-              style={[
-                styles.pageButton,
-                {
-                  backgroundColor: theme.secondary,
-                },
-              ]}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageOnTheAir - 1}
-              </Text>
-            </TouchableOpacity>
-          )}
-          <Text
-            style={[
-              styles.genreText,
-              {
-                color: theme.text.secondary,
-                width: 25,
-                height: 20,
-                textAlign: "center",
-              },
-            ]}
-          >
-            {pageOnTheAir}
-          </Text>
-          <TouchableOpacity
-            onPress={() => setPageOnTheAir(pageOnTheAir + 1)}
-            style={[
-              styles.pageButton,
-              {
-                backgroundColor: theme.secondary,
-              },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageOnTheAir + 1}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setPageOnTheAir(pageOnTheAir + 2)}
-            style={[
-              styles.pageButton,
-              {
-                backgroundColor: theme.secondary,
-              },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageOnTheAir + 2}
-            </Text>
-          </TouchableOpacity>
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.muted }]}
-          >
-            ●
-          </Text>
-          <TouchableOpacity
-            onPress={() => setPageOnTheAir(pageOnTheAir + 5)}
-            style={[
-              styles.pageButton,
-              {
-                backgroundColor: theme.secondary,
-              },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageOnTheAir + 5}
-            </Text>
-          </TouchableOpacity>
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.muted }]}
-          >
-            ●●●
-          </Text>
-        </View>
       </View>
     );
   }
-  const MovieItem = ({ item }) => {
-    const { inWatchList, inFavorites, isWatched, isInOtherLists } =
-      useListStatus(item.id, "tv");
-    return (
-      item.poster_path && (
-        <TouchableOpacity
-          style={styles.similarItem}
-          activeOpacity={0.8}
-          onPressIn={() => onPressIn(item.id)}
-          onPressOut={() => onPressOut(item.id)}
-          onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
-        >
-          <Animated.View
-            style={[
-              {
-                transform: [{ scale: getScaleValue(item.id) }],
-              },
-            ]}
-          >
-            <Image
-              source={
-                item.poster_path
-                  ? {
-                      uri: getTmdbUrl(item.poster_path, 'poster', 200),
-                    }
-                  : require("../../assets/image/no_image.png")
-              }
-              style={[styles.similarPoster, { shadowColor: theme.shadow }]}
-              cachePolicy="memory-disk"
-              transition={120}
-            />
-
-            <View
-              style={[
-                styles.relaseDateCount,
-                { backgroundColor: theme.secondaryt },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.similarRatingText,
-                  { color: theme.text.secondary },
-                ]}
-              >
-                {item.first_air_date}
-              </Text>
-            </View>
-            <View
-              style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}
-            >
-              <Text
-                style={[
-                  styles.similarRatingText,
-                  { color: theme.colors.orange },
-                ]}
-              >
-                {item.vote_average}
-              </Text>
-            </View>
-            <View
-              style={{
-                justifyContent: "center",
-                alignItems: "center",
-                position: "absolute",
-                left: 2,
-                bottom: 8,
-              }}
-            >
-              <View
-                style={{
-                  gap: 3,
-                  backgroundColor: theme.secondaryt,
-                  paddingVertical: 3,
-                  paddingHorizontal: 1,
-                  borderRadius: 7,
-                }}
-              >
-                {inWatchList && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      //updateTvSeriesList("watchList", "tv");
-                    }}
-                  >
-                    <Ionicons
-                      name="bookmark"
-                      size={12}
-                      color={theme.colors.blue}
-                    />
-                  </TouchableOpacity>
-                )}
-                {isWatched && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      //updateTvSeriesList("watchedTv", "tv");
-                    }}
-                  >
-                    <Ionicons name="eye" size={12} color={theme.colors.green} />
-                  </TouchableOpacity>
-                )}
-                {inFavorites && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      //updateTvSeriesList("favorites", "tv");
-                    }}
-                  >
-                    <Ionicons name="heart" size={12} color={theme.colors.red} />
-                  </TouchableOpacity>
-                )}
-                {isInOtherLists && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      //updateMovieList("favorites", "movie");
-                    }}
-                  >
-                    <Ionicons
-                      name="grid"
-                      size={12}
-                      color={theme.colors.orange}
-                    />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          </Animated.View>
-        </TouchableOpacity>
-      )
-    );
-  };
   const renderMovieItem = ({ item }) => {
     if (!item.poster_path) return null;
-    return <MovieItem item={item} navigation={navigation} />;
+    return (
+      <TvOnTheAirCard
+        item={item}
+        navigation={navigation}
+        theme={theme}
+        getTmdbUrl={getTmdbUrl}
+      />
+    );
   };
   return (
     <View style={styles.container}>
@@ -376,175 +136,19 @@ export default function TvShowsOnTheAir({ navigation }) {
           {t.tvShowScreens.onTheAir}
         </Text>
       </View>
-      <FlatList
+      <PaginatedRail
         data={moviesOnTheAir}
-        horizontal
         contentContainerStyle={{ paddingHorizontal: 15 }}
-        showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id.toString()}
+        renderItem={renderMovieItem}
+        onLoadMore={loadMoreOnTheAir}
+        loadingMore={loadingMoreOnTheAir}
+        hasMore={pageOnTheAir < totalPagesOnTheAir}
         initialNumToRender={3}
         maxToRenderPerBatch={3}
         updateCellsBatchingPeriod={80}
         windowSize={5}
-        removeClippedSubviews
-        renderItem={renderMovieItem}
       />
-      <View
-        style={{
-          flexDirection: "row",
-          gap: 5,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <Text
-          allowFontScaling={false}
-          style={[styles.genreText, { color: theme.text.muted }]}
-        >
-          ●●●
-        </Text>
-        {pageOnTheAir > 1 && (
-          <>
-            <TouchableOpacity
-              onPress={() => setPageOnTheAir(1)}
-              style={[
-                styles.pageButton,
-                {
-                  backgroundColor: theme.secondary,
-                },
-              ]}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {1}
-              </Text>
-            </TouchableOpacity>
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.muted }]}
-            >
-              ●
-            </Text>
-          </>
-        )}
-
-        {pageOnTheAir > 2 && (
-          <TouchableOpacity
-            onPress={() => setPageOnTheAir(pageOnTheAir - 2)}
-            style={[
-              styles.pageButton,
-              {
-                backgroundColor: theme.secondary,
-              },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageOnTheAir - 2}
-            </Text>
-          </TouchableOpacity>
-        )}
-        {pageOnTheAir > 1 && (
-          <TouchableOpacity
-            onPress={() => setPageOnTheAir(pageOnTheAir - 1)}
-            style={[
-              styles.pageButton,
-              {
-                backgroundColor: theme.secondary,
-              },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageOnTheAir - 1}
-            </Text>
-          </TouchableOpacity>
-        )}
-        <Text
-          style={[
-            styles.genreText,
-            {
-              color: theme.text.secondary,
-              width: 25,
-              height: 20,
-              textAlign: "center",
-            },
-          ]}
-        >
-          {pageOnTheAir}
-        </Text>
-        {pageOnTheAir < totalPagesOnTheAir - 2 ? (
-          <>
-            <TouchableOpacity
-              onPress={() => setPageOnTheAir(pageOnTheAir + 1)}
-              style={[
-                styles.pageButton,
-                {
-                  backgroundColor: theme.secondary,
-                },
-              ]}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageOnTheAir + 1}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setPageOnTheAir(pageOnTheAir + 2)}
-              style={[
-                styles.pageButton,
-                {
-                  backgroundColor: theme.secondary,
-                },
-              ]}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageOnTheAir + 2}
-              </Text>
-            </TouchableOpacity>
-          </>
-        ) : null}
-        <Text
-          allowFontScaling={false}
-          style={[styles.genreText, { color: theme.text.muted }]}
-        >
-          ●
-        </Text>
-        <TouchableOpacity
-          onPress={() => setPageOnTheAir(totalPagesOnTheAir)}
-          style={[
-            styles.pageButton,
-            {
-              backgroundColor: theme.secondary,
-            },
-          ]}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.primary }]}
-          >
-            {totalPagesOnTheAir}
-          </Text>
-        </TouchableOpacity>
-        <Text
-          allowFontScaling={false}
-          style={[styles.genreText, { color: theme.text.muted }]}
-        >
-          ●●●
-        </Text>
-      </View>
     </View>
   );
 }

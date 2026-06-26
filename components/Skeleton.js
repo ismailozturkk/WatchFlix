@@ -106,6 +106,31 @@ export const MovieBestsSkeleton = () => {
     </View>
   );
 };
+// MovieCollection kartı yatay poster (0.4 × 0.45) — Oscar skeleton'ı uymuyordu.
+export const MovieCollectionSkeleton = () => {
+  return (
+    <View style={{ marginBottom: 5, marginRight: 15 }}>
+      <Skeleton
+        width={width * 0.4}
+        height={width * 0.45}
+        style={{
+          borderRadius: 15,
+          marginBottom: 5,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.94,
+          shadowRadius: 10.32,
+          elevation: 5,
+        }}
+      />
+      <Skeleton
+        width={30}
+        height={15}
+        style={{ position: "absolute", right: 10, bottom: 13, borderRadius: 10 }}
+      />
+    </View>
+  );
+};
 export const MovieOscarSkeleton = () => {
   const { theme } = useTheme();
   return (
@@ -160,118 +185,34 @@ export const MovieOscarSkeleton = () => {
     </ScrollView>
   );
 };
-export const MovieProviderSkeleton = () => {
-  const { theme } = useTheme();
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{
-        marginRight: 10,
-        marginBottom: 20,
-      }}
-    >
-      <View style={{ flexDirection: "row", gap: 10 }}>
-        <Skeleton
-          width={width * 0.15}
-          height={40}
-          style={{ borderRadius: 10 }}
-        />
-        <Skeleton
-          width={width * 0.27}
-          height={40}
-          style={{ borderRadius: 10 }}
-        />
-        <Skeleton
-          width={width * 0.32}
-          height={40}
-          style={{ borderRadius: 10 }}
-        />
-      </View>
-    </ScrollView>
-  );
-};
+// Yatay poster section'ları (Genres, NowPlaying, Provders, TvGenres, TvProvders…)
+// Gerçek kart 0.4×0.6 r15 → skeleton de aynı ölçüde.
 export const MovieSkeleton = () => {
-  const { theme } = useTheme();
   return (
-    <View style={{ paddingBottom: 15, gap: 10 }}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          flexDirection: "column",
-          gap: 5,
-          marginRight: 10,
+    <View style={{ marginBottom: 5, marginRight: 10 }}>
+      <Skeleton
+        width={width * 0.4}
+        height={width * 0.6}
+        style={{
+          borderRadius: 15,
           marginBottom: 5,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.94,
+          shadowRadius: 10.32,
+          elevation: 5,
         }}
-      >
-        <View style={{ gap: 5, width: width * 0.3 }}>
-          <Skeleton
-            width={width * 0.35}
-            height={width * 0.45}
-            style={{
-              marginRight: 15,
-              width: width * 0.3,
-              height: width * 0.45,
-              borderRadius: 10,
-              marginBottom: 5,
-              shadowColor: "#000",
-              shadowOffset: {
-                width: 0,
-                height: 8,
-              },
-              shadowOpacity: 0.94,
-              shadowRadius: 10.32,
-              elevation: 5,
-            }}
-          />
-          <Skeleton
-            width={30}
-            height={15}
-            style={{
-              position: "absolute",
-              right: 5,
-              bottom: 10,
-              borderRadius: 10,
-            }}
-          />
-        </View>
-        <View style={{}}>
-          <Skeleton width={width * 0.3} height={15} style={styles.title} />
-        </View>
-      </ScrollView>
-    </View>
-  );
-};
-export const MovieGenreSkeleton = () => {
-  const { theme } = useTheme();
-  return (
-    <View style={{ marginBottom: 15 }}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          marginRight: 10,
+      />
+      <Skeleton
+        width={30}
+        height={15}
+        style={{
+          position: "absolute",
+          right: 10,
+          bottom: 13,
+          borderRadius: 10,
         }}
-      >
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <Skeleton
-            width={width * 0.15}
-            height={35}
-            style={{ borderRadius: 20 }}
-          />
-          <Skeleton
-            width={width * 0.27}
-            height={35}
-            style={{ borderRadius: 20 }}
-          />
-          <Skeleton
-            width={width * 0.22}
-            height={35}
-            style={{ borderRadius: 20 }}
-          />
-        </View>
-      </ScrollView>
+      />
     </View>
   );
 };
@@ -348,145 +289,116 @@ export const WatchedInfoSkeleton = () => {
     </View>
   );
 };
+// ProfileLists ile BİRE BİR: yatay scroll, ~152×150 r15 kartlar (collage + etiket),
+// paddingHorizontal 15 + gap 10.
 export const ListsSkeleton = () => {
   return (
-    <Skeleton
-      width={170}
-      height={135}
-      style={{ borderRadius: 12, marginBottom: 10 }}
-    />
+    <View style={{ flexDirection: "row", paddingHorizontal: 15, gap: 10 }}>
+      {[1, 2, 3].map((i) => (
+        <Skeleton key={i} width={152} height={150} style={{ borderRadius: 15 }} />
+      ))}
+    </View>
   );
 };
+// MovieDetail / TvShowsDetails ile BİRE BİR: hero (9/16) + üste binen 110×165
+// poster + bilgi sütunu + stat satırı + yorum butonu + özet + cast rail.
 export const DetailsSkeleton = () => {
   const { theme } = useTheme();
+  const BACKDROP_H = width * (9 / 16);
+  const CAST_W = width * 0.26;
   return (
     <View style={[styles.detailsContainer, { backgroundColor: theme.primary }]}>
-      <Skeleton width={width} height={width * 0.6} style={styles.backdrop} />
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Skeleton
-            width={width * 0.35}
-            height={width * 0.5}
-            style={styles.posterSmall}
-          />
-          <View style={styles.headerInfo}>
-            <Skeleton
-              width={width * 0.5}
-              height={24}
-              style={styles.titleLarge}
-            />
-            <Skeleton width={width * 0.4} height={16} style={styles.tagline} />
-            <View style={styles.genres}>
-              <Skeleton width={80} height={25} style={styles.genre} />
-              <Skeleton width={80} height={25} style={styles.genre} />
-              <Skeleton width={80} height={25} style={styles.genre} />
-            </View>
-            <View style={styles.rating}>
-              <Skeleton width={100} height={20} style={styles.ratingValue} />
-              <Skeleton width={150} height={15} style={styles.stars} />
-            </View>
+      {/* Hero / backdrop */}
+      <Skeleton width={width} height={BACKDROP_H} style={{ borderRadius: 0 }} />
+
+      {/* Info header — poster hero'nun üstüne biner */}
+      <View
+        style={{
+          flexDirection: "row",
+          paddingHorizontal: 16,
+          marginTop: -BACKDROP_H * 0.28,
+          gap: 14,
+          alignItems: "flex-end",
+          marginBottom: 20,
+        }}
+      >
+        <Skeleton width={110} height={110 * 1.5} style={{ borderRadius: 14 }} />
+        <View style={{ flex: 1, gap: 8, paddingBottom: 4 }}>
+          <Skeleton width={"85%"} height={22} style={{ borderRadius: 6 }} />
+          <Skeleton width={"55%"} height={13} style={{ borderRadius: 4 }} />
+          <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
+            <Skeleton width={62} height={26} style={{ borderRadius: 20 }} />
+            <Skeleton width={52} height={26} style={{ borderRadius: 20 }} />
+            <Skeleton width={70} height={26} style={{ borderRadius: 20 }} />
           </View>
+          <Skeleton width={"62%"} height={18} style={{ borderRadius: 6, marginTop: 4 }} />
         </View>
+      </View>
 
-        <View style={styles.stats}>
-          <Skeleton width={width * 0.9} height={60} style={styles.statsCard} />
-        </View>
+      {/* Body */}
+      <View style={{ paddingHorizontal: 15 }}>
+        {/* Stat satırı */}
+        <Skeleton width={"100%"} height={88} style={{ borderRadius: 20, marginBottom: 16 }} />
+        {/* Yorumlar butonu */}
+        <Skeleton width={"100%"} height={64} style={{ borderRadius: 18, marginBottom: 26 }} />
 
-        <Skeleton width={width * 0.9} height={80} style={styles.overview} />
+        {/* Özet */}
+        <Skeleton width={width * 0.4} height={18} style={{ borderRadius: 6, marginBottom: 14 }} />
+        <Skeleton width={"100%"} height={13} style={{ borderRadius: 4, marginBottom: 7 }} />
+        <Skeleton width={"100%"} height={13} style={{ borderRadius: 4, marginBottom: 7 }} />
+        <Skeleton width={"72%"} height={13} style={{ borderRadius: 4, marginBottom: 26 }} />
 
-        <View style={styles.castSection}>
-          <Skeleton
-            width={width * 0.5}
-            height={24}
-            style={styles.sectionTitle}
-          />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.castList}>
-              {[1, 2, 3, 4].map((_, index) => (
-                <View key={index} style={styles.castItem}>
-                  <Skeleton width={80} height={80} style={styles.castImage} />
-                  <Skeleton width={70} height={12} style={styles.castName} />
-                  <Skeleton width={60} height={10} style={styles.castRole} />
-                </View>
-              ))}
+        {/* Cast rail */}
+        <Skeleton width={width * 0.45} height={18} style={{ borderRadius: 6, marginBottom: 14 }} />
+        <View style={{ flexDirection: "row", gap: 14 }}>
+          {[1, 2, 3, 4].map((i) => (
+            <View key={i} style={{ width: CAST_W, alignItems: "center", gap: 7 }}>
+              <Skeleton width={CAST_W} height={CAST_W * 1.5} style={{ borderRadius: 12 }} />
+              <Skeleton width={"85%"} height={11.5} style={{ borderRadius: 4 }} />
+              <Skeleton width={"60%"} height={10.5} style={{ borderRadius: 4 }} />
             </View>
-          </ScrollView>
-        </View>
-
-        <View style={styles.videoSection}>
-          <Skeleton
-            width={width * 0.5}
-            height={24}
-            style={styles.sectionTitle}
-          />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.videoList}>
-              {[1, 2, 3].map((_, index) => (
-                <View key={index} style={styles.videoItem}>
-                  <Skeleton
-                    width={200}
-                    height={120}
-                    style={styles.videoThumbnail}
-                  />
-                  <Skeleton width={180} height={12} style={styles.videoTitle} />
-                </View>
-              ))}
-            </View>
-          </ScrollView>
+          ))}
         </View>
       </View>
     </View>
   );
 };
 
+// SeasonDetails ile BİRE BİR: tam genişlik hero poster (width×width*1.35) +
+// içerik (show adı, meta rozetleri, bölüm başlığı) + bölüm kartları (thumb 155×110).
 export const SeasonSkeleton = () => {
   const { theme } = useTheme();
+  const HERO_H = Math.round(width * 1.35);
   return (
-    <View style={[styles.seasonContainer, { backgroundColor: theme.primary }]}>
-      <View style={styles.seasonHeader}>
-        <Skeleton
-          width={width * 0.35}
-          height={width * 0.5}
-          style={styles.seasonPoster}
-        />
-        <View style={styles.seasonInfo}>
-          <Skeleton
-            width={width * 0.5}
-            height={24}
-            style={styles.seasonTitle}
-          />
-          <Skeleton width={width * 0.3} height={16} style={styles.seasonMeta} />
-          <Skeleton
-            width={width * 0.5}
-            height={60}
-            style={styles.seasonOverview}
-          />
+    <View style={{ flex: 1, backgroundColor: theme.primary }}>
+      <Skeleton width={width} height={HERO_H} style={{ borderRadius: 0 }} />
+      <View style={{ paddingHorizontal: 18, paddingTop: 16 }}>
+        <Skeleton width={"45%"} height={15} style={{ borderRadius: 4, marginBottom: 10 }} />
+        <View style={{ flexDirection: "row", gap: 8, marginBottom: 18 }}>
+          <Skeleton width={92} height={28} style={{ borderRadius: 20 }} />
+          <Skeleton width={70} height={28} style={{ borderRadius: 20 }} />
+          <Skeleton width={60} height={28} style={{ borderRadius: 20 }} />
         </View>
-      </View>
-      <View style={styles.episodesList}>
-        <Skeleton width={width * 0.5} height={24} style={styles.sectionTitle} />
-        {[1, 2, 3].map((_, index) => (
-          <View key={index} style={styles.episodeCard}>
-            <Skeleton width={160} height={130} style={styles.episodeImage} />
-            <View style={styles.episodeInfo}>
-              <Skeleton
-                width={width * 0.4}
-                height={18}
-                style={styles.episodeTitle}
-              />
-              <View style={styles.episodeMetaContainer}>
-                <Skeleton
-                  width={100}
-                  height={12}
-                  style={styles.episodeRating}
-                />
-                <Skeleton width={80} height={12} style={styles.episodeDate} />
-              </View>
-              <Skeleton
-                width={width * 0.4}
-                height={30}
-                style={styles.episodeOverview}
-              />
+        <Skeleton width={width * 0.4} height={20} style={{ borderRadius: 6, marginBottom: 16 }} />
+        {[1, 2, 3].map((i) => (
+          <View
+            key={i}
+            style={{
+              flexDirection: "row",
+              padding: 5,
+              gap: 5,
+              borderRadius: 25,
+              borderWidth: 1,
+              borderColor: theme.border,
+              marginBottom: 12,
+            }}
+          >
+            <Skeleton width={155} height={110} style={{ borderRadius: 20 }} />
+            <View style={{ flex: 1, paddingVertical: 8, paddingRight: 8, gap: 9, justifyContent: "center" }}>
+              <Skeleton width={"80%"} height={16} style={{ borderRadius: 4 }} />
+              <Skeleton width={"50%"} height={12} style={{ borderRadius: 4 }} />
+              <Skeleton width={"95%"} height={11} style={{ borderRadius: 4 }} />
+              <Skeleton width={"70%"} height={11} style={{ borderRadius: 4 }} />
             </View>
           </View>
         ))}
@@ -501,11 +413,7 @@ export const EpisodeSkeleton = () => {
     <ScrollView
       style={[styles.episodeContainer, { backgroundColor: theme.primary }]}
     >
-      <Skeleton
-        width={width}
-        height={width * 0.6}
-        style={styles.episodeBackdrop}
-      />
+      <Skeleton width={width} height={280} style={styles.episodeBackdrop} />
       <View style={styles.episodeContent}>
         <View style={styles.episodeHeader}>
           <Skeleton
@@ -555,8 +463,8 @@ export const EpisodeSkeleton = () => {
             {[1, 2, 3].map((_, index) => (
               <View key={index} style={styles.crewItem}>
                 <Skeleton
-                  width={width * 0.2}
-                  height={width * 0.2}
+                  width={width * 0.18}
+                  height={width * 0.18}
                   style={styles.crewImage}
                 />
                 <Skeleton
@@ -584,8 +492,8 @@ export const EpisodeSkeleton = () => {
             {[1, 2, 3, 4, 5, 6].map((_, index) => (
               <View key={index} style={styles.guestItem}>
                 <Skeleton
-                  width={width * 0.2}
-                  height={width * 0.2}
+                  width={width * 0.18}
+                  height={width * 0.18}
                   style={styles.guestImage}
                 />
                 <Skeleton
@@ -615,9 +523,9 @@ export const SearchSkeleton = () => {
         {[1, 2, 3, 4].map((_, index) => (
           <View key={index} style={styles.searchItem}>
             <Skeleton
-              width={110}
-              height={170}
-              style={{ ...styles.searchPoster, borderRadius: 5 }}
+              width={100}
+              height={152}
+              style={{ ...styles.searchPoster, borderRadius: 12 }}
             />
             <View style={styles.searchInfo}>
               <Skeleton
@@ -635,6 +543,95 @@ export const SearchSkeleton = () => {
                 <Skeleton width={150} height={15} style={styles.stars} />
               </View>
             </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+// Oyuncu detay sayfası (hero + bilgi pill'leri + biyografi + filmografi)
+export const ActorSkeleton = () => {
+  const { theme } = useTheme();
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.primary }}>
+      {/* Hero görsel */}
+      <Skeleton width={width} height={width * 1.1} style={{ borderRadius: 0 }} />
+      <View style={{ padding: 16, gap: 14 }}>
+        {/* İsim + meta rozetleri */}
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Skeleton width={130} height={26} style={{ borderRadius: 13 }} />
+          <Skeleton width={70} height={26} style={{ borderRadius: 13 }} />
+        </View>
+        {/* Doğum bilgisi pill'leri */}
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Skeleton width={width * 0.42} height={40} style={{ borderRadius: 12 }} />
+          <Skeleton width={width * 0.42} height={40} style={{ borderRadius: 12 }} />
+        </View>
+        {/* Biyografi */}
+        <View style={{ gap: 8 }}>
+          <Skeleton width={width * 0.4} height={20} style={{ borderRadius: 6 }} />
+          <Skeleton width={"100%"} height={13} style={{ borderRadius: 4 }} />
+          <Skeleton width={"100%"} height={13} style={{ borderRadius: 4 }} />
+          <Skeleton width={"70%"} height={13} style={{ borderRadius: 4 }} />
+        </View>
+        {/* Filmografi başlığı + posterler */}
+        <Skeleton
+          width={width * 0.5}
+          height={22}
+          style={{ borderRadius: 6, marginTop: 4 }}
+        />
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          {[1, 2, 3].map((i) => (
+            <Skeleton
+              key={i}
+              width={width * 0.3}
+              height={width * 0.45}
+              style={{ borderRadius: 12 }}
+            />
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+};
+
+// Devam Eden Diziler (başlık + 4 istatistik kartı + 2 sütun poster grid)
+export const OnGoingSeriesSkeleton = () => {
+  const POSTER_W = (width - 48) / 2;
+  const POSTER_H = POSTER_W * 1.5;
+  const STAT_W = (width - 48) / 4;
+  return (
+    <View style={{ flex: 1, paddingTop: 12 }}>
+      {/* Başlık */}
+      <View style={{ paddingHorizontal: 16, gap: 8, marginBottom: 16 }}>
+        <Skeleton width={width * 0.55} height={22} style={{ borderRadius: 6 }} />
+        <Skeleton width={width * 0.3} height={14} style={{ borderRadius: 4 }} />
+      </View>
+      {/* İstatistik kartları */}
+      <View
+        style={{
+          flexDirection: "row",
+          paddingHorizontal: 12,
+          gap: 8,
+          marginBottom: 16,
+        }}
+      >
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton
+            key={i}
+            width={STAT_W}
+            height={70}
+            style={{ borderRadius: 12 }}
+          />
+        ))}
+      </View>
+      {/* Dizi grid (2 sütun) */}
+      <View style={{ paddingHorizontal: 12, gap: 12 }}>
+        {[0, 1, 2].map((r) => (
+          <View key={r} style={{ flexDirection: "row", gap: 12 }}>
+            <Skeleton width={POSTER_W} height={POSTER_H} style={{ borderRadius: 14 }} />
+            <Skeleton width={POSTER_W} height={POSTER_H} style={{ borderRadius: 14 }} />
           </View>
         ))}
       </View>
@@ -906,7 +903,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   crewImage: {
-    borderRadius: width * 0.1,
+    borderRadius: width * 0.09,
   },
   crewName: {
     borderRadius: 4,
@@ -926,7 +923,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   guestImage: {
-    borderRadius: width * 0.1,
+    borderRadius: width * 0.09,
   },
   guestName: {
     borderRadius: 4,

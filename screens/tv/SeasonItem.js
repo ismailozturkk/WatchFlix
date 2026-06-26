@@ -25,10 +25,12 @@ import {
   useImageQualitySettings,
 } from "../../context/AppSettingsContext";
 import { LinearGradient } from "expo-linear-gradient";
-import DateTimePickerModal from "react-native-modal-datetime-picker";
+import DrumDatePickerModal from "@components/modals/DatePickerModal";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import Entypo from "@expo/vector-icons/Entypo";
 import { useListStatusContext } from "../../context/ListStatusContext";
+import { i18nText } from "../../utils/i18nText";
+
 
 const { width } = Dimensions.get("window");
 
@@ -55,6 +57,7 @@ const DatePickerModal = memo(
     isDatePickerVisible,
     onConfirm,
     onCancelPicker,
+    formatDateSave,
   }) => (
     <Modal
       visible={visible}
@@ -83,9 +86,7 @@ const DatePickerModal = memo(
 
         <Text
           style={[styles.sheetTitle, { color: theme.text?.primary ?? "#fff" }]}
-        >
-          İzleme Tarihi
-        </Text>
+        >{i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}</Text>
         <Text
           style={[
             styles.sheetSubtitle,
@@ -115,16 +116,14 @@ const DatePickerModal = memo(
                 styles.optionLabel,
                 { color: theme.text?.primary ?? "#fff" },
               ]}
-            >
-              Tarih Seç
-            </Text>
+            >{i18nText("autoI18n.tarih_sec", "Tarih Seç")}</Text>
             <Text
               style={[
                 styles.optionDate,
                 { color: theme.text?.secondary ?? "#aaa" },
               ]}
             >
-              {selectedDate ? formatDate(selectedDate) : "Gün seçiniz"}
+              {selectedDate ? formatDate(selectedDate) : i18nText("autoI18n.gun_seciniz", "Gün seçiniz")}
             </Text>
           </TouchableOpacity>
 
@@ -147,9 +146,7 @@ const DatePickerModal = memo(
                 styles.optionLabel,
                 { color: theme.text?.primary ?? "#fff" },
               ]}
-            >
-              Şimdi
-            </Text>
+            >{i18nText("autoI18n.simdi", "Şimdi")}</Text>
             <Text
               style={[
                 styles.optionDate,
@@ -183,9 +180,7 @@ const DatePickerModal = memo(
                 styles.optionLabel,
                 { color: theme.text?.primary ?? "#fff" },
               ]}
-            >
-              Yayın Tarihi
-            </Text>
+            >{i18nText("autoI18n.yayin_tarihi", "Yayın Tarihi")}</Text>
             <Text
               style={[
                 styles.optionDate,
@@ -210,18 +205,19 @@ const DatePickerModal = memo(
               styles.cancelBtnText,
               { color: theme.text?.secondary ?? "#aaa" },
             ]}
-          >
-            İptal
-          </Text>
+          >{i18nText("autoI18n.iptal", "İptal")}</Text>
         </TouchableOpacity>
 
-        <DateTimePickerModal
-          isVisible={isDatePickerVisible}
-          mode="date"
-          onConfirm={onConfirm}
-          onCancel={onCancelPicker}
-          minimumDate={releaseDate}
-          maximumDate={new Date()}
+        <DrumDatePickerModal
+          visible={isDatePickerVisible}
+          value={selectedDate || (formatDateSave ? formatDateSave(new Date()) : "")}
+          onConfirm={(iso) => onConfirm(iso)}
+          onClose={onCancelPicker}
+          title={i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}
+          subtitle="Bu sezonu ne zaman izlediniz?"
+          confirmLabel="Tarihi Onayla"
+          minDate={releaseDate}
+          maxDate={new Date()}
         />
       </View>
     </Modal>
@@ -279,11 +275,13 @@ const SeasonItem = ({ season, details, navigation }) => {
 
   const handleConfirm = useCallback(
     (date) => {
-      setSelectedDate(date);
-      addSeasonToFirestore(false, date);
+      // date artık ISO string ("YYYY-MM-DD") veya Date objesi olabilir
+      const isoDate = typeof date === "string" ? date : formatDateSave(date);
+      setSelectedDate(isoDate);
+      addSeasonToFirestore(false, isoDate);
       hideDatePicker();
     },
-    [hideDatePicker],
+    [hideDatePicker, formatDateSave],
   );
 
   // ── Tarih yardımcıları ────────────────────────────────────────────────────
@@ -414,7 +412,7 @@ const SeasonItem = ({ season, details, navigation }) => {
           }
         }
       } catch (e) {
-        if (__DEV__) console.error("Hata:", e);
+        if (__DEV__) console.error(i18nText("autoI18n.hata_3", "Hata:"), e);
       }
     },
     [user],
@@ -487,7 +485,7 @@ const SeasonItem = ({ season, details, navigation }) => {
         });
         setIsWatched(true);
       } catch (e) {
-        if (__DEV__) console.error("Sezon eklenirken hata:", e);
+        if (__DEV__) console.error(i18nText("autoI18n.sezon_eklenirken_hata", "Sezon eklenirken hata:"), e);
       } finally {
         setIsLoading(false);
       }
@@ -545,13 +543,13 @@ const SeasonItem = ({ season, details, navigation }) => {
                 <>
                   <LottieView
                     style={[styles.fireworks, { left: "50%", right: 0 }]}
-                    source={require("../../LottieJson/6_fireworks.json")}
+                    source={require("@lottie/6_fireworks.json")}
                     autoPlay
                     loop={false}
                   />
                   <LottieView
                     style={[styles.fireworks, { left: 0, right: "50%" }]}
-                    source={require("../../LottieJson/6_fireworks.json")}
+                    source={require("@lottie/6_fireworks.json")}
                     autoPlay
                     loop={false}
                   />
@@ -630,7 +628,7 @@ const SeasonItem = ({ season, details, navigation }) => {
                   >
                     {isLoading ? (
                       <LottieView
-                        source={require("../../LottieJson/loading15.json")}
+                        source={require("@lottie/loading15.json")}
                         style={{ width: 32, height: 32 }}
                         autoPlay
                         loop
@@ -749,6 +747,7 @@ const SeasonItem = ({ season, details, navigation }) => {
         isDatePickerVisible={isDatePickerVisible}
         onConfirm={handleConfirm}
         onCancelPicker={hideDatePicker}
+        formatDateSave={formatDateSave}
       />
     </>
   );
@@ -971,4 +970,6 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SeasonItem;
+// memo: TvShowsDetails her re-render olduğunda tüm sezon kartlarının
+// yeniden çizilmesini engeller (props referansları stabil).
+export default memo(SeasonItem);

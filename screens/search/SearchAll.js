@@ -1,14 +1,14 @@
+import { Image } from "expo-image";
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   TextInput,
   FlatList,
-  Image,
   Text,
   TouchableOpacity,
   ActivityIndicator,
   Animated,
-  Keyboard,
+  Keyboard
 } from "react-native";
 import axios from "axios";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,11 +17,13 @@ import { useAppSettings, useImageQualitySettings } from "../../context/AppSettin
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import LottieView from "lottie-react-native";
+import { i18nText } from "../../utils/i18nText";
+
 
 const SearchAll = ({ navigation }) => {
   const { theme } = useTheme();
-  const { t } = useLanguage();
-  const { API_KEY, language, adultContent, imageQuality } = useAppSettings();
+  const { t, language } = useLanguage();
+  const { API_KEY, adultContent } = useAppSettings();
   const { getTmdbUrl } = useImageQualitySettings();
 
   const [query, setQuery] = useState("");
@@ -101,7 +103,7 @@ const SearchAll = ({ navigation }) => {
         setLoading(false);
       }
     },
-    [API_KEY, language],
+    [API_KEY, adultContent, language],
   );
 
   const renderItem = ({ item }) => {
@@ -201,7 +203,7 @@ const SearchAll = ({ navigation }) => {
           marginBottom: 10,
         }}
       >
-        {t.SearchScreen.searchAll || "Tüm Aramalar"}
+        {t.SearchScreen.searchAll || i18nText("autoI18n.tum_aramalar", "Tüm Aramalar")}
       </Text>
 
       {/* 🔍 Search Bar */}
@@ -217,7 +219,7 @@ const SearchAll = ({ navigation }) => {
       >
         <Ionicons name="search" size={20} color={theme.text.muted} />
         <TextInput
-          placeholder="Film, Dizi veya Oyuncu Ara..."
+          placeholder={t.SearchScreen?.searchAllPlaceholder || i18nText("autoI18n.film_dizi_veya_oyuncu_ara", "Film, Dizi veya Oyuncu Ara...")}
           placeholderTextColor={theme.text.secondary}
           style={{
             paddingVertical: 12,
@@ -241,7 +243,7 @@ const SearchAll = ({ navigation }) => {
         <View style={{ justifyContent: "center", alignItems: "center" }}>
           <LottieView
             style={{ width: 350, height: 350 }}
-            source={require("../../LottieJson/search12.json")}
+            source={require("@lottie/search12.json")}
             autoPlay
             loop
           />

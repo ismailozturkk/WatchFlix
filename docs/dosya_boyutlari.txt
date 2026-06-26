@@ -1,0 +1,45 @@
+﻿WhatchFlix Projesi Dosya ve Klasör Boyut Analizi
+==========================================
+
+Klasörler (MB cinsinden):
+
+Name          SizeMB
+----          ------
+node_modules 1005,52
+assets         63,44
+screens         1,33
+components      0,41
+docs            0,29
+context         0,15
+services         0,1
+translations    0,08
+utils           0,02
+theme           0,01
+.agent             0
+.claude            0
+hooks              0
+.vscode            0
+.expo              0
+
+
+
+Ana Dizindeki Dosyalar (MB cinsinden):
+
+Name              SizeMB
+----              ------
+package-lock.json   0,67
+App.js              0,02
+firestore.rules     0,01
+tsconfig.json          0
+index.js               0
+README.md              0
+package.json           0
+app.json               0
+.gitignore             0
+.env                   0
+firebase.js            0
+eas.json               0
+babel.config.js        0
+
+
+

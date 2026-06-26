@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,17 +7,20 @@ import {
   Animated,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useNavigation } from "@react-navigation/native";
 import { WatchedInfoSkeleton } from "../../../components/Skeleton";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useProfileStats } from "../../../context/ProfileStatsContext";
 import { LinearGradient } from "expo-linear-gradient";
+import { getAvailableYears } from "../../../utils/wrapped";
+import { getWrappedStrings } from "../../../utils/wrappedStrings";
 
 const StatisticsSection = () => {
   const navigation = useNavigation();
   const { theme } = useTheme();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const {
     watchedMovieCount,
     totalWatchedTime,
@@ -35,7 +38,17 @@ const StatisticsSection = () => {
     borderColorMovie,
     rankNameTv,
     rankNameMovie,
+    listItems,
+    flatEpisodesTv,
   } = useProfileStats();
+
+  // ── Watchify Wrapped giriş kartı verisi ──
+  const wrappedStr = useMemo(() => getWrappedStrings(language), [language]);
+  const wrappedYears = useMemo(() => {
+    const movies = (listItems || []).filter((m) => m?.type === "movie");
+    return getAvailableYears(movies, flatEpisodesTv || []);
+  }, [listItems, flatEpisodesTv]);
+  const latestWrappedYear = wrappedYears[0];
 
   const scaleAnimTv = useRef(new Animated.Value(1)).current;
   const scaleAnimMovie = useRef(new Animated.Value(1)).current;
@@ -73,6 +86,61 @@ const StatisticsSection = () => {
   );
   return (
     <>
+      {latestWrappedYear != null && (
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() =>
+            navigation.navigate("WrappedScreen", { year: latestWrappedYear })
+          }
+          style={[styles.wrappedCard, { shadowColor: theme.accent }]}
+        >
+          <LinearGradient
+            colors={[theme.accent, "#7C3AED", "#1A1030"]}
+            locations={[0, 0.55, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.wrappedGradient}
+          >
+            {/* Üst parıltı + dekoratif soluk motif */}
+            <LinearGradient
+              pointerEvents="none"
+              colors={["rgba(255,255,255,0.18)", "transparent"]}
+              style={styles.wrappedSheen}
+            />
+            <MaterialCommunityIcons
+              name="gift"
+              size={104}
+              color="rgba(255,255,255,0.08)"
+              style={styles.wrappedMotif}
+            />
+
+            <View style={styles.wrappedBadge}>
+              <MaterialCommunityIcons name="calendar-star" size={13} color="#fff" />
+              <Text style={styles.wrappedBadgeText} allowFontScaling={false}>
+                {latestWrappedYear}
+              </Text>
+            </View>
+            <View style={styles.wrappedTextCol}>
+              <View style={styles.wrappedTitleRow}>
+                <Text style={styles.wrappedTitle} allowFontScaling={false} numberOfLines={1}>
+                  {wrappedStr.entryTitle}
+                </Text>
+                <MaterialCommunityIcons name="star-four-points" size={13} color="#fff" />
+              </View>
+              <Text style={styles.wrappedSubtitle} allowFontScaling={false} numberOfLines={1}>
+                {wrappedStr.entrySubtitle}
+              </Text>
+            </View>
+            <View style={styles.wrappedCta}>
+              <Text style={styles.wrappedCtaText} allowFontScaling={false}>
+                {wrappedStr.entryCta}
+              </Text>
+              <Ionicons name="arrow-forward" size={15} color="#000" />
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
+
       <View style={styles.section}>
         <Text
           allowFontScaling={false}
@@ -553,6 +621,54 @@ const StatisticsSection = () => {
 };
 
 const styles = StyleSheet.create({
+  wrappedCard: {
+    width: "90%",
+    borderRadius: 20,
+    marginBottom: 14,
+    overflow: "hidden",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  wrappedGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    gap: 12,
+    overflow: "hidden",
+  },
+  wrappedSheen: { position: "absolute", top: 0, left: 0, right: 0, height: "60%" },
+  wrappedMotif: { position: "absolute", right: -14, top: -16, transform: [{ rotate: "-12deg" }] },
+  wrappedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+  },
+  wrappedBadgeText: { color: "#fff", fontSize: 16, fontWeight: "900", letterSpacing: -0.5 },
+  wrappedTextCol: { flex: 1 },
+  wrappedTitleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  wrappedTitle: { color: "#fff", fontSize: 15, fontWeight: "900", letterSpacing: 0.2 },
+  wrappedSubtitle: { color: "rgba(255,255,255,0.85)", fontSize: 11, fontWeight: "600", marginTop: 3 },
+  wrappedCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingLeft: 12,
+    paddingRight: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#fff",
+  },
+  wrappedCtaText: { color: "#000", fontSize: 12, fontWeight: "800" },
+
   section: {
     width: "90%",
   },

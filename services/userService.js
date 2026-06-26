@@ -1,0 +1,378 @@
+// services/userService.js
+//
+// User profil CRUD + Usernames reservation (atomic).
+//
+// ── Şema ─────────────────────────────────────────────────────────────────────
+// Users/{uid}
+//   uid, username, usernameLower, email, displayName, bio?,
+//   avatarIndex,
+//   friendsCount, postsCount, followersCount, followingCount,
+//   pendingRequestsInCount, pendingRequestsOutCount, unreadNotifsCount,
+//   isOnline, lastActiveAt, lastSeen,
+//   privacy: { profile, lists, posts, onlineStatus },
+//   listVisible: { ...map },
+//   createdAt, updatedAt,
+//   _schemaVersion           ← migration tracking için
+//
+// Usernames/{usernameLower}
+//   uid, reservedAt
+
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  collection,
+  query,
+  where,
+  limit,
+  getDocs,
+  runTransaction,
+  serverTimestamp,
+  writeBatch,
+} from "firebase/firestore";
+import { updateProfile } from "firebase/auth";
+import { auth, db } from "../firebase";
+import { clampAvatarIndex, DEFAULT_AVATAR_INDEX } from "../utils/avatars";
+
+export const SCHEMA_VERSION = 2;
+
+export const DEFAULT_PRIVACY = {
+  profile: "public",
+  lists: "public",
+  posts: "public",
+  onlineStatus: "everyone",
+};
+
+const DEFAULT_LIST_VISIBLE = {
+  watchedMovies: true,
+  watchedTv: true,
+  watchList: true,
+  favorites: true,
+};
+
+// ── Username helpers ────────────────────────────────────────────────────────
+
+export function normalizeUsername(username) {
+  return (username || "").trim().toLowerCase();
+}
+
+export const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/;
+
+export function isValidUsername(username) {
+  return USERNAME_REGEX.test((username || "").trim());
+}
+
+/**
+ * Username arama — usernameLower üzerinden prefix sorgu.
+ * Single-field index Firestore'da otomatik, ek ayar gerek yok.
+ */
+export async function searchUsersByUsername(searchTerm, { excludeUid, max = 20 } = {}) {
+  const q = normalizeUsername(searchTerm);
+  if (!q) return [];
+  const usersRef = collection(db, "Users");
+  const snap = await getDocs(
+    query(
+      usersRef,
+      where("usernameLower", ">=", q),
+      where("usernameLower", "<=", q + ""),
+      limit(max),
+    ),
+  );
+  const results = [];
+  snap.forEach((d) => {
+    if (d.id === excludeUid) return;
+    results.push({ uid: d.id, ...d.data() });
+  });
+  return results;
+}
+
+/**
+ * Username serbest mi? Usernames/{lower} dokümanı yoksa serbest.
+ */
+export async function isUsernameAvailable(username) {
+  const lower = normalizeUsername(username);
+  if (!isValidUsername(username)) return false;
+  const snap = await getDoc(doc(db, "Usernames", lower));
+  return !snap.exists();
+}
+
+// ── Profile CRUD ────────────────────────────────────────────────────────────
+
+/**
+ * Kayıt sırasında çağrılır. Username'i atomic olarak rezerve eder + Users doc'u
+ * oluşturur. Username çakışırsa transaction rollback olur, hiçbir şey yazılmaz.
+ *
+ * @param {Object} params
+ * @param {string} params.uid Firebase Auth uid'si
+ * @param {string} params.username      "Ahmet_42" (görüntü)
+ * @param {string} params.email
+ * @param {string} params.displayName
+ * @param {number} params.avatarIndex
+ */
+export async function createUserProfile({
+  uid,
+  username,
+  email,
+  displayName,
+  avatarIndex = DEFAULT_AVATAR_INDEX,
+}) {
+  if (!uid) throw new Error("createUserProfile: uid yok");
+  if (!isValidUsername(username))
+    throw new Error("Geçersiz kullanıcı adı (3-20 char, a-z 0-9 _)");
+
+  const usernameLower = normalizeUsername(username);
+
+  await runTransaction(db, async (tx) => {
+    const usernameRef = doc(db, "Usernames", usernameLower);
+    const usernameSnap = await tx.get(usernameRef);
+
+    if (usernameSnap.exists() && usernameSnap.data().uid !== uid) {
+      throw new Error("Bu kullanıcı adı zaten alınmış");
+    }
+
+    const userRef = doc(db, "Users", uid);
+
+    tx.set(usernameRef, {
+      uid,
+      reservedAt: serverTimestamp(),
+    });
+
+    tx.set(userRef, {
+      uid,
+      username: username.trim(),
+      usernameLower,
+      email,
+      displayName: displayName || username,
+      bio: "",
+      avatarIndex: clampAvatarIndex(avatarIndex),
+
+      friendsCount: 0,
+      postsCount: 0,
+      followersCount: 0,
+      followingCount: 0,
+      pendingRequestsInCount: 0,
+      pendingRequestsOutCount: 0,
+      unreadNotifsCount: 0,
+
+      // NOT: isOnline/lastActiveAt/lastSeen ARTIK Presence/{uid}'de.
+      // Bkz. services/presenceService.js
+
+      privacy: DEFAULT_PRIVACY,
+      listVisible: DEFAULT_LIST_VISIBLE,
+
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      _schemaVersion: SCHEMA_VERSION,
+    });
+  });
+}
+
+/**
+ * Profili al.
+ */
+export async function getUserProfile(uid) {
+  const snap = await getDoc(doc(db, "Users", uid));
+  return snap.exists() ? { uid: snap.id, ...snap.data() } : null;
+}
+
+/**
+ * Tek alan güncelleme — updatedAt otomatik.
+ */
+export async function updateUserProfile(uid, partial) {
+  await updateDoc(doc(db, "Users", uid), {
+    ...partial,
+    updatedAt: serverTimestamp(),
+  });
+  // İsim değiştiyse Firebase Auth displayName'i de güncelle → yeni paylaşılan
+  // postlar/yorumlar güncel ismi alır (createPost user.displayName okuyor).
+  if (
+    typeof partial.displayName === "string" &&
+    auth.currentUser?.uid === uid
+  ) {
+    updateProfile(auth.currentUser, { displayName: partial.displayName }).catch(
+      () => {},
+    );
+  }
+}
+
+/**
+ * Username değiştir — eski rezervasyonu sil + yeni rezerve et.
+ */
+export async function changeUsername(uid, newUsername) {
+  if (!isValidUsername(newUsername))
+    throw new Error("Geçersiz kullanıcı adı");
+  const newLower = normalizeUsername(newUsername);
+
+  await runTransaction(db, async (tx) => {
+    const userRef = doc(db, "Users", uid);
+    const newUsernameRef = doc(db, "Usernames", newLower);
+
+    const [userSnap, newUsernameSnap] = await Promise.all([
+      tx.get(userRef),
+      tx.get(newUsernameRef),
+    ]);
+
+    if (!userSnap.exists()) throw new Error("Profil bulunamadı");
+    if (newUsernameSnap.exists() && newUsernameSnap.data().uid !== uid) {
+      throw new Error("Bu kullanıcı adı zaten alınmış");
+    }
+
+    const oldLower = userSnap.data().usernameLower;
+
+    tx.set(newUsernameRef, { uid, reservedAt: serverTimestamp() });
+    if (oldLower && oldLower !== newLower) {
+      tx.delete(doc(db, "Usernames", oldLower));
+    }
+    tx.update(userRef, {
+      username: newUsername.trim(),
+      usernameLower: newLower,
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
+/**
+ * Avatar değiştir — Users.avatarIndex'i set et.
+ * (Eski post'lardaki authorAvatarIndex değişmez — bilinçli snapshot davranışı.)
+ */
+export async function setAvatarIndex(uid, avatarIndex) {
+  await updateUserProfile(uid, {
+    avatarIndex: clampAvatarIndex(avatarIndex),
+  });
+}
+
+/**
+ * Privacy ayarlarını güncelle (kısmi merge).
+ */
+export async function updatePrivacy(uid, partialPrivacy) {
+  const ref = doc(db, "Users", uid);
+  const snap = await getDoc(ref);
+  const current = snap.exists() ? snap.data().privacy || DEFAULT_PRIVACY : DEFAULT_PRIVACY;
+  await updateDoc(ref, {
+    privacy: { ...current, ...partialPrivacy },
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// ── Migration ───────────────────────────────────────────────────────────────
+
+/**
+ * Eski şemadan yeni şemaya geçiş. UserProfileContext ilk açılışta çağırır.
+ *
+ * Yapılanlar:
+ *   1. _schemaVersion < 2 ise eksik alanları doldur (counter, privacy, listVisible)
+ *   2. usernameLower yoksa hesapla
+ *   3. Usernames/{lower} rezervasyonu yoksa oluştur (geçmişe dönük)
+ *   4. friends[] array varsa /friends/{uid} subcollection'a kopyala
+ *   5. friendRequests.receivedRequest[] varsa /friendRequests/{id} subcoll'a
+ *   6. friendRequests.sendRequest[] varsa /sentRequests/{id} subcoll'a
+ *
+ * Idempotent — defalarca çağrılabilir.
+ */
+export async function migrateUserIfNeeded(uid) {
+  const userRef = doc(db, "Users", uid);
+  const snap = await getDoc(userRef);
+  if (!snap.exists()) return { migrated: false, reason: "no-doc" };
+
+  const data = snap.data();
+  if (data._schemaVersion >= SCHEMA_VERSION) {
+    return { migrated: false, reason: "up-to-date" };
+  }
+
+  const updates = {};
+
+  // 1) usernameLower
+  if (!data.usernameLower && data.username) {
+    updates.usernameLower = normalizeUsername(data.username);
+  }
+
+  // 2) Counters
+  if (typeof data.friendsCount !== "number") {
+    updates.friendsCount = Array.isArray(data.friends) ? data.friends.length : 0;
+  }
+  if (typeof data.postsCount !== "number") updates.postsCount = 0;
+  if (typeof data.followersCount !== "number") updates.followersCount = 0;
+  if (typeof data.followingCount !== "number") updates.followingCount = 0;
+  if (typeof data.pendingRequestsInCount !== "number") {
+    updates.pendingRequestsInCount =
+      data.friendRequests?.receivedRequest?.length || 0;
+  }
+  if (typeof data.pendingRequestsOutCount !== "number") {
+    updates.pendingRequestsOutCount =
+      data.friendRequests?.sendRequest?.length || 0;
+  }
+  if (typeof data.unreadNotifsCount !== "number") updates.unreadNotifsCount = 0;
+
+  // 3) Privacy
+  if (!data.privacy || typeof data.privacy !== "object") {
+    updates.privacy = DEFAULT_PRIVACY;
+  }
+
+  // 4) listVisible — array formatından map'e dönüştür
+  if (Array.isArray(data.listVisible)) {
+    const map = {};
+    data.listVisible.forEach((entry) => {
+      const k = Object.keys(entry)[0];
+      const v = entry[k];
+      if (k) map[k] = !!v;
+    });
+    updates.listVisible = { ...DEFAULT_LIST_VISIBLE, ...map };
+  } else if (!data.listVisible) {
+    updates.listVisible = DEFAULT_LIST_VISIBLE;
+  }
+
+  // 5) avatarIndex (null → 0)
+  if (typeof data.avatarIndex !== "number") {
+    updates.avatarIndex = DEFAULT_AVATAR_INDEX;
+  }
+
+  // 6) bio
+  if (typeof data.bio !== "string") updates.bio = "";
+
+  // 7) Username reservation — yoksa oluştur
+  const lowerForReservation = updates.usernameLower || data.usernameLower;
+  if (lowerForReservation) {
+    const usernameSnap = await getDoc(doc(db, "Usernames", lowerForReservation));
+    if (!usernameSnap.exists()) {
+      await setDoc(doc(db, "Usernames", lowerForReservation), {
+        uid,
+        reservedAt: serverTimestamp(),
+      });
+    }
+  }
+
+  // 8) Schema version
+  updates._schemaVersion = SCHEMA_VERSION;
+  updates.updatedAt = serverTimestamp();
+
+  await updateDoc(userRef, updates);
+
+  // 9) friends[] → /friends subcollection (lazy, sadece eksikse)
+  if (Array.isArray(data.friends) && data.friends.length > 0) {
+    const batch = writeBatch(db);
+    let writesQueued = 0;
+    for (const f of data.friends) {
+      if (!f?.uid) continue;
+      const fRef = doc(db, "Users", uid, "friends", f.uid);
+      const fSnap = await getDoc(fRef);
+      if (!fSnap.exists()) {
+        batch.set(fRef, {
+          friendUid: f.uid,
+          friendName: f.displayName || "",
+          friendUsername: f.username || "",
+          friendAvatarIndex: clampAvatarIndex(f.avatarIndex),
+          friendsSince: serverTimestamp(),
+        });
+        writesQueued++;
+      }
+      // Firestore batch max 500 yazma — büyük listede chunk lazım,
+      // şimdilik 100'lük arkadaş listesi varsayımıyla tek batch.
+      if (writesQueued >= 400) break;
+    }
+    if (writesQueued > 0) await batch.commit();
+  }
+
+  return { migrated: true, fieldsAdded: Object.keys(updates) };
+}

@@ -12,9 +12,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   InteractionManager,
+  ActivityIndicator,
 } from "react-native";
 import { useLanguage } from "../../context/LanguageContext";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import AppIcon from "../../components/AppIcon";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../context/ThemeContext";
 import LottieView from "lottie-react-native";
@@ -25,14 +26,30 @@ import {
   useOngoingTvShowsSettings,
   useSnowSettings,
   useIconBackgroundSettings,
+  useHapticsSettings,
+  useNotificationSettings,
+  useAutoDataCacheSettings,
 } from "../../context/AppSettingsContext";
-import SwitchToggle from "../../modules/SwitchToggle";
-import SwipeCard from "../../modules/SwipeCard";
-import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import { useDeviceNotifications } from "../../context/DeviceNotificationsContext";
+import SwitchToggle from "@components/SwitchToggle";
+import SwipeCard from "@components/SwipeCard";
+import PetSettingsSection from "@components/pet/PetSettingsSection";
 import { BlurView } from "expo-blur";
 import CountryFlag from "react-native-country-flag";
 import IconBacground from "../../components/IconBacground";
 import { alpha } from "../../theme/colors";
+import { downloadAllData } from "../../services/dataDownloader";
+import { useConnectivity } from "../../context/ConnectivityContext";
+import { i18nText } from "../../utils/i18nText";
+import CacheManagerModal from "../../components/CacheManagerModal";
+import { appAlert } from "@components/AppAlert";
+import { Image } from "expo-image";
+import { getBreakdown } from "../../services/cacheInspector";
+
+const fmtBytes = (b) =>
+  b >= 1024 * 1024
+    ? `${(b / 1048576).toFixed(1)} MB`
+    : `${Math.max(0, Math.round(b / 1024))} KB`;
 
 const LANGUAGES = [
   { code: "tr", name: "Türkçe", nativeName: "Türkçe", flag: "tr" },
@@ -40,11 +57,69 @@ const LANGUAGES = [
 ];
 
 const IMAGE_QUALITIES = [
-  { label: "Düşük", value: "low" },
-  { label: "Orta", value: "medium" },
-  { label: "İyi", value: "good" },
-  { label: "Yüksek", value: "high" },
-  { label: "Orijinal", value: "original" },
+  { labelKey: "imageQualityLow", value: "low" },
+  { labelKey: "imageQualityMedium", value: "medium" },
+  { labelKey: "imageQualityGood", value: "good" },
+  { labelKey: "imageQualityHigh", value: "high" },
+  { labelKey: "imageQualityOriginal", value: "original" },
+];
+
+const REMINDER_NOTIFICATION_TIMINGS = [
+  { labelKey: "onReleaseDay", value: 0 },
+  { labelKey: "oneDayBefore", value: 1 },
+  { labelKey: "threeDaysBefore", value: 3 },
+  { labelKey: "oneWeekBefore", value: 7 },
+];
+
+const NOTIFICATION_ROWS = [
+  {
+    key: "friendRequestsEnabled",
+    titleKey: "friendRequestNotifications",
+    subtitleKey: "friendRequestNotificationsSubtitle",
+    iconName: "person-add-outline",
+    colorKey: "blue",
+    bgKey: "iconBlue",
+  },
+  {
+    key: "friendAcceptedEnabled",
+    titleKey: "friendAcceptedNotifications",
+    subtitleKey: "friendAcceptedNotificationsSubtitle",
+    iconName: "people-outline",
+    colorKey: "green",
+    bgKey: "iconGreen",
+  },
+  {
+    key: "messagesEnabled",
+    titleKey: "messageNotifications",
+    subtitleKey: "messageNotificationsSubtitle",
+    iconName: "chatbubble-ellipses-outline",
+    colorKey: "teal",
+    bgKey: "iconTeal",
+  },
+  {
+    key: "postLikesEnabled",
+    titleKey: "postLikeNotifications",
+    subtitleKey: "postLikeNotificationsSubtitle",
+    iconName: "heart-outline",
+    colorKey: "amber",
+    bgKey: "iconAmber",
+  },
+  {
+    key: "postCommentsEnabled",
+    titleKey: "postCommentNotifications",
+    subtitleKey: "postCommentNotificationsSubtitle",
+    iconName: "chatbox-outline",
+    colorKey: "purple",
+    bgKey: "iconPurple",
+  },
+  {
+    key: "mentionsEnabled",
+    titleKey: "mentionNotifications",
+    subtitleKey: "mentionNotificationsSubtitle",
+    iconName: "at-outline",
+    colorKey: "blue",
+    bgKey: "iconBlue",
+  },
 ];
 
 function buildUiColors(theme) {
@@ -86,7 +161,7 @@ function SectionLabel({ children, color }) {
 }
 
 function Chevron({ color }) {
-  return <Ionicons name="chevron-forward" size={14} color={color} />;
+  return <AppIcon family="Ionicons" name="chevron-forward" size={14} color={color} />;
 }
 
 function SettingRow({
@@ -94,7 +169,7 @@ function SettingRow({
   iconBg,
   iconColor,
   iconName,
-  iconLib = "ion",
+  iconFamily = "Ionicons",
   title,
   subtitle,
   right,
@@ -102,13 +177,6 @@ function SettingRow({
   danger,
   last,
 }) {
-  const Icon =
-    iconLib === "mc"
-      ? MaterialCommunityIcons
-      : iconLib === "mi"
-        ? MaterialIcons
-        : Ionicons;
-
   return (
     <TouchableOpacity
       style={[
@@ -121,7 +189,7 @@ function SettingRow({
     >
       <View style={s.rowLeft}>
         <View style={[s.iconWrap, { backgroundColor: iconBg }]}>
-          <Icon name={iconName} size={15} color={iconColor} />
+          <AppIcon family={iconFamily} name={iconName} size={15} color={iconColor} />
         </View>
         <View style={s.rowTexts}>
           <Text
@@ -143,11 +211,28 @@ function SettingRow({
 }
 
 export default function SettingsScreen() {
-  const [notifications, setNotifications] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [langSearch, setLangSearch] = useState("");
   const [renderSnow, setRenderSnow] = useState(false);
+
+  // Offline-first: veri indirme + önbellek boyutu
+  const { isOnline } = useConnectivity();
+  const [cacheSize, setCacheSize] = useState(0);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadPct, setDownloadPct] = useState(0);
+
+  const refreshCacheSize = async () => {
+    try {
+      const breakdown = await getBreakdown();
+      setCacheSize(breakdown.total);
+    } catch {
+      // yok say
+    }
+  };
+  useEffect(() => {
+    refreshCacheSize();
+  }, []);
 
   const { t, language, toggleLanguage } = useLanguage();
   const { theme } = useTheme();
@@ -158,6 +243,16 @@ export default function SettingsScreen() {
     useOngoingTvShowsSettings();
   const { imageQuality, imageQualityLevel, changeImageQuality } =
     useImageQualitySettings();
+  const { hapticsEnabled, changeHapticsEnabled } = useHapticsSettings();
+  const {
+    notificationSettings,
+    changeNotificationSettings,
+  } = useNotificationSettings();
+  const {
+    autoDataCacheEnabled,
+    changeAutoDataCacheEnabled,
+  } = useAutoDataCacheSettings();
+  const { permissionStatus, requestPermission } = useDeviceNotifications();
 
   useEffect(() => {
     if (!showSnow) {
@@ -182,12 +277,44 @@ export default function SettingsScreen() {
   const currentLang =
     LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0];
 
-  const handleClearCache = async () => {
+  const handleDownloadData = async () => {
+    if (downloading) return;
+    if (!isOnline) {
+      appAlert(
+        i18nText("autoI18n.cevrimdisi", "Çevrimdışı"),
+        i18nText(
+          "autoI18n.veriIndirmeInternet",
+          "Verileri indirmek için internet bağlantısı gerekli.",
+        ),
+      );
+      return;
+    }
+    setDownloading(true);
+    setDownloadPct(0);
     try {
-      await AsyncStorage.clear();
-      Alert.alert(t.success, t.cacheCleared);
-    } catch {
-      Alert.alert(t.error, t.errorClearingCache);
+      const res = await downloadAllData({
+        language,
+        onProgress: (p) => setDownloadPct(p),
+      });
+      await refreshCacheSize();
+      if (res.ok) {
+        appAlert(
+          i18nText("autoI18n.tamamlandi", "Tamamlandı"),
+          i18nText(
+            "autoI18n.verilerIndirildi",
+            "Veriler çevrimdışı kullanım için indirildi.",
+          ),
+        );
+      } else {
+        appAlert(
+          i18nText("autoI18n.kismenIndirildi", "Kısmen indirildi"),
+          res.errors.join("\n"),
+        );
+      }
+    } catch (e) {
+      appAlert(i18nText("autoI18n.hata", "Hata"), e?.message || "");
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -198,7 +325,30 @@ export default function SettingsScreen() {
   };
 
   const currentQualityLabel =
-    IMAGE_QUALITIES.find((q) => q.value === imageQualityLevel)?.label ?? "—";
+    t[IMAGE_QUALITIES.find((q) => q.value === imageQualityLevel)?.labelKey] ?? "—";
+  const notificationsEnabled = notificationSettings.enabled;
+  const remindersEnabled =
+    notificationsEnabled && notificationSettings.remindersEnabled;
+
+  const updateNotifications = (patch) => {
+    changeNotificationSettings(patch);
+  };
+
+  // Ana anahtar açılınca OS bildirim iznini iste; reddedilirse yönlendir.
+  const handleToggleMaster = async (enabled) => {
+    updateNotifications({ enabled });
+    if (enabled && permissionStatus !== "granted") {
+      const granted = await requestPermission();
+      if (!granted) {
+        appAlert(t.notifPermissionTitle, t.notifPermissionMessage);
+      }
+    }
+  };
+
+  const masterSubtitle =
+    notificationsEnabled && permissionStatus === "denied"
+      ? t.notifPermissionDenied
+      : t.allNotificationsSubtitle;
 
   return (
     <View style={[s.root, { backgroundColor: C.bg }]}>
@@ -213,7 +363,7 @@ export default function SettingsScreen() {
         {renderSnow && (
           <LottieView
             style={s.lottie}
-            source={require("../../LottieJson/snow.json")}
+            source={require("@lottie/snow.json")}
             autoPlay
             loop
           />
@@ -234,7 +384,7 @@ export default function SettingsScreen() {
         >
           <View style={s.langLeft}>
             <View style={[s.iconWrap, { backgroundColor: C.iconBlue }]}>
-              <Ionicons name="language-outline" size={16} color={C.blue} />
+              <AppIcon name="language-outline" size={16} color={C.blue} />
             </View>
             <View>
               <Text allowFontScaling={false} style={[s.langSubLabel, { color: C.muted }]}>
@@ -261,24 +411,24 @@ export default function SettingsScreen() {
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <View style={[s.themeHeader, { borderBottomColor: C.borderMuted }]}>
             <View style={[s.iconWrap, { backgroundColor: C.iconAmber }]}>
-              <Ionicons name="sunny-outline" size={15} color={C.amber} />
+              <AppIcon name="sunny-outline" size={15} color={C.amber} />
             </View>
             <Text allowFontScaling={false} style={[s.rowTitle, { color: C.text }]}>
-              Görünüm
+              {t.appearance}
             </Text>
           </View>
           <SettingsTheme />
         </View>
 
-        <SectionLabel color={C.muted}>KALITE</SectionLabel>
+        <SectionLabel color={C.muted}>{t.quality.toUpperCase()}</SectionLabel>
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <View style={s.qualityHeader}>
             <View style={[s.iconWrap, { backgroundColor: C.iconPurple }]}>
-              <MaterialIcons name="high-quality" size={16} color={C.purple} />
+              <AppIcon family="MaterialIcons" name="high-quality" size={16} color={C.purple} />
             </View>
             <View style={{ flex: 1 }}>
               <Text allowFontScaling={false} style={[s.rowTitle, { color: C.text }]}>
-                Poster Kalitesi
+                {t.posterQuality}
               </Text>
               <Text allowFontScaling={false} style={[s.rowSub, { color: C.muted }]}>
                 {currentQualityLabel} · poster:{imageQuality.poster} · backdrop:
@@ -316,12 +466,205 @@ export default function SettingsScreen() {
                       { color: active ? C.white : C.muted, fontWeight: active ? "700" : "500" },
                     ]}
                   >
-                    {q.label}
+                    {t[q.labelKey]}
                   </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
+        </View>
+
+        <SectionLabel color={C.muted}>{t.notifications.toUpperCase()}</SectionLabel>
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <SettingRow
+            colors={C}
+            iconBg={C.iconBlue}
+            iconColor={C.blue}
+            iconName={
+              notificationsEnabled
+                ? "notifications-outline"
+                : "notifications-off-outline"
+            }
+            title={t.allNotifications}
+            subtitle={masterSubtitle}
+            right={
+              <SwitchToggle
+                value={notificationsEnabled}
+                onValueChange={handleToggleMaster}
+                size={36}
+              />
+            }
+          />
+          <View style={[s.notificationGroup, { borderBottomColor: C.borderMuted }]}>
+            <Text allowFontScaling={false} style={[s.notificationGroupText, { color: C.muted }]}>
+              {t.reminderNotificationGroup}
+            </Text>
+          </View>
+          <SettingRow
+            colors={C}
+            iconBg={C.iconGreen}
+            iconColor={C.green}
+            iconName="alarm-outline"
+            title={t.reminderNotifications}
+            subtitle={t.reminderNotificationsSubtitle}
+            right={
+              <SwitchToggle
+                value={remindersEnabled}
+                onValueChange={(remindersEnabled) =>
+                  updateNotifications({ remindersEnabled })
+                }
+                disabled={!notificationsEnabled}
+                size={36}
+              />
+            }
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconAmber}
+            iconColor={C.amber}
+            iconName="film-outline"
+            title={t.movieReminderNotifications}
+            subtitle={t.movieReminderNotificationsSubtitle}
+            right={
+              <SwitchToggle
+                value={
+                  remindersEnabled &&
+                  notificationSettings.moviesEnabled
+                }
+                onValueChange={(moviesEnabled) =>
+                  updateNotifications({ moviesEnabled })
+                }
+                disabled={!remindersEnabled}
+                size={36}
+              />
+            }
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconPurple}
+            iconColor={C.purple}
+            iconName="tv-outline"
+            title={t.tvReminderNotifications}
+            subtitle={t.tvReminderNotificationsSubtitle}
+            right={
+              <SwitchToggle
+                value={
+                  remindersEnabled &&
+                  notificationSettings.tvShowsEnabled
+                }
+                onValueChange={(tvShowsEnabled) =>
+                  updateNotifications({ tvShowsEnabled })
+                }
+                disabled={!remindersEnabled}
+                size={36}
+              />
+            }
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconTeal}
+            iconColor={C.teal}
+            iconName="document-text-outline"
+            title={t.noteReminderNotifications}
+            subtitle={t.noteReminderNotificationsSubtitle}
+            right={
+              <SwitchToggle
+                value={
+                  remindersEnabled &&
+                  notificationSettings.noteRemindersEnabled
+                }
+                onValueChange={(noteRemindersEnabled) =>
+                  updateNotifications({ noteRemindersEnabled })
+                }
+                disabled={!remindersEnabled}
+                size={36}
+              />
+            }
+          />
+          <View style={s.notificationTiming}>
+            <View style={s.notificationTimingHeader}>
+              <View style={[s.iconWrap, { backgroundColor: C.iconGreen }]}>
+                <AppIcon name="time-outline" size={15} color={C.green} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text allowFontScaling={false} style={[s.rowTitle, { color: C.text }]}>
+                  {t.reminderNotificationTiming}
+                </Text>
+                <Text allowFontScaling={false} style={[s.rowSub, { color: C.muted }]}>
+                  {t.reminderNotificationTimingSubtitle}
+                </Text>
+              </View>
+            </View>
+            <View
+              style={[
+                s.segment,
+                s.notificationTimingSegment,
+                { backgroundColor: C.cardAlt, borderTopColor: C.border },
+              ]}
+            >
+              {REMINDER_NOTIFICATION_TIMINGS.map((item) => {
+                const active =
+                  notificationSettings.leadTimeDays === item.value;
+                return (
+                  <TouchableOpacity
+                    key={item.value}
+                    style={[
+                      s.segOpt,
+                      active && remindersEnabled && { backgroundColor: C.accent },
+                      !remindersEnabled && { opacity: 0.45 },
+                    ]}
+                    disabled={!remindersEnabled}
+                    onPress={() =>
+                      updateNotifications({ leadTimeDays: item.value })
+                    }
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      allowFontScaling={false}
+                      style={[
+                        s.segText,
+                        {
+                          color:
+                            active && remindersEnabled ? C.white : C.muted,
+                          fontWeight:
+                            active && remindersEnabled ? "700" : "500",
+                        },
+                      ]}
+                    >
+                      {t[item.labelKey]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+          <View style={[s.notificationGroup, { borderBottomColor: C.borderMuted }]}>
+            <Text allowFontScaling={false} style={[s.notificationGroupText, { color: C.muted }]}>
+              {t.socialNotificationGroup}
+            </Text>
+          </View>
+          {NOTIFICATION_ROWS.map((row, index) => (
+            <SettingRow
+              key={row.key}
+              colors={C}
+              iconBg={C[row.bgKey]}
+              iconColor={C[row.colorKey]}
+              iconName={row.iconName}
+              title={t[row.titleKey]}
+              subtitle={t[row.subtitleKey]}
+              last={index === NOTIFICATION_ROWS.length - 1}
+              right={
+                <SwitchToggle
+                  value={notificationsEnabled && notificationSettings[row.key]}
+                  onValueChange={(value) =>
+                    updateNotifications({ [row.key]: value })
+                  }
+                  disabled={!notificationsEnabled}
+                  size={36}
+                />
+              }
+            />
+          ))}
         </View>
 
         <SectionLabel color={C.muted}>{t.content.toUpperCase()}</SectionLabel>
@@ -332,7 +675,7 @@ export default function SettingsScreen() {
             iconColor={C.teal}
             iconName={showSnow ? "snow-sharp" : "snow-outline"}
             title={t.snow}
-            subtitle="Animasyonlu kar taneleri"
+            subtitle={t.snowSubtitle}
             right={
               <SwitchToggle
                 value={showSnow}
@@ -346,8 +689,8 @@ export default function SettingsScreen() {
             iconBg={C.iconBlue}
             iconColor={C.blue}
             iconName={showIconBackground ? "image-outline" : "image-sharp"}
-            title="İkon Arka Plan"
-            subtitle="Sayfalardaki desenli arka plan"
+            title={t.iconBackground}
+            subtitle={t.iconBackgroundSubtitle}
             right={
               <SwitchToggle
                 value={showIconBackground}
@@ -361,10 +704,14 @@ export default function SettingsScreen() {
             iconBg={C.iconAmber}
             iconColor={C.amber}
             iconName="cloud-download-outline"
-            title="Verileri İndir"
-            subtitle="Çevrimdışı kullanım için"
+            title={t.downloadData}
+            subtitle={t.downloadDataSubtitle}
             right={
-              <SwitchToggle value={false} onValueChange={() => {}} size={36} />
+              <SwitchToggle
+                value={autoDataCacheEnabled}
+                onValueChange={changeAutoDataCacheEnabled}
+                size={36}
+              />
             }
           />
           <SettingRow
@@ -373,7 +720,7 @@ export default function SettingsScreen() {
             iconColor={C.purple}
             iconName={adultContent ? "eye-outline" : "eye-off-outline"}
             title={t.adultContent}
-            subtitle="18+ içerikleri göster"
+            subtitle={t.adultContentSubtitle}
             right={
               <SwitchToggle
                 value={adultContent}
@@ -388,7 +735,7 @@ export default function SettingsScreen() {
             iconColor={C.green}
             iconName={showOngoingTvShows ? "play-circle-outline" : "pause-circle-outline"}
             title={t.showOngoingTvShows}
-            subtitle="Devam eden diziler sekmesini göster"
+            subtitle={t.showOngoingTvShowsSubtitle}
             right={
               <SwitchToggle
                 value={showOngoingTvShows}
@@ -399,39 +746,66 @@ export default function SettingsScreen() {
           />
           <SettingRow
             colors={C}
-            iconBg={C.iconBlue}
-            iconColor={C.blue}
-            iconName={
-              notifications
-                ? "notifications-outline"
-                : "notifications-off-outline"
-            }
-            title={t.notifications}
-            subtitle="Yeni içerik bildirimleri"
+            iconBg={C.iconAmber}
+            iconColor={C.amber}
+            iconName={hapticsEnabled ? "phone-portrait-outline" : "phone-portrait"}
+            title={t.haptics}
+            subtitle={t.hapticsSubtitle}
             last
             right={
               <SwitchToggle
-                value={notifications}
-                onValueChange={setNotifications}
+                value={hapticsEnabled}
+                onValueChange={changeHapticsEnabled}
                 size={36}
               />
             }
           />
         </View>
 
+        <PetSettingsSection colors={C} />
+
         <SectionLabel color={C.muted}>{t.data.toUpperCase()}</SectionLabel>
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <SettingRow
             colors={C}
-            iconBg={C.dangerDim}
-            iconColor={C.danger}
-            iconName="trash-outline"
-            title={t.clearCache}
-            subtitle="Tüm geçici veriler silinir"
-            danger
+            iconBg={C.iconBlue}
+            iconColor={C.blue}
+            iconFamily="MaterialCommunityIcons"
+            iconName="cloud-download-outline"
+            title={i18nText("autoI18n.verileriIndir", "Verileri indir")}
+            subtitle={
+              downloading
+                ? `${i18nText("autoI18n.indiriliyor", "İndiriliyor")} · %${Math.round(
+                    downloadPct * 100,
+                  )}`
+                : i18nText(
+                    "autoI18n.verileriIndirAlt",
+                    "Çevrimdışı için listeler, notlar, hatırlatıcılar ve posterler",
+                  )
+            }
+            onPress={handleDownloadData}
+            right={
+              downloading ? (
+                <ActivityIndicator size="small" color={C.blue} />
+              ) : (
+                <Chevron color={C.muted} />
+              )
+            }
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconBlue}
+            iconColor={C.blue}
+            iconName="server-outline"
+            title={i18nText("autoI18n.onbellek", "Önbellek")}
+            subtitle={
+              cacheSize > 0
+                ? `${fmtBytes(cacheSize)} · ${i18nText("autoI18n.goruntuleVeTemizle", "görüntüle ve temizle")}`
+                : i18nText("autoI18n.goruntuleVeTemizle", "görüntüle ve temizle")
+            }
             last
             onPress={() => setModalVisible(true)}
-            right={<Chevron color={C.danger} />}
+            right={<Chevron color={C.muted} />}
           />
         </View>
 
@@ -447,20 +821,19 @@ export default function SettingsScreen() {
               style={[
                 s.appIcon,
                 {
-                  backgroundColor: C.iconGreen,
-                  borderColor: alpha(C.green, 0.24),
+                  borderColor: C.border,
                 },
               ]}
             >
-              <MaterialCommunityIcons
-                name="movie-open"
-                size={24}
-                color={C.teal}
+              <Image
+                source={require("../../assets/android-icon-foreground.png")}
+                style={{ width: 50, height: 50 }}
+                contentFit="contain"
               />
             </View>
             <View style={{ flex: 1 }}>
               <Text allowFontScaling={false} style={[s.aboutName, { color: C.text }]}>
-                Watch Flix
+                Watchify
               </Text>
               <Text allowFontScaling={false} style={[s.aboutMeta, { color: C.muted }]}>
                 created by ismail ozturk · © 2025
@@ -469,88 +842,28 @@ export default function SettingsScreen() {
                 allowFontScaling={false}
                 style={[s.aboutMeta, { marginTop: 2, fontSize: 10, color: C.muted }]}
               >
-                Veriler TMDB API'sinden alınmıştır.
+                {t.tmdbAttribution}
               </Text>
             </View>
-            <View style={[s.versionBadge, { backgroundColor: C.accentDim }]}>
+            <View style={[s.versionBadge, { backgroundColor: C.borderMuted }]}>
               <Text
                 allowFontScaling={false}
-                style={[s.versionText, { color: C.accentStrong }]}
+                style={[s.versionText, { color: C.text }]}
               >
-                v1.1.0
+                v1.21.1
               </Text>
             </View>
           </View>
         </SwipeCard>
 
-        <Modal
-          animationType="fade"
-          transparent
+        <CacheManagerModal
           visible={modalVisible}
-          onRequestClose={() => setModalVisible(false)}
-        >
-          <View style={s.modalOverlay}>
-            <TouchableOpacity
-              style={StyleSheet.absoluteFill}
-              onPress={() => setModalVisible(false)}
-            />
-            <BlurView
-              tint="dark"
-              intensity={50}
-              experimentalBlurMethod="dimezisBlurView"
-              style={StyleSheet.absoluteFill}
-            />
-            <View
-              style={[
-                s.modalBox,
-                { backgroundColor: C.card, borderColor: C.border },
-              ]}
-            >
-              <View
-                style={[
-                  s.iconWrap,
-                  {
-                    backgroundColor: C.dangerDim,
-                    alignSelf: "center",
-                    width: 52,
-                    height: 52,
-                    borderRadius: 16,
-                    marginBottom: 14,
-                  },
-                ]}
-              >
-                <Ionicons name="trash-outline" size={24} color={C.danger} />
-              </View>
-              <Text allowFontScaling={false} style={[s.modalTitle, { color: C.text }]}>
-                {t.clearCacheMessage}
-              </Text>
-              <View style={s.modalButtons}>
-                <TouchableOpacity
-                  style={[
-                    s.btnCancel,
-                    { backgroundColor: C.cardAlt, borderColor: C.border },
-                  ]}
-                  onPress={() => setModalVisible(false)}
-                >
-                  <Text allowFontScaling={false} style={[s.btnText, { color: C.text }]}>
-                    {t.cancel}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[s.btnConfirm, { backgroundColor: C.danger }]}
-                  onPress={() => {
-                    handleClearCache();
-                    setModalVisible(false);
-                  }}
-                >
-                  <Text allowFontScaling={false} style={[s.btnText, { color: C.white }]}>
-                    {t.confirm}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
+          onClose={() => {
+            setModalVisible(false);
+            refreshCacheSize();
+          }}
+          colors={C}
+        />
 
         <Modal
           animationType="slide"
@@ -589,7 +902,7 @@ export default function SettingsScreen() {
                 <View style={[s.sheetHandle, { backgroundColor: C.handle }]} />
                 <View style={s.sheetHeader}>
                   <View style={s.sheetTitleRow}>
-                    <Ionicons
+                    <AppIcon
                       name="language-outline"
                       size={20}
                       color={C.text}
@@ -605,7 +918,7 @@ export default function SettingsScreen() {
                       setLangSearch("");
                     }}
                   >
-                    <Ionicons name="close" size={16} color={C.muted} />
+                    <AppIcon name="close" size={16} color={C.muted} />
                   </TouchableOpacity>
                 </View>
 
@@ -615,11 +928,11 @@ export default function SettingsScreen() {
                     { borderColor: C.border, backgroundColor: C.cardAlt },
                   ]}
                 >
-                  <Ionicons name="search-outline" size={16} color={C.muted} />
+                  <AppIcon name="search-outline" size={16} color={C.muted} />
                   <TextInput
                     allowFontScaling={false}
                     style={[s.searchInput, { color: C.text }]}
-                    placeholder="Dil ara..."
+                    placeholder={t.searchLanguage}
                     placeholderTextColor={C.muted}
                     value={langSearch}
                     onChangeText={setLangSearch}
@@ -628,7 +941,7 @@ export default function SettingsScreen() {
                   />
                   {langSearch.length > 0 && (
                     <TouchableOpacity onPress={() => setLangSearch("")}>
-                      <Ionicons name="close-circle" size={16} color={C.muted} />
+                      <AppIcon name="close-circle" size={16} color={C.muted} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -640,13 +953,13 @@ export default function SettingsScreen() {
                   showsVerticalScrollIndicator={false}
                   ListEmptyComponent={
                     <View style={s.emptyContainer}>
-                      <Ionicons
+                      <AppIcon
                         name="search-outline"
                         size={28}
                         color={C.muted}
                       />
                       <Text allowFontScaling={false} style={[s.emptyText, { color: C.muted }]}>
-                        Dil bulunamadı
+                        {t.languageNotFound}
                       </Text>
                     </View>
                   }
@@ -686,7 +999,7 @@ export default function SettingsScreen() {
                           </View>
                         </View>
                         {sel && (
-                          <Ionicons
+                          <AppIcon
                             name="checkmark-circle"
                             size={20}
                             color={C.accent}
@@ -841,6 +1154,31 @@ const s = StyleSheet.create({
   qualityBadgeText: {
     fontSize: 11,
     fontWeight: "700",
+  },
+  notificationTiming: {
+    paddingTop: 13,
+  },
+  notificationTimingHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  notificationTimingSegment: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  notificationGroup: {
+    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 8,
+  },
+  notificationGroupText: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.8,
   },
   segment: {
     flexDirection: "row",

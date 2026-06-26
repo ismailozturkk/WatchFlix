@@ -1,3 +1,4 @@
+import { i18nText } from "../../../utils/i18nText";
 export const UploadToCloudinary = async (imageUri) => {
   const CLOUD_NAME = "djcnwzzqn";
   const UPLOAD_PRESET = "unsigned_avatar";
@@ -23,7 +24,7 @@ export const UploadToCloudinary = async (imageUri) => {
     const data = await response.json();
     return data.secure_url; // Yüklenen fotoğrafın URL'si
   } catch (error) {
-    console.error("Cloudinary yükleme hatası:", error);
+    console.error(i18nText("autoI18n.cloudinary_yukleme_hatasi", "Cloudinary yükleme hatası:"), error);
     return null;
   }
 };

@@ -1,5 +1,7 @@
 import React from "react";
 import { View, TouchableOpacity, Text } from "react-native";
+import { i18nText } from "../../utils/i18nText";
+
 
 export default function ListFilters({
   sortType,
@@ -14,11 +16,11 @@ export default function ListFilters({
       style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 10 }}
     >
       <TouchableOpacity onPress={() => setSortType("name")}>
-        <Text>İsim</Text>
+        <Text>{i18nText("autoI18n.isim", "İsim")}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => setSortType("release")}>
-        <Text>Yayın</Text>
+        <Text>{i18nText("autoI18n.yayin", "Yayın")}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -28,11 +30,11 @@ export default function ListFilters({
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => setTvStatus(null)}>
-        <Text>Tümü</Text>
+        <Text>{i18nText("autoI18n.tumu", "Tümü")}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => setTvStatus(true)}>
-        <Text>Bitmiş</Text>
+        <Text>{i18nText("autoI18n.bitmis", "Bitmiş")}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => setTvStatus(false)}>

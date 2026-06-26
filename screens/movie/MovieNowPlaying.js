@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { memo, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -17,50 +17,77 @@ import { MovieSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
-import { useListStatus } from "../../modules/UseListStatus";
+import ListBadges from "../../components/ListBadges";
+import PaginatedRail from "../../components/PaginatedRail";
 import Ionicons from "@expo/vector-icons/Ionicons";
 const { width } = Dimensions.get("window");
+
+// Stable, module-scope item component → no remount → no flicker.
+const MovieNowPlayingCard = memo(function MovieNowPlayingCard({ item, navigation, theme, getTmdbUrl }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const onPressIn = () =>
+    Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
+  const onPressOut = () =>
+    Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+
+  const source = useMemo(
+    () =>
+      item.poster_path
+        ? { uri: getTmdbUrl(item.poster_path, "poster", 200) }
+        : require("../../assets/image/no_image.png"),
+    [item.poster_path, getTmdbUrl]
+  );
+
+  return (
+    <TouchableOpacity
+      style={styles.similarItem}
+      activeOpacity={0.8}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      onPress={() => navigation.push("MovieDetails", { id: item.id })}
+    >
+      <Animated.View style={[{ transform: [{ scale }] }]}>
+        <Image
+          source={source}
+          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+          cachePolicy="memory-disk"
+          recyclingKey={`movienowplaying-${item.id}`}
+          transition={120}
+        />
+
+        <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
+          <Text allowFontScaling={false} style={styles.similarRatingText}>
+            {item.vote_average.toFixed(1)}
+          </Text>
+        </View>
+        <ListBadges
+          mediaId={item.id}
+          mediaType="movie"
+          theme={theme}
+          style={{ position: "absolute", left: 2, bottom: 8 }}
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+});
 
 export default function MovieNowPlaying({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
-  const { moviesNowPlaying, loadingNowPlaying, activateMovieSection } = useMovie();
+  const {
+    moviesNowPlaying,
+    loadingNowPlaying,
+    activateMovieSection,
+    loadMoreNowPlaying,
+    loadingMoreNowPlaying,
+    pageNowPlaying,
+    totalPagesNowPlaying,
+  } = useMovie();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
 
   useEffect(() => {
     activateMovieSection("nowPlaying");
   }, [activateMovieSection]);
-
-  // Animated import'unun eklendiğinden emin olun
-  const [scaleValues, setScaleValues] = useState({});
-
-  useEffect(() => {
-    const newScaleValues = {};
-    if (moviesNowPlaying && moviesNowPlaying.length > 0) {
-      moviesNowPlaying.forEach((item) => {
-        newScaleValues[item.id] = new Animated.Value(1);
-      });
-      setScaleValues(newScaleValues);
-    }
-  }, [moviesNowPlaying]);
-
-  const onPressIn = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 0.9,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const onPressOut = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
 
   if (loadingNowPlaying) {
     return (
@@ -86,114 +113,16 @@ export default function MovieNowPlaying({ navigation }) {
       </View>
     );
   }
-  const MovieItem = ({ item }) => {
-    const { inWatchList, inFavorites, isWatched, isInOtherLists } =
-      useListStatus(item.id, "movie");
-    return (
-      <TouchableOpacity
-        style={styles.similarItem}
-        activeOpacity={0.8}
-        onPressIn={() => onPressIn(item.id)}
-        onPressOut={() => onPressOut(item.id)}
-        onPress={() => navigation.push("MovieDetails", { id: item.id })}
-      >
-        <Animated.View
-          style={[
-            {
-              transform: [{ scale: scaleValues[item.id] || 1 }],
-            },
-          ]}
-        >
-          <Image
-            source={
-              item.poster_path
-                ? {
-                    uri: getTmdbUrl(item.poster_path, 'poster', 200),
-                  }
-                : require("../../assets/image/no_image.png")
-            }
-            style={[styles.similarPoster, { shadowColor: theme.shadow }]}
-            cachePolicy="memory-disk"
-            transition={120}
-          />
-
-          <View
-            style={[
-              styles.similarRating,
-              { backgroundColor: theme.secondaryt },
-            ]}
-          >
-            <Text allowFontScaling={false} style={styles.similarRatingText}>
-              {item.vote_average.toFixed(1)}
-            </Text>
-          </View>
-          <View
-            style={{
-              justifyContent: "center",
-              alignItems: "center",
-              position: "absolute",
-              left: 2,
-              bottom: 8,
-            }}
-          >
-            <View
-              style={{
-                gap: 3,
-                backgroundColor: theme.secondaryt,
-                paddingVertical: 3,
-                paddingHorizontal: 1,
-                borderRadius: 7,
-              }}
-            >
-              {inWatchList && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("watchList", "tv");
-                  }}
-                >
-                  <Ionicons
-                    name="bookmark"
-                    size={12}
-                    color={theme.colors.blue}
-                  />
-                </TouchableOpacity>
-              )}
-              {isWatched && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("watchedTv", "tv");
-                  }}
-                >
-                  <Ionicons name="eye" size={12} color={theme.colors.green} />
-                </TouchableOpacity>
-              )}
-              {inFavorites && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("favorites", "tv");
-                  }}
-                >
-                  <Ionicons name="heart" size={12} color={theme.colors.red} />
-                </TouchableOpacity>
-              )}
-              {isInOtherLists && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateMovieList("favorites", "movie");
-                  }}
-                >
-                  <Ionicons name="grid" size={12} color={theme.colors.orange} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </Animated.View>
-      </TouchableOpacity>
-    );
-  };
-  const renderMovieItem = ({ item, index, navigation }) => {
+  const renderMovieItem = ({ item }) => {
     if (!item.poster_path) return null;
-    return <MovieItem item={item} index={index} navigation={navigation} />;
+    return (
+      <MovieNowPlayingCard
+        item={item}
+        navigation={navigation}
+        theme={theme}
+        getTmdbUrl={getTmdbUrl}
+      />
+    );
   };
   return (
     <View style={{ flex: 1, paddingVertical: 10 }}>
@@ -204,18 +133,18 @@ export default function MovieNowPlaying({ navigation }) {
         {t.movieScreens.theaters}
       </Text>
 
-      <FlatList
+      <PaginatedRail
         data={moviesNowPlaying}
-        horizontal
-        showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderMovieItem}
         contentContainerStyle={{ paddingHorizontal: 15 }}
+        onLoadMore={loadMoreNowPlaying}
+        loadingMore={loadingMoreNowPlaying}
+        hasMore={pageNowPlaying < totalPagesNowPlaying}
         initialNumToRender={3}
         maxToRenderPerBatch={3}
         updateCellsBatchingPeriod={80}
         windowSize={5}
-        removeClippedSubviews
       />
     </View>
   );

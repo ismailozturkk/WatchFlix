@@ -1,12 +1,12 @@
 import {
-  FlatList,
-  StyleSheet,
-  Text,
-  View,
   RefreshControl,
+  StyleSheet,
+  TextInput,
+  View,
   Pressable,
 } from "react-native";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import Animated from "react-native-reanimated";
 
 //import {  } from "react-native-safe-area-context";
 import MovieOscar from "../movie/MovieOscar";
@@ -19,31 +19,40 @@ import LottieView from "lottie-react-native";
 import MovieBests from "../movie/MovieBests";
 import MovieTrends from "../movie/MovieTrends";
 import MovieCollection from "../movie/MovieCollection";
-import { useMovie } from "../../context/MovieContex";
 import { useSnowSettings } from "../../context/AppSettingsContext";
 import { useLanguage } from "../../context/LanguageContext";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import AppIcon from "../../components/AppIcon";
 import IconBacground from "../../components/IconBacground";
+import usePullToSearch from "../../hooks/usePullToSearch";
 
-const INITIAL_SECTION_COUNT = 3;
+const INITIAL_SECTION_COUNT = 2;
 
 export default function MovieScreen({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
 
   const { showSnow } = useSnowSettings();
-  const [refreshing, setRefreshing] = useState(false);
+  const searchInputRef = useRef(null);
+  const openSearch = useCallback(() => {
+    const navigateToSearch = (searchOrigin) => {
+      navigation.navigate("UnifiedSearch", {
+        initialType: "movie",
+        autoFocus: true,
+        searchOrigin,
+      });
+    };
 
-  const {
-    fetchSeriesTrends,
-    fetchMoviesBests,
-    fetchMoviesOscar,
-    fetchMoviesCollection,
-    fetchProviders,
-    fetchMoviesByGenres,
-    fetchMovieUpcoming,
-    fetchMoviNowPlaying,
-  } = useMovie();
+    if (searchInputRef.current?.measureInWindow) {
+      searchInputRef.current.measureInWindow((x, y, width, height) => {
+        navigateToSearch({ x, y, width, height });
+      });
+      return;
+    }
+
+    navigateToSearch(undefined);
+  }, [navigation]);
+  const { animatedSearchStyle, onScroll, triggerSearch } =
+    usePullToSearch(openSearch);
 
   const sections = useMemo(
     () => [
@@ -59,9 +68,7 @@ export default function MovieScreen({ navigation }) {
     [],
   );
 
-  const [visibleSectionCount, setVisibleSectionCount] = useState(
-    Math.min(INITIAL_SECTION_COUNT, sections.length),
-  );
+  const [visibleSectionCount, setVisibleSectionCount] = useState(INITIAL_SECTION_COUNT);
 
   const visibleSections = useMemo(
     () => sections.slice(0, visibleSectionCount),
@@ -79,24 +86,30 @@ export default function MovieScreen({ navigation }) {
   const renderHeader = useCallback(
     () => (
       <Pressable
-        onPress={() =>
-          navigation.navigate("MovieSearch", { autoFocus: true })
-        }
+        onPress={openSearch}
         style={styles.fakeSearchContainer}
       >
-        <View
-          style={[styles.searchInput, { backgroundColor: theme.secondary }]}
-          placeholderTextColor={theme.text.muted}
-          placeholder={t.SearchScreen.searchMovies}
+        <Animated.View
+          ref={searchInputRef}
+          collapsable={false}
+          style={[
+            styles.searchInput,
+            { backgroundColor: theme.secondary },
+            animatedSearchStyle,
+          ]}
         >
-          <Ionicons name="search" size={20} color={theme.text.muted} />
-          <Text allowFontScaling={false} style={{ color: theme.text.muted }}>
-            {t.searchMovies}
-          </Text>
-        </View>
+          <AppIcon family="Ionicons" name="search" size={20} color={theme.text.muted} />
+          <TextInput
+            editable={false}
+            pointerEvents="none"
+            style={[styles.searchTextInput, { color: theme.text.muted }]}
+            placeholder={t.SearchScreen.searchMovies}
+            placeholderTextColor={theme.text.muted}
+          />
+        </Animated.View>
       </Pressable>
     ),
-    [navigation, t.SearchScreen.searchMovies, t.searchMovies, theme.secondary, theme.text.muted],
+    [animatedSearchStyle, openSearch, t.SearchScreen.searchMovies, theme.secondary, theme.text.muted],
   );
 
   const revealNextSection = useCallback(() => {
@@ -105,43 +118,10 @@ export default function MovieScreen({ navigation }) {
     );
   }, [sections.length]);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      const refreshTasks = visibleSections
-        .map(({ key }) => {
-          switch (key) {
-            case "trends":
-              return fetchSeriesTrends();
-            case "bests":
-              return fetchMoviesBests();
-            case "nowPlaying":
-              return fetchMoviNowPlaying();
-            case "oscar":
-              return fetchMoviesOscar();
-            case "collection":
-              return fetchMoviesCollection();
-            case "providers":
-              return fetchProviders();
-            case "genres":
-              return fetchMoviesByGenres();
-            case "upcoming":
-              return fetchMovieUpcoming();
-            default:
-              return null;
-          }
-        })
-        .filter(Boolean);
-      await Promise.allSettled(refreshTasks);
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   return (
     <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
       <IconBacground opacity={0.3} />
-      <FlatList
+      <Animated.FlatList
         data={visibleSections}
         keyExtractor={(item) => item.key}
         renderItem={renderSection}
@@ -149,14 +129,18 @@ export default function MovieScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.container}
         initialNumToRender={INITIAL_SECTION_COUNT}
-        maxToRenderPerBatch={1}
-        updateCellsBatchingPeriod={80}
-        windowSize={5}
         onEndReached={revealNextSection}
         onEndReachedThreshold={0.6}
-        removeClippedSubviews
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={false}
+            onRefresh={triggerSearch}
+            colors={["transparent"]}
+            progressBackgroundColor="transparent"
+            tintColor="transparent"
+          />
         }
       />
 
@@ -164,7 +148,7 @@ export default function MovieScreen({ navigation }) {
         <View style={styles.snowOverlay} pointerEvents="none">
           <LottieView
             style={{ flex: 1 }}
-            source={require("../../LottieJson/snow.json")}
+            source={require("@lottie/snow.json")}
             autoPlay
             loop
           />
@@ -199,5 +183,10 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 7,
     borderRadius: 10,
+  },
+  searchTextInput: {
+    flex: 1,
+    paddingVertical: 0,
+    fontSize: 14,
   },
 });

@@ -1,16 +1,16 @@
 {
   "expo": {
     "name": "Watchify",
-    "slug": "Watchify",
+    "slug": "WatchFlix",
     "version": "1.4.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "cover",
-      "backgroundColor": "#00000000"
+      "image": "./assets/android-icon-foreground.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1E1E1E"
     },
     "scheme": "watchify",
     "ios": {
@@ -24,11 +24,11 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "splash": {
-        "image": "./assets/splash-icon.png",
-        "resizeMode": "cover",
-        "backgroundColor": "#00000000"
+        "image": "./assets/android-icon-foreground.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#1E1E1E"
       },
-      "package": "com.smlztrkk.Watchify",
+      "package": "com.smlztrk.Watchify",
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
@@ -36,8 +36,8 @@
     },
     "extra": {
       "eas": {
-        "projectId": "b0ff17ab-04b9-4e70-8e3d-588770bfdc5c"
-        //   "projectId": "3bbd3b81-8382-4788-bfc9-dbde13043eaf"
+        //"projectId": "b0ff17ab-04b9-4e70-8e3d-588770bfdc5c"
+           "projectId": "3bbd3b81-8382-4788-bfc9-dbde13043eaf"
       }
     },
     "plugins": [
@@ -49,8 +49,24 @@
           "supportsPictureInPicture": true
         }
       ],
-      "expo-web-browser"
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#1E1E1E",
+          "defaultChannel": "default"
+        }
+      ],
+      "expo-web-browser",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Uygulamanın oluşturduğun story görselini galerine kaydetmesine izin ver.",
+          "savePhotosPermission": "Uygulamanın oluşturduğun story görselini galerine kaydetmesine izin ver.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ]
     ],
-    "owner": "smlztrkk"
+    "owner": "smlztrk"
   }
 }

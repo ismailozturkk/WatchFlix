@@ -1,0 +1,266 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helpers ────────────────────────────────────────────────────────
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function onlyUpdating(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+    function notBlocked(uid) {
+      return !exists(/databases/$(database)/documents/Users/$(uid)/blocked/$(request.auth.uid));
+    }
+
+    // ─── Listeler ───────────────────────────────────────────────────────
+    match /Lists/{uid}/{document=**} {
+      allow read:  if isSignedIn();
+      allow write: if isOwner(uid);
+    }
+
+    // ─── Kullanıcı profili ──────────────────────────────────────────────
+    match /Users/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(uid);
+      // Sahibi her şeyi yazar; diğer signed-in kullanıcılar SADECE
+      // counter/timestamp alanlarını günceller (friend req / like / comment
+      // akışlarında karşı tarafın dokümanı güncellenir).
+      allow update: if isOwner(uid)
+                    || (isSignedIn() && onlyUpdating([
+                         'friendsCount','followersCount','followingCount',
+                         'pendingRequestsInCount','pendingRequestsOutCount',
+                         'unreadNotifsCount','updatedAt'
+                       ]));
+      allow delete: if isOwner(uid);
+    }
+
+    // friends subcollection — sahibi okur; sahibi VEYA arkadaşın kendisi
+    // (cross-write için) yazabilir / silebilir.
+    match /Users/{uid}/friends/{friendUid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid)
+                    || (isSignedIn() && request.auth.uid == friendUid);
+      allow delete: if isOwner(uid)
+                    || (isSignedIn() && request.auth.uid == friendUid);
+      // Profil değişiminde karşı tarafın listesindeki KENDİ kaydımı (doc id ==
+      // benim uid'im) güncelleyebilmem için (friendName/friendAvatarIndex).
+      allow update: if isOwner(uid)
+                    || (isSignedIn() && request.auth.uid == friendUid);
+    }
+
+    // ─── Friend requests (incoming) ─────────────────────────────────────
+    // Eski v1: friendRequests bir map alanıydı (Users/{uid}.friendRequests).
+    // Yeni v2: subcollection /friendRequests/{requestId}
+    // Eski client'larda /friendRequests/{rid} ile rid'le erişiliyor olabilir,
+    // o yüzden kural her ikisini de kapsayacak şekilde.
+    match /Users/{uid}/friendRequests/{reqId} {
+      allow read: if isOwner(uid);
+      // Yeni model: fromUid alanı request.auth.uid'e eşit olmalı.
+      // Engelli kullanıcı istek atamaz.
+      allow create: if isSignedIn()
+                    && request.resource.data.fromUid == request.auth.uid
+                    && notBlocked(uid);
+      // Sahibi (alıcı) okur/günceller/siler;
+      // Gönderen istek geri alabilmek için silebilir.
+      allow update, delete: if isOwner(uid)
+                            || (isSignedIn() &&
+                                resource.data.fromUid == request.auth.uid);
+    }
+
+    // ─── Sent requests (outgoing kopyası) ───────────────────────────────
+    match /Users/{uid}/sentRequests/{reqId} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid);
+      // Sahibi siler (cancel) veya alıcı kabul ederken siler (cross-write).
+      allow delete: if isOwner(uid)
+                    || (isSignedIn() &&
+                        resource.data.toUid == request.auth.uid);
+    }
+
+    // ─── Blocked ────────────────────────────────────────────────────────
+    match /Users/{uid}/blocked/{blockedUid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // ─── Following / Followers / Liked / Bookmarks (Posts için) ─────────
+    match /Users/{uid}/following/{targetUid} {
+      allow read: if isSignedIn();
+      allow create, delete: if isOwner(uid);
+    }
+    match /Users/{uid}/followers/{followerUid} {
+      allow read: if isSignedIn();
+      // followers dokümanını "followerUid" sahibi yazar (cross-write).
+      allow create, delete: if isOwner(followerUid);
+    }
+    match /Users/{uid}/likedPosts/{postId} {
+      allow read, create, delete: if isOwner(uid);
+    }
+    match /Users/{uid}/bookmarks/{postId} {
+      allow read, write: if isOwner(uid);
+    }
+    // "Puanladıklarım" — kullanıcının verdiği oyların denormalize kopyası.
+    match /Users/{uid}/myRatings/{mediaKey} {
+      allow read, write: if isOwner(uid);
+    }
+    // "Yorumlarım" — kullanıcının yazdığı yorumların denormalize kopyası.
+    match /Users/{uid}/myComments/{commentId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // ─── Notifications ──────────────────────────────────────────────────
+    // ÖNEMLI: kodda alan adı `fromUid` (eskiden `fromUserId` yazılmıştı).
+    match /Users/{uid}/notifications/{notifId} {
+      allow read: if isOwner(uid);
+      allow create: if isSignedIn()
+                    && request.resource.data.fromUid == request.auth.uid;
+      // Sahibi sadece 'read' alanını değiştirebilir veya silebilir.
+      allow update: if isOwner(uid) && onlyUpdating(['read']);
+      allow delete: if isOwner(uid);
+    }
+
+    // ─── Notlar / Hatırlatıcılar / İstatistikler ────────────────────────
+    match /Notes/{uid}/{document=**} {
+      allow read, write: if isOwner(uid);
+    }
+    match /Reminders/{uid}/{document=**} {
+      allow read, write: if isOwner(uid);
+    }
+    match /UserStats/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+    match /SceneGame/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(uid);
+    }
+    // Soru gecmisi leaderboard belgesinden ayridir ve yalnizca sahibine aittir.
+    match /SceneGameHistory/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // ─── Part 16 - Yeni oyun veri modeli (additive, SceneGame'i degistirmez) ──
+    // Kisisel ozet/istatistik/oturum belgeleri: SceneGame/SceneGameHistory ile
+    // ayni guven modeli (sahibi okur/yazar; bu fazda backend olmadigi icin
+    // sunucu tarafi dogrulama yok — Part 17 bulgusu burada da gecerlidir).
+    match /Users/{uid}/gameProfile/{docId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /Users/{uid}/gameStats/{gameId} {
+      allow read, write: if isOwner(uid);
+    }
+    // Oturum kayitlari da SceneGameHistory gibi sahibine ozeldir; SceneGame
+    // veya SceneGameHistory'de mevcut bir "create-only" kisitlama olmadigi
+    // icin (ikisi de owner read/write) burada da duz owner read/write
+    // kullanildi (tutarlilik).
+    match /Users/{uid}/gameSessions/{sessionId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // ─── Part 16.4 - Liderlik (yeni model) ──────────────────────────────
+    // SceneGame'deki mevcut leaderboard kuraliyla (herkes okur, sahibi
+    // yazar) ayni guven modeli; istemci sadece KENDI uid'ine yazabilir.
+    match /GameLeaderboards/{boardId}/entries/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(uid);
+    }
+
+    // ─── Film yorumları ─────────────────────────────────────────────────
+    match /MovieComment/{movieId}/comments/{commentId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+    }
+    match /MovieComment/{movieId}/comments/{commentId}/replies/{replyId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+    }
+
+    // ─── Dizi yorumları (film ile birebir aynı yapı) ────────────────────
+    match /TvComment/{tvId}/comments/{commentId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+    }
+    match /TvComment/{tvId}/comments/{commentId}/replies/{replyId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+    }
+
+    // ─── Derecelendirmeler (film + dizi, TMDB ile hybrid) ───────────────
+    // Ratings/{mediaKey}  → agregat sayaçlar (count / sum). Tüm signed-in
+    // kullanıcılar transaction içinde günceller; tutarlılık client-side
+    // transaction ile sağlanır (MovieComment beğenisiyle aynı güven modeli).
+    // Ratings/{mediaKey}/userRatings/{uid} → yalnız sahibinin oyu.
+    match /Ratings/{mediaKey} {
+      allow read:           if true;
+      allow create, update: if isSignedIn();
+
+      match /userRatings/{uid} {
+        allow read:                 if true;
+        allow create, update, delete: if isOwner(uid);
+      }
+    }
+
+    // ─── Posts (sosyal feed) ────────────────────────────────────────────
+    match /Posts/{postId} {
+      allow read: if true;
+
+      allow create: if isSignedIn()
+                    && request.resource.data.authorId == request.auth.uid
+                    && request.resource.data.likesCount == 0
+                    && request.resource.data.commentsCount == 0;
+
+      allow update: if isOwner(resource.data.authorId)
+                    || (isSignedIn() &&
+                        onlyUpdating(['likesCount', 'commentsCount', 'updatedAt']));
+
+      allow delete: if isOwner(resource.data.authorId);
+
+      match /likes/{userId} {
+        allow read: if true;
+        allow create, delete: if isOwner(userId);
+      }
+
+      match /comments/{commentId} {
+        allow read:   if isSignedIn();
+        allow create: if isSignedIn()
+                      && request.resource.data.authorId == request.auth.uid;
+        // Sahibi her şeyi güncelleyebilir/silebilir; sahibi olmayan kullanıcı
+        // SADECE beğeni alanlarını (likesCount / likedBy) güncelleyebilir.
+        allow update: if isSignedIn()
+                      && (request.auth.uid == resource.data.authorId
+                          || onlyUpdating(['likesCount', 'likedBy']));
+        allow delete: if isSignedIn()
+                      && request.auth.uid == resource.data.authorId;
+      }
+    }
+    // ─── Presence (online status, ayrı koleksiyon) ──────────────────────
+    // Heartbeat'i Users üzerindeki listener fan-out'undan kaçırmak için
+    // ayrı koleksiyon. Tüm signed-in kullanıcılar okur (privacy filtresi
+    // UI tarafında); sadece sahibi yazar.
+    match /Presence/{uid} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isOwner(uid);
+    }
+
+
+    // ─── Usernames (uniqueness için reservation) ────────────────────────
+    match /Usernames/{usernameLower} {
+      allow read: if true;       // checkUsername & arama için
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+      // Update yok — username değişimi delete+create transaction'ı.
+    }
+
+    // ─── Sohbetler ──────────────────────────────────────────────────────
+    match /chats/{chatId} {
+      allow read, write: if isSignedIn()
+                         && chatId.matches('.*' + request.auth.uid + '.*');
+    }
+    match /chats/{chatId}/messages/{msgId} {
+      allow read, write: if isSignedIn()
+                         && chatId.matches('.*' + request.auth.uid + '.*');
+    }
+  }
+}

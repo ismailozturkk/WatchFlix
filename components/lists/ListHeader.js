@@ -1,5 +1,7 @@
 import React from "react";
 import { View, Text, TextInput } from "react-native";
+import { i18nText } from "../../utils/i18nText";
+
 
 export default function ListHeader({ title, search, setSearch, theme }) {
   return (
@@ -13,7 +15,7 @@ export default function ListHeader({ title, search, setSearch, theme }) {
       <TextInput
         value={search}
         onChangeText={setSearch}
-        placeholder="Ara..."
+        placeholder={i18nText("autoI18n.ara", "Ara...")}
         placeholderTextColor={theme.text.muted}
         style={{
           marginTop: 10,

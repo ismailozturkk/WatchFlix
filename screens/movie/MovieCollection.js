@@ -9,19 +9,70 @@ import {
   Animated,
 } from "react-native";
 import { Image } from "expo-image";
-import React, { useState, useEffect } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useTheme } from "../../context/ThemeContext";
 import RatingStars from "../../components/RatingStars";
 import { useLanguage } from "../../context/LanguageContext";
-import { MovieOscarSkeleton } from "../../components/Skeleton";
+import { MovieCollectionSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
-import { useListStatus } from "../../modules/UseListStatus";
+import ListBadges from "../../components/ListBadges";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 const { width } = Dimensions.get("window");
+
+// Stable, module-scope item component → no remount → no flicker.
+const MovieCollectionCard = memo(function MovieCollectionCard({ item, navigation, theme, getTmdbUrl }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const onPressIn = () =>
+    Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
+  const onPressOut = () =>
+    Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+
+  const source = useMemo(
+    () =>
+      item.poster_path
+        ? { uri: getTmdbUrl(item.poster_path, "poster", 200) }
+        : require("../../assets/image/no_image.png"),
+    [item.poster_path, getTmdbUrl]
+  );
+
+  return (
+    <TouchableOpacity
+      style={styles.movieCollectionItem}
+      activeOpacity={0.8}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      onPress={() => navigation.push("MovieDetails", { id: item.id })}
+    >
+      <Animated.View style={[{ transform: [{ scale }] }]}>
+        <View style={{ flexDirection: "row" }}>
+          <Image
+            source={source}
+            style={[styles.movieCollectionPoster, { shadowColor: theme.shadow }]}
+            cachePolicy="memory-disk"
+            recyclingKey={`moviecollection-${item.id}`}
+            transition={120}
+          />
+          <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
+            <Text allowFontScaling={false} style={styles.similarRatingText}>
+              {item.vote_average?.toFixed(1) ?? ""}
+            </Text>
+          </View>
+        </View>
+        <ListBadges
+          mediaId={item.id}
+          mediaType="movie"
+          theme={theme}
+          style={{ position: "absolute", left: 2, bottom: 8 }}
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+});
+
 export default function MovieCollection({ navigation }) {
   const { t } = useLanguage();
   const { theme } = useTheme();
@@ -38,7 +89,9 @@ export default function MovieCollection({ navigation }) {
   }, [activateMovieSection]);
 
   const [selectedMovieCollection, setSelectedMovieCollection] = useState(null);
-  // Animated import'unun eklendiğinden emin olun
+
+  // Press-scale for the inline collection-selector posters (rendered as inline
+  // JSX, not a custom component type, so they don't cause remount flicker).
   const [scaleValues, setScaleValues] = useState({});
   useEffect(() => {
     const newScaleValues = {};
@@ -80,7 +133,7 @@ export default function MovieCollection({ navigation }) {
 
         <FlatList
           data={[1, 2, 3]}
-          renderItem={() => <MovieOscarSkeleton />}
+          renderItem={() => <MovieCollectionSkeleton />}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 15 }}
@@ -97,120 +150,16 @@ export default function MovieCollection({ navigation }) {
     return <Text>Error: {errorCollection}</Text>;
   }
 
-  const MovieItem = ({ item, index }) => {
-    const { inWatchList, inFavorites, isWatched, isInOtherLists } =
-      useListStatus(item.id, "movie");
-    return (
-      <TouchableOpacity
-        key={index}
-        style={styles.movieCollectionItem}
-        activeOpacity={0.8}
-        onPressIn={() => onPressIn(item.id)}
-        onPressOut={() => onPressOut(item.id)}
-        onPress={() => navigation.push("MovieDetails", { id: item.id })}
-      >
-        <Animated.View
-          style={[
-            {
-              transform: [{ scale: scaleValues[item.id] || 1 }],
-            },
-          ]}
-        >
-          <View style={{ flexDirection: "row" }}>
-            <Image
-              source={
-                item.poster_path
-                  ? {
-                      uri: getTmdbUrl(item.poster_path, 'poster', 200),
-                    }
-                  : require("../../assets/image/no_image.png")
-              }
-              style={[
-                styles.movieCollectionPoster,
-                { shadowColor: theme.shadow },
-              ]}
-              cachePolicy="memory-disk"
-              transition={120}
-            />
-            <View
-              style={[
-                styles.similarRating,
-                { backgroundColor: theme.secondaryt },
-              ]}
-            >
-              <Text allowFontScaling={false} style={styles.similarRatingText}>
-                {item.vote_average?.toFixed(1) ?? ""}
-              </Text>
-            </View>
-          </View>
-          <View
-            style={{
-              justifyContent: "center",
-              alignItems: "center",
-              position: "absolute",
-              left: 2,
-              bottom: 8,
-            }}
-          >
-            <View
-              style={{
-                gap: 3,
-                backgroundColor: theme.secondaryt,
-                paddingVertical: 3,
-                paddingHorizontal: 1,
-                borderRadius: 7,
-              }}
-            >
-              {inWatchList && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("watchList", "tv");
-                  }}
-                >
-                  <Ionicons
-                    name="bookmark"
-                    size={12}
-                    color={theme.colors.blue}
-                  />
-                </TouchableOpacity>
-              )}
-              {isWatched && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("watchedTv", "tv");
-                  }}
-                >
-                  <Ionicons name="eye" size={12} color={theme.colors.green} />
-                </TouchableOpacity>
-              )}
-              {inFavorites && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("favorites", "tv");
-                  }}
-                >
-                  <Ionicons name="heart" size={12} color={theme.colors.red} />
-                </TouchableOpacity>
-              )}
-              {isInOtherLists && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateMovieList("favorites", "movie");
-                  }}
-                >
-                  <Ionicons name="grid" size={12} color={theme.colors.orange} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </Animated.View>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderMovieItem = ({ item, index }) => {
+  const renderMovieItem = ({ item }) => {
     if (!item.poster_path) return null;
-    return <MovieItem item={item} index={index} />;
+    return (
+      <MovieCollectionCard
+        item={item}
+        navigation={navigation}
+        theme={theme}
+        getTmdbUrl={getTmdbUrl}
+      />
+    );
   };
 
   return (

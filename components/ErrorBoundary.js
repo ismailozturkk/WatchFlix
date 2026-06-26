@@ -1,5 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { i18nText } from "../utils/i18nText";
+
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -22,10 +24,8 @@ export default class ErrorBoundary extends React.Component {
       return (
         <View style={styles.container}>
           <Text style={styles.emoji}>⚠️</Text>
-          <Text style={styles.title}>Bir şeyler ters gitti</Text>
-          <Text style={styles.message}>
-            Uygulama beklenmedik bir hatayla karşılaştı.
-          </Text>
+          <Text style={styles.title}>{i18nText("autoI18n.bir_seyler_ters_gitti", "Bir şeyler ters gitti")}</Text>
+          <Text style={styles.message}>{i18nText("autoI18n.uygulama_beklenmedik_bir_hatayla_karsilasti", "Uygulama beklenmedik bir hatayla karşılaştı.")}</Text>
           <TouchableOpacity
             style={styles.button}
             onPress={() => this.setState({ hasError: false, error: null })}

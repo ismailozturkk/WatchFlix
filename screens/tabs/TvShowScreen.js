@@ -1,11 +1,11 @@
 import {
-  FlatList,
   RefreshControl,
   StyleSheet,
   Pressable,
-  Text,
+  TextInput,
   View,
 } from "react-native";
+import Animated from "react-native-reanimated";
 import { useTheme } from "../../context/ThemeContext";
 import LottieView from "lottie-react-native";
 import TvShowsOnTheAir from "../tv/TvShowsOnTheAir";
@@ -15,33 +15,53 @@ import TvShowsProvders from "../tv/TvShowsProvders";
 import TvShowsTrends from "../tv/TvShowsTrends";
 import TvShowBests from "../tv/TvShowBests";
 import TvOngoingSection from "../tv/TvOngoingSection";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { useTvShow } from "../../context/TvShowContex";
+import { DeviceEventEmitter } from "react-native";
 import {
   useOngoingTvShowsSettings,
   useSnowSettings,
 } from "../../context/AppSettingsContext";
 import { useLanguage } from "../../context/LanguageContext";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import AppIcon from "../../components/AppIcon";
 import IconBacground from "../../components/IconBacground";
+import usePullToSearch from "../../hooks/usePullToSearch";
 
-const INITIAL_SECTION_COUNT = 3;
+const INITIAL_SECTION_COUNT = 2;
 
 export default function TvShowScreen({ navigation }) {
   const { theme } = useTheme();
   const { showSnow } = useSnowSettings();
   const { showOngoingTvShows } = useOngoingTvShowsSettings();
   const { t } = useLanguage();
-  const [refreshing, setRefreshing] = useState(false);
+  const { loadingTrend } = useTvShow();
+  const searchInputRef = useRef(null);
+  const openSearch = useCallback(() => {
+    const navigateToSearch = (searchOrigin) => {
+      navigation.navigate("UnifiedSearch", {
+        initialType: "tv",
+        autoFocus: true,
+        searchOrigin,
+      });
+    };
 
-  const {
-    fetchSeriesTrends,
-    fetchSeriesBest,
-    fetchAiringToday,
-    fetchProviders,
-    fetchTvByGenres,
-    fetchOnTheAir,
-  } = useTvShow();
+    if (searchInputRef.current?.measureInWindow) {
+      searchInputRef.current.measureInWindow((x, y, width, height) => {
+        navigateToSearch({ x, y, width, height });
+      });
+      return;
+    }
+
+    navigateToSearch(undefined);
+  }, [navigation]);
+  const { animatedSearchStyle, onScroll, triggerSearch } =
+    usePullToSearch(openSearch);
+
+  useEffect(() => {
+    if (!loadingTrend) {
+      DeviceEventEmitter.emit("APP_READY");
+    }
+  }, [loadingTrend]);
 
   const sections = useMemo(() => {
     const items = [
@@ -59,9 +79,7 @@ export default function TvShowScreen({ navigation }) {
     return items.filter(Boolean);
   }, [showOngoingTvShows]);
 
-  const [visibleSectionCount, setVisibleSectionCount] = useState(
-    Math.min(INITIAL_SECTION_COUNT, sections.length),
-  );
+  const [visibleSectionCount, setVisibleSectionCount] = useState(INITIAL_SECTION_COUNT);
 
   const visibleSections = useMemo(
     () => sections.slice(0, visibleSectionCount),
@@ -79,24 +97,30 @@ export default function TvShowScreen({ navigation }) {
   const renderHeader = useCallback(
     () => (
       <Pressable
-        onPress={() =>
-          navigation.navigate("TvShowSearch", { autoFocus: true })
-        }
+        onPress={openSearch}
         style={styles.fakeSearchContainer}
       >
-        <View
-          style={[styles.searchInput, { backgroundColor: theme.secondary }]}
-          placeholderTextColor={theme.text.muted}
-          placeholder={t.SearchScreen.searchTvShows}
+        <Animated.View
+          ref={searchInputRef}
+          collapsable={false}
+          style={[
+            styles.searchInput,
+            { backgroundColor: theme.secondary },
+            animatedSearchStyle,
+          ]}
         >
-          <Ionicons name="search" size={20} color={theme.text.muted} />
-          <Text allowFontScaling={false} style={{ color: theme.text.muted }}>
-            {t.SearchScreen.searchTvShows}
-          </Text>
-        </View>
+          <AppIcon family="Ionicons" name="search" size={20} color={theme.text.muted} />
+          <TextInput
+            editable={false}
+            pointerEvents="none"
+            style={[styles.searchTextInput, { color: theme.text.muted }]}
+            placeholder={t.SearchScreen.searchTvShows}
+            placeholderTextColor={theme.text.muted}
+          />
+        </Animated.View>
       </Pressable>
     ),
-    [navigation, t.SearchScreen.searchTvShows, theme.secondary, theme.text.muted],
+    [animatedSearchStyle, openSearch, t.SearchScreen.searchTvShows, theme.secondary, theme.text.muted],
   );
 
   const revealNextSection = useCallback(() => {
@@ -105,38 +129,10 @@ export default function TvShowScreen({ navigation }) {
     );
   }, [sections.length]);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      const refreshTasks = visibleSections
-        .map(({ key }) => {
-          switch (key) {
-            case "trends":
-              return fetchSeriesTrends();
-            case "best":
-              return fetchSeriesBest();
-            case "providers":
-              return fetchProviders();
-            case "genres":
-              return fetchTvByGenres();
-            case "onTheAir":
-              return fetchOnTheAir();
-            case "airingToday":
-              return fetchAiringToday();
-            default:
-              return null;
-          }
-        })
-        .filter(Boolean);
-      await Promise.allSettled(refreshTasks);
-    } finally {
-      setRefreshing(false);
-    }
-  };
   return (
     <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
       <IconBacground opacity={0.3} />
-      <FlatList
+      <Animated.FlatList
         data={visibleSections}
         keyExtractor={(item) => item.key}
         renderItem={renderSection}
@@ -144,14 +140,18 @@ export default function TvShowScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.container}
         initialNumToRender={INITIAL_SECTION_COUNT}
-        maxToRenderPerBatch={1}
-        updateCellsBatchingPeriod={80}
-        windowSize={5}
         onEndReached={revealNextSection}
         onEndReachedThreshold={0.6}
-        removeClippedSubviews
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={false}
+            onRefresh={triggerSearch}
+            colors={["transparent"]}
+            progressBackgroundColor="transparent"
+            tintColor="transparent"
+          />
         }
       />
 
@@ -159,7 +159,7 @@ export default function TvShowScreen({ navigation }) {
         <View style={styles.snowOverlay} pointerEvents="none">
           <LottieView
             style={{ flex: 1 }}
-            source={require("../../LottieJson/snow.json")}
+            source={require("@lottie/snow.json")}
             autoPlay
             loop
           />
@@ -194,5 +194,10 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 7,
     borderRadius: 10,
+  },
+  searchTextInput: {
+    flex: 1,
+    paddingVertical: 0,
+    fontSize: 14,
   },
 });

@@ -14,6 +14,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { EpisodeSkeleton } from "../../components/Skeleton";
 import RatingStars from "../../components/RatingStars";
+import BackButton from "../../components/BackButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import LottieView from "lottie-react-native";
@@ -28,7 +29,7 @@ import {
 const { width } = Dimensions.get("window");
 
 // ─── Oyuncu / Ekip Kartı (Memoize) ───────────────────────────────────────────
-const PersonCard = memo(({ person, role, imageQuality, theme, onPress }) => (
+const PersonCard = memo(({ person, role, imageQuality, getTmdbUrl, theme, onPress }) => (
   <TouchableOpacity
     onPress={onPress}
     activeOpacity={0.75}
@@ -199,6 +200,7 @@ export default function EpisodeDetails({ route, navigation }) {
     navigation.navigate("ActorViewScreen", { personId });
 
   return (
+    <>
     <ScrollView
       style={[styles.container, { backgroundColor: theme.primary }]}
       showsVerticalScrollIndicator={false}
@@ -214,7 +216,7 @@ export default function EpisodeDetails({ route, navigation }) {
       {check && (
         <LottieView
           style={styles.confetti}
-          source={require("../../LottieJson/confetti_2.json")}
+          source={require("@lottie/confetti_2.json")}
           autoPlay={check}
           loop={false}
         />
@@ -262,7 +264,7 @@ export default function EpisodeDetails({ route, navigation }) {
         {showSnow && (
           <LottieView
             style={styles.lottie}
-            source={require("../../LottieJson/snow.json")}
+            source={require("@lottie/snow.json")}
             autoPlay
             loop
           />
@@ -366,6 +368,7 @@ export default function EpisodeDetails({ route, navigation }) {
                   person={actor}
                   role={actor.character}
                   imageQuality={imageQuality}
+                  getTmdbUrl={getTmdbUrl}
                   theme={theme}
                   onPress={() => navigateToPerson(actor.id)}
                 />
@@ -393,6 +396,7 @@ export default function EpisodeDetails({ route, navigation }) {
                   person={member}
                   role={member.job}
                   imageQuality={imageQuality}
+                  getTmdbUrl={getTmdbUrl}
                   theme={theme}
                   onPress={() => navigateToPerson(member.id)}
                 />
@@ -402,6 +406,8 @@ export default function EpisodeDetails({ route, navigation }) {
         )}
       </View>
     </ScrollView>
+    <BackButton variant="blur" />
+    </>
   );
 }
 

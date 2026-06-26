@@ -8,10 +8,12 @@ import { useTheme } from "../../context/ThemeContext";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import LottieView from "lottie-react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import DateTimePickerModal from "react-native-modal-datetime-picker";
+import DatePickerModal from "@components/modals/DatePickerModal";
 import Entypo from "@expo/vector-icons/Entypo";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useLanguage } from "../../context/LanguageContext";
+import { i18nText } from "../../utils/i18nText";
+
 
 export default function WatchedAdd({
   showId,
@@ -51,8 +53,10 @@ export default function WatchedAdd({
   const hideDatePicker = () => setDatePickerVisibility(false);
 
   const handleConfirm = (date) => {
-    setSelectedDate(date);
-    markEpisodeAsWatched(date);
+    // date artık ISO string ("YYYY-MM-DD") veya Date objesi olabilir
+    const isoDate = typeof date === "string" ? date : formatDateSave(date);
+    setSelectedDate(isoDate);
+    markEpisodeAsWatched(isoDate);
     hideDatePicker();
   };
 
@@ -77,7 +81,7 @@ export default function WatchedAdd({
         setIsWatched(!!episode);
       }
     } catch (error) {
-      console.error("Hata:", error);
+      console.error(i18nText("autoI18n.hata_3", "Hata:"), error);
     } finally {
       setIsLoading(false);
     }
@@ -271,7 +275,7 @@ export default function WatchedAdd({
       setIsWatched(true);
       checkIfWatched();
     } catch (error) {
-      console.error("Hata:", error);
+      console.error(i18nText("autoI18n.hata_3", "Hata:"), error);
     } finally {
       setIsLoading(false);
     }
@@ -292,7 +296,7 @@ export default function WatchedAdd({
       >
         {isLoading ? (
           <LottieView
-            source={require("../../LottieJson/loading15.json")}
+            source={require("@lottie/loading15.json")}
             style={{ width: size, height: size }}
             autoPlay
             loop
@@ -347,17 +351,13 @@ export default function WatchedAdd({
               styles.sheetTitle,
               { color: theme.text?.primary ?? "#fff" },
             ]}
-          >
-            İzleme Tarihi
-          </Text>
+          >{i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}</Text>
           <Text
             style={[
               styles.sheetSubtitle,
               { color: theme.text?.secondary ?? "#aaa" },
             ]}
-          >
-            Bu bölümü ne zaman izlediniz?
-          </Text>
+          >{i18nText("autoI18n.bu_bolumu_ne_zaman_izlediniz", "Bu bölümü ne zaman izlediniz?")}</Text>
 
           {/* Seçenekler */}
           <View style={styles.optionsRow}>
@@ -380,16 +380,14 @@ export default function WatchedAdd({
                   styles.optionLabel,
                   { color: theme.text?.primary ?? "#fff" },
                 ]}
-              >
-                Tarih Seç
-              </Text>
+              >{i18nText("autoI18n.tarih_sec", "Tarih Seç")}</Text>
               <Text
                 style={[
                   styles.optionDate,
                   { color: theme.text?.secondary ?? "#aaa" },
                 ]}
               >
-                {selectedDate ? formatDate(selectedDate) : "Gün seçiniz"}
+                {selectedDate ? formatDate(selectedDate) : i18nText("autoI18n.gun_seciniz", "Gün seçiniz")}
               </Text>
             </TouchableOpacity>
 
@@ -412,9 +410,7 @@ export default function WatchedAdd({
                   styles.optionLabel,
                   { color: theme.text?.primary ?? "#fff" },
                 ]}
-              >
-                Şimdi
-              </Text>
+              >{i18nText("autoI18n.simdi", "Şimdi")}</Text>
               <Text
                 style={[
                   styles.optionDate,
@@ -448,9 +444,7 @@ export default function WatchedAdd({
                   styles.optionLabel,
                   { color: theme.text?.primary ?? "#fff" },
                 ]}
-              >
-                Yayın Tarihi
-              </Text>
+              >{i18nText("autoI18n.yayin_tarihi", "Yayın Tarihi")}</Text>
               <Text
                 style={[
                   styles.optionDate,
@@ -476,18 +470,19 @@ export default function WatchedAdd({
                 styles.cancelBtnText,
                 { color: theme.text?.secondary ?? "#aaa" },
               ]}
-            >
-              İptal
-            </Text>
+            >{i18nText("autoI18n.iptal", "İptal")}</Text>
           </TouchableOpacity>
 
-          <DateTimePickerModal
-            isVisible={isDatePickerVisible}
-            mode="date"
-            onConfirm={handleConfirm}
-            onCancel={hideDatePicker}
-            minimumDate={new Date(showReleaseDateTime)}
-            maximumDate={new Date()}
+          <DatePickerModal
+            visible={isDatePickerVisible}
+            value={selectedDate || formatDateSave(new Date())}
+            onConfirm={(iso) => handleConfirm(iso)}
+            onClose={hideDatePicker}
+            title={i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}
+            subtitle={i18nText("autoI18n.bu_bolumu_ne_zaman_izlediniz", "Bu bölümü ne zaman izlediniz?")}
+            confirmLabel="Tarihi Onayla"
+            minDate={showReleaseDateTime}
+            maxDate={new Date()}
           />
         </View>
       </Modal>

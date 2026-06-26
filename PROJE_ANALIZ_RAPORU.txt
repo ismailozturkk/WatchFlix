@@ -673,3 +673,7 @@ desteklenmiştir.
   Rapor Tarihi: 2026-05-17
   Analiz Kapsamı: Tüm kaynak dosyalar (68 ekran, 14 context, 18 bileşen)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+ ERROR  Movies snapshot error: [FirebaseError: Missing or insufficient permissions.]
+ ERROR  TvShows snapshot error: [FirebaseError: Missing or insufficient permissions.]

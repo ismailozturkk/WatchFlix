@@ -10,6 +10,13 @@ import { doc, collection, onSnapshot } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
+import {
+  isAuthTransitionError,
+  snapshotErrorHandler,
+} from "../utils/firestoreError";
+import { shouldPersistInternetData } from "../utils/dataCacheSettings";
+import * as cacheStore from "../utils/cacheStore";
+import { cacheKeys } from "../utils/cacheKeys";
 
 const PREDEFINED = new Set([
   "watchedTv",
@@ -124,6 +131,35 @@ export const ListStatusProvider = ({ children }) => {
           setCachedStatusIndex(parsed.statusIndex);
           setAllLists(parsed.allLists ?? null);
           setLoading(false);
+          return;
+        }
+      } catch {}
+
+      try {
+        const root = cacheStore.getJSON(...cacheKeys.lists(uid, "root"));
+        const favorites = cacheStore.getJSON(...cacheKeys.lists(uid, "favorites")) || {};
+        const watchList = cacheStore.getJSON(...cacheKeys.lists(uid, "watchList")) || {};
+        const watchedMovies = cacheStore.getJSON(...cacheKeys.lists(uid, "watchedMovies")) || {};
+        const watchedTv = cacheStore.getJSON(...cacheKeys.lists(uid, "watchedTv")) || {};
+
+        if (
+          root ||
+          Object.keys(favorites).length ||
+          Object.keys(watchList).length ||
+          Object.keys(watchedMovies).length ||
+          Object.keys(watchedTv).length
+        ) {
+          const statusIndex = buildStatusIndex({
+            allLists: root,
+            favoritesMap: favorites,
+            watchListMap: watchList,
+            watchedMoviesMap: watchedMovies,
+            watchedTvMap: watchedTv,
+          });
+          hasHydratedStatusCache.current = true;
+          setCachedStatusIndex(statusIndex);
+          setAllLists(root ?? null);
+          setLoading(false);
         }
       } catch {}
     };
@@ -158,7 +194,8 @@ export const ListStatusProvider = ({ children }) => {
         setLoading(false);
       },
       (error) => {
-        if (__DEV__) console.error("Error fetching lists:", error);
+        if (!isAuthTransitionError(error) && __DEV__)
+          console.warn("[Lists] snapshot error:", error?.message);
         setLoading(false);
       },
     );
@@ -185,18 +222,22 @@ export const ListStatusProvider = ({ children }) => {
     const unsubFav = onSnapshot(
       collection(db, "Lists", uid, "favorites"),
       updateMap(setFavoritesMap),
+      snapshotErrorHandler("Lists/favorites"),
     );
     const unsubWatch = onSnapshot(
       collection(db, "Lists", uid, "watchList"),
       updateMap(setWatchListMap),
+      snapshotErrorHandler("Lists/watchList"),
     );
     const unsubMov = onSnapshot(
       collection(db, "Lists", uid, "watchedMovies"),
       updateMap(setWatchedMoviesMap),
+      snapshotErrorHandler("Lists/watchedMovies"),
     );
     const unsubTv = onSnapshot(
       collection(db, "Lists", uid, "watchedTv"),
       updateMap(setWatchedTvMap),
+      snapshotErrorHandler("Lists/watchedTv"),
     );
 
     return () => {
@@ -230,6 +271,8 @@ export const ListStatusProvider = ({ children }) => {
 
   useEffect(() => {
     if (!user?.uid || !hasFirestoreIndex) return;
+
+    if (!shouldPersistInternetData()) return;
 
     AsyncStorage.setItem(
       `${CACHE_PREFIX}${user.uid}`,

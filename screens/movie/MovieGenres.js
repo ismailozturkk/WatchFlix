@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Text,
   TouchableOpacity,
@@ -10,13 +10,64 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { useTheme } from "../../context/ThemeContext";
-import { MovieGenreSkeleton, MovieSkeleton } from "../../components/Skeleton";
+import { MovieSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
 import { useMovie } from "../../context/MovieContex";
-import { useListStatus } from "../../modules/UseListStatus";
+import ListBadges from "../../components/ListBadges";
+import PaginatedRail from "../../components/PaginatedRail";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
 const { width, height } = Dimensions.get("window");
+
+// Stable, module-scope item component → no remount → no flicker.
+const MovieGenresCard = memo(function MovieGenresCard({ item, navigation, theme, getTmdbUrl }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const onPressIn = () =>
+    Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
+  const onPressOut = () =>
+    Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+
+  const source = useMemo(
+    () =>
+      item.poster_path
+        ? { uri: getTmdbUrl(item.poster_path, "poster", 200) }
+        : require("../../assets/image/no_image.png"),
+    [item.poster_path, getTmdbUrl]
+  );
+
+  return (
+    <TouchableOpacity
+      style={styles.similarItem}
+      activeOpacity={1}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      onPress={() => navigation.push("MovieDetails", { id: item.id })}
+    >
+      <Animated.View style={[{ transform: [{ scale }] }]}>
+        <Image
+          source={source}
+          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+          cachePolicy="memory-disk"
+          recyclingKey={`moviegenres-${item.id}`}
+          transition={120}
+        />
+
+        <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
+          <Text allowFontScaling={false} style={styles.similarRatingText}>
+            {item.vote_average.toFixed(1)}
+          </Text>
+        </View>
+        <ListBadges
+          mediaId={item.id}
+          mediaType="movie"
+          theme={theme}
+          style={{ position: "absolute", left: 2, bottom: 8 }}
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+});
+
 export default function MovieGenres({ navigation }) {
   const { theme } = useTheme();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
@@ -26,8 +77,10 @@ export default function MovieGenres({ navigation }) {
     toggleGenre,
     loadingGenres,
     moviesGenres,
-    setPageGenres,
     pageGenres,
+    totalPagesGenres,
+    loadMoreGenres,
+    loadingMoreGenres,
     selectedGenres,
     activateMovieSection,
   } = useMovie();
@@ -35,37 +88,6 @@ export default function MovieGenres({ navigation }) {
   useEffect(() => {
     activateMovieSection("genres");
   }, [activateMovieSection]);
-
-  // Animated import'unun eklendiğinden emin olun
-  const [scaleValues, setScaleValues] = useState({});
-
-  useEffect(() => {
-    const newScaleValues = {};
-    if (moviesGenres && moviesGenres.length > 0) {
-      moviesGenres.forEach((item) => {
-        newScaleValues[item.id] = new Animated.Value(1);
-      });
-      setScaleValues(newScaleValues);
-    }
-  }, [moviesGenres]);
-
-  const onPressIn = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 0.9,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const onPressOut = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
 
   if (loadingGenres || moviesGenres.length < 1) {
     return (
@@ -104,282 +126,20 @@ export default function MovieGenres({ navigation }) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 15 }}
         />
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 5,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.muted }]}
-          >
-            ●●●
-          </Text>
-          {pageGenres > 5 && (
-            <>
-              <TouchableOpacity
-                onPress={() => setPageGenres(pageGenres - 5)}
-                style={{
-                  width: 25,
-                  height: 20,
-                  borderRadius: 10,
-                  backgroundColor: theme.secondary,
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.genreText, { color: theme.text.primary }]}
-                >
-                  {pageGenres - 5}
-                </Text>
-              </TouchableOpacity>
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.muted }]}
-              >
-                ●
-              </Text>
-            </>
-          )}
-
-          {pageGenres > 2 && (
-            <TouchableOpacity
-              onPress={() => setPageGenres(pageGenres - 2)}
-              style={{
-                width: 25,
-                height: 20,
-                borderRadius: 10,
-                backgroundColor: theme.secondary,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageGenres - 2}
-              </Text>
-            </TouchableOpacity>
-          )}
-          {pageGenres > 1 && (
-            <TouchableOpacity
-              onPress={() => setPageGenres(pageGenres - 1)}
-              style={{
-                width: 25,
-                height: 20,
-                borderRadius: 10,
-                justifyContent: "center",
-                backgroundColor: theme.secondary,
-
-                alignItems: "center",
-              }}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageGenres - 1}
-              </Text>
-            </TouchableOpacity>
-          )}
-          <Text
-            style={[
-              styles.genreText,
-              {
-                color: theme.text.secondary,
-                width: 25,
-                height: 20,
-                textAlign: "center",
-              },
-            ]}
-          >
-            {pageGenres}
-          </Text>
-          <TouchableOpacity
-            onPress={() => setPageGenres(pageGenres + 1)}
-            style={{
-              width: 25,
-              height: 20,
-              borderRadius: 10,
-              backgroundColor: theme.secondary,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageGenres + 1}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setPageGenres(pageGenres + 2)}
-            style={{
-              width: 25,
-              height: 20,
-              borderRadius: 10,
-              backgroundColor: theme.secondary,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageGenres + 2}
-            </Text>
-          </TouchableOpacity>
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.muted }]}
-          >
-            ●
-          </Text>
-          <TouchableOpacity
-            onPress={() => setPageGenres(pageGenres + 5)}
-            style={{
-              width: 25,
-              height: 20,
-              borderRadius: 10,
-              backgroundColor: theme.secondary,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageGenres + 5}
-            </Text>
-          </TouchableOpacity>
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.muted }]}
-          >
-            ●●●
-          </Text>
-        </View>
       </View>
     );
   }
 
-  const MovieItem = ({ item, index }) => {
-    const { inWatchList, inFavorites, isWatched, isInOtherLists } =
-      useListStatus(item.id, "movie");
-    return (
-      <TouchableOpacity
-        style={styles.similarItem}
-        activeOpacity={1}
-        onPressIn={() => onPressIn(item.id)}
-        onPressOut={() => onPressOut(item.id)}
-        onPress={() => navigation.push("MovieDetails", { id: item.id })}
-      >
-        <Animated.View
-          style={[
-            {
-              transform: [{ scale: scaleValues[item.id] || 1 }],
-            },
-          ]}
-        >
-          <Image
-            source={
-              item.poster_path
-                ? {
-                    uri: getTmdbUrl(item.poster_path, 'poster', 200),
-                  }
-                : require("../../assets/image/no_image.png")
-            }
-            style={[styles.similarPoster, { shadowColor: theme.shadow }]}
-            cachePolicy="memory-disk"
-            transition={120}
-          />
-
-          <View
-            style={[
-              styles.similarRating,
-              { backgroundColor: theme.secondaryt },
-            ]}
-          >
-            <Text allowFontScaling={false} style={styles.similarRatingText}>
-              {item.vote_average.toFixed(1)}
-            </Text>
-          </View>
-          <View
-            style={{
-              justifyContent: "center",
-              alignItems: "center",
-              position: "absolute",
-              left: 2,
-              bottom: 8,
-            }}
-          >
-            <View
-              style={{
-                gap: 3,
-                backgroundColor: theme.secondaryt,
-                paddingVertical: 3,
-                paddingHorizontal: 1,
-                borderRadius: 7,
-              }}
-            >
-              {inWatchList && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("watchList", "tv");
-                  }}
-                >
-                  <Ionicons
-                    name="bookmark"
-                    size={12}
-                    color={theme.colors.blue}
-                  />
-                </TouchableOpacity>
-              )}
-              {isWatched && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("watchedTv", "tv");
-                  }}
-                >
-                  <Ionicons name="eye" size={12} color={theme.colors.green} />
-                </TouchableOpacity>
-              )}
-              {inFavorites && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("favorites", "tv");
-                  }}
-                >
-                  <Ionicons name="heart" size={12} color={theme.colors.red} />
-                </TouchableOpacity>
-              )}
-              {isInOtherLists && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateMovieList("favorites", "movie");
-                  }}
-                >
-                  <Ionicons name="grid" size={12} color={theme.colors.orange} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </Animated.View>
-      </TouchableOpacity>
-    );
-  };
-  const renderMovieItem = ({ item, index, navigation }) => {
+  const renderMovieItem = ({ item }) => {
     if (!item.poster_path) return null;
-    return <MovieItem item={item} index={index} navigation={navigation} />;
+    return (
+      <MovieGenresCard
+        item={item}
+        navigation={navigation}
+        theme={theme}
+        getTmdbUrl={getTmdbUrl}
+      />
+    );
   };
   return (
     <View style={styles.container}>
@@ -410,183 +170,19 @@ export default function MovieGenres({ navigation }) {
           </TouchableOpacity>
         )}
       />
-      <FlatList
+      <PaginatedRail
         data={moviesGenres}
-        horizontal
         contentContainerStyle={{ paddingHorizontal: 15 }}
-        showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id.toString()}
+        renderItem={renderMovieItem}
+        onLoadMore={loadMoreGenres}
+        loadingMore={loadingMoreGenres}
+        hasMore={pageGenres < totalPagesGenres}
         initialNumToRender={3}
         maxToRenderPerBatch={3}
         updateCellsBatchingPeriod={80}
         windowSize={5}
-        removeClippedSubviews
-        renderItem={renderMovieItem}
       />
-      <View
-        style={{
-          flexDirection: "row",
-          gap: 5,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <Text
-          allowFontScaling={false}
-          style={[styles.genreText, { color: theme.text.muted }]}
-        >
-          ●●●
-        </Text>
-        {pageGenres > 5 && (
-          <>
-            <TouchableOpacity
-              onPress={() => setPageGenres(pageGenres - 5)}
-              style={{
-                width: 25,
-                height: 20,
-                borderRadius: 10,
-                backgroundColor: theme.secondary,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageGenres - 5}
-              </Text>
-            </TouchableOpacity>
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.muted }]}
-            >
-              ●
-            </Text>
-          </>
-        )}
-
-        {pageGenres > 2 && (
-          <TouchableOpacity
-            onPress={() => setPageGenres(pageGenres - 2)}
-            style={{
-              width: 25,
-              height: 20,
-              borderRadius: 10,
-              backgroundColor: theme.secondary,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageGenres - 2}
-            </Text>
-          </TouchableOpacity>
-        )}
-        {pageGenres > 1 && (
-          <TouchableOpacity
-            onPress={() => setPageGenres(pageGenres - 1)}
-            style={{
-              width: 25,
-              height: 20,
-              borderRadius: 10,
-              justifyContent: "center",
-              backgroundColor: theme.secondary,
-
-              alignItems: "center",
-            }}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageGenres - 1}
-            </Text>
-          </TouchableOpacity>
-        )}
-        <Text
-          style={[
-            styles.genreText,
-            {
-              color: theme.text.secondary,
-              width: 25,
-              height: 20,
-              textAlign: "center",
-            },
-          ]}
-        >
-          {pageGenres}
-        </Text>
-        <TouchableOpacity
-          onPress={() => setPageGenres(pageGenres + 1)}
-          style={{
-            width: 25,
-            height: 20,
-            borderRadius: 10,
-            backgroundColor: theme.secondary,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.primary }]}
-          >
-            {pageGenres + 1}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setPageGenres(pageGenres + 2)}
-          style={{
-            width: 25,
-            height: 20,
-            borderRadius: 10,
-            backgroundColor: theme.secondary,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.primary }]}
-          >
-            {pageGenres + 2}
-          </Text>
-        </TouchableOpacity>
-        <Text
-          allowFontScaling={false}
-          style={[styles.genreText, { color: theme.text.muted }]}
-        >
-          ●
-        </Text>
-        <TouchableOpacity
-          onPress={() => setPageGenres(pageGenres + 5)}
-          style={{
-            width: 25,
-            height: 20,
-            borderRadius: 10,
-            backgroundColor: theme.secondary,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.primary }]}
-          >
-            {pageGenres + 5}
-          </Text>
-        </TouchableOpacity>
-        <Text
-          allowFontScaling={false}
-          style={[styles.genreText, { color: theme.text.muted }]}
-        >
-          ●●●
-        </Text>
-      </View>
     </View>
   );
 }

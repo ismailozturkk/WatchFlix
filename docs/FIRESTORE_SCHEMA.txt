@@ -1,0 +1,174 @@
+================================================================================
+WHATCHFLIX FIRESTORE SCHEMA — v2 (2026-06-09)
+================================================================================
+
+LEGEND
+  [denormalize]  → başka yerden kopyalanmış, eventual consistency
+  [counter]      → increment() ile güncellenir
+  [reserved]     → uniqueness için ayrı top-level koleksiyon
+  [snapshot]     → yazma anındaki değer dondurulur (avatarIndex gibi)
+
+--------------------------------------------------------------------------------
+ USERS — kullanıcı profili (single source of truth)
+--------------------------------------------------------------------------------
+
+Users/{uid}
+  uid                      : string              = doc id
+  username                 : string              "Ahmet_42" (görüntü)
+  usernameLower            : string              "ahmet_42" (arama)
+  email                    : string
+  displayName              : string
+  bio?                     : string              max 160 char
+
+  avatarIndex              : number              0-55 — utils/avatars.js
+  _schemaVersion           : number              migration tracking
+
+  # Counters (denormalize, increment ile güncellenir)
+  friendsCount             : number   [counter]
+  postsCount               : number   [counter]
+  followersCount           : number   [counter]   Posts için
+  followingCount           : number   [counter]
+  pendingRequestsInCount   : number   [counter]   gelen bekleyen istekler
+  pendingRequestsOutCount  : number   [counter]   gönderilen bekleyen
+  unreadNotifsCount        : number   [counter]   bildirim badge
+
+  # Presence (presenceService)
+  isOnline                 : boolean             best-effort flag
+  lastActiveAt             : Timestamp           heartbeat (30sn)
+  lastSeen                 : Timestamp           son offline
+
+  # Privacy
+  privacy: {
+    profile                : 'public' | 'friends' | 'private',
+    lists                  : 'public' | 'friends' | 'private',
+    posts                  : 'public' | 'friends',
+    onlineStatus           : 'everyone' | 'friends' | 'none',
+  }
+  listVisible: {                                  yalnız map (legacy array migrate edildi)
+    watchedMovies          : boolean,
+    watchedTv              : boolean,
+    watchList              : boolean,
+    favorites              : boolean,
+  }
+
+  # System
+  createdAt                : Timestamp           serverTimestamp
+  updatedAt                : Timestamp           her yazmada güncellenir
+
+--------------------------------------------------------------------------------
+ USERS ALT KOLEKSİYONLARI
+--------------------------------------------------------------------------------
+
+Users/{uid}/friends/{friendUid}
+  friendUid, friendName, friendUsername, friendAvatarIndex [denormalize]
+  friendsSince             : Timestamp
+
+Users/{uid}/friendRequests/{requestId}             # GELEN istekler
+  fromUid, fromName, fromUsername, fromAvatarIndex [denormalize]
+  status                   : 'pending' | 'accepted' | 'declined'
+  seen, message?, createdAt
+  # requestId = `${fromUid}_${toUid}` deterministik — duplicate imkânsız
+
+Users/{uid}/sentRequests/{requestId}               # GÖNDERİLEN (kopya)
+  toUid, toName, toUsername, toAvatarIndex          [denormalize]
+  status, createdAt
+
+Users/{uid}/blocked/{blockedUid}
+  blockedAt, reason?
+
+Users/{uid}/notifications/{notifId}
+  type, fromUid, fromName, fromAvatarIndex          [denormalize][snapshot]
+  postId?, requestId?, commentId?
+  text?, read, createdAt
+
+Users/{uid}/following/{targetUid}      Posts için
+Users/{uid}/followers/{followerUid}
+Users/{uid}/likedPosts/{postId}
+Users/{uid}/bookmarks/{postId}
+
+--------------------------------------------------------------------------------
+ USERNAMES — username uniqueness (transaction-based reservation)
+--------------------------------------------------------------------------------
+
+Usernames/{usernameLower}                          [reserved]
+  uid                      : string                = sahibi
+  reservedAt               : Timestamp
+
+Kayıt akışı: createUserProfile() runTransaction içinde username + Users yazar.
+
+--------------------------------------------------------------------------------
+ POSTS — sosyal feed (mevcut, v1 idi v2'de değişmedi)
+--------------------------------------------------------------------------------
+
+Posts/{postId}
+  authorId, authorName, authorAvatarIndex  [denormalize][snapshot]
+  type, title, content, mediaList
+  userRating?, hasSpoiler?, visibility
+  likesCount, commentsCount                [counter]
+  createdAt, updatedAt
+
+  /likes/{userId}
+  /comments/{commentId}
+
+--------------------------------------------------------------------------------
+ DİĞER (legacy, değişmedi)
+--------------------------------------------------------------------------------
+
+Lists/{uid}                # izleme listeleri
+Notes/{uid}/items/{noteId} # FAZ 6
+Reminders/{uid}/movies/{movieId}
+Reminders/{uid}/tvShows/{showId}/episodes/{episodeId}
+UserStats/{uid}
+
+MovieComment/{movieId}/comments/{commentId}
+MovieComment/{movieId}/comments/{commentId}/replies/{replyId}
+
+chats/{chatId}             # chatId = "uid1_uid2"
+chats/{chatId}/messages/{msgId}
+
+================================================================================
+ INDEX'LER (Composite, Firebase Console > Firestore > Indexes)
+================================================================================
+
+Posts:
+  visibility (Asc), createdAt (Desc)                      # all feed
+  type (Asc), visibility (Asc), createdAt (Desc)          # review/list filter
+  authorId (Asc), createdAt (Desc)                        # follow feed + profil
+
+Users:
+  usernameLower (Asc)                                     # AUTO single-field
+
+Users/{uid}/friendRequests:
+  status (Asc), createdAt (Desc)                          # gelen pending
+
+Users/{uid}/sentRequests:
+  status (Asc), createdAt (Desc)                          # gönderilen pending
+
+================================================================================
+ MIGRATION NOTLARI
+================================================================================
+
+v1 → v2 (UserProfileContext.migrateUserIfNeeded otomatik yapar):
+
+  1. usernameLower yoksa username.toLowerCase()
+  2. Counter alanları yoksa hesaplandı veya 0
+  3. privacy yoksa default { public, public, public, everyone }
+  4. listVisible array ise map'e dönüştür
+  5. avatarIndex yoksa 0
+  6. Usernames/{lower} rezervasyonu yoksa oluştur
+  7. friends[] array → /friends/{uid} subcollection (eksiklere yaz)
+  8. _schemaVersion = 2
+
+Legacy alanlar (silinmedi, geriye uyum için):
+  Users/{uid}.friends[]                      ← yeni kod okumaz
+  Users/{uid}.friendRequests.sendRequest[]
+  Users/{uid}.friendRequests.receivedRequest[]
+  Users/{uid}.avatar (URL veya null)         ← avatarIndex tercih edilir
+
+Cleanup script (gelecekte, tüm clientlar v2'de iken):
+  for each Users/{uid}:
+    updateDoc(ref, {
+      friends: deleteField(),
+      friendRequests: deleteField(),
+      avatar: deleteField(),
+    });

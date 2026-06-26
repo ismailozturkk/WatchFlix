@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -14,33 +14,53 @@ const { width: SCREEN_W } = Dimensions.get("window");
 // Tab bar: marginHorizontal 16 her iki yan → bar genişliği = SCREEN_W - 32
 // 2 sekme eşit bölünür
 const TAB_W = (SCREEN_W - 32) / 2;
-import {
-  doc,
-  collection,
-  onSnapshot,
-  updateDoc,
-  arrayUnion,
-  setDoc,
-  deleteDoc,
-  getDoc,
-} from "firebase/firestore";
-import { getAuth } from "firebase/auth";
-import { db } from "../../../firebase";
 import { useTheme } from "../../../context/ThemeContext";
 import { useProfileUi } from "../../../context/ProfileUiContext";
-import SwipeCard from "../../../modules/SwipeCard";
+import { useFriends } from "../../../context/FriendsContext";
+import SwipeCard from "@components/SwipeCard";
 import IconBacground from "../../../components/IconBacground";
 import { SafeAreaView } from "react-native-safe-area-context";
+import BackButton from "../../../components/BackButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { i18nText } from "../../../utils/i18nText";
+
 
 export default function FriendRequestsScreen() {
   const [tab, setTab] = useState("received");
-  const [requests, setRequests] = useState([]);
-  const [sentRequests, setSentRequests] = useState([]);
-  const auth = getAuth();
   const { theme } = useTheme();
-  const user = auth.currentUser;
   const { avatars } = useProfileUi();
+  const {
+    incomingRequests,
+    outgoingRequests,
+    acceptRequest,
+    declineRequest,
+    cancelRequest,
+  } = useFriends();
+
+  // Context (alt koleksiyon modeli) verisini kartın beklediği
+  // {id, uid, displayName, username, avatarIndex} şekline normalize et.
+  const requests = useMemo(
+    () =>
+      incomingRequests.map((r) => ({
+        id: r.id,
+        uid: r.fromUid,
+        displayName: r.fromName,
+        username: r.fromUsername,
+        avatarIndex: r.fromAvatarIndex,
+      })),
+    [incomingRequests],
+  );
+  const sentRequests = useMemo(
+    () =>
+      outgoingRequests.map((r) => ({
+        id: r.id,
+        uid: r.toUid,
+        displayName: r.toName,
+        username: r.toUsername,
+        avatarIndex: r.toAvatarIndex,
+      })),
+    [outgoingRequests],
+  );
 
   const tabAnim = useRef(new Animated.Value(0)).current;
   const titleAnim = useRef(new Animated.Value(0)).current;
@@ -53,19 +73,6 @@ export default function FriendRequestsScreen() {
     }).start();
   }, []);
 
-  useEffect(() => {
-    if (!user) return;
-    const userRef = doc(db, "Users", user.uid);
-    const unsubscribe = onSnapshot(userRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setRequests(data.friendRequests?.receivedRequest || []);
-        setSentRequests(data.friendRequests?.sendRequest || []);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
   const switchTab = (t) => {
     setTab(t);
     Animated.spring(tabAnim, {
@@ -76,85 +83,15 @@ export default function FriendRequestsScreen() {
     }).start();
   };
 
-  const handleAccept = async (friend) => {
-    const userRef   = doc(db, "Users", user.uid);
-    const friendRef = doc(db, "Users", friend.uid);
-    const [userSnap, friendSnap] = await Promise.all([getDoc(userRef), getDoc(friendRef)]);
-    if (!userSnap.exists() || !friendSnap.exists()) return;
-    const userData   = userSnap.data();
-    const friendData = friendSnap.data();
-    const currentUserObj = {
-      uid: user.uid, displayName: user.displayName,
-      username: userData.username || "", avatarIndex: userData.avatarIndex || 0,
-    };
-    const friendObj = {
-      uid: friend.uid, displayName: friend.displayName,
-      username: friend.username, avatarIndex: friend.avatarIndex || 0,
-    };
-    // Subcollection'a yaz + root-doc array güncelle (dual-write)
-    await Promise.all([
-      setDoc(doc(db, "Users", user.uid,   "friends", friend.uid),  friendObj),
-      setDoc(doc(db, "Users", friend.uid, "friends", user.uid),    currentUserObj),
-      updateDoc(userRef, {
-        friends: arrayUnion(friendObj),
-        "friendRequests.receivedRequest":
-          (userData.friendRequests?.receivedRequest || []).filter((r) => r.uid !== friend.uid),
-      }),
-      updateDoc(friendRef, {
-        friends: arrayUnion(currentUserObj),
-        "friendRequests.sendRequest":
-          (friendData.friendRequests?.sendRequest || []).filter((r) => r.uid !== user.uid),
-      }),
-    ]);
-  };
-
-  const handleDecline = async (friend) => {
-    const userRef = doc(db, "Users", user.uid);
-    const friendRef = doc(db, "Users", friend.uid);
-    const userSnap = await getDoc(userRef);
-    const friendSnap = await getDoc(friendRef);
-    if (!userSnap.exists() || !friendSnap.exists()) return;
-    const userData = userSnap.data();
-    const friendData = friendSnap.data();
-    await updateDoc(userRef, {
-      "friendRequests.receivedRequest":
-        userData.friendRequests.receivedRequest.filter(
-          (req) => req.uid !== friend.uid,
-        ),
-    });
-    await updateDoc(friendRef, {
-      "friendRequests.sendRequest":
-        friendData.friendRequests.sendRequest.filter(
-          (req) => req.uid !== user.uid,
-        ),
-    });
-  };
-
-  const handleCancelSent = async (friend) => {
-    const userRef = doc(db, "Users", user.uid);
-    const friendRef = doc(db, "Users", friend.uid);
-    const userSnap = await getDoc(userRef);
-    const friendSnap = await getDoc(friendRef);
-    if (!userSnap.exists() || !friendSnap.exists()) return;
-    const userData = userSnap.data();
-    const friendData = friendSnap.data();
-    await updateDoc(userRef, {
-      "friendRequests.sendRequest": userData.friendRequests.sendRequest.filter(
-        (req) => req.uid !== friend.uid,
-      ),
-    });
-    await updateDoc(friendRef, {
-      "friendRequests.receivedRequest":
-        friendData.friendRequests.receivedRequest.filter(
-          (req) => req.uid !== user.uid,
-        ),
-    });
-  };
+  // Tüm yazma mantığı FriendsContext + friendsService'te (atomic batch).
+  const handleAccept = (friend) => acceptRequest(friend.uid);
+  const handleDecline = (friend) => declineRequest(friend.uid);
+  const handleCancelSent = (friend) => cancelRequest(friend.uid);
 
   const renderItem = ({ item }) => (
     <SwipeCard
       rightButton={{
-        label: tab === "received" ? "Reddet" : "İptal Et",
+        label: tab === "received" ? "Reddet" : i18nText("autoI18n.iptal_et", "İptal Et"),
         color: "#c44f4f",
         onPress: () =>
           tab === "received" ? handleDecline(item) : handleCancelSent(item),
@@ -284,9 +221,7 @@ export default function FriendRequestsScreen() {
             ],
           },
         ]}
-      >
-        Arkadaşlık İstekleri
-      </Animated.Text>
+      >{i18nText("autoI18n.arkadaslik_istekleri", "Arkadaşlık İstekleri")}</Animated.Text>
 
       {/* Sekme çubuğu */}
       <View style={[styles.tabBar, { backgroundColor: theme.secondary }]}>
@@ -308,8 +243,8 @@ export default function FriendRequestsScreen() {
           ]}
         />
         {[
-          { key: "received", label: "Gelen İstekler", count: requests.length },
-          { key: "sent", label: "Gönderilenler", count: sentRequests.length },
+          { key: "received", label: i18nText("autoI18n.gelen_istekler", "Gelen İstekler"), count: requests.length },
+          { key: "sent", label: i18nText("autoI18n.gonderilenler", "Gönderilenler"), count: sentRequests.length },
         ].map((t) => (
           <TouchableOpacity
             key={t.key}
@@ -367,8 +302,8 @@ export default function FriendRequestsScreen() {
             ]}
           >
             {tab === "received"
-              ? "Gelen arkadaşlık isteği yok"
-              : "Gönderilen arkadaşlık isteği yok"}
+              ? i18nText("autoI18n.gelen_arkadaslik_istegi_yok", "Gelen arkadaşlık isteği yok")
+              : i18nText("autoI18n.gonderilen_arkadaslik_istegi_yok", "Gönderilen arkadaşlık isteği yok")}
           </Text>
         </View>
       ) : (
@@ -380,6 +315,7 @@ export default function FriendRequestsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+      <BackButton top={8} />
     </SafeAreaView>
   );
 }

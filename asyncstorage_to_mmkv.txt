@@ -1,0 +1,282 @@
+================================================================================
+  WATCHFLIX — ASYNCSTORAGE KULLANIM ENVANTERİ ve MMKV GEÇİŞ REHBERİ
+================================================================================
+  Hazırlayan : Claude (Opus 4.8)
+  Tarih      : 2026-06-13
+  Amaç       : AsyncStorage kullanılan tüm dosya/sayfaları listelemek ve
+               react-native-mmkv (MMKV) yapısına geçiş için yol haritası.
+================================================================================
+
+
+--------------------------------------------------------------------------------
+0. KISA CEVAP: MMKV DAHA PERFORMANSLI MI?  → EVET, belirgin şekilde.
+--------------------------------------------------------------------------------
+
+  AsyncStorage:
+    - ASENKRON (her çağrı Promise). Eski mimaride köprü (bridge) üzerinden;
+      Android'de SQLite/dosya tabanlı. Çok sayıda küçük okumada yavaş.
+    - Açılışta veriyi `await` ile okumak zorundasın → "hidrasyon yarışı" ve
+      kısa süreli boş/flicker durumları (örn. tema/dil ilk karede yanlış).
+
+  MMKV (react-native-mmkv):
+    - SENKRON, native C++ (mmap + protobuf), JSI tabanlı → köprü yok.
+    - Pratikte ~10-30x daha hızlı; küçük KV okumaları neredeyse anlık.
+    - SENKRON olduğu için modül yüklenirken `await` OLMADAN okunur →
+      AppSettings/tema/dil/oturum cache'i ilk render'dan ÖNCE hazır olur,
+      hidrasyon yarışı ve flicker BİTER. Bu, bu uygulamadaki asıl kazanç.
+    - Bonus: dahili ŞİFRELEME desteği (encryption key) — aşağıdaki düz-metin
+      parola sorununu (LoginScreen) çözmek için fırsat.
+
+  GERÇEK KAZANÇ (bu projede):
+    En büyük fayda ham hız değil, AppSettingsContext'teki tek büyük `multiGet`
+    round-trip'ini ve onu bekleyen async hidrasyonu ortadan kaldırmaktır.
+    Senkron okuma = ayarlar/tema/dil/oturum daha açılışta yerinde.
+
+  ÖN KOŞULLAR (zaten sağlanıyor):
+    - Native build gerekir (Expo Go değil). Proje zaten dev-client/EAS build
+      (skia, reanimated, google-signin var) → sorun yok.
+    - react-native-mmkv v3 New Architecture ister; app.json'da
+      newArchEnabled:true → uyumlu.
+
+
+--------------------------------------------------------------------------------
+1. ÖZET ENVANTER (17 kaynak dosya)
+--------------------------------------------------------------------------------
+
+  Kategori        | Dosya                              | Tür
+  ----------------|------------------------------------|--------------------
+  Auth / Oturum   | firebase.js                        | ÖZEL (persistence)
+                  | context/AuthContext.js             | KV
+                  | screens/auth/LoginScreen.js        | KV (GÜVENLİK!)
+  Ayarlar         | context/AppSettingsContext.js      | KV (ana merkez)
+                  | context/ProfileUiContext.js        | KV
+                  | translations/index.js              | KV (i18n init)
+  Cache (büyük)   | utils/apiCache.js                  | KV (TMDB cache)
+                  | context/ListStatusContext.js       | KV (büyük blob)
+                  | context/PostsContext.js            | KV (büyük blob)
+                  | context/TvShowContex.js            | KV (büyük blob)
+  AI              | services/aiConversationsStore.js   | KV
+                  | services/aiCineStore.js            | KV
+                  | screens/chat/AIChatScreen.js       | KV
+  Taslak / Draft  | components/modals/CreatePostModal.js| KV
+                  | services/StoryDraftService.js      | KV
+  Diğer           | context/PetContext.js              | KV
+                  | utils/phoneCalendar.js             | KV
+  Toplu temizleme | screens/tabs/SettingsScreen.js     | clear() ÖZEL
+
+
+--------------------------------------------------------------------------------
+2. DETAYLI ENVANTER (dosya → satır → key → amaç)
+--------------------------------------------------------------------------------
+
+### AUTH / OTURUM ###############################################################
+
+firebase.js
+  - satır 4,7,23 : getReactNativePersistence(AsyncStorage)
+  - AMAÇ         : Firebase Auth oturum kalıcılığı.
+  - >> ÖZEL DURUM: Bölüm 3.1'e bak. MMKV'ye DOĞRUDAN verilemez.
+
+context/AuthContext.js
+  - satır 18 : setItem("cachedUserId", user.uid)
+  - satır 22 : removeItem("cachedUserId")
+  - AMAÇ     : Offline/erken hidrasyon için uid cache (ListStatus & TvShow okur).
+
+screens/auth/LoginScreen.js
+  - satır 64,81  : getItem/setItem("recentUsers")        → son giriş yapanlar
+  - satır 103,123: setItem/getItem(`password_${email}`)  → KAYITLI PAROLA
+  - >> GÜVENLİK : Parola DÜZ METİN saklanıyor. Geçişte MMKV encryption key ile
+                  şifrele (veya expo-secure-store'a taşı). Bkz. Bölüm 3.3.
+
+### AYARLAR #####################################################################
+
+context/AppSettingsContext.js   (ANA AYAR MERKEZİ)
+  - satır 123 : multiGet([...12 key...]) — TEK round-trip açılış okuması:
+        showSnow, selectedLanguage, selectedTheme, selectedAvatar,
+        adultContent, showOngoingTvShows, showIconBackground,
+        imageQualityLevel, imageQuality(legacy), hapticsEnabled,
+        notificationSettings, reminderNotificationSettings(legacy)
+  - satır 152,153,169,170 : legacy migrasyon (setItem/removeItem)
+  - satır 188-259 : her ayar değişiminde setItem(...) (showSnow, language,
+        theme, avatar, adultContent, ongoingTvShows, iconBackground,
+        imageQuality, haptics, notificationSettings)
+  - >> MMKV'de bu multiGet senkron okumaya dönüşür → açılış hidrasyonu biter.
+
+context/ProfileUiContext.js
+  - satır 27,46 : getItem/setItem("listGridStyle")
+  - satır 37,55 : getItem/setItem("allCornersRounded")
+  - satır 66,83 : getItem/setItem(`avatar_${uid}`)
+
+translations/index.js
+  - satır 7,14 : getItem("selectedLanguage")  (STORE_LANGUAGE_KEY)
+  - AMAÇ       : i18next başlatılırken dil okuması (erken).
+
+### CACHE (BÜYÜK BLOB'LAR) ######################################################
+
+utils/apiCache.js   (TMDB CACHE — merkezi modül)
+  - satır 36,43,57,65 : getItem/removeItem/setItem (prefix: apicache_*)
+  - satır 73,76       : getAllKeys + multiGet (preloadAllCache)
+  - AMAÇ              : TMDB istek sonuçlarının TTL cache'i. Çok sayıda key,
+                        bazıları büyük JSON. MMKV bunları da hızlı yönetir.
+
+context/ListStatusContext.js
+  - satır 118    : getItem("cachedUserId")
+  - satır 123,243: getItem/setItem(`list_status_cache_${uid}`) (CACHE_PREFIX)
+  - AMAÇ         : Liste durum indeksi cache'i (büyük JSON blob).
+
+context/PostsContext.js
+  - satır 31         : FEED_CACHE_KEY = "feed_cache_v1"
+  - satır 61,76,106,200 : getItem/setItem(feed_cache_v1)
+  - AMAÇ             : Sosyal feed cold-start cache'i (büyük JSON).
+
+context/TvShowContex.js
+  - satır 87          : WATCHED_TV_CACHE = "cache_watchedTvShows"
+  - satır 106,114,121 : removeItem/setItem/getItem(cache_watchedTvShows)
+  - satır 122         : getItem("cachedUserId")
+  - AMAÇ              : İzlenen diziler cache'i (büyük JSON).
+
+### AI ##########################################################################
+
+services/aiConversationsStore.js
+  - satır 26,44,60 : getItem/setItem("@whatchflix/ai_conversations")
+  - AMAÇ           : WhatchFlix AI asistanı sohbet geçmişi.
+
+services/aiCineStore.js
+  - satır 21,27,43 : getItem/setItem("@whatchflix/ai_cine_conversations")
+  - AMAÇ           : CineMatch Pro (yapılandırılmış AI) sohbet geçmişi.
+
+screens/chat/AIChatScreen.js
+  - satır 77,242,252 : getItem/setItem("@whatchflix/ai_cine_prefs") (PREFS_KEY)
+  - AMAÇ             : AI sohbet kullanıcı tercihleri.
+
+### TASLAK / DRAFT ##############################################################
+
+components/modals/CreatePostModal.js
+  - satır 192,234,255 : getItem/setItem("post_drafts")
+  - AMAÇ              : Post taslakları.
+
+services/StoryDraftService.js
+  - satır 3,7,16 : getItem/setItem("story_drafts_v1") (KEY)
+  - AMAÇ         : Story paylaşım taslakları.
+
+### DİĞER #######################################################################
+
+context/PetContext.js
+  - satır 60      : STORAGE_KEYS = { enabled, owned, selected, position, size }
+  - satır 83      : multiGet(tüm pet key'leri)
+  - satır 104-136 : setItem(enabled/owned/selected/position/size)
+  - AMAÇ          : Pet durumu, sahiplik, konum, boyut.
+
+utils/phoneCalendar.js
+  - satır 6,11,20 : getItem/setItem("phone_calendar_saved_events_v1") (STORAGE_KEY)
+  - AMAÇ          : Telefon takvimine eklenen etkinlik eşlemesi.
+
+### TOPLU TEMİZLEME #############################################################
+
+screens/tabs/SettingsScreen.js
+  - satır 244 : AsyncStorage.clear()
+  - AMAÇ      : Çıkış/sıfırlamada tüm depoyu sil.
+  - >> ÖZEL   : MMKV'de clear() farklı (storage.clearAll()). Ayrıca Firebase
+                Auth persistence AsyncStorage'da kalırsa onu ayrıca temizle.
+
+
+--------------------------------------------------------------------------------
+3. GEÇİŞTE DİKKAT EDİLMESİ GEREKEN ÖZEL DURUMLAR (RİSKLER)
+--------------------------------------------------------------------------------
+
+3.1  FIREBASE AUTH PERSISTENCE  (en kritik)
+  firebase.js: getReactNativePersistence(AsyncStorage) bir ASENKRON Storage
+  arayüzü (getItem/setItem/removeItem → Promise) bekler. MMKV SENKRONDUR ve
+  doğrudan verilemez. İki seçenek:
+    (A) MMKV'yi async arayüze saran ince bir adaptör yaz:
+          { getItem: k => Promise.resolve(storage.getString(k) ?? null),
+            setItem: (k,v) => { storage.set(k,v); return Promise.resolve(); },
+            removeItem: k => { storage.delete(k); return Promise.resolve(); } }
+        ve getReactNativePersistence(adapter) ile ver.
+    (B) Daha güvenli/az riskli: Firebase Auth için AsyncStorage'ı OLDUĞU GİBİ
+        BIRAK, geri kalan her şeyi MMKV'ye taşı. (Tek paket bağımlılığı kalır
+        ama auth oturumu riske girmez.)
+  ÖNERİ: İlk fazda (B), test edildikten sonra istenirse (A).
+
+3.2  MEVCUT VERİNİN GÖÇÜ (one-time migration)
+  Kullanıcılarda zaten AsyncStorage'da kayıtlı ayar/oturum/cache var. MMKV'ye
+  geçince bunlar OTOMATİK gelmez → ayarlar sıfırlanır, "son giriş" kaybolur.
+  ÇÖZÜM: İlk açılışta tek seferlik göç:
+    - AsyncStorage.getAllKeys() → ilgili key'leri oku → MMKV'ye yaz →
+      bir "mmkv_migrated_v1" bayrağı set et → sonraki açılışlarda atla.
+  KRİTİK key'ler: tüm AppSettings key'leri, cachedUserId, recentUsers,
+  avatar_*, listGridStyle, allCornersRounded, pet_*, *_drafts, ai_* .
+  (apicache_* / *_cache gibi büyük cache'ler göç ETMEYEBİLİR — yeniden dolar.)
+
+3.3  DÜZ METİN PAROLA  (güvenlik fırsatı)
+  LoginScreen `password_${email}` parolayı düz metin saklıyor. Geçiş anında:
+    - MMKV'yi encryption key ile başlat (new MMKV({ id, encryptionKey })), VEYA
+    - Parolayı tamamen expo-secure-store'a taşı (Keychain/Keystore).
+  Migrasyon sırasında eski düz-metin key silinmeli.
+
+3.4  BÜYÜK JSON BLOB'LAR
+  feed_cache_v1, list_status_cache_*, cache_watchedTvShows, apicache_* büyük
+  olabilir. MMKV bunları da hızlı tutar; yine de çok büyürse ileride bunları
+  bir dosya/DB'ye almak düşünülebilir (şimdilik MMKV yeterli).
+
+3.5  clear() DAVRANIŞI
+  SettingsScreen.clear() → MMKV'de storage.clearAll(). Birden fazla MMKV
+  instance (örn. şifreli auth ayrı, genel ayrı) varsa HEPSİ temizlenmeli.
+
+
+--------------------------------------------------------------------------------
+4. ÖNERİLEN GEÇİŞ MİMARİSİ
+--------------------------------------------------------------------------------
+
+4.1  TEK SARMALAYICI MODÜL (storage soyutlaması)
+  Tüm dosyalar AsyncStorage'ı doğrudan import etmek yerine TEK bir modülden
+  okusun → gelecekte tekrar değişim (veya hibrit) sınırlı kalır:
+
+    // utils/storage.js
+    import { MMKV } from "react-native-mmkv";
+    const mmkv = new MMKV();
+    export const storage = {
+      getString: (k) => mmkv.getString(k) ?? null,
+      set:       (k, v) => mmkv.set(k, v),
+      delete:    (k) => mmkv.delete(k),
+      getJSON:   (k) => { const s = mmkv.getString(k); return s ? JSON.parse(s) : null; },
+      setJSON:   (k, v) => mmkv.set(k, JSON.stringify(v)),
+      clearAll:  () => mmkv.clearAll(),
+    };
+
+  Avantaj: senkron API → çağıran yerlerde `await` ve loading state'leri kalkar
+  (özellikle AppSettings, ProfileUi, translations, PetContext açılış okumaları).
+
+4.2  GEÇİŞ SIRASI (düşük riskten yükseğe)
+  1) utils/storage.js + react-native-mmkv kur, dev-client/EAS build al.
+  2) Tek seferlik göç fonksiyonu (Bölüm 3.2) — App açılışında en erken çalıştır.
+  3) Saf KV / ayar dosyalarını çevir (senkron kazancı en yüksek, risk en düşük):
+       AppSettingsContext, ProfileUiContext, translations/index.js,
+       PetContext, phoneCalendar, AuthContext(cachedUserId).
+  4) Draft + AI dosyaları: CreatePostModal, StoryDraftService,
+       aiConversationsStore, aiCineStore, AIChatScreen.
+  5) Cache dosyaları: apiCache, ListStatusContext, PostsContext, TvShowContex.
+  6) LoginScreen: parolayı şifreli MMKV / secure-store'a (Bölüm 3.3).
+  7) SettingsScreen.clear() → clearAll() (+ auth temizliği).
+  8) firebase.js (Bölüm 3.1): faz 1'de AsyncStorage'da BIRAK; sonra adaptör.
+
+4.3  DEĞİŞTİRİLECEK DOSYA SAYISI: 17 kaynak dosya (Bölüm 1 listesi).
+     Bunların ~6'sı senkron kazancın en yüksek olduğu ayar/erken-okuma yeri.
+
+
+--------------------------------------------------------------------------------
+5. ÖZET / KARAR
+--------------------------------------------------------------------------------
+
+  - EVET, MMKV bu uygulamada hem daha hızlı hem de mimari olarak daha temiz.
+    En somut kazanç: AppSettings/tema/dil/oturum cache'inin SENKRON, açılış
+    anında hazır olması (multiGet round-trip ve flicker'ın bitmesi).
+  - Geçiş RİSKLİ NOKTALAR: (1) Firebase Auth persistence — faz 1'de AsyncStorage
+    kalsın, (2) mevcut veri için tek seferlik göç ŞART, (3) düz-metin parolayı
+    bu fırsatla şifrele.
+  - YÖNTEM: önce tek bir utils/storage.js soyutlaması kur, sonra dosyaları
+    düşük riskten yükseğe sırayla çevir. Böylece kazanç erken gelir, risk
+    kontrollü kalır.
+
+================================================================================
+  SON
+================================================================================

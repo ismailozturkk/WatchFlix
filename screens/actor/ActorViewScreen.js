@@ -1,3 +1,4 @@
+import { Image } from "expo-image";
 import React, { useState, useEffect, useRef } from "react";
 import {
   View,
@@ -6,12 +7,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Animated,
-  Image,
   StyleSheet,
   ActivityIndicator,
   Dimensions,
   StatusBar,
-  Platform,
+  Platform
 } from "react-native";
 import axios from "axios";
 import { useTheme } from "../../context/ThemeContext";
@@ -25,23 +25,26 @@ import { BlurView } from "expo-blur";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ActorSkeleton } from "../../components/Skeleton";
+import { i18nText } from "../../utils/i18nText";
+
 
 const { width } = Dimensions.get("window");
 const HERO_HEIGHT = width * 1.1;
 
 const FILTERS = [
-  { key: "popular", label: "Popüler", icon: "flame-outline" },
-  { key: "voted", label: "En Çok Oy", icon: "people-outline" },
-  { key: "rated", label: "En İyi Puan", icon: "star-outline" },
-  { key: "upcoming", label: "Yakında", icon: "time-outline" },
-  { key: "latest", label: "En Yeni", icon: "calendar-outline" },
+  { key: "popular", label: i18nText("autoI18n.populer", "Popüler"), icon: "flame-outline" },
+  { key: "voted", label: i18nText("autoI18n.en_cok_oy", "En Çok Oy"), icon: "people-outline" },
+  { key: "rated", label: i18nText("autoI18n.en_iyi_puan", "En İyi Puan"), icon: "star-outline" },
+  { key: "upcoming", label: i18nText("autoI18n.yakinda", "Yakında"), icon: "time-outline" },
+  { key: "latest", label: i18nText("autoI18n.en_yeni", "En Yeni"), icon: "calendar-outline" },
 ];
 
 const TV_FILTERS = [
-  { key: "popular", label: "Popüler", icon: "flame-outline" },
-  { key: "voted", label: "En Çok Oy", icon: "people-outline" },
-  { key: "rated", label: "En İyi Puan", icon: "star-outline" },
-  { key: "latest", label: "En Yeni", icon: "calendar-outline" },
+  { key: "popular", label: i18nText("autoI18n.populer", "Popüler"), icon: "flame-outline" },
+  { key: "voted", label: i18nText("autoI18n.en_cok_oy", "En Çok Oy"), icon: "people-outline" },
+  { key: "rated", label: i18nText("autoI18n.en_iyi_puan", "En İyi Puan"), icon: "star-outline" },
+  { key: "latest", label: i18nText("autoI18n.en_yeni", "En Yeni"), icon: "calendar-outline" },
 ];
 
 const getRatingColor = (r) => {
@@ -289,11 +292,7 @@ const ActorViewScreen = ({ route, navigation }) => {
   });
 
   if (loading) {
-    return (
-      <View style={[styles.center, { backgroundColor: theme.primary }]}>
-        <ActivityIndicator size="large" color={theme.accent} />
-      </View>
-    );
+    return <ActorSkeleton />;
   }
 
   if (!actor) {
@@ -304,9 +303,7 @@ const ActorViewScreen = ({ route, navigation }) => {
           size={48}
           color={theme.text?.muted ?? "#555"}
         />
-        <Text style={[styles.errorText, { color: theme.text?.secondary }]}>
-          Oyuncu bilgisi yüklenemedi
-        </Text>
+        <Text style={[styles.errorText, { color: theme.text?.secondary }]}>{i18nText("autoI18n.oyuncu_bilgisi_yuklenemedi", "Oyuncu bilgisi yüklenemedi")}</Text>
       </View>
     );
   }
@@ -321,7 +318,7 @@ const ActorViewScreen = ({ route, navigation }) => {
   const formatDate = (d) => {
     if (!d) return null;
     try {
-      return new Date(d).toLocaleDateString("tr-TR", {
+      return new Date(d).toLocaleDateString(language === "tr" ? "tr-TR" : "en-US", {
         day: "numeric",
         month: "long",
         year: "numeric",
@@ -376,9 +373,9 @@ const ActorViewScreen = ({ route, navigation }) => {
         <View style={{ height: HERO_HEIGHT }}>
           {actor.profile_path ? (
             <Image
-              source={{ uri: `getTmdbUrl(actor.profile_path, 'profile', 200)` }}
+              source={{ uri: getTmdbUrl(actor.profile_path, 'profile', 200) }}
               style={StyleSheet.absoluteFill}
-              resizeMode="cover"
+              contentFit="cover"
             />
           ) : (
             <View
@@ -457,7 +454,7 @@ const ActorViewScreen = ({ route, navigation }) => {
             icon="film-outline"
             label={
               actor.movie_credits?.cast?.length
-                ? `${actor.movie_credits.cast.length} film`
+                ? i18nText("autoI18n.movie_count", "{{count}} film", { count: actor.movie_credits.cast.length })
                 : null
             }
             theme={theme}
@@ -466,7 +463,7 @@ const ActorViewScreen = ({ route, navigation }) => {
             icon="tv-outline"
             label={
               actor.tv_credits?.cast?.length
-                ? `${actor.tv_credits.cast.length} dizi`
+                ? i18nText("autoI18n.tv_show_count", "{{count}} dizi", { count: actor.tv_credits.cast.length })
                 : null
             }
             theme={theme}
@@ -476,7 +473,7 @@ const ActorViewScreen = ({ route, navigation }) => {
         {/* ── Biyografi ── */}
         {actor.biography ? (
           <View style={styles.section}>
-            <SectionHeader title="Biyografi" theme={theme} />
+            <SectionHeader title={i18nText("autoI18n.biyografi", "Biyografi")} theme={theme} />
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={() => setBioExpanded((e) => !e)}
@@ -489,7 +486,7 @@ const ActorViewScreen = ({ route, navigation }) => {
               </Text>
               <View style={styles.bioToggle}>
                 <Text style={[styles.bioToggleText, { color: theme.accent }]}>
-                  {bioExpanded ? "Daha az göster" : "Devamını oku"}
+                  {bioExpanded ? i18nText("autoI18n.daha_az_goster", "Daha az göster") : i18nText("autoI18n.devamini_oku", "Devamını oku")}
                 </Text>
                 <Ionicons
                   name={bioExpanded ? "chevron-up" : "chevron-down"}
@@ -505,7 +502,7 @@ const ActorViewScreen = ({ route, navigation }) => {
         {actor.movie_credits?.cast?.length > 0 && (
           <View style={styles.section}>
             <SectionHeader
-              title="Filmler"
+              title={i18nText("autoI18n.filmler", "Filmler")}
               count={actor.movie_credits.cast.length}
               theme={theme}
             />
@@ -541,9 +538,7 @@ const ActorViewScreen = ({ route, navigation }) => {
                   size={32}
                   color={theme.text?.muted ?? "#555"}
                 />
-                <Text style={[styles.emptyFilterText, { color: theme.text?.secondary ?? "#aaa" }]}>
-                  Bu filtre için sonuç bulunamadı
-                </Text>
+                <Text style={[styles.emptyFilterText, { color: theme.text?.secondary ?? "#aaa" }]}>{i18nText("autoI18n.bu_filtre_icin_sonuc_bulunamadi", "Bu filtre için sonuç bulunamadı")}</Text>
               </View>
             )}
           </View>
@@ -553,7 +548,7 @@ const ActorViewScreen = ({ route, navigation }) => {
         {actor.tv_credits?.cast?.length > 0 && (
           <View style={styles.section}>
             <SectionHeader
-              title="Diziler"
+              title={i18nText("autoI18n.diziler", "Diziler")}
               count={
                 Array.from(
                   new Map(
@@ -595,9 +590,7 @@ const ActorViewScreen = ({ route, navigation }) => {
                   size={32}
                   color={theme.text?.muted ?? "#555"}
                 />
-                <Text style={[styles.emptyFilterText, { color: theme.text?.secondary ?? "#aaa" }]}>
-                  Bu filtre için sonuç bulunamadı
-                </Text>
+                <Text style={[styles.emptyFilterText, { color: theme.text?.secondary ?? "#aaa" }]}>{i18nText("autoI18n.bu_filtre_icin_sonuc_bulunamadi", "Bu filtre için sonuç bulunamadı")}</Text>
               </View>
             )}
           </View>
@@ -765,7 +758,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    resizeMode: "cover",
+    contentFit: "cover",
   },
   mediaNoImage: {
     position: "absolute",

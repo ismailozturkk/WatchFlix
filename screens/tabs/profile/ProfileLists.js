@@ -7,6 +7,7 @@ import {
   FlatList,
   Modal,
   Animated,
+  ScrollView,
 } from "react-native";
 import React, { useEffect, useState } from "react";
 import { useLanguage } from "../../../context/LanguageContext";
@@ -18,6 +19,8 @@ import { useProfileStats } from "../../../context/ProfileStatsContext";
 import { useProfileUi }    from "../../../context/ProfileUiContext";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
+import SwitchToggle from "../../../components/SwitchToggle";
+
 export default function ProfileLists({ navigation }) {
   const { t } = useLanguage();
   const { theme } = useTheme();
@@ -26,7 +29,8 @@ export default function ProfileLists({ navigation }) {
     selectedList, setSelectedList,
     modalDeleteVisible, setModalDeleteVisible, deleteList,
   } = useProfileStats();
-  const { gridStyle, setGridStyle, saveListGridStyle } = useProfileUi();
+  const { gridStyle, setGridStyle, saveListGridStyle, allCornersRounded, saveAllCornersRounded } = useProfileUi();
+  const [layoutModalVisible, setLayoutModalVisible] = useState(false);
   // ...existing code...
   const [scaleValues, setScaleValues] = useState({});
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
@@ -75,14 +79,12 @@ export default function ProfileLists({ navigation }) {
               styles.addButton,
               { backgroundColor: theme.secondary, borderColor: theme.border },
             ]}
-            onPress={() => {
-              saveListGridStyle(!gridStyle);
-            }}
+            onPress={() => setLayoutModalVisible(true)}
           >
             <MaterialCommunityIcons
-              name={gridStyle ? "grid-large" : "grid"}
+              name={gridStyle === 1 ? "grid-large" : gridStyle === 2 ? "grid" : gridStyle === 3 ? "view-dashboard" : "layers"}
               size={18}
-              color="white"
+              color={theme.text.primary ?? "white"}
             />
           </TouchableOpacity>
           <TouchableOpacity
@@ -94,7 +96,7 @@ export default function ProfileLists({ navigation }) {
               navigation.navigate("ListsViewScreen");
             }}
           >
-            <Ionicons name="arrow-forward-outline" size={18} color="white" />
+            <Ionicons name="arrow-forward-outline" size={18} color={theme.text.primary ?? "white"} />
           </TouchableOpacity>
         </View>
       </View>
@@ -142,7 +144,7 @@ export default function ProfileLists({ navigation }) {
                       },
                     ]}
                   >
-                    {gridStyle ? (
+                    {gridStyle === 1 ? (
                       <View
                         style={{
                           flexDirection: "row",
@@ -160,10 +162,8 @@ export default function ProfileLists({ navigation }) {
                                 }}
                                 style={[
                                   styles.image,
-                                  { width: 50, height: 100 },
-                                  index === 0
-                                    ? {
-                                        borderTopLeftRadius: 10,
+                                  { width: 60, height: 112 },
+                                  allCornersRounded ? { borderRadius: 10 } : index === 0 ? { borderTopLeftRadius: 10,
                                         borderBottomLeftRadius: 10,
                                       }
                                     : index === 1
@@ -181,11 +181,9 @@ export default function ProfileLists({ navigation }) {
                                 key={index}
                                 style={[
                                   styles.placeholder,
-                                  { width: 50, height: 100 },
+                                  { width: 60, height: 112 },
 
-                                  index === 0
-                                    ? {
-                                        borderTopLeftRadius: 10,
+                                  allCornersRounded ? { borderRadius: 10 } : index === 0 ? { borderTopLeftRadius: 10,
                                         borderBottomLeftRadius: 10,
                                       }
                                     : index === 1
@@ -201,7 +199,7 @@ export default function ProfileLists({ navigation }) {
                           }
                         })}
                       </View>
-                    ) : (
+                    ) : gridStyle === 2 ? (
                       <>
                         <View
                           style={{
@@ -220,9 +218,7 @@ export default function ProfileLists({ navigation }) {
                                   }}
                                   style={[
                                     styles.image,
-                                    index === 0
-                                      ? {
-                                          borderTopLeftRadius: 10,
+                                    allCornersRounded ? { borderRadius: 10 } : index === 0 ? { borderTopLeftRadius: 10,
                                           borderBottomLeftRadius: gridStyle
                                             ? 10
                                             : 0,
@@ -244,9 +240,7 @@ export default function ProfileLists({ navigation }) {
                                   key={index}
                                   style={[
                                     styles.placeholder,
-                                    index === 0
-                                      ? {
-                                          borderTopLeftRadius: 10,
+                                    allCornersRounded ? { borderRadius: 10 } : index === 0 ? { borderTopLeftRadius: 10,
                                           borderBottomLeftRadius: gridStyle
                                             ? 10
                                             : 0,
@@ -284,11 +278,7 @@ export default function ProfileLists({ navigation }) {
                                   }}
                                   style={[
                                     styles.image,
-                                    index === 4
-                                      ? {
-                                          borderTopLeftRadius: gridStyle
-                                            ? 10
-                                            : 0,
+                                    allCornersRounded ? { borderRadius: 10 } : index === 4 ? { borderTopLeftRadius: gridStyle ? 10 : 0,
                                           borderBottomLeftRadius: 10,
                                         }
                                       : index === 7
@@ -308,11 +298,7 @@ export default function ProfileLists({ navigation }) {
                                   key={index}
                                   style={[
                                     styles.placeholder,
-                                    index === 4
-                                      ? {
-                                          borderTopLeftRadius: gridStyle
-                                            ? 10
-                                            : 0,
+                                    allCornersRounded ? { borderRadius: 10 } : index === 4 ? { borderTopLeftRadius: gridStyle ? 10 : 0,
                                           borderBottomLeftRadius: 10,
                                         }
                                       : index === 7
@@ -331,6 +317,78 @@ export default function ProfileLists({ navigation }) {
                           })}
                         </View>
                       </>
+                    ) : gridStyle === 3 ? (
+                      <View style={{ flexDirection: "row", gap: 2 }}>
+                        <View style={{ width: 75, height: 112 }}>
+                          {items && items[0]?.imagePath ? (
+                            <Image
+                              source={{ uri: getTmdbUrl(items[0].imagePath, 'poster', 200) }}
+                              style={[styles.image, { width: 75, height: 112 }, allCornersRounded ? { borderRadius: 10 } : { borderTopLeftRadius: 10, borderBottomLeftRadius: 10 }]}
+                            />
+                          ) : (
+                            <View style={[styles.placeholder, { width: 75, height: 112 }, allCornersRounded ? { borderRadius: 10 } : { borderTopLeftRadius: 10, borderBottomLeftRadius: 10 }, { backgroundColor: theme.primary }]} />
+                          )}
+                        </View>
+                        <View style={{ gap: 2 }}>
+                          <View style={{ width: 37.5, height: 55 }}>
+                            {items && items[1]?.imagePath ? (
+                              <Image
+                                source={{ uri: getTmdbUrl(items[1].imagePath, 'poster', 200) }}
+                                style={[styles.image, { width: 37.5, height: 55 }, allCornersRounded ? { borderRadius: 10 } : { borderTopRightRadius: 10 }]}
+                              />
+                            ) : (
+                              <View style={[styles.placeholder, { width: 37.5, height: 55 }, allCornersRounded ? { borderRadius: 10 } : { borderTopRightRadius: 10 }, { backgroundColor: theme.primary }]} />
+                            )}
+                          </View>
+                          <View style={{ width: 37.5, height: 55 }}>
+                            {items && items[2]?.imagePath ? (
+                              <Image
+                                source={{ uri: getTmdbUrl(items[2].imagePath, 'poster', 200) }}
+                                style={[styles.image, { width: 37.5, height: 55 }, allCornersRounded ? { borderRadius: 10 } : { borderBottomRightRadius: 10 }]}
+                              />
+                            ) : (
+                              <View style={[styles.placeholder, { width: 37.5, height: 55 }, allCornersRounded ? { borderRadius: 10 } : { borderBottomRightRadius: 10 }, { backgroundColor: theme.primary }]} />
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                    ) : (
+                      <View style={{ width: 138, height: 112, alignItems: "center", justifyContent: "center" }}>
+                        {[2, 1, 0].map((i) => {
+                          const item = items && items[i];
+                          const angles = [0, -6, 6];
+                          const offsets = [0, -22, 22];
+                          const zIndexes = [3, 2, 1];
+                          return (
+                            <View
+                              key={i}
+                              style={{
+                                position: "absolute",
+                                transform: [
+                                  { rotate: `${angles[i]}deg` },
+                                  { translateX: offsets[i] },
+                                ],
+                                zIndex: zIndexes[i],
+                                width: 75,
+                                height: 112,
+                                borderRadius: 10,
+                                overflow: "hidden",
+                                borderWidth: 1,
+                                borderColor: "rgba(255,255,255,0.1)",
+                              }}
+                            >
+                              {item && item.imagePath ? (
+                                <Image
+                                  source={{ uri: getTmdbUrl(item.imagePath, 'poster', 200) }}
+                                  style={{ width: "100%", height: "100%" }}
+                                />
+                              ) : (
+                                <View style={[styles.placeholder, { width: "100%", height: "100%", backgroundColor: theme.primary }]} />
+                              )}
+                            </View>
+                          );
+                        })}
+                      </View>
                     )}
 
                     <View
@@ -492,6 +550,243 @@ export default function ProfileLists({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* Görünüm Seçimi Modalı */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={layoutModalVisible}
+        onRequestClose={() => setLayoutModalVisible(false)}
+      >
+        <View style={styles.bottomModalOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setLayoutModalVisible(false)} />
+          <View style={[styles.bottomModalSheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+            <View style={[styles.modalDragHandle, { backgroundColor: theme.text.muted }]} />
+            <Text style={[styles.bottomModalTitle, { color: theme.text.primary }]}>Liste Görünümü Seçin</Text>
+
+            <View style={{ width: "100%", paddingHorizontal: 20, gap: 10 }}>
+              {/* Üst Sıra */}
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                {/* Option 1: Büyük Kapaklar */}
+                <TouchableOpacity
+                  style={{ flex: 1 }}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    saveListGridStyle(1);
+                    setLayoutModalVisible(false);
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.listContainer,
+                      {
+                        width: "100%",
+                        backgroundColor: theme.secondary,
+                        borderColor: gridStyle === 1 ? theme.colors.orange : theme.border,
+                        opacity: gridStyle === 1 ? 1 : 0.6,
+                      },
+                    ]}
+                  >
+                    <View style={{ flexDirection: "row", gap: 2, justifyContent: "center", width: "100%" }}>
+                      {[0, 1, 2].map((index) => (
+                        <View
+                          key={index}
+                          style={[
+                            styles.placeholder,
+                            { width: 54, height: 101 },
+                            allCornersRounded ? { borderRadius: 10 } : [index === 0 && { borderTopLeftRadius: 10, borderBottomLeftRadius: 10 }, index === 2 && { borderTopRightRadius: 10, borderBottomRightRadius: 10 }],
+                            { backgroundColor: theme.primary },
+                          ]}
+                        />
+                      ))}
+                    </View>
+                    <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 5 }}>
+                      <MaterialCommunityIcons name="movie" size={16} color={theme.colors.green} />
+                      <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>Büyük Kapaklar</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Option 3: Karışık Kapaklar */}
+                <TouchableOpacity
+                  style={{ flex: 1 }}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    saveListGridStyle(3);
+                    setLayoutModalVisible(false);
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.listContainer,
+                      {
+                        width: "100%",
+                        backgroundColor: theme.secondary,
+                        borderColor: gridStyle === 3 ? theme.colors.orange : theme.border,
+                        opacity: gridStyle === 3 ? 1 : 0.6,
+                      },
+                    ]}
+                  >
+                    <View style={{ flexDirection: "row", gap: 2, justifyContent: "center", width: "100%" }}>
+                      <View style={[styles.placeholder, { width: 68, height: 101 }, allCornersRounded ? { borderRadius: 10 } : { borderTopLeftRadius: 10, borderBottomLeftRadius: 10 }, { backgroundColor: theme.primary }]} />
+                      <View style={{ gap: 2, justifyContent: "center" }}>
+                        <View style={[styles.placeholder, { width: 34, height: 49.5 }, allCornersRounded ? { borderRadius: 10 } : { borderTopRightRadius: 10 }, { backgroundColor: theme.primary }]} />
+                        <View style={[styles.placeholder, { width: 34, height: 49.5 }, allCornersRounded ? { borderRadius: 10 } : { borderBottomRightRadius: 10 }, { backgroundColor: theme.primary }]} />
+                      </View>
+                    </View>
+                    <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 5 }}>
+                      <MaterialCommunityIcons name="view-dashboard" size={16} color={theme.colors.blue} />
+                      <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>Karışık</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {/* Alt Sıra */}
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                {/* Option 4: Yığın Kapaklar */}
+                <TouchableOpacity
+                  style={{ flex: 1 }}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    saveListGridStyle(4);
+                    setLayoutModalVisible(false);
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.listContainer,
+                      {
+                        width: "100%",
+                        backgroundColor: theme.secondary,
+                        borderColor: gridStyle === 4 ? theme.colors.orange : theme.border,
+                        opacity: gridStyle === 4 ? 1 : 0.6,
+                      },
+                    ]}
+                  >
+                    <View style={{ width: 124, height: 101, alignItems: "center", justifyContent: "center" }}>
+                      {[2, 1, 0].map((i) => {
+                        const angles = [0, -6, 6];
+                        const offsets = [0, -20, 20];
+                        const zIndexes = [3, 2, 1];
+                        return (
+                          <View
+                            key={i}
+                            style={[
+                              styles.placeholder,
+                              {
+                                position: "absolute",
+                                transform: [
+                                  { rotate: `${angles[i]}deg` },
+                                  { translateX: offsets[i] },
+                                ],
+                                zIndex: zIndexes[i],
+                                width: 68,
+                                height: 101,
+                                borderRadius: 10,
+                                backgroundColor: theme.primary,
+                                borderWidth: 1,
+                                borderColor: "rgba(255,255,255,0.1)",
+                              }
+                            ]}
+                          />
+                        );
+                      })}
+                    </View>
+                    <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 5 }}>
+                      <MaterialCommunityIcons name="layers" size={16} color={theme.colors.purple || "#a78bfa"} />
+                      <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>Yığın</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Option 2: Küçük Kapaklar */}
+                <TouchableOpacity
+                  style={{ flex: 1 }}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    saveListGridStyle(2);
+                    setLayoutModalVisible(false);
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.listContainer,
+                      {
+                        width: "100%",
+                        backgroundColor: theme.secondary,
+                        borderColor: gridStyle === 2 ? theme.colors.orange : theme.border,
+                        opacity: gridStyle === 2 ? 1 : 0.6,
+                      },
+                    ]}
+                  >
+                    <View style={{ gap: 2, alignItems: "center", width: "100%" }}>
+                      <View style={{ flexDirection: "row", gap: 2 }}>
+                        {[0, 1, 2, 3].map((index) => (
+                          <View
+                            key={index}
+                            style={[
+                              styles.placeholder,
+                              { width: 34, height: 49.5 },
+                              allCornersRounded ? { borderRadius: 10 } : [index === 0 && { borderTopLeftRadius: 10 }, index === 3 && { borderTopRightRadius: 10 }],
+                              { backgroundColor: theme.primary },
+                            ]}
+                          />
+                        ))}
+                      </View>
+                      <View style={{ flexDirection: "row", gap: 2 }}>
+                        {[4, 5, 6, 7].map((index) => (
+                          <View
+                            key={index}
+                            style={[
+                              styles.placeholder,
+                              { width: 34, height: 49.5 },
+                              allCornersRounded ? { borderRadius: 10 } : [index === 4 && { borderBottomLeftRadius: 10 }, index === 7 && { borderBottomRightRadius: 10 }],
+                              { backgroundColor: theme.primary },
+                            ]}
+                          />
+                        ))}
+                      </View>
+                    </View>
+                    <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 5 }}>
+                      <Ionicons name="grid" size={16} color={theme.colors.orange} />
+                      <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>Küçük Kapaklar</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              <View 
+                style={{ 
+                  width: "100%",
+                  marginTop: 5, 
+                  paddingHorizontal: 16, 
+                  paddingVertical: 14, 
+                  flexDirection: "row", 
+                  alignItems: "center", 
+                  justifyContent: "space-between",
+                  backgroundColor: theme.secondary,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: theme.border || "rgba(255,255,255,0.05)"
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <Ionicons name="crop-outline" size={20} color={theme.text.primary} />
+                  <Text style={{ color: theme.text.primary, fontSize: 14, fontWeight: "600" }}>Ayrı Köşeli Afişler</Text>
+                </View>
+                <SwitchToggle
+                  value={allCornersRounded}
+                  onValueChange={saveAllCornersRounded}
+                  size={28}
+                  onColor={theme.colors.orange || "#f59e0b"}
+                  offColor={theme.border || "#cacacaad"}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -567,5 +862,40 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
     textAlign: "center",
+  },
+
+  // ── Layout Modal Styles ──────────────────────────────────────────────────
+  bottomModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  bottomModalSheet: {
+    width: "100%",
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    paddingTop: 24,
+    paddingBottom: 40,
+    alignItems: "center",
+  },
+  modalDragHandle: {
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    marginBottom: 20,
+  },
+  bottomModalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    marginBottom: 24,
+    textAlign: "center",
+  },
+  layoutOptionsRow: {
+    flexDirection: "row",
+    gap: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
   },
 });

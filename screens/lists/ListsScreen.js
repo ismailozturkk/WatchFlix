@@ -1,0 +1,2095 @@
+import { Image } from "expo-image";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  ScrollView,
+  Dimensions,
+  Animated,
+  PanResponder,
+  ActivityIndicator,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import BackButton from "../../components/BackButton";
+import { useTheme } from "@context/ThemeContext";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "../../firebase";
+import { useListStatusContext } from "@context/ListStatusContext";
+import { useLanguage } from "@context/LanguageContext";
+import { useAuth } from "@context/AuthContext";
+import SkeletonPlaceholder from "react-native-skeleton-placeholder";
+import { LinearGradient } from "expo-linear-gradient";
+import Toast from "react-native-toast-message";
+import SwipeCard from "@components/SwipeCard";
+import { BlurView } from "expo-blur";
+import { useImageQualitySettings } from "@context/AppSettingsContext";
+import CaseOpeningModal from "@components/modals/CaseOpeningModal";
+import Feather from "@expo/vector-icons/Feather";
+import { i18nText } from "@utils/i18nText";
+
+const { width, height } = Dimensions.get("window");
+export default function ListsScreen({ route, navigation }) {
+  const { theme } = useTheme();
+  const { listName } = route.params;
+  const [listItems, setListItems] = useState([]);
+  const [listModalItems, setListModalItems] = useState([]);
+  const [searchQuery, setSearchQuery] = useState(""); // Arama için state
+  // ── Sıralama & filtreleme ───────────────────────────────────────────────
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [sortBy, setSortBy] = useState("default"); // default | dateAdded | name | minutes
+  const [sortDir, setSortDir] = useState("desc"); // asc | desc
+  const [typeFilter, setTypeFilter] = useState("all"); // all | movie | tv
+  const [dateRange, setDateRange] = useState("all"); // all | 7 | 30 | 365
+  const [genreFilter, setGenreFilter] = useState([]); // seçili tür isimleri
+  const [filtering, setFiltering] = useState(false); // sıralama/filtre yükleniyor
+  const filterFirstRef = useRef(true);
+  // Görünür vurgu rengi (theme.between bazı temalarda tanımsız/kontrastsız olabilir)
+  const accent = theme.between || theme.accent || "#4b69ff";
+  const { t, language } = useLanguage();
+  const { user } = useAuth();
+  const { allLists, loading: listsLoading } = useListStatusContext();
+  const [isLoading, setIsLoading] = useState(listsLoading);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [reorderModalVisible, setReorderModalVisible] = useState(false);
+  const [index, setIndex] = useState(0);
+  const [reorderItems, setReorderItems] = useState(null);
+  const [randomModalVisible, setRandomModalVisible] = useState(false);
+  const [filterType, setFilterType] = useState("mixed");
+  // Gesture tracking removed in favor of a cleaner 3-way segmented toggle.
+  const [value, setValue] = useState("");
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+
+  const handleChange = (text) => {
+    // Sadece rakamları al
+    const numericValue = text.replace(/[^0-9]/g, "");
+    setValue(numericValue - 1);
+  };
+  const [tvShowStatus, setTvShowStatus] = useState(null);
+
+  // ── Tab pill boyutları (mesafe hesabı) ─────────────────────────────────────
+  const TAB_PADDING = 3;
+  const [tabPillWidth, setTabPillWidth] = useState(0);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let toValue = 0;
+    if (tvShowStatus === true) toValue = 1;
+    if (tvShowStatus === false) toValue = 2;
+    slideAnim.setValue(toValue);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleTvTabPress = useCallback(
+    (status) => {
+      setTvShowStatus(status);
+      let toValue = 0;
+      if (status === true) toValue = 1;
+      if (status === false) toValue = 2;
+      Animated.spring(slideAnim, {
+        toValue,
+        useNativeDriver: true,
+        speed: 18,
+        bounciness: 0,
+      }).start();
+    },
+    [setTvShowStatus, slideAnim],
+  );
+
+  const sliderTranslateX = slideAnim.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: [0, tabPillWidth / 3, (tabPillWidth / 3) * 2],
+  });
+
+  // Animated import'unun eklendiğinden emin olun
+  const formatDate = (timestamp) => {
+    const date = new Date(timestamp);
+    return new Intl.DateTimeFormat(language, {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(date);
+  };
+  const [scaleValues, setScaleValues] = useState({});
+  useEffect(() => {
+    if (!listItems?.length) return;
+    setScaleValues((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      listItems.forEach((item) => {
+        if (!next[item.id]) {
+          next[item.id] = new Animated.Value(1);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [listItems]);
+
+  const onPressIn = (itemId) => {
+    if (!scaleValues[itemId]) return;
+    Animated.timing(scaleValues[itemId], {
+      toValue: 0.9,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const onPressOut = (itemId) => {
+    if (!scaleValues[itemId]) return;
+    Animated.timing(scaleValues[itemId], {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  useEffect(() => {
+    setIsLoading(listsLoading);
+    if (!listsLoading) {
+      setListItems(allLists?.[listName] || []);
+    }
+  }, [allLists, listName, listsLoading]);
+
+  const reorderWatchedTv = async (fromIndex, toIndex, listName) => {
+    try {
+      const docRef = doc(db, "Lists", user.uid);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        console.warn(i18nText("autoI18n.belge_bulunamadi", "Belge bulunamadı."));
+        return;
+      }
+
+      const data = docSnap.data();
+      let listReorder = data[listName] || [];
+
+      if (
+        fromIndex < 0 ||
+        fromIndex >= listReorder.length ||
+        toIndex < 0 ||
+        toIndex >= listReorder.length
+      ) {
+        Toast.show({
+          type: "error",
+          text1: i18nText("autoI18n.enter_index_range", "Lütfen 1 ile {{count}} arasında indeksler girin.", { count: listReorder.length }),
+        });
+        return;
+      }
+
+      const item = listReorder.splice(fromIndex, 1)[0]; // Elemanı çıkar
+      listReorder.splice(toIndex, 0, item); // Yeni index'e yerleştir
+
+      await updateDoc(docRef, { [listName]: listReorder });
+      setIndex(toIndex);
+      Toast.show({
+        type: "success",
+        text1: i18nText("autoI18n.item_moved_to_position", "{{name}} başarıyla {{position}}. sıraya taşındı.", {
+          name: reorderItems.name,
+          position: toIndex + 1,
+        }),
+      });
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: `${error.message}`,
+      });
+    }
+  };
+  // Listede mevcut türler (genre) ve tarihli öğe var mı?
+  const availableGenres = useMemo(() => {
+    const set = new Set();
+    listItems.forEach((it) => (it.genres || []).forEach((g) => g && set.add(g)));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, language));
+  }, [listItems, language]);
+  const hasDates = useMemo(
+    () => listItems.some((it) => it.dateAdded),
+    [listItems],
+  );
+
+  // Aktif filtre/sıralama göstergesi
+  const sortActive = sortBy !== "default";
+  const activeFilterCount =
+    (typeFilter !== "all" ? 1 : 0) +
+    (dateRange !== "all" ? 1 : 0) +
+    (genreFilter.length > 0 ? 1 : 0);
+
+  // Bir öğenin toplam süresi (dk): film → runtime, dizi → bölüm sürelerinin toplamı.
+  const getItemMinutes = (item) => {
+    if (item.type === "movie") return item.minutes || 0;
+    if (typeof item.totalMinutes === "number") return item.totalMinutes;
+    const seasons = item.seasons;
+    if (!seasons) return 0;
+    let total = 0;
+    for (const sk in seasons) {
+      const eps = seasons[sk]?.episodes;
+      for (const ek in eps) {
+        const m = eps[ek]?.episodeMinutes;
+        if (typeof m === "number") total += m;
+      }
+    }
+    return total;
+  };
+
+  // Arama + filtre + sıralama — TEK geçiş, yalnız girdiler değişince yeniden
+  // hesaplanır (her render'da değil). Eskiden 5 ayrı .filter() + sort kopyası
+  // her render'da çalışıyordu; ana yavaşlık buydu.
+  const filteredItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+
+    const watchedCountOf = (item) =>
+      Array.isArray(item.seasons)
+        ? item.seasons.reduce(
+            (acc, s) => acc + (s.episodes ? s.episodes.length : 0),
+            0,
+          )
+        : 0;
+
+    const now = Date.now();
+    const rangeMs = dateRange === "all" ? 0 : Number(dateRange) * 86400000;
+
+    const out = listItems.filter((item) => {
+      if (q && !(item.name || "").toLowerCase().includes(q)) return false;
+      if (
+        tvShowStatus !== null &&
+        (watchedCountOf(item) === item.showEpisodeCount) !== tvShowStatus
+      )
+        return false;
+      if (typeFilter !== "all" && item.type !== typeFilter) return false;
+      if (dateRange !== "all") {
+        if (!item.dateAdded) return false;
+        const ts = new Date(item.dateAdded).getTime();
+        if (isNaN(ts) || ts < now - rangeMs) return false;
+      }
+      if (
+        genreFilter.length > 0 &&
+        !(item.genres || []).some((g) => genreFilter.includes(g))
+      )
+        return false;
+      return true;
+    });
+
+    if (sortBy === "default") return out;
+
+    return out.sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === "name") {
+        cmp = (a.name || "").localeCompare(b.name || "", language);
+      } else if (sortBy === "minutes") {
+        cmp = getItemMinutes(a) - getItemMinutes(b);
+      } else {
+        const ta = a.dateAdded ? new Date(a.dateAdded).getTime() : 0;
+        const tb = b.dateAdded ? new Date(b.dateAdded).getTime() : 0;
+        cmp = (isNaN(ta) ? 0 : ta) - (isNaN(tb) ? 0 : tb);
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    listItems,
+    searchQuery,
+    tvShowStatus,
+    typeFilter,
+    dateRange,
+    genreFilter,
+    sortBy,
+    sortDir,
+    language,
+  ]);
+
+  const resetFilters = () => {
+    setSortBy("default");
+    setSortDir("desc");
+    setTypeFilter("all");
+    setDateRange("all");
+    setGenreFilter([]);
+  };
+
+  const toggleGenre = (g) =>
+    setGenreFilter((prev) =>
+      prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g],
+    );
+
+  // Sıralama/filtre değişince kısa bir "yükleniyor" göster — donma hissi olmasın.
+  // (Arama hariç; o anlık ve her tuşta spinner istemiyoruz.)
+  useEffect(() => {
+    if (filterFirstRef.current) {
+      filterFirstRef.current = false;
+      return;
+    }
+    setFiltering(true);
+    const id = setTimeout(() => setFiltering(false), 280);
+    return () => clearTimeout(id);
+  }, [tvShowStatus, typeFilter, dateRange, genreFilter, sortBy, sortDir]);
+
+  const renderSkeleton = () => (
+    <SkeletonPlaceholder>
+      <View style={{ flexDirection: "row", marginBottom: 10 }}>
+        {[...Array(3)].map((_, index) => (
+          <View key={index} style={{ marginRight: 10 }}>
+            <View style={styles.skeletonImage} />
+            <View style={styles.skeletonText} />
+            <View style={styles.skeletonTextSmall} />
+          </View>
+        ))}
+      </View>
+    </SkeletonPlaceholder>
+  );
+  function calculateTotalDuration(item) {
+    let totalMinutes = 0;
+
+    const seasons = item.seasons;
+
+    for (const seasonKey in seasons) {
+      const season = seasons[seasonKey];
+      const episodes = season.episodes;
+
+      for (const episodeKey in episodes) {
+        const episode = episodes[episodeKey];
+        if (episode && typeof episode.episodeMinutes === "number") {
+          totalMinutes += episode.episodeMinutes;
+        }
+      }
+    }
+
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    return `${hours} saat ${minutes} dakika`;
+  }
+  const chooseRandomly = (selectedType) => {
+    const pool =
+      selectedType === "mixed"
+        ? filteredItems
+        : filteredItems.filter((item) => item.type === selectedType);
+    if (pool.length === 0) {
+      Toast.show({
+        type: "warning",
+        text1:
+          selectedType === "movie"
+            ? i18nText("autoI18n.listede_hic_film_yok", "Listede hiç film yok!")
+            : selectedType === "tv"
+              ? i18nText("autoI18n.listede_hic_dizi_yok", "Listede hiç dizi yok!")
+              : i18nText("autoI18n.liste_bos_lutfen_icerik_ekleyiniz", "Liste boş, lütfen içerik ekleyiniz"),
+      });
+      return;
+    }
+    setFilterType(selectedType);
+    setRandomModalVisible(true);
+  };
+
+  // List counts
+  const movieCount = useMemo(
+    () => filteredItems.filter((i) => i.type === "movie").length,
+    [filteredItems],
+  );
+  const tvCount = useMemo(
+    () => filteredItems.filter((i) => i.type === "tv").length,
+    [filteredItems],
+  );
+
+  // İzlenen bölüm sayısı ve toplam süre: renderItem içinde her çizimde
+  // reduce/loop çalıştırmak yerine öğe başına bir kez hesaplanır.
+  const { watchedCountById, durationTextById } = useMemo(() => {
+    const counts = {};
+    const durations = {};
+    listItems.forEach((item) => {
+      counts[item.id] = Array.isArray(item.seasons)
+        ? item.seasons.reduce(
+            (acc, s) => acc + (s.episodes ? s.episodes.length : 0),
+            0,
+          )
+        : 0;
+      durations[item.id] = calculateTotalDuration(item);
+    });
+    return { watchedCountById: counts, durationTextById: durations };
+  }, [listItems]);
+  return (
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.primary }]}
+    >
+      <Text
+        allowFontScaling={false}
+        style={[styles.header, { color: theme.text.primary }]}
+      >
+        {listName == "watchedMovies"
+          ? i18nText("autoI18n.izlenen_filmler", "İzlenen Filmler")
+          : listName == "watchedTv"
+            ? i18nText("autoI18n.izlenen_diziler", "İzlenen Diziler")
+            : listName == "favorites"
+              ? "Favoriler"
+              : listName == "watchList"
+                ? i18nText("autoI18n.izlenecekler", "İzlenecekler")
+                : listName}
+      </Text>
+
+      {/* 15'ten fazla öğe varsa arama çubuğunu göster */}
+
+      {isLoading ? (
+        renderSkeleton()
+      ) : listItems.length === 0 ? (
+        <Text
+          allowFontScaling={false}
+          style={[styles.emptyText, { color: theme.text.muted }]}
+        >{i18nText("autoI18n.bu_liste_bos", "Bu liste boş.")}</Text>
+      ) : (
+        <>
+          {listItems.length > 12 && (
+            <View style={styles.searchRow}>
+              <TextInput
+                style={[
+                  styles.searchInput,
+                  styles.searchInputFlex,
+                  { backgroundColor: theme.secondary, color: theme.text.primary },
+                ]}
+                placeholder={i18nText("autoI18n.ara", "Ara...")}
+                placeholderTextColor={theme.text.muted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setFilterModalVisible(true)}
+                style={[
+                  styles.filterBtn,
+                  {
+                    backgroundColor: theme.secondary,
+                    borderColor:
+                      sortActive || activeFilterCount > 0 ? accent : theme.border,
+                  },
+                ]}
+              >
+                {filtering ? (
+                  <ActivityIndicator size="small" color={accent} />
+                ) : (
+                  <Feather name="sliders" size={18} color={theme.text.primary} />
+                )}
+                {!filtering && (sortActive || activeFilterCount > 0) ? (
+                  <View style={[styles.filterDot, { backgroundColor: accent }]}>
+                    <Text style={styles.filterDotText}>
+                      {activeFilterCount + (sortActive ? 1 : 0)}
+                    </Text>
+                  </View>
+                ) : null}
+              </TouchableOpacity>
+            </View>
+          )}
+          {listName == "watchList" && (
+            <View style={{ marginBottom: 95, marginHorizontal: 15 }}>
+              {/* Interactive 3-Way Random Selector & Stats */}
+              <SwipeCard
+                leftButton={{
+                  label: i18nText("autoI18n.sadece_dizi", "📺 Sadece\nDizi"),
+                  color: "#8847ff",
+                  onPress: () => chooseRandomly("tv"),
+                }}
+                rightButton={{
+                  label: i18nText("autoI18n.sadece_film", "🎬 Sadece\nFilm"),
+                  color: "#4b69ff",
+                  onPress: () => chooseRandomly("movie"),
+                }}
+              >
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => chooseRandomly("mixed")}
+                  style={{
+                    width: "100%",
+                    height: 90,
+                    backgroundColor: theme.secondary,
+                    borderColor: theme.border,
+                    borderWidth: 1,
+                    borderRadius: 24,
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    overflow: "hidden",
+                  }}
+                >
+                  <LinearGradient
+                    colors={["#396fe415", "transparent"]}
+                    style={StyleSheet.absoluteFill}
+                  />
+
+                  {/* Main Call to Action */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 6,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 22,
+                        backgroundColor: "#3961e433",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        borderWidth: 1,
+                        borderColor: "#3961e466",
+                      }}
+                    >
+                      <Text style={{ fontSize: 16 }}>🎲</Text>
+                    </View>
+                    <View>
+                      <Text
+                        style={{
+                          color: "#3983e4ff",
+                          fontSize: 14,
+                          fontWeight: "bold",
+                          letterSpacing: 0.5,
+                        }}
+                      >{i18nText("autoI18n.rastgele_ne_izlesem", "Rastgele Ne İzlesem?")}</Text>
+                      <Text
+                        style={{
+                          color: "#3983e4aa",
+                          fontSize: 10,
+                          marginTop: 2,
+                          fontWeight: "500",
+                        }}
+                      >{i18nText("autoI18n.karisik_icin_bas_dizi_film_icin_kaydir", "Karışık için bas, Dizi/Film için kaydır")}</Text>
+                    </View>
+                  </View>
+
+                  {/* Context Stats (Count chips) wrapped inside */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      width: "100%",
+                      justifyContent: "space-between",
+                      gap: 8,
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.countChip,
+                        {
+                          flex: 1,
+                          paddingVertical: 3,
+                          borderColor: "#4b69ff44",
+                          backgroundColor: "#4b69ff15",
+                        },
+                      ]}
+                    >
+                      <Feather name="chevron-left" size={14} color="#4b69ff" />
+                      <Text
+                        style={[styles.countChipTextBlue, { fontSize: 14 }]}
+                      >
+                        {movieCount}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          color: "#4b69ff88",
+                          fontWeight: "600",
+                          marginTop: 2,
+                        }}
+                      >{i18nText("autoI18n.film_2", "FİLM")}</Text>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.countChip,
+                        {
+                          flex: 1,
+                          paddingVertical: 3,
+                          borderColor: "#e4ae3944",
+                          backgroundColor: "#e4ae3915",
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.countChipTextGold, { fontSize: 14 }]}
+                      >
+                        ∑ {filteredItems.length}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          color: "#e4ae3988",
+                          fontWeight: "600",
+                          marginTop: 2,
+                        }}
+                      >
+                        TOPLAM
+                      </Text>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.countChip,
+                        {
+                          flex: 1,
+                          paddingVertical: 3,
+                          borderColor: "#8847ff44",
+                          backgroundColor: "#8847ff15",
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.countChipTextPurple, { fontSize: 14 }]}
+                      >
+                        📺 {tvCount}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          color: "#8847ff88",
+                          fontWeight: "600",
+                          marginTop: 2,
+                        }}
+                      >{i18nText("autoI18n.dizi_2", "DİZİ")}</Text>
+                      <Feather name="chevron-right" size={14} color="#8847ff" />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </SwipeCard>
+            </View>
+          )}
+          {listName == "watchedTv" && (
+            <View
+              style={{
+                flexDirection: "row",
+                marginHorizontal: 15,
+                marginBottom: 12,
+                borderRadius: 14,
+                borderWidth: 1,
+                overflow: "hidden",
+                position: "relative",
+                padding: TAB_PADDING,
+                height: 40,
+                backgroundColor: theme.secondary,
+                borderColor: theme.border,
+              }}
+              onLayout={(e) => {
+                const w = e.nativeEvent.layout.width - TAB_PADDING * 2;
+                if (tabPillWidth !== w) setTabPillWidth(w);
+              }}
+            >
+              {/* Sliding indicator – translateX ile kasma yok */}
+              <Animated.View
+                style={{
+                  position: "absolute",
+                  top: TAB_PADDING,
+                  bottom: TAB_PADDING,
+                  left: TAB_PADDING,
+                  width: "33.33%",
+                  borderRadius: 11,
+                  zIndex: 0,
+                  backgroundColor: theme.accent,
+                  transform: [{ translateX: sliderTranslateX }],
+                }}
+              />
+
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 5,
+                  zIndex: 1,
+                  borderRadius: 11,
+                }}
+                onPress={() => handleTvTabPress(null)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "600",
+                    color: tvShowStatus === null ? "#fff" : theme.text.muted,
+                  }}
+                >{i18nText("autoI18n.tumu", "Tümü")}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 5,
+                  zIndex: 1,
+                  borderRadius: 11,
+                }}
+                onPress={() => handleTvTabPress(true)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "600",
+                    color: tvShowStatus === true ? "#fff" : theme.text.muted,
+                  }}
+                >
+                  Bitirilen
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 5,
+                  zIndex: 1,
+                  borderRadius: 11,
+                }}
+                onPress={() => handleTvTabPress(false)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "600",
+                    color: tvShowStatus === false ? "#fff" : theme.text.muted,
+                  }}
+                >
+                  Devam Eden
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          <FlatList
+            key={listName}
+            data={filteredItems}
+            initialNumToRender={12}
+            maxToRenderPerBatch={12}
+            windowSize={7}
+            removeClippedSubviews
+            keyExtractor={(item) => String(item.id)}
+            showsVerticalScrollIndicator={false}
+            numColumns={3}
+            contentContainerStyle={{
+              alignItems: "center",
+              paddingBottom: 40,
+            }}
+            columnWrapperStyle={{ justifyContent: "space-between" }}
+            renderItem={({ item, index }) => (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPressIn={() => onPressIn(item.id)}
+                onPressOut={() => onPressOut(item.id)}
+                onLongPress={() => {
+                  setReorderModalVisible(true);
+                  const originalIndex = listItems.findIndex(
+                    (i) => i.id === item.id,
+                  );
+                  setIndex(originalIndex);
+                  setReorderItems(item);
+                }}
+                onPress={() => {
+                  listName !== "watchedTv"
+                    ? navigation.navigate(
+                        item.type === "movie"
+                          ? "MovieDetails"
+                          : "TvShowsDetails",
+                        { id: item.id },
+                      )
+                    : setModalVisible(true);
+                  setListModalItems([item]); // Tek bir öğeyi modalda göstermek için diziye sarın
+                }}
+                style={styles.item}
+              >
+                <SwipeCard>
+                  <Animated.View
+                    style={[
+                      {
+                        margin: 3,
+                        transform: [{ scale: scaleValues[item.id] || 1 }],
+                      },
+                      item.type === "movie"
+                        ? { borderWidth: 0 }
+                        : item.showEpisodeCount ===
+                            (watchedCountById[item.id] || 0)
+                          ? item.showEpisodeCount && {
+                              borderWidth: 1, // Border kalınlığını artırdım
+                              borderTopColor: theme.primary,
+                              borderLeftColor: theme.primary,
+                              borderRightColor: theme.primary,
+                              borderBottomColor: theme.colors.green,
+                              borderRadius: 11,
+                            }
+                          : item.showEpisodeCount && {
+                              borderWidth: 1, // Border kalınlığını artırdım
+                              borderTopColor: theme.primary,
+                              borderLeftColor: theme.primary,
+                              borderRightColor: theme.primary,
+                              borderBottomColor: theme.colors.orange,
+
+                              borderRadius: 11,
+                            },
+                    ]}
+                  >
+                    <Image
+                      source={
+                        item.imagePath
+                          ? {
+                              uri: getTmdbUrl(item.imagePath, 'poster', 200),
+                            }
+                          : require("@assets/image/no_image.png")
+                      }
+                      style={styles.image}
+                    />
+                    {listName !== "watchedTv" &&
+                    listName !== "watchedMovies" ? (
+                      <Text
+                        style={[
+                          styles.typeBadge,
+                          {
+                            backgroundColor:
+                              item.type == "movie"
+                                ? theme.notesColor.blueBackground
+                                : theme.notesColor.greenBackground,
+                          },
+                        ]}
+                      >
+                        {item.type == "movie" ? t.typeMovies : t.typeTvSeries}
+                      </Text>
+                    ) : null}
+                    {listName !== "watchedTv" ? (
+                      item.minutes ? (
+                        <Text
+                          style={[
+                            styles.minutesBadge,
+                            {
+                              backgroundColor: theme.secondaryt,
+                              color: theme.text.primary,
+                            },
+                          ]}
+                        >
+                          {item.minutes + " " + t.minutes}
+                        </Text>
+                      ) : null
+                    ) : (
+                      <Text
+                        style={[
+                          styles.nameBadge,
+                          { backgroundColor: theme.secondaryt },
+                        ]}
+                      >
+                        {durationTextById[item.id]}
+                      </Text>
+                    )}
+                  </Animated.View>
+                </SwipeCard>
+              </TouchableOpacity>
+            )}
+          />
+        </>
+      )}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <BlurView
+            tint="dark"
+            intensity={50}
+            experimentalBlurMethod="dimezisBlurView"
+            style={StyleSheet.absoluteFill}
+          />
+          <TouchableOpacity
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+            }}
+            activeOpacity={1}
+            onPress={() => setModalVisible(false)}
+          />
+
+          {isLoading
+            ? renderSkeleton()
+            : listModalItems.length > 0 &&
+              (() => {
+                const item = listModalItems[0];
+                const watchedEps = (item.seasons || []).reduce(
+                  (acc, s) => acc + (s.episodes?.length || 0),
+                  0,
+                );
+                const totalEps = item.showEpisodeCount || 0;
+                const pct =
+                  totalEps > 0 ? Math.min(watchedEps / totalEps, 1) : 0;
+                const completed = totalEps > 0 && watchedEps >= totalEps;
+                const accent = completed
+                  ? theme.colors.green
+                  : theme.colors.orange;
+                const sortedSeasons = [...(item.seasons || [])].sort(
+                  (a, b) => a.seasonNumber - b.seasonNumber,
+                );
+                const posterSource = item.imagePath
+                  ? {
+                      uri: getTmdbUrl(item.imagePath, "poster", 200),
+                      cache: "force-cache",
+                    }
+                  : null;
+
+                return (
+                  <View
+                    style={[styles.sheet, { backgroundColor: theme.secondary }]}
+                  >
+                    {/* ── Hero: bulanık poster zemin üstünde dizi bilgisi ── */}
+                    <View style={styles.sheetHero}>
+                      {posterSource && (
+                        <Image
+                          source={posterSource}
+                          style={StyleSheet.absoluteFill}
+                          contentFit="cover"
+                          blurRadius={30}
+                        />
+                      )}
+                      <LinearGradient
+                        colors={["rgba(0,0,0,0.30)", theme.secondary]}
+                        style={StyleSheet.absoluteFill}
+                      />
+
+                      <View style={styles.sheetHandle} />
+                      <TouchableOpacity
+                        style={styles.sheetClose}
+                        onPress={() => setModalVisible(false)}
+                        hitSlop={10}
+                      >
+                        <Feather name="x" size={16} color="#fff" />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.heroRow}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          setModalVisible(false);
+                          navigation.navigate("TvShowsDetails", {
+                            id: item.id,
+                          });
+                        }}
+                      >
+                        <Image
+                          source={
+                            posterSource ||
+                            require("@assets/image/no_image.png")
+                          }
+                          style={styles.heroPoster}
+                        />
+                        <View style={styles.heroInfo}>
+                          <Text
+                            numberOfLines={2}
+                            style={[
+                              styles.heroTitle,
+                              { color: theme.text.primary },
+                            ]}
+                          >
+                            {item.name}
+                          </Text>
+
+                          <View style={styles.heroChips}>
+                            <View style={styles.heroChip}>
+                              <Feather
+                                name="layers"
+                                size={10}
+                                color="rgba(255,255,255,0.85)"
+                              />
+                              <Text style={styles.heroChipText}>
+                                {item.showSeasonCount}{" "}
+                                {i18nText("autoI18n.sezon", "sezon")}
+                              </Text>
+                            </View>
+                            <View style={styles.heroChip}>
+                              <Feather
+                                name="tv"
+                                size={10}
+                                color="rgba(255,255,255,0.85)"
+                              />
+                              <Text style={styles.heroChipText}>
+                                {item.showEpisodeCount}{" "}
+                                {i18nText("autoI18n.bolum_4", "bölüm")}
+                              </Text>
+                            </View>
+                            <View
+                              style={[
+                                styles.heroChip,
+                                {
+                                  backgroundColor: accent + "33",
+                                  borderColor: accent + "77",
+                                },
+                              ]}
+                            >
+                              <View
+                                style={[
+                                  styles.heroStatusDot,
+                                  { backgroundColor: accent },
+                                ]}
+                              />
+                              <Text
+                                style={[
+                                  styles.heroChipText,
+                                  { color: accent },
+                                ]}
+                              >
+                                {completed
+                                  ? i18nText(
+                                      "autoI18n.tamamlandi",
+                                      "Tamamlandı",
+                                    )
+                                  : i18nText(
+                                      "autoI18n.devam_ediyor",
+                                      "Devam ediyor",
+                                    )}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.heroProgressRow}>
+                            <View style={styles.heroProgressTrack}>
+                              <View
+                                style={{
+                                  width: `${pct * 100}%`,
+                                  height: "100%",
+                                  borderRadius: 3,
+                                  backgroundColor: accent,
+                                }}
+                              />
+                            </View>
+                            <Text
+                              style={[
+                                styles.heroProgressPct,
+                                { color: accent },
+                              ]}
+                            >
+                              %{Math.round(pct * 100)}
+                            </Text>
+                          </View>
+                          <Text
+                            style={[
+                              styles.heroProgressDetail,
+                              { color: theme.text.muted },
+                            ]}
+                          >
+                            {watchedEps}/{totalEps}{" "}
+                            {i18nText(
+                              "autoI18n.bolum_izlendi",
+                              "bölüm izlendi",
+                            )}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* ── Gövde: CTA + sezonlar ── */}
+                    <View style={styles.sheetBody}>
+                      <View style={[styles.sectionRow, { marginTop: 0 }]}>
+                        <Text
+                          style={[
+                            styles.sectionLabel,
+                            { color: theme.text.muted },
+                          ]}
+                        >
+                          {i18nText("autoI18n.sezonlar_upper", "SEZONLAR")}
+                        </Text>
+                        <View
+                          style={[
+                            styles.sectionCount,
+                            { backgroundColor: theme.primary },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.sectionCountText,
+                              { color: theme.text.secondary },
+                            ]}
+                          >
+                            {sortedSeasons.length}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <ScrollView
+                        style={{ maxHeight: height * 0.36 }}
+                        contentContainerStyle={styles.seasonGrid}
+                        showsVerticalScrollIndicator={false}
+                      >
+                        {sortedSeasons.length > 0 ? (
+                          sortedSeasons.map((season) => {
+                            const sw = season.episodes?.length || 0;
+                            const st = season.seasonEpisodes || 0;
+                            const sPct = st > 0 ? Math.min(sw / st, 1) : 0;
+                            const sComplete = st > 0 && sw >= st;
+                            const sColor = sComplete
+                              ? theme.colors.green
+                              : theme.colors.orange;
+                            return (
+                              <TouchableOpacity
+                                key={season.seasonNumber}
+                                activeOpacity={0.85}
+                                onPress={() => {
+                                  setModalVisible(false);
+                                  navigation.navigate("SeasonDetails", {
+                                    showId: item.id,
+                                    seasonNumber: season.seasonNumber,
+                                  });
+                                }}
+                                style={[
+                                  styles.seasonCard,
+                                  {
+                                    backgroundColor: theme.primary,
+                                    borderColor: theme.border,
+                                  },
+                                ]}
+                              >
+                                <View style={styles.seasonPosterWrap}>
+                                  <Image
+                                    source={
+                                      season.seasonPosterPath
+                                        ? {
+                                            uri: getTmdbUrl(
+                                              season.seasonPosterPath,
+                                              "poster",
+                                              200,
+                                            ),
+                                            cache: "force-cache",
+                                          }
+                                        : require("@assets/image/no_image.png")
+                                    }
+                                    style={styles.seasonPoster}
+                                  />
+                                  <LinearGradient
+                                    colors={[
+                                      "transparent",
+                                      "rgba(0,0,0,0.75)",
+                                    ]}
+                                    style={styles.seasonPosterShade}
+                                  />
+                                  <View style={styles.seasonNoBadge}>
+                                    <Text style={styles.seasonNoText}>
+                                      S{season.seasonNumber}
+                                    </Text>
+                                  </View>
+                                  {sComplete && (
+                                    <View
+                                      style={[
+                                        styles.seasonCheck,
+                                        {
+                                          backgroundColor: theme.colors.green,
+                                        },
+                                      ]}
+                                    >
+                                      <Feather
+                                        name="check"
+                                        size={10}
+                                        color="#fff"
+                                      />
+                                    </View>
+                                  )}
+                                  <View style={styles.seasonMiniTrack}>
+                                    <View
+                                      style={{
+                                        width: `${sPct * 100}%`,
+                                        height: "100%",
+                                        backgroundColor: sColor,
+                                      }}
+                                    />
+                                  </View>
+                                </View>
+                                <Text
+                                  numberOfLines={1}
+                                  style={[
+                                    styles.seasonName,
+                                    { color: theme.text.primary },
+                                  ]}
+                                >
+                                  {season.seasonNumber}. Sezon
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.seasonEpText,
+                                    { color: sColor },
+                                  ]}
+                                >
+                                  {sw}/{st}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })
+                        ) : (
+                          <Text
+                            style={{
+                              color: theme.text.muted,
+                              textAlign: "center",
+                              paddingVertical: 24,
+                              width: "100%",
+                            }}
+                          >
+                            {i18nText("autoI18n.bu_dizi_bos", "Bu dizi boş.")}
+                          </Text>
+                        )}
+                      </ScrollView>
+                    </View>
+                  </View>
+                );
+              })()}
+        </View>
+      </Modal>
+      <CaseOpeningModal
+        visible={randomModalVisible}
+        onClose={() => setRandomModalVisible(false)}
+        items={filteredItems}
+        filterType={filterType}
+        onNavigate={(item) => {
+          navigation.navigate(
+            item.type === "movie" ? "MovieDetails" : "TvShowsDetails",
+            { id: item.id },
+          );
+        }}
+      />
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={reorderModalVisible}
+        onRequestClose={() => setReorderModalVisible(false)}
+      >
+        <BlurView
+          tint="dark"
+          intensity={50}
+          experimentalBlurMethod="dimezisBlurView"
+          style={StyleSheet.absoluteFill}
+        />
+        <TouchableOpacity
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+          }}
+          onPress={() => setReorderModalVisible(false)}
+        />
+
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: 200,
+              //height: 320,
+              borderRadius: 30,
+              justifyContent: "center",
+              alignItems: "center",
+              //backgroundColor: theme.secondary,
+              gap: 10,
+            }}
+          >
+            <Text
+              style={{
+                color: theme.text.primary,
+                fontWeight: "bold",
+                fontSize: 12,
+              }}
+            ></Text>
+            <Image
+              source={
+                reorderItems?.imagePath
+                  ? {
+                      uri: getTmdbUrl(reorderItems.imagePath, 'poster', 200),
+                    }
+                  : require("@assets/image/no_image.png")
+              }
+              style={styles.imageReorder}
+            />
+            <Text
+              style={{
+                color: theme.text.primary,
+                fontWeight: "bold",
+                fontSize: 12,
+              }}
+            >
+              {reorderItems?.name}
+            </Text>
+            <Text
+              style={{
+                color: theme.text.primary,
+                fontWeight: "bold",
+                fontSize: 12,
+              }}
+            >
+              {index + 1}{i18nText("autoI18n.sirada", ". sırada")}</Text>
+            <TextInput
+              value={value}
+              onChangeText={handleChange}
+              keyboardType="numeric"
+              placeholder={i18nText("autoI18n.move_between_range", "1 ile {{count}} arasında taşıyın", { count: listItems.length })}
+              placeholderTextColor={theme.text.muted}
+              style={{
+                width: 150,
+                color: theme.text.primary,
+                backgroundColor: theme.primary,
+                paddingVertical: 5,
+                paddingHorizontal: 10,
+                borderRadius: 10,
+              }}
+            />
+            <TouchableOpacity
+              onPress={() => {
+                reorderWatchedTv(index, value, listName);
+              }}
+              style={{
+                justifyContent: "center",
+                alignItems: "center",
+                marginBottom: 20,
+              }}
+            >
+              <Text
+                style={{
+                  color: theme.text.primary,
+                  fontWeight: "bold",
+                  textAlign: "center",
+                  backgroundColor: theme.between,
+                  paddingVertical: 10,
+                  paddingHorizontal: 30,
+                  borderRadius: 15,
+                }}
+              >{i18nText("autoI18n.tasi", "Taşı")}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Sıralama & Filtreleme modalı ── */}
+      <Modal
+        animationType="slide"
+        transparent
+        visible={filterModalVisible}
+        onRequestClose={() => setFilterModalVisible(false)}
+      >
+        <View style={{ flex: 1, justifyContent: "flex-end" }}>
+          <BlurView tint="dark" intensity={30} style={StyleSheet.absoluteFill} />
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setFilterModalVisible(false)}
+          />
+          <View
+            style={[
+              fStyles.sheet,
+              { backgroundColor: theme.primary, borderColor: theme.border },
+            ]}
+          >
+            <View style={[fStyles.handle, { backgroundColor: theme.border }]} />
+
+            <View style={fStyles.headerRow}>
+              <Text style={[fStyles.title, { color: theme.text.primary }]}>{i18nText("autoI18n.sirala_filtrele", "Sırala & Filtrele")}</Text>
+              <TouchableOpacity onPress={resetFilters} hitSlop={8}>
+                <Text style={[fStyles.reset, { color: theme.between }]}>{i18nText("autoI18n.sifirla", "Sıfırla")}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 10 }}
+            >
+              {/* Sıralama */}
+              <Text style={[fStyles.section, { color: theme.text.muted }]}>
+                SIRALAMA
+              </Text>
+              {[
+                { key: "default", label: i18nText("autoI18n.varsayilan_liste_sirasi", "Varsayılan (liste sırası)"), icon: "list" },
+                { key: "dateAdded", label: "Eklenme tarihi", icon: "calendar" },
+                { key: "name", label: i18nText("autoI18n.isim", "İsim"), icon: "type" },
+                { key: "minutes", label: i18nText("autoI18n.sure", "Süre"), icon: "clock" },
+              ].map((opt) => {
+                const selected = sortBy === opt.key;
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      if (opt.key === "default") setSortBy("default");
+                      else if (selected)
+                        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                      else setSortBy(opt.key);
+                    }}
+                    style={[
+                      fStyles.sortRow,
+                      {
+                        backgroundColor: selected
+                          ? theme.between + "18"
+                          : theme.secondary,
+                        borderColor: selected ? theme.between : theme.border,
+                      },
+                    ]}
+                  >
+                    <Feather
+                      name={opt.icon}
+                      size={16}
+                      color={selected ? theme.between : theme.text.secondary}
+                    />
+                    <Text
+                      style={[
+                        fStyles.sortLabel,
+                        { color: selected ? theme.text.primary : theme.text.secondary },
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                    {selected && opt.key !== "default" ? (
+                      <View style={fStyles.dirWrap}>
+                        <Feather
+                          name={sortDir === "asc" ? "arrow-up" : "arrow-down"}
+                          size={15}
+                          color={theme.between}
+                        />
+                        <Text style={[fStyles.dirText, { color: theme.between }]}>
+                          {sortDir === "asc" ? "Artan" : "Azalan"}
+                        </Text>
+                      </View>
+                    ) : selected ? (
+                      <Feather name="check" size={16} color={theme.between} />
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
+
+              {/* Tür (yalnız karışık listelerde) */}
+              {listName !== "watchedMovies" && listName !== "watchedTv" ? (
+                <>
+                  <Text style={[fStyles.section, { color: theme.text.muted }]}>{i18nText("autoI18n.tur", "TÜR")}</Text>
+                  <View style={fStyles.segRow}>
+                    {[
+                      { key: "all", label: "Hepsi" },
+                      { key: "movie", label: t.typeMovies || i18nText("autoI18n.film", "Film") },
+                      { key: "tv", label: t.typeTvSeries || i18nText("autoI18n.dizi", "Dizi") },
+                    ].map((opt) => {
+                      const sel = typeFilter === opt.key;
+                      return (
+                        <TouchableOpacity
+                          key={opt.key}
+                          activeOpacity={0.8}
+                          onPress={() => setTypeFilter(opt.key)}
+                          style={[
+                            fStyles.segBtn,
+                            {
+                              backgroundColor: sel ? theme.between : theme.secondary,
+                              borderColor: sel ? theme.between : theme.border,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              fStyles.segText,
+                              { color: sel ? "#fff" : theme.text.secondary },
+                            ]}
+                          >
+                            {opt.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              ) : null}
+
+              {/* Eklenme tarihi aralığı */}
+              {hasDates ? (
+                <>
+                  <Text style={[fStyles.section, { color: theme.text.muted }]}>{i18nText("autoI18n.eklenme_tarihi", "EKLENME TARİHİ")}</Text>
+                  <View style={fStyles.chipsWrap}>
+                    {[
+                      { key: "all", label: i18nText("autoI18n.tumu", "Tümü") },
+                      { key: "7", label: i18nText("autoI18n.son_7_gun", "Son 7 gün") },
+                      { key: "30", label: i18nText("autoI18n.son_30_gun", "Son 30 gün") },
+                      { key: "365", label: i18nText("autoI18n.son_1_yil", "Son 1 yıl") },
+                    ].map((opt) => {
+                      const sel = dateRange === opt.key;
+                      return (
+                        <TouchableOpacity
+                          key={opt.key}
+                          activeOpacity={0.8}
+                          onPress={() => setDateRange(opt.key)}
+                          style={[
+                            fStyles.chip,
+                            {
+                              backgroundColor: sel
+                                ? theme.between + "22"
+                                : theme.secondary,
+                              borderColor: sel ? theme.between : theme.border,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              fStyles.chipText,
+                              { color: sel ? theme.between : theme.text.secondary },
+                            ]}
+                          >
+                            {opt.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              ) : null}
+
+              {/* Türler (genre) */}
+              {availableGenres.length > 0 ? (
+                <>
+                  <Text style={[fStyles.section, { color: theme.text.muted }]}>{i18nText("autoI18n.turler", "TÜRLER")}</Text>
+                  <View style={fStyles.chipsWrap}>
+                    {availableGenres.map((g) => {
+                      const sel = genreFilter.includes(g);
+                      return (
+                        <TouchableOpacity
+                          key={g}
+                          activeOpacity={0.8}
+                          onPress={() => toggleGenre(g)}
+                          style={[
+                            fStyles.chip,
+                            {
+                              backgroundColor: sel
+                                ? theme.between + "22"
+                                : theme.secondary,
+                              borderColor: sel ? theme.between : theme.border,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              fStyles.chipText,
+                              { color: sel ? theme.between : theme.text.secondary },
+                            ]}
+                          >
+                            {g}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              ) : null}
+            </ScrollView>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setFilterModalVisible(false)}
+              style={[fStyles.applyBtn, { backgroundColor: accent }]}
+            >
+              {filtering ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={fStyles.applyText}>
+                  {filteredItems.length}{i18nText("autoI18n.sonuc_goster", "sonuç göster")}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      <BackButton top={8} />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    //paddingTop: 0,
+    paddingHorizontal: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  header: {
+    fontWeight: "bold",
+    fontSize: 22,
+    textAlign: "center",
+    marginBottom: 20,
+    paddingHorizontal: 15,
+  },
+  searchInput: {
+    height: 40,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+  },
+  searchRow: {
+    width: "95%",
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  searchInputFlex: { flex: 1 },
+  filterBtn: {
+    width: 44,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterDot: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  filterDotText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+  emptyText: {
+    fontSize: 16,
+    textAlign: "center",
+  },
+
+  itemTvShow: {
+    width: 120,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  minutesBadge: {
+    position: "absolute",
+    top: 3,
+    right: 3,
+    fontSize: 9,
+    paddingVertical: 2,
+    paddingHorizontal: 5,
+    borderRadius: 10,
+  },
+  typeBadge: {
+    position: "absolute",
+    top: 3,
+    left: 3,
+    fontSize: 9,
+    backgroundColor: "#555",
+    color: "#fff",
+    paddingVertical: 2,
+    paddingHorizontal: 5,
+    borderRadius: 10,
+  },
+  nameBadge: {
+    position: "absolute",
+    top: 3,
+    right: 3,
+    left: 3,
+    fontSize: 9,
+    textAlign: "center",
+    backgroundColor: "#555",
+    color: "#fff",
+    paddingVertical: 1,
+    paddingHorizontal: 5,
+    borderRadius: 10,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  skeletonImage: {
+    width: 120,
+    height: 180,
+    borderRadius: 10,
+    margin: 5,
+  },
+  skeletonText: {
+    width: 100,
+    height: 20,
+    borderRadius: 10,
+    marginTop: 5,
+  },
+  skeletonTextSmall: {
+    width: 60,
+    height: 15,
+    borderRadius: 10,
+    marginTop: 5,
+  },
+  infoContainer: {
+    paddingTop: 15,
+    borderTopRightRadius: 15,
+    borderTopLeftRadius: 15,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  item: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  image: {
+    width: width * 0.3,
+    height: height * 0.22,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.94,
+    shadowRadius: 10.32,
+    elevation: 5,
+  },
+  imageReorder: {
+    width: width * 0.4,
+    height: height * 0.3,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.94,
+    shadowRadius: 10.32,
+    elevation: 5,
+  },
+  imageSelected: {
+    width: 100,
+    height: 150,
+    borderRadius: 10,
+    margin: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.94,
+    shadowRadius: 10.32,
+    elevation: 5,
+  },
+  title: {
+    fontWeight: "bold",
+    fontSize: 16,
+    textAlign: "center",
+  },
+  detail: {
+    fontSize: 12,
+    textAlign: "center",
+    marginVertical: 3,
+    marginHorizontal: 3,
+  },
+  detailGenres: {
+    fontSize: 12,
+    textAlign: "center",
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+  },
+  detailSeason: {
+    fontSize: 11,
+    textAlign: "center",
+  },
+  seasonBox: {
+    padding: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    //borderTopWidth: 0,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.94,
+    shadowRadius: 10.32,
+    elevation: 5,
+  },
+
+  // ── İzlenen dizi modalı (modern bottom sheet) ─────────────────────────────
+  sheet: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    overflow: "hidden",
+  },
+  sheetHero: {
+    paddingTop: 14,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.45)",
+    marginBottom: 14,
+  },
+  sheetClose: {
+    position: "absolute",
+    top: 14,
+    right: 14,
+    zIndex: 5,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  heroRow: { flexDirection: "row", gap: 14 },
+  heroPoster: {
+    width: 96,
+    height: 144,
+    borderRadius: 14,
+    backgroundColor: "#2a2a2a",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  heroInfo: { flex: 1, justifyContent: "center", gap: 8, paddingRight: 4 },
+  heroTitle: { fontSize: 19, fontWeight: "800", letterSpacing: -0.4 },
+  heroChips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  heroChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(0,0,0,0.30)",
+  },
+  heroChipText: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.85)",
+  },
+  heroStatusDot: { width: 6, height: 6, borderRadius: 3 },
+  heroProgressRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  heroProgressTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+  heroProgressPct: {
+    fontSize: 12,
+    fontWeight: "800",
+    minWidth: 36,
+    textAlign: "right",
+  },
+  heroProgressDetail: { fontSize: 11, fontWeight: "600" },
+
+  sheetBody: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 30 },
+  ctaBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 13,
+    borderRadius: 16,
+  },
+  ctaText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+  },
+  sectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 18,
+    marginBottom: 10,
+  },
+  sectionLabel: { fontSize: 11, fontWeight: "800", letterSpacing: 1.2 },
+  sectionCount: {
+    minWidth: 22,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sectionCountText: { fontSize: 10, fontWeight: "800" },
+
+  seasonGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  seasonCard: {
+    width: (width - 60) / 3,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 6,
+    alignItems: "center",
+    gap: 6,
+  },
+  seasonPosterWrap: {
+    width: "100%",
+    aspectRatio: 2 / 3,
+    borderRadius: 10,
+    overflow: "hidden",
+    position: "relative",
+    backgroundColor: "#2a2a2a",
+  },
+  seasonPoster: { width: "100%", height: "100%" },
+  seasonPosterShade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "45%",
+  },
+  seasonNoBadge: {
+    position: "absolute",
+    top: 5,
+    left: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  seasonNoText: { color: "#fff", fontSize: 9, fontWeight: "800" },
+  seasonCheck: {
+    position: "absolute",
+    top: 5,
+    right: 5,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  seasonMiniTrack: {
+    position: "absolute",
+    left: 6,
+    right: 6,
+    bottom: 6,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    overflow: "hidden",
+  },
+  seasonName: { fontSize: 11, fontWeight: "700", textAlign: "center" },
+  seasonEpText: { fontSize: 10, fontWeight: "800" },
+
+  // Count chips
+  countRow: {
+    flexDirection: "row",
+    gap: 7,
+    marginBottom: 8,
+    flexWrap: "wrap",
+  },
+  countChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    paddingHorizontal: 5,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  countChipTextBlue: { color: "#4b69ff", fontWeight: "700", fontSize: 12 },
+  countChipTextPurple: { color: "#8847ff", fontWeight: "700", fontSize: 12 },
+  countChipTextGold: { color: "#e4ae39", fontWeight: "700", fontSize: 12 },
+
+  // Interactive Segmented Buttons
+  segmentContainer: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderRadius: 24,
+    padding: 4,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  segmentBtnCenter: {
+    flex: 1.4,
+    marginHorizontal: 4,
+  },
+  segmentText: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+});
+
+// ── Sıralama & filtreleme modalı stilleri ──────────────────────────────────
+const fStyles = StyleSheet.create({
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 16,
+    maxHeight: height * 0.82,
+  },
+  handle: {
+    alignSelf: "center",
+    width: 42,
+    height: 5,
+    borderRadius: 3,
+    marginBottom: 14,
+    opacity: 0.6,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  title: { fontSize: 18, fontWeight: "800", letterSpacing: -0.3 },
+  reset: { fontSize: 14, fontWeight: "700" },
+  section: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1,
+    marginTop: 16,
+    marginBottom: 9,
+  },
+  sortRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  sortLabel: { flex: 1, fontSize: 14.5, fontWeight: "600" },
+  dirWrap: { flexDirection: "row", alignItems: "center", gap: 4 },
+  dirText: { fontSize: 12, fontWeight: "700" },
+  segRow: { flexDirection: "row", gap: 8 },
+  segBtn: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  segText: { fontSize: 13.5, fontWeight: "700" },
+  chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  chipText: { fontSize: 13, fontWeight: "600" },
+  applyBtn: {
+    marginTop: 14,
+    paddingVertical: 15,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  applyText: { color: "#fff", fontSize: 15, fontWeight: "800" },
+});

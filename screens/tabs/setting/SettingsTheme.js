@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { StyleSheet, View, Text, Pressable, ScrollView } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useTheme } from "../../../context/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
@@ -10,7 +11,8 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { themes } from "../../../theme/colors";
+import { buildCustomTheme, themes } from "../../../theme/colors";
+import { i18nText } from "../../../utils/i18nText";
 
 const THEME_CONFIGS = [
   { key: "gray", icon: "contrast", labelKey: "grayTheme" },
@@ -20,8 +22,8 @@ const THEME_CONFIGS = [
   { key: "light", icon: "sunny", labelKey: "lightTheme" },
 ];
 
-const ThemeCard = ({ themeKey, isSelected, onPress, label, icon }) => {
-  const p = themes[themeKey];
+const ThemeCard = ({ themeKey, isSelected, onPress, label, icon, palette, onEdit }) => {
+  const p = palette || themes[themeKey] || themes.gray;
 
   const scale = useSharedValue(isSelected ? 1.07 : 1);
   const borderWidth = useSharedValue(isSelected ? 2 : 1);
@@ -135,6 +137,19 @@ const ThemeCard = ({ themeKey, isSelected, onPress, label, icon }) => {
         >
           <Ionicons name="checkmark" size={11} color="#fff" />
         </Animated.View>
+
+        {/* Düzenleme rozeti (yalnızca özel temalarda) */}
+        {onEdit ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Edit"
+            onPress={onEdit}
+            hitSlop={8}
+            style={[styles.editBadge, { backgroundColor: p.secondary, borderColor: p.border }]}
+          >
+            <Ionicons name="create-outline" size={12} color={p.text.primary} />
+          </Pressable>
+        ) : null}
       </Animated.View>
     </Pressable>
   );
@@ -142,7 +157,10 @@ const ThemeCard = ({ themeKey, isSelected, onPress, label, icon }) => {
 
 export default function SettingsTheme() {
   const { t } = useLanguage();
-  const { selectedTheme, changeTheme, theme } = useTheme();
+  const { selectedTheme, changeTheme, theme, customThemes = [] } = useTheme();
+  const navigation = useNavigation();
+
+  const openEditor = (themeId) => navigation.navigate("CustomThemeScreen", themeId ? { themeId } : undefined);
 
   return (
     <View
@@ -171,10 +189,44 @@ export default function SettingsTheme() {
             icon={cfg.icon}
           />
         ))}
+
+        {/* Kaydedilmiş özel temalar — her biri seçilebilir + düzenlenebilir */}
+        {customThemes.map((ct) => (
+          <ThemeCard
+            key={ct.id}
+            themeKey={`custom:${ct.id}`}
+            palette={buildCustomTheme(ct.tokens)}
+            isSelected={selectedTheme === `custom:${ct.id}`}
+            onPress={() => changeTheme(`custom:${ct.id}`)}
+            onEdit={() => openEditor(ct.id)}
+            label={ct.name || i18nText("autoI18n.ozel_tema", "Özel Tema")}
+            icon="color-palette"
+          />
+        ))}
+
+        {/* Yeni özel tema oluştur kartı */}
+        <AddThemeCard
+          theme={theme}
+          label={i18nText("autoI18n.ct_olustur", "Tema Oluştur")}
+          onPress={() => openEditor()}
+        />
       </ScrollView>
     </View>
   );
 }
+
+const AddThemeCard = ({ theme, label, onPress }) => (
+  <Pressable onPress={onPress} style={styles.cardWrapper}>
+    <View style={[styles.addCard, { borderColor: theme.accent, backgroundColor: theme.primary }]}>
+      <View style={[styles.addIcon, { backgroundColor: `${theme.accent}22` }]}>
+        <Ionicons name="add" size={26} color={theme.accent} />
+      </View>
+      <Text allowFontScaling={false} numberOfLines={1} style={[styles.addLabel, { color: theme.text.primary }]}>
+        {label}
+      </Text>
+    </View>
+  </Pressable>
+);
 
 const styles = StyleSheet.create({
   container: {
@@ -212,6 +264,30 @@ const styles = StyleSheet.create({
   topStrip: {
     height: 5,
     width: "100%",
+  },
+
+  /* Özel tema oluştur kartı */
+  addCard: {
+    width: 100,
+    height: 152,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingHorizontal: 8,
+  },
+  addIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addLabel: {
+    fontSize: 12,
+    fontWeight: "700",
   },
 
   /* Mockup alanı */
@@ -280,6 +356,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     flex: 1,
+  },
+
+  /* Düzenleme rozeti (özel temalar) */
+  editBadge: {
+    position: "absolute",
+    top: 10,
+    left: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   /* Checkmark rozeti */

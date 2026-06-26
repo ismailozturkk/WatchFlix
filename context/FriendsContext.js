@@ -1,0 +1,253 @@
+// context/FriendsContext.js
+//
+// Arkadaşlar + gelen/gönderilen istekler için merkezi state.
+// Realtime listener'lar burada yaşar — UI ekranları doğrudan Firestore'a
+// bakmaz, sadece bu context'i tüketir.
+
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import Toast from "react-native-toast-message";
+import { useAuth } from "./AuthContext";
+import {
+  subscribeToFriends,
+  subscribeToIncomingRequests,
+  subscribeToOutgoingRequests,
+  sendFriendRequest as sendReq,
+  acceptFriendRequest as acceptReq,
+  declineFriendRequest as declineReq,
+  cancelFriendRequest as cancelReq,
+  unfriend as unfriendApi,
+  blockUser as blockApi,
+  unblockUser as unblockApi,
+  checkRelationship as checkRel,
+} from "../services/friendsService";
+import { useUserProfile } from "./UserProfileContext";
+import { getUserProfile } from "../services/userService";
+import { i18nText } from "../utils/i18nText";
+
+
+const FriendsContext = createContext();
+export const useFriends = () => useContext(FriendsContext);
+
+export function FriendsProvider({ children }) {
+  const { user } = useAuth();
+  const { profile: myProfile } = useUserProfile();
+  const uid = user?.uid;
+
+  const [friends, setFriends] = useState([]);
+  const [incomingRequests, setIncomingRequests] = useState([]);
+  const [outgoingRequests, setOutgoingRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // ── Realtime listeners ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (!uid) {
+      setFriends([]);
+      setIncomingRequests([]);
+      setOutgoingRequests([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    let mounted = true;
+    let loadedCount = 0;
+    const markLoaded = () => {
+      loadedCount++;
+      if (loadedCount >= 3 && mounted) setLoading(false);
+    };
+
+    const unsubFriends = subscribeToFriends(uid, (list) => {
+      setFriends(list);
+      markLoaded();
+    });
+    const unsubIn = subscribeToIncomingRequests(uid, (list) => {
+      setIncomingRequests(list);
+      markLoaded();
+    });
+    const unsubOut = subscribeToOutgoingRequests(uid, (list) => {
+      setOutgoingRequests(list);
+      markLoaded();
+    });
+
+    return () => {
+      mounted = false;
+      unsubFriends();
+      unsubIn();
+      unsubOut();
+    };
+  }, [uid]);
+
+  // ── Derived helpers ──────────────────────────────────────────────────────
+  const friendUidSet = useMemo(
+    () => new Set(friends.map((f) => f.friendUid || f.id)),
+    [friends],
+  );
+  const incomingUidSet = useMemo(
+    () => new Set(incomingRequests.map((r) => r.fromUid)),
+    [incomingRequests],
+  );
+  const outgoingUidSet = useMemo(
+    () => new Set(outgoingRequests.map((r) => r.toUid)),
+    [outgoingRequests],
+  );
+
+  const isFriend = useCallback((targetUid) => friendUidSet.has(targetUid), [friendUidSet]);
+  const hasIncomingFrom = useCallback(
+    (targetUid) => incomingUidSet.has(targetUid),
+    [incomingUidSet],
+  );
+  const hasOutgoingTo = useCallback(
+    (targetUid) => outgoingUidSet.has(targetUid),
+    [outgoingUidSet],
+  );
+
+  // ── Actions ──────────────────────────────────────────────────────────────
+  const sendRequest = useCallback(
+    async (targetUid) => {
+      if (!myProfile?.uid) return;
+      if (targetUid === myProfile.uid) return;
+      try {
+        const targetProfile = await getUserProfile(targetUid);
+        if (!targetProfile) throw new Error(i18nText("autoI18n.kullanici_bulunamadi_2", "Kullanıcı bulunamadı"));
+        await sendReq(myProfile, targetProfile);
+        Toast.show({ type: "success", text1: i18nText("autoI18n.istek_gonderildi_2", "İstek gönderildi") });
+      } catch (e) {
+        Toast.show({ type: "error", text1: e.message });
+      }
+    },
+    [myProfile],
+  );
+
+  const acceptRequest = useCallback(
+    async (fromUid) => {
+      if (!myProfile?.uid) return;
+      try {
+        const fromProfile = await getUserProfile(fromUid);
+        if (!fromProfile) throw new Error(i18nText("autoI18n.kullanici_bulunamadi_2", "Kullanıcı bulunamadı"));
+        await acceptReq(myProfile, fromProfile);
+        Toast.show({ type: "success", text1: i18nText("autoI18n.arkadas_olarak_eklendi", "Arkadaş olarak eklendi") });
+      } catch (e) {
+        Toast.show({ type: "error", text1: e.message });
+      }
+    },
+    [myProfile],
+  );
+
+  const declineRequest = useCallback(
+    async (fromUid) => {
+      if (!uid) return;
+      try {
+        await declineReq(uid, fromUid);
+      } catch (e) {
+        Toast.show({ type: "error", text1: e.message });
+      }
+    },
+    [uid],
+  );
+
+  const cancelRequest = useCallback(
+    async (toUid) => {
+      if (!uid) return;
+      try {
+        await cancelReq(uid, toUid);
+      } catch (e) {
+        Toast.show({ type: "error", text1: e.message });
+      }
+    },
+    [uid],
+  );
+
+  const removeFriend = useCallback(
+    async (friendUid) => {
+      if (!uid) return;
+      try {
+        await unfriendApi(uid, friendUid);
+        Toast.show({ type: "success", text1: i18nText("autoI18n.arkadasliktan_cikarildi", "Arkadaşlıktan çıkarıldı") });
+      } catch (e) {
+        Toast.show({ type: "error", text1: e.message });
+      }
+    },
+    [uid],
+  );
+
+  const block = useCallback(
+    async (targetUid) => {
+      if (!myProfile?.uid) return;
+      try {
+        await blockApi(myProfile, targetUid);
+        Toast.show({ type: "success", text1: i18nText("autoI18n.kullanici_engellendi", "Kullanıcı engellendi") });
+      } catch (e) {
+        Toast.show({ type: "error", text1: e.message });
+      }
+    },
+    [myProfile],
+  );
+
+  const unblock = useCallback(
+    async (targetUid) => {
+      if (!uid) return;
+      try {
+        await unblockApi(uid, targetUid);
+        Toast.show({ type: "success", text1: i18nText("autoI18n.engel_kaldirildi", "Engel kaldırıldı") });
+      } catch (e) {
+        Toast.show({ type: "error", text1: e.message });
+      }
+    },
+    [uid],
+  );
+
+  const checkRelationship = useCallback(
+    async (targetUid) => checkRel(uid, targetUid),
+    [uid],
+  );
+
+  const value = useMemo(
+    () => ({
+      // state
+      friends,
+      incomingRequests,
+      outgoingRequests,
+      loading,
+      // derived
+      isFriend,
+      hasIncomingFrom,
+      hasOutgoingTo,
+      // actions
+      sendRequest,
+      acceptRequest,
+      declineRequest,
+      cancelRequest,
+      removeFriend,
+      block,
+      unblock,
+      checkRelationship,
+    }),
+    [
+      friends,
+      incomingRequests,
+      outgoingRequests,
+      loading,
+      isFriend,
+      hasIncomingFrom,
+      hasOutgoingTo,
+      sendRequest,
+      acceptRequest,
+      declineRequest,
+      cancelRequest,
+      removeFriend,
+      block,
+      unblock,
+      checkRelationship,
+    ],
+  );
+
+  return (
+    <FriendsContext.Provider value={value}>{children}</FriendsContext.Provider>
+  );
+}

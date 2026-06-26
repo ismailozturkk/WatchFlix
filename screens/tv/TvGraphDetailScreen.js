@@ -8,6 +8,7 @@ import {
   Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import BackButton from "../../components/BackButton";
 
 import React, {
   useEffect,
@@ -21,6 +22,8 @@ import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import LottieView from "lottie-react-native";
 import { useTheme } from "../../context/ThemeContext";
+import { i18nText } from "../../utils/i18nText";
+
 import {
   useApiSettings,
   useImageQualitySettings,
@@ -200,7 +203,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
             };
           }
         } catch (e) {
-          console.log("OMDb Ana Hata:", e);
+          console.log(i18nText("autoI18n.omdb_ana_hata", "OMDb Ana Hata:"), e);
         }
       }
 
@@ -231,7 +234,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
             );
             omdbEpisodes = omdbRes.data.Episodes || [];
           } catch (e) {
-            console.log("OMDb Sezon Hata:", e);
+            console.log(i18nText("autoI18n.omdb_sezon_hata", "OMDb Sezon Hata:"), e);
           }
         }
 
@@ -255,7 +258,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
       setTVShows(seasonsData);
     } catch (err) {
       setError(err.message);
-      console.error("Genel Hata:", err);
+      console.error(i18nText("autoI18n.genel_hata", "Genel Hata:"), err);
     } finally {
       setLoading(false);
     }
@@ -342,7 +345,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
       {showSnow && (
         <LottieView
           style={styles.lottie}
-          source={require("../../LottieJson/snow.json")}
+          source={require("@lottie/snow.json")}
           autoPlay
           loop
         />
@@ -482,9 +485,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                     {showDetail.imdb_votes} oy
                   </Text>
                 </View>
-                <Text style={styles.hintText}>
-                  Bölüme dokun → bölüm bilgisi
-                </Text>
+                <Text style={styles.hintText}>{i18nText("autoI18n.bolume_dokun_bolum_bilgisi", "Bölüme dokun → bölüm bilgisi")}</Text>
               </>
             )}
           </View>
@@ -567,6 +568,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
           </View>
         </ScrollView>
       </ScrollView>
+      <BackButton variant="blur" top={8} />
     </SafeAreaView>
   );
 };

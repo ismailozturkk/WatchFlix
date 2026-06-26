@@ -7,6 +7,13 @@ import {
 import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 import { useLanguage } from "./LanguageContext";
+import {
+  isAuthTransitionError,
+  snapshotErrorHandler,
+} from "../utils/firestoreError";
+import * as cacheStore from "../utils/cacheStore";
+import { cacheKeys } from "../utils/cacheKeys";
+import { shouldPersistInternetData } from "../utils/dataCacheSettings";
 
 const ProfileRemindersContext = createContext();
 export const useProfileReminders = () => useContext(ProfileRemindersContext);
@@ -107,7 +114,17 @@ export const ProfileRemindersProvider = ({ children }) => {
 
   useEffect(() => {
     if (!uid) { setLoading(false); return; }
-    setLoading(true);
+
+    // Offline-first: önce cache'ten seed.
+    const cachedMovies = cacheStore.getJSON(...cacheKeys.reminders(uid, "movies"));
+    const cachedEpisodes = cacheStore.getJSON(...cacheKeys.reminders(uid, "episodes"));
+    if (Array.isArray(cachedMovies)) setMovieReminders(cachedMovies);
+    if (Array.isArray(cachedEpisodes)) setAllTvEpisodes(cachedEpisodes);
+    if (Array.isArray(cachedMovies) || Array.isArray(cachedEpisodes)) {
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
 
     // ── Movies subcollection ────────────────────────────────────────────────
     const movieUnsub = onSnapshot(
@@ -125,15 +142,27 @@ export const ProfileRemindersProvider = ({ children }) => {
               }
             }
           } catch (err) {
-            console.error("Error checking old reminders:", err);
+            if (!isAuthTransitionError(err) && __DEV__)
+              console.warn("Error checking old reminders:", err?.message);
           }
           setMovieReminders([]);
+          if (shouldPersistInternetData()) {
+            cacheStore.setJSON(...cacheKeys.reminders(uid, "movies"), []);
+          }
         } else {
-          setMovieReminders(snap.docs.map((d) => d.data()));
+          const movies = snap.docs.map((d) => d.data());
+          setMovieReminders(movies);
+          if (shouldPersistInternetData()) {
+            cacheStore.setJSON(...cacheKeys.reminders(uid, "movies"), movies);
+          }
         }
         setLoading(false);
       },
-      (err) => { console.error("Movies snapshot error:", err); setLoading(false); },
+      (err) => {
+        if (!isAuthTransitionError(err) && __DEV__)
+          console.warn("[Reminders/movies] snapshot error:", err?.message);
+        setLoading(false);
+      },
     );
 
     // ── TV shows subcollection → dynamic episode subscriptions ──────────────
@@ -153,6 +182,9 @@ export const ProfileRemindersProvider = ({ children }) => {
 
         if (showsSnap.empty) {
           setAllTvEpisodes([]);
+          if (shouldPersistInternetData()) {
+            cacheStore.setJSON(...cacheKeys.reminders(uid, "episodes"), []);
+          }
           return;
         }
 
@@ -164,12 +196,17 @@ export const ProfileRemindersProvider = ({ children }) => {
             collection(db, "Reminders", uid, "tvShows", sid, "episodes"),
             (epSnap) => {
               epDataRef.current[sid] = epSnap.docs.map((d) => d.data());
-              setAllTvEpisodes(Object.values(epDataRef.current).flat());
+              const all = Object.values(epDataRef.current).flat();
+              setAllTvEpisodes(all);
+              if (shouldPersistInternetData()) {
+                cacheStore.setJSON(...cacheKeys.reminders(uid, "episodes"), all);
+              }
             },
+            snapshotErrorHandler("Reminders/episodes"),
           );
         });
       },
-      (err) => { console.error("TvShows snapshot error:", err); },
+      snapshotErrorHandler("Reminders/tvShows"),
     );
 
     return () => {

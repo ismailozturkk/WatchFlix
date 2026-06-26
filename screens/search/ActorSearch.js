@@ -1,3 +1,4 @@
+import { Image } from "expo-image";
 import React, { useCallback, useState, useRef, useEffect, memo } from "react";
 import {
   StyleSheet,
@@ -5,13 +6,12 @@ import {
   Text,
   TextInput,
   FlatList,
-  Image,
   Dimensions,
   ActivityIndicator,
   TouchableOpacity,
   ScrollView,
   Animated,
-  Keyboard,
+  Keyboard
 } from "react-native";
 import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
@@ -29,6 +29,8 @@ import { useFocusEffect } from "@react-navigation/native";
 import IconBacground from "../../components/IconBacground";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import { i18nText } from "../../utils/i18nText";
+
 
 const { width } = Dimensions.get("window");
 
@@ -286,7 +288,7 @@ const DiscoverSection = memo(
     const [trending, setTrending] = useState([]);
     const [loadingDiscover, setLoading] = useState(true);
     const tabAnim = useRef(new Animated.Value(0)).current;
-    const TABS = ["Popüler", "Trend"];
+    const TABS = [i18nText("autoI18n.populer", "Popüler"), "Trend"];
     const TAB_W = (width - 32) / 2;
 
     useEffect(() => {
@@ -480,13 +482,20 @@ const LayoutToggle = memo(({ viewMode, onToggle, theme }) => {
 });
 
 // ─── Ana Bileşen ──────────────────────────────────────────────────────────────
-export default function ActorSearch({ navigation, route }) {
+export default function ActorSearch({ navigation, route, isUnified, unifiedQuery, unifiedViewMode }) {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastSearch, setLastSearch] = useState([]);
-  const [viewMode, setViewMode] = useState("row");
+  const [internalViewMode, setInternalViewMode] = useState("row");
+  const viewMode = isUnified && unifiedViewMode ? unifiedViewMode : internalViewMode;
+  
+  const Container = isUnified ? View : SafeAreaView;
+
+  const handleToggleView = useCallback(() => {
+    setInternalViewMode((prev) => (prev === "row" ? "grid" : "row"));
+  }, []);
 
   const { language, t } = useLanguage();
   const { theme } = useTheme();
@@ -516,10 +525,16 @@ export default function ActorSearch({ navigation, route }) {
 
   useFocusEffect(
     useCallback(() => {
-      if (route.params?.autoFocus)
+      if (route?.params?.autoFocus)
         setTimeout(() => inputRef.current?.focus(), 100);
-    }, [route.params]),
+    }, [route?.params]),
   );
+
+  useEffect(() => {
+    if (isUnified && unifiedQuery !== undefined) {
+      handleSearch(unifiedQuery);
+    }
+  }, [unifiedQuery, isUnified]);
 
   const handleSearch = useCallback((text) => {
     setSearch(text);
@@ -578,7 +593,7 @@ export default function ActorSearch({ navigation, route }) {
     [language, adultContent, API_KEY],
   );
 
-  const handleToggleView = useCallback((next) => setViewMode(next), []);
+
 
   const renderRowResult = useCallback(
     ({ item, index }) => (
@@ -634,39 +649,38 @@ export default function ActorSearch({ navigation, route }) {
       <View style={styles.centerBox}>
         <LottieView
           style={{ width: 280, height: 280 }}
-          source={require("../../LottieJson/search_notfound.json")}
+          source={require("@lottie/search_notfound.json")}
           autoPlay
           loop
         />
         <Text
           style={[styles.emptyHint, { color: theme.text?.secondary ?? "#aaa" }]}
         >
-          "{search}" için sonuç bulunamadı
-        </Text>
+          "{search}{i18nText("autoI18n.icin_sonuc_bulunamadi", "\" için sonuç bulunamadı")}</Text>
       </View>
     ),
     [search, theme],
   );
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.primary }]}
+    <Container
+      style={[styles.container, !isUnified && { backgroundColor: theme.primary }]}
     >
-      <IconBacground opacity={0.3} />
+      {!isUnified && <IconBacground opacity={0.3} />}
 
       {/* ── Başlık ─────────────────────────────────────────────────────── */}
-      <Animated.Text
+      {!isUnified && <Animated.Text
         style={[
           styles.pageTitle,
           { color: theme.text?.primary ?? "#fff" },
           titleStyle,
         ]}
       >
-        {t.SearchScreen?.searchActrist ?? "Oyuncu Ara"}
-      </Animated.Text>
+        {t.SearchScreen?.searchActrist ?? i18nText("autoI18n.oyuncu_ara", "Oyuncu Ara")}
+      </Animated.Text>}
 
       {/* ── Arama Kutusu + Toggle ──────────────────────────────────────── */}
-      <Animated.View style={[styles.searchRow, searchBarStyle]}>
+      {!isUnified && <Animated.View style={[styles.searchRow, searchBarStyle]}>
         <View
           style={[
             styles.searchBar,
@@ -685,7 +699,7 @@ export default function ActorSearch({ navigation, route }) {
               styles.searchInput,
               { color: theme.text?.primary ?? "#fff" },
             ]}
-            placeholder={t.SearchScreen?.searchActrist ?? "Oyuncu ara..."}
+            placeholder={t.SearchScreen?.searchActrist ?? i18nText("autoI18n.oyuncu_ara_2", "Oyuncu ara...")}
             placeholderTextColor={theme.text?.muted ?? "#666"}
             value={search}
             onChangeText={handleSearch}
@@ -717,7 +731,7 @@ export default function ActorSearch({ navigation, route }) {
           onToggle={handleToggleView}
           theme={theme}
         />
-      </Animated.View>
+      </Animated.View>}
 
       {/* ── Son Aramalar ───────────────────────────────────────────────── */}
       {lastSearch.length > 0 && (
@@ -792,13 +806,13 @@ export default function ActorSearch({ navigation, route }) {
           ListEmptyComponent={search.length > 1 ? <EmptySearch /> : null}
         />
       )}
-    </SafeAreaView>
+    </Container>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 10 },
+  container: { flex: 1 ,paddingTop:10},
 
   pageTitle: {
     fontSize: 26,
@@ -837,7 +851,7 @@ const styles = StyleSheet.create({
   },
 
   // ── Son aramalar ──────────────────────────────────────────────────────────
-  chipsWrapper: { marginBottom: 4 },
+  chipsWrapper: { marginBottom: 10 },
   chipsList: { paddingHorizontal: 16, alignItems: "center", gap: 8 },
   chip: {
     flexDirection: "row",
@@ -851,7 +865,7 @@ const styles = StyleSheet.create({
   // ── ROW KART ──────────────────────────────────────────────────────────────
   rowList: {
     paddingHorizontal: 16,
-    paddingTop: 20,
+    paddingTop: 10,
     paddingBottom: 30,
   },
   rowCard: {
@@ -955,7 +969,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    resizeMode: "cover",
+    contentFit: "cover",
   },
   gridNoPhoto: {
     position: "absolute",

@@ -1,5 +1,6 @@
+import { Image } from "expo-image";
 import React from "react";
-import { StyleSheet, View, Text, Image, ScrollView } from "react-native";
+import { StyleSheet, View, Text, ScrollView } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
 export default function TVShowItem({ item }) {
@@ -176,7 +177,7 @@ const styles = StyleSheet.create({
   logoPath: {
     width: 80,
     height: 30,
-    resizeMode: "contain",
+    contentFit: "contain",
   },
   networkContainerList: {
     justifyContent: "center",

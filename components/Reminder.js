@@ -8,6 +8,8 @@ import {
 import Toast from "react-native-toast-message";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
+import { i18nText } from "../utils/i18nText";
+
 
 export default function Reminder({
   showId,
@@ -163,11 +165,11 @@ export default function Reminder({
       setIsReminderSet(!isReminderSet);
       Toast.show({
         type:  isReminderSet ? "error" : "success",
-        text1: isReminderSet ? "Hatırlatma kaldırıldı" : "Hatırlatma başarıyla eklendi",
+        text1: isReminderSet ? i18nText("autoI18n.hatirlatma_kaldirildi", "Hatırlatma kaldırıldı") : i18nText("autoI18n.hatirlatma_basariyla_eklendi", "Hatırlatma başarıyla eklendi"),
       });
     } catch (error) {
       console.error("Error adding reminder:", error);
-      Toast.show({ type: "error", text1: "Hatırlatma eklenirken bir hata oluştu" });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.hatirlatma_eklenirken_bir_hata_olustu", "Hatırlatma eklenirken bir hata oluştu") });
     }
   };
 

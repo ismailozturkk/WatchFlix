@@ -7,8 +7,11 @@ import {
   ScrollView,
   Dimensions,
   StatusBar,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import LottieView from "lottie-react-native";
 import { useSnow } from "../../context/SnowContext";
@@ -25,14 +28,19 @@ import Checkbox from "expo-checkbox";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import IconBacground from "../../components/IconBacground";
 import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
+import { alpha } from "../../theme/colors";
 import {
   useAuthRequest,
   makeRedirectUri,
   ResponseType,
 } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase";
+import { createUserProfile } from "../../services/userService";
+import { i18nText } from "../../utils/i18nText";
+
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -44,9 +52,16 @@ const GOOGLE_DISCOVERY = {
 const { width, height } = Dimensions.get("window");
 
 export default function LoginScreen({ navigation }) {
-  const { theme } = useTheme();
+  const { theme, selectedTheme } = useTheme();
   const { showSnow } = useSnow();
   const { t, language, toggleLanguage } = useLanguage();
+  const insets = useSafeAreaInsets();
+  const accent = theme.accent;
+  const hairline = theme.border;
+  const isLightTheme = selectedTheme === "light" || selectedTheme === "green";
+  const surface = isLightTheme ? "rgba(255,255,255,0.62)" : "rgba(255,255,255,0.055)";
+  const elevatedSurface = isLightTheme ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.075)";
+  const fieldSurface = isLightTheme ? "rgba(255,255,255,0.66)" : "rgba(0,0,0,0.18)";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isloading, setIsloading] = useState(false);
@@ -68,7 +83,7 @@ export default function LoginScreen({ navigation }) {
     try {
       const newUser = {
         email,
-        date: new Date().toLocaleString("tr-TR"),
+        date: new Date().toLocaleString(language === "tr" ? "tr-TR" : "en-US"),
       };
       let updatedUsers = [newUser, ...recentUsers];
       updatedUsers = updatedUsers.filter(
@@ -78,7 +93,7 @@ export default function LoginScreen({ navigation }) {
       await AsyncStorage.setItem("recentUsers", JSON.stringify(updatedUsers));
       setRecentUsers(updatedUsers);
     } catch (e) {
-      console.error("Kullanıcı kaydedilemedi", e);
+      console.error(i18nText("autoI18n.kullanici_kaydedilemedi", "Kullanıcı kaydedilemedi"), e);
     }
   };
 
@@ -105,7 +120,7 @@ export default function LoginScreen({ navigation }) {
         type: "success",
         text1: t.LoginScreen.loginToast + " " + userName,
       });
-      navigation.navigate("TabScreen", userCredentials.user);
+      navigation.reset({ index: 0, routes: [{ name: "TabScreen" }] });
     } catch (error) {
       Toast.show({
         type: "error",
@@ -125,7 +140,7 @@ export default function LoginScreen({ navigation }) {
     } else {
       Toast.show({
         type: "info",
-        text1: "Bu kullanıcı için parola kayıtlı değil.",
+        text1: i18nText("autoI18n.bu_kullanici_icin_parola_kayitli_degil", "Bu kullanıcı için parola kayıtlı değil."),
       });
     }
   };
@@ -165,25 +180,35 @@ export default function LoginScreen({ navigation }) {
       const userRef = doc(db, "Users", user.uid);
       const userSnap = await getDoc(userRef);
       if (!userSnap.exists()) {
-        const emailPrefix = user.email?.split("@")[0] || "user";
-        await setDoc(userRef, {
-          username: emailPrefix,
-          email: user.email,
-          displayName: user.displayName,
-          avatar: user.photoURL,
-          createdAt: new Date(),
-          friends: [],
-          friendRequests: { sendRequest: [], receivedRequest: [] },
-        });
+        const base = (user.email?.split("@")[0] || "user").replace(/[^a-zA-Z0-9_]/g, "");
+        let attemptUsername = base;
+        for (let i = 0; i < 5; i++) {
+          try {
+            await createUserProfile({
+              uid: user.uid,
+              username: attemptUsername,
+              email: user.email,
+              displayName: user.displayName,
+              avatarIndex: 0,
+            });
+            break;
+          } catch (e) {
+            if (/alınmış/.test(e.message)) {
+              attemptUsername = `${base}_${Math.floor(Math.random() * 9999)}`;
+            } else {
+              throw e;
+            }
+          }
+        }
       }
 
       Toast.show({
         type: "success",
-        text1: "Hoş geldin, " + (user.displayName || user.email),
+        text1: i18nText("autoI18n.hos_geldin", "Hoş geldin, ") + (user.displayName || user.email),
       });
-      navigation.navigate("TabScreen", user);
+      navigation.reset({ index: 0, routes: [{ name: "TabScreen" }] });
     } catch (error) {
-      Toast.show({ type: "error", text1: "Google ile giriş başarısız." });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.google_ile_giris_basarisiz", "Google ile giriş başarısız.") });
     } finally {
       setIsGoogleLoading(false);
     }
@@ -192,33 +217,65 @@ export default function LoginScreen({ navigation }) {
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
       <StatusBar
-        barStyle="light-content"
+        barStyle={isLightTheme ? "dark-content" : "light-content"}
         translucent
         backgroundColor="transparent"
       />
-      <IconBacground opacity={0.08} />
-
-      {/* Ambient gradient blob */}
-      <View style={styles.gradientBlob} pointerEvents="none">
+      <IconBacground opacity={isLightTheme ? 0.05 : 0.08} />
+      <View style={styles.backdropWash} pointerEvents="none">
         <LinearGradient
-          colors={["rgba(26,107,60,0.35)", "transparent"]}
-          style={{ width: 320, height: 320, borderRadius: 160 }}
+          colors={[
+            alpha(accent, isLightTheme ? 0.22 : 0.34),
+            alpha(theme.bold, isLightTheme ? 0.1 : 0.16),
+            "transparent",
+          ]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </View>
+      <View style={styles.shapeLayer} pointerEvents="none">
+        <View
+          style={[
+            styles.colorShape,
+            styles.shapeOne,
+            { backgroundColor: alpha(accent, isLightTheme ? 0.22 : 0.28) },
+          ]}
+        />
+        <View
+          style={[
+            styles.colorShape,
+            styles.shapeTwo,
+            { backgroundColor: alpha(theme.colors.orange, isLightTheme ? 0.18 : 0.24) },
+          ]}
+        />
+        <View
+          style={[
+            styles.colorShape,
+            styles.shapeThree,
+            { backgroundColor: alpha(theme.colors.green, isLightTheme ? 0.14 : 0.18) },
+          ]}
         />
       </View>
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
       <ScrollView
         style={{ flex: 1 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}
       >
         {/* Language toggle */}
         <TouchableOpacity
           style={[
             styles.languageButton,
             {
+              top: insets.top + 8,
               backgroundColor: theme.secondary,
-              borderColor: "rgba(255,255,255,0.08)",
+              borderColor: hairline,
             },
           ]}
           onPress={() => toggleLanguage(language === "tr" ? "en" : "tr")}
@@ -240,17 +297,55 @@ export default function LoginScreen({ navigation }) {
         {showSnow && (
           <LottieView
             style={styles.lottie}
-            source={require("../../LottieJson/snow.json")}
+            source={require("@lottie/snow.json")}
             autoPlay
             loop
           />
         )}
 
-        {/* Logo area */}
-        <View style={styles.logoContainer}>
+        <View style={styles.heroHeader}>
+          <View
+            style={[
+              styles.brandPill,
+              {
+                backgroundColor: elevatedSurface,
+                borderColor: alpha(accent, 0.28),
+              },
+            ]}
+          >
+            <Ionicons name="play-circle" size={15} color={accent} />
+            <Text style={[styles.brandPillText, { color: theme.text.primary }]}>
+              WATCHFLIX
+            </Text>
+          </View>
+          <Text style={[styles.heroTitle, { color: theme.text.primary }]}>
+            {i18nText("autoI18n.hesabina_devam_et", "Hesabına devam et")}
+          </Text>
+          <Text style={[styles.heroSubtitle, { color: theme.text.secondary }]}>
+            {i18nText("autoI18n.izleme_listelerin_ve_sosyal_akisin_hazir", "İzleme listelerin ve sosyal akışın hazır.")}
+          </Text>
+        </View>
+
+        <View
+          style={[
+            styles.logoContainer,
+            {
+              backgroundColor: surface,
+              borderColor: alpha(accent, 0.2),
+            },
+          ]}
+        >
+          <View style={styles.heroAccent} pointerEvents="none">
+            <LinearGradient
+              colors={[alpha(accent, 0.2), "transparent"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+          </View>
           <LottieView
-            source={require("../../LottieJson/login.json")}
-            style={{ width: 200, height: 200 }}
+            source={require("@lottie/login.json")}
+            style={styles.heroAnimation}
             autoPlay
             loop
           />
@@ -261,25 +356,40 @@ export default function LoginScreen({ navigation }) {
           style={[
             styles.card,
             {
-              backgroundColor: theme.secondary,
-              borderColor: "rgba(255,255,255,0.07)",
+              backgroundColor: isLightTheme
+                ? "rgba(255,255,255,0.18)"
+                : "rgba(18,18,18,0.28)",
+              borderColor: alpha(accent, isLightTheme ? 0.18 : 0.28),
+              shadowColor: accent,
             },
           ]}
         >
-          {/* Heading */}
+          <BlurView
+            tint="dark"
+            intensity={50}
+            experimentalBlurMethod="dimezisBlurView"
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.cardEyebrowRow}>
+            <View style={[styles.statusChip, { backgroundColor: alpha(accent, 0.12) }]}>
+              <Ionicons name="shield-checkmark-outline" size={14} color={accent} />
+              <Text style={[styles.statusChipText, { color: accent }]}>
+                {i18nText("autoI18n.guvenli_oturum", "Güvenli oturum")}
+              </Text>
+            </View>
+            <View style={[styles.statusDot, { backgroundColor: accent }]} />
+          </View>
           <Text style={[styles.title, { color: theme.text.primary }]}>
             {t.LoginScreen.loginButton}
           </Text>
           <Text style={[styles.subtitle, { color: theme.text.muted }]}>
-            Hesabınıza giriş yapın
+            {i18nText("autoI18n.e_posta_veya_google_ile_hizlica_giris_yap", "E-posta veya Google ile hızlıca giriş yap.")}
           </Text>
 
           {/* Recent users */}
           {recentUsers.length > 0 && (
             <View style={styles.recentContainer}>
-              <Text style={[styles.recentTitle, { color: theme.text.muted }]}>
-                Son giriş yapanlar
-              </Text>
+              <Text style={[styles.recentTitle, { color: theme.text.muted }]}>{i18nText("autoI18n.son_giris_yapanlar", "Son giriş yapanlar")}</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -291,8 +401,8 @@ export default function LoginScreen({ navigation }) {
                     style={[
                       styles.recentUser,
                       {
-                        backgroundColor: theme.primary,
-                        borderColor: "rgba(255,255,255,0.08)",
+                        backgroundColor: fieldSurface,
+                        borderColor: hairline,
                       },
                     ]}
                     onPress={() => handleUserPress(user)}
@@ -301,11 +411,11 @@ export default function LoginScreen({ navigation }) {
                     <View
                       style={[
                         styles.recentAvatar,
-                        { backgroundColor: "rgba(26,107,60,0.25)" },
+                        { backgroundColor: alpha(accent, 0.2) },
                       ]}
                     >
                       <Text
-                        style={[styles.recentAvatarText, { color: "#1a6b3c" }]}
+                        style={[styles.recentAvatarText, { color: accent }]}
                       >
                         {getInitials(user.email)}
                       </Text>
@@ -334,12 +444,10 @@ export default function LoginScreen({ navigation }) {
               <View
                 style={[
                   styles.divider,
-                  { backgroundColor: "rgba(255,255,255,0.06)" },
+                  { backgroundColor: hairline },
                 ]}
               >
-                <Text style={[styles.dividerText, { color: theme.text.muted }]}>
-                  veya e-posta ile giriş yap
-                </Text>
+                <Text style={[styles.dividerText, { color: theme.text.muted }]}>{i18nText("autoI18n.veya_e_posta_ile_giris_yap", "veya e-posta ile giriş yap")}</Text>
               </View>
             </View>
           )}
@@ -349,17 +457,17 @@ export default function LoginScreen({ navigation }) {
             style={[
               styles.inputWrapper,
               {
-                backgroundColor: theme.primary,
+                backgroundColor: emailFocused ? alpha(accent, 0.1) : fieldSurface,
                 borderColor: emailFocused
-                  ? "#1a6b3c"
-                  : "rgba(255,255,255,0.07)",
+                  ? alpha(accent, 0.85)
+                  : hairline,
               },
             ]}
           >
             <Ionicons
               name="mail-outline"
               size={20}
-              color={emailFocused ? "#1a6b3c" : theme.text.muted}
+              color={emailFocused ? accent : theme.text.muted}
               style={styles.inputIcon}
             />
             <TextInput
@@ -380,17 +488,17 @@ export default function LoginScreen({ navigation }) {
             style={[
               styles.inputWrapper,
               {
-                backgroundColor: theme.primary,
+                backgroundColor: passwordFocused ? alpha(accent, 0.1) : fieldSurface,
                 borderColor: passwordFocused
-                  ? "#1a6b3c"
-                  : "rgba(255,255,255,0.07)",
+                  ? alpha(accent, 0.85)
+                  : hairline,
               },
             ]}
           >
             <Ionicons
               name="lock-closed-outline"
               size={20}
-              color={passwordFocused ? "#1a6b3c" : theme.text.muted}
+              color={passwordFocused ? accent : theme.text.muted}
               style={styles.inputIcon}
             />
             <TextInput
@@ -427,20 +535,18 @@ export default function LoginScreen({ navigation }) {
                 style={styles.checkbox}
                 value={isChecked}
                 onValueChange={setChecked}
-                color={isChecked ? "#1a6b3c" : undefined}
+                color={isChecked ? accent : undefined}
               />
               <Text
                 allowFontScaling={false}
                 style={[styles.rememberText, { color: theme.text.secondary }]}
-              >
-                Beni Hatırla
-              </Text>
+              >{i18nText("autoI18n.beni_hatirla", "Beni Hatırla")}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => navigation.navigate("ForgotPasswordScreen")}
             >
-              <Text allowFontScaling={false} style={styles.forgotText}>
+              <Text allowFontScaling={false} style={[styles.forgotText, { color: accent }]}>
                 {t.LoginScreen.forgotPassword}
               </Text>
             </TouchableOpacity>
@@ -448,19 +554,19 @@ export default function LoginScreen({ navigation }) {
 
           {/* Login button */}
           <TouchableOpacity
-            style={styles.loginButton}
+            style={[styles.loginButton, { shadowColor: accent }]}
             onPress={() => signIn()}
             activeOpacity={0.85}
           >
             <LinearGradient
-              colors={["#1e8449", "#1a6b3c"]}
+              colors={[accent, theme.bold]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.loginGradient}
             >
               {isloading ? (
                 <LottieView
-                  source={require("../../LottieJson/loading15.json")}
+                  source={require("@lottie/loading15.json")}
                   style={{ width: 36, height: 36 }}
                   autoPlay
                   loop
@@ -481,16 +587,16 @@ export default function LoginScreen({ navigation }) {
             <View
               style={[
                 styles.orLine,
-                { backgroundColor: "rgba(255,255,255,0.08)" },
+                { backgroundColor: hairline },
               ]}
             />
             <Text style={[styles.orText, { color: theme.text.muted }]}>
-              veya
+              {i18nText("autoI18n.veya", "veya")}
             </Text>
             <View
               style={[
                 styles.orLine,
-                { backgroundColor: "rgba(255,255,255,0.08)" },
+                { backgroundColor: hairline },
               ]}
             />
           </View>
@@ -500,8 +606,8 @@ export default function LoginScreen({ navigation }) {
             style={[
               styles.googleButton,
               {
-                backgroundColor: theme.primary,
-                borderColor: "rgba(255,255,255,0.1)",
+                backgroundColor: fieldSurface,
+                borderColor: hairline,
               },
             ]}
             onPress={() => promptAsync()}
@@ -510,7 +616,7 @@ export default function LoginScreen({ navigation }) {
           >
             {isGoogleLoading ? (
               <LottieView
-                source={require("../../LottieJson/loading15.json")}
+                source={require("@lottie/loading15.json")}
                 style={{ width: 28, height: 28 }}
                 autoPlay
                 loop
@@ -527,9 +633,7 @@ export default function LoginScreen({ navigation }) {
                     styles.googleButtonText,
                     { color: theme.text.primary },
                   ]}
-                >
-                  Google ile giriş yap
-                </Text>
+                >{i18nText("autoI18n.google_ile_giris_yap", "Google ile giriş yap")}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -538,7 +642,10 @@ export default function LoginScreen({ navigation }) {
           <TouchableOpacity
             style={[
               styles.registerButton,
-              { borderColor: "rgba(255,255,255,0.1)" },
+              {
+                borderColor: hairline,
+                backgroundColor: fieldSurface,
+              },
             ]}
             onPress={() => navigation.navigate("RegisterScreen")}
             activeOpacity={0.75}
@@ -549,13 +656,12 @@ export default function LoginScreen({ navigation }) {
                 styles.registerButtonText,
                 { color: theme.text.secondary },
               ]}
-            >
-              Hesabın yok mu?{" "}
+            >{i18nText("autoI18n.hesabin_yok_mu", "Hesabın yok mu?")}{" "}
             </Text>
             <Text
               style={[
                 styles.registerButtonText,
-                { color: "#1a6b3c", fontWeight: "700" },
+                { color: accent, fontWeight: "700" },
               ]}
             >
               {t.LoginScreen.registerButton}
@@ -565,6 +671,7 @@ export default function LoginScreen({ navigation }) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -572,18 +679,49 @@ export default function LoginScreen({ navigation }) {
 const styles = StyleSheet.create({
   scrollContent: {
     alignItems: "center",
-    paddingTop: 60,
+    paddingHorizontal: 0,
+    paddingBottom: 24,
   },
-  gradientBlob: {
+  backdropWash: {
     position: "absolute",
-    top: -60,
-    left: -80,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: height * 0.46,
     zIndex: 0,
     pointerEvents: "none",
   },
+  shapeLayer: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: "hidden",
+  },
+  colorShape: {
+    position: "absolute",
+    borderRadius: 18,
+  },
+  shapeOne: {
+    width: 170,
+    height: 76,
+    top: height * 0.2,
+    left: -48,
+    transform: [{ rotate: "-18deg" }],
+  },
+  shapeTwo: {
+    width: 132,
+    height: 92,
+    top: height * 0.32,
+    right: -34,
+    transform: [{ rotate: "21deg" }],
+  },
+  shapeThree: {
+    width: 210,
+    height: 54,
+    top: height * 0.49,
+    left: width * 0.36,
+    transform: [{ rotate: "-10deg" }],
+  },
   languageButton: {
     position: "absolute",
-    top: 52,
     right: 20,
     flexDirection: "row",
     alignItems: "center",
@@ -597,7 +735,7 @@ const styles = StyleSheet.create({
   languageButtonText: {
     fontSize: 12,
     fontWeight: "700",
-    letterSpacing: 1,
+    letterSpacing: 0,
   },
   lottie: {
     position: "absolute",
@@ -606,34 +744,125 @@ const styles = StyleSheet.create({
     left: -60,
     right: -60,
   },
-  logoContainer: {
+  heroHeader: {
+    width: "100%",
+    maxWidth: 440,
     alignItems: "center",
+    paddingHorizontal: 22,
+    paddingTop: 8,
     marginBottom: 8,
   },
-  card: {
-    width: width - 32,
-    borderRadius: 24,
+  brandPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
     borderWidth: 1,
-    padding: 24,
-    paddingBottom: 28,
+    marginBottom: 10,
+  },
+  brandPillText: {
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0,
+  },
+  heroTitle: {
+    fontSize: 24,
+    fontWeight: "900",
+    textAlign: "center",
+    letterSpacing: 0,
+  },
+  heroSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
+    marginTop: 5,
+    paddingHorizontal: 10,
+  },
+  logoContainer: {
+    width: Math.min(width - 104, 240),
+    height: 76,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  heroAccent: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroAnimation: {
+    width: 116,
+    height: 116,
+  },
+  card: {
+    width: "100%",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderWidth: 1,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 22,
+    marginBottom: 24,
+    overflow: "hidden",
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  cardEyebrowRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  statusChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  statusChipText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   title: {
-    fontSize: 26,
-    fontWeight: "800",
-    letterSpacing: -0.5,
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: 0,
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 14,
-    marginBottom: 24,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 16,
   },
   recentContainer: {
-    marginBottom: 20,
+    marginBottom: 14,
   },
   recentTitle: {
     fontSize: 12,
     fontWeight: "600",
-    letterSpacing: 0.5,
+    letterSpacing: 0,
     textTransform: "uppercase",
   },
   recentUser: {
@@ -682,10 +911,10 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    height: 52,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    marginBottom: 14,
+    minHeight: 48,
+    borderRadius: 15,
+    borderWidth: 1,
+    marginBottom: 10,
     overflow: "hidden",
   },
   inputIcon: {
@@ -695,6 +924,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: "100%",
     fontSize: 15,
+    fontWeight: "600",
   },
   eyeButton: {
     paddingHorizontal: 14,
@@ -703,7 +933,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 16,
     marginTop: 4,
   },
   rememberRow: {
@@ -713,29 +943,27 @@ const styles = StyleSheet.create({
   },
   checkbox: {
     borderRadius: 6,
-    width: 18,
-    height: 18,
+    width: 19,
+    height: 19,
   },
   rememberText: {
     fontSize: 14,
   },
   forgotText: {
     fontSize: 14,
-    color: "#1a6b3c",
     fontWeight: "600",
   },
   loginButton: {
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: "hidden",
     marginBottom: 12,
-    shadowColor: "#1a6b3c",
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.28,
     shadowRadius: 14,
     elevation: 8,
   },
   loginGradient: {
-    height: 52,
+    height: 50,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -745,11 +973,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800",
     color: "#fff",
-    letterSpacing: 0.3,
+    letterSpacing: 0,
   },
   registerButton: {
-    height: 48,
-    borderRadius: 14,
+    height: 46,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
@@ -771,11 +999,11 @@ const styles = StyleSheet.create({
   orText: {
     fontSize: 12,
     fontWeight: "600",
-    letterSpacing: 0.5,
+    letterSpacing: 0,
   },
   googleButton: {
-    height: 52,
-    borderRadius: 14,
+    height: 48,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
@@ -799,6 +1027,6 @@ const styles = StyleSheet.create({
   },
   googleButtonText: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "700",
   },
 });

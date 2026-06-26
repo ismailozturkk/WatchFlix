@@ -21,38 +21,22 @@ import { getAuth } from "firebase/auth";
 import { db } from "../../../firebase";
 import { useProfileUi } from "../../../context/ProfileUiContext";
 import { useTheme } from "../../../context/ThemeContext";
-import SwipeCard from "../../../modules/SwipeCard";
+import SwipeCard from "@components/SwipeCard";
 import Toast from "react-native-toast-message";
 import { useLanguage } from "../../../context/LanguageContext";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import IconBacground from "../../../components/IconBacground";
+import BackButton from "../../../components/BackButton";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
-
-const LIST_META = {
-  watchedMovies: { icon: "movie-outline", iconLib: "mci", color: "#29b864", label: "İzlenen Filmler" },
-  watchedTv:     { icon: "tv",           iconLib: "feather", color: "#29b864", label: "İzlenen Diziler" },
-  favorites:     { icon: "heart",        iconLib: "ion",  color: "#e33",     label: "Favoriler" },
-  watchList:     { icon: "bookmark",     iconLib: "ion",  color: "#64b4ff",  label: "İzlenecekler" },
-};
-
-const ListIcon = ({ name, iconLib, color, size = 14 }) => {
-  if (iconLib === "mci") return <MaterialCommunityIcons name={name} size={size} color={color} />;
-  if (iconLib === "feather") return <Feather name={name} size={size} color={color} />;
-  return <Ionicons name={name} size={size} color={color} />;
-};
-
-const protectedLists = ["watchedTv", "watchedMovies", "watchList", "favorites"];
+import { i18nText } from "../../../utils/i18nText";
 
 export default function FriendsListScreen({ navigation }) {
   const [friends, setFriends] = useState([]);
-  const [selectedFriend, setSelectedFriend] = useState(null);
-  const [friendLists, setFriendLists] = useState([]);
 
   const auth = getAuth();
   const user = auth.currentUser;
-  const { avatars, gridStyle } = useProfileUi();
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { avatars } = useProfileUi();
   const { theme } = useTheme();
   useLanguage();
 
@@ -74,11 +58,19 @@ export default function FriendsListScreen({ navigation }) {
       collection(db, "Users", user.uid, "friends"),
       (snap) => {
         if (!snap.empty) {
-          // Subcollection'da veri var → eski listener'ı kapat
           if (legacyUnsub) { legacyUnsub(); legacyUnsub = null; }
-          setFriends(snap.docs.map((d) => d.data()));
+          setFriends(
+            snap.docs.map((d) => {
+              const data = d.data();
+              return {
+                uid: data.friendUid || d.id,
+                displayName: data.friendName || "",
+                username: data.friendUsername || "",
+                avatarIndex: data.friendAvatarIndex ?? 0,
+              };
+            }),
+          );
         } else if (!legacyUnsub) {
-          // Subcollection boş → root-doc array fallback (sadece bir kez aç)
           legacyUnsub = onSnapshot(doc(db, "Users", user.uid), (docSnap) => {
             if (docSnap.exists()) setFriends(docSnap.data().friends || []);
           });
@@ -92,29 +84,12 @@ export default function FriendsListScreen({ navigation }) {
     };
   }, [user]);
 
-  useEffect(() => {
-    if (!selectedFriend) { setFriendLists([]); return; }
-    const userRef = doc(db, "Users", selectedFriend.uid);
-    const unsubscribeUser = onSnapshot(userRef, (userSnap) => {
-      if (!userSnap.exists()) return;
-      const rawVisible = userSnap.data().listVisible;
-      const visibleListNames = Array.isArray(rawVisible)
-        ? rawVisible.filter((m) => Object.values(m)[0] === true).map((m) => Object.keys(m)[0])
-        : Object.entries(rawVisible || {}).filter(([, v]) => v === true).map(([k]) => k);
-      const listsRef = doc(db, "Lists", selectedFriend.uid);
-      const unsubscribeLists = onSnapshot(listsRef, (listsSnap) => {
-        if (!listsSnap.exists()) { setFriendLists([]); return; }
-        const all = Object.entries(listsSnap.data() || {});
-        setFriendLists(all.filter(([name]) => visibleListNames.includes(name)));
-      });
-      return () => unsubscribeLists();
-    });
-    return () => unsubscribeUser();
-  }, [selectedFriend]);
-
   const handleDelete = async (friend) => {
     try {
-      Toast.show({ type: "success", text1: `${friend.displayName} arkadaş listenizden silindi` });
+      Toast.show({
+        type: "success",
+        text1: i18nText("autoI18n.friend_removed_named", "{{name}} arkadaş listenizden silindi", { name: friend.displayName }),
+      });
       // Subcollection sil
       await Promise.all([
         deleteDoc(doc(db, "Users", user.uid,   "friends", friend.uid)),
@@ -134,8 +109,8 @@ export default function FriendsListScreen({ navigation }) {
       if (friendEntry) updates.push(updateDoc(doc(db, "Users", friend.uid), { friends: arrayRemove(friendEntry) }));
       if (updates.length) await Promise.all(updates);
     } catch (error) {
-      console.error("Arkadaş silme hatası:", error);
-      Toast.show({ type: "error", text1: "Silme işlemi başarısız", text2: error.message });
+      console.error(i18nText("autoI18n.arkadas_silme_hatasi", "Arkadaş silme hatası:"), error);
+      Toast.show({ type: "error", text1: i18nText("autoI18n.silme_islemi_basarisiz", "Silme işlemi başarısız"), text2: error.message });
     }
   };
 
@@ -143,22 +118,20 @@ export default function FriendsListScreen({ navigation }) {
     navigation.navigate("ChatScreen", { friendUid: friend.uid, friendName: friend.displayName });
   };
 
-  const sortedLists = (lists) => [
-    ...protectedLists.map((n) => lists.find(([ln]) => ln === n)).filter(Boolean),
-    ...lists.filter(([ln]) => !protectedLists.includes(ln)).sort((a, b) => a[0].localeCompare(b[0])),
-  ];
-
   const renderFriend = ({ item }) => {
-    const isExpanded = selectedFriend?.uid === item.uid;
     return (
       <SwipeCard
-        leftButton={{ label: "Sil", color: "#e53935", onPress: () => handleDelete(item) }}
-        rightButton={{ label: "Mesaj", color: "#5aacf0", onPress: () => handleSendMessage(item) }}
+        leftButton={{ label: i18nText("autoI18n.sil", "Sil"), color: "#e53935", onPress: () => handleDelete(item) }}
+        rightButton={{ label: i18nText("autoI18n.mesaj_2", "Mesaj"), color: "#5aacf0", onPress: () => handleSendMessage(item) }}
       >
-        {/* Arkadaş satırı */}
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => setSelectedFriend(isExpanded ? null : item)}
+          onPress={() =>
+            navigation.navigate("FriendProfileScreen", {
+              friendUid: item.uid,
+              friendName: item.displayName,
+            })
+          }
           style={[styles.friendCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}
         >
           <View style={[styles.avatarWrapper, { borderColor: theme.accent + "66" }]}>
@@ -179,91 +152,11 @@ export default function FriendsListScreen({ navigation }) {
             </Text>
           </View>
           <Ionicons
-            name={isExpanded ? "chevron-up" : "chevron-down"}
+            name="chevron-forward"
             size={18}
             color={theme.text?.muted ?? "#555"}
           />
         </TouchableOpacity>
-
-        {/* Açılır liste kartları */}
-        {isExpanded && (
-          <View style={styles.listsSection}>
-            {friendLists.length === 0 ? (
-              <Text style={[styles.noListsText, { color: theme.text?.muted ?? "#666" }]}>
-                Paylaşılan liste yok
-              </Text>
-            ) : (
-              <FlatList
-                horizontal
-                data={sortedLists(friendLists)}
-                keyExtractor={([listName]) => listName}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.listCardsRow}
-                renderItem={({ item: listItem }) => {
-                  const [listName, items] = listItem;
-                  const meta = LIST_META[listName];
-                  const cols = gridStyle ? 2 : 4;
-                  const imgW = gridStyle ? 52 : 36;
-                  const imgH = gridStyle ? 78 : 54;
-
-                  return (
-                    <TouchableOpacity
-                      activeOpacity={0.85}
-                      style={[styles.listCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-                    >
-                      {/* Poster grid */}
-                      <View style={styles.posterGrid}>
-                        {Array.from({ length: cols }).map((_, idx) => {
-                          const ci = items?.[idx];
-                          return ci?.imagePath ? (
-                            <Image
-                              key={idx}
-                              source={{ uri: getTmdbUrl(ci.imagePath, 'poster', 200) }}
-                              style={[
-                                styles.posterImg,
-                                { width: imgW, height: imgH },
-                                idx === 0 && styles.roundLeft,
-                                idx === cols - 1 && styles.roundRight,
-                              ]}
-                            />
-                          ) : (
-                            <View
-                              key={idx}
-                              style={[
-                                styles.posterPlaceholder,
-                                { width: imgW, height: imgH, backgroundColor: theme.primary },
-                                idx === 0 && styles.roundLeft,
-                                idx === cols - 1 && styles.roundRight,
-                              ]}
-                            />
-                          );
-                        })}
-                      </View>
-
-                      {/* Liste etiketi */}
-                      <View style={styles.listLabel}>
-                        {meta ? (
-                          <ListIcon name={meta.icon} iconLib={meta.iconLib} color={meta.color} />
-                        ) : (
-                          <Ionicons name="grid" size={13} color={theme.colors?.orange ?? "#ff6400"} />
-                        )}
-                        <Text
-                          style={[styles.listLabelText, { color: theme.text?.primary ?? "#fff" }]}
-                          numberOfLines={1}
-                        >
-                          {meta?.label ?? listName}
-                        </Text>
-                        <Text style={[styles.listCount, { color: theme.text?.muted ?? "#666" }]}>
-                          {items?.length ?? 0}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                }}
-              />
-            )}
-          </View>
-        )}
       </SwipeCard>
     );
   };
@@ -284,9 +177,7 @@ export default function FriendsListScreen({ navigation }) {
           },
         ]}
       >
-        <Text style={[styles.pageTitle, { color: theme.text?.primary ?? "#fff" }]}>
-          Arkadaşlar
-        </Text>
+        <Text style={[styles.pageTitle, { color: theme.text?.primary ?? "#fff" }]}>{i18nText("autoI18n.arkadaslar", "Arkadaşlar")}</Text>
         {friends.length > 0 && (
           <View style={[styles.countBadge, { backgroundColor: theme.secondary }]}>
             <Text style={[styles.countBadgeText, { color: theme.text?.secondary ?? "#aaa" }]}>
@@ -300,9 +191,7 @@ export default function FriendsListScreen({ navigation }) {
       {friends.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="people-outline" size={56} color={theme.text?.muted ?? "#444"} />
-          <Text style={[styles.emptyText, { color: theme.text?.secondary ?? "#aaa" }]}>
-            Henüz hiç arkadaşın yok
-          </Text>
+          <Text style={[styles.emptyText, { color: theme.text?.secondary ?? "#aaa" }]}>{i18nText("autoI18n.henuz_hic_arkadasin_yok", "Henüz hiç arkadaşın yok")}</Text>
         </View>
       ) : (
         <FlatList
@@ -313,6 +202,7 @@ export default function FriendsListScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         />
       )}
+      <BackButton top={8} />
     </SafeAreaView>
   );
 }
@@ -370,33 +260,6 @@ const styles = StyleSheet.create({
   friendInfo: { flex: 1, gap: 3 },
   friendName: { fontSize: 15, fontWeight: "700" },
   friendUsername: { fontSize: 13 },
-
-  // ── Expanded lists ────────────────────────────────────────────────────────
-  listsSection: { marginBottom: 10 },
-  noListsText: { fontSize: 13, textAlign: "center", paddingVertical: 14 },
-  listCardsRow: { paddingHorizontal: 4, paddingVertical: 10, gap: 8 },
-
-  listCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    overflow: "hidden",
-    alignItems: "center",
-  },
-  posterGrid: { flexDirection: "row" },
-  posterImg: { resizeMode: "cover" },
-  posterPlaceholder: {},
-  roundLeft: { borderTopLeftRadius: 14, borderBottomLeftRadius: 14 },
-  roundRight: { borderTopRightRadius: 14, borderBottomRightRadius: 14 },
-
-  listLabel: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  listLabelText: { fontSize: 11, fontWeight: "600", flex: 1 },
-  listCount: { fontSize: 10 },
 
   // ── Empty state ───────────────────────────────────────────────────────────
   emptyState: {

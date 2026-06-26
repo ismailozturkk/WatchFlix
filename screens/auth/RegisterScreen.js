@@ -7,8 +7,11 @@ import {
   ScrollView,
   Dimensions,
   StatusBar,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import React, { useState, useEffect } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import LottieView from "lottie-react-native";
 import { useSnow } from "../../context/SnowContext";
@@ -23,33 +26,47 @@ import {
 import Toast from "react-native-toast-message";
 import { useLanguage } from "../../context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import {
-  doc,
-  setDoc,
-  getDoc,
-  collection,
-  query,
-  where,
-  getDocs,
-} from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase";
+import {
+  createUserProfile,
+  isUsernameAvailable,
+} from "../../services/userService";
 import IconBacground from "../../components/IconBacground";
 import { LinearGradient } from "expo-linear-gradient";
-import * as Google from "expo-auth-session/providers/google";
+import { BlurView } from "expo-blur";
+import { alpha } from "../../theme/colors";
+import {
+  useAuthRequest,
+  makeRedirectUri,
+  ResponseType,
+} from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
+import { i18nText } from "../../utils/i18nText";
+
 
 WebBrowser.maybeCompleteAuthSession();
 
+const GOOGLE_DISCOVERY = {
+  authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
+  tokenEndpoint: "https://oauth2.googleapis.com/token",
+};
+
 const { width, height } = Dimensions.get("window");
 
-const GREEN = "#1a6b3c";
-const GREEN_LIGHT = "#1e8449";
 const SUCCESS = "rgb(37, 211, 102)";
 const ERROR = "rgb(189, 8, 28)";
 
 export default function RegisterScreen({ navigation }) {
-  const { theme } = useTheme();
+  const { theme, selectedTheme } = useTheme();
   const { showSnow } = useSnow();
+  const insets = useSafeAreaInsets();
+  const accent = theme.accent;
+  const hairline = theme.border;
+  const isLightTheme = selectedTheme === "light" || selectedTheme === "green";
+  const surface = isLightTheme ? "rgba(255,255,255,0.62)" : "rgba(255,255,255,0.055)";
+  const elevatedSurface = isLightTheme ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.075)";
+  const fieldSurface = isLightTheme ? "rgba(255,255,255,0.66)" : "rgba(0,0,0,0.18)";
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [usernameAvailable, setUsernameAvailable] = useState(null);
@@ -63,16 +80,15 @@ export default function RegisterScreen({ navigation }) {
   const [focusedField, setFocusedField] = useState(null);
   const { t } = useLanguage();
 
-  let border = theme.border;
   const [passwordCorrect, setPasswordCorrect] = useState(null);
   const [passwordCorrectAgain, setPasswordCorrectAgain] = useState(null);
 
   let usernameTimeout;
 
   const checkUsername = async (name) => {
-    const q = query(collection(db, "Users"), where("username", "==", name));
-    const snapshot = await getDocs(q);
-    setUsernameAvailable(snapshot.empty);
+    // Atomic check via Usernames/{lower} doc presence
+    const available = await isUsernameAvailable(name);
+    setUsernameAvailable(available);
   };
 
   const validateUsername = (text) => {
@@ -117,20 +133,20 @@ export default function RegisterScreen({ navigation }) {
     if (!username || username.length < 3) {
       Toast.show({
         type: "error",
-        text1: "Lütfen kullanıcı adını düzenleyiniz!",
+        text1: i18nText("autoI18n.lutfen_kullanici_adini_duzenleyiniz", "Lütfen kullanıcı adını düzenleyiniz!"),
       });
       return;
     }
     if (usernameAvailable === false) {
-      Toast.show({ type: "error", text1: "Bu kullanıcı adı alınmış!" });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.bu_kullanici_adi_alinmis", "Bu kullanıcı adı alınmış!") });
       return;
     }
     if (!name || !lastname) {
-      Toast.show({ type: "error", text1: "Lütfen isim ve soyisim giriniz!" });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.lutfen_isim_ve_soyisim_giriniz", "Lütfen isim ve soyisim giriniz!") });
       return;
     }
     if (password !== passwordAgain) {
-      Toast.show({ type: "error", text1: "Şifreler eşleşmiyor!" });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.sifreler_eslesmiyor", "Şifreler eşleşmiyor!") });
       return;
     }
     setIsloading(true);
@@ -147,51 +163,59 @@ export default function RegisterScreen({ navigation }) {
         username,
       });
       await sendEmailVerification(user);
-      const userRef = doc(db, "Users", user.uid);
-      await setDoc(userRef, {
+
+      // Atomic profile + username reservation (transaction).
+      // Çakışırsa createUserProfile throw eder → catch'e düşer, user'a hata.
+      await createUserProfile({
+        uid: user.uid,
         username,
         email,
         displayName: user.displayName,
-        avatar: null,
-        createdAt: new Date(),
-        friends: [],
-        friendRequests: { sendRequest: [], receivedRequest: [] },
+        avatarIndex: 0,
       });
+
       Toast.show({
         type: "success",
-        text1: `${username} olarak kayıt başarılı! Email doğrulaması gönderildi: ${email}`,
+        text1: i18nText("autoI18n.registration_success_verify_email", "{{username}} olarak kayıt başarılı! Email doğrulaması gönderildi: {{email}}", {
+          username,
+          email,
+        }),
       });
+      navigation.navigate("LoginScreen");
     } catch (error) {
       Toast.show({
         type: "error",
-        text1: "Kayıt sırasında hata oluştu: " + error.message,
+        text1: i18nText("autoI18n.kayit_sirasinda_hata_olustu", "Kayıt sırasında hata oluştu: ") + error.message,
       });
     } finally {
       setIsloading(false);
-      navigation.navigate("LoginScreen");
     }
   };
 
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-  // ⚠️ clientId değerlerini kendi Google Cloud Console'unuzdan alın
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    iosClientId: "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
-    androidClientId: "YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com",
-    webClientId: "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
-  });
+  const [request, response, promptAsync] = useAuthRequest(
+    {
+      clientId:
+        "427087836931-in7lreg3vjgnvudn5h8gauradaeo58kc.apps.googleusercontent.com",
+      scopes: ["openid", "profile", "email"],
+      responseType: ResponseType.Token,
+      redirectUri: makeRedirectUri({ scheme: "watchify" }),
+    },
+    GOOGLE_DISCOVERY,
+  );
 
   useEffect(() => {
     if (response?.type === "success") {
-      const { id_token } = response.params;
-      handleGoogleCredential(id_token);
+      const { access_token } = response.params;
+      handleGoogleCredential(access_token);
     }
   }, [response]);
 
-  const handleGoogleCredential = async (idToken) => {
+  const handleGoogleCredential = async (accessToken) => {
     setIsGoogleLoading(true);
     try {
-      const credential = GoogleAuthProvider.credential(idToken);
+      const credential = GoogleAuthProvider.credential(null, accessToken);
       const auth = getAuth();
       const userCredential = await signInWithCredential(auth, credential);
       const user = userCredential.user;
@@ -199,25 +223,37 @@ export default function RegisterScreen({ navigation }) {
       const userRef = doc(db, "Users", user.uid);
       const userSnap = await getDoc(userRef);
       if (!userSnap.exists()) {
-        const emailPrefix = user.email?.split("@")[0] || "user";
-        await setDoc(userRef, {
-          username: emailPrefix,
-          email: user.email,
-          displayName: user.displayName,
-          avatar: user.photoURL,
-          createdAt: new Date(),
-          friends: [],
-          friendRequests: { sendRequest: [], receivedRequest: [] },
-        });
+        // Google'dan gelen email prefix'i username olarak dene; çakışırsa
+        // _XXXX random ekle (basit retry).
+        const base = (user.email?.split("@")[0] || "user").replace(/[^a-zA-Z0-9_]/g, "");
+        let attemptUsername = base;
+        for (let i = 0; i < 5; i++) {
+          try {
+            await createUserProfile({
+              uid: user.uid,
+              username: attemptUsername,
+              email: user.email,
+              displayName: user.displayName,
+              avatarIndex: 0,
+            });
+            break;
+          } catch (e) {
+            if (/alınmış/.test(e.message)) {
+              attemptUsername = `${base}_${Math.floor(Math.random() * 9999)}`;
+            } else {
+              throw e;
+            }
+          }
+        }
       }
 
       Toast.show({
         type: "success",
-        text1: "Hoş geldin, " + (user.displayName || user.email),
+        text1: i18nText("autoI18n.hos_geldin", "Hoş geldin, ") + (user.displayName || user.email),
       });
-      navigation.navigate("TabScreen", user);
+      navigation.reset({ index: 0, routes: [{ name: "TabScreen" }] });
     } catch (error) {
-      Toast.show({ type: "error", text1: "Google ile giriş başarısız." });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.google_ile_giris_basarisiz", "Google ile giriş başarısız.") });
     } finally {
       setIsGoogleLoading(false);
     }
@@ -231,54 +267,86 @@ export default function RegisterScreen({ navigation }) {
     const isFocused = focusedField === field;
     if (validState === true) return SUCCESS;
     if (validState === false) return ERROR;
-    if (isFocused) return GREEN;
-    return "rgba(255,255,255,0.07)";
+    if (isFocused) return accent;
+    return hairline;
   };
 
   const getIconColor = (field, validState) => {
     if (validState === true) return SUCCESS;
     if (validState === false) return ERROR;
-    if (focusedField === field) return GREEN;
+    if (focusedField === field) return accent;
     return theme.text.muted;
   };
 
   const getUsernameBorderColor = () => {
     if (usernameAvailable === true) return SUCCESS;
     if (usernameAvailable === false) return ERROR;
-    if (focusedField === "username") return GREEN;
-    return "rgba(255,255,255,0.07)";
+    if (focusedField === "username") return accent;
+    return hairline;
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
       <StatusBar
-        barStyle="light-content"
+        barStyle={isLightTheme ? "dark-content" : "light-content"}
         translucent
         backgroundColor="transparent"
       />
-      <IconBacground opacity={0.08} />
-
-      {/* Ambient blob */}
-      <View style={styles.gradientBlob} pointerEvents="none">
+      <IconBacground opacity={isLightTheme ? 0.05 : 0.08} />
+      <View style={styles.backdropWash} pointerEvents="none">
         <LinearGradient
-          colors={["rgba(26,107,60,0.3)", "transparent"]}
-          style={{ width: 280, height: 280, borderRadius: 140 }}
+          colors={[
+            alpha(accent, isLightTheme ? 0.2 : 0.3),
+            alpha(theme.bold, isLightTheme ? 0.09 : 0.15),
+            "transparent",
+          ]}
+          start={{ x: 1, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </View>
+      <View style={styles.shapeLayer} pointerEvents="none">
+        <View
+          style={[
+            styles.colorShape,
+            styles.shapeOne,
+            { backgroundColor: alpha(accent, isLightTheme ? 0.2 : 0.26) },
+          ]}
+        />
+        <View
+          style={[
+            styles.colorShape,
+            styles.shapeTwo,
+            { backgroundColor: alpha(theme.colors.purple, isLightTheme ? 0.12 : 0.18) },
+          ]}
+        />
+        <View
+          style={[
+            styles.colorShape,
+            styles.shapeThree,
+            { backgroundColor: alpha(theme.colors.orange, isLightTheme ? 0.16 : 0.22) },
+          ]}
         />
       </View>
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
       <ScrollView
         style={{ flex: 1 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}
       >
         {/* Back button */}
         <TouchableOpacity
           style={[
             styles.backButton,
             {
+              top: insets.top + 8,
               backgroundColor: theme.secondary,
-              borderColor: "rgba(255,255,255,0.08)",
+              borderColor: hairline,
             },
           ]}
           onPress={() => navigation.navigate("LoginScreen")}
@@ -290,17 +358,55 @@ export default function RegisterScreen({ navigation }) {
         {showSnow && (
           <LottieView
             style={styles.lottie}
-            source={require("../../LottieJson/snow.json")}
+            source={require("@lottie/snow.json")}
             autoPlay
             loop
           />
         )}
 
-        {/* Logo */}
-        <View style={styles.logoContainer}>
+        <View style={styles.heroHeader}>
+          <View
+            style={[
+              styles.brandPill,
+              {
+                backgroundColor: elevatedSurface,
+                borderColor: alpha(accent, 0.28),
+              },
+            ]}
+          >
+            <Ionicons name="sparkles-outline" size={15} color={accent} />
+            <Text style={[styles.brandPillText, { color: theme.text.primary }]}>
+              WATCHFLIX
+            </Text>
+          </View>
+          <Text style={[styles.heroTitle, { color: theme.text.primary }]}>
+            {i18nText("autoI18n.yeni_hesap_olustur", "Yeni hesap oluştur")}
+          </Text>
+          <Text style={[styles.heroSubtitle, { color: theme.text.secondary }]}>
+            {i18nText("autoI18n.profilini_olusturup_listelerine_basla", "Profilini oluşturup listelerine başla.")}
+          </Text>
+        </View>
+
+        <View
+          style={[
+            styles.logoContainer,
+            {
+              backgroundColor: surface,
+              borderColor: alpha(accent, 0.2),
+            },
+          ]}
+        >
+          <View style={styles.heroAccent} pointerEvents="none">
+            <LinearGradient
+              colors={[alpha(accent, 0.18), "transparent"]}
+              start={{ x: 1, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+          </View>
           <LottieView
-            source={require("../../LottieJson/register.json")}
-            style={{ width: 180, height: 180 }}
+            source={require("@lottie/register.json")}
+            style={styles.heroAnimation}
             autoPlay
             loop
           />
@@ -311,22 +417,40 @@ export default function RegisterScreen({ navigation }) {
           style={[
             styles.card,
             {
-              backgroundColor: theme.secondary,
-              borderColor: "rgba(255,255,255,0.07)",
+              backgroundColor: isLightTheme
+                ? "rgba(255,255,255,0.18)"
+                : "rgba(18,18,18,0.28)",
+              borderColor: alpha(accent, isLightTheme ? 0.18 : 0.28),
+              shadowColor: accent,
             },
           ]}
         >
+          <BlurView
+            tint="dark"
+            intensity={50}
+            experimentalBlurMethod="dimezisBlurView"
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.cardEyebrowRow}>
+            <View style={[styles.statusChip, { backgroundColor: alpha(accent, 0.12) }]}>
+              <Ionicons name="person-add-outline" size={14} color={accent} />
+              <Text style={[styles.statusChipText, { color: accent }]}>
+                {i18nText("autoI18n.profil_kurulumu", "Profil kurulumu")}
+              </Text>
+            </View>
+            <View style={[styles.stepBadge, { borderColor: alpha(accent, 0.28) }]}>
+              <Text style={[styles.stepBadgeText, { color: theme.text.secondary }]}>1/1</Text>
+            </View>
+          </View>
           <Text style={[styles.title, { color: theme.text.primary }]}>
             {t.RegisterScreen.registerButton}
           </Text>
           <Text style={[styles.subtitle, { color: theme.text.muted }]}>
-            Yeni bir hesap oluşturun
+            {i18nText("autoI18n.hesap_bilgilerini_tamamla", "Hesap bilgilerini tamamla.")}
           </Text>
 
           {/* Section: Kimlik */}
-          <Text style={[styles.sectionLabel, { color: theme.text.muted }]}>
-            KİŞİSEL BİLGİLER
-          </Text>
+          <Text style={[styles.sectionLabel, { color: theme.text.muted }]}>{i18nText("autoI18n.kisisel_bilgiler", "KİŞİSEL BİLGİLER")}</Text>
 
           {/* İsim + Soyisim - yan yana */}
           <View style={styles.rowInputs}>
@@ -335,7 +459,7 @@ export default function RegisterScreen({ navigation }) {
                 styles.inputWrapper,
                 styles.halfInput,
                 {
-                  backgroundColor: theme.primary,
+                  backgroundColor: fieldSurface,
                   borderColor: getBorderColor("name", null),
                 },
               ]}
@@ -360,7 +484,7 @@ export default function RegisterScreen({ navigation }) {
                 styles.inputWrapper,
                 styles.halfInput,
                 {
-                  backgroundColor: theme.primary,
+                  backgroundColor: fieldSurface,
                   borderColor: getBorderColor("lastname", null),
                 },
               ]}
@@ -388,16 +512,14 @@ export default function RegisterScreen({ navigation }) {
               styles.sectionLabel,
               { color: theme.text.muted, marginTop: 8 },
             ]}
-          >
-            HESAP BİLGİLERİ
-          </Text>
+          >{i18nText("autoI18n.hesap_bilgileri", "HESAP BİLGİLERİ")}</Text>
 
           {/* Kullanıcı adı */}
           <View
             style={[
               styles.inputWrapper,
               {
-                backgroundColor: theme.primary,
+                backgroundColor: fieldSurface,
                 borderColor: getUsernameBorderColor(),
               },
             ]}
@@ -411,7 +533,7 @@ export default function RegisterScreen({ navigation }) {
                   : usernameAvailable === false
                     ? ERROR
                     : focusedField === "username"
-                      ? GREEN
+                      ? accent
                       : theme.text.muted
               }
               style={styles.inputIcon}
@@ -428,7 +550,7 @@ export default function RegisterScreen({ navigation }) {
                 },
               ]}
               placeholderTextColor={theme.text.muted}
-              placeholder="Kullanıcı Adı"
+              placeholder={i18nText("autoI18n.kullanici_adi", "Kullanıcı Adı")}
               onChangeText={handleUsernameChange}
               autoCapitalize="none"
               onFocus={() => setFocusedField("username")}
@@ -448,9 +570,7 @@ export default function RegisterScreen({ navigation }) {
           {usernameAvailable === null &&
             username.length > 0 &&
             username.length < 3 && (
-              <Text style={[styles.hintText, { color: theme.text.muted }]}>
-                En az 3 karakter · yalnızca a–z, 0–9, _
-              </Text>
+              <Text style={[styles.hintText, { color: theme.text.muted }]}>{i18nText("autoI18n.en_az_3_karakter_yalnizca_a_z_0_9", "En az 3 karakter · yalnızca a–z, 0–9, _")}</Text>
             )}
 
           {/* Email */}
@@ -458,7 +578,7 @@ export default function RegisterScreen({ navigation }) {
             style={[
               styles.inputWrapper,
               {
-                backgroundColor: theme.primary,
+                backgroundColor: fieldSurface,
                 borderColor: getBorderColor("email", null),
               },
             ]}
@@ -486,7 +606,7 @@ export default function RegisterScreen({ navigation }) {
             style={[
               styles.inputWrapper,
               {
-                backgroundColor: theme.primary,
+                backgroundColor: fieldSurface,
                 borderColor: getBorderColor("password", passwordCorrect),
               },
             ]}
@@ -524,7 +644,7 @@ export default function RegisterScreen({ navigation }) {
             style={[
               styles.inputWrapper,
               {
-                backgroundColor: theme.primary,
+                backgroundColor: fieldSurface,
                 borderColor: getBorderColor(
                   "passwordAgain",
                   passwordCorrectAgain,
@@ -576,19 +696,19 @@ export default function RegisterScreen({ navigation }) {
                             : i < 3
                               ? "#f39c12"
                               : SUCCESS
-                          : "rgba(255,255,255,0.1)",
+                          : hairline,
                     },
                   ]}
                 />
               ))}
               <Text style={[styles.strengthLabel, { color: theme.text.muted }]}>
                 {password.length < 6
-                  ? "Zayıf"
+                  ? i18nText("autoI18n.zayif", "Zayıf")
                   : password.length < 9
-                    ? "Orta"
+                    ? i18nText("autoI18n.orta", "Orta")
                     : password.length < 12
-                      ? "İyi"
-                      : "Güçlü"}
+                      ? i18nText("autoI18n.iyi", "İyi")
+                      : i18nText("autoI18n.guclu", "Güçlü")}
               </Text>
             </View>
           )}
@@ -597,6 +717,7 @@ export default function RegisterScreen({ navigation }) {
           <TouchableOpacity
             style={[
               styles.registerButton,
+              { shadowColor: accent },
               usernameAvailable === false && { opacity: 0.5 },
             ]}
             onPress={createAccount}
@@ -604,14 +725,14 @@ export default function RegisterScreen({ navigation }) {
             activeOpacity={0.85}
           >
             <LinearGradient
-              colors={[GREEN_LIGHT, GREEN]}
+              colors={[accent, theme.bold]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.registerGradient}
             >
               {isloading ? (
                 <LottieView
-                  source={require("../../LottieJson/loading15.json")}
+                  source={require("@lottie/loading15.json")}
                   style={{ width: 36, height: 36 }}
                   autoPlay
                   loop
@@ -636,16 +757,16 @@ export default function RegisterScreen({ navigation }) {
             <View
               style={[
                 styles.orLine,
-                { backgroundColor: "rgba(255,255,255,0.08)" },
+                { backgroundColor: hairline },
               ]}
             />
             <Text style={[styles.orText, { color: theme.text.muted }]}>
-              veya
+              {i18nText("autoI18n.veya", "veya")}
             </Text>
             <View
               style={[
                 styles.orLine,
-                { backgroundColor: "rgba(255,255,255,0.08)" },
+                { backgroundColor: hairline },
               ]}
             />
           </View>
@@ -655,17 +776,17 @@ export default function RegisterScreen({ navigation }) {
             style={[
               styles.googleButton,
               {
-                backgroundColor: theme.primary,
-                borderColor: "rgba(255,255,255,0.1)",
+                backgroundColor: fieldSurface,
+                borderColor: hairline,
               },
             ]}
             onPress={signInWithGoogle}
             activeOpacity={0.8}
-            disabled={isGoogleLoading}
+            disabled={!request || isGoogleLoading}
           >
             {isGoogleLoading ? (
               <LottieView
-                source={require("../../LottieJson/loading15.json")}
+                source={require("@lottie/loading15.json")}
                 style={{ width: 28, height: 28 }}
                 autoPlay
                 loop
@@ -681,9 +802,7 @@ export default function RegisterScreen({ navigation }) {
                     styles.googleButtonText,
                     { color: theme.text.primary },
                   ]}
-                >
-                  Google ile kayıt ol
-                </Text>
+                >{i18nText("autoI18n.google_ile_kayit_ol", "Google ile kayıt ol")}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -692,20 +811,22 @@ export default function RegisterScreen({ navigation }) {
           <TouchableOpacity
             style={[
               styles.loginLink,
-              { borderColor: "rgba(255,255,255,0.09)" },
+              {
+                borderColor: hairline,
+                backgroundColor: fieldSurface,
+              },
             ]}
             onPress={() => navigation.navigate("LoginScreen")}
             activeOpacity={0.75}
           >
             <Text
               style={[styles.loginLinkText, { color: theme.text.secondary }]}
-            >
-              Zaten hesabın var mı?{" "}
+            >{i18nText("autoI18n.zaten_hesabin_var_mi", "Zaten hesabın var mı?")}{" "}
             </Text>
             <Text
               style={[
                 styles.loginLinkText,
-                { color: GREEN, fontWeight: "700" },
+                { color: accent, fontWeight: "700" },
               ]}
             >
               {t.RegisterScreen.loginButton}
@@ -715,6 +836,7 @@ export default function RegisterScreen({ navigation }) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -722,17 +844,48 @@ export default function RegisterScreen({ navigation }) {
 const styles = StyleSheet.create({
   scrollContent: {
     alignItems: "center",
-    paddingTop: 60,
+    paddingHorizontal: 0,
+    paddingBottom: 24,
   },
-  gradientBlob: {
+  backdropWash: {
     position: "absolute",
-    top: -40,
-    right: -60,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: height * 0.46,
     zIndex: 0,
+  },
+  shapeLayer: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: "hidden",
+  },
+  colorShape: {
+    position: "absolute",
+    borderRadius: 18,
+  },
+  shapeOne: {
+    width: 178,
+    height: 72,
+    top: height * 0.18,
+    right: -48,
+    transform: [{ rotate: "18deg" }],
+  },
+  shapeTwo: {
+    width: 122,
+    height: 90,
+    top: height * 0.34,
+    left: -28,
+    transform: [{ rotate: "-20deg" }],
+  },
+  shapeThree: {
+    width: 218,
+    height: 52,
+    top: height * 0.51,
+    left: width * 0.34,
+    transform: [{ rotate: "9deg" }],
   },
   backButton: {
     position: "absolute",
-    top: 52,
     left: 20,
     width: 40,
     height: 40,
@@ -750,37 +903,135 @@ const styles = StyleSheet.create({
     right: -60,
     zIndex: 0,
   },
-  logoContainer: {
+  heroHeader: {
+    width: "100%",
+    maxWidth: 440,
     alignItems: "center",
-    marginBottom: 4,
+    paddingHorizontal: 22,
+    paddingTop: 8,
+    marginBottom: 8,
+  },
+  brandPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  brandPillText: {
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0,
+  },
+  heroTitle: {
+    fontSize: 24,
+    fontWeight: "900",
+    textAlign: "center",
+    letterSpacing: 0,
+  },
+  heroSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
+    marginTop: 5,
+    paddingHorizontal: 10,
+  },
+  logoContainer: {
+    width: Math.min(width - 104, 240),
+    height: 72,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  heroAccent: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroAnimation: {
+    width: 108,
+    height: 108,
   },
   card: {
-    width: width - 32,
-    borderRadius: 24,
+    width: "100%",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     borderWidth: 1,
-    padding: 24,
-    paddingBottom: 28,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 22,
+    marginBottom: 24,
+    overflow: "hidden",
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  cardEyebrowRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  statusChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  statusChipText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  stepBadge: {
+    minWidth: 40,
+    height: 28,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepBadgeText: {
+    fontSize: 12,
+    fontWeight: "800",
   },
   title: {
-    fontSize: 26,
-    fontWeight: "800",
-    letterSpacing: -0.5,
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: 0,
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 14,
-    marginBottom: 20,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 14,
   },
   sectionLabel: {
     fontSize: 11,
     fontWeight: "700",
-    letterSpacing: 1.2,
-    marginBottom: 10,
+    letterSpacing: 0,
+    marginBottom: 8,
   },
   rowInputs: {
     flexDirection: "row",
     gap: 10,
-    marginBottom: 14,
+    marginBottom: 10,
   },
   halfInput: {
     flex: 1,
@@ -789,10 +1040,10 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    height: 50,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    marginBottom: 12,
+    minHeight: 47,
+    borderRadius: 15,
+    borderWidth: 1,
+    marginBottom: 9,
     overflow: "hidden",
   },
   inputIcon: {
@@ -802,6 +1053,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: "100%",
     fontSize: 14,
+    fontWeight: "600",
   },
   eyeButton: {
     paddingHorizontal: 12,
@@ -820,7 +1072,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
     marginTop: -4,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   strengthBar: {
     flex: 1,
@@ -833,18 +1085,17 @@ const styles = StyleSheet.create({
     minWidth: 32,
   },
   registerButton: {
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: "hidden",
     marginTop: 8,
     marginBottom: 12,
-    shadowColor: GREEN,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.28,
     shadowRadius: 14,
     elevation: 8,
   },
   registerGradient: {
-    height: 52,
+    height: 50,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -854,11 +1105,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800",
     color: "#fff",
-    letterSpacing: 0.3,
+    letterSpacing: 0,
   },
   loginLink: {
-    height: 48,
-    borderRadius: 14,
+    height: 46,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
@@ -880,11 +1131,11 @@ const styles = StyleSheet.create({
   orText: {
     fontSize: 12,
     fontWeight: "600",
-    letterSpacing: 0.5,
+    letterSpacing: 0,
   },
   googleButton: {
-    height: 52,
-    borderRadius: 14,
+    height: 48,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
@@ -908,6 +1159,6 @@ const styles = StyleSheet.create({
   },
   googleButtonText: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "700",
   },
 });

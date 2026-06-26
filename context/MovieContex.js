@@ -4,13 +4,75 @@ import Toast from "react-native-toast-message";
 import { useLanguage } from "./LanguageContext";
 import axios from "axios";
 import { getCachedValue, setCachedValue, TTL } from "../utils/apiCache";
+import { i18nText } from "../utils/i18nText";
+
 
 const MovieContext = createContext();
 export const useMovie = () => useContext(MovieContext);
 
+const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const setIfChanged = (setter, next) => {
+  setter((current) => (sameJson(current, next) ? current : next));
+};
+
+// id'ye göre tekilleştirerek append eder (sayfalar arası tekrarları eler).
+const mergeUniqueById = (prev, next) => {
+  if (!Array.isArray(next)) return prev;
+  const seen = new Set(prev.map((x) => x && x.id));
+  return [...prev, ...next.filter((x) => x && !seen.has(x.id))];
+};
+
+// Trend carousel'i için: kenar spacer'larını koruyarak yeni sayfayı sağ
+// spacer'dan ÖNCE ekler (mevcut kartların index/animasyonu bozulmaz).
+const rewrapTrends = (prev, next) => {
+  const raw = (prev || []).filter(
+    (x) => x && x.id !== "left-spacer" && x.id !== "right-spacer",
+  );
+  const merged = mergeUniqueById(raw, next);
+  return [{ id: "left-spacer" }, ...merged, { id: "right-spacer" }];
+};
+
+// Sayfalı bölümlerin ortak yükleyicisi: cache okuma, loading bayrakları,
+// append/replace + dedup mantığını tek yerde toplar. Her bölüm yalnızca
+// kendi cacheKey'ini ve `request`'ini verir.
+const loadPage = async ({
+  cacheKey,
+  ttl,
+  append,
+  request,
+  setData,
+  setTotal,
+  setLoading,
+  setLoadingMore,
+}) => {
+  const apply = (results, totalPages) => {
+    if (setTotal) setTotal(totalPages || 1);
+    if (append) setData((prev) => mergeUniqueById(prev, results));
+    else setIfChanged(setData, results);
+  };
+  const cached = await getCachedValue(cacheKey, ttl);
+  if (cached) {
+    apply(cached.results ?? cached, cached.total_pages ?? 1);
+    (append ? setLoadingMore : setLoading)(false);
+    return;
+  }
+  (append ? setLoadingMore : setLoading)(true);
+  try {
+    const { results, total_pages } = await request();
+    apply(results, total_pages);
+    setCachedValue(cacheKey, { results, total_pages });
+  } catch (error) {
+    if (__DEV__) console.error("loadPage:", error?.message || error);
+  } finally {
+    (append ? setLoadingMore : setLoading)(false);
+  }
+};
+
 export const MovieProvider = ({ children }) => {
   const { API_KEY } = useApiSettings();
   const { language, t } = useLanguage();
+  const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
+  const tmdbRegion = language === "tr" ? "TR" : "US";
   const [activeSections, setActiveSections] = useState({});
 
   const activateMovieSection = useCallback((section) => {
@@ -20,9 +82,10 @@ export const MovieProvider = ({ children }) => {
     });
   }, []);
 
-  const [totalPagesBest, setTotalPagesBest] = useState([]); // Filmler için yeni durum ekleyin
-  const [pageBest, setPageBest] = useState(1); // loading durumu ekleyin
+  const [totalPagesBest, setTotalPagesBest] = useState(1);
+  const [pageBest, setPageBest] = useState(1);
   const [loadingBests, setLoadingBests] = useState(true);
+  const [loadingMoreBests, setLoadingMoreBests] = useState(false);
   const [movieBests, setMoviesBests] = useState([]);
   const [selectedCategoryBests, setSelectedCategoryBests] =
     useState("vote_count.desc");
@@ -39,50 +102,49 @@ export const MovieProvider = ({ children }) => {
     }
   };
 
-  const fetchMoviesBests = async () => {
+  const fetchMoviesBests = (page = 1, append = false) => {
     const lang = language === "tr" ? "tr-TR" : "en-US";
-    const cacheKey = `movie_bests_${lang}_${selectedCategoryBests}_page_${pageBest}`;
-    const cached = await getCachedValue(cacheKey, TTL.TREND);
-    if (cached) {
-      setMoviesBests(cached.results);
-      setTotalPagesBest(cached.total_pages);
-      setLoadingBests(false);
-      return;
-    }
-
-    setLoadingBests(true);
-    const options = {
-      method: "GET",
-      url: "https://api.themoviedb.org/3/discover/movie",
-      params: {
-        include_adult: "true",
-        include_null_first_air_dates: "false",
-        language: lang,
-        page: pageBest,
-        sort_by: selectedCategoryBests,
-        "vote_count.gte": "100",
+    return loadPage({
+      cacheKey: `movie_bests_${lang}_${selectedCategoryBests}_page_${page}`,
+      ttl: TTL.TREND,
+      append,
+      setData: setMoviesBests,
+      setTotal: setTotalPagesBest,
+      setLoading: setLoadingBests,
+      setLoadingMore: setLoadingMoreBests,
+      request: async () => {
+        const response = await axios.request({
+          method: "GET",
+          url: "https://api.themoviedb.org/3/discover/movie",
+          params: {
+            include_adult: "true",
+            include_null_first_air_dates: "false",
+            language: lang,
+            page,
+            sort_by: selectedCategoryBests,
+            "vote_count.gte": "100",
+          },
+          headers: { accept: "application/json", Authorization: API_KEY },
+        });
+        return {
+          results: response.data.results,
+          total_pages: response.data.total_pages,
+        };
       },
-      headers: { accept: "application/json", Authorization: API_KEY },
-    };
-
-    try {
-      const response = await axios.request(options);
-      setMoviesBests(response.data.results);
-      setTotalPagesBest(response.data.total_pages);
-      setCachedValue(cacheKey, {
-        results: response.data.results,
-        total_pages: response.data.total_pages,
-      });
-    } catch (error) {
-      Toast.show({ type: "error", text1: "error:" + error });
-    } finally {
-      setLoadingBests(false);
-    }
+    });
   };
   useEffect(() => {
     if (!activeSections.bests) return;
-    fetchMoviesBests();
-  }, [activeSections.bests, selectedCategoryBests, language, pageBest]);
+    setPageBest(1);
+    fetchMoviesBests(1, false);
+  }, [activeSections.bests, selectedCategoryBests, language]);
+
+  const loadMoreBests = () => {
+    if (loadingBests || loadingMoreBests || pageBest >= totalPagesBest) return;
+    const next = pageBest + 1;
+    setPageBest(next);
+    fetchMoviesBests(next, true);
+  };
 
   const categoriesTrends = ["week", "day"];
 
@@ -99,52 +161,78 @@ export const MovieProvider = ({ children }) => {
 
   const [movieTrends, setMovieTrends] = useState([]);
   const [loadingTrends, setLoadingTrends] = useState(true);
+  const [loadingMoreTrends, setLoadingMoreTrends] = useState(false);
+  const [pageTrends, setPageTrends] = useState(1);
+  const [totalPagesTrends, setTotalPagesTrends] = useState(1);
   const [selectedCategoryTrends, setSelectedCategoryTrends] = useState("week");
   const [selectedCategoryTrendsMovie, setSelectedCategoryTrendsMovie] =
     useState("trending");
 
-  const fetchSeriesTrends = async () => {
+  const fetchSeriesTrends = async (page = 1, append = false) => {
     const lang = language === "tr" ? "tr-TR" : "en-US";
-    const cacheKey = `movie_trends_${lang}_${selectedCategoryTrends}_${selectedCategoryTrendsMovie}`;
+    const baseKey = `movie_trends_${lang}_${selectedCategoryTrends}_${selectedCategoryTrendsMovie}`;
+    const cacheKey = page === 1 ? baseKey : `${baseKey}_p${page}`;
+
     const cached = await getCachedValue(cacheKey, TTL.TREND);
     if (cached) {
-      setMovieTrends(cached);
-      setLoadingTrends(false);
+      if (append) {
+        setMovieTrends((prev) => rewrapTrends(prev, cached.results ?? cached));
+        setLoadingMoreTrends(false);
+      } else {
+        // page 1 önbelleği spacer'lı tam dizi (offline indirme ile uyumlu)
+        setIfChanged(setMovieTrends, cached);
+        setLoadingTrends(false);
+        // toplam sayfa önbellekte yok → loadMore'a izin vermek için üst sınır
+        setTotalPagesTrends((p) => (p > 1 ? p : 1000));
+      }
       return;
     }
 
-    setLoadingTrends(true);
-    const options = {
-      method: "GET",
-      url: `https://api.themoviedb.org/3/${selectedCategoryTrendsMovie}/movie/${selectedCategoryTrends}`,
-      params: {
-        include_adult: "false",
-        include_null_first_air_dates: "false",
-        language: lang,
-        page: "1",
-      },
-      headers: { accept: "application/json", Authorization: API_KEY },
-    };
-
+    (append ? setLoadingMoreTrends : setLoadingTrends)(true);
     try {
-      const response = await axios.request(options);
-      const data = [
-        { id: "left-spacer" },
-        ...response.data.results,
-        { id: "right-spacer" },
-      ];
-      setMovieTrends(data);
-      setCachedValue(cacheKey, data);
+      const response = await axios.request({
+        method: "GET",
+        url: `https://api.themoviedb.org/3/${selectedCategoryTrendsMovie}/movie/${selectedCategoryTrends}`,
+        params: {
+          include_adult: "false",
+          include_null_first_air_dates: "false",
+          language: lang,
+          page,
+        },
+        headers: { accept: "application/json", Authorization: API_KEY },
+      });
+      const results = response.data.results || [];
+      setTotalPagesTrends(response.data.total_pages || 1);
+      if (append) {
+        setMovieTrends((prev) => rewrapTrends(prev, results));
+        setCachedValue(cacheKey, results);
+      } else {
+        const data = [
+          { id: "left-spacer" },
+          ...results,
+          { id: "right-spacer" },
+        ];
+        setIfChanged(setMovieTrends, data);
+        setCachedValue(baseKey, data);
+      }
     } catch (error) {
-      Toast.show({ type: "error", text1: "error:" + error });
+      if (__DEV__) console.error("fetchSeriesTrends:", error?.message || error);
     } finally {
-      setLoadingTrends(false);
+      (append ? setLoadingMoreTrends : setLoadingTrends)(false);
     }
   };
   useEffect(() => {
     if (!activeSections.trends) return;
-    fetchSeriesTrends();
+    setPageTrends(1);
+    fetchSeriesTrends(1, false);
   }, [activeSections.trends, selectedCategoryTrends, selectedCategoryTrendsMovie, language]);
+
+  const loadMoreTrends = () => {
+    if (loadingTrends || loadingMoreTrends || pageTrends >= totalPagesTrends) return;
+    const next = pageTrends + 1;
+    setPageTrends(next);
+    fetchSeriesTrends(next, true);
+  };
 
   //!--------------------------- movie oscar --------------
   // Önceki adımda bulduğumuz TMDB ID'leri
@@ -163,7 +251,7 @@ export const MovieProvider = ({ children }) => {
     const cacheKey = `movie_oscar_${lang}`;
     const cached = await getCachedValue(cacheKey, TTL.OSCAR);
     if (cached) {
-      setMoviesOscar(cached);
+      setIfChanged(setMoviesOscar, cached);
       setErrorOscar(null);
       setLoadingOscar(false);
       return;
@@ -179,7 +267,7 @@ export const MovieProvider = ({ children }) => {
       );
       const responses = await Promise.all(moviePromises);
       const movieResults = responses.map((res) => res.data);
-      setMoviesOscar(movieResults);
+      setIfChanged(setMoviesOscar, movieResults);
       setErrorOscar(null);
       setCachedValue(cacheKey, movieResults);
     } catch (err) {
@@ -226,7 +314,7 @@ export const MovieProvider = ({ children }) => {
     const cacheKey = `movie_collection_${lang}`;
     const cached = await getCachedValue(cacheKey, TTL.COLLECTION);
     if (cached) {
-      setMoviesCollection(cached);
+      setIfChanged(setMoviesCollection, cached);
       setErrorCollection(null);
       setLoadingCollection(false);
       return;
@@ -242,12 +330,12 @@ export const MovieProvider = ({ children }) => {
       );
       const movieResults = await Promise.all(moviePromises);
       const allMovies = movieResults.flat().filter(Boolean);
-      setMoviesCollection(allMovies);
+      setIfChanged(setMoviesCollection, allMovies);
       setErrorCollection(null);
       setCachedValue(cacheKey, allMovies);
     } catch (err) {
       const message =
-        err.response?.data?.status_message || err.message || "Bilinmeyen hata";
+        err.response?.data?.status_message || err.message || i18nText("autoI18n.bilinmeyen_hata", "Bilinmeyen hata");
       setErrorCollection(message);
     } finally {
       setLoadingCollection(false);
@@ -264,6 +352,9 @@ export const MovieProvider = ({ children }) => {
   const [moviesProvider, setMoviesProvider] = useState([]);
   const [loadingMovieProvider, setLoadingMovieProvider] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState(false);
+  const [loadingMoreProvider, setLoadingMoreProvider] = useState(false);
+  const [pageProvider, setPageProvider] = useState(1);
+  const [totalPagesProvider, setTotalPagesProvider] = useState(1);
 
   useEffect(() => {
     if (!activeSections.providers) return;
@@ -271,10 +362,10 @@ export const MovieProvider = ({ children }) => {
   }, [activeSections.providers, language]);
 
   const fetchProviders = async () => {
-    const cacheKey = `movie_providers_${language}`;
+    const cacheKey = `movie_providers_${tmdbLanguage}_${tmdbRegion}`;
     const cached = await getCachedValue(cacheKey, TTL.PROVIDERS);
     if (cached) {
-      setProviders(cached);
+      setIfChanged(setProviders, cached);
       if (cached.length > 0) {
         setSelectedProvider(cached[0].provider_id);
         fetchMoviesByProvider(cached[0].provider_id);
@@ -285,95 +376,120 @@ export const MovieProvider = ({ children }) => {
 
     setLoadingProvider(true);
     try {
-      const url = `https://api.themoviedb.org/3/watch/providers/movie?language=${language}&watch_region=${language == "tr-TR" ? "tr" : "us"}`;
+      const url = `https://api.themoviedb.org/3/watch/providers/movie?language=${tmdbLanguage}&watch_region=${tmdbRegion}`;
       const response = await axios.get(url, { headers: { Authorization: API_KEY } });
       const results = response.data.results;
-      setProviders(results);
+      setIfChanged(setProviders, results);
       setCachedValue(cacheKey, results);
       if (results.length > 0) {
         setSelectedProvider(results[0].provider_id);
         fetchMoviesByProvider(results[0].provider_id);
       }
     } catch (err) {
-      if (__DEV__) console.error("Sağlayıcıları çekerken hata:", err.message);
+      if (__DEV__) console.error(i18nText("autoI18n.saglayicilari_cekerken_hata", "Sağlayıcıları çekerken hata:"), err.message);
     } finally {
       setLoadingProvider(false);
     }
   };
 
-  // Seçilen sağlayıcıya göre filmleri çek
-  const fetchMoviesByProvider = async (providerId) => {
-    const cacheKey = `movie_provider_${language}_${providerId}`;
-    const cached = await getCachedValue(cacheKey, TTL.PROVIDERS);
-    if (cached) {
-      setMoviesProvider(cached);
-      setLoadingMovieProvider(false);
-      return;
+  // Seçilen sağlayıcıya göre filmleri çek (sayfalı)
+  const fetchMoviesByProvider = (providerId, page = 1, append = false) => {
+    if (!append) {
+      setSelectedProvider(providerId);
+      setPageProvider(1);
     }
+    return loadPage({
+      cacheKey: `movie_provider_${tmdbLanguage}_${tmdbRegion}_${providerId}_p${page}`,
+      ttl: TTL.PROVIDERS,
+      append,
+      setData: setMoviesProvider,
+      setTotal: setTotalPagesProvider,
+      setLoading: setLoadingMovieProvider,
+      setLoadingMore: setLoadingMoreProvider,
+      request: async () => {
+        const url = `https://api.themoviedb.org/3/discover/movie?language=${tmdbLanguage}&watch_region=${tmdbRegion}&with_watch_providers=${providerId}&sort_by=vote_count.desc&page=${page}`;
+        const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+        return {
+          results: response.data.results,
+          total_pages: response.data.total_pages,
+        };
+      },
+    });
+  };
 
-    setLoadingMovieProvider(true);
-    setSelectedProvider(providerId);
-    try {
-      const url = `https://api.themoviedb.org/3/discover/movie?watch_region=${language == "tr-TR" ? "TR" : "US"}&with_watch_providers=${providerId}&sort_by=vote_count.desc`;
-      const response = await axios.get(url, { headers: { Authorization: API_KEY } });
-      setMoviesProvider(response.data.results);
-      setCachedValue(cacheKey, response.data.results);
-    } catch (err) {
-      if (__DEV__) console.error("Filmleri çekerken hata:", err.message);
-    } finally {
-      setLoadingMovieProvider(false);
-    }
+  const loadMoreProvider = () => {
+    if (
+      loadingMovieProvider ||
+      loadingMoreProvider ||
+      !selectedProvider ||
+      pageProvider >= totalPagesProvider
+    )
+      return;
+    const next = pageProvider + 1;
+    setPageProvider(next);
+    fetchMoviesByProvider(selectedProvider, next, true);
   };
 
   const [moviesNowPlaying, setMoviesNowPlaying] = useState([]);
   const [loadingNowPlaying, setLoadingNowPlaying] = useState(false);
+  const [loadingMoreNowPlaying, setLoadingMoreNowPlaying] = useState(false);
+  const [pageNowPlaying, setPageNowPlaying] = useState(1);
+  const [totalPagesNowPlaying, setTotalPagesNowPlaying] = useState(1);
 
   useEffect(() => {
     if (!activeSections.nowPlaying) return;
-    fetchMoviNowPlaying();
+    setPageNowPlaying(1);
+    fetchMoviNowPlaying(1, false);
   }, [activeSections.nowPlaying, language]);
-  // Seçilen sağlayıcıya göre filmleri çek
-  const fetchMoviNowPlaying = async () => {
-    const cacheKey = `movie_now_playing_${language}`;
-    const cached = await getCachedValue(cacheKey, TTL.NOW_PLAYING);
-    if (cached) {
-      setMoviesNowPlaying(cached);
-      setLoadingNowPlaying(false);
-      return;
-    }
 
-    setLoadingNowPlaying(true);
-    try {
-      const url = `https://api.themoviedb.org/3/movie/now_playing?language=${language}&region=${language == "tr-TR" ? "TR" : "US"}`;
-      const response = await axios.get(url, { headers: { Authorization: API_KEY } });
-      setMoviesNowPlaying(response.data.results);
-      setCachedValue(cacheKey, response.data.results);
-    } catch (err) {
-      if (__DEV__) console.error("Filmleri çekerken hata:", err.message);
-    } finally {
-      setLoadingNowPlaying(false);
-    }
+  const fetchMoviNowPlaying = (page = 1, append = false) => {
+    return loadPage({
+      cacheKey: `movie_now_playing_${tmdbLanguage}_${tmdbRegion}_p${page}`,
+      ttl: TTL.NOW_PLAYING,
+      append,
+      setData: setMoviesNowPlaying,
+      setTotal: setTotalPagesNowPlaying,
+      setLoading: setLoadingNowPlaying,
+      setLoadingMore: setLoadingMoreNowPlaying,
+      request: async () => {
+        const url = `https://api.themoviedb.org/3/movie/now_playing?language=${tmdbLanguage}&region=${tmdbRegion}&page=${page}`;
+        const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+        return {
+          results: response.data.results,
+          total_pages: response.data.total_pages,
+        };
+      },
+    });
+  };
+
+  const loadMoreNowPlaying = () => {
+    if (loadingNowPlaying || loadingMoreNowPlaying || pageNowPlaying >= totalPagesNowPlaying) return;
+    const next = pageNowPlaying + 1;
+    setPageNowPlaying(next);
+    fetchMoviNowPlaying(next, true);
   };
 
   const [genres, setGenres] = useState([]); // Başlangıç değeri boş dizi
   const [selectedGenres, setSelectedGenres] = useState([]);
   const [moviesGenres, setMoviesGenres] = useState([]); // Filmler için yeni durum ekleyin
   const [loadingGenres, setLoadingGenres] = useState(true); // loading durumu ekleyin
+  const [loadingMoreGenres, setLoadingMoreGenres] = useState(false);
   const [pageGenres, setPageGenres] = useState(1); // loading durumu ekleyin
+  const [totalPagesGenres, setTotalPagesGenres] = useState(1);
 
   const movieGenres = async () => {
-    const cacheKey = `movie_genres_${language}`;
+    const cacheKey = `movie_genres_${tmdbLanguage}`;
     const cached = await getCachedValue(cacheKey, TTL.GENRES);
     if (cached) {
-      setGenres(cached);
+      setIfChanged(setGenres, cached);
       setLoadingGenres(false);
       return;
     }
 
     try {
-      const url = `https://api.themoviedb.org/3/genre/movie/list?language=${language}`;
+      const url = `https://api.themoviedb.org/3/genre/movie/list?language=${tmdbLanguage}`;
       const response = await axios.get(url, { headers: { Authorization: API_KEY } });
-      setGenres(response.data.genres);
+      setIfChanged(setGenres, response.data.genres);
       setCachedValue(cacheKey, response.data.genres);
     } catch (err) {
       if (__DEV__) console.error(err.message);
@@ -381,36 +497,40 @@ export const MovieProvider = ({ children }) => {
       setLoadingGenres(false);
     }
   };
-  const fetchMoviesByGenres = async () => {
+  const fetchMoviesByGenres = (page = 1, append = false) => {
     const genresKey = [...selectedGenres].sort().join(",");
-    const cacheKey = `movie_genres_content_${language}_p${pageGenres}_g${genresKey}`;
-    const cached = await getCachedValue(cacheKey, TTL.TREND);
-    if (cached) {
-      setMoviesGenres(cached);
-      setLoadingGenres(false);
-      return;
-    }
-
-    setLoadingGenres(true);
-    try {
-      let url = `https://api.themoviedb.org/3/discover/movie?language=${language}&page=${pageGenres}`;
-      if (selectedGenres.length > 0) {
-        url += `&with_genres=${genresKey}`;
-      }
-      const response = await axios.get(url, { headers: { Authorization: API_KEY } });
-      setMoviesGenres(response.data.results);
-      setCachedValue(cacheKey, response.data.results);
-    } catch (err) {
-      if (__DEV__) console.error(err.message);
-    } finally {
-      setLoadingGenres(false);
-    }
+    return loadPage({
+      cacheKey: `movie_genres_content_${tmdbLanguage}_p${page}_g${genresKey}`,
+      ttl: TTL.TREND,
+      append,
+      setData: setMoviesGenres,
+      setTotal: setTotalPagesGenres,
+      setLoading: setLoadingGenres,
+      setLoadingMore: setLoadingMoreGenres,
+      request: async () => {
+        let url = `https://api.themoviedb.org/3/discover/movie?language=${tmdbLanguage}&page=${page}`;
+        if (selectedGenres.length > 0) url += `&with_genres=${genresKey}`;
+        const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+        return {
+          results: response.data.results,
+          total_pages: response.data.total_pages,
+        };
+      },
+    });
   };
   useEffect(() => {
     if (!activeSections.genres) return;
     movieGenres();
-    fetchMoviesByGenres();
-  }, [activeSections.genres, language, pageGenres, selectedGenres]);
+    setPageGenres(1);
+    fetchMoviesByGenres(1, false);
+  }, [activeSections.genres, language, selectedGenres]);
+
+  const loadMoreGenres = () => {
+    if (loadingGenres || loadingMoreGenres || pageGenres >= totalPagesGenres) return;
+    const next = pageGenres + 1;
+    setPageGenres(next);
+    fetchMoviesByGenres(next, true);
+  };
 
   const toggleGenre = (genreId) => {
     setSelectedGenres(
@@ -423,7 +543,9 @@ export const MovieProvider = ({ children }) => {
 
   const [moviesUpcoming, setMoviesUpcoming] = useState([]); // Filmler için yeni durum ekleyin
   const [loadingUpcoming, setLoadingUpcoming] = useState(true); // loading durumu ekleyin
+  const [loadingMoreUpcoming, setLoadingMoreUpcoming] = useState(false);
   const [pageUpcoming, setPageUpcoming] = useState(1); // loading durumu ekleyin
+  const [totalPagesUpcoming, setTotalPagesUpcoming] = useState(1);
   const [valueUpcoming, setValueUpcoming] = useState("0"); // Varsayılan olarak "Bu hafta" seçili
   const [isFocusUpcoming, setIsFocusUpcoming] = useState(false);
   const [calculatedDate, setCalculatedDate] = useState("");
@@ -485,34 +607,44 @@ export const MovieProvider = ({ children }) => {
   };
 
   // Film türlerini API'den almak
-  const fetchMovieUpcoming = async () => {
+  const fetchMovieUpcoming = (page = 1, append = false) => {
     if (!calculatedDate) return;
-    const cacheKey = `movie_upcoming_${language}_${calculatedDate}_p${pageUpcoming}`;
-    const cached = await getCachedValue(cacheKey, TTL.NOW_PLAYING);
-    if (cached) {
-      setMoviesUpcoming(cached);
-      setLoadingUpcoming(false);
-      return;
-    }
-
-    setLoadingUpcoming(true);
-    try {
-      const url = `https://api.themoviedb.org/3/discover/movie?include_adult=false&include_video=false&language=${language}&primary_release_date.gte=${formatDate(today)}&primary_release_date.lte=${calculatedDate}&region=${language == "tr-TR" ? "tr" : "us"}&page=${pageUpcoming}&sort_by=popularity.desc`;
-      const response = await axios.get(url, { headers: { Authorization: API_KEY } });
-      setMoviesUpcoming(response.data.results);
-      setCachedValue(cacheKey, response.data.results);
-    } catch (err) {
-      if (__DEV__) console.error("Yakında çıkacak filmleri çekerken hata:", err.message);
-    } finally {
-      setLoadingUpcoming(false);
-    }
+    return loadPage({
+      cacheKey: `movie_upcoming_${tmdbLanguage}_${tmdbRegion}_${calculatedDate}_p${page}`,
+      ttl: TTL.NOW_PLAYING,
+      append,
+      setData: setMoviesUpcoming,
+      setTotal: setTotalPagesUpcoming,
+      setLoading: setLoadingUpcoming,
+      setLoadingMore: setLoadingMoreUpcoming,
+      request: async () => {
+        const url = `https://api.themoviedb.org/3/discover/movie?include_adult=false&include_video=false&language=${tmdbLanguage}&primary_release_date.gte=${formatDate(today)}&primary_release_date.lte=${calculatedDate}&region=${tmdbRegion}&page=${page}&sort_by=popularity.desc`;
+        const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+        return {
+          results: response.data.results,
+          total_pages: response.data.total_pages,
+        };
+      },
+    });
   };
 
   useEffect(() => {
     if (!activeSections.upcoming) return;
     addTimeToDate(valueUpcoming);
-    fetchMovieUpcoming();
-  }, [activeSections.upcoming, language, pageUpcoming, valueUpcoming, calculatedDate]);
+  }, [activeSections.upcoming, valueUpcoming]);
+
+  useEffect(() => {
+    if (!activeSections.upcoming || !calculatedDate) return;
+    setPageUpcoming(1);
+    fetchMovieUpcoming(1, false);
+  }, [activeSections.upcoming, language, calculatedDate]);
+
+  const loadMoreUpcoming = () => {
+    if (loadingUpcoming || loadingMoreUpcoming || pageUpcoming >= totalPagesUpcoming) return;
+    const next = pageUpcoming + 1;
+    setPageUpcoming(next);
+    fetchMovieUpcoming(next, true);
+  };
 
   const RelaseCount = (relaseDate) => {
     const today = new Date().toISOString().split("T")[0]; // Bugünün tarihi
@@ -565,6 +697,26 @@ export const MovieProvider = ({ children }) => {
 
     setTotalPagesBest,
     setPageBest,
+    loadMoreBests,
+    loadingMoreBests,
+    loadMoreGenres,
+    loadingMoreGenres,
+    totalPagesGenres,
+    loadMoreUpcoming,
+    loadingMoreUpcoming,
+    totalPagesUpcoming,
+    loadMoreNowPlaying,
+    loadingMoreNowPlaying,
+    pageNowPlaying,
+    totalPagesNowPlaying,
+    loadMoreProvider,
+    loadingMoreProvider,
+    pageProvider,
+    totalPagesProvider,
+    loadMoreTrends,
+    loadingMoreTrends,
+    pageTrends,
+    totalPagesTrends,
     setSelectedCategoryBests,
     getCategoryTitleTrends,
     getCategoryTitleBests,
@@ -597,7 +749,12 @@ export const MovieProvider = ({ children }) => {
     loadingNowPlaying, genres, loadingGenres, moviesGenres, pageGenres,
     selectedGenres, dateData, moviesUpcoming, loadingUpcoming,
     pageUpcoming, valueUpcoming, isFocusUpcoming, moviesCollection,
-    loadingCollection, errorCollection, activateMovieSection
+    loadingCollection, errorCollection, activateMovieSection,
+    loadingMoreBests, loadingMoreGenres, totalPagesGenres,
+    loadingMoreUpcoming, totalPagesUpcoming,
+    loadingMoreNowPlaying, pageNowPlaying, totalPagesNowPlaying,
+    loadingMoreProvider, pageProvider, totalPagesProvider,
+    loadingMoreTrends, pageTrends, totalPagesTrends,
   ]);
 
   return (

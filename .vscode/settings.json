@@ -1,4 +1,5 @@
 {
   "CodeGPT.apiKey": "CodeGPT Plus Beta",
-  "commentTranslate.source": "Google"
+  "commentTranslate.source": "Google",
+  "java.compile.nullAnalysis.mode": "automatic"
 }

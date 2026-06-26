@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Progress from "react-native-progress";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import { i18nText } from "../../utils/i18nText";
+
 
 const { width } = Dimensions.get("window");
 const CARD_W = width * 0.4;
@@ -79,6 +81,7 @@ const OngoingCard = ({
           style={[styles.similarPoster, { shadowColor: theme.shadow }]}
           contentFit="cover"
           cachePolicy="memory-disk"
+          recyclingKey={`tvongoing-${item.id}`}
           transition={120}
         />
 
@@ -149,7 +152,6 @@ export default function TvOngoingSection({ navigation }) {
   const { theme } = useTheme();
   const { watchedTvShows: shows } = useTvShow();
 
-  const [activeFilter, setActiveFilter] = useState("ongoing"); // all | ongoing | completed
   const scaleValuesRef = useRef({});
   const getScaleValue = (id) => {
     if (!scaleValuesRef.current[id]) {
@@ -173,27 +175,18 @@ export default function TvOngoingSection({ navigation }) {
     }).start();
   };
 
-  // ── Filtre ────────────────────────────────────────────────────────────────
+  // ── Yalnızca devam eden (tamamlanmamış) diziler ─────────────────────────────
   const filtered = shows.filter((s) => {
     const watched = (s.seasons || []).reduce(
       (acc, ss) => acc + (ss.episodes ? ss.episodes.length : 0),
       0,
     );
     const total = s.showEpisodeCount || 1;
-    const pct = watched / total;
-    if (activeFilter === "ongoing" && pct >= 1) return false;
-    if (activeFilter === "completed" && pct < 1) return false;
-    return true;
+    return watched / total < 1;
   });
 
-  // Hiç dizi yoksa section'ı gösterme
-  if (shows.length === 0) return null;
-
-  const FILTERS = [
-    { key: "all", label: "Tümü" },
-    { key: "ongoing", label: "Devam" },
-    { key: "completed", label: "Bitti" },
-  ];
+  // Devam eden dizi yoksa section'ı hiç gösterme
+  if (filtered.length === 0) return null;
 
   return (
     <View style={styles.container}>
@@ -212,57 +205,9 @@ export default function TvOngoingSection({ navigation }) {
           <Text
             allowFontScaling={false}
             style={[styles.seeAllText, { color: theme.text.muted }]}
-          >
-            Tümü
-          </Text>
+          >{i18nText("autoI18n.tumu", "Tümü")}</Text>
           <Ionicons name="chevron-forward" size={13} color={theme.text.muted} />
         </TouchableOpacity>
-      </View>
-
-      {/* ── Filtre çipleri (TvShowBests'deki kategori çipleri gibi) ── */}
-      <View style={{ paddingLeft: 15, marginBottom: 8 }}>
-        <FlatList
-          data={FILTERS}
-          keyExtractor={(f) => f.key}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.categoriesList,
-            { backgroundColor: theme.secondary },
-          ]}
-          renderItem={({ item: f }) => (
-            <TouchableOpacity
-              onPress={() => setActiveFilter(f.key)}
-              style={[
-                styles.categoryItem,
-                {
-                  borderColor:
-                    activeFilter === f.key
-                      ? theme.text.primary
-                      : theme.text.muted,
-                  paddingVertical: 7,
-                  borderRadius: 13,
-                  paddingHorizontal: 12,
-                  backgroundColor: theme.primary,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.categoryText,
-                  {
-                    color:
-                      activeFilter === f.key
-                        ? theme.text.primary
-                        : theme.text.muted,
-                  },
-                ]}
-              >
-                {f.label}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
       </View>
 
       {/* ── Yatay dizi listesi ── */}
@@ -287,16 +232,6 @@ export default function TvOngoingSection({ navigation }) {
             onPressOut={onPressOut}
           />
         )}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text
-              allowFontScaling={false}
-              style={[styles.emptyText, { color: theme.text.muted }]}
-            >
-              Bu filtre için dizi yok
-            </Text>
-          </View>
-        }
       />
     </View>
   );

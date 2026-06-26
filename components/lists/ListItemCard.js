@@ -1,5 +1,6 @@
+import { Image } from "expo-image";
 import React from "react";
-import { View, Text, Image, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity } from "react-native";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
 
 export default function ListItemCard({ item, theme, onPress }) {

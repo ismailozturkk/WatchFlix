@@ -16,6 +16,8 @@ import { useProfileReminders } from "../../../context/ProfileRemindersContext";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
+import { i18nText } from "../../../utils/i18nText";
+
 
 const { width } = Dimensions.get("window");
 
@@ -30,7 +32,7 @@ function getCountdownStyle(diff, colors) {
       color: colors.green,
       background: colors.greenBackground,
       icon: "checkmark-circle",
-      label: "Yayınlandı",
+      label: i18nText("autoI18n.yayinlandi", "Yayınlandı"),
     };
   }
   const { days, months } = diff;
@@ -141,9 +143,7 @@ function MovieCard({
             style={[styles.typeBadge, { backgroundColor: theme.accent + "cc" }]}
           >
             <Ionicons name="film-outline" size={9} color="#fff" />
-            <Text allowFontScaling={false} style={styles.typeBadgeText}>
-              FİLM
-            </Text>
+            <Text allowFontScaling={false} style={styles.typeBadgeText}>{i18nText("autoI18n.film_2", "FİLM")}</Text>
           </View>
         </View>
 
@@ -278,9 +278,7 @@ function EpisodeCard({
           />
           <View style={[styles.typeBadge, { backgroundColor: "#6d28d9cc" }]}>
             <Ionicons name="tv-outline" size={9} color="#fff" />
-            <Text allowFontScaling={false} style={styles.typeBadgeText}>
-              DİZİ
-            </Text>
+            <Text allowFontScaling={false} style={styles.typeBadgeText}>{i18nText("autoI18n.dizi_2", "DİZİ")}</Text>
           </View>
           <View
             style={[
@@ -306,8 +304,7 @@ function EpisodeCard({
             style={[styles.cardSubTitle, { color: theme.text.secondary }]}
             numberOfLines={1}
           >
-            {episode.episodeNumber}. Bölüm
-          </Text>
+            {episode.episodeNumber}{i18nText("autoI18n.bolum_3", ". Bölüm")}</Text>
 
           <View style={styles.infoRow}>
             <Ionicons
@@ -595,17 +592,11 @@ export default function ProfileReminders({ navigation }) {
           <Text
             allowFontScaling={false}
             style={[styles.emptyText, { color: theme.text.muted }]}
-          >
-            Yükleniyor...
-          </Text>
+          >{i18nText("autoI18n.yukleniyor", "Yükleniyor...")}</Text>
         </View>
       ) : activeTab === "movie" ? (
         sortedMovieReminders.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.listContent}
-          >
+          <View style={styles.gridWrap}>
             {sortedMovieReminders.map((reminder) => (
               <MovieCard
                 key={reminder.movieId}
@@ -616,7 +607,7 @@ export default function ProfileReminders({ navigation }) {
                 calculateDateDifference={calculateDateDifference}
               />
             ))}
-          </ScrollView>
+          </View>
         ) : (
           <View style={styles.emptyContainer}>
             <Ionicons name="film-outline" size={32} color={theme.text.muted} />
@@ -629,17 +620,11 @@ export default function ProfileReminders({ navigation }) {
             <Text
               allowFontScaling={false}
               style={[styles.emptyHint, { color: theme.text.muted }]}
-            >
-              Film detay sayfasından hatırlatıcı ekleyebilirsin.
-            </Text>
+            >{i18nText("autoI18n.film_detay_sayfasindan_hatirlatici_ekleyebilirsin", "Film detay sayfasından hatırlatıcı ekleyebilirsin.")}</Text>
           </View>
         )
       ) : flatTvReminders.length > 0 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-        >
+        <View style={styles.gridWrap}>
           {flatTvReminders.map(({ show, season, episode }, idx) => (
             <EpisodeCard
               key={
@@ -655,7 +640,7 @@ export default function ProfileReminders({ navigation }) {
               calculateDateDifference={calculateDateDifference}
             />
           ))}
-        </ScrollView>
+        </View>
       ) : (
         <View style={styles.emptyContainer}>
           <Ionicons name="tv-outline" size={32} color={theme.text.muted} />
@@ -668,17 +653,18 @@ export default function ProfileReminders({ navigation }) {
           <Text
             allowFontScaling={false}
             style={[styles.emptyHint, { color: theme.text.muted }]}
-          >
-            Dizi detay sayfasından hatırlatıcı ekleyebilirsin.
-          </Text>
+          >{i18nText("autoI18n.dizi_detay_sayfasindan_hatirlatici_ekleyebilirsin", "Dizi detay sayfasından hatırlatıcı ekleyebilirsin.")}</Text>
         </View>
       )}
     </View>
   );
 }
 
-const CARD_W = 140;
-const CARD_H = 210;
+const GRID_COLS = 3;
+const GRID_PAD = 14;
+const GRID_GAP = 10;
+const CARD_W = (width - GRID_PAD * 2 - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
+const CARD_H = CARD_W * 1.62;
 
 const styles = StyleSheet.create({
   section: { width: "100%", marginBottom: 14 },
@@ -745,6 +731,13 @@ const styles = StyleSheet.create({
 
   /* Liste */
   listContent: { paddingHorizontal: 16, gap: 10, paddingBottom: 4 },
+  gridWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: GRID_PAD,
+    gap: GRID_GAP,
+    paddingBottom: 8,
+  },
 
   /* Kart */
   card: {

@@ -1,3 +1,4 @@
+import { Image } from "expo-image";
 import React, { useCallback, useState, useRef, useEffect, memo } from "react";
 import {
   StyleSheet,
@@ -5,13 +6,12 @@ import {
   Text,
   TextInput,
   FlatList,
-  Image,
   Dimensions,
   ActivityIndicator,
   TouchableOpacity,
   ScrollView,
   Animated,
-  Keyboard,
+  Keyboard
 } from "react-native";
 import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
@@ -26,10 +26,12 @@ import { db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
 import { useAppSettings, useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useFocusEffect } from "@react-navigation/native";
-import { useListStatus } from "../../modules/UseListStatus";
+import ListBadges from "../../components/ListBadges";
 import { SafeAreaView } from "react-native-safe-area-context";
 import IconBacground from "../../components/IconBacground";
 import { LinearGradient } from "expo-linear-gradient";
+import { i18nText } from "../../utils/i18nText";
+
 
 const { width } = Dimensions.get("window");
 
@@ -103,86 +105,10 @@ const useEnterAnim = (index) => {
   }, []);
   return { opacity, translateY };
 };
-// ─── Liste rozet ikonu ────────────────────────────────────────────────────────
-const ListBadge = memo(
-  ({
-    inWatchList,
-    isWatched,
-    inFavorites,
-    isInOtherLists,
-    theme,
-    vertical = true,
-  }) => {
-    if (!inWatchList && !isWatched && !inFavorites && !isInOtherLists)
-      return null;
-    return (
-      <View style={[vertical ? styles.badgeVertical : styles.badgeHorizontal]}>
-        {inWatchList && (
-          <View
-            style={[
-              styles.badge,
-              { backgroundColor: (theme.colors?.blue ?? "#64b4ff") + "33" },
-            ]}
-          >
-            <Ionicons
-              name="bookmark"
-              size={vertical ? 10 : 9}
-              color={theme.colors?.blue ?? "#64b4ff"}
-            />
-          </View>
-        )}
-        {isWatched && (
-          <View
-            style={[
-              styles.badge,
-              { backgroundColor: (theme.colors?.green ?? "#29b864") + "33" },
-            ]}
-          >
-            <Ionicons
-              name="eye"
-              size={vertical ? 10 : 9}
-              color={theme.colors?.green ?? "#29b864"}
-            />
-          </View>
-        )}
-        {inFavorites && (
-          <View
-            style={[
-              styles.badge,
-              { backgroundColor: (theme.colors?.red ?? "#e33") + "33" },
-            ]}
-          >
-            <Ionicons
-              name="heart"
-              size={vertical ? 10 : 9}
-              color={theme.colors?.red ?? "#e33"}
-            />
-          </View>
-        )}
-        {isInOtherLists && (
-          <View
-            style={[
-              styles.badge,
-              { backgroundColor: (theme.colors?.orange ?? "#ff6400") + "33" },
-            ]}
-          >
-            <Ionicons
-              name="grid"
-              size={vertical ? 10 : 9}
-              color={theme.colors?.orange ?? "#ff6400"}
-            />
-          </View>
-        )}
-      </View>
-    );
-  },
-);
 // ─── ROW KART ─────────────────────────────────────────────────────────────────
 const MovieRowItem = memo(
   ({ item, navigation, imageQuality, theme, index }) => {
     const { getTmdbUrl } = useImageQualitySettings();
-    const { inWatchList, inFavorites, isWatched, isInOtherLists } =
-      useListStatus(item.id, "movie");
     const { scale, onIn, onOut } = usePressAnim();
     const { opacity, translateY } = useEnterAnim(index);
     const rating = item.vote_average ?? 0;
@@ -258,7 +184,7 @@ const MovieRowItem = memo(
                 ]}
                 numberOfLines={2}
               >
-                {item.title || "İsimsiz"}
+                {item.title || i18nText("autoI18n.isimsiz", "İsimsiz")}
               </Text>
               <Text
                 style={[
@@ -301,12 +227,11 @@ const MovieRowItem = memo(
               )}
             </View>
             {/* Rozetler */}
-            <ListBadge
-              inWatchList={inWatchList}
-              isWatched={isWatched}
-              inFavorites={inFavorites}
-              isInOtherLists={isInOtherLists}
+            <ListBadges
+              mediaId={item.id}
+              mediaType="movie"
               theme={theme}
+              variant="chip"
               vertical
             />
           </View>
@@ -320,8 +245,6 @@ const MovieRowItem = memo(
 const MovieGridItem = memo(
   ({ item, navigation, imageQuality, theme, index }) => {
     const { getTmdbUrl } = useImageQualitySettings();
-    const { inWatchList, inFavorites, isWatched, isInOtherLists } =
-      useListStatus(item.id, "movie");
     const { scale, onIn, onOut } = usePressAnim();
     const { opacity, translateY } = useEnterAnim(index);
     const rating = item.vote_average ?? 0;
@@ -380,12 +303,11 @@ const MovieGridItem = memo(
                 <Text style={styles.gridRatingText}>★ {rating.toFixed(1)}</Text>
               </View>
             )}
-            <ListBadge
-              inWatchList={inWatchList}
-              isWatched={isWatched}
-              inFavorites={inFavorites}
-              isInOtherLists={isInOtherLists}
+            <ListBadges
+              mediaId={item.id}
+              mediaType="movie"
               theme={theme}
+              variant="chip"
               vertical={false}
             />
             {/* Film adı + yıl + liste rozetleri */}
@@ -417,7 +339,7 @@ const DiscoverSection = memo(
     const [topRated, setTopRated] = useState([]);
     const [loadingDiscover, setLoading] = useState(true);
     const tabAnim = useRef(new Animated.Value(0)).current;
-    const TABS = ["Popüler", "Yakında", "En İyi"];
+    const TABS = [i18nText("autoI18n.populer", "Popüler"), i18nText("autoI18n.yakinda", "Yakında"), i18nText("autoI18n.en_iyi", "En İyi")];
     const TAB_W = (width - 32) / 3;
 
     useEffect(() => {
@@ -633,13 +555,20 @@ const LayoutToggle = memo(({ viewMode, onToggle, theme }) => {
 });
 
 // ─── Ana Bileşen ──────────────────────────────────────────────────────────────
-export default function MovieSearch({ navigation, route }) {
+export default function MovieSearch({ navigation, route, isUnified, unifiedQuery, unifiedViewMode }) {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastSearch, setLastSearch] = useState([]);
-  const [viewMode, setViewMode] = useState("row"); // "row" | "grid"
+  const [internalViewMode, setInternalViewMode] = useState("row"); // "row" | "grid"
+  const viewMode = isUnified && unifiedViewMode ? unifiedViewMode : internalViewMode;
+  
+  const Container = isUnified ? View : SafeAreaView;
+
+  const handleToggleView = useCallback(() => {
+    setInternalViewMode((prev) => (prev === "row" ? "grid" : "row"));
+  }, []);
 
   const { language, t } = useLanguage();
   const { theme } = useTheme();
@@ -667,12 +596,18 @@ export default function MovieSearch({ navigation, route }) {
 
   useFocusEffect(
     useCallback(() => {
-      if (route.params?.autoFocus)
+      if (route?.params?.autoFocus)
         setTimeout(() => inputRef.current?.focus(), 100);
-    }, [route.params]),
+    }, [route?.params]),
   );
 
-  const routeName = route.params?.name;
+  useEffect(() => {
+    if (isUnified && unifiedQuery !== undefined) {
+      handleSearch(unifiedQuery);
+    }
+  }, [unifiedQuery, isUnified]);
+
+  const routeName = route?.params?.name;
   useEffect(() => {
     if (routeName) {
       setSearch(routeName);
@@ -730,7 +665,7 @@ export default function MovieSearch({ navigation, route }) {
         });
       } catch (err) {
         setError(err.message);
-        Toast.show({ type: "error", text1: "Hata: " + err.message });
+        Toast.show({ type: "error", text1: i18nText("autoI18n.hata_2", "Hata: ") + err.message });
       } finally {
         setLoading(false);
       }
@@ -738,7 +673,7 @@ export default function MovieSearch({ navigation, route }) {
     [language, adultContent, API_KEY],
   );
 
-  const handleToggleView = useCallback((next) => setViewMode(next), []);
+
 
   // Arama sonuçları renderlar
   const renderRowResult = useCallback(
@@ -795,47 +730,46 @@ export default function MovieSearch({ navigation, route }) {
       <View style={styles.centerBox}>
         <LottieView
           style={{ width: 280, height: 280 }}
-          source={require("../../LottieJson/search_notfound.json")}
+          source={require("@lottie/search_notfound.json")}
           autoPlay
           loop
         />
         <Text
           style={[styles.emptyHint, { color: theme.text?.secondary ?? "#aaa" }]}
         >
-          "{search}" için sonuç bulunamadı
-        </Text>
+          "{search}{i18nText("autoI18n.icin_sonuc_bulunamadi", "\" için sonuç bulunamadı")}</Text>
       </View>
     ),
     [search, theme],
   );
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.primary }]}
+    <Container
+      style={[styles.container, !isUnified && { backgroundColor: theme.primary }]}
     >
-      <IconBacground opacity={0.3} />
+      {!isUnified && <IconBacground opacity={0.3} />}
       {showSnow && (
         <LottieView
           style={styles.lottie}
-          source={require("../../LottieJson/snow.json")}
+          source={require("@lottie/snow.json")}
           autoPlay
           loop
         />
       )}
 
       {/* ── Başlık ─────────────────────────────────────────────────────── */}
-      <Animated.Text
+      {!isUnified && <Animated.Text
         style={[
           styles.pageTitle,
           { color: theme.text?.primary ?? "#fff" },
           titleStyle,
         ]}
       >
-        {t.searchMovies}
-      </Animated.Text>
+        {t.SearchScreen?.searchMovies ?? i18nText("autoI18n.film_ara", "Film Ara")}
+      </Animated.Text>}
 
       {/* ── Arama Kutusu + Toggle ──────────────────────────────────────── */}
-      <Animated.View style={[styles.searchRow, searchBarStyle]}>
+      {!isUnified && <Animated.View style={[styles.searchRow, searchBarStyle]}>
         <View
           style={[
             styles.searchBar,
@@ -854,7 +788,7 @@ export default function MovieSearch({ navigation, route }) {
               styles.searchInput,
               { color: theme.text?.primary ?? "#fff" },
             ]}
-            placeholder={t.searchMovies}
+            placeholder={t.SearchScreen?.searchMovies ?? i18nText("autoI18n.film_ara_2", "Film ara...")}
             placeholderTextColor={theme.text?.muted ?? "#666"}
             value={search}
             onChangeText={handleSearch}
@@ -887,7 +821,7 @@ export default function MovieSearch({ navigation, route }) {
           onToggle={handleToggleView}
           theme={theme}
         />
-      </Animated.View>
+      </Animated.View>}
 
       {/* ── Son Aramalar ───────────────────────────────────────────────── */}
       {lastSearch.length > 0 && (
@@ -965,13 +899,13 @@ export default function MovieSearch({ navigation, route }) {
           ListEmptyComponent={search.length > 1 ? <EmptySearch /> : null}
         />
       )}
-    </SafeAreaView>
+    </Container>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 10 },
+  container: { flex: 1, paddingTop:10 },
   lottie: {
     position: "absolute",
     top: 0,
@@ -1019,7 +953,7 @@ const styles = StyleSheet.create({
   },
 
   // ── Son aramalar ──────────────────────────────────────────────────────────
-  chipsWrapper: { marginBottom: 4 },
+  chipsWrapper: { marginBottom: 10 },
   chipsList: { paddingHorizontal: 16, alignItems: "center", gap: 8 },
   chip: {
     flexDirection: "row",
@@ -1033,9 +967,8 @@ const styles = StyleSheet.create({
   // ── ROW KART ─────────────────────────────────────────────────────────────
   rowList: {
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 15,
     paddingBottom: 30,
-    paddingTop: 20,
   },
   rowCard: {
     height: 130,
@@ -1056,7 +989,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     opacity: 0.28,
     borderRadius: 16,
-    resizeMode: "cover",
+    contentFit: "cover",
   },
   rowPosterWrapper: {
     width: ROW_POSTER_W + 8,
@@ -1126,7 +1059,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
+    contentFit: "cover",
   },
   gridNoPoster: {
     position: "absolute",
@@ -1173,29 +1106,6 @@ const styles = StyleSheet.create({
   ratingText: { fontSize: 12, fontWeight: "700" },
   voteCount: { fontSize: 11 },
 
-  // Rozetler
-  badgeContainer: { position: "relative", gap: 3 }, // <-- position: "relative" oldu
-  // ── Rozetler ──────────────────────────────────────────────────────────────
-  badgeVertical: {
-    position: "absolute",
-    right: 7,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-    gap: 3,
-  },
-  badgeHorizontal: {
-    flexDirection: "row",
-    gap: 4,
-    marginBottom: 5,
-  },
-  badge: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   // ── Keşfet ────────────────────────────────────────────────────────────────
   discoverWrapper: { flex: 1 },
   discoverLoadingBox: {

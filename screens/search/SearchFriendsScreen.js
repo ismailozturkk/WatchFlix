@@ -1,3 +1,4 @@
+import { Image } from "expo-image";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
@@ -9,36 +10,35 @@ import {
   Animated,
   Keyboard,
 } from "react-native";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  updateDoc,
-  arrayUnion,
-  getDoc,
-  setDoc,
-  deleteDoc,
-} from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { db } from "../../firebase";
 import { useTheme } from "../../context/ThemeContext";
-import SwipeCard from "../../modules/SwipeCard";
+import SwipeCard from "@components/SwipeCard";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import IconBacground from "../../components/IconBacground";
 import { SafeAreaView } from "react-native-safe-area-context";
+import BackButton from "../../components/BackButton";
 import LottieView from "lottie-react-native";
 import { useProfileUi } from "../../context/ProfileUiContext";
-import { Image } from "react-native";
+import { useFriends } from "../../context/FriendsContext";
+import { searchUsersByUsername } from "../../services/userService";
+import { i18nText } from "../../utils/i18nText";
 
-export default function SearchFriendsScreen() {
+;
+
+export default function SearchFriendsScreen({ navigation }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [results, setResults] = useState([]);
   const auth = getAuth();
   const { theme } = useTheme();
   const currentUser = auth.currentUser;
   const { avatars } = useProfileUi();
+  const {
+    isFriend,
+    hasOutgoingTo,
+    sendRequest,
+    cancelRequest,
+    removeFriend,
+  } = useFriends();
 
   const titleAnim = useRef(new Animated.Value(0)).current;
   const searchBarAnim = useRef(new Animated.Value(0)).current;
@@ -70,146 +70,50 @@ export default function SearchFriendsScreen() {
   }, [searchTerm]);
 
   const handleSearch = useCallback(
-    async (search) => {
-      if (!search || !currentUser) return;
-      const usersRef = collection(db, "Users");
-      const q = query(
-        usersRef,
-        where("username", ">=", search),
-        where("username", "<=", search + "\uf8ff"),
-      );
-      const querySnapshot = await getDocs(q);
-      const users = [];
-      const currentUserDocRef = doc(db, "Users", currentUser.uid);
-      const currentUserSnap = await getDoc(currentUserDocRef);
-      const currentUserData = currentUserSnap.data();
-      const friends = currentUserData.friends || [];
-      const sendRequests = currentUserData.friendRequests?.sendRequest || [];
-
-      querySnapshot.forEach((docSnap) => {
-        if (docSnap.id !== currentUser.uid) {
-          const userData = { uid: docSnap.id, ...docSnap.data() };
-          const alreadyFriend = friends.some((f) => f.uid === docSnap.id);
-          const requestSent = sendRequests.some((r) => r.uid === docSnap.id);
-          users.push({ ...userData, alreadyFriend, requestSent });
-        }
+    async (searchTerm) => {
+      if (!searchTerm || !currentUser) return;
+      const users = await searchUsersByUsername(searchTerm, {
+        excludeUid: currentUser.uid,
       });
       setResults(users);
     },
     [currentUser],
   );
 
-  const sendFriendRequest = async (friend) => {
-    const friendRef = doc(db, "Users", friend.uid);
-    const currentUserRef = doc(db, "Users", currentUser.uid);
-    const currentUserData = (await getDoc(currentUserRef)).data();
-    const requestObj = {
-      uid: currentUser.uid,
-      displayName: currentUserData.displayName || "",
-      username: currentUserData.username || "",
-      avatarIndex: currentUserData.avatarIndex || 0,
-    };
-    const receivedObj = {
-      uid: friend.uid,
-      displayName: friend.displayName || "",
-      username: friend.username || "",
-      avatarIndex: friend.avatarIndex || 0,
-    };
-    await setDoc(
-      currentUserRef,
-      { friendRequests: { sendRequest: arrayUnion(receivedObj) } },
-      { merge: true },
-    );
-    await setDoc(
-      friendRef,
-      { friendRequests: { receivedRequest: arrayUnion(requestObj) } },
-      { merge: true },
-    );
-    setResults((prev) =>
-      prev.map((u) => (u.uid === friend.uid ? { ...u, requestSent: true } : u)),
-    );
-  };
-
-  const handleCancelSent = async (friend) => {
-    const userRef = doc(db, "Users", currentUser.uid);
-    const friendRef = doc(db, "Users", friend.uid);
-    const [userDoc, friendDoc] = await Promise.all([
-      getDoc(userRef),
-      getDoc(friendRef),
-    ]);
-    if (!userDoc.exists() || !friendDoc.exists()) return;
-    await updateDoc(userRef, {
-      "friendRequests.sendRequest": userDoc
-        .data()
-        .friendRequests.sendRequest.filter((req) => req.uid !== friend.uid),
-    });
-    await updateDoc(friendRef, {
-      "friendRequests.receivedRequest": friendDoc
-        .data()
-        .friendRequests.receivedRequest.filter(
-          (req) => req.uid !== currentUser.uid,
-        ),
-    });
-    setResults((prev) =>
-      prev.map((u) =>
-        u.uid === friend.uid ? { ...u, requestSent: false } : u,
-      ),
-    );
-  };
-
-  const handleDelete = async (friend) => {
-    try {
-      // Subcollection sil + root-doc array temizle
-      await Promise.all([
-        deleteDoc(doc(db, "Users", currentUser.uid, "friends", friend.uid)),
-        deleteDoc(doc(db, "Users", friend.uid,      "friends", currentUser.uid)),
-      ]);
-      const [userSnap, friendSnap] = await Promise.all([
-        getDoc(doc(db, "Users", currentUser.uid)),
-        getDoc(doc(db, "Users", friend.uid)),
-      ]);
-      const legacyU = userSnap.data()?.friends?.find((f) => f.uid === friend.uid);
-      const legacyF = friendSnap.data()?.friends?.find((f) => f.uid === currentUser.uid);
-      const updates = [];
-      if (legacyU) updates.push(updateDoc(doc(db, "Users", currentUser.uid), {
-        friends: userSnap.data().friends.filter((f) => f.uid !== friend.uid),
-      }));
-      if (legacyF) updates.push(updateDoc(doc(db, "Users", friend.uid), {
-        friends: friendSnap.data().friends.filter((f) => f.uid !== currentUser.uid),
-      }));
-      if (updates.length) await Promise.all(updates);
-      setResults((prev) =>
-        prev.map((u) => u.uid === friend.uid ? { ...u, alreadyFriend: false } : u),
-      );
-    } catch (error) {
-      console.error("Arkadaş silme hatası:", error);
-    }
-  };
-
   const renderItem = ({ item }) => {
-    const statusColor = item.alreadyFriend
+    const alreadyFriend = isFriend(item.uid);
+    const requestSent = hasOutgoingTo(item.uid);
+
+    const statusColor = alreadyFriend
       ? theme.colors?.green ?? "#29b864"
-      : item.requestSent
+      : requestSent
         ? "#ff9650"
         : null;
 
-    const statusLabel = item.alreadyFriend
-      ? "Arkadaş"
-      : item.requestSent
-        ? "İstek Gönderildi"
+    const statusLabel = alreadyFriend
+      ? i18nText("autoI18n.arkadas", "Arkadaş")
+      : requestSent
+        ? i18nText("autoI18n.istek_gonderildi", "İstek Gönderildi")
         : null;
 
     return (
       <SwipeCard
         rightButton={
-          item.requestSent
-            ? { label: "Geri Al", color: "#e56d35", onPress: () => handleCancelSent(item) }
-            : item.alreadyFriend
-              ? { label: "Sil", color: "#fa3232", onPress: () => handleDelete(item) }
-              : { label: "İstek Gönder", color: "#30a75e", onPress: () => sendFriendRequest(item) }
+          requestSent
+            ? { label: i18nText("autoI18n.geri_al", "Geri Al"), color: "#e56d35", onPress: () => cancelRequest(item.uid) }
+            : alreadyFriend
+              ? { label: i18nText("autoI18n.sil", "Sil"), color: "#fa3232", onPress: () => removeFriend(item.uid) }
+              : { label: i18nText("autoI18n.istek_gonder", "İstek Gönder"), color: "#30a75e", onPress: () => sendRequest(item.uid) }
         }
       >
-        <View
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() =>
+            navigation.navigate("FriendProfileScreen", {
+              friendUid: item.uid,
+              friendName: item.displayName,
+            })
+          }
           style={[
             styles.userCard,
             {
@@ -265,7 +169,7 @@ export default function SearchFriendsScreen() {
               <Ionicons name="person-add-outline" size={18} color={theme.accent} />
             </View>
           )}
-        </View>
+        </TouchableOpacity>
       </SwipeCard>
     );
   };
@@ -300,9 +204,7 @@ export default function SearchFriendsScreen() {
       {/* Başlık */}
       <Animated.Text
         style={[styles.pageTitle, { color: theme.text?.primary ?? "#fff" }, titleStyle]}
-      >
-        Arkadaş Ara
-      </Animated.Text>
+      >{i18nText("autoI18n.arkadas_ara", "Arkadaş Ara")}</Animated.Text>
 
       {/* Arama kutusu */}
       <Animated.View style={[styles.searchRow, searchBarStyle]}>
@@ -314,7 +216,7 @@ export default function SearchFriendsScreen() {
             style={{ marginRight: 8 }}
           />
           <TextInput
-            placeholder="Kullanıcı adı ile ara..."
+            placeholder={i18nText("autoI18n.kullanici_adi_ile_ara", "Kullanıcı adı ile ara...")}
             placeholderTextColor={theme.text?.muted ?? "#666"}
             value={searchTerm}
             onChangeText={setSearchTerm}
@@ -338,20 +240,17 @@ export default function SearchFriendsScreen() {
         <View style={styles.emptyState}>
           <LottieView
             style={{ width: 300, height: 300 }}
-            source={require("../../LottieJson/search12.json")}
+            source={require("@lottie/search12.json")}
             autoPlay
             loop
           />
-          <Text style={[styles.emptyText, { color: theme.text?.secondary ?? "#aaa" }]}>
-            Arkadaşlarını bulmak için kullanıcı adı yaz
-          </Text>
+          <Text style={[styles.emptyText, { color: theme.text?.secondary ?? "#aaa" }]}>{i18nText("autoI18n.arkadaslarini_bulmak_icin_kullanici_adi_yaz", "Arkadaşlarını bulmak için kullanıcı adı yaz")}</Text>
         </View>
       ) : results.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="person-outline" size={52} color={theme.text?.muted ?? "#444"} />
           <Text style={[styles.emptyText, { color: theme.text?.secondary ?? "#aaa" }]}>
-            "{searchTerm}" için kullanıcı bulunamadı
-          </Text>
+            "{searchTerm}{i18nText("autoI18n.icin_kullanici_bulunamadi", "\" için kullanıcı bulunamadı")}</Text>
         </View>
       ) : (
         <FlatList
@@ -363,6 +262,7 @@ export default function SearchFriendsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+      <BackButton top={8} />
     </SafeAreaView>
   );
 }

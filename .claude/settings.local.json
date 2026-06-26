@@ -1,7 +1,26 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node -e \"require\\('fs'\\).writeFileSync\\('c:/Users/ismail/Desktop/projeler/MainProject/WhatchFlix/screens/ChatScreen.js', require\\('fs'\\).readFileSync\\('c:/Users/ismail/Desktop/projeler/MainProject/WhatchFlix/screens/ChatScreen.js.bak','utf8'\\), 'utf8'\\); console.log\\('restored'\\);\")"
+      "Bash(node -e \"require\\('fs'\\).writeFileSync\\('c:/Users/ismail/Desktop/projeler/MainProject/WhatchFlix/screens/ChatScreen.js', require\\('fs'\\).readFileSync\\('c:/Users/ismail/Desktop/projeler/MainProject/WhatchFlix/screens/ChatScreen.js.bak','utf8'\\), 'utf8'\\); console.log\\('restored'\\);\")",
+      "Bash(git -C C:\\\\Users\\\\ismail\\\\Desktop\\\\projeler\\\\MainProject\\\\WhatchFlix status --short)",
+      "Bash(node -c screens/tv/TvShowsTrends.js)",
+      "Bash(node -c screens/tv/TvShowBests.js)",
+      "Bash(node -c screens/tv/TvShowsAiringToday.js)",
+      "Bash(node -c screens/tv/TvShowsOnTheAir.js)",
+      "Bash(node -c screens/tv/TvShowsGenres.js)",
+      "Bash(node -c screens/tv/TvShowsProvders.js)",
+      "Bash(node -e \"require\\('fs'\\).readFileSync\\('C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\ismail\\\\\\\\\\\\\\\\Desktop\\\\\\\\\\\\\\\\projeler\\\\\\\\\\\\\\\\MainProject\\\\\\\\\\\\\\\\WhatchFlix\\\\\\\\\\\\\\\\screens\\\\\\\\\\\\\\\\tabs\\\\\\\\\\\\\\\\profile\\\\\\\\\\\\\\\\ProfileNotes.js','utf8'\\); console.log\\('OK file is readable, length:', require\\('fs'\\).statSync\\('C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\ismail\\\\\\\\\\\\\\\\Desktop\\\\\\\\\\\\\\\\projeler\\\\\\\\\\\\\\\\MainProject\\\\\\\\\\\\\\\\WhatchFlix\\\\\\\\\\\\\\\\screens\\\\\\\\\\\\\\\\tabs\\\\\\\\\\\\\\\\profile\\\\\\\\\\\\\\\\ProfileNotes.js'\\).size\\)\")",
+      "Bash(node -e \"const c=require\\('fs'\\).readFileSync\\('screens/tabs/profile/ProfileNotes.js','utf8'\\); console.log\\('length:',c.length\\); console.log\\('last 100:', c.slice\\(-100\\)\\);\")",
+      "Bash(npx --yes esbuild --bundle=false --loader=jsx screens/tabs/profile/ProfileNotes.js)",
+      "Bash(npx --yes esbuild --bundle=false \"--loader:.js=jsx\" screens/CalendarScreen.js)",
+      "Bash(npx --yes esbuild --bundle=false \"--loader:.js=jsx\" utils/phoneCalendar.js)",
+      "Bash(node --check services/geminiService.js)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('scripts:', JSON.stringify\\(p.scripts\\)\\); console.log\\('eslint:', !!\\(p.devDependencies&&p.devDependencies.eslint\\)||!!\\(p.dependencies&&p.dependencies.eslint\\)\\);\")",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"const babel=require\\('@babel/core'\\); babel.transformFileSync\\('components/ChatModal.js',{presets:['babel-preset-expo']}\\); console.log\\('ChatModal OK'\\);\")",
+      "Bash(node -e \"for \\(const f of ['.env','.env.local','.env.development','app.json','app.config.js','eas.json']\\) { try { const s=require\\('fs'\\).readFileSync\\(f,'utf8'\\); const hit=/GEMINI/i.test\\(s\\); console.log\\(f, hit?'\\(GEMINI var\\)':''\\); } catch\\(e\\){} }\")",
+      "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('.env','utf8'\\); const m=s.match\\(/EXPO_PUBLIC_GEMINI_API_KEY\\\\s*=\\\\s*\\(.+\\)/\\); console.log\\('found:', !!m, m? 'len='+m[1].trim\\(\\).length : ''\\);\")",
+      "PowerShell(Add-Type -AssemblyName System.Drawing; $img = [System.Drawing.Image]::FromFile\\(\\(Resolve-Path 'assets/pets/Astronaut-Sheet.png'\\)\\); \"$\\($img.Width\\)x$\\($img.Height\\)\"; $img.Dispose\\(\\))"
     ]
   }
 }

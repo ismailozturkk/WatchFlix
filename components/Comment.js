@@ -1,3 +1,4 @@
+import { Image } from "expo-image";
 import React, { useState, useEffect, useCallback, memo, useRef } from "react";
 import {
   View,
@@ -7,16 +8,16 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Image,
   Animated,
   ActivityIndicator,
   StyleSheet,
-  Dimensions,
+  Dimensions
 } from "react-native";
 import { db } from "../firebase";
 import {
   collection,
   addDoc,
+  setDoc,
   onSnapshot,
   serverTimestamp,
   query,
@@ -34,6 +35,8 @@ import { BlurView } from "expo-blur";
 import { MaterialCommunityIcons, Ionicons, Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import LottieView from "lottie-react-native";
+import { i18nText } from "../utils/i18nText";
+
 
 const { height: SCREEN_H } = Dimensions.get("window");
 
@@ -110,7 +113,7 @@ const CommentItem = memo(
               <Text allowFontScaling={false} style={styles.timestamp}>
                 {item.timestamp?.toDate
                   ? item.timestamp.toDate().toLocaleString()
-                  : "Az önce"}
+                  : i18nText("autoI18n.az_once", "Az önce")}
               </Text>
             </View>
           </View>
@@ -163,9 +166,7 @@ const CommentItem = memo(
                   size={16}
                   color={theme.text.secondary}
                 />
-                <Text allowFontScaling={false} style={styles.spoilerText}>
-                  Spoiler içeriği gör
-                </Text>
+                <Text allowFontScaling={false} style={styles.spoilerText}>{i18nText("autoI18n.spoiler_icerigi_gor", "Spoiler içeriği gör")}</Text>
               </BlurView>
             </TouchableOpacity>
           ) : (
@@ -222,9 +223,7 @@ const CommentItem = memo(
                   size={18}
                   color={theme.text.secondary}
                 />
-                <Text allowFontScaling={false} style={styles.actionLabel}>
-                  Yanıtla
-                </Text>
+                <Text allowFontScaling={false} style={styles.actionLabel}>{i18nText("autoI18n.yanitla", "Yanıtla")}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -236,7 +235,7 @@ const CommentItem = memo(
               style={styles.repliesToggle}
             >
               <Text allowFontScaling={false} style={styles.repliesToggleText}>
-                {totalReplies} Yanıt {isVisible ? "Gizle" : "Gör"}
+                {totalReplies}{i18nText("autoI18n.yanit", "Yanıt")}{isVisible ? "Gizle" : i18nText("autoI18n.gor", "Gör")}
               </Text>
             </TouchableOpacity>
           )}
@@ -247,7 +246,8 @@ const CommentItem = memo(
 );
 
 // ── Ana Bileşen ───────────────────────────────────────────
-const Comment = ({ contextId }) => {
+// collectionName: "MovieComment" (film) | "TvComment" (dizi). Yapı birebir aynı.
+const Comment = ({ contextId, collectionName = "MovieComment", mediaTitle = "", mediaPoster = null }) => {
   const { theme } = useTheme();
   const styles = getStyles(theme);
   const { user: currentUser } = useAuth();
@@ -273,7 +273,7 @@ const Comment = ({ contextId }) => {
     if (!contextId) return;
     const cid = contextId.toString();
     const q = query(
-      collection(db, "MovieComment", cid, "comments"),
+      collection(db, collectionName, cid, "comments"),
       orderBy("timestamp", "desc"),
     );
     const unsub = onSnapshot(q, (snapshot) => {
@@ -300,7 +300,7 @@ const Comment = ({ contextId }) => {
         if (willBeVisible && !replyUnsubsRef.current[id]) {
           const cid = contextId.toString();
           const rq = query(
-            collection(db, "MovieComment", cid, "comments", id, "replies"),
+            collection(db, collectionName, cid, "comments", id, "replies"),
             orderBy("timestamp", "asc"),
           );
           replyUnsubsRef.current[id] = onSnapshot(rq, (snap) => {
@@ -332,14 +332,15 @@ const Comment = ({ contextId }) => {
     const cid = contextId.toString();
 
     try {
+      let newRef = null;
       if (editId) {
         const ref = isReply
-          ? doc(db, "MovieComment", cid, "comments", parentId, "replies", editId)
-          : doc(db, "MovieComment", cid, "comments", editId);
+          ? doc(db, collectionName, cid, "comments", parentId, "replies", editId)
+          : doc(db, collectionName, cid, "comments", editId);
         await updateDoc(ref, { text: text.trim(), isSpoiler });
       } else if (isReply) {
-        await addDoc(
-          collection(db, "MovieComment", cid, "comments", parentId, "replies"),
+        newRef = await addDoc(
+          collection(db, collectionName, cid, "comments", parentId, "replies"),
           {
             userId:    currentUser.uid,
             username:  currentUser.displayName || "Anonim",
@@ -353,12 +354,12 @@ const Comment = ({ contextId }) => {
           },
         );
         // Increment replyCount on parent comment
-        await updateDoc(doc(db, "MovieComment", cid, "comments", parentId), {
+        await updateDoc(doc(db, collectionName, cid, "comments", parentId), {
           replyCount: increment(1),
         });
       } else {
-        await addDoc(
-          collection(db, "MovieComment", cid, "comments"),
+        newRef = await addDoc(
+          collection(db, collectionName, cid, "comments"),
           {
             userId:     currentUser.uid,
             username:   currentUser.displayName || "Anonim",
@@ -372,6 +373,23 @@ const Comment = ({ contextId }) => {
             timestamp:  serverTimestamp(),
           },
         );
+      }
+
+      // Yeni yorum/yanıt eklendiyse: kullanıcının yorum sayacını artır VE
+      // "Etkinliklerim → Yorumlarım" için denormalize kopya yaz (best-effort).
+      // mirror doc id = yorum/yanıt id'si → silmede senkron kaldırılır.
+      if (!editId && newRef) {
+        updateDoc(doc(db, "Users", currentUser.uid), {
+          mediaCommentCount: increment(1),
+        }).catch(() => {});
+        setDoc(doc(db, "Users", currentUser.uid, "myComments", newRef.id), {
+          kind: collectionName === "TvComment" ? "tv" : "movie",
+          targetId: cid,
+          text: text.trim(),
+          title: mediaTitle || "",
+          poster: mediaPoster || null,
+          createdAt: serverTimestamp(),
+        }).catch(() => {});
       }
 
       setCommentInputState({
@@ -388,10 +406,10 @@ const Comment = ({ contextId }) => {
     const cid = contextId.toString();
     if (pid) {
       await deleteDoc(
-        doc(db, "MovieComment", cid, "comments", pid, "replies", id),
+        doc(db, collectionName, cid, "comments", pid, "replies", id),
       );
       // Decrement replyCount (guard against going below 0)
-      await updateDoc(doc(db, "MovieComment", cid, "comments", pid), {
+      await updateDoc(doc(db, collectionName, cid, "comments", pid), {
         replyCount: increment(-1),
       });
     } else {
@@ -400,8 +418,13 @@ const Comment = ({ contextId }) => {
         replyUnsubsRef.current[id]();
         delete replyUnsubsRef.current[id];
       }
-      await deleteDoc(doc(db, "MovieComment", cid, "comments", id));
+      await deleteDoc(doc(db, collectionName, cid, "comments", id));
     }
+    // Kullanıcının yorum sayacını azalt + denormalize kopyayı kaldır (best-effort).
+    updateDoc(doc(db, "Users", currentUser.uid), {
+      mediaCommentCount: increment(-1),
+    }).catch(() => {});
+    deleteDoc(doc(db, "Users", currentUser.uid, "myComments", id)).catch(() => {});
   };
 
   return (
@@ -425,7 +448,7 @@ const Comment = ({ contextId }) => {
               isVisible={replyVisibility[item.id]}
               toggleReplyVisibility={toggleReplyVisibility}
               handleLikeToggle={(id, liked) => {
-                const ref = doc(db, "MovieComment", contextId.toString(), "comments", id);
+                const ref = doc(db, collectionName, contextId.toString(), "comments", id);
                 if (liked) {
                   updateDoc(ref, {
                     likeCount: increment(-1),
@@ -454,7 +477,7 @@ const Comment = ({ contextId }) => {
                   handleDeleteReply={(pid, id) => handleDelete(id, pid)}
                   handleLikeToggle={(id, liked) => {
                     const ref = doc(
-                      db, "MovieComment", contextId.toString(),
+                      db, collectionName, contextId.toString(),
                       "comments", item.id, "replies", id,
                     );
                     if (liked) {
@@ -482,8 +505,8 @@ const Comment = ({ contextId }) => {
             <View style={styles.indicatorBadge}>
               <Text allowFontScaling={false} style={styles.indicatorText}>
                 {commentInputState.editId
-                  ? "Düzenleniyor"
-                  : `${commentInputState.replieName} kişisine yanıt`}
+                  ? i18nText("autoI18n.duzenleniyor", "Düzenleniyor")
+                  : i18nText("autoI18n.replying_to_user", "{{name}} kişisine yanıt", { name: commentInputState.replieName })}
               </Text>
             </View>
             <TouchableOpacity
@@ -556,7 +579,7 @@ const Comment = ({ contextId }) => {
           >
             {isSending ? (
               <LottieView
-                source={require("../LottieJson/loading15.json")}
+                source={require("@lottie/loading15.json")}
                 autoPlay
                 loop
                 style={{ width: 35, height: 35 }}

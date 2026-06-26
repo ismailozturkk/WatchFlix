@@ -1,0 +1,2563 @@
+WATCHFLIX - OYUN KISMI GELISTIRME PLANI
+========================================
+
+Dokuman amaci
+-------------
+Bu dokuman, profil alaninda baslayan oyun yapisinin urun, UI/UX, oyun
+mekanigi, teknik mimari, veri modeli, guvenlik, performans ve test acilarindan
+gelistirilmesi icin uygulanabilir yol haritasidir.
+
+Dokuman tek seferde buyuk bir yeniden yazim yapilmasini onermez. Calisma,
+birbirinden bagimsiz dogrulanabilen partlara ayrilmistir. Her part sonunda
+uygulama calisir durumda kalmali ve o part icin belirtilen kabul kriterleri
+saglanmalidir.
+
+Incelenen mevcut dosyalar
+------------------------
+- screens/tabs/ProfileScreen.js
+- screens/game/SceneGuessGameScreen.js
+- hooks/useSceneGame.js
+- services/sceneGameService.js
+- App.js
+- firestore.rules
+- translations/tr.json
+- translations/en.json
+- context/AppSettingsContext.js
+- context/ListStatusContext.js
+
+
+PART 01 - MEVCUT YAPININ OZETI
+==============================
+
+1.1 Profil girisi
+-----------------
+Profil ekraninda "Oyunlar" basligi altinda tek bir Sahne Tahmin banner'i
+bulunmaktadir. Banner dogrudan SceneGuessGameScreen rotasina gider.
+
+Mevcut olumlu noktalar:
+- Oyun profil icinde gorunur bir konumdadir.
+- Gradient, golge ve belirgin oynat butonu kullanilmistir.
+- Kullanicinin oyunu kesfetmesi icin ek bir menuye girmesi gerekmez.
+
+Mevcut sorunlar:
+- Alan tek oyuna ozel tasarlanmistir; ikinci oyun eklendiginde olceklenmez.
+- Banner icindeki stil degerleri buyuk oranda inline yazilmistir.
+- Sabit mor/pembe renkler tema sisteminden bagimsizdir.
+- Emoji kullanimi uygulamanin AppIcon dilinden ayrilmaktadir.
+- Kart uzerinde kullanicinin rekoru, seviyesi veya gunluk gorevi yoktur.
+- Oyun alani profil sayfasinin en altlarinda kaldigi icin tekrar oynanabilirlik
+  dusuktur.
+
+1.2 Mevcut oyun akisi
+---------------------
+SceneGuessGameScreen su durumlari ayni dosyada yonetmektedir:
+- Kaynak secimi
+- Kullanici istatistikleri
+- Ilk uc liderlik tablosu ozeti
+- Istatistik modal'i
+- Liderlik modal'i
+- Yukleme durumu
+- Aktif oyun
+- Joker kontrolleri
+- Cevap animasyonlari
+- Oyun sonu
+- Oturum cevap gecmisi
+
+Bu ekran yaklasik 791 satirdir. Birden fazla urun sorumlulugunun tek ekranda
+toplanmasi gelistirme ve test maliyetini artirmaktadir.
+
+1.3 Mevcut oyun kurallari
+-------------------------
+- Her soru icin 10 saniye verilir.
+- Dort secenek gosterilir.
+- Dogru cevapta oyun devam eder.
+- Yanlis cevapta oyun sona erer.
+- Her bes dogru seride puan carpani artar.
+- Baslangicta uc ortak joker bulunur.
+- Yuzde 50 jokeri iki yanlis secenegi eler.
+- Gorsel jokeri alternatif sahne gorseline gecer.
+- Skor; temel puan, kalan sure ve seri carpanindan uretilir.
+- Global kaynaklar liderlik tablosuna yazilir.
+- Kisisel listelerden oynanan oturumlar global tabloya yazilmaz.
+
+1.4 Mevcut kaynaklar
+--------------------
+- Populer
+- En iyi filmler
+- En iyi diziler
+- Populer filmler
+- Populer diziler
+- Izleme listem
+- Favoriler
+- Izlenen filmler
+- Izlenen diziler
+
+Kaynak sayisi genis olsa da bunlar oyun modu gibi sunulmaktadir. Kullanici
+once nasil oynamak istedigini degil, verinin nereden gelecegini secmektedir.
+Premium bir oyun deneyiminde ana secim oyun modu olmali; kaynak ve zorluk
+ikincil ayarlar olarak sunulmalidir.
+
+
+PART 02 - KRITIK HATA VE TUTARLILIK DUZELTMELERI
+================================================
+
+UYGULAMA DURUMU (2026-06-22): TAMAMLANDI
+-----------------------------------------
+Uygulananlar:
+- Oyun basinda benzersiz sessionId uretiliyor.
+- Skor kaydi Firestore transaction ve recentSessionIds kontrolu ile ayni
+  oturum icin tek sefer calisiyor.
+- Es zamanli veya tekrar save istekleri ayni promise uzerinden birlestiriliyor.
+- Basarisiz skor/gecmis kaydi sonuc ekraninda gorunuyor ve yeniden denenebiliyor.
+- Soru gecmisi public SceneGame belgesinden ayrilarak yalniz kullaniciya acik
+  SceneGameHistory belgesine tasindi.
+- Gecmis source + language kapsaminda ayri tutuluyor.
+- Gecmis kayitlari tekrar etmeyecek sekilde birlestiriliyor ve son 500 kayitla
+  sinirlaniyor.
+- Gosterilen soru aninda rezerve edilerek arka arkaya ayni sorunun uretilmesi
+  engellendi.
+- Prefetch tek promise, generationId ve guncel ref seti ile yarisa dayanikli
+  hale getirildi.
+- Eski oyun oturumundan gec donen soru istekleri yok sayiliyor.
+- Soru havuzunun son dort kayitta erken bitmesi duzeltildi.
+- Kisisel listeler populer havuza sessizce dusmek yerine yetersizse pasif ve
+  aciklamali gosteriliyor.
+- TMDB, yetersiz havuz, uygun gorsel ve baglanti hatalari ayri UI durumlarina
+  donusturuldu.
+- Liderlik tablosunda loading, gercek bos sonuc ve hata durumlari ayrildi.
+- Timer sahne gorseli yuklenmeden baslamiyor.
+- Timer Date.now tabanli deadline kullaniyor; timer/cevap cift eventi tek phase
+  kontroluyle engelleniyor.
+- Sahne gorseli yuklenemezse timer baslamiyor ve yeniden deneme sunuluyor.
+- TR/EN hata ve durum metinleri eklendi.
+
+Dogrulama:
+- 196 JavaScript dosyasi Babel ile parse edildi, hata yok.
+- TR/EN ceviri JSON dosyalari parse edildi, hata yok.
+- Expo public config kontrolu basarili.
+- Android production export 2656 modulle basarili.
+- Firestore rules degisikligi yerel olarak hazir; yeni SceneGameHistory
+  erisiminin calismasi icin rules yayin ortaminda deploy edilmelidir.
+
+Bu part, yeni ekran tasarimina gecilmeden tamamlanmalidir.
+
+2.1 Cift istatistik kaydi
+-------------------------
+Yanlis cevap sonrasinda istatistik kaydi yapilmaktadir. Oyun sonu ekranindaki
+"Geri Don" aksiyonu quitGame fonksiyonunu tekrar calistirabildigi icin ayni
+oturum ikinci kez kaydedilebilir.
+
+Cozum:
+- Her oyun baslangicinda benzersiz sessionId uretilmeli.
+- saveSession(sessionId) idempotent olmali.
+- Hook icinde hasSavedSessionRef tutulmali.
+- Sonuc, geri don, uygulamanin arka plana gecmesi ve ekranin kapanmasi ayni
+  finalizeSession fonksiyonuna baglanmali.
+- Firestore tarafinda ayni sessionId ikinci kez toplam istatistige eklenmemeli.
+
+Kabul kriteri:
+- Bir oturumdan kac farkli cikis aksiyonu kullanilirsa kullanilsin totalPlayed
+  yalnizca bir artar.
+
+2.2 Siradaki sorunun tekrar etmesi
+---------------------------------
+Ilk soru gosterilirken hazirlanan ikinci sorunun usedIds setine ilk soru her
+zaman eklenmemektedir. Bu nedenle ayni yapim arka arkaya gelebilir.
+
+Cozum:
+- Oturum basinda soru kuyrugu olusturulmali.
+- currentQuestion kuyruktan cikarildigi anda sessionUsedIds guncellenmeli.
+- Prefetch fonksiyonu state closure yerine guncel ref veya saf oyun motoru
+  state'i kullanmali.
+- Ayni medya kimligi oturum boyunca tekrar kullanilmamali.
+
+Kabul kriteri:
+- Bir oturumda ayni mediaType + TMDB id ikilisi ikinci kez sorulmaz.
+
+2.3 Prefetch yarisi
+-------------------
+Arka plandaki prefetch tamamlanmadan kullanici cevap verirse ikinci bir soru
+istegi baslatilabilir. Gec tamamlanan eski istek daha sonra kuyruga yanlis bir
+soru birakabilir.
+
+Cozum:
+- Her oyun icin generationId tutulmali.
+- Eski generationId ile donen sonuclar yok sayilmali.
+- Ayni anda tek soru uretim isi calismali.
+- Ekran kapaninca bekleyen istekler iptal edilmeli veya sonuclari uygulanmamali.
+
+2.4 Havuz tukenmesi
+-------------------
+Soru gecmisi son 500 kaydi ortak bir listede tutmaktadir. Kucuk veya tekrarli
+TMDB havuzlarinda kullanici yeni oyun baslatamayabilir.
+
+Cozum:
+- Gecmis sourceKey ve difficulty bazinda ayrilmali.
+- Oturum ici tekrar ile oturumlar arasi tekrar farkli yonetilmeli.
+- Yeni soru sayisi yetersizse en eski gecmis kontrollu bicimde serbest
+  birakilmali.
+- Kullaniciya "Yeni sorular hazirlaniyor" veya "Bu listede yeterli icerik yok"
+  gibi acik durum mesaji gosterilmeli.
+
+2.5 Kisisel liste fallback davranisi
+------------------------------------
+Kisisel listede dortten az kayit varsa mevcut sistem listeyi tamamen populer
+havuz ile degistirmektedir. Kullanici hala kendi listesinden oynadigini
+zannedebilir.
+
+Cozum secenekleri:
+- En dogru varsayilan: modu kilitle ve gereken minimum icerik sayisini goster.
+- Alternatif: kullanicidan onay alarak listeyi populer icerikle tamamla.
+- Sessiz fallback kaldirilmali.
+
+2.6 Hata durumlari
+------------------
+Asagidaki durumlar birbirinden ayrilmalidir:
+- Internet yok
+- TMDB anahtari yok veya gecersiz
+- TMDB kota/servis hatasi
+- Yeterli baslik yok
+- Uygun sahne gorseli yok
+- Firestore istatistik hatasi
+- Liderlik tablosu bos
+- Liderlik tablosu yuklenemedi
+
+Her durum icin kullanici mesaji, tekrar dene aksiyonu ve gerekirse cevrimdisi
+alternatif bulunmalidir. Bos veri yukleniyor gostergesiyle sonsuza kadar
+gosterilmemelidir.
+
+2.7 Timer tutarliligi
+---------------------
+- Soru gorseli tamamen hazir olmadan sure baslamamali.
+- Uygulama arka plana gectiginde timer davranisi mod kuralina gore durdurulmali
+  veya gercek zaman damgasi uzerinden hesaplanmali.
+- setInterval azaltmasi yerine questionDeadline kullanilmasi tercih edilmeli.
+- Cift dokunma ve timer'in ayni anda cevap vermesi tek reducer eventi ile
+  engellenmeli.
+
+
+PART 03 - URUN BILGI MIMARISI
+=============================
+
+UYGULAMA DURUMU (2026-06-22): TAMAMLANDI
+-----------------------------------------
+Uygulananlar:
+- Profildeki oyun karti artik aktif oyuna degil GameHubScreen'e gidiyor.
+- Oyun Merkezi, Sahne Tahmin detay ve oyun kurulum ekranlari eklendi.
+- Aktif oyun SceneGamePlayScreen rotasina tasindi.
+- Sonuc ekrani aktif oyundan ayrilarak SceneGameResultScreen rotasina tasindi.
+- Liderlik, istatistik ve basarimlar bagimsiz ekran rotalari haline getirildi.
+- Route parametreleri gameId, modeId, difficultyId, sourceId ve sessionId ile
+  sinirlandi.
+- Soru ve sonuc nesneleri navigation parametresine konulmadi; sonuc verisi
+  sessionId ile kisa omurlu oturum deposundan okunuyor.
+- Eski SceneGuessGameScreen rotasi geriye donuk uyumluluk icin korundu.
+
+Dogrulama:
+- Projedeki 214 JavaScript dosyasi Babel ile parse edildi, hata yok.
+- Expo public config kontrolu basarili.
+- Android production export 2667 modulle basarili.
+- Route isimleri, profil girisi ve navigation parametreleri statik olarak
+  kontrol edildi.
+
+3.1 Hedef navigasyon
+--------------------
+Profil
+  -> Oyun Merkezi
+      -> Sahne Tahmin Detayi
+          -> Oyun Kurulumu
+              -> Aktif Oyun
+                  -> Sonuc
+      -> Liderlik
+      -> Istatistikler
+      -> Basarimlar
+
+Profil karti artik dogrudan aktif oyuna degil Oyun Merkezi'ne gitmelidir.
+Istenirse kart uzerindeki "Hizli Oyna" aksiyonu son kullanilan ayarlarla
+dogrudan yeni oturum baslatabilir.
+
+3.2 Route onerileri
+-------------------
+- GameHubScreen
+- SceneGameDetailScreen
+- SceneGameSetupScreen
+- SceneGamePlayScreen
+- SceneGameResultScreen
+- GameLeaderboardScreen
+- GameStatsScreen
+- GameAchievementsScreen
+
+Stack parametreleri yalnizca kimlik ve basit secimler tasimalidir:
+- gameId
+- modeId
+- difficultyId
+- sourceId
+- sessionId
+
+Buyuk soru nesneleri navigation parametresi olarak tasinmamalidir.
+
+
+PART 04 - PROFILDE OYUNLAR ALANI
+================================
+
+UYGULAMA DURUMU (2026-06-22): TAMAMLANDI
+-----------------------------------------
+Uygulananlar:
+- Profildeki tek oyuna ozel inline banner ProfileGamesModule bilesenine
+  tasindi.
+- Baslik satirina Oyunlar ve Tumunu Gor aksiyonu eklendi.
+- Ana kartta oyun kimligi, oyuncu seviyesi, haftalik seri, en iyi Klasik skor
+  ve Oyna aksiyonu gosteriliyor.
+- Gunluk meydan okuma henuz uygulanmadigi icin sahte XP veya tamamlanma verisi
+  uretilmeden Yakinda durumu gosteriliyor.
+- Oyun kartlari GAME_REGISTRY verisinden uretiliyor; ikinci oyun icin kilitli
+  kompakt Poster Bulmaca karti eklenerek coklu oyun yerlesimi dogrulandi.
+- Sabit mor/pembe renkler kaldirildi; gradient aktif temanin accent ve bold
+  tokenlarindan uretiliyor.
+- Emoji kaldirildi ve AppIcon kullanildi.
+- Kartin tamami tiklanabilir ve erisilebilirlik etiketleri eklendi.
+- Istatistik yuklenirken ayni yuksekligi koruyan iskelet kartlar eklendi.
+- Yeni gorunen metinler TR/EN ceviri kaynaklarina eklendi.
+
+Dogrulama:
+- Projedeki 216 JavaScript dosyasi Babel ile parse edildi, hata yok.
+- TR/EN ceviri JSON dosyalari parse edildi, hata yok.
+- Yeni moduldaki style referanslari kontrol edildi, eksik stil yok.
+- Eski sabit gradient ve emoji referanslarinin profilden kalktigi kontrol edildi.
+- Expo public config kontrolu basarili.
+- Android production export 2669 modulle basarili.
+- iOS shadow ve Android elevation degerleri birlikte tanimlandi; fiziksel cihazda
+  gorsel golge/kontrast kontrolu yayin oncesi manuel test matrisinde yapilmalidir.
+
+4.1 Yeni profil modulu
+----------------------
+Profil icinde asagidaki hiyerarsi onerilir:
+
+Baslik satiri:
+- "Oyunlar"
+- Sagda "Tumunu Gor"
+
+Ana kart:
+- Sahne Tahmin kapak gorseli veya sinematik arka plan
+- Oyuncu seviyesi
+- Haftalik seri
+- En iyi Klasik skor
+- Ana aksiyon: "Oyna"
+
+Alt bilgi satiri:
+- Gunluk meydan okuma durumu
+- Tamamlanmissa kazanilan XP
+- Tamamlanmamissa kalan sure
+
+4.2 Birden fazla oyun destegi
+-----------------------------
+Profil yuzeyi tek banner yerine yatay oyun kartlari veya bir ana kart + kompakt
+ikincil kartlar kullanmalidir. Ikinci oyun eklendiginde ProfileScreen yeniden
+tasarlanmak zorunda kalmamalidir.
+
+Oyun karti veri modeli:
+- id
+- titleKey
+- descriptionKey
+- icon
+- artwork
+- accentColors
+- routeName
+- availability
+- playerProgress
+- dailyState
+
+4.3 Premium gorunum ilkeleri
+----------------------------
+- Sabit mor/pembe yerine tema ile uyumlu oyun accent tokenlari kullanilmali.
+- Emoji yerine AppIcon veya lisansli/ozgun gorsel kullanilmali.
+- Kartta birincil aksiyon tek ve belirgin olmali.
+- Metin kontrasti WCAG hedeflerine uygun olmali.
+- Golge Android ve iOS'ta ayri test edilmeli.
+- Kartin tamami tiklanabilir olmali; ic aksiyonlar erisilebilir etiket tasimali.
+- Yuklenirken iskelet kart gosterilmeli; layout atlamamali.
+
+
+PART 05 - OYUN MERKEZI EKRANI
+=============================
+
+UYGULAMA DURUMU (2026-06-22): TAMAMLANDI
+-----------------------------------------
+Uygulananlar:
+- Ust bara oyuncu seviyesi ve uygulama ayarlarina gecis eklendi.
+- Gunluk meydan okuma hero karti; deneme durumu, kalan sure, arkadas sirasi,
+  XP odulu ve sonuc aksiyonu alanlarini destekleyecek sekilde eklendi.
+- Gunluk oyun motoru Part 8'de oldugu icin mevcut durumda sahte deneme veya XP
+  uretilmeden Yakinda durumu gosteriliyor.
+- Oyunlar GAME_REGISTRY uzerinden listeleniyor; oyun adi, aciklama, son oynama,
+  kisisel rekor, mod sayisi ve kilit kosulu gosteriliyor.
+- Mevcut oyun istatistiklerinden ilerleyen baslangic gorevleri eklendi.
+- Global liderlik verisi FriendsContext UID'leriyle filtrelenerek ilk uc
+  arkadas siralamasi olusturuldu.
+- Son kazanilan basarimlar merkezi basarim katalogundan gosteriliyor.
+- Hic oyun oynamamis kullanici icin sifir tablolari yerine tanitim ve ilk oyunu
+  baslat aksiyonu eklendi; XP sistemi hazir olmadigi icin bonus miktari
+  uydurulmadi.
+- Liderlik hata/bos, arkadas yukleme ve oyun merkezi yukleme durumlari eklendi.
+- Oyun Merkezi ayarlar aksiyonu icin TabScreenNavigator initialTab destegi
+  eklendi.
+- Tum yeni metinler TR/EN ceviri kaynaklarina eklendi.
+
+Dogrulama:
+- Projedeki 216 JavaScript dosyasi Babel ile parse edildi, hata yok.
+- TR/EN ceviri JSON dosyalari parse edildi, hata yok.
+- GameHubScreen style referanslari ve stack route kayitlari kontrol edildi.
+- Expo public config kontrolu basarili.
+- Android production export 2669 modulle basarili.
+- Fiziksel cihazda kucuk ekran, buyuk font ve dokunma testi manuel test
+  matrisinde ayrica yapilmalidir.
+
+5.1 Ekran hiyerarsisi
+---------------------
+1. Ust bar: Oyun Merkezi, oyuncu seviyesi ve ayarlar
+2. Gunluk meydan okuma hero karti
+3. Oyunlar listesi
+4. Devam eden gorevler
+5. Arkadaslar arasinda siralama ozeti
+6. Son kazanilan basarimlar
+
+5.2 Gunluk meydan okuma karti
+-----------------------------
+- Herkese ayni soru seti
+- Kalan sure
+- Bugunku deneme durumu
+- Arkadaslar arasindaki mevcut sira
+- Odul XP bilgisi
+- Tamamlanmissa sonucu inceleme
+
+5.3 Oyun kartlari
+-----------------
+Her kart su bilgileri tasimalidir:
+- Oyun adi
+- Tek cumlelik aciklama
+- Son oynama bilgisi
+- Kisisel rekor
+- Mod sayisi
+- Kilitliysa acilma kosulu
+
+5.4 Bos ve yeni kullanici durumu
+--------------------------------
+Hic oyun oynamamis kullaniciya anlamsiz sifir tablolar yerine:
+- Kisa oyun tanitimi
+- Ilk oyun icin XP bonusu
+- "Ilk oyununu baslat" aksiyonu
+gosterilmelidir.
+
+
+PART 06 - SAHNE TAHMIN DETAY EKRANI
+===================================
+
+UYGULAMA DURUMU (2026-06-22): TAMAMLANDI
+-----------------------------------------
+Uygulananlar:
+- Tema tokenlarindan uretilen sinematik hero, oyun aciklamasi ve kurallar
+  aksiyonu eklendi.
+- En iyi skor, toplam dogruluk orani ve en iyi seri gercek SceneGame verisinden
+  gosteriliyor.
+- Klasik, Zamana Karsi ve Hayatta Kalma mod kartlari eklendi; Part 8'de henuz
+  uygulanmayan modlar sahte calisir gosterilmeden kilitli ve Yakinda durumunda.
+- Son oyun kartinda tarih, son skor, mod, zorluk ve kaynak ozeti gosteriliyor.
+- Yeni kullanici icin anlamsiz son oyun degerleri yerine ilk oyunu baslat bos
+  durumu eklendi.
+- Kurallar erisilebilir bir bottom sheet icinde listelendi.
+- Liderlik tablosu gecisi ve ana Oyuna Basla aksiyonu eklendi.
+- Son modeId, difficultyId ve sourceId kullanici bazli AsyncStorage kaydinda
+  saklaniyor.
+- Daha once oynayan kullanici icin kayitli basit secim parametreleriyle dogrudan
+  aktif oyuna giden Hizli Oyna aksiyonu eklendi.
+- Yeni oyun kayitlari son mode, zorluk ve kaynak bilgisini SceneGame ozetine de
+  yaziyor; eski kayitlar icin varsayilan fallback korunuyor.
+- Tum yeni metinler TR/EN ceviri kaynaklarina eklendi.
+
+6.1 Amac
+--------
+Kullanici aktif oyuna girmeden oyunun kurallarini, kendi ilerlemesini ve
+mevcut modlari anlayabilmelidir.
+
+6.2 Icerik
+----------
+- Sinematik hero gorseli
+- Oyun adi ve kisa aciklama
+- En iyi skor, dogruluk orani ve en iyi seri
+- Mod secim kartlari
+- Son oyun ozeti
+- Kurallar bottom sheet'i
+- Liderlik tablosuna gecis
+- Ana "Oyuna Basla" butonu
+
+6.3 Hizli baslatma
+------------------
+Kullanici daha once oynadiysa son mode, difficulty ve source secimleri yerel
+olarak saklanmalidir. "Hizli Oyna" bu ayarlari kullanmalidir.
+
+
+PART 07 - OYUN KURULUM EKRANI
+=============================
+
+UYGULAMA DURUMU (2026-06-22): TAMAMLANDI
+-----------------------------------------
+Uygulananlar:
+- Secim sirasi: 1) Mod, 2) Zorluk, 3) Kaynak, 4) Ozet, 5) Baslat olarak
+  uygulandir.
+- Mod kartlarinda mod adi, tek cumlelik kural, tahmini sure, soru/can sayisi
+  ve liderlik uygunlugu gosteriliyor.
+- Zamana Karsi ve Hayatta Kalma modlari Part 8 icin kilitli; sahte calisir
+  gosterilmeden Yakinda durumunda.
+- Zorluk secimi uclu yatay chip yapisiyla (Kolay/Normal/Zor) eklendi; her chip
+  sure, secenek sayisi ve renk tasiyor.
+- Kaynaklar Kesfet ve Sana Ozel gruplarina ayrildi.
+- Kisisel kaynak kartlarinda uygun icerik sayisi gosteriliyor; yetersiz kartlar
+  disabled ve aciklamali.
+- Canli ozet karti secili mod, zorluk ve kaynak bilgisini gosteriyor.
+- Baslat butonu secim tercihlerini AsyncStorage'a kaydedip
+  SceneGamePlayScreen'e yonlendiriyor.
+- Mod ve zorluk veri modelleri gameConfig.js icine SCENE_GAME_MODES ve
+  SCENE_GAME_DIFFICULTIES olarak eklendi; kaynaklara group alani eklendi.
+- Tum metinler i18nText ile TR/EN ceviri kaynaklarina eklendi.
+- Eski SceneGameSetupScreen basit kaynak secim gorunumu tamamen yeniden yazildi.
+
+Dogrulama:
+- Projedeki 217 JavaScript dosyasi Babel ile parse edildi, hata yok.
+- TR/EN ceviri JSON dosyalari parse edildi, hata yok.
+- SceneGameSetupScreen style referanslari kontrol edildi; 28 kullanim 28
+  tanimlama ile eslesiyor.
+- Ekranda kullanilan 19 i18nText anahtari hem TR hem EN icinde dogrulandi.
+- gameConfig.js icindeki 24 i18n referansi TR/EN icinde dogrulandi.
+- Expo public config kontrolu basarili.
+- Route parametreleri (gameId, modeId, difficultyId, sourceId) kontrol edildi.
+
+7.1 Secim sirasi
+----------------
+1. Oyun modu
+2. Zorluk
+3. Icerik kaynagi
+4. Mod ozet ve odulleri
+5. Baslat
+
+7.2 Mod karti bilgileri
+-----------------------
+- Mod adi
+- Tek cumlelik kural
+- Tahmini sure
+- Soru veya can sayisi
+- Liderlik tablosuna uygunluk
+
+7.3 Kaynak secimi
+-----------------
+Kaynaklar gruplandirilmalidir:
+
+Kesfet:
+- Karisik populer
+- Filmler
+- Diziler
+- En iyi yapimlar
+
+Sana ozel:
+- Izleme listesi
+- Favoriler
+- Izlenen filmler
+- Izlenen diziler
+
+Her kisisel kaynak kartinda mevcut uygun icerik sayisi gosterilmelidir. Yeterli
+icerigi olmayan kart disabled olmali ve gereksinimi aciklamalidir.
+
+
+PART 08 - OYUN MODLARI
+======================
+
+UYGULAMA DURUMU (2026-06-24): TAMAMLANDI
+-----------------------------------------
+Uygulananlar:
+- Oyun motoru (useSceneGame) mode ve difficulty parametrelerini alacak sekilde
+  yeniden yapilandirildi; mod kurallari React bilesenlerinden ayrildi.
+- Klasik mod: sabit 10 soru, zorluga bagli soru suresi, yanlis cevap oyunu
+  bitirmez, oturum sonunda toplam skor; sayac #tur/10 olarak gosterilir.
+- Zamana Karsi: tek oturum sayaci (60 sn), dogru cevap aninda sonraki soruya
+  gecirir, yanlis cevap zaman cezasi (5 sn) verir, sorular arasi yukleme sayaci
+  duraklatilir (toplam sureyi tuketmez).
+- Hayatta Kalma: 3 can, yanlis veya sure bitimi bir can goturur, her 5 dogru
+  seride can (maks 5) veya joker odulu, havuz tukenirse basarili tamamlama.
+- Mod bazli joker ekonomisi: Klasik 3, Zamana Karsi 1, Hayatta Kalma 2.
+- Devam/bitis karari moda gore tek noktadan (advanceAfterAnswer) verilir.
+- Kisisel liste oyunlari global tabloya yazilmaz (sessiz fallback yok).
+- Zamana Karsi ve Hayatta Kalma modlari setup ve detay ekranlarinda acildi;
+  "Yakinda" durumu kaldirildi.
+- Aktif oyun ust bari moda gore uyarlandi (Klasik sayac, Hayatta Kalma can,
+  Zamana Karsi oturum sayaci).
+- Sonuc ekrani oynanan modu ve sonucu (tamamlandi/oyun bitti) gosteriyor.
+- Global bestScore liderligi yalnizca Klasik moddan beslenir; diger modlarin
+  rekoru bestScoresByMode altinda ayri tutulur.
+- Detay ekranindaki son oyun ve hizli oyna ozetleri gercek mod/zorlugu gosterir.
+- Yeni gorunen metinler TR/EN ceviri kaynaklarina eklendi.
+
+Dogrulama:
+- Degisen 8 oyun dosyasi Babel ile parse edildi, hata yok.
+- TR/EN ceviri JSON dosyalari parse edildi, hata yok.
+- Oyun ekranlarinda kullanilan 141 i18nText anahtari hem TR hem EN dogrulandi.
+- generateQuestion/getDetailedSceneImage imza degisikliklerinin yalniz
+  useSceneGame'den cagrildigi kontrol edildi.
+
+Not: Gunluk Meydan Okuma (8.4) bu fazda kapsam disi birakildi; deterministik
+seed/backend gereksinimi nedeniyle GameHub'da "Yakinda" olarak korunuyor
+(Part 10.5 / 17 ve Faz D).
+
+8.1 Klasik Mod
+---------------
+- 10 soru
+- Her soru icin zorluga bagli sure
+- Bir yanlis cevap oyunu bitirmez
+- Oturum sonunda toplam skor hesaplanir
+- Tum oyuncular ayni soru sayisinda yaristigi icin skor karsilastirilabilir
+
+8.2 Zamana Karsi
+-----------------
+- Toplam 60 saniye
+- Dogru cevap sonraki soruya aninda gecirir
+- Yanlis cevap zaman cezasi verir
+- Soru arasi yukleme toplam sureyi tuketmemeli
+- Onceden yeterli soru kuyrugu hazirlanmali
+
+8.3 Hayatta Kalma
+-----------------
+- 3 can
+- Yanlis cevap veya sure bitimi bir can eksiltir
+- Belirli serilerde can veya joker odulu verilebilir
+- Havuz tukenirse basarili tamamlama olarak bitirilir
+
+8.4 Gunluk Meydan Okuma
+-----------------------
+- Gunluk sabit seed
+- Ayni bolge/dil grubundaki herkese ayni sorular
+- Dereceli tek deneme
+- Sonradan tekrar oynama antrenman olarak isaretlenir
+- Gunluk skor, global kalici rekordan ayrilir
+
+8.5 Kisisel Liste Modu
+----------------------
+- Kullanicinin listelerinden uretilir
+- Global liderlik tablosuna dahil edilmez
+- Istenirse arkadasa meydan okuma icin paylasilabilir
+- Yetersiz icerikte sessiz populer fallback yapilmaz
+
+
+PART 09 - ZORLUK SISTEMI
+========================
+
+UYGULAMA DURUMU (2026-06-24): TAMAMLANDI
+-----------------------------------------
+Uygulananlar:
+- Zorluk artik yalnizca sureyi degil; sahne taninirligini ve yanlis secenek
+  kalitesini de belirler (9.4 adil zorluk).
+- Soru suresi ve secenek sayisi zorluga gore uygulanir: Kolay 15 sn / 3 secenek,
+  Normal 12 sn / 4 secenek, Zor 8 sn / 4 secenek.
+- Sahne gorseli secimi zorluga gore: Kolay en taninir backdrop'lar, Normal ana
+  veya ikincil sahne, Zor daha az bilinen sahneler (TMDB backdrop sirasina gore).
+- Yanlis secenek kalitesi zorluga gore: Kolay farkli turlerden, Normal benzer
+  turlerden, Zor ayni tur + yakin yil + benzer populerlik.
+- Havuza yil (year) bilgisi eklendi; Zor modda yil/populerlik yakinligiyla
+  yaniltici secenekler uretiliyor.
+- Film/Dizi etiketi Zor modda cevap verilene kadar gizleniyor (9.3).
+- Adil rekabet icin global liderlik (bestScore) yalnizca Klasik + Normal
+  kombinasyonundan beslenir; farkli zorluklar ayni tabloda karistirilmaz.
+
+Dogrulama:
+- Degisen oyun dosyalari Babel ile parse edildi, hata yok.
+- TR/EN ceviri JSON dosyalari parse edildi, hata yok.
+
+Not: Zorluk bazinda ayri liderlik tablolari (per-difficulty board) Part 14 /
+Faz E kapsamindadir; bu fazda global tablo Klasik+Normal ile sinirlandirilarak
+karisim engellendi.
+
+9.1 Kolay
+---------
+- 15 saniye
+- 3 secenek
+- Ana veya daha taninir backdrop
+- Film/dizi tur etiketi gorunur
+- Daha farkli turlerden yanlis secenekler
+
+9.2 Normal
+----------
+- 12 saniye
+- 4 secenek
+- Ana gorsel veya ikincil sahne
+- Benzer turlerden secenekler
+
+9.3 Zor
+--------
+- 8 saniye
+- 4 secenek
+- Daha az bilinen sahne gorseli
+- Ayni tur, benzer yil ve benzer populerlikte secenekler
+- Film/dizi tur etiketi cevap verilene kadar gizlenebilir
+
+9.4 Adil zorluk
+----------------
+Zorluk sadece sureyi azaltmakla olculmemelidir. Sahne taninirligi ve yanlis
+secenek kalitesi de hesaba katilmalidir. Ayni liderlik tablosunda farkli
+zorluklar karistirilmamalidir.
+
+
+PART 10 - SORU URETIM MOTORU
+============================
+
+UYGULAMA DURUMU (2026-06-24): TAMAMLANDI (10.5 haric)
+-----------------------------------------------------
+Uygulananlar:
+- Normalize medya modeli (10.2): tum havuz kayitlari normalizeMediaItem ile tek
+  tip hale getirildi; mediaKey, id, type/mediaType, title/localizedTitle,
+  originalTitle, year, genreIds, popularity, popularityBand, posterPath,
+  backdropPath ve sourceIds alanlari uretiliyor. UI'nin kullandigi alanlar korundu.
+- Havuz cekiminde original_title/original_name ve yil bilgisi yakalaniyor;
+  gorseli (backdrop) olmayan kayitlar eleniyor (10.1 adim 3).
+- Akilli yanlis secenekler (10.3): ayni mediaType tercih edilir; ayni isim
+  (dil varyanti) ve ayni franchise secenekler elenir; benzersiz baslik garantisi;
+  havuz cok kucukse kural kademeli gevsetilir.
+- Zor modda yil + popularityBand + populerlik yakinligi ile yaniltici secenekler.
+- Ayni isimli iki secenek kalirsa yil bilgisi gosterilir; secenekler havuz
+  nesnesi bozulmadan klonlanarak uretilir.
+- Gorsel kalite kontrolu (10.4): minimum genislik, yazisiz (iso_639_1 === null)
+  ve ~16:9 en-boy orani; secilen sahne gorseli oturum kaydina (sessionHistory)
+  yaziliyor.
+- Oturum on hazirligi (10.1): kaynak yukleme, normalize, gorselsiz eleme,
+  gecmis/oturum tekrar kurallari, mod soru sayisi, ilk soru + bir soru ileri
+  prefetch ve minimum hazir soruda baslatma akisi korunuyor.
+
+Dogrulama:
+- Degisen oyun dosyalari Babel ile parse edildi, hata yok.
+- TR/EN ceviri JSON dosyalari parse edildi; 141 i18n anahtari iki dilde tam.
+- getSmartOptions/normalize/disambiguate saf mantigi sentetik havuzlarla test
+  edildi: ayni mediaType, franchise/dil varyanti eleme, yil belirsizligi giderme
+  ve kucuk havuz fallback senaryolari dogrulandi.
+
+Not (10.5): Deterministik gunluk sorular, ertelenen Gunluk Meydan Okuma (8.4)
+moduna bagli oldugundan bu fazda uygulanmadi; tarih+dil+bolge+gameVersion seed
+veya backend uretimi Faz D / Part 17 ile birlikte ele alinacak.
+
+10.1 Oturum on hazirligi
+------------------------
+Oyun baslatilirken:
+1. Kaynak havuzu yuklenir.
+2. Uygun icerikler normalize edilir.
+3. Gorseli olmayan kayitlar elenir.
+4. Gecmis ve oturum tekrar kurallari uygulanir.
+5. Mod icin gereken soru sayisi belirlenir.
+6. Ilk sorular ve gorseller onceden hazirlanir.
+7. Minimum hazir soru sayisina ulasinca oyun baslar.
+
+10.2 Normalize medya modeli
+---------------------------
+- mediaKey: movie_123 veya tv_456
+- id
+- mediaType
+- localizedTitle
+- originalTitle
+- year
+- genreIds
+- popularityBand
+- posterPath
+- backdropPaths
+- sourceIds
+
+10.3 Akilli yanlis secenekler
+-----------------------------
+Yanlis cevaplar su sinyallerle secilmelidir:
+- Ayni mediaType
+- Ortak turler
+- Yakin yayin yili
+- Benzer populerlik seviyesi
+- Ayni franchise olmama
+- Ayni basligin farkli dil varyanti olmama
+
+Secenekler benzersiz gorunen basliklara sahip olmalidir. Ayni isimli iki yapim
+varsa yil bilgisi gosterilmelidir.
+
+10.4 Gorsel kalite kontrolu
+---------------------------
+- Minimum genislik
+- Asiri karanlik veya bos gorsel kontrolu mumkunse metadata ile yapilmali
+- Basligi acikca gosteren logo/yazi iceren gorseller tercih edilmemeli
+- Alternatif gorseller ayni yapima ait olmali
+- Secilen gorsel ve soru oturum kaydina yazilmali
+
+10.5 Deterministik gunluk sorular
+---------------------------------
+Gunluk oyun icin istemcide rastgele Math.random kullanmak yeterli degildir.
+Tarih + dil + bolge + gameVersion ile seed uretilmeli veya soru seti backend
+tarafinda olusturulmalidir.
+
+
+PART 11 - PUANLAMA VE EKONOMI
+=============================
+
+UYGULAMA DURUMU (2026-06-24): TAMAMLANDI
+-----------------------------------------
+Uygulananlar:
+- Puanlama saf, test edilebilir bir modulde toplandi: utils/gameScoring.js.
+- Yeni soru puani (11.1): (base 100 + timeBonus 0-50 + streakBonus <=50) *
+  zorluk carpani (kolay 1.0 / normal 1.25 / zor 1.5) - joker cezasi.
+- Joker cezasi (11.1 / 11.4): %50 joker sorunun puanini %25, gorsel degistirme
+  %15 dusurur; cezalar yalnizca o soruda joker kullanildiysa uygulanir.
+- Joker kullanimi soru bazinda izleniyor; her yeni soruda sifirlaniyor. Oturum
+  toplam joker sayisi totalJokersUsed olarak saklaniyor (ileride tie-break icin).
+- Eski "carpani" (floor(streak/5)+1) ve x2 badge'i kaldirildi; puanlama artik
+  additive streakBonus kullaniyor (12.1 ile uyumlu).
+- XP/skor ayrimi (11.3): XP skordan ve liderlikten bagimsiz. Oturum XP'si =
+  dogru*10 + tamamlama 25 + floor(bestStreak/5)*10. Basarim/gunluk gorev XP'si
+  ilgili sistemlere (Part 15 / 8.4) birakildi (achievementsUnlocked parametresi
+  hazir).
+- XP kalici saklaniyor (SceneGame.totalXp) ve seviye ucgensel egriyle turetiliyor
+  (computeLevel; N->N+1 = 100*N XP). GameHub seviye rozeti artik gercek seviyeyi
+  gosteriyor.
+- Kisisel liste oyunlari da XP ve istatistik kazandiriyor; ancak global liderlik
+  (bestScore) Klasik + Normal + kisisel-olmayan kaynak ile sinirli kaldi.
+- Sonuc ekraninda kazanilan XP rozeti (+N XP) gosteriliyor.
+- Joker ekonomisi (11.4): mod bazli baslangic jokerleri Part 8'de tanimliydi
+  (Klasik 3 / Zamana Karsi 1 / Hayatta Kalma 2 + seri odulu); bu fazda joker
+  cezasi ile anlamli bir denge kuruldu. Ucretli para birimi/magaza eklenmedi.
+
+Dogrulama:
+- Degisen 9 oyun dosyasi Babel ile parse edildi, hata yok.
+- TR/EN ceviri JSON parse edildi; 141 i18n anahtari iki dilde tam.
+- gameScoring saf fonksiyonlari birim testlerle dogrulandi (16/16 gecti):
+  puan formulu (zaman/seri/zorluk/joker cezasi), XP kaynaklari ve seviye egrisi.
+
+Not: 11.2 (sabit 10 soruluk Klasik ile karsilastirilabilir skor) Part 8'de
+uygulanmisti. Skor olcegi degistigi icin eski leaderboard kayitlari yeni
+skorlarla birlikte gorunur; sezon/sifirlama Part 14.4 (Faz E) kapsamindadir.
+
+11.1 Onerilen puan formulu
+--------------------------
+Dogru cevap:
+
+baseScore
++ timeBonus
++ streakBonus
++ difficultyBonus
+- jokerPenalty
+
+Ornek normal zorluk:
+- Temel: 100
+- Sure bonusu: 0-50
+- Seri bonusu: en fazla 50
+- Zorluk carpani: kolay 1.0, normal 1.25, zor 1.5
+- Yuzde 50 joker cezasi: sorunun puaninda yuzde 25 azalma
+- Gorsel degistirme cezasi: sorunun puaninda yuzde 15 azalma
+
+11.2 Neden mevcut sonsuz skor degismeli
+---------------------------------------
+Yanlisa kadar devam eden sistemde skor;
+- daha buyuk soru havuzuna,
+- daha uzun oynama suresine,
+- kaynak kolayligina
+baglidir. Sabit 10 soruluk Klasik mod skor karsilastirmasini daha adil yapar.
+
+11.3 XP ve skor ayrimi
+----------------------
+Skor liderlik tablosu icindir. XP kalici oyuncu ilerlemesi icindir.
+
+XP kaynaklari:
+- Oyun tamamlama
+- Dogru cevap
+- Gunluk gorev
+- Seri
+- Yeni basarim
+
+XP, liderlik skorunu etkilememelidir.
+
+11.4 Joker ekonomisi
+---------------------
+Ilk surumde basit ve acik bir sistem kullanilmalidir:
+- Klasik: her turden bir joker
+- Zamana Karsi: joker yok veya tek joker
+- Hayatta Kalma: odul olarak joker kazanilabilir
+- Gunluk: herkes icin ayni joker hakki
+
+Ucretli para birimi veya karmasik magazaya ilk surumde girilmemelidir.
+
+
+PART 12 - AKTIF OYUN EKRANI UI/UX
+=================================
+
+UYGULAMA DURUMU (2026-06-24): TAMAMLANDI
+-----------------------------------------
+Uygulananlar:
+- Ust alan (12.1): sol cikis, orta skor+seri, sag soru sayaci / kalan can,
+  altinda animasyonlu sure cubugu. Yaniltici x2 carpani badge'i Part 11'de
+  kaldirildi; seri tek alanda gosteriliyor.
+- Sahne alani (12.2): gorsel yuklenene kadar iskelet (skeleton + spinner)
+  gosteriliyor; timer yalnizca gorsel yuklendikten sonra basliyor; cevap
+  sonrasi yapim adi + yil overlay'i gosteriliyor.
+- Secenekler (12.3): elenen secenek tamamen kaybolmuyor, okunabilir (opacity
+  0.45) ve disabled kaliyor; dogru/yanlis yalnizca renkle degil ikon + metin
+  ("Dogru"/"Yanlis") ile gosteriliyor; secenek ve joker butonlarina min dokunma
+  alani (hitSlop) ve erisilebilirlik etiketleri eklendi; Film/Dizi badge zorluk
+  kuralina gore (Part 9.3).
+- Cevap geri bildirimi (12.4): dogru cevapta kazanilan puan etiketi (+N), yanlis
+  cevapta moda gore ceza gostergesi (Hayatta Kalma -1 can, Zamana Karsi -sn);
+  haptik korunuyor.
+- Reduce Motion (12.4 / 20.3): AccessibilityInfo izleniyor; etkinse skor/seri
+  scale ve tam ekran flash animasyonlari atlaniyor (giris animasyonu secenek
+  gorunurlugu icin korunuyor).
+- Cikis davranisi (12.5): kapatma butonu dogrudan cikmiyor; sureyi duraklatip
+  onay sayfasi aciyor. Sayfada uc aksiyon: Oyuna Devam Et (resume), Oturumu
+  Bitir (mevcut skorla sonuc ekranina) ve Ana Ekrana Don (kaydet + geri).
+- Engine'e pauseGame/resumeGame/endSession ve lastPoints eklendi.
+- Yeni metinler (cikis sayfasi, joker etiketleri) TR/EN'e eklendi.
+
+Dogrulama:
+- Degisen 9 oyun dosyasi Babel ile parse edildi, hata yok.
+- TR/EN ceviri JSON parse edildi; 149 i18n anahtari iki dilde tam.
+
+Not: Gunluk dereceli denemede cikisin denemeyi tuketmesi (12.5 son madde) Gunluk
+mod (8.4) ertelendigi icin kapsam disi. Fiziksel cihazda kucuk ekran/Reduce
+Motion/buyuk font dogrulamasi manuel test matrisinde kalir.
+
+12.1 Ust alan
+-------------
+- Sol: cikis/duraklatma
+- Orta: skor ve seri
+- Sag: soru sayaci veya kalan can
+- Altinda animasyonlu sure cubugu
+
+Ust alan dar ekranlarda tasma yapmamali. Carpani ayri bir badge ile surekli
+gostermek yerine seri alani icinde birlestirmek daha temiz olabilir.
+
+12.2 Sahne alani
+----------------
+- Ekranin ana odagi olmalidir.
+- 16:9 oran korunmalidir.
+- Gorsel yuklenirken skeleton veya blurhash gosterilmelidir.
+- Gorsel yuklendikten sonra timer baslamalidir.
+- Cevap sonrasinda yapim adi ve yil kontrollu bir overlay ile gosterilmelidir.
+
+12.3 Secenekler
+---------------
+- Minimum dokunma alani 44x44 olmalidir.
+- Uzun basliklar iki satirda okunabilmelidir.
+- Film/dizi badge'i zorluk kuralina gore gosterilmelidir.
+- Dogru ve yanlis sadece renkle anlatilmamali; ikon ve metin de kullanilmalidir.
+- Elenmis secenek tamamen kaybolmaktansa disabled ve okunabilir kalabilir.
+
+12.4 Cevap geri bildirimi
+-------------------------
+Dogru cevap:
+- Kisa haptic
+- Puan artisi animasyonu
+- Dogru kart vurgusu
+- Kazanilan puan etiketi
+
+Yanlis cevap:
+- Hata haptic'i
+- Secilen ve dogru secenegin birlikte gosterilmesi
+- Kisa aciklama
+- Moda gore can/zaman cezasi
+
+Tam ekran kirmizi/yesil flash dusuk yogunlukta olmali ve Reduce Motion ayarina
+uyum saglamalidir.
+
+12.5 Cikis davranisi
+--------------------
+Aktif oyun sirasinda kapatma butonu dogrudan cikmamalidir.
+
+Onay bottom sheet'i:
+- Oyuna devam et
+- Oturumu bitir
+- Ana ekrana don
+
+Gunluk dereceli denemede cikisin denemeyi tuketip tuketmedigi acik yazilmalidir.
+
+
+PART 13 - SONUC EKRANI
+======================
+
+UYGULAMA DURUMU (2026-06-26): TAMAMLANDI
+-----------------------------------------
+Uygulananlar:
+- Sonuc ekrani bastan yazildi: hero skor, yeni rekor rozeti, kazanilan XP ve
+  oyun sonucu (tamamlandi/oyun bitti/yarida) gosteriliyor.
+- Birincil metrikler: dogru/toplam, dogruluk orani, en iyi seri; ayrica zorluk,
+  kaynak ve ortalama cevap suresi seridi eklendi.
+- Oyun motoru (useSceneGame) her cevap icin responseMs ve kazanilan puani oturum
+  kaydina yaziyor; sonuc ekrani bunlardan ortalama cevap suresini hesapliyor.
+- Yeni rekor durumu saveGameScore transaction'indan (mod+zorluk onceki rekoru)
+  donuyor; istemcide tahmin edilmiyor.
+- Cevap incelemesi yatay poster seridi yerine acilir/kapanir listeye donustu;
+  her satir poster, dogru yapim, kullanicinin cevabi, sure ve kazanilan puani
+  gosterir, dokununca yapimin detay ekranina gider (listeye ekleme aksiyonu).
+- Aksiyonlar (13.3): birincil Tekrar Oyna; ikincil Mod Secimi, Liderlik ve
+  Paylas; alt aksiyon Oyun Merkezine Don. Geri donus istatistigi tekrar
+  tetiklemez (oturum sonucu silinir).
+- Paylasim karti (13.4): spoiler sahne gorseli icermeyen; skor, mod, zorluk,
+  dogruluk, seri ve WatchFlix markasi tasiyan statik kart captureRef ile
+  yakalanip expo-sharing ile paylasiliyor (Wrapped paylasim altyapisi deseni).
+
+Dogrulama:
+- Degisen oyun dosyalari Babel ile parse edildi, hata yok.
+- TR/EN ceviri JSON dosyalari parse edildi, hata yok.
+
+Not: Kazanilan puan/sure analizi cihazda oturum kaydindan uretilir; Firestore
+sema degisikligi yoktur. Paylasimin fiziksel cihazda gorsel dogrulamasi manuel
+test matrisinde kalir.
+
+13.1 Birincil bilgi
+-------------------
+- Toplam skor
+- Yeni rekor durumu
+- Kazanilan XP
+- Dogru / toplam soru
+- Dogruluk orani
+- Ortalama cevap suresi
+- En iyi seri
+
+13.2 Cevap inceleme
+-------------------
+Yatay kucuk poster listesi yerine acilip kapanabilen cevap listesi onerilir.
+Her satir:
+- Sahne veya poster
+- Dogru yapim
+- Kullanicinin cevabi
+- Harcanan sure
+- Kazanilan puan
+- Listeye ekleme aksiyonu
+
+13.3 Aksiyonlar
+---------------
+- Ayni ayarlarla tekrar oyna
+- Mod secimine don
+- Sonucu paylas
+- Liderlik tablosunu gor
+- Oyun merkezine don
+
+Birincil aksiyon "Tekrar Oyna" olmalidir. Geri donmek istatistik kaydini tekrar
+tetiklememelidir.
+
+13.4 Paylasim karti
+-------------------
+Mevcut story/share altyapisi ile entegre edilmelidir. Kartta spoiler olacak
+sahne gorselleri yerine:
+- Skor
+- Mod
+- Zorluk
+- Dogruluk
+- Seri
+- WatchFlix marka alani
+kullanilmalidir.
+
+
+PART 14 - LIDERLIK TABLOSU
+==========================
+
+UYGULAMA DURUMU (2026-06-26): TAMAMLANDI (kismi - backend bagimlilari ertelendi)
+--------------------------------------------------------------------------------
+Uygulananlar:
+- Liderlik ekrani bastan yazildi: kapsam filtreleri (Arkadaslar/Global aktif),
+  ilk uc icin podyum ve geri kalan icin sanallastirilmis FlatList.
+- Arkadaslar kapsami FriendsContext UID'leri + kullanicinin kendisiyle filtrelenir.
+- Kullanicinin kendi satiri vurgulanir; satirlar avatar, ad, skor ve tie-break
+  bilgisi (dogruluk + en iyi seri) gosterir.
+- Tie-break sirasi istemcide uygulanir: skor, sonra dogru sayisi, sonra en iyi
+  seri; kurallar bir bilgi sayfasinda kullaniciya aciklanir (14.3).
+- Loading, hata (tekrar dene) ve bos (global/arkadas) durumlari ayrildi.
+
+Ertelenenler (Faz E / Part 17):
+- Gunluk/Haftalik/Sezonluk filtreleri kilitli "Yakinda" durumunda; dereceli
+  tablo ve sezon sifirlama backend uretimi gerektirir (14.4).
+- Kesin sure/joker tie-break'i oturum bazli verinin Firestore'a tasinmasini bekler.
+
+Dogrulama:
+- Degisen dosyalar Babel ile parse edildi, hata yok.
+
+14.1 Filtreler
+--------------
+- Arkadaslar
+- Global
+- Gunluk
+- Haftalik
+- Sezonluk
+- Tum zamanlar
+- Mod
+- Zorluk
+
+14.2 Satir tasarimi
+-------------------
+- Sira
+- Avatar
+- Kullanici adi
+- Skor
+- Dogruluk veya sure tie-break bilgisi
+- Kullanicinin kendi satirinda belirgin vurgu
+
+Ilk uc kullanici icin podium kullanilabilir ancak geri kalan liste okunabilir
+bir FlatList olmali. ScrollView ile 50 satirin tamamini ayni anda render etmek
+yerine sanallastirma kullanilmalidir.
+
+14.3 Tie-break kurallari
+------------------------
+Ayni skorda siralama:
+1. Daha yuksek dogru sayisi
+2. Daha dusuk toplam cevap suresi
+3. Daha az joker kullanimi
+4. Skora daha erken ulasma
+
+Kurallar kullaniciya aciklanmalidir.
+
+14.4 Sezon sistemi
+------------------
+- Aylik veya 6 haftalik sezon
+- Sezon basinda dereceli tablo sifirlanir
+- Kalici profil istatistikleri sifirlanmaz
+- Onceki sezon dereceleri profil rozetinde saklanabilir
+
+
+PART 15 - OYUNCU PROFILI, XP VE BASARIMLAR
+==========================================
+
+UYGULAMA DURUMU (2026-06-26): TAMAMLANDI (kismi)
+-------------------------------------------------
+Uygulananlar:
+- Istatistik ekrani "Oyuncu Profili"ne donustu: seviye/XP karti (computeLevel ile
+  seviye, XP ilerleme cubugu, sonraki seviyeye kalan XP), haftalik seri ve son
+  oynama tarihi (15.1).
+- Mevcut istatistik grid'i korundu; mod+zorluk bazli rekorlar (bestScoresByMode)
+  ayri bir bolumde listeleniyor. Basarimlar ekranina gecis eklendi.
+- Basarim katalogu genisletildi (15.2): Ilk Oyun, Keskin Goz, Seri Ustasi (20),
+  Film Kurdu, Skor Avcisi, Maraton, Hayatta Kalan, Veteran, Keskin Nisanci.
+  Her basarim ilerleme tabanlidir; kilitliyken ilerleme cubugu gosterilir.
+- Baslangic gorevleri genisletildi (15.3): oyun tamamla, 5/50 dogru, 5 oyun,
+  10 seri.
+
+Ertelenenler (Faz D/E):
+- Film/dizi ayrimi, kusursuz tur, hizli cevap (<2sn) ve gunluk takip basarimlari
+  oturum bazli ayri sayaclar gerektirir; ilgili veriler Firestore'a tasininca
+  eklenecek.
+- Gercek gunluk/haftalik gorev sifirlamasi tarih takibi ve backend ister; bu
+  surumde birikimli baslangic gorevleri kullanilir.
+
+Dogrulama:
+- Degisen dosyalar Babel ile parse edildi, hata yok.
+- TR/EN ceviri JSON dosyalari parse edildi; yeni basarim/gorev anahtarlari iki
+  dilde tam.
+
+15.1 Oyuncu seviyesi
+--------------------
+- totalXp
+- currentLevel
+- currentLevelProgress
+- weeklyStreak
+- lastPlayedDate
+
+Seviye gorsel odul saglayabilir ancak rekabet skoruna avantaj vermemelidir.
+
+15.2 Basarim ornekleri
+----------------------
+- Ilk Oyun: ilk oturumu tamamla
+- Film Kurdu: 100 film sorusunu dogru cevapla
+- Dizi Uzmani: 100 dizi sorusunu dogru cevapla
+- Kusursuz Tur: Klasik modu 10/10 bitir
+- Hizli Cevap: bir soruyu iki saniyenin altinda dogru cevapla
+- Seri Ustasi: 20 dogru seri yap
+- Gunluk Takip: yedi gunluk meydan okumayi arka arkaya tamamla
+
+15.3 Gorevler
+-------------
+Gunluk gorevler:
+- Bir oyun tamamla
+- Bes soruyu dogru cevapla
+- Bir zor soru cevapla
+
+Haftalik gorevler:
+- 50 dogru cevap
+- Uc farkli mod oyna
+- Gunluk oyunu bes kez tamamla
+
+
+PART 16 - FIRESTORE VERI MODELI
+===============================
+
+UYGULAMA DURUMU (2026-06-26): TAMAMLANDI (kismi)
+-------------------------------------------------
+Uygulananlar:
+- Yeni model TAMAMEN ADDITIVE eklendi; SceneGame/{uid} ve SceneGameHistory/{uid}
+  belgeleri ve alanlari DEGISTIRILMEDI/SILINMEDI; eski okuyucu ekranlar
+  (GameHubScreen, GameStatsScreen, SceneGameDetailScreen, GameLeaderboardScreen)
+  hala eski belgeden besleniyor ve bozulmadi.
+- services/sceneGameService.js icindeki saveGameScore artik ayni Firestore
+  transaction'i icinde (eski SceneGame/{uid} yazimiyla birlikte, kismi yazim
+  riski olmadan) su yeni belgelere de yaziyor:
+  - Users/{uid}/gameProfile/summary (16.1: totalXp, level, weeklyStreak,
+    lastPlayedAt, totalSessions, totalCorrect, totalWrong, achievementsCount,
+    schemaVersion).
+  - Users/{uid}/gameStats/scene (16.2: bestScoresByMode, bestStreak,
+    totalSessions, totalQuestions, totalCorrect, totalWrong,
+    totalAnswerTimeMs, jokerUsage, sourceStats, difficultyStats, updatedAt).
+    gameId sabit "scene" kullanildi (tek oyun var; ileride ikinci oyun
+    eklenince parametreli olur).
+  - Users/{uid}/gameSessions/{sessionId} (16.3: gameId, modeId, difficultyId,
+    sourceId, startedAt, completedAt, status, score, correctCount, wrongCount,
+    averageAnswerMs, bestStreak, jokerUsage, gameVersion, resultHash). Belge
+    id'si olarak Firestore auto-id YERINE mevcut benzersiz sessionId
+    (useSceneGame.js'de uretiliyor, Part 2.1) kullanildi: dogal idempotent
+    olur ve ayri bir id uretimine gerek kalmaz.
+  - GameLeaderboards/{boardId}/entries/{uid} (16.4: uid, displayNameSnapshot,
+    avatarIndexSnapshot, score, correctCount, totalAnswerMs, jokerCount,
+    achievedAt, verified, gameVersion). boardId basitlestirildi:
+    "scene_<modeId>_<difficultyId>" (ornek: scene_classic_normal); tarih/sezon
+    sharding'i (16.4'teki "scene_classic_normal_2026_07" ornegi) BILEREK
+    uygulanmadi (asagida Ertelenenler). Kisisel kaynak oturumlari (Part 8.5)
+    hicbir board'a yazilmaz; entry sadece skor onceki kayitli skordan yuksek
+    veya esitse guncellenir. verified alani HER ZAMAN false (Part 17 bulgusu:
+    backend yok, dogrulama yapilamaz).
+  - Lazy migration: gameProfile/summary veya gameStats/scene yoksa (exists()
+    kontrolu, flag alani degil - Notes/Reminders ile ayni idiom), ayni
+    transaction icinde eski SceneGame belgesinin GERCEK alan adlarindan
+    (totalXp, level, totalPlayed, totalCorrect, totalWrong, bestScoresByMode,
+    bestStreak, totalJokersUsed) turetilerek bir kez olusturulur
+    (deriveProfileFromOldDoc / deriveStatsFromOldDoc).
+- hooks/useSceneGame.js guncellendi: sessionStartedAtRef (oturum baslangic
+  zamani) ve sessionHistoryRef (responseMs toplami icin) eklendi;
+  saveStatsToFirebase artik startedAt, outcome, totalAnswerTimeMs,
+  averageAnswerMs, gameVersion alanlarini da saveGameScore'a iletiyor.
+- Salt-okunur dual-read yardimcilari eklendi (henuz hicbir ekranda
+  KULLANILMADI, ileride GameStatsScreen/GameHubScreen gibi ekranlar bu yeni
+  modele gecmek istediginde hazir): loadGameProfile(uid) ve
+  loadGameStats(uid, gameId) - yeni belgeyi tercih eder, yoksa eski SceneGame
+  belgesinden ayni sekli turetir (Notes/Reminders'daki "yeni yoksa eskiye dus"
+  okuma idiomunun ayni mantigi, write-time migration degil read-time fallback).
+- firestore.rules additive olarak guncellendi: Users/{uid}/gameProfile/{docId},
+  Users/{uid}/gameStats/{gameId}, Users/{uid}/gameSessions/{sessionId} ->
+  owner read/write (SceneGame/SceneGameHistory ile ayni guven modeli, ikisi
+  de zaten owner read/write oldugu icin create-only/no-delete ozel bir kisit
+  eklenmedi - tutarlilik). GameLeaderboards/{boardId}/entries/{uid} -> herkes
+  (signed-in) okur, sadece sahibi kendi uid'ine yazar (SceneGame'in mevcut
+  leaderboard guven modeliyle ayni). Mevcut hicbir rule blogu SILINMEDI veya
+  DARALTILMADI (asagida Dogrulama).
+
+Ertelenenler:
+- 16.4'teki tarih-sharded/sezonluk boardId ornekleri (scene_classic_normal_
+  2026_07, scene_daily_tr_2026_06_22) BILEREK uygulanmadi; bu Part 14.4
+  (sezon sistemi) kapsamindadir ve bu fazda kapsam disi tutuldu. Bunun yerine
+  basit, sabit "scene_<modeId>_<difficultyId>" boardId kullanildi
+  (basitlestirme, dokumante edildi).
+- 16.5 (soru gecmisinin source+oyun bazli sinirli yapilara tasinmasi) bu
+  fazda ele alinmadi; SceneGameHistory/{uid} (Part 2'de zaten public
+  belgeden ayrilmis, owner-only) DEGISTIRILMEDEN korundu. Yeni bir
+  gameQuestionHistory alt koleksiyonu bu fazda EKLENMEDI (gorev metni
+  16.1-16.4'u istedi; 16.5 ayri, daha riskli bir veri tasimasi gerektirir).
+- Okuyucu ekranlar (GameHubScreen, GameStatsScreen, SceneGameDetailScreen,
+  GameLeaderboardScreen) yeni modele GECIRILMEDI; hala eski SceneGame
+  belgesini okuyor. Bu BILEREK yapildi: eski belge hicbir alan kaybetmeden
+  guncellenmeye devam ettigi icin ekranlar zaten dogru calisiyor; ekranlari
+  degistirmek ek risk eklerdi (calisani bozma riski) ve gorev kapsaminda
+  zorunlu degildi. loadGameProfile/loadGameStats dual-read fonksiyonlari
+  ileride bu gecis icin hazir birakildi.
+- Canli Firestore rules deploy'u veya emulator/test calistirmasi YAPILMADI
+  (asagida Dogrulama'da aciklaniyor).
+
+Dogrulama:
+- services/sceneGameService.js ve hooks/useSceneGame.js Babel parser ile tek
+  tek parse edildi, hata yok.
+- Depo capinda 234 JavaScript dosyasi Babel ile yeniden parse edildi, hata yok
+  (oncesinde calisan hicbir dosya bozulmadi).
+- translations/tr.json ve translations/en.json JSON.parse ile dogrulandi,
+  hata yok (bu fazda yeni gorunen metin eklenmedigi icin yeni anahtar
+  gerekmedi).
+- firestore.rules `git diff` ile incelendi: diff yalnizca EKLEME (+) satirlari
+  iceriyor, hicbir mevcut satir SILINMEDI/DEGISTIRILMEDI (SceneGame,
+  SceneGameHistory, Notes, Reminders ve diger tum mevcut kurallar oldugu gibi
+  kaldi).
+- DURUSTCE BELIRTILMELI: bu ortamda canli bir Firebase projesine
+  `firebase deploy --only firestore:rules` calistirilamadi ve hicbir
+  Firestore emulator/entegrasyon testi YAPILMADI. Depoda firebase.json
+  bulunmadigi icin proje ozel bir deploy script'i de yok (yalnizca
+  firebase.js SDK init dosyasi var). Kullanici, yeni Users/{uid}/gameProfile,
+  Users/{uid}/gameStats, Users/{uid}/gameSessions ve GameLeaderboards
+  yollarinin production'da okunup yazilabilmesi icin BU DEGISIKLIKLERI
+  MANUEL OLARAK `firebase deploy --only firestore:rules` komutuyla
+  (Firebase CLI projeye baglanmis sekilde) DEPLOY ETMELIDIR; deploy
+  edilmeden bu yollara yazma/okuma "permission-denied" ile basarisiz olur
+  (mevcut saveGameScore try/catch'i bu durumda null donerek eski SceneGame
+  yazimini etkilemeden sessizce basarisiz olur - eski davranis bozulmaz).
+
+16.1 Kullanici oyun profili
+---------------------------
+Users/{uid}/gameProfile/summary
+
+Alanlar:
+- totalXp
+- level
+- weeklyStreak
+- lastPlayedAt
+- totalSessions
+- totalCorrect
+- totalWrong
+- achievementsCount
+- schemaVersion
+
+16.2 Oyun bazli istatistik
+--------------------------
+Users/{uid}/gameStats/{gameId}
+
+Alanlar:
+- bestScoresByMode
+- bestStreak
+- totalSessions
+- totalQuestions
+- totalCorrect
+- totalWrong
+- totalAnswerTimeMs
+- jokerUsage
+- sourceStats
+- difficultyStats
+- updatedAt
+
+16.3 Oturumlar
+--------------
+Users/{uid}/gameSessions/{sessionId}
+
+Alanlar:
+- gameId
+- modeId
+- difficultyId
+- sourceId
+- startedAt
+- completedAt
+- status
+- score
+- correctCount
+- wrongCount
+- averageAnswerMs
+- bestStreak
+- jokerUsage
+- gameVersion
+- resultHash
+
+Detayli cevap gecmisi gerekiyorsa alt koleksiyon veya sinirli answers array'i
+kullanilabilir. Belge boyutu izlenmelidir.
+
+16.4 Liderlik
+-------------
+GameLeaderboards/{boardId}/entries/{uid}
+
+boardId ornegi:
+- scene_classic_normal_2026_07
+- scene_daily_tr_2026_06_22
+
+Alanlar:
+- uid
+- displayNameSnapshot
+- avatarIndexSnapshot
+- score
+- correctCount
+- totalAnswerMs
+- jokerCount
+- achievedAt
+- verified
+- gameVersion
+
+16.5 Soru gecmisi
+-----------------
+Mevcut tek questionHistory dizisi yerine source ve oyun bazli sinirli yapilar
+kullanilmalidir. Tum gecmisi liderlik belgesiyle ayni public belgede tutmak
+yerine kullaniciya ozel belgede saklamak gerekir.
+
+
+PART 17 - SKOR GUVENLIGI
+========================
+
+UYGULAMA DURUMU (2026-06-26): TAMAMLANDI (kismi)
+-------------------------------------------------
+Uygulananlar:
+- 17.2 (backend session token + sunucu tarafi yeniden hesaplama) bu projede
+  kapsam disi: depoda Cloud Functions veya baska bir backend servisi yok; bu
+  is tek bir React Native istemci uygulamasidir. 17.3 "Backend yapilmayacaksa"
+  yolu izlendi.
+- Global liderlik tablosu zaten "dogrulanmamis" kabul ediliyordu (17.1'de
+  tanimlanan risk hala gecerli); bu fazda buna ek olarak temel anomali
+  kontrolleri eklendi (utils/gameScoring.js: computeMaxPossibleScore +
+  validateSessionResult): negatif deger, soru sayisini asan cevap sayisi,
+  cevaplanan soru sayisini asan dogru sayisi, dogru sayisini asan en iyi seri,
+  ve mod+zorluga gore hesaplanan kaba teorik skor tavanini asan skor.
+- saveGameScore (services/sceneGameService.js) artik transaction'a girmeden
+  once validateSessionResult calistirir; anormal bulunan oturum Firestore'a
+  yazilmadan { rejected: true, reason } ile doner. useSceneGame.js bu durumu
+  "basarisiz kayit" olarak degil "tekrar denenmeyecek finalize" olarak ele
+  alir (kullaniciya hata gosterip sonsuz "tekrar dene" dongusune girmez).
+- Kisisel liste oyunlari ve Klasik+Normal disi mod/zorluk kombinasyonlari
+  halihazirda global bestScore'a yazmiyordu (Part 8.5 / Part 9.4); bu davranis
+  degismedi, sadece dogrulandi.
+- 17.4 Firestore kurallari incelendi: SceneGame/{uid} -> "allow read: signed-in,
+  allow write: owner"; SceneGameHistory/{uid} -> "allow read/write: owner".
+  Bu, 17.1'de tanimlanan temel riski (istemci kendi bestScore'unu istedigi gibi
+  yazabilir) yapisal olarak korur - backend olmadan kapatilamaz (17.2 gerekir).
+  Baska bir acik BULUNMADI: soru gecmisi public belgede degil (SceneGameHistory
+  ayri ve owner-only), liderlik istemcisi yalniz kendi uid yolunu yazabiliyor,
+  baskasinin SceneGame belgesine yazma izni yok. Bu nedenle rules dosyasinda
+  degisiklik YAPILMADI; mevcut kisitlamalar 17.4'un istedigi ayrimi zaten
+  saglar (sahibi yazar / herkes okur / public'te ozel veri yok).
+
+Ertelenenler (backend gerektirir):
+- 17.2 guvenli akis (sunucu seed/soru uretimi + sunucu tarafi skor yeniden
+  hesaplama + yalniz backend'in liderlige yazmasi).
+- Gercek "verified" alani / sezon sistemi (Part 14.4) backend'e bagli.
+
+Dogrulama:
+- utils/gameScoring.js, services/sceneGameService.js, hooks/useSceneGame.js
+  Babel ile parse edildi, hata yok.
+- validateSessionResult mantigi elle ornek senaryolarla kontrol edildi: negatif
+  skor, soru sayisini asan cevap, seriyi asan dogru, ve mod+zorluk tavanini
+  asan skor reddedildi; normal bir Klasik/Normal oturumu (10 soru, makul skor)
+  kabul edildi.
+- firestore.rules elle okunup SceneGame/SceneGameHistory kurallari 17.4
+  gereksinimleriyle karsilastirildi; rules dosyasinda degisiklik yapilmadi.
+
+17.1 Mevcut risk
+----------------
+Firestore kurallari kullanicinin kendi SceneGame belgesine yazmasina izin
+vermektedir. Bu, kullanicinin istemciyi degistirerek istedigi bestScore degerini
+yazabilecegi anlamina gelir. Bu tablo ciddi rekabet icin guvenilir degildir.
+
+17.2 Onerilen guvenli akis
+--------------------------
+1. Backend session token uretir.
+2. Oyun soru kimliklerini veya seed bilgisini backend kaydeder.
+3. Istemci cevap eventlerini yollar.
+4. Backend skor formulu ile sonucu tekrar hesaplar.
+5. Liderlik kaydini yalnizca backend yazar.
+
+Firebase Cloud Functions veya guvenilir bir uygulama servisi kullanilabilir.
+
+17.3 Backend yapilmayacaksa
+---------------------------
+- Global tablo "dogrulanmamis" kabul edilmeli.
+- Gunluk dereceli oduller degerli hale getirilmemeli.
+- Anormal skorlar icin temel limit kontrolleri yapilmali.
+- Kullanicinin sadece kendi ozet istatistigine yazmasina izin verilmeli.
+- Public belgede soru gecmisi gibi ozel veriler tutulmamali.
+
+17.4 Firestore kurallari
+------------------------
+Kurallar su ayrimi yapmalidir:
+- Kisisel istatistik: sahibi okuyabilir.
+- Public profil ozeti: signed-in kullanicilar okuyabilir.
+- Liderlik: herkes/signed-in okuyabilir, istemci yazamaz.
+- Session: sahibi okuyabilir, create alanlari sinirli olabilir.
+- Backend sonucu: yalnizca Admin SDK yazar.
+
+
+PART 18 - SERVIS VE CACHE MIMARISI
+=================================
+
+UYGULAMA DURUMU (2026-06-26): TAMAMLANDI (kismi)
+-------------------------------------------------
+Uygulananlar:
+- 18.1 (features/games/ klasor tasimasi) BILEREK YAPILMADI: tum calisan oyun
+  dosyalarini tasimak/yeniden adlandirmak buyuk, riskli bir refactordur; bu
+  fazda risk/deger orani uygun bulunmadi. Mevcut screens/game, hooks, services
+  konumlari korundu.
+- 18.3/18.4 ruhuyla TMDB havuz cekimi (fetchTitlePool,
+  services/sceneGameService.js) uygulamanin mevcut cachedRead/cacheStore
+  altyapisina (utils/cachedRead.js) baglandi. Anahtar semasi onerilen 18.3
+  formatina uygun: "game" namespace + "scene:pool:<source>:<lang>:v2" key.
+- TTL'li dondurma BILEREK kullanilmadi: havuzun her cagrida TMDB'den rastgele
+  yeni sayfalar cekmesi (cesitlilik) tasarimin parcasi; cachedRead({forceRefresh:
+  true}) ile online iken her zaman taze veri cekilir, cache sadece cevrimdisi
+  veya istek hatasinda son basarili havuza dusmek icin kullanilir (fallbackToCache).
+  Bu, 18.3'teki sabit TTL onerisinden bilerek sapar; gerekce: TTL dondurmasi
+  havuz cesitliligini saatlerce sabitler ve oyun tekrar oynanabilirligini
+  bozar. Asil deger katan kisim (cevrimdisi/hata aninda dusebilecek bir
+  havuz) korunarak eklendi.
+- getDetailedSceneImage (sahne gorseli secimi) cachelenmedi: zorluga gore her
+  cagrida rastgele bir backdrop araligindan secim yapar; sabit cachelenirse
+  ayni yapim icin hep ayni sahne donerdi. Bu, tasarimsal olarak cache'e uygun
+  degildir.
+- 18.2 (engine/repository/UI katman ayrimi) zaten byk olcude mevcuttu:
+  useSceneGame.js saf state/skor/timer/joker mantigini tutuyor,
+  sceneGameService.js TMDB+Firestore repository fonksiyonlarini barindiriyor,
+  SceneGuessGameScreen.js (ve Part 19'da cikartilan components/game/* )
+  sadece gosterim/event iletimi yapiyor. Bu ayrim klasor tasimadan da
+  korunmustur; sadece isim/klasor semasi 18.1'deki gibi degil.
+
+Ertelenenler:
+- 18.1 klasor tasimasi: ayri, dusuk riskli bir refactor gorevi olarak
+  birakildi (calisan kodu bozma riski bu fazin kapsamina gore orantisiz).
+- 18.4 son maddesi (Gunluk mod cevrimdisi suistimal) Gunluk Meydan Okuma
+  (Part 8.4) ertelendigi icin hala kapsam disi.
+
+Dogrulama:
+- services/sceneGameService.js Babel ile parse edildi, hata yok.
+- cachedRead/cacheStore importlarinin var olan utils/ dosyalarina dogru
+  isaret ettigi kontrol edildi (utils/cachedRead.js, utils/cacheStore.js).
+- fetchTitlePool'un forceRefresh:true ile cagirdigi dogrulandi; maxAge
+  parametresi KASITLI olarak gecilmedi (yorumla aciklandi).
+
+18.1 Onerilen klasor yapisi
+---------------------------
+features/games/
+  registry/
+    gameRegistry.js
+  shared/
+    components/
+    hooks/
+    repositories/
+    scoring/
+  sceneGuess/
+    config/
+    engine/
+    components/
+    repositories/
+    screens/
+
+18.2 Katmanlar
+--------------
+Game engine:
+- Saf state gecisleri
+- Skor hesaplama
+- Timer olaylari
+- Joker kurallari
+- Oturum sonucu
+
+Repository:
+- TMDB havuzu
+- Firestore istatistikleri
+- Liderlik
+- Yerel cache
+
+UI:
+- State gosterimi
+- Kullanici eventlerini engine'e iletme
+- Animasyon ve erisilebilirlik
+
+18.3 Mevcut cache ile entegrasyon
+---------------------------------
+Uygulamanin cacheStore, cachedRead ve otomatik veri indirme yapisi incelenerek
+oyun havuzlari ayri bir cache namespace ile saklanmalidir.
+
+Cache anahtari ornegi:
+- game:scene:pool:popular:tr:normal:v2
+- game:scene:media:movie_123:tr:v2
+
+TTL:
+- Populer havuz: 6-12 saat
+- Top rated havuz: 24 saat
+- Medya detay/gorsel listesi: 7 gun
+- Gunluk soru seti: gun sonuna kadar
+
+18.4 Cevrimdisi davranis
+------------------------
+- Onceden indirilmis yeterli soru varsa antrenman modu acilabilir.
+- Cevrimdisi skor global tabloya dogrudan yazilmamali.
+- Baglanti gelince session sync edilmelidir.
+- Gunluk dereceli mod cevrimdisi oynanacaksa zaman ve tekrar suistimali backend
+  tasariminda ele alinmalidir.
+
+
+PART 19 - BILESENLESTIRME PLANI
+===============================
+
+UYGULAMA DURUMU (2026-06-26): TAMAMLANDI (kismi)
+-------------------------------------------------
+Uygulananlar:
+- components/game/ klasoru olusturuldu (yoktu). Asagidaki bilesenler
+  SceneGuessGameScreen.js icinden cikartildi ve ayni davranisla (pure
+  refactor, davranis degisikligi yok) tekrar baglandi:
+  - GameTopBar.js        (12.1 ust bar: cikis, skor+seri, can/sayac)
+  - GameTimerBar.js      (12.1/12.2 zamanlayici cubugu)
+  - JokerBar.js          (12.3 %50 ve gorsel jokeri kontrolleri)
+  - AnswerOptionCard.js  (12.3 tek sik karti, dogru/yanlis durum mantigi)
+  - ExitGameSheet.js     (12.5 cikis onay bottom sheet'i)
+  - GameLoadingState.js  (soru hazirlanirken tam ekran yukleme)
+  - GameErrorState.js    (2.6 oyun baslatma hata durumu)
+- Tum bilesenler saf gosterimdir; Firestore/TMDB istegi icermez, ihtiyac
+  duydugu veriyi sadece prop olarak alir (theme, gameTokens, durum bayraklari,
+  callback'ler).
+- SceneGuessGameScreen.js bu yedi bilesenle guncellendi; kaldirilan inline JSX
+  bloklarinin styles tanimlari (topBar, timerWrap, jokerBar, optionCard,
+  exitSheet*, errorState*, loadingWrap vb.) ilgili bilesen dosyalarina
+  tasindi, ana ekran dosyasinda ayni isimli styles kullanilmiyor (kopya
+  tutulmadi).
+- Onceden var olan components/game/SceneResultShareCard.js (Part 13.4) ile
+  yeni bilesenler ayni klasorde toplandi.
+
+BILEREK CIKARTILMAYANLAR (gerekce):
+- GameResultSummary / AnswerReviewList: SceneGameResultScreen.js'de (ayri
+  rotada, Part 13'te zaten yeniden yazilmis) yasiyorlar; bu dosya bu fazda
+  okunmadi/degistirilmedi, cikartma kapsamin disinda tutuldu (riskten kacinma:
+  zaten ayri ekran/rotada olan kodu degistirip dogrulamadan "tamamlandi"
+  denemez).
+- LeaderboardPreview / LeaderboardList / GameStatsSummary: SceneGuessGameScreen
+  icindeki "source_select" fazinda hala inline (top-3 onizleme kartlari,
+  istatistik banner'i, history/leaderboard modal'lari). Bu bloklar UI olarak
+  ayrilabilir gorunse de mevcut ekranin en az 4 farkli durumunu (loading/
+  error/success/empty) bilesene tasimak daha buyuk bir yeniden yazim
+  gerektirir; bu fazda "calisani bozma" riskine karsi ertelendi.
+- ModeCard / DifficultySelector / SourceSelector: bu bilesenler aktif oyun
+  ekraninda degil, SceneGameSetupScreen.js icinde kullaniliyor (Part 07); o
+  dosya bu fazda okunmadi/degistirilmedi.
+- ScoreFeedback: cevap geri bildirim "pop" katmani (+N / -1 / -Xsn) sahne
+  gorseli overlay'i ile gorsel olarak ic ice (ayni Animated.View agaci
+  icinde, image error/skeleton durumlariyla paylasimli); ayirmak gorsel
+  konumlandirmayi (position: absolute, image container'a bagimli) bozma
+  riski tasidigi icin bu fazda dokunulmadi.
+
+Dogrulama:
+- Degisen/eklenen 8 dosya (7 yeni bilesen + SceneGuessGameScreen.js) Babel
+  ile parse edildi, hata yok.
+- Depo capinda 234 JavaScript dosyasi Babel ile yeniden parse edildi, hata yok
+  (oncesinde de calisan hicbir dosya bozulmadi).
+- Her yeni bilesenin SceneGuessGameScreen.js icinde TAM OLARAK bir kez
+  kullanildigi grep ile dogrulandi (<GameTopBar, <GameTimerBar, <JokerBar,
+  <AnswerOptionCard, <ExitGameSheet, <GameLoadingState, <GameErrorState).
+- Kullanilan i18nText anahtarlarinin (components/game/*.js +
+  SceneGuessGameScreen.js) tamami TR ve EN ceviri dosyalarinda script ile
+  dogrulandi; eksik anahtar bulunmadi (yeni metin eklenmedi, sadece tasindi).
+- Expo public config kontrolu basarili.
+
+SceneGuessGameScreen icinden ayrilmasi gereken bilesenler:
+- GameTopBar
+- GameTimerBar
+- SceneImageCard
+- AnswerOptionCard
+- JokerBar
+- ScoreFeedback
+- GameLoadingState
+- GameErrorState
+- GameResultSummary
+- AnswerReviewList
+- LeaderboardPreview
+- LeaderboardList
+- GameStatsSummary
+- ModeCard
+- DifficultySelector
+- SourceSelector
+- ExitGameSheet
+
+Her bilesen yalnizca ihtiyaci olan prop'lari almali. Firestore veya TMDB
+istekleri gorsel bilesenlerin icinden yapilmamalidir.
+
+
+PART 20 - TASARIM SISTEMI
+=========================
+
+UYGULAMA DURUMU (2026-06-26): TAMAMLANDI (kismi)
+-------------------------------------------------
+Uygulananlar:
+- 20.1 game.* token namespace'i eklendi: theme/gameTokens.js ->
+  buildGameTokens(theme). Tokenlar YENI hex degeri TANITMAZ; mevcut
+  theme/colors.js cikisindan (theme.primary/secondary/between/accent/bold/
+  border/shadow/colors.green/red/orange) turetilir. Boylece yerlesik temalar
+  (gray/dark/light/blue/green) ve kullanicinin ozel temasi (buildCustomTheme)
+  ile otomatik uyumludur.
+  Saglanan alanlar: background, surface, surfaceElevated, accent,
+  accentSecondary, correct, incorrect, warning, gold, overlay, border,
+  radiusSmall/Medium/Large, spacing1..6.
+- SceneGuessGameScreen.js icinde gameTokens = buildGameTokens(theme) uretilip
+  Part 19'da cikartilan bilesenlere (GameTopBar, AnswerOptionCard, JokerBar)
+  prop olarak gecirildi; bu bilesenlerdeki dogru/yanlis renkleri artik
+  gameTokens.correct/incorrect kullaniyor (onceden sabit "#00E676"/"#FF1744"
+  / "#2ECC71"/"#E74C3C" idi).
+- JokerBar.js'deki sabit "#FFD700" degerleri gameTokens.gold ile degistirildi.
+- Grep ile components/game/*.js ve SceneGuessGameScreen.js icinde kalan sabit
+  hex renkler tarandi (asagida).
+
+Grep sonucu / BILEREK DOKUNULMAYANLAR:
+- screens/game/SceneGuessGameScreen.js icindeki "source_select", "game_over",
+  history/leaderboard modal JSX'leri (Part 19'da BILEREK cikartilmadi, bkz.
+  Part 19 notu) hala kendi sabit renklerini (#FFD700, #5BFF6B, #FF5555 vb.)
+  kullaniyor. Bu bloklar bilesene tasinmadigi icin token'a gecirilmedi;
+  bilesenlestirme (Part 19'un ertelenen kismi) tamamlaninca token gecisi de
+  o bilesenlerle birlikte yapilmalidir.
+- components/game/SceneResultShareCard.js (Part 13.4 paylasim karti) sabit
+  marka renklerini (#7C3AED, #FF2D87, #E8B931, #160C24 vb.) BILEREK korur:
+  bu kart captureRef ile yakalanip disari paylasilan SABIT GORSEL bir
+  marka materyali, kullanicinin uygulama temasina gore degismemesi tasarim
+  geregi (Part 13.4: "spoiler olmayan ... WatchFlix marka alani").
+  Tema tokenlarina baglamak bu tasarim amacina aykiri olurdu.
+- GameTopBar.js'deki "#FF5A5F" (Hayatta Kalma can rozeti) bilerek
+  gameTokens.incorrect'e esitlenmedi: can rozeti ile yanlis-cevap rengi ayni
+  kavram degildir (can kaybi farkli bir gorsel dil), tek bir kirmizi tona
+  zorlamak anlam kaybina yol acabilirdi; bu kucuk fark dusuk risk/deger
+  nedeniyle birakildi.
+- 20.2 (Tipografi) ve 20.3 (Animasyon ilkeleri) bu fazda ele ALINMADI:
+  - 20.3'un buyuk kismi zaten Part 12.4'te uygulanmisti (Reduce Motion
+    kontrolu, 300-500ms cevap gecisi). Yeni bir Reanimated gecisi bu fazda
+    yapilmadi (mevcut Animated API calisir durumda, riskli olmayan bir
+    degisiklik degil).
+  - 20.2 (Display/Heading/Body/Label/Numeric tipografi olcegi) hic
+    uygulanmadi; bu, font-scale/allowFontScaling davranisini etkileyen daha
+    genis bir degisikliktir ve ayri, dikkatli bir incelemeyi gerektirir.
+
+Dogrulama:
+- theme/gameTokens.js, JokerBar.js, GameTopBar.js, AnswerOptionCard.js,
+  SceneGuessGameScreen.js Babel ile parse edildi, hata yok.
+- buildGameTokens'in theme/colors.js disinda yeni hex SABITI tanitmadigi elle
+  kontrol edildi (tek sabit: GOLD = "#FFD700", semantik altin rengi icin;
+  bu deger zaten projede SceneGame ekranlarinda var olan rengin aynisidir).
+- Depo capinda hex renk grep'i yapilip token'a tasinmayan dosyalar (yukarida)
+  bilerek listelendi; "tum hex renkler kaldirildi" gibi yanlis bir iddia
+  YAPILMADI.
+
+20.1 Oyun tokenlari
+-------------------
+- game.background
+- game.surface
+- game.surfaceElevated
+- game.accent
+- game.accentSecondary
+- game.correct
+- game.incorrect
+- game.warning
+- game.gold
+- game.overlay
+- game.radiusSmall
+- game.radiusMedium
+- game.radiusLarge
+- game.spacing1 ... game.spacing6
+
+Bu tokenlar mevcut theme yapisini tamamlamali; her ekranda ayri hex renkleri
+tanitilmamalidir.
+
+20.2 Tipografi
+--------------
+- Display: oyun sonucu ve hero skor
+- Heading: ekran ve bolum basliklari
+- Body: aciklamalar
+- Label: badge ve istatistik etiketleri
+- Numeric: skor ve timer
+
+Tum metinler allowFontScaling davranisi acisindan bilincli secilmelidir. Her
+metinde otomatik olarak false kullanmak erisilebilirligi bozar.
+
+20.3 Animasyon ilkeleri
+-----------------------
+- Animasyon bilgi vermeli, beklemeyi veya sonucu aciklamalidir.
+- Uzun ardisik animasyonlar hizli oyuncuyu bekletmemelidir.
+- Cevap gecisi 300-500 ms hedefinde tutulmalidir.
+- Reduce Motion etkinse scale, shake ve tam ekran flash azaltimalidir.
+- JS thread yerine uygun yerlerde Reanimated kullanimi degerlendirilebilir.
+
+
+PART 21 - ERISILEBILIRLIK VE RESPONSIVE TASARIM
+==============================================
+
+UYGULAMA DURUMU (2026-06-26): TAMAMLANDI (kismi)
+-------------------------------------------------
+Uygulananlar:
+- Inceleme sonucu: ikon butonlarin buyuk kismi (GameTopBar, JokerBar,
+  ExitGameSheet, GameLeaderboardScreen, SceneGameDetailScreen,
+  SceneGameResultScreen, GameHubScreen) zaten accessibilityLabel/Role
+  tasiyordu (Part 12/19'da eklenmis). Bu fazda eksik kalan somut noktalar
+  duzeltildi:
+  - screens/game/SceneGuessGameScreen.js kaynak secimi ekranindaki geri
+    don, liderlik (trophy), istatistik (stats-chart) ve her iki modaldaki
+    kapat (close) ikon butonlarina accessibilityRole/Label + hitSlop
+    eklendi (onceden bu bes buton etiketsizdi).
+  - components/game/AnswerOptionCard.js: secenek etiketi artik "A şıkkı,
+    Film adı" formatinda (autoI18n.oyun_secenek_etiketi, harf onek A/B/C/D).
+  - AnswerOptionCard.js: cevap verildiginde dogru/yanlis sonucu artik
+    AccessibilityInfo.announceForAccessibility ile screen reader'a
+    ayrica duyuruluyor (onceden sadece renk+ikon+metin vardi, ekran okuyucu
+    aktif duyuru almiyordu).
+  - Renk korlugu (21.1): AnswerOptionCard zaten ikon+metin ("Doğru"/
+    "Yanlış") kullaniyordu; degisiklik gerekmedi, dogrulandi.
+  - Minimum dokunma alani: optionCard minHeight 56, ikon butonlar 38-44px;
+    21.1 esigini zaten karsiliyordu, dogrulandi.
+  - Part 21.3 (Dimensions.get module-scope anti-pattern): grep ile
+    screens/game ve hooks/useSceneGame.js icinde 2 gercek kullanim
+    bulundu (modul yuklenirken bir kez okunan SCREEN_W). Ikisi de
+    duzeltildi:
+    - screens/game/SceneGuessGameScreen.js: useWindowDimensions() ile
+      degistirildi; rotasyon/katlanir cihazda da guncel kalir.
+    - hooks/useSceneGame.js: prepareNextQuestion icinde ihtiyac aninda
+      Dimensions.get("window") okunuyor (prefetch gorsel genisligi icin,
+      render-kritik degil ama modul-scope anti-pattern'i ortadan kaldirir).
+  - Part 21.2 (kucuk ekranlar): sahne gorseli yuksekligi artik sabit
+    SCREEN_W*0.56 carpani DEGIL; useWindowDimensions'tan gelen ekran
+    yuksekligine de bagli (Math.min(width*0.56, height*0.34) dikeyde,
+    height*0.62 yatayda) - kucuk ekranlarda secenek alani icin her zaman
+    yer kalir. optionsWrap zaten flex:1 + justifyContent:flex-end
+    oldugu icin kalan alani otomatik kullaniyordu (degisiklik gerekmedi).
+
+Ertelenenler:
+- Tablet icin "solda sahne, sagda cevaplar" iki-kolon yatay duzeni (21.3,
+  3. madde) BILEREK uygulanmadi: bu, aktif oyun ekraninin JSX agacinin
+  buyuk bir yeniden duzenlemesini gerektirir (calisan kodu bozma riski
+  bu fazin kapsamina gore orantisiz). Bunun yerine dusuk riskli/yuksek
+  degerli kisim (useWindowDimensions + dinamik gorsel yuksekligi)
+  uygulandi; bu, telefon yatay modunda da (isLandscape kontrolu) gorsel
+  alaninin ekrani kaplamasini onler. Gercek iki-kolon tablet duzeni ayri,
+  dikkatli bir faz olarak birakildi.
+- Dinamik fontta (buyuk font / Dynamic Type) kartlarin kesilip
+  kesilmedigi fiziksel cihazda/simulatorde GORSEL olarak test edilemedi
+  (bu ortamda RN render/screenshot yok); optionTitle/answeredTitle/
+  sourceCardText zaten numberOfLines={2} kullaniyor ve optionCard
+  minHeight (sabit deger) yerine paddingVertical ile esnek yukseklik
+  kullaniyor, bu da buyuk fontta kartin esnemesine izin verir - ancak bu
+  iddia kod okumayla dogrulandi, fiziksel cihaz testi degildir.
+
+Dogrulama:
+- Degisen 2 dosya (screens/game/SceneGuessGameScreen.js,
+  hooks/useSceneGame.js) ve AnswerOptionCard.js Babel ile parse edildi,
+  hata yok.
+- Depo capinda 237 JavaScript dosyasi Babel ile parse edildi, hata yok.
+- grep ile components/game/*.js ve screens/game/*.js + hooks/useSceneGame.js
+  icinde Dimensions.get( aramasi tekrarlandi: 0 sonuc (oncesinde 2 idi).
+- TR/EN ceviri JSON dosyalari JSON.parse ile dogrulandi, hata yok.
+
+21.1 Erisilebilirlik
+--------------------
+- Tum ikon butonlar accessibilityLabel tasimali.
+- Cevaplar "A secenegi, Film adi" gibi okunabilir olmali.
+- Dogru/yanlis sonucu screen reader ile duyurulmali.
+- Renk korlugu icin ikon ve metin kullanilmali.
+- Minimum dokunma alani korunmali.
+- Dinamik fontta kartlar kesilmemeli.
+
+21.2 Kucuk ekranlar
+-------------------
+Aktif oyun ekrani sabit yuksekliklerin toplamina bagli kalmamalidir.
+- Gorsel yuksekligi availableHeight ile hesaplanmali.
+- Secenek alani gerekirse kontrollu scroll desteklemeli.
+- Safe area ve alt navigation alanlari dikkate alinmali.
+
+21.3 Tablet ve yatay ekran
+--------------------------
+- Tablet: solda sahne, sagda cevaplar kullanilabilir.
+- Telefon yatay: kompakt iki kolon duzeni kullanilabilir.
+- Dimensions modulu dosya yuklenirken bir kez okunmamalidir; useWindowDimensions
+  tercih edilmelidir.
+
+
+PART 22 - LOKALIZASYON
+======================
+
+UYGULAMA DURUMU (2026-06-26): TAMAMLANDI (kismi)
+-------------------------------------------------
+Uygulananlar:
+- Grep ile components/game/*.js ve screens/game/*.js icinde emoji + i18n
+  metni birlikte kullanim taramasi yapildi. Tek somut ihlal bulundu:
+  translations/tr.json ve translations/en.json icindeki
+  "autoI18n.sahne_tahmin_oyunu" degeri emojiyi (🎬) metnin ICINE
+  gomuyordu ("🎬 Sahne Tahmin Oyunu" / "🎬 Scene Guess Game"). Bu
+  duzeltildi: ceviri degerlerinden emoji cikarildi, emoji JSX'te ayri bir
+  literal olarak (cevrilen metnin disinda) eklendi
+  (screens/game/SceneGuessGameScreen.js kaynak secimi basligi).
+  Diger emoji kullanimlari (🏆, 🔥) zaten i18nText(...) cagrisinin DISINDA
+  duruyordu (sadece dekoratif, cevrilen string'e gomulmemis) - bunlara
+  dokunulmadi.
+- Aym taramada SceneGuessGameScreen.js kaynak secimi ekraninda 5 ikon
+  buton etiketsizdi (Part 21 kapsaminda duzeltildi, bkz. Part 21 notu);
+  bu da dolayli olarak 22'nin "her ekran/metin TR+EN'de olmali" ilkesini
+  guclendirdi (eklenen accessibilityLabel'lar da TR/EN ceviri
+  anahtarlarindan okunuyor, sabit metin degil).
+- Mod ve zorluk adlari (22.1): screens/game/gameConfig.js icindeki
+  SCENE_GAME_MODES ve SCENE_GAME_DIFFICULTIES halihazirda key-tabanliydi
+  (titleKey/descriptionKey/ruleKey/metaKey alanlari, Part 07/08'de
+  eklenmis); bu fazda dogrulandi, degisiklik gerekmedi. Yeni eklenen
+  __tests__/gameConfig.test.js bu kosulu (titleKey alaninin var olmasi
+  ve "autoI18n." ile baslamasi) birim testle kalici olarak kilitler.
+- TMDB localized title bos ise originalTitle fallback (22.1): grep ile
+  services/sceneGameService.js normalizeMediaItem fonksiyonu incelendi;
+  originalTitle alaninda fallback zaten vardi AMA UI'nin kullandigi
+  asil "title" alani yalnizca localizedTitle'a esitti (bos string ise
+  bos kaliyordu, originalTitle'a dusmuyordu). Bu somut bug duzeltildi:
+  artik title = localizedTitle || originalTitle (displayTitle).
+- Uzun Ingilizce baslik tasmasi kontrol listesi (22.2): AnswerOptionCard
+  optionTitle, SceneGuessGameScreen answeredTitle/sourceCardText,
+  SceneGameResultScreen reviewName ve GameHubScreen/GameLeaderboardScreen
+  displayName alanlari grep ile tek tek incelendi; tum dinamik (TMDB/
+  kullanici verisi) baslik Text bilesenlerinde numberOfLines (1 veya 2)
+  ZATEN mevcuttu. Eksik bulunmadi, yeni numberOfLines eklenmedi (zaten
+  vardi, dogrulandi).
+
+Ertelenenler:
+- Sagdan sola (RTL) dil destegi: bu uygulamada su an TR/EN disinda dil
+  yok ve RTL bir dil eklenmesi planlanmiyor; 22.2'nin bu maddesi
+  uygulanabilir bir kapsam tanimlamadigi icin BILEREK ele alinmadi.
+- Sayisal tarih/sure formatlarinin locale ile uretilmesi (22.1, 4. madde):
+  oyun ekranlarinda gosterilen sureler (orn. "{{count}}sn", ortalama
+  cevap suresi "X.Xs") zaten sade sayisal bicimde ve TR/EN'de ayni
+  formatta; locale-aware Intl.NumberFormat/Intl.RelativeTimeFormat
+  gecisi bu fazda KAPSAM DISI tutuldu cunku mevcut format zaten her iki
+  dilde okunaklı ve hicbir somut hata bulunmadi (speculative degisiklik
+  yapilmadi).
+
+Dogrulama:
+- translations/tr.json ve translations/en.json JSON.parse ile dogrulandi,
+  hata yok.
+- Degisen/eklenen accessibilityLabel ve oyun_secenek_etiketi/
+  oyun_cevap_dogru_duyuru/oyun_cevap_yanlis_duyuru anahtarlarinin TR ve
+  EN dosyalarinin HER IKISINDE de bulundugu script ile dogrulandi.
+- services/sceneGameService.js Babel ile parse edildi, hata yok.
+- __tests__/gameConfig.test.js mod/zorluk key-tabanli kontrolu jest ile
+  calistirildi ve gecti (bkz. Part 23 dogrulama).
+
+22.1 Kurallar
+-------------
+- Emoji i18n metinlerinin icine gomulmemeli.
+- Tum yeni ekran ve hata mesajlari TR/EN birlikte eklenmeli.
+- Mod ve zorluk adlari key tabanli olmali.
+- Sayisal tarih ve sure formatlari locale ile uretilmeli.
+- TMDB localized title bos ise originalTitle fallback kullanilmali.
+
+22.2 Kontrol listesi
+--------------------
+- Uzun Ingilizce basliklarda tasma
+- Turkce karakterler
+- Cok uzun film/dizi adlari
+- Sagdan sola dil gelecekte desteklenirse layout varsayimlari
+- Sert kodlanmis "Film", "Dizi", saniye ve sira metinleri
+
+
+PART 23 - TEST PLANI
+====================
+
+UYGULAMA DURUMU (2026-06-26): TAMAMLANDI (kismi - sadece 23.1 unit testler)
+----------------------------------------------------------------------------
+Durum tespiti (onceki "16/16 gecti" notlari icin onemli duzeltme):
+- Bu depoda Part 11/17 dokumantasyonunda "gameScoring saf fonksiyonlari
+  birim testlerle dogrulandi (16/16 gecti)" denmis olsa da, depoda
+  package.json'da "test" script'i, jest config dosyasi veya __tests__
+  klasoru YOKTU; o dogrulama gercek bir test runner ile YAPILMAMISTI
+  (muhtemelen ad-hoc/elle calistirilan bir script ile yapilmis ve
+  kalici test altyapisi olarak birakilmamis). Bu fazda BUNUN YERINE
+  gercek, calisir, tekrar calistirilabilir bir jest altyapisi kuruldu.
+- jest (29.7.0) ve babel-jest paketleri node_modules'ta ZATEN MEVCUTTU
+  (expo tooling'in transitive bagimliligi olarak); yeni bir paket
+  YUKLENMEDI, sadece var olan jest dogrudan kullanildi. jest-expo de
+  node_modules'ta bulundu ANCAK versiyonu (51.0.4) bu projenin expo
+  (~54.0.33) surumune gore eski/uyumsuz oldugu icin BILEREK
+  kullanilmadi; onun yerine test edilen modullerin (gameScoring,
+  gameConfig) React Native importu olmadigi tespit edilip duz
+  testEnvironment:"node" + babel-jest transform ile test edildi -
+  bu, "ikinci bir test framework getirme" riskini almadan en sade,
+  en az riskli kurulumdur.
+
+Uygulananlar (23.1 - Unit testler):
+- jest.config.js eklendi (kok dizinde): testEnvironment "node",
+  testMatch __tests__/**/*.test.js, transform babel-jest.
+- package.json "scripts" icine "test": "jest" eklendi.
+- __tests__/gameScoring.test.js (24 test): computeQuestionScore icin
+  zaman bonusu, seri bonusu tavani (5 adimda +10, max 50), zorluk
+  carpani, %50/gorsel joker cezalari (tek ve birlikte), negatif skor
+  korumasi; computeSessionXp icin dogru/tamamlama/seri/basarim XP
+  kaynaklari ve negatif girdi korumasi; xpForLevel/computeLevel icin
+  ucgensel egri ve ilerleme orani; computeMaxPossibleScore/
+  validateSessionResult icin negatif deger, soru sayisini asan cevap,
+  seriyi asan dogru, teorik tavani asan skor reddi ve gecerli bir
+  Klasik oturumun kabulu.
+- __tests__/gameConfig.test.js (9 test): getModeConfig/
+  getDifficultyConfig/getSourceConfig fallback davranisi, isPersonalSource
+  ayrimi, mod/zorluk adlarinin key-tabanli olmasi (22.1 ile cakisan
+  dogrulama), getLocalizedGameLabel dil secimi.
+- 23.1'in istedigi maddelerden BU IKI DOSYANIN GERCEKTEN
+  KAPSADIKLARI: "Skor formulu" (tam), "Seri artisi ve sifirlanmasi"
+  (streakBonus tavani uzerinden kismi - sifirlanma mantigi hook'ta,
+  asagida aciklandi), "Joker haklari" (ceza hesaplama kismi),
+  "Akilli secenek benzersizligi" (KAPSANMADI, asagida).
+- Diger 5 maddenin (Timer bitimi, cift cevap eventinin engellenmesi,
+  mod bitis kosullari, soru tekrarinin engellenmesi, session'in tek kez
+  finalize edilmesi, akilli secenek benzersizligi) GERCEK durumu
+  asagida durustce aciklanmistir.
+
+DURUSTCE BELIRTILMELI - 23.1'in tam kapsanamayan kismi:
+- hooks/useSceneGame.js (903 satir) timer bitimi, cift cevap engelleme,
+  mod bitis karari (advanceAfterAnswer) ve session finalize mantigini
+  icerir; ANCAK bu mantik useState/useRef/useCallback/useEffect ile SIKI
+  SEKILDE ORULMUS bir React hook'tur, ayri saf fonksiyonlara
+  CIKARILMAMIS durumda. Bu depoda @testing-library/react-hooks veya
+  react-test-renderer/hooks tabanli bir hook-test altyapisi YOK ve bu
+  fazda KURULMADI (yeni bir test framework/agir bagimlilik getirmek
+  gorev talimatinin disinda). Bu nedenle: timer bitimi, cift cevap
+  engelleme, mod bitis kosullari, soru tekrarinin engellenmesi ve
+  session'in tek kez finalize edilmesi GERCEKTEN unit test
+  EDILEMEMISTIR - bunlar hook'u mocklayarak SAHTE testler yazmak yerine
+  MANUEL/ENTEGRASYON test olarak ERTELENMISTIR (asagida).
+- generateQuestion/getSmartOptions (akilli secenek benzersizligi,
+  services/sceneGameService.js icinde) TMDB API cagrisi ve havuz
+  islemleriyle ic ice; bu fazda ayri test edilmedi (Part 10'da elle/
+  ad-hoc senaryolarla dogrulandigi belirtilmis, kalici jest testi bu
+  fazda da EKLENMEDI - zaman/risk nedeniyle 23.1'in en degerli/en
+  kolay kapsanabilir kismina (gameScoring, gameConfig) oncelik
+  verildi).
+
+Ertelenenler (durust gerekce ile):
+- 23.2 Repository testleri (TMDB yanit/hata, cache, Firestore
+  save/retry, liderlik sorgusu): services/sceneGameService.js Firestore
+  SDK ve fetch/axios'a dogrudan bagli; mock'lamak icin jest.mock
+  altyapisi ve agir kurulum gerekir. Bu fazda KAPSAM DISI (gorev
+  tanimi yalniz "gercekci UNIT testler" istedi, repository mock'lari
+  ayri bir faz olarak daha degerlidir).
+- 23.3 Firestore emulator testleri: depoda firebase-tools/emulator
+  kurulumu, firebase.json veya emulator config YOK. Bir emulator
+  ortami kurmak bu gorevin acikca belirttigi kapsam disidir (gorev
+  talimati: "Firestore emulator tests... no emulator/e2e infra exists
+  in this repo and standing one up is out of scope"). MANUEL DOGRULAMA
+  GEREKLI kalir: kullanici baskasinin verisini okuyamaz/yazamaz,
+  istemci verified leaderboard kaydi yazamaz, ayni session ikinci kez
+  agregata eklenmez (bu son madde zaten Part 2.1'de kod seviyesinde
+  hasSavedSessionRef + Firestore transaction ile ele alinmisti, ancak
+  emulator testiyle DOGRULANMADI).
+- 23.4 UI test senaryolari: depoda Detox/Maestro/react-native-testing-
+  library veya herhangi bir E2E/UI otomasyon araci YOK; kurulmasi bu
+  fazin ve gorev talimatinin acikca kapsam disinda tuttugu agir bir
+  isin. Tum 23.4 maddeleri (yeni kullanici, bos liderlik, cevrimdisi,
+  internet kesilmesi, arka plana gecis, cift dokunma, timer+cevap
+  yarisi, gorsel yuklenememe, kucuk ekran, tablet, temalar, TR/EN,
+  buyuk font, Reduce Motion) MANUEL TEST MATRISINE birakilmistir (bu,
+  onceki partlarda da (12, 13, 20) tekrarlanan bir desendir).
+- 23.5 Manuel kabul testi: tanimi geregi manuel; bu fazda otomatize
+  edilmedi (otomatize edilebilir bir sey degil - gercek kullanici
+  oturumlari gerektirir).
+
+Dogrulama (gercek calistirma, sahte degil):
+- `npm test` (jest) calistirildi: 2 test suite, 33 test, TUMU GECTI
+  (0 basarisiz). Tam komut ve cikti:
+    PASS __tests__/gameConfig.test.js
+    PASS __tests__/gameScoring.test.js
+    Test Suites: 2 passed, 2 total
+    Tests:       33 passed, 33 total
+- jest.config.js ve her iki test dosyasi Babel ile de ayrica parse
+  edildi, hata yok.
+- Depo capinda 237 JavaScript dosyasi Babel ile parse edildi, hata yok.
+
+23.1 Unit testler
+-----------------
+- Skor formulu
+- Seri artisi ve sifirlanmasi
+- Timer bitimi
+- Cift cevap eventinin engellenmesi
+- Joker haklari
+- Mod bitis kosullari
+- Soru tekrarinin engellenmesi
+- Akilli secenek benzersizligi
+- Session'in tek kez finalize edilmesi
+
+23.2 Repository testleri
+------------------------
+- TMDB basarili yanit
+- Kismi basarili Promise.allSettled
+- 401/429/500 hatalari
+- Bos result
+- Cache hit/miss/expiry
+- Firestore save ve retry
+- Liderlik sorgusu
+
+23.3 Firestore emulator testleri
+--------------------------------
+- Kullanici baskasinin kisisel istatistigini okuyamaz.
+- Kullanici baskasinin session belgesini yazamaz.
+- Istemci verified leaderboard kaydi yazamaz.
+- Ayni session ikinci kez agregata eklenmez.
+
+23.4 UI test senaryolari
+------------------------
+- Yeni kullanici
+- Liderlik tablosu bos
+- Cevrimdisi baslatma
+- Oyun ortasinda internet kesilmesi
+- Uygulamanin arka plana gecmesi
+- Cok hizli cift dokunma
+- Timer ve cevap ayni anda
+- Gorsel yuklenememesi
+- Kucuk ekran
+- Tablet
+- Light/dark/diger temalar
+- TR/EN
+- Buyuk font
+- Reduce Motion
+
+23.5 Manuel kabul testi
+-----------------------
+Her mod en az:
+- 3 basarili oturum
+- 3 hata/yarida cikis oturumu
+- 1 cevrimdisi senaryo
+- 1 dusuk hizli ag senaryosu
+ile denenmelidir.
+
+
+PART 24 - ANALITIK VE URUN METRIKLERI
+=====================================
+
+UYGULAMA DURUMU (2026-06-26): YAPILAMADI - BLOKE (analitik SDK/altyapi karari bekliyor)
+------------------------------------------------------------------------------------------
+Tespit:
+- package.json bagimliliklari (dependencies + devDependencies) tek tek
+  incelendi: firebase/analytics, @react-native-firebase/analytics,
+  amplitude, mixpanel, segment, expo-analytics veya benzeri HICBIR
+  analitik SDK'si YOK.
+- Depo capinda (node_modules haric) "logEvent", "analytics(", "mixpanel",
+  "amplitude", "segment" icin grep yapildi: SIFIR sonuc. Uygulamanin
+  herhangi bir yerinde (oyun disindaki ekranlarda dahil) calisan veya
+  yarim birakilmis bir analitik cagrisi YOK - bu, "baska bir ekranda
+  kullanilan mevcut SDK'yi takip et" secenegini de gecersiz kiliyor
+  cunku ortada takip edilecek bir desen/SDK yok.
+- firebase.js sadece Firestore/Auth/Storage init ediyor (mevcut
+  kullanim); Firebase Analytics modulu projeye hic eklenmemis.
+
+Karar (gorev talimati geregi):
+- Talimat acikca: "If NO analytics SDK exists in this repo at all, do
+  NOT install a new third-party SDK or backend without being asked."
+  Bu kosul tam olarak gecerli oldugu icin BU FAZDA HICBIR ANALITIK SDK'SI
+  KURULMADI, hicbir event cagrisi (sahte/stub/no-op bile) EKLENMEDI ve
+  hicbir backend/Cloud Function olusturulmadi.
+- 24.1 (12 event: game_hub_viewed...achievement_unlocked), 24.2 (event
+  alanlari ve gizlilik kurali) ve 24.3 (basari metrikleri) TAMAMEN
+  UYGULANMADI. Bunlarin hangi cagri noktalarina (GameHubScreen,
+  SceneGameDetailScreen, useSceneGame.js, SceneGameResultScreen,
+  GameLeaderboardScreen, GameAchievementsScreen) eklenecegi bu inceleme
+  sirasinda tespit edildi (orn. game_started -> useSceneGame.startGame,
+  question_answered -> answerQuestion, joker_used ->
+  useFiftyFiftyJoker/useChangeImageJoker, game_completed ->
+  finalizeAndEnd, result_shared -> SceneGameResultScreen handleShare),
+  ANCAK gercek entegrasyon bir SDK secimi olmadan anlamsiz/spekulatif
+  olacagi icin kod YAZILMADI.
+
+UYGULAMA SAHIBI ICIN URUN/ALTYAPI KARARI GEREKIYOR:
+- Hangi analitik saglayici kullanilacak? Secenekler: Firebase Analytics
+  (mevcut Firebase projesiyle dogal entegre, ek backend gerektirmez),
+  Amplitude/Mixpanel/Segment (daha zengin urun analitigi ama ek SDK +
+  muhtemelen ek maliyet) veya ozel/minimal bir cozum (orn. Firestore'a
+  yazilan basit event log - ancak bu da maliyet/olcek acisindan
+  dikkatli tasarlanmalidir).
+- Bu karar verildikten sonra Part 24 bagimsiz bir fazda (SDK kurulumu +
+  24.1'deki 12 event + 24.2 alan semasi + 24.3 metrik panosu) ayrica
+  ele alinmalidir.
+
+Dogrulama:
+- package.json bagimlilik listesi tamami okunup analitik anahtar
+  kelimeleri icin tarandi: 0 eslesme.
+- Depo capinda (node_modules haric) "logEvent|analytics\(|mixpanel|
+  amplitude|segment" icin grep yapildi: 0 eslesme.
+- Bu fazda hicbir dosya DEGISTIRILMEDI/EKLENMEDI (Part 24 icin kod
+  degisikligi yok; sadece bu durum tespiti ve dokumantasyon var).
+
+24.1 Eventler
+-------------
+- game_hub_viewed
+- game_detail_viewed
+- game_setup_changed
+- game_started
+- question_answered
+- joker_used
+- game_paused
+- game_abandoned
+- game_completed
+- result_shared
+- leaderboard_viewed
+- achievement_unlocked
+
+24.2 Event alanlari
+-------------------
+- gameId
+- modeId
+- difficultyId
+- sourceId
+- sessionId
+- questionIndex
+- responseMs
+- isCorrect
+- jokerType
+- networkState
+- appVersion
+- gameVersion
+
+Kullaniciya ait hassas icerik ve tam soru cevabi analitige gereksiz yere
+gonderilmemelidir.
+
+24.3 Basari metrikleri
+----------------------
+- Profil oyun kartindan oyun merkezine gecis orani
+- Baslatilan/tamamlanan oyun orani
+- Ortalama haftalik oyun sayisi
+- Gunluk meydan okuma geri donus orani
+- Sonuc ekranindan tekrar oynama orani
+- Ortalama soru yukleme suresi
+- Hata nedeniyle terk orani
+
+
+PART 25 - PERFORMANS HEDEFLERI
+==============================
+
+UYGULAMA DURUMU (2026-06-26): TAMAMLANDI (kismi - 25.1 olcum hedefleri ertelendi)
+------------------------------------------------------------------------------------
+Uygulananlar (25.2 - somut kod degisikligi yapilan maddeler):
+- Ilk 3-5 soruyu onceden hazirlama: hooks/useSceneGame.js incelendi, sadece
+  TEK bir "next" sorusu prefetch ediliyordu (nextQuestionRef +
+  prefetchPromiseRef). Bu fazda ikinci bir kuyruk yuvasi eklendi
+  (queuedQuestionRef + queuePrefetchPromiseRef, yeni prepareQueuedQuestion
+  fonksiyonu): ilk soru prefetch tamamlaninca otomatik olarak ikinci soru
+  da arka planda uretilip gorseli prefetch edilir, boylece normal akista
+  her zaman ~2 soru onde kalinir (1 -> 2 soru one cikarildi; "3-5" hedefi
+  TMDB sayfa/havuz uretiminin tek soruluk maliyetine kiyasla orantisiz agir
+  oldugu icin BILEREK 2'de tutuldu - bkz. Ertelenenler). goToNextQuestion
+  guncellendi: once nextQuestionRef, yoksa queuedQuestionRef, yoksa ilgili
+  promise'ler beklenir; tuketilen yuvaya gore dogru kuyruk yeniden
+  doldurulur (usedQueuedSlot bayragi ile). startGame yeni queue ref'lerini
+  sifirlar (eski oturumdan soru sizmaz).
+- Gorsel prefetch sonucunu izleme: eskiden Image.prefetch(imageUrl)
+  .catch(() => {}) ile basari/hata TAMAMEN sessizce yutuluyordu (sonuc
+  hicbir yerde okunmuyordu). Yeni prefetchQuestionImage(question)
+  fonksiyonu eklendi: Promise.then(() => true)/.catch(() => { __DEV__
+  altinda console.warn + false donus }) ile sonuc artik hem gozlemlenebilir
+  hem de cagirana (true/false) donen bir deger. prepareNextQuestion ve
+  prepareQueuedQuestion bu fonksiyonu kullanir.
+- Inline fonksiyon ve buyuk stil objelerini azaltma: grep ile
+  screens/game ve components/game tarandi.
+  * components/game/AnswerOptionCard.js (4 kopya, her soru render'inda):
+    onPress={() => onPress(index)} inline closure'i useCallback'e
+    (handlePress) tasindi VE bilesen React.memo ile sarildi (export
+    degisti: "export default function AnswerOptionCard" ->
+    "function AnswerOptionCard" + en altta
+    "export default React.memo(AnswerOptionCard)"; import eden
+    SceneGuessGameScreen.js'de degisiklik gerekmedi, default import ayni
+    kaldi).
+  * screens/game/SceneGuessGameScreen.js: "oynaniyor" (playing) fazinda
+    HER soruda render olan soru basligi/joker satirinin inline stil
+    objesi (style={{ flexDirection: "row", ... }}) module-level
+    styles.questionRow'a tasindi. "Top 3 Liderlik Onizleme" karti
+    (source_select ekraninda; 7 inline stil objesi: kart, header, row,
+    kolon, rank/isim/skor metinleri) styles.lbPreview* anahtarlarina
+    tasindi (dinamik renk kalan tek satirda [styles.lbPreviewRank,
+    {color:...}] seklinde birlestirilerek korundu). Kaynak secimi
+    basligindaki ikon grubu (style={{flexDirection:"row", gap:14}})
+    styles.sourceHeaderActions'a tasindi.
+  * components/game/GameTopBar.js, JokerBar.js, GameTimerBar.js,
+    ExitGameSheet.js incelendi: hepsi zaten module-level
+    StyleSheet.create kullaniyordu, onPress prop'lari ust bilesenden
+    GELEN (zaten useCallback'li) referanslardi, .map() ici inline
+    closure YOKTU - DEGISIKLIK YAPILMADI (zaten temizdi).
+  * SceneGuessGameScreen.js source_select listesindeki
+    onPress={() => startGame(opt.key)} (.map() icinde, 9 statik
+    SOURCE_OPTIONS uzerinde) BILEREK DOKUNULMADI: bu ekran soru-cevap
+    dongusunun disinda, kullanici basina sadece 1 kez (oyun baslamadan
+    once) render olur; "cevap dokunmasi <100ms" hedefiyle ilgisi yok ve
+    speculative degisiklik riskinden kacinildi.
+  * components/game/SceneResultShareCard.js'deki 3 inline stil
+    incelendi: bunlar dinamik olcek fonksiyonu u() degerine bagli
+    (yakalama zamaninda hesaplanan capture scale), sonuc paylasim
+    kartinda oturum basina 1 kez render olur (hot-path disi); BILEREK
+    DOKUNULMADI.
+- FlatList sanallastirma: screens/game/GameLeaderboardScreen.js
+  dogrulandi - initialNumToRender={12}, windowSize={9},
+  removeClippedSubviews zaten MEVCUTTU (Part 14'te eklenmis). Hicbir
+  degisiklik gerekmedi, sadece dogrulandi.
+- Liderlik verisini sayfalama: services/sceneGameService.js
+  fetchLeaderboard() incelendi - Firestore sorgusu zaten
+  query(collection(...), orderBy("bestScore","desc"), limit(limitCount))
+  seklinde SUNUCU TARAFINDA siniri var (limit=50), tum koleksiyonu
+  cekmiyor. Cursor tabanli (startAfter) sonsuz kaydirma YOK ama UI'da da
+  zaten "ilk 50" disina kaydirma ozelligi yok (podyum + duz liste);
+  bu nedenle mevcut limit(50) yaklasimi yeterli kabul edildi, ek
+  startAfter sayfalama EKLENMEDI (ihtiyaci dogrulayan bir UI akisi
+  bulunamadi - speculative olurdu).
+- Istatistik ve leaderboard sorgularini ayirma:
+  services/sceneGameService.js'de Users/{uid}/gameStats/{gameId}
+  (gameStatsRef) ve GameLeaderboards/{boardId}/entries/{uid}
+  (leaderboardEntryRef) tamamen AYRI Firestore yollari/belgeleri
+  oldugu, Part 16 model degisikliginde boyle ayrildigi dogrulandi.
+  loadGameData/fetchLeaderboard farkli koleksiyonlari okur, ortak bir
+  "tek sorguda birlesik okuma" YOK. Degisiklik gerekmedi.
+- Gereksiz phase degisiminde tekrar Firestore okumasini kaldirma:
+  SceneGuessGameScreen.js'de SOMUT bir kusur bulundu - leaderboard verisi
+  hem "source_select" fazina girince (useEffect) hem de
+  handleOpenLeaderboard icinde (kullanici liderlik butonuna basinca)
+  AYRI AYRI fetchLeaderboard(50) ile cekiliyordu; modal her acildiginda
+  bellekte zaten taze olan veriyi tekrar Firestore'dan okuyordu. Bu fazda
+  handleOpenLeaderboard sadece modali acar hale getirildi (await
+  loadLeaderboard() cagrisi kaldirildi); retry butonu hala dogrudan
+  loadLeaderboard'u cagirir (degismedi). useSceneGame.js / phase
+  degisimleri ayrica tarandi - goToNextQuestion/advanceAfterAnswer hicbir
+  Firestore okumasi YAPMIYOR (sadece TMDB generateQuestion + bellek ici
+  havuz), loadGameData'nin source_select/game_over fazlarinda tekrar
+  cagrilmasi ise GERCEKTEN gerekli (yeni oturum bestScore/streak
+  guncellemis olabilir) - bu BILEREK degistirilmedi (gereksiz degil).
+
+Ertelenenler:
+- 25.1'deki TUM hedefler (sicak cache <1s, soguk ag <3s, sorular arasi
+  yukleme normal akista sifir, cevap dokunmasi geri bildirimi <100ms,
+  liderlik ilk ekran <1.5s): bunlar olculebilir performans hedefleri,
+  dogrudan "uygulanacak kod" degil. Gercek dogrulama fiziksel cihazda
+  profiling (Flipper/React DevTools Profiler, ag throttling, gercek TMDB
+  gecikmesi) gerektirir; bu ortamda (kod duzenleme oturumu, gercek cihaz
+  yok) yapilamaz. Diger fazlardaki konvansiyona uyularak fiziksel
+  cihazda calistirilacak manuel test matrisine ERTELENDI.
+- Ilk 3-5 soru hedefinin ust siniri (5): yalnizca 2 soru onde tutmaya
+  cikarildi (1 -> 2). Daha fazla (3-5) onceden uretim, her soru icin
+  TMDB'den ekstra sahne secimi + Image.prefetch agirligini onceden
+  yuklemek anlamina gelir; kullanicinin gercekte kac soruyu hizla
+  gecebildigine dair veri olmadan (cevap suresi zorluga gore degisir,
+  bazi zorluklarda 5-15sn) bu, kullanilmayacak agirlik uretme riski
+  tasir. Somut bir darbogaz olcumu (25.1 profiling) olmadan 3-5'e
+  cikarmak SPEKULATIF olacagindan BILEREK 2'de tutuldu.
+- fetchLeaderboard icin cursor tabanli (startAfter) sayfalama: UI'da
+  henuz "50'den fazlasini yukle" akisi olmadigi icin eklenmedi (yukarida
+  detaylandirildi).
+
+Dogrulama:
+- Degisen 3 dosya (hooks/useSceneGame.js,
+  screens/game/SceneGuessGameScreen.js,
+  components/game/AnswerOptionCard.js) Babel ile (babel-preset-expo)
+  parse edildi - 0 hata.
+- npm test calistirildi: __tests__/gameScoring.test.js (24 test) ve
+  __tests__/gameConfig.test.js (9 test) - toplam 33/33 testin TUMU
+  GECTI (bu testler degisen dosyalari dogrudan kapsamiyor - gameScoring/
+  gameConfig saf fonksiyonlaridir - ama regresyon kontrolu olarak
+  calistirildi, hicbir test bozulmadi).
+- grep ile prop kablolama dogrulandi: AnswerOptionCard'in 11 prop'u
+  (theme, gameTokens, item, index, isCorrectOption, isSelected,
+  isAnswered, isEliminated, showTypeBadge, anim, onPress) kullanim
+  yerinde (SceneGuessGameScreen.js) ve bilesen imzasinda BIREBIR
+  eslesiyor; React.memo sarmalama default export uzerinden yapildigi
+  icin import tarafinda degisiklik gerekmedi.
+- useSceneGame.js'in return ettigi public API (hook'un disa actigi tum
+  alan/fonksiyon adlari) degismedi; yeni prefetch kuyrugu tamamen
+  internal ref'lerle (queuedQuestionRef, queuePrefetchPromiseRef,
+  prepareQueuedQuestion, prefetchQuestionImage) yonetildigi icin
+  SceneGuessGameScreen.js tarafinda hicbir cagri degisikligi gerekmedi.
+
+25.1 Hedefler
+-------------
+- Sicak cache ile oyun kurulumundan ilk soruya gecis: 1 saniyenin alti
+- Soguk ag ile ilk soru: 3 saniye hedefi
+- Sorular arasi gorunur yukleme: normal akista sifir
+- Cevap dokunmasi geri bildirimi: 100 ms alti
+- Liderlik ilk ekran: 1.5 saniye hedefi
+
+25.2 Optimizasyonlar
+--------------------
+- Ilk 3-5 soruyu onceden hazirlama
+- Gorsel prefetch sonucunu izleme
+- FlatList sanallastirma
+- Inline fonksiyon ve buyuk stil objelerini azaltma
+- Liderlik verisini sayfalama
+- Istatistik ve leaderboard sorgularini ayirma
+- Gereksiz phase degisiminde tekrar Firestore okumasini kaldirma
+
+
+PART 26 - UYGULAMA SIRASI
+=========================
+
+26.1 Faz A - Stabilizasyon
+-------------------------
+Tahmin: 2-3 is gunu
+
+Gorevler:
+- Cift save problemini duzelt
+- Soru tekrarini duzelt
+- Prefetch yarisi ve eski request sonuclarini engelle
+- Bos/error state'leri ekle
+- Kisisel liste fallback davranisini kaldir
+- Timer'i gorsel hazirligina bagla
+- Mevcut akis icin temel unit testler ekle
+
+Cikis kriteri:
+- Mevcut UI korunarak oyun veri ve oturum acisindan tutarli calisir.
+
+26.2 Faz B - Oyun motoru ve veri modeli
+---------------------------------------
+Tahmin: 3-4 is gunu
+
+Gorevler:
+- Engine reducer/state machine olustur
+- Mod konfigurasyonlarini tanimla
+- Session modelini ekle
+- Repository katmanini ayir
+- Kaynak bazli soru gecmisi ekle
+- Firestore migration/fallback stratejisi belirle
+
+Cikis kriteri:
+- Oyun kurallari React bilesenleri olmadan test edilebilir.
+
+26.3 Faz C - Premium temel ekranlar
+-----------------------------------
+Tahmin: 5-7 is gunu
+
+Gorevler:
+- Profil oyun modulunu yenile
+- GameHubScreen
+- SceneGameDetailScreen
+- SceneGameSetupScreen
+- SceneGamePlayScreen
+- SceneGameResultScreen
+- Ortak game tokenlari ve bilesenleri
+- Responsive ve erisilebilirlik kontrolleri
+
+Cikis kriteri:
+- Klasik mod yeni akisla bastan sona oynanabilir.
+
+26.4 Faz D - Modlar ve ilerleme
+--------------------------------
+Tahmin: 4-6 is gunu
+
+Gorevler:
+- Zamana Karsi
+- Hayatta Kalma
+- Gunluk meydan okuma
+- XP ve seviye
+- Gorevler
+- Basarimlar
+
+Cikis kriteri:
+- Modlar ayri kurallarla ve ayri istatistiklerle calisir.
+
+26.5 Faz E - Rekabet ve guvenlik
+--------------------------------
+Tahmin: 4-6 is gunu
+
+Gorevler:
+- Yeni leaderboard ekranlari
+- Arkadas/global filtreleri
+- Sezon modeli
+- Backend skor dogrulama
+- Firestore kurallarini sertlestirme
+- Anormal skor izleme
+
+Cikis kriteri:
+- Dereceli skor istemci tarafindan keyfi olarak yazilamaz.
+
+26.6 Faz F - Kalite ve yayin
+----------------------------
+Tahmin: 2-3 is gunu
+
+Gorevler:
+- Tum test matrisi
+- Dusuk cihaz ve yavas ag testi
+- Tema ve lokalizasyon testi
+- Analitik event kontrolu
+- Firestore index ve maliyet kontrolu
+- Kademeli yayin
+
+
+PART 27 - ONERILEN MVP KAPSAMI
+==============================
+
+Ilk kaliteli yayin icin dahil edilmesi gerekenler:
+- Profilde genisleyebilir yeni oyun modulu
+- Oyun Merkezi
+- Sahne Tahmin detay ve kurulum ekrani
+- Sabit 10 soruluk Klasik mod
+- Kolay, Normal, Zor seviyeleri
+- Yenilenmis aktif oyun ekrani
+- Ayrintili sonuc ekrani
+- Arkadaslar ve global liderlik
+- Session bazli tek kayit
+- Kaynak bazli gecmis
+- Hata ve cevrimdisi durumlari
+- Temel XP
+- Unit ve Firestore kural testleri
+
+MVP sonrasi:
+- Zamana Karsi
+- Hayatta Kalma
+- Gunluk meydan okuma
+- Sezonlar
+- Gorev ve basarim katalogu
+- Arkadasa meydan okuma
+- Yeni oyun turleri
+
+
+PART 28 - GELECEK OYUN FIKIRLERI
+================================
+
+Yeni oyunlar ayni Game Hub ve ilerleme sistemine eklenebilir:
+
+28.1 Poster Bulmaca
+-------------------
+Poster parca parca acilir; kullanici erken tahminde daha cok puan alir.
+
+28.2 Oyuncuyu Tahmin Et
+-----------------------
+Filmografi veya portre uzerinden oyuncu tahmin edilir.
+
+28.3 Hangisi Daha Yuksek
+------------------------
+Iki yapim arasinda puan, populerlik veya kullanici liste verisi karsilastirilir.
+
+28.4 Film Siralama
+------------------
+Bir franchise veya yonetmenin filmleri kronolojik siraya dizilir.
+
+28.5 Emoji ile Yapim
+--------------------
+Ozgun emoji kombinasyonundan film/dizi tahmin edilir. Lokalizasyon ve soru
+kalitesi manuel veri seti gerektirebilir.
+
+Yeni oyun eklenmeden once Sahne Tahmin icin kurulan game registry, session,
+leaderboard ve progress yapisi tekrar kullanilmalidir.
+
+
+PART 29 - RISKLER VE KARAR NOKTALARI
+===================================
+
+29.1 Backend karari
+-------------------
+Guvenilir global rekabet isteniyorsa backend skor dogrulama zorunlu kabul
+edilmelidir. Sadece istemci ve Firestore rules ile tam guven saglanamaz.
+
+29.2 TMDB gorsel bagimliligi
+----------------------------
+- Ag kalitesi oyun deneyimini etkiler.
+- Gorsel bulunabilirligi her yapimda esit degildir.
+- Cache ve fallback zorunludur.
+- Gorsel kullanim/attribution gereksinimleri yayin oncesi kontrol edilmelidir.
+
+29.3 Kapsam buyumesi
+--------------------
+XP, gorev, basarim, sezon ve birden fazla modu ayni anda yapmak ilk yayini
+geciktirebilir. Once Klasik modu kaliteli ve guvenilir hale getirmek gerekir.
+
+29.4 Eski veri migrasyonu
+-------------------------
+Mevcut SceneGame belgeleri silinmemelidir. Yeni model ilk okumada eski
+bestScore, bestStreak ve toplam sayaclari tasiyabilir. Migration tamamlanana
+kadar eski alanlar read fallback olarak desteklenebilir.
+
+
+PART 30 - TAMAMLANMA KRITERLERI
+==============================
+
+Oyun kismi gelistirmesi asagidaki maddeler saglandiginda tamamlanmis kabul
+edilebilir:
+
+- Profil oyun alani ikinci bir oyunu destekleyecek sekilde veri tabanlidir.
+- Kullanici Oyun Merkezi'nden oyunu, modu, zorlugu ve kaynagi anlayarak secer.
+- Soru gorseli yuklenmeden timer baslamaz.
+- Bir oturumda soru tekrari olmaz.
+- Ayni session istatistige ikinci kez eklenmez.
+- Bos, hata ve cevrimdisi durumlarinin hepsinde anlamli UI vardir.
+- Farkli mod ve zorluk skorlarinin liderlik tablolari ayridir.
+- Kisisel liste oyunlari global tabloyu etkilemez.
+- Dereceli skorlar backend tarafinda dogrulanir veya acikca dogrulanmamis
+  olarak isaretlenir.
+- Oyun motoru unit testlerle kapsanir.
+- Firestore kurallari emulator testlerinden gecer.
+- Kucuk telefon, tablet, tum temalar, TR/EN ve buyuk font test edilir.
+- Sonuc ekrani tekrar oynama ve paylasim icin net aksiyonlar sunar.
+- Yeni oyun eklemek icin ProfileScreen veya mevcut oyun motorunu yeniden
+  yazmak gerekmez.
+
+
+TAHMINI TOPLAM SURE
+===================
+
+Tek gelistirici icin:
+- Stabilizasyon + mimari: 5-7 is gunu
+- Premium temel ekranlar: 5-7 is gunu
+- Modlar ve ilerleme: 4-6 is gunu
+- Guvenli rekabet: 4-6 is gunu
+- Test ve yayin: 2-3 is gunu
+
+Toplam: yaklasik 20-29 is gunu.
+
+Sadece onerilen MVP: yaklasik 12-17 is gunu.
+
+Bu tahmin; backend kurulumu, tasarim assetlerinin hazirligi, Firebase index
+gereksinimleri ve mevcut calisma agacindaki diger degisikliklerle entegrasyona
+gore degisebilir.

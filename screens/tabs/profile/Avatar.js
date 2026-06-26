@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import { View, Image, TouchableOpacity, StyleSheet, Text } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { UploadToCloudinary } from "./UploadToCloudinary";
+import { i18nText } from "../../../utils/i18nText";
+
 
 const defaultAvatar = require("../../../assets/avatar/1.png");
 
@@ -46,9 +48,7 @@ const Avatar = () => {
         </View>
       </TouchableOpacity>
       {loading && (
-        <Text allowFontScaling={false} style={styles.loadingText}>
-          Yükleniyor...
-        </Text>
+        <Text allowFontScaling={false} style={styles.loadingText}>{i18nText("autoI18n.yukleniyor", "Yükleniyor...")}</Text>
       )}
     </View>
   );

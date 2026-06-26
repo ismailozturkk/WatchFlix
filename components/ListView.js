@@ -7,6 +7,7 @@ import {
   StyleSheet,
   FlatList,
   Animated,
+  Easing,
   Pressable,
   Dimensions,
 } from "react-native";
@@ -15,8 +16,12 @@ import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
 import LottieView from "lottie-react-native";
 import { useListStatusContext } from "../context/ListStatusContext";
+import { useHapticsSettings } from "../context/AppSettingsContext";
 import { BlurView } from "expo-blur";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import * as Haptics from "expo-haptics";
+import { i18nText } from "../utils/i18nText";
+
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 /* ─── Küçük yardımcı ─────────────────────────────────── */
@@ -31,20 +36,22 @@ const formatDateSave = (timestamp) => {
 /* ─── Ana buton bileşeni ──────────────────────────────── */
 const ActionButton = ({
   onPress,
-  onPressIn,
-  onPressOut,
   scale,
+  opacity,
   children,
   badge,
 }) => (
   <TouchableOpacity
     onPress={onPress}
-    onPressIn={onPressIn}
-    onPressOut={onPressOut}
-    activeOpacity={0.85}
+    activeOpacity={1}
     style={styles.actionButtonWrapper}
   >
-    <Animated.View style={{ transform: [{ scale: scale || 1 }] }}>
+    <Animated.View
+      style={{
+        transform: [{ scale: scale || 1 }],
+        opacity: opacity !== undefined ? opacity : 1,
+      }}
+    >
       {children}
       {badge != null && badge > 0 && (
         <View style={styles.badgeWrap}>
@@ -62,10 +69,9 @@ const GridCard = ({
   item,
   isIn,
   scale,
+  opacity,
   theme,
   onPress,
-  onPressIn,
-  onPressOut,
 }) => (
   <TouchableOpacity
     style={[
@@ -76,13 +82,12 @@ const GridCard = ({
       },
     ]}
     onPress={onPress}
-    onPressIn={onPressIn}
-    onPressOut={onPressOut}
-    activeOpacity={0.75}
+    activeOpacity={1}
   >
     <Animated.View
       style={{
         transform: [{ scale: scale || 1 }],
+        opacity: opacity !== undefined ? opacity : 1,
         alignItems: "center",
         gap: 8,
       }}
@@ -133,41 +138,69 @@ const ListView = ({
   const { t } = useLanguage();
   const { theme } = useTheme();
   const { otherListKeys, allListKeys } = useListStatusContext();
+  const { hapticsEnabled } = useHapticsSettings();
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [optimisticStates, setOptimisticStates] = useState({});
+
+  React.useEffect(() => {
+    setOptimisticStates({});
+  }, [listStates, isReminderSet, isRemaining]);
+
+  const getIsActive = (key) => {
+    if (optimisticStates[key] !== undefined) return optimisticStates[key];
+    if (key === "reminder") return isReminderSet;
+    return listStates[key];
+  };
 
   const slideAnim = useRef(new Animated.Value(300)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleValuesRef = useRef({});
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const scaleValuesRef   = useRef({});
+  const opacityValuesRef = useRef({});
 
-  // Yeni liste anahtarları için Animated.Value oluştur, mevcutları koru
-  allListKeys.forEach((name) => {
-    if (!scaleValuesRef.current[name]) {
-      scaleValuesRef.current[name] = new Animated.Value(1);
+  // Sabit + dinamik key'ler için Animated.Value'ları başlat
+  const initKey = (k) => {
+    if (!scaleValuesRef.current[k])   scaleValuesRef.current[k]   = new Animated.Value(1);
+    if (!opacityValuesRef.current[k]) opacityValuesRef.current[k] = new Animated.Value(1);
+  };
+  ["watchList", "watchedMovies", "favorites", "apps"].forEach(initKey);
+  allListKeys.forEach(initKey);
+
+  const trueCount = otherListKeys.filter((list) => getIsActive(list)).length;
+
+  /* ── Animasyonlar ── */
+  const animateBounce = (name) => {
+    if (hapticsEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-  });
-
-  const trueCount = otherListKeys.filter((list) => listStates[list]).length;
-
-  const onPressIn = (name) => {
-    const anim = scaleValuesRef.current[name];
-    if (!anim) return;
-    Animated.spring(anim, {
-      toValue: 0.65,
-      friction: 4,
-      tension: 220,
+    const sc = scaleValuesRef.current[name];
+    if (!sc) return;
+    
+    // Animasyonu anında resetle ve küçült
+    sc.stopAnimation();
+    sc.setValue(0.75);
+    
+    // Zıplayarak geri dön
+    Animated.spring(sc, {
+      toValue: 1,
+      mass: 1,
+      stiffness: 250,
+      damping: 12, // Düşük damping = daha fazla zıplama (bounce)
       useNativeDriver: true,
     }).start();
   };
-  const onPressOut = (name) => {
-    const anim = scaleValuesRef.current[name];
-    if (!anim) return;
-    Animated.spring(anim, {
-      toValue: 1,
-      friction: 4,
-      tension: 220,
-      useNativeDriver: true,
-    }).start();
+
+  const handleOptimisticPress = (key, action, toggle = true) => {
+    animateBounce(key);
+    
+    if (toggle) {
+      const currentState = getIsActive(key);
+      setOptimisticStates((prev) => ({ ...prev, [key]: !currentState }));
+    }
+    // Animasyonun donmaması için ana işlemi bir sonraki event loop'a bırak
+    setTimeout(() => {
+      action();
+    }, 15);
   };
 
   /* ── modal aç/kapat ── */
@@ -176,13 +209,15 @@ const ListView = ({
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 220,
+        duration: 300,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.spring(slideAnim, {
         toValue: 0,
-        friction: 7,
-        tension: 60,
+        mass: 1,
+        stiffness: 250,
+        damping: 22,
         useNativeDriver: true,
       }),
     ]).start();
@@ -191,12 +226,14 @@ const ListView = ({
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 180,
+        duration: 200,
+        easing: Easing.in(Easing.ease),
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
         toValue: 300,
         duration: 200,
+        easing: Easing.in(Easing.ease),
         useNativeDriver: true,
       }),
     ]).start(() => setModalVisible(false));
@@ -206,10 +243,10 @@ const ListView = ({
   const ICONS = [
     {
       key: "watchList",
-      icon: listStates["watchList"] ? "bookmark" : "bookmark-outline",
-      color: listStates["watchList"] ? theme.colors.blue : theme.text.secondary,
-      label: t.watchlist || "Liste",
-      onPress: () => updateList("watchList", type, formatDateSave(new Date())),
+      icon: getIsActive("watchList") ? "bookmark" : "bookmark-outline",
+      color: getIsActive("watchList") ? theme.colors.blue : theme.text.secondary,
+      label: t.watchlist || i18nText("autoI18n.liste_2", "Liste"),
+      onPress: () => handleOptimisticPress("watchList", () => updateList("watchList", type, formatDateSave(new Date()))),
     },
     {
       key: "watchedMovies",
@@ -217,10 +254,10 @@ const ListView = ({
     },
     {
       key: "favorites",
-      icon: listStates["favorites"] ? "heart" : "heart-outline",
-      color: listStates["favorites"] ? theme.colors.red : theme.text.secondary,
+      icon: getIsActive("favorites") ? "heart" : "heart-outline",
+      color: getIsActive("favorites") ? theme.colors.red : theme.text.secondary,
       label: t.favorites || "Favori",
-      onPress: () => updateList("favorites", type, formatDateSave(new Date())),
+      onPress: () => handleOptimisticPress("favorites", () => updateList("favorites", type, formatDateSave(new Date()))),
     },
   ];
 
@@ -239,51 +276,37 @@ const ListView = ({
             <View key={key} style={styles.iconCol}>
               <ActionButton
                 scale={scaleValuesRef.current[key]}
-                onPressIn={() => onPressIn(key)}
-                onPressOut={() => onPressOut(key)}
+                opacity={opacityValuesRef.current[key]}
                 onPress={
                   isReminderMode
-                    ? addReminder
+                    ? () => handleOptimisticPress("reminder", addReminder)
                     : () =>
-                        listStates["watchedMovies"]
-                          ? updateList(
-                              "watchedMovies",
-                              type,
-                              formatDateSave(new Date()),
-                            )
-                          : updateWatchedList()
+                        getIsActive("watchedMovies")
+                          ? handleOptimisticPress("watchedMovies", () => updateList("watchedMovies", type, formatDateSave(new Date())))
+                          : handleOptimisticPress("watchedMovies", updateWatchedList, false)
                 }
               >
                 {isReminderMode ? (
                   <MaterialCommunityIcons
-                    name={isReminderSet ? "bell-ring" : "bell-ring-outline"}
+                    name={getIsActive("reminder") ? "bell-ring" : "bell-ring-outline"}
                     size={30}
-                    color={
-                      isReminderSet ? theme.colors.orange : theme.text.secondary
-                    }
+                    color={getIsActive("reminder") ? theme.colors.orange : theme.text.secondary}
                   />
-                ) : listStates["watchedMovies"] ? (
+                ) : getIsActive("watchedMovies") ? (
                   <Ionicons name="eye" size={30} color={theme.colors.green} />
                 ) : isLoading ? (
                   <LottieView
-                    source={require("../LottieJson/loading15.json")}
+                    source={require("@lottie/loading15.json")}
                     style={{ width: 30, height: 30 }}
                     autoPlay
                     loop
                   />
                 ) : (
-                  <Ionicons
-                    name="eye-outline"
-                    size={30}
-                    color={theme.text.secondary}
-                  />
+                  <Ionicons name="eye-outline" size={30} color={theme.text.secondary} />
                 )}
               </ActionButton>
-              <Text
-                allowFontScaling={false}
-                style={[styles.iconLabel, { color: theme.text.muted }]}
-              >
-                {t.watched || "İzledim"}
+              <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>
+                {t.watched || i18nText("autoI18n.izledim", "İzledim")}
               </Text>
             </View>
           );
@@ -292,16 +315,12 @@ const ListView = ({
           <View key={key} style={styles.iconCol}>
             <ActionButton
               scale={scaleValuesRef.current[key]}
-              onPressIn={() => onPressIn(key)}
-              onPressOut={() => onPressOut(key)}
+              opacity={opacityValuesRef.current[key]}
               onPress={onPress}
             >
               <Ionicons name={icon} size={30} color={color} />
             </ActionButton>
-            <Text
-              allowFontScaling={false}
-              style={[styles.iconLabel, { color: theme.text.muted }]}
-            >
+            <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>
               {label}
             </Text>
           </View>
@@ -311,14 +330,10 @@ const ListView = ({
       {/* ── Diğer listeler butonu ── */}
       <View style={styles.iconCol}>
         <ActionButton
-          onPress={openModal}
-          badge={
-            trueCount > 0
-              ? trueCount
-              : otherListKeys?.length > 0
-                ? trueCount
-                : null
-          }
+          onPress={() => { animateBounce("apps"); openModal(); }}
+          scale={scaleValuesRef.current["apps"]}
+          opacity={opacityValuesRef.current["apps"]}
+          badge={trueCount > 0 ? trueCount : null}
         >
           <View
             style={[
@@ -352,11 +367,8 @@ const ListView = ({
             />
           </View>
         </ActionButton>
-        <Text
-          allowFontScaling={false}
-          style={[styles.iconLabel, { color: theme.text.muted }]}
-        >
-          {t.otherListKeys || "Diğerleri"}
+        <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>
+          {t.otherListKeys || i18nText("autoI18n.digerleri", "Diğerleri")}
         </Text>
       </View>
 
@@ -389,31 +401,16 @@ const ListView = ({
             {/* Header */}
             <View style={styles.sheetHeader}>
               <View style={styles.sheetTitleRow}>
-                <View
-                  style={[
-                    styles.headerIconBg,
-                    { backgroundColor: theme.accent + "20" },
-                  ]}
-                >
+                <View style={[styles.headerIconBg, { backgroundColor: theme.accent + "20" }]}>
                   <Ionicons name="grid" size={16} color={theme.accent} />
                 </View>
                 <View>
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.sheetTitle, { color: theme.text.primary }]}
-                  >
-                    {t.otherListKeys || "Diğer Listeler"}
+                  <Text allowFontScaling={false} style={[styles.sheetTitle, { color: theme.text.primary }]}>
+                    {t.otherListKeys || i18nText("autoI18n.diger_listeler", "Diğer Listeler")}
                   </Text>
                   {otherListKeys?.length > 0 && (
-                    <Text
-                      allowFontScaling={false}
-                      style={[
-                        styles.sheetSubtitle,
-                        { color: theme.text.muted },
-                      ]}
-                    >
-                      {otherListKeys.length} liste · {trueCount} seçili
-                    </Text>
+                    <Text allowFontScaling={false} style={[styles.sheetSubtitle, { color: theme.text.muted }]}>
+                      {otherListKeys.length}{i18nText("autoI18n.liste_3", "liste ·")}{trueCount}{i18nText("autoI18n.secili", "seçili")}</Text>
                   )}
                 </View>
               </View>
@@ -426,9 +423,7 @@ const ListView = ({
             </View>
 
             {/* Separator */}
-            <View
-              style={[styles.separator, { backgroundColor: theme.border }]}
-            />
+            <View style={[styles.separator, { backgroundColor: theme.border }]} />
 
             {otherListKeys?.length > 0 ? (
               <>
@@ -443,152 +438,61 @@ const ListView = ({
                   renderItem={({ item }) => (
                     <GridCard
                       item={item}
-                      isIn={!!listStates[item]}
+                      isIn={!!getIsActive(item)}
                       scale={scaleValuesRef.current[item]}
+                      opacity={opacityValuesRef.current[item]}
                       theme={theme}
-                      onPress={() =>
-                        updateList(item, type, formatDateSave(new Date()))
-                      }
-                      onPressIn={() => onPressIn(item)}
-                      onPressOut={() => onPressOut(item)}
+                      onPress={() => handleOptimisticPress(item, () => updateList(item, type, formatDateSave(new Date())))}
                     />
                   )}
                 />
 
                 {/* Eylemler */}
-                <View
-                  style={[
-                    styles.separator,
-                    { backgroundColor: theme.border, marginBottom: 12 },
-                  ]}
-                />
+                <View style={[styles.separator, { backgroundColor: theme.border, marginBottom: 12 }]} />
                 <View style={styles.sheetActions}>
                   <TouchableOpacity
-                    style={[
-                      styles.actionBtn,
-                      {
-                        backgroundColor: theme.primary,
-                        borderColor: theme.border,
-                      },
-                    ]}
+                    style={[styles.actionBtn, { backgroundColor: theme.primary, borderColor: theme.border }]}
                     onPress={closeModal}
                   >
-                    <Ionicons
-                      name="close-circle-outline"
-                      size={15}
-                      color={theme.text.muted}
-                    />
-                    <Text
-                      allowFontScaling={false}
-                      style={[
-                        styles.actionBtnText,
-                        { color: theme.text.muted },
-                      ]}
-                    >
+                    <Ionicons name="close-circle-outline" size={15} color={theme.text.muted} />
+                    <Text allowFontScaling={false} style={[styles.actionBtnText, { color: theme.text.muted }]}>
                       Kapat
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[
-                      styles.actionBtn,
-                      { backgroundColor: theme.accent },
-                    ]}
-                    onPress={() => {
-                      closeModal();
-                      navigation.navigate("ListsViewScreen");
-                    }}
+                    style={[styles.actionBtn, { backgroundColor: theme.accent }]}
+                    onPress={() => { closeModal(); navigation.navigate("ListsViewScreen"); }}
                   >
                     <Ionicons name="list" size={15} color="#fff" />
-                    <Text
-                      allowFontScaling={false}
-                      style={[styles.actionBtnText, { color: "#fff" }]}
-                    >
-                      Tüm Listeler
-                    </Text>
+                    <Text allowFontScaling={false} style={[styles.actionBtnText, { color: "#fff" }]}>{i18nText("autoI18n.tum_listeler", "Tüm Listeler")}</Text>
                   </TouchableOpacity>
                 </View>
               </>
             ) : (
               /* Boş durum */
               <View style={styles.emptyContainer}>
-                <View
-                  style={[
-                    styles.emptyIconBg,
-                    { backgroundColor: theme.primary },
-                  ]}
-                >
-                  <Ionicons
-                    name="folder-open-outline"
-                    size={36}
-                    color={theme.text.muted}
-                  />
+                <View style={[styles.emptyIconBg, { backgroundColor: theme.primary }]}>
+                  <Ionicons name="folder-open-outline" size={36} color={theme.text.muted} />
                 </View>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.emptyTitle, { color: theme.text.primary }]}
-                >
-                  Liste Bulunamadı
-                </Text>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.emptySubtitle, { color: theme.text.muted }]}
-                >
-                  Henüz özel liste oluşturmadın. Listeler ekranından yeni liste
-                  ekleyebilirsin.
-                </Text>
-                <View
-                  style={[
-                    styles.separator,
-                    { backgroundColor: theme.border, marginBottom: 4 },
-                  ]}
-                />
+                <Text allowFontScaling={false} style={[styles.emptyTitle, { color: theme.text.primary }]}>{i18nText("autoI18n.liste_bulunamadi", "Liste Bulunamadı")}</Text>
+                <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: theme.text.muted }]}>{i18nText("autoI18n.henuz_ozel_liste_olusturmadin_listeler_ekranindan_", "Henüz özel liste oluşturmadın. Listeler ekranından yeni liste ekleyebilirsin.")}</Text>
+                <View style={[styles.separator, { backgroundColor: theme.border, marginBottom: 4 }]} />
                 <View style={styles.sheetActions}>
                   <TouchableOpacity
-                    style={[
-                      styles.actionBtn,
-                      {
-                        backgroundColor: theme.primary,
-                        borderColor: theme.border,
-                      },
-                    ]}
+                    style={[styles.actionBtn, { backgroundColor: theme.primary, borderColor: theme.border }]}
                     onPress={closeModal}
                   >
-                    <Ionicons
-                      name="close-circle-outline"
-                      size={15}
-                      color={theme.text.muted}
-                    />
-                    <Text
-                      allowFontScaling={false}
-                      style={[
-                        styles.actionBtnText,
-                        { color: theme.text.muted },
-                      ]}
-                    >
-                      {t.cancel || "İptal"}
+                    <Ionicons name="close-circle-outline" size={15} color={theme.text.muted} />
+                    <Text allowFontScaling={false} style={[styles.actionBtnText, { color: theme.text.muted }]}>
+                      {t.cancel || i18nText("autoI18n.iptal", "İptal")}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[
-                      styles.actionBtn,
-                      { backgroundColor: theme.accent },
-                    ]}
-                    onPress={() => {
-                      closeModal();
-                      navigation.navigate("ListsViewScreen");
-                    }}
+                    style={[styles.actionBtn, { backgroundColor: theme.accent }]}
+                    onPress={() => { closeModal(); navigation.navigate("ListsViewScreen"); }}
                   >
-                    <Ionicons
-                      name="add-circle-outline"
-                      size={15}
-                      color="#fff"
-                    />
-                    <Text
-                      allowFontScaling={false}
-                      style={[styles.actionBtnText, { color: "#fff" }]}
-                    >
-                      Liste Oluştur
-                    </Text>
+                    <Ionicons name="add-circle-outline" size={15} color="#fff" />
+                    <Text allowFontScaling={false} style={[styles.actionBtnText, { color: "#fff" }]}>{i18nText("autoI18n.liste_olustur", "Liste Oluştur")}</Text>
                   </TouchableOpacity>
                 </View>
               </View>

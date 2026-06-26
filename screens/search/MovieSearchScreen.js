@@ -1,5 +1,7 @@
 // SearchScreen.js
 import React, { useEffect, useRef } from "react";
+import { i18nText } from "../../utils/i18nText";
+
 import {
   Animated,
   StyleSheet,
@@ -41,7 +43,7 @@ export default function MovieSearchScreen({ navigation }) {
       >
         <TextInput
           autoFocus
-          placeholder="Film veya dizi ara..."
+          placeholder={i18nText("autoI18n.film_veya_dizi_ara", "Film veya dizi ara...")}
           placeholderTextColor="#888"
           style={styles.input}
         />

@@ -19,7 +19,9 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useProfileNotes } from "../../../context/ProfileNotesContext";
 import { BlurView } from "expo-blur";
-import DateTimePickerModal from "react-native-modal-datetime-picker";
+import DatePickerModal from "@components/modals/DatePickerModal";
+import { i18nText } from "../../../utils/i18nText";
+
 
 // ─── Renk seçici sabitleri ────────────────────────────────────────────────────
 const COLOR_PAIRS = [
@@ -82,7 +84,7 @@ const ColorPicker = React.memo(
 
 // ─── Ana bileşen ──────────────────────────────────────────────────────────────
 export default function ProfileNotes() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { theme } = useTheme();
 
   const {
@@ -128,7 +130,8 @@ export default function ProfileNotes() {
 
   const handleDateConfirm = useCallback(
     (date) => {
-      const iso = date.toISOString().split("T")[0];
+      // date artık ISO string ("YYYY-MM-DD") veya Date objesi olabilir
+      const iso = typeof date === "string" ? date : date.toISOString().split("T")[0];
       setScheduledDate(iso);
       setShowDatePicker(false);
     },
@@ -138,7 +141,7 @@ export default function ProfileNotes() {
   const formatScheduledDate = (dateStr) => {
     if (!dateStr) return null;
     const d = new Date(dateStr + "T00:00:00");
-    return d.toLocaleDateString("tr-TR", {
+    return d.toLocaleDateString(language === "tr" ? "tr-TR" : "en-US", {
       day: "numeric",
       month: "long",
       year: "numeric",
@@ -433,9 +436,7 @@ export default function ProfileNotes() {
               <Text
                 allowFontScaling={false}
                 style={[styles.addTodoInlineText, { color: note.color }]}
-              >
-                Ekle
-              </Text>
+              >{i18nText("autoI18n.ekle", "Ekle")}</Text>
             </View>
             <View
               style={[
@@ -507,9 +508,7 @@ export default function ProfileNotes() {
                 styles.tabBtnText,
                 { color: activeTab === "note" ? "#fff" : theme.text.muted },
               ]}
-            >
-              Not
-            </Text>
+            >{i18nText("autoI18n.not", "Not")}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setActiveTab("todo")}
@@ -608,8 +607,8 @@ export default function ProfileNotes() {
               style={[styles.emptyText, { color: theme.text.muted }]}
             >
               {activeTab === "note"
-                ? "Henüz not eklenmedi"
-                : "Henüz todo eklenmedi"}
+                ? i18nText("autoI18n.henuz_not_eklenmedi", "Henüz not eklenmedi")
+                : i18nText("autoI18n.henuz_todo_eklenmedi", "Henüz todo eklenmedi")}
             </Text>
           </View>
         )}
@@ -682,9 +681,7 @@ export default function ProfileNotes() {
                             noteType === "note" ? "#fff" : theme.text.muted,
                         },
                       ]}
-                    >
-                      Not
-                    </Text>
+                    >{i18nText("autoI18n.not", "Not")}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => setNoteType("todo")}
@@ -799,7 +796,7 @@ export default function ProfileNotes() {
                         borderColor: borderColorNotes,
                       },
                     ]}
-                    placeholder="Başlık (opsiyonel)"
+                    placeholder={i18nText("autoI18n.baslik_opsiyonel", "Başlık (opsiyonel)")}
                     placeholderTextColor={theme.text.muted}
                     value={todoTitle}
                     onChangeText={setTodoTitle}
@@ -863,9 +860,7 @@ export default function ProfileNotes() {
                           styles.addMoreText,
                           { color: borderColorNotes },
                         ]}
-                      >
-                        Madde ekle
-                      </Text>
+                      >{i18nText("autoI18n.madde_ekle", "Madde ekle")}</Text>
                     </TouchableOpacity>
                   </ScrollView>
                 </View>
@@ -893,16 +888,17 @@ export default function ProfileNotes() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* DateTimePicker */}
-      <DateTimePickerModal
-        isVisible={showDatePicker}
-        mode="date"
-        minimumDate={new Date()}
+      {/* DatePickerModal */}
+      <DatePickerModal
+        visible={showDatePicker}
+        value={scheduledDate || new Date().toISOString().split("T")[0]}
         onConfirm={handleDateConfirm}
-        onCancel={() => setShowDatePicker(false)}
-        locale="tr"
-        confirmTextIOS="Seç"
-        cancelTextIOS="İptal"
+        onClose={() => setShowDatePicker(false)}
+        title={i18nText("autoI18n.hatirlatici_tarihi", "Hatırlatıcı Tarihi")}
+        subtitle={i18nText("autoI18n.bu_not_icin_hatirlatma_tarihi_secin", "Bu not için hatırlatma tarihi seçin")}
+        confirmLabel={i18nText("autoI18n.tarih_sec", "Tarihi Seç")}
+        minDate={new Date()}
+        minDateErrorMsg={i18nText("autoI18n.gecmis_bir_tarih_secilemez", "Geçmiş bir tarih seçilemez")}
       />
 
       {/* ──────── VIEW / EDIT MODAL ──────── */}
@@ -961,7 +957,7 @@ export default function ProfileNotes() {
                               marginBottom: 8,
                             },
                           ]}
-                          placeholder="Başlık..."
+                          placeholder={i18nText("autoI18n.baslik", "Başlık...")}
                           placeholderTextColor={theme.text.muted}
                           value={localEditTitle}
                           onChangeText={setLocalEditTitle}
@@ -1144,7 +1140,7 @@ export default function ProfileNotes() {
                         ]}
                         multiline
                         editable={isEditable}
-                        placeholder="Not içeriği..."
+                        placeholder={i18nText("autoI18n.not_icerigi", "Not içeriği...")}
                         placeholderTextColor={theme.text.muted}
                         value={noteContent}
                         onChangeText={setNoteContent}
@@ -1179,8 +1175,7 @@ export default function ProfileNotes() {
                   <View style={styles.dateRow}>
                     <Text
                       style={[styles.noteDate, { color: theme.text.muted }]}
-                    >
-                      Oluşturuldu: {formatDate(selectedNote.createdAt)}
+                    >{i18nText("autoI18n.olusturuldu", "Oluşturuldu:")}{formatDate(selectedNote.createdAt)}
                     </Text>
                     {selectedNote.updatedAt !== selectedNote.createdAt && (
                       <Text
@@ -1188,8 +1183,7 @@ export default function ProfileNotes() {
                           styles.noteDate,
                           { color: theme.text.muted, fontStyle: "italic" },
                         ]}
-                      >
-                        Düzenlendi: {formatDate(selectedNote.updatedAt)}
+                      >{i18nText("autoI18n.duzenlendi_2", "Düzenlendi:")}{formatDate(selectedNote.updatedAt)}
                       </Text>
                     )}
                   </View>
@@ -1214,9 +1208,7 @@ export default function ProfileNotes() {
                           <Text
                             allowFontScaling={false}
                             style={styles.actionBtnText}
-                          >
-                            Kaydet
-                          </Text>
+                          >{i18nText("autoI18n.kaydet", "Kaydet")}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={[
@@ -1251,7 +1243,7 @@ export default function ProfileNotes() {
                             allowFontScaling={false}
                             style={styles.actionBtnText}
                           >
-                            {t.profileScreen.Notes.notesEdit || "Düzenle"}
+                            {t.profileScreen.Notes.notesEdit || i18nText("autoI18n.duzenle", "Düzenle")}
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -1288,7 +1280,7 @@ export default function ProfileNotes() {
                           allowFontScaling={false}
                           style={styles.actionBtnText}
                         >
-                          {t.profileScreen.Notes.notesEdit || "Düzenle"}
+                          {t.profileScreen.Notes.notesEdit || i18nText("autoI18n.duzenle", "Düzenle")}
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity

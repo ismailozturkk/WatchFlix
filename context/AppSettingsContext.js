@@ -9,6 +9,12 @@ import React, {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Toast from "react-native-toast-message";
 import { buildTmdbUrl } from "../utils/tmdbImageUtils";
+import { i18nText } from "../utils/i18nText";
+import {
+  AUTO_DATA_CACHE_KEY,
+  setAutoDataCacheEnabled,
+} from "../utils/dataCacheSettings";
+
 
 const AppSettingsContext = createContext();
 const LanguageSettingsContext = createContext();
@@ -20,6 +26,9 @@ const ImageQualitySettingsContext = createContext();
 const IconBackgroundSettingsContext = createContext();
 const AvatarSettingsContext = createContext();
 const ApiSettingsContext = createContext();
+const HapticsSettingsContext = createContext();
+const NotificationSettingsContext = createContext();
+const AutoDataCacheSettingsContext = createContext();
 
 /**
  * TMDB Image Quality Presets
@@ -44,16 +53,65 @@ const LEGACY_TO_LEVEL = {
 
 const RAW_KEY = process.env.EXPO_PUBLIC_API_KEY || "";
 const API_KEY = RAW_KEY && !RAW_KEY.startsWith("Bearer ") ? `Bearer ${RAW_KEY}` : RAW_KEY;
+const DEFAULT_NOTIFICATION_SETTINGS = {
+  enabled: true,
+  remindersEnabled: true,
+  moviesEnabled: true,
+  tvShowsEnabled: true,
+  noteRemindersEnabled: true,
+  friendRequestsEnabled: true,
+  friendAcceptedEnabled: true,
+  messagesEnabled: true,
+  postLikesEnabled: true,
+  postCommentsEnabled: true,
+  mentionsEnabled: true,
+  leadTimeDays: 0,
+};
+
+const genThemeId = () =>
+  `ct_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+
+const getBooleanSetting = (settings, key) =>
+  typeof settings[key] === "boolean" ? settings[key] : DEFAULT_NOTIFICATION_SETTINGS[key];
+
+const normalizeNotificationSettings = (settings) => {
+  const next = {
+    ...DEFAULT_NOTIFICATION_SETTINGS,
+    ...(settings && typeof settings === "object" ? settings : {}),
+  };
+
+  return {
+    enabled: getBooleanSetting(next, "enabled"),
+    remindersEnabled: getBooleanSetting(next, "remindersEnabled"),
+    moviesEnabled: getBooleanSetting(next, "moviesEnabled"),
+    tvShowsEnabled: getBooleanSetting(next, "tvShowsEnabled"),
+    noteRemindersEnabled: getBooleanSetting(next, "noteRemindersEnabled"),
+    friendRequestsEnabled: getBooleanSetting(next, "friendRequestsEnabled"),
+    friendAcceptedEnabled: getBooleanSetting(next, "friendAcceptedEnabled"),
+    messagesEnabled: getBooleanSetting(next, "messagesEnabled"),
+    postLikesEnabled: getBooleanSetting(next, "postLikesEnabled"),
+    postCommentsEnabled: getBooleanSetting(next, "postCommentsEnabled"),
+    mentionsEnabled: getBooleanSetting(next, "mentionsEnabled"),
+    leadTimeDays: [0, 1, 3, 7].includes(next.leadTimeDays)
+      ? next.leadTimeDays
+      : DEFAULT_NOTIFICATION_SETTINGS.leadTimeDays,
+  };
+};
 
 export const AppSettingsProvider = ({ children }) => {
   const [showSnow, setShowSnow] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState("en");
+  const [selectedLanguage, setSelectedLanguage] = useState("tr");
   const [selectedTheme, setSelectedTheme] = useState("dark");
+  const [customThemes, setCustomThemes] = useState([]);
   const [adultContent, setAdultContent] = useState(false);
   const [showOngoingTvShows, setShowOngoingTvShows] = useState(true);
   const [showIconBackground, setShowIconBackground] = useState(true);
   const [imageQualityLevel, setImageQualityLevel] = useState("good");
   const [selectedAvatar, setSelectedAvatar] = useState(null);
+  const [hapticsEnabled, setHapticsEnabled] = useState(true);
+  const [autoDataCacheEnabled, setAutoDataCacheEnabledState] = useState(false);
+  const [notificationSettings, setNotificationSettings] =
+    useState(DEFAULT_NOTIFICATION_SETTINGS);
 
   // Single multiGet reads all persisted settings in one AsyncStorage round-trip.
   useEffect(() => {
@@ -69,6 +127,12 @@ export const AppSettingsProvider = ({ children }) => {
           [, savedIconBackground],
           [, savedLevel],
           [, savedLegacy],
+          [, savedHapticsEnabled],
+          [, savedNotificationSettings],
+          [, savedReminderNotificationSettings],
+          [, savedAutoDataCache],
+          [, savedCustomTheme],
+          [, savedCustomThemes],
         ] = await AsyncStorage.multiGet([
           "showSnow",
           "selectedLanguage",
@@ -79,6 +143,12 @@ export const AppSettingsProvider = ({ children }) => {
           "showIconBackground",
           "imageQualityLevel",
           "imageQuality", // legacy key — migrated on first read
+          "hapticsEnabled",
+          "notificationSettings",
+          "reminderNotificationSettings",
+          AUTO_DATA_CACHE_KEY,
+          "customThemeTokens", // legacy tek özel tema — çoklu yapıya migrate edilir
+          "customThemes",
         ]);
 
         if (savedAdultContent !== null)
@@ -102,9 +172,55 @@ export const AppSettingsProvider = ({ children }) => {
         if (savedShowSnow !== null) setShowSnow(JSON.parse(savedShowSnow));
         if (savedLanguage !== null) setSelectedLanguage(savedLanguage);
         if (savedTheme !== null) setSelectedTheme(savedTheme);
+
+        // Özel temalar (çoklu). Eski tek "customThemeTokens" kaydı varsa adlandırılmış
+        // bir temaya migrate edilir ve seçili tema "custom" ise "custom:<id>" olur.
+        let themesArr = [];
+        if (savedCustomThemes !== null) {
+          try {
+            const parsed = JSON.parse(savedCustomThemes);
+            if (Array.isArray(parsed)) themesArr = parsed.filter((x) => x && x.id && x.tokens);
+          } catch { /* gecersiz kayit yok sayilir */ }
+        }
+        if (themesArr.length === 0 && savedCustomTheme !== null) {
+          try {
+            const legacyTokens = JSON.parse(savedCustomTheme);
+            if (legacyTokens && typeof legacyTokens === "object") {
+              const migratedId = genThemeId();
+              themesArr = [{
+                id: migratedId,
+                name: i18nText("autoI18n.ozel_tema", "Özel Tema"),
+                tokens: legacyTokens,
+              }];
+              AsyncStorage.setItem("customThemes", JSON.stringify(themesArr)).catch(() => {});
+              if (savedTheme === "custom") {
+                setSelectedTheme(`custom:${migratedId}`);
+                AsyncStorage.setItem("selectedTheme", `custom:${migratedId}`).catch(() => {});
+              }
+              AsyncStorage.removeItem("customThemeTokens").catch(() => {});
+            }
+          } catch { /* gecersiz legacy kayit yok sayilir */ }
+        }
+        if (themesArr.length > 0) setCustomThemes(themesArr);
         if (savedAvatar !== null) setSelectedAvatar(JSON.parse(savedAvatar));
+        if (savedHapticsEnabled !== null) setHapticsEnabled(JSON.parse(savedHapticsEnabled));
+        const autoCache = savedAutoDataCache === "true";
+        setAutoDataCacheEnabledState(autoCache);
+        setAutoDataCacheEnabled(autoCache);
+        if (savedNotificationSettings !== null || savedReminderNotificationSettings !== null) {
+          const loadedSettings = JSON.parse(
+            savedNotificationSettings ?? savedReminderNotificationSettings,
+          );
+          const normalized = normalizeNotificationSettings(loadedSettings);
+          setNotificationSettings(normalized);
+
+          if (savedNotificationSettings === null) {
+            await AsyncStorage.setItem("notificationSettings", JSON.stringify(normalized));
+            await AsyncStorage.removeItem("reminderNotificationSettings");
+          }
+        }
       } catch (error) {
-        Toast.show({ type: "error", text1: "Ayarlar yüklenemedi: " + error });
+        Toast.show({ type: "error", text1: i18nText("autoI18n.ayarlar_yuklenemedi", "Ayarlar yüklenemedi: ") + error });
       }
     };
     loadSettings();
@@ -126,15 +242,46 @@ export const AppSettingsProvider = ({ children }) => {
   const changeLanguage = useCallback((newVal) => {
     setSelectedLanguage(newVal);
     AsyncStorage.setItem("selectedLanguage", newVal).catch((e) =>
-      Toast.show({ type: "error", text1: "Dil kaydedilemedi: " + e }),
+      Toast.show({ type: "error", text1: i18nText("autoI18n.dil_kaydedilemedi", "Dil kaydedilemedi: ") + e }),
     );
   }, []);
 
   const changeTheme = useCallback((newVal) => {
     setSelectedTheme(newVal);
     AsyncStorage.setItem("selectedTheme", newVal).catch((e) =>
-      Toast.show({ type: "error", text1: "Tema kaydedilemedi: " + e }),
+      Toast.show({ type: "error", text1: i18nText("autoI18n.tema_kaydedilemedi", "Tema kaydedilemedi: ") + e }),
     );
+  }, []);
+
+  // Özel tema (ad + token seti) ekler veya günceller. id verilmezse yeni üretilir.
+  // Yalnızca isim ve token haritası (mutlak hex + bağıl) saklanır; tam tema nesnesi
+  // ThemeContext içinde buildCustomTheme ile üretilir. Kaydedilen tema id'sini döner.
+  const saveCustomTheme = useCallback((themeInput) => {
+    const id = themeInput?.id || genThemeId();
+    const entry = {
+      id,
+      name: (themeInput?.name || "").trim() || i18nText("autoI18n.ozel_tema", "Özel Tema"),
+      tokens: themeInput?.tokens || {},
+    };
+    setCustomThemes((prev) => {
+      const idx = prev.findIndex((x) => x.id === id);
+      const next = idx >= 0 ? prev.map((x, i) => (i === idx ? entry : x)) : [...prev, entry];
+      AsyncStorage.setItem("customThemes", JSON.stringify(next)).catch((e) =>
+        Toast.show({ type: "error", text1: i18nText("autoI18n.tema_kaydedilemedi", "Tema kaydedilemedi: ") + e }),
+      );
+      return next;
+    });
+    return id;
+  }, []);
+
+  const deleteCustomTheme = useCallback((id) => {
+    setCustomThemes((prev) => {
+      const next = prev.filter((x) => x.id !== id);
+      AsyncStorage.setItem("customThemes", JSON.stringify(next)).catch((e) =>
+        Toast.show({ type: "error", text1: i18nText("autoI18n.tema_kaydedilemedi", "Tema kaydedilemedi: ") + e }),
+      );
+      return next;
+    });
   }, []);
 
   const changeAvatar = useCallback((userId, newAvatar) => {
@@ -157,14 +304,14 @@ export const AppSettingsProvider = ({ children }) => {
   const changeShowOngoingTvShows = useCallback((newVal) => {
     setShowOngoingTvShows(newVal);
     AsyncStorage.setItem("showOngoingTvShows", JSON.stringify(newVal)).catch((e) =>
-      Toast.show({ type: "error", text1: "Devam eden diziler ayarı kaydedilemedi: " + e }),
+      Toast.show({ type: "error", text1: i18nText("autoI18n.devam_eden_diziler_ayari_kaydedilemedi", "Devam eden diziler ayarı kaydedilemedi: ") + e }),
     );
   }, []);
 
   const changeShowIconBackground = useCallback((newVal) => {
     setShowIconBackground(newVal);
     AsyncStorage.setItem("showIconBackground", JSON.stringify(newVal)).catch((e) =>
-      Toast.show({ type: "error", text1: "İkon arka plan ayarı kaydedilemedi: " + e }),
+      Toast.show({ type: "error", text1: i18nText("autoI18n.ikon_arka_plan_ayari_kaydedilemedi", "İkon arka plan ayarı kaydedilemedi: ") + e }),
     );
   }, []);
 
@@ -173,6 +320,42 @@ export const AppSettingsProvider = ({ children }) => {
     setImageQualityLevel(level);
     AsyncStorage.setItem("imageQualityLevel", level).catch((e) =>
       Toast.show({ type: "error", text1: "Kalite kaydedilemedi: " + e }),
+    );
+  }, []);
+
+  const changeHapticsEnabled = useCallback((newVal) => {
+    setHapticsEnabled(newVal);
+    AsyncStorage.setItem("hapticsEnabled", JSON.stringify(newVal)).catch((e) =>
+      Toast.show({ type: "error", text1: i18nText("autoI18n.titresim_ayari_kaydedilemedi", "Titreşim ayarı kaydedilemedi: ") + e }),
+    );
+  }, []);
+
+  const changeNotificationSettings = useCallback((patch) => {
+    const next = normalizeNotificationSettings({
+      ...notificationSettings,
+      ...patch,
+    });
+    setNotificationSettings(next);
+    AsyncStorage.setItem(
+      "notificationSettings",
+      JSON.stringify(next),
+    ).catch((e) =>
+      Toast.show({
+        type: "error",
+        text1: i18nText("autoI18n.bildirim_ayari_kaydedilemedi", "Bildirim ayarı kaydedilemedi: ") + e,
+      }),
+    );
+  }, [notificationSettings]);
+
+  const changeAutoDataCacheEnabled = useCallback((newVal) => {
+    const enabled = !!newVal;
+    setAutoDataCacheEnabledState(enabled);
+    setAutoDataCacheEnabled(enabled);
+    AsyncStorage.setItem(AUTO_DATA_CACHE_KEY, JSON.stringify(enabled)).catch((e) =>
+      Toast.show({
+        type: "error",
+        text1: i18nText("autoI18n.veri_indirme_ayari_kaydedilemedi", "Veri indirme ayarı kaydedilemedi: ") + e,
+      }),
     );
   }, []);
 
@@ -194,6 +377,12 @@ export const AppSettingsProvider = ({ children }) => {
       imageQualityLevel,
       changeImageQuality,
       API_KEY,
+      hapticsEnabled,
+      changeHapticsEnabled,
+      notificationSettings,
+      changeNotificationSettings,
+      autoDataCacheEnabled,
+      changeAutoDataCacheEnabled,
     }),
     [
       showSnow,
@@ -213,6 +402,12 @@ export const AppSettingsProvider = ({ children }) => {
       showIconBackground,
       changeShowIconBackground,
       changeImageQuality,
+      hapticsEnabled,
+      changeHapticsEnabled,
+      notificationSettings,
+      changeNotificationSettings,
+      autoDataCacheEnabled,
+      changeAutoDataCacheEnabled,
     ],
   );
 
@@ -228,8 +423,11 @@ export const AppSettingsProvider = ({ children }) => {
     () => ({
       selectedTheme,
       changeTheme,
+      customThemes,
+      saveCustomTheme,
+      deleteCustomTheme,
     }),
-    [selectedTheme, changeTheme],
+    [selectedTheme, changeTheme, customThemes, saveCustomTheme, deleteCustomTheme],
   );
 
   const snowValue = useMemo(
@@ -289,6 +487,30 @@ export const AppSettingsProvider = ({ children }) => {
     [selectedAvatar, changeAvatar],
   );
 
+  const hapticsValue = useMemo(
+    () => ({
+      hapticsEnabled,
+      changeHapticsEnabled,
+    }),
+    [hapticsEnabled, changeHapticsEnabled],
+  );
+
+  const notificationValue = useMemo(
+    () => ({
+      notificationSettings,
+      changeNotificationSettings,
+    }),
+    [notificationSettings, changeNotificationSettings],
+  );
+
+  const autoDataCacheValue = useMemo(
+    () => ({
+      autoDataCacheEnabled,
+      changeAutoDataCacheEnabled,
+    }),
+    [autoDataCacheEnabled, changeAutoDataCacheEnabled],
+  );
+
   const apiValue = useMemo(() => ({ API_KEY }), []);
 
   return (
@@ -301,9 +523,19 @@ export const AppSettingsProvider = ({ children }) => {
                 <IconBackgroundSettingsContext.Provider value={iconBackgroundValue}>
                   <ImageQualitySettingsContext.Provider value={imageQualityValue}>
                     <AvatarSettingsContext.Provider value={avatarValue}>
-                      <AppSettingsContext.Provider value={value}>
-                        {children}
-                      </AppSettingsContext.Provider>
+                      <HapticsSettingsContext.Provider value={hapticsValue}>
+                        <NotificationSettingsContext.Provider
+                          value={notificationValue}
+                        >
+                          <AutoDataCacheSettingsContext.Provider
+                            value={autoDataCacheValue}
+                          >
+                            <AppSettingsContext.Provider value={value}>
+                              {children}
+                            </AppSettingsContext.Provider>
+                          </AutoDataCacheSettingsContext.Provider>
+                        </NotificationSettingsContext.Provider>
+                      </HapticsSettingsContext.Provider>
                     </AvatarSettingsContext.Provider>
                   </ImageQualitySettingsContext.Provider>
                 </IconBackgroundSettingsContext.Provider>
@@ -364,3 +596,17 @@ export const useAvatarSettings = () =>
 
 export const useApiSettings = () =>
   useRequiredContext(ApiSettingsContext, "useApiSettings");
+
+export const useHapticsSettings = () =>
+  useRequiredContext(HapticsSettingsContext, "useHapticsSettings");
+
+export const useNotificationSettings = () =>
+  useRequiredContext(NotificationSettingsContext, "useNotificationSettings");
+
+export const useAutoDataCacheSettings = () =>
+  useRequiredContext(
+    AutoDataCacheSettingsContext,
+    "useAutoDataCacheSettings",
+  );
+
+export const useReminderNotificationSettings = useNotificationSettings;

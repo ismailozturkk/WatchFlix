@@ -1,5 +1,6 @@
+import { Image } from "expo-image";
 import React, { useMemo } from "react";
-import { Dimensions, Image, StyleSheet, View } from "react-native";
+import { Dimensions, StyleSheet, View } from "react-native";
 import { useIconBackgroundSettings } from "../context/AppSettingsContext";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -405,7 +406,7 @@ const IconBacground = React.memo(({ opacity = 0.5 }) => {
           <Image
             source={PATTERN_IMAGES[item.imgIndex]}
             style={{ width: "100%", height: "100%" }}
-            resizeMode="contain"
+            contentFit="contain"
           />
         </View>
       ))}

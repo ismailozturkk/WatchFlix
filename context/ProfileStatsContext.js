@@ -7,6 +7,9 @@ import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 import { useLanguage } from "./LanguageContext";
 import Toast from "react-native-toast-message";
+import { snapshotErrorHandler } from "../utils/firestoreError";
+import { i18nText } from "../utils/i18nText";
+
 
 const ProfileStatsContext = createContext();
 export const useProfileStats = () => useContext(ProfileStatsContext);
@@ -145,7 +148,7 @@ export const ProfileStatsProvider = ({ children }) => {
       setIsLoadingMovieInfo(false);
       setIsLoadingShowInfo(false);
       setIsLoading(false);
-    });
+    }, snapshotErrorHandler("Stats/Lists"));
     return () => unsub();
   }, [uid]);
 
@@ -153,13 +156,18 @@ export const ProfileStatsProvider = ({ children }) => {
   useEffect(() => {
     if (!uid) return;
     const unsub = onSnapshot(collection(db, "Lists", uid, "watchedMovies"), (snap) => {
-      const subMovies = snap.docs.map((d) => ({ ...d.data(), _src: "sub" }));
+      // Firestore doc data'sında id alanı OLMAYABILIR — doc.id'yi explicit ekliyoruz.
+      // Aksi halde item.id undefined olur, keyExtractor `item.id.toString()` crash eder.
+      const subMovies = snap.docs.map((d) => {
+        const data = d.data() || {};
+        return { ...data, id: data.id ?? d.id, _src: "sub" };
+      });
       setListItems((prev) => {
         const subIds = new Set(subMovies.map((m) => m.id));
         const legacy = prev.filter((m) => m._src !== "sub" && !subIds.has(m.id));
         return [...subMovies, ...legacy];
       });
-    });
+    }, snapshotErrorHandler("Stats/watchedMovies"));
     return () => unsub();
   }, [uid]);
 
@@ -167,15 +175,18 @@ export const ProfileStatsProvider = ({ children }) => {
   useEffect(() => {
     if (!uid) return;
     const unsub = onSnapshot(collection(db, "Lists", uid, "watchedTv"), (snap) => {
-      // Show-level dokümanlardan istatistik hesapla
-      const subShows = snap.docs.map((d) => ({ ...d.data(), _src: "sub" }));
+      // Aynı sebep: doc.id'yi explicit ekle.
+      const subShows = snap.docs.map((d) => {
+        const data = d.data() || {};
+        return { ...data, id: data.id ?? d.id, _src: "sub" };
+      });
       setListItemsTv((prev) => {
         const subIds = new Set(subShows.map((s) => s.id));
         const legacy = prev.filter((s) => s._src !== "sub" && !subIds.has(s.id));
         return [...subShows, ...legacy];
       });
       setLoadingTv(false);
-    });
+    }, snapshotErrorHandler("Stats/watchedTv"));
     return () => unsub();
   }, [uid]);
 
@@ -234,11 +245,12 @@ export const ProfileStatsProvider = ({ children }) => {
     setTimeDisplayMode((p) => p === "minutes" ? "hours" : p === "hours" ? "days" : "minutes");
 
   const formatTotalDurationTime = (totalMinutes, mode) => {
+    const locale = language === "tr" ? "tr-TR" : "en-US";
     const hours = Math.floor(totalMinutes / 60);
     const days  = Math.floor(hours / 24);
-    if (mode === "hours") return `${hours.toLocaleString("tr-TR")} ${t.profileScreen.hours}`;
-    if (mode === "days")  return `${days.toLocaleString("tr-TR")} ${t.profileScreen.days}`;
-    return `${totalMinutes.toLocaleString("tr-TR")} ${t.profileScreen.minutes}`;
+    if (mode === "hours") return `${hours.toLocaleString(locale)} ${t.profileScreen.hours}`;
+    if (mode === "days")  return `${days.toLocaleString(locale)} ${t.profileScreen.days}`;
+    return `${totalMinutes.toLocaleString(locale)} ${t.profileScreen.minutes}`;
   };
 
   const formatDate = (timestamp) => {
@@ -253,9 +265,9 @@ export const ProfileStatsProvider = ({ children }) => {
     try {
       await updateDoc(doc(db, "Lists", uid), { [selectedList]: deleteField() });
       setModalDeleteVisible(false);
-      Toast.show({ type: "success", text1: "Liste başarıyla silindi" });
+      Toast.show({ type: "success", text1: i18nText("autoI18n.liste_basariyla_silindi", "Liste başarıyla silindi") });
     } catch (err) {
-      Toast.show({ type: "error", text1: "Silme hatası: " + err.message });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.silme_hatasi", "Silme hatası: ") + err.message });
     }
   };
 

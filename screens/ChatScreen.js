@@ -1,3 +1,4 @@
+import { Image } from "expo-image";
 import React, {
   useEffect,
   useState,
@@ -19,12 +20,12 @@ import {
   Linking,
   Alert,
   Modal,
-  Image,
   Animated,
   Dimensions,
   StatusBar,
-  Pressable,
+  Pressable
 } from "react-native";
+import { appAlert } from "@components/AppAlert";
 import { db } from "../firebase";
 import { getAuth } from "firebase/auth";
 import {
@@ -594,7 +595,7 @@ export default function ChatScreen({ route, navigation }) {
       setSearchModalVisible(false);
     } catch (error) {
       console.error("Mesaj gönderme hatası:", error);
-      Alert.alert("Hata", "Mesaj gönderilemedi.");
+      appAlert("Hata", "Mesaj gönderilemedi.");
     }
   }, [text, editingMessage, chatId, currentUser.uid, friendUid]);
 
@@ -778,7 +779,7 @@ export default function ChatScreen({ route, navigation }) {
         setSearchChoise(null);
       } catch (err) {
         console.error("Arama sonucu gönderme hatası:", err);
-        Alert.alert("Hata", "Mesaj gönderilemedi.");
+        appAlert("Hata", "Mesaj gönderilemedi.");
       }
     },
     [chatId, currentUser.uid, friendUid],
@@ -808,11 +809,13 @@ export default function ChatScreen({ route, navigation }) {
   ];
 
   return (
-    <View
+    <KeyboardAvoidingView
       style={[
         styles.container,
         { backgroundColor: theme.primary || "#0F0F1A" },
       ]}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : -(StatusBar.currentHeight -18|| 24)}
     >
       <StatusBar barStyle="light-content" />
 
@@ -890,11 +893,6 @@ export default function ChatScreen({ route, navigation }) {
         edges={["bottom"]}
         style={[styles.container, { backgroundColor: "transparent" }]}
       >
-        <KeyboardAvoidingView
-          style={styles.chatKeyboardView}
-          behavior="padding"
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : StatusBar.currentHeight || 0}
-        >
           {/* ── MESAJ LİSTESİ ── */}
           {/* Arka plan dekor ikonu */}
           <View style={styles.iconBgWrapper} pointerEvents="none">
@@ -902,6 +900,7 @@ export default function ChatScreen({ route, navigation }) {
           </View>
           <FlatList
             ref={flatListRef}
+            style={styles.chatList}
             data={memoizedMessages}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
@@ -1032,7 +1031,6 @@ export default function ChatScreen({ route, navigation }) {
                 </TouchableOpacity>
               </View>
             </View>
-        </KeyboardAvoidingView>
 
         {/* ── # ARAMA MODALİ ── */}
         <Modal
@@ -1355,7 +1353,7 @@ export default function ChatScreen({ route, navigation }) {
           </Modal>
         )}
       </SafeAreaView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -1414,6 +1412,7 @@ const styles = StyleSheet.create({
   headerAction: { padding: 6, marginLeft: 4 },
 
   // ── Mesaj listesi ──────────────────────────────────────
+  chatList: { flex: 1 },
   listContent: { padding: 14, paddingBottom: 18 },
 
   // wrapper — hizalama için

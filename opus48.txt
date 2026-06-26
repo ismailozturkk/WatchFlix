@@ -1,0 +1,955 @@
+================================================================================
+  WATCHFLIX / WATCHIFY — DÜŞÜK DONANIMLI CİHAZLARDA PERFORMANS İNCELEME RAPORU
+================================================================================
+  Hazırlayan : Claude (Opus 4.8)
+  Tarih      : 2026-06-13
+  Kapsam     : React Native 0.81.5 + Expo SDK 54 + Firebase 11 (managed workflow)
+  Hedef      : Düşük/orta segment Android cihazlarda (2-4 GB RAM, eski GPU)
+               takılma (jank), açılış gecikmesi ve pil tüketimini azaltmak.
+================================================================================
+
+
+--------------------------------------------------------------------------------
+0. YÖNETİCİ ÖZETİ
+--------------------------------------------------------------------------------
+
+Proje, geçmiş "FAZ 1-12" performans çalışmaları sayesinde ekran/bileşen
+seviyesinde olgun bir optimizasyon temeline sahip: expo-image + memory-disk
+cache, dinamik TMDB görsel boyutlandırma (getTmdbUrl), memoize edilmiş context
+value'ları, FlatList tuning (windowSize/maxToRenderPerBatch/getItemLayout),
+react-native-screens ile pasif sekmelerin dondurulması (freezeOnBlur),
+lazy bölüm açılımı (activateMovieSection) ve Yeni Mimari (newArchEnabled:true).
+Bunlar doğru kararlardır ve korunmalıdır.
+
+Bununla birlikte düşük cihazlarda takılmaya yol açan asıl yük, TEK TEK
+ekranlarda değil; UYGULAMA GENELİNDE SÜREKLİ ÇALIŞAN ve AÇILIŞTA TOPTAN MOUNT
+EDİLEN katmanlarda toplanıyor. En kritik 5 başlık:
+
+  1) IconBacground — neredeyse her ekranda 45  adet absolute <Image> view
+     render ediyor ve modül yüklenirken 175 PNG'yi (6.2 MB) statik require
+     ediyor. Tek başına en büyük "her ekran" maliyeti.
+  2) Çift/üçlü global Firestore listener'ları — ListStatusContext ve
+     ProfileStatsContext aynı 3 veri kaynağını ayrı ayrı dinliyor; tüm
+     ağır context'ler kullanıcı o ekrana hiç gitmeden açılışta mount ediliyor.
+  3) ProfileStatsContext — tüm izleme geçmişi üzerinde ağır türetme
+     (flatMap/sort/group/tür sayımı) hesaplamasını global ve her snapshot'ta
+     yapıyor; kullanıcı Film/Dizi sekmesindeyken bile.
+  4) Tab bar'da sürekli animasyon + canlı blur — PetCompanion her zaman ya
+     setInterval tabanlı sprite döngüsü ya da sürekli Lottie FAB çalıştırıyor;
+     üstüne BlurView (dimezisBlurView) her karede GPU blur hesaplıyor.
+  5) Cihaz-katmanı (device tier) farkındalığı yok — düşük cihaz da amiral
+     gemisi cihaz da aynı görsel kalite, animasyon ve arka plan yükünü alıyor.
+
+Aşağıdaki yol haritası uygulanırsa, düşük cihazlarda açılış süresinde,
+kaydırma akıcılığında (özellikle ana sekmeler ve liste ekranları) ve pil
+tüketiminde belirgin iyileşme beklenir; üst segment cihazlarda görsel kayıp
+neredeyse sıfırdır (değişiklikler büyük ölçüde "lite mode" ile koşullu).
+
+
+--------------------------------------------------------------------------------
+1. METODOLOJİ VE İNCELENEN KAPSAM
+--------------------------------------------------------------------------------
+
+İnceleme statik kod analizi ile yapıldı (çalışma zamanı profil ölçümü
+yapılmadı — bkz. Bölüm 7'deki ölçüm önerileri). İncelenen başlıca alanlar:
+
+  - Uygulama kök yapısı ve provider zinciri ........ App.js
+  - Build/derleme yapılandırması ................... app.json, babel.config.js,
+                                                     package.json
+  - Görsel boru hattı .............................. utils/tmdbImageUtils.js,
+                                                     context/AppSettingsContext.js,
+                                                     components/IconBacground.js
+  - Global state / Firestore dinleyicileri ......... context/* (12 context),
+                                                     services/* (5 servis)
+  - Navigasyon ve sekme yaşam döngüsü .............. screens/navigation/
+                                                     TabScreenNavigator.js
+  - Liste/ray render desenleri ..................... MovieScreen.js, MovieTrends.js,
+                                                     components/lists/ListItemCard.js,
+                                                     ListsScreen.js
+  - Sürekli animasyonlar ........................... components/pet/*, Lottie kullanımı
+  - Asset envanteri ................................ assets/ (65 MB), Lottie boyutları
+
+En büyük 10 JS dosyası (satır): ListsScreen(2093), ChatScreen(2004),
+MovieDetail(1876), TvShowsDetails(1753), ProfileNotes(1653), ShareContentScreen
+(1634), StoryShareScreen(1617), FriendProfileScreen(1573), ChatModal(1375),
+CalendarScreen(1359).
+
+
+--------------------------------------------------------------------------------
+2. HALİHAZIRDA DOĞRU YAPILANLAR (KORUNMASI GEREKENLER)
+--------------------------------------------------------------------------------
+
+Rapor dengeli olsun ve mevcut yatırım korunsun diye, zaten yerinde olan iyi
+uygulamalar:
+
+  [+] expo-image + cachePolicy="memory-disk" + recyclingKey + transition
+      (örn. MovieTrends.js:97-103) — poster ray'lerinde doğru görsel cache.
+  [+] Dinamik TMDB boyutu: getTmdbUrl(path,type,width) bileşen genişliğine ve
+      kullanıcı kalite tercihine göre w92..w780 seçiyor (tmdbImageUtils.js).
+  [+] react-native-screens: enableFreeze(true) (App.js:99) + TabScreenNavigator'da
+      <Screen freezeOnBlur shouldFreeze activityState> — pasif sekmeler donuyor.
+  [+] Lazy sekme mount: yalnız "tvshows" açılışta mount, diğerleri
+      InteractionManager + gecikmeli (TabScreenNavigator.js:124-144).
+  [+] Lazy bölüm açılımı: MovieScreen FlatList ile bölümleri kademeli açıyor
+      (visibleSectionCount + onEndReached), MovieContext activeSections ile
+      yalnız görünen bölümün isteğini atıyor.
+  [+] Context value'ları useMemo + setter'lar useCallback ile stabilize
+      (AppSettingsContext, MovieContex). AppSettings tek dosyada 12 ayrı küçük
+      context'e bölünmüş → gereksiz re-render azaltılmış.
+  [+] TMDB için AsyncStorage tabanlı TTL cache (utils/apiCache.js) + açılışta
+      preloadAllCache (App.js:112).
+  [+] Production'da console.log/info/warn susturuluyor (App.js:6-10).
+  [+] FlatList tuning ray'lerde mevcut (MovieTrends.js:290-298: removeClippedSubviews,
+      windowSize, getItemLayout); ListsScreen grid'inde de var (numColumns=3,
+      windowSize=7, getItemLayout — ListsScreen.js:760-769).
+
+Bu temel, aşağıdaki bulguların "ekran içi render" değil "global/sürekli yük"
+odaklı olmasının nedenidir.
+
+
+--------------------------------------------------------------------------------
+3. BULGULAR (ÖNCELİK SIRASINA GÖRE)
+--------------------------------------------------------------------------------
+
+Şiddet ölçeği:  P0 = düşük cihazda en büyük etki / önce yapılmalı
+                P1 = orta etki
+                P2 = hijyen / küçük kazanım
+Efor ölçeği:    S (saatler) / M (1-2 gün) / L (haftalar)
+
+
+================================================================================
+P0-1  IconBacground: her ekranda 45 görsel view + 175 PNG eager require   [Efor: M]
+================================================================================
+
+DOSYA: components/IconBacground.js
+
+KANIT:
+  - Modül kapsamında PATTERN_IMAGES dizisi 175 require() içeriyor; üstelik
+    1..171 aralığı İKİ KEZ tekrarlanıyor (satır 8-179 ve 180-353) — gereksiz.
+    Bu 175 PNG diskte 6.2 MB ve hepsi uygulama açılışında JS modül grafiğine
+    girer (require statik çözülür).
+  - Render'da 5 sütun x 9 satır = 45 adet absolute konumlu <View><Image/></View>
+    üretiliyor (satır 360-413).
+  - Bu bileşen pratikte HER ANA YÜZEYDE var: MovieScreen, TvShowScreen,
+    ProfileScreen, SplashScreen, detay ekranları... (App.js ve sekmelerde
+    <IconBacground/> tekrar tekrar mount ediliyor).
+
+NEDEN ÖNEMLİ (düşük cihaz):
+  - Her ekran geçişinde 45 görsel view'in layout + raster + kompozit maliyeti
+    (overdraw). Düşük GPU'da bu, geçiş animasyonu sırasında düşen kareye
+    doğrudan katkı yapar.
+  - 45 ayrı bağımsız <Image> → 45 doku (texture) bellekte; bellek baskısı
+    altındaki cihazda GC ve doku yeniden yükleme tetikler.
+  - Açılış: 175 PNG'lik statik require modül parse/registration süresini uzatır.
+
+ÖNERİ:
+  (a) En etkili: 45 ayrı view yerine TEK bir önceden hazırlanmış (pre-baked)
+      desen PNG'si veya tekrarlayan (tiled) tek görsel kullan. Desen rastgeleliği
+      görsel olarak korunabilir ama runtime'da tek doku olur.
+  (b) Eğer dinamik dağılım korunacaksa: item sayısını cihaz katmanına göre
+      düşür (düşük cihazda 45 -> ~16) ve görselleri WebP'ye çevir (PNG->WebP
+      ~%60-80 küçülme, 6.2 MB -> ~1.5 MB; expo-image WebP'yi sorunsuz açar).
+  (c) Tekrarlanan require bloğunu kaldır (1..174 tek kez) — anlık temizlik.
+  (d) showIconBackground varsayılanını düşük cihazda OFF yap (Bölüm 4, lite mode).
+  (e) Dekoratif olduğu için: ana içerik kaydırılırken arka plan zaten sabit;
+      pointerEvents="none" zaten yok — eklenebilir (dokunma testini atlar).
+
+KAZANIM: Her ekran geçişinde 45 view -> 1 view; açılışta 6.2 MB -> ~1.5 MB
+görsel yükü; bellek baskısında belirgin azalma.
+
+
+================================================================================
+P0-2  Açılışta toptan mount edilen + çakışan global Firestore listener'ları [Efor: M]
+================================================================================
+
+DOSYALAR: App.js (provider zinciri), context/ListStatusContext.js,
+          context/ProfileStatsContext.js, context/ProfileNotesContext.js,
+          context/ProfileRemindersContext.js, context/PostsContext.js,
+          context/FriendsContext.js, context/NotificationsContext.js,
+          context/UserProfileContext.js
+
+KANIT:
+  App.js'te kullanıcı giriş yaptığında AYNI ANDA mount edilen provider'lar
+  (her biri kendi onSnapshot'ını açar):
+      UserProfileProvider, FriendsProvider, NotificationsProvider,
+      ListStatusProvider, ProfileStatsProvider, ProfileNotesProvider,
+      ProfileRemindersProvider, PostsProvider, TvShowProvider, PetProvider
+
+  ÇAKIŞMA (kritik): Aynı Firestore yollarını İKİ ayrı context dinliyor:
+      ListStatusContext.js:156  -> Lists/{uid}            (kök doc)
+      ListStatusContext.js:190  -> Lists/{uid}/favorites
+      ListStatusContext.js:195  -> Lists/{uid}/watchList
+      ListStatusContext.js:200  -> Lists/{uid}/watchedMovies
+      ListStatusContext.js:205  -> Lists/{uid}/watchedTv
+      ProfileStatsContext.js:122 -> Lists/{uid}            (AYNI doc, 2. listener)
+      ProfileStatsContext.js:158 -> Lists/{uid}/watchedMovies (AYNI, 2. listener)
+      ProfileStatsContext.js:177 -> Lists/{uid}/watchedTv     (AYNI, 2. listener)
+
+  Yani 3 veri kaynağı için 6 ayrı dinleyici, 6 ayrı snapshot işleme döngüsü.
+
+NEDEN ÖNEMLİ (düşük cihaz):
+  - Açılışta ~10+ realtime dinleyici aynı anda kurulur; her ilk snapshot
+    senkron state set + türetme tetikler → açılışta JS thread tıkanması (jank).
+  - watchedMovies/watchedTv değişince İKİ context birden yeniden hesaplar.
+  - Profil/sosyal verisi (stats, notes, reminders, posts) kullanıcı o ekrana
+    HİÇ gitmese bile dinleniyor → boşa CPU + ağ + pil.
+
+ÖNERİ:
+  (a) Tek kaynak ilkesi: Lists kök + watchedMovies + watchedTv için TEK
+      dinleyici (ListStatusContext) olsun; ProfileStatsContext bu veriyi
+      ListStatus'tan türetsin (kendi dinleyicilerini kaldır). watchedTvMap
+      zaten ListStatus value'sunda paylaşılıyor (ListStatusContext.js:270).
+  (b) Lazy provider mount: Sekmeler zaten lazy (TabScreenNavigator). Profil'e
+      özgü provider'ları (Stats/Notes/Reminders) global App.js yerine Profil
+      route'unun içine taşı (CalendarProvider'ın ProfileScreen'i sardığı gibi).
+      Böylece kullanıcı Profil'e gitmeden bu dinleyiciler hiç açılmaz.
+  (c) PostsProvider/Posts feed'i de ShareContent/feed ekranına scope'la.
+
+KAZANIM: Açılışta aktif dinleyici sayısı ~yarıya iner; watched* değişiminde
+çift hesaplama biter; profil-dışı oturumlarda sosyal/stat yükü sıfırlanır.
+
+
+================================================================================
+P0-3  ProfileStatsContext: ağır türetmeyi global + her snapshot'ta yapıyor  [Efor: M]
+================================================================================
+
+DOSYA: context/ProfileStatsContext.js
+
+KANIT:
+  - flatEpisodesTv (satır 294-308): TÜM dizilerin TÜM sezon x TÜM bölümleri
+    üzerinde iç içe flatMap. Çok izleyen bir kullanıcıda binlerce eleman.
+  - Ardından sortedFlatEpisodesTv (310), groupByDateFlatTv (318),
+    uniqueDatesTv (320), tür sayımı (329-334), film tarafında groupByDate +
+    uniqueDates + tür sayımı (275-291).
+  - Bu provider App.js'te global mount → kullanıcı Film/Dizi sekmesinde
+    otururken bile, watchedTv/watchedMovies her değiştiğinde tüm bu zincir
+    yeniden koşar.
+
+NEDEN ÖNEMLİ (düşük cihaz):
+  - İstatistik ekranı nadiren ilk açılan yüzeydir; ama hesap her zaman çalışır.
+  - Büyük geçmişte tek snapshot, ana sekmede gözle görülür donma yaratabilir.
+
+ÖNERİ:
+  (a) Bu provider'ı yalnız Profil/İstatistik route'unda mount et (P0-2/b ile
+      birlikte). Global kalması gerekiyorsa:
+  (b) "active" bayrağı: ağır useMemo'lar yalnız stats ekranı görünürken hesaplansın
+      (örn. bir isStatsScreenFocused state'i veya useIsFocused ile gate).
+  (c) Ham listeyi tut, türetmeleri ekran açılınca/lazımken hesapla (deferred).
+
+KAZANIM: Ana sekmelerde watched* güncellemelerinin neden olduğu donma ortadan
+kalkar; stats yalnız gerektiğinde hesaplanır.
+
+
+================================================================================
+P0-4  Tab bar'da sürekli animasyon + canlı blur                            [Efor: M]
+================================================================================
+
+DOSYALAR: components/pet/SpritePet.js, components/pet/PetCompanion.js,
+          screens/navigation/TabScreenNavigator.js
+
+KANIT (sürekli sprite render):
+  - SpritePet.js:53-65: playing=true iken setInterval ile her karede
+    setState(frame) çağrılıyor (~3-7 fps, SPEED=0.55). Bu, JS thread'inde
+    sürekli re-render döngüsüdür ve pet görünür olduğu HER sekmede çalışır
+    (PetCompanion TabScreenNavigator.js:227'de daima mount).
+  - Pet kapalıyken (PetCompanion.js:211-225): gemini.json Lottie FAB autoPlay
+    + loop → yine sürekli animasyon. Yani "her durumda" tab bar'da sonsuz
+    animasyon var.
+
+KANIT (canlı blur):
+  - TabScreenNavigator.js:238-241: <BlurView intensity={50}
+    experimentalBlurMethod="dimezisBlurView"> tab konteynerini sarıyor.
+    Android'de gerçek zamanlı blur her karede arka planı yeniden örnekler;
+    düşük GPU'da bilinen kare düşürücüdür ve tab bar her zaman ekranda.
+
+NEDEN ÖNEMLİ (düşük cihaz):
+  - setInterval->setState deseni Reanimated/native değil; JS thread'i sürekli
+    meşgul eder, navigasyon/kaydırma ile yarışır.
+  - Sürekli blur + sürekli Lottie/sprite = boşta dahi yüksek CPU/GPU ve pil.
+
+ÖNERİ:
+  (a) SpritePet kare ilerletmeyi setState yerine Reanimated (useFrameCallback
+      veya useDerivedValue + Image translate) ile native thread'e taşı; ya da
+      en az: ekran/sekme blur olduğunda (useIsFocused / AppState) interval'i
+      durdur. Pet zaten dekoratif → görünmüyorsa animasyon durmalı.
+  (b) Pet varsayılanı düşük cihazda OFF (lite mode). Kapalıyken Lottie FAB
+      yerine statik bir ikon (TouchableOpacity + Ionicons) kullan — sürekli
+      Lottie yerine sıfır maliyetli buton.
+  (c) BlurView'ı lite mode'da düz yarı saydam renkle değiştir
+      (backgroundColor: 'rgba(20,20,20,0.85)'); görsel fark minimal, kazanç
+      yüksek. experimentalBlurMethod özellikle eski Android'lerde maliyetli.
+
+KAZANIM: Boşta CPU/GPU kullanımı ve pil tüketiminde kalıcı düşüş; tab bar
+kompozisyonu ucuzlar; navigasyon akıcılaşır.
+
+
+================================================================================
+P0-5  Cihaz-katmanı (device tier) / "lite mode" yok                        [Efor: M]
+================================================================================
+
+KANIT:
+  - Varsayılan görsel kalite "good" (AppSettingsContext.js:100) =>
+    QUALITY_MULTIPLIERS.good = PixelRatio.get() (tmdbImageUtils.js:25).
+    Yani 200px poster düşük cihazda bile DPR x 200 hedef pikselle istenir;
+    DPR=3 olan ucuz yüksek-yoğunluklu panellerde gereksiz büyük görsel
+    (indirme + decode + bellek).
+  - showIconBackground varsayılan true (AppSettingsContext.js:99).
+  - showSnow kapalı (iyi) ama açılırsa tam ekran sürekli Lottie (MovieScreen.js:153).
+  - Arka plan sekme ısıtması agresif: 6 sn sonra her 1.2 sn'de bir ağır ekran
+    mount (TabScreenNavigator.js:34-35,124-144). Düşük cihazda bu ısıtma
+    kullanıcı etkileşimdeyken jank dalgaları üretebilir.
+
+NEDEN ÖNEMLİ:
+  Tek bir varsayılan tüm cihazlara uygulanıyor; düşük cihaz "amiral gemisi"
+  ayarlarıyla eziliyor.
+
+ÖNERİ:
+  (a) expo-device ile cihaz sınıflandırması yap (Device.totalMemory veya
+      Android API/yıl sınıfı). Eşik altı = "lite mode".
+  (b) Lite mode'da varsayılanlar:
+        - imageQualityLevel: "low" veya "medium"
+        - showIconBackground: false
+        - pet: kapalı, blur: kapalı (düz renk)
+        - arka plan ısıtma gecikmesi: 6s->12s, adım 1.2s->3s veya yalnız
+          "bir sonraki olası sekme" ısıtılsın
+        - snow: zorunlu kapalı
+  (c) Ayarlar ekranında "Performans modu (düşük cihazlar için)" anahtarı sun;
+      otomatik tespit + manuel override.
+
+KAZANIM: Tek noktadan, düşük cihaz deneyimini hedefli iyileştirir; üst segmentte
+hiçbir kayıp olmaz.
+
+
+================================================================================
+P1-6  JSON.stringify tabanlı eşitlik kontrolü büyük objelerde              [Efor: S]
+================================================================================
+
+DOSYALAR: context/ListStatusContext.js:31 (sameJson), MovieContex.js:13
+
+KANIT:
+  - ListStatusContext her snapshot'ta sameJson(current, next) ile tüm allLists
+    dokümanını ve 4 map'i JSON.stringify edip karşılaştırıyor (satır 160, 187).
+  - Çok öğeli listelerde JSON.stringify her snapshot'ta O(n) string üretir +
+    karşılaştırır; sık güncellemede CPU yükü.
+
+ÖNERİ:
+  - Sığ/yapısal karşılaştırma (alan-bazlı) veya doc sayısı + güncelleme
+    zaman damgası gibi ucuz imza; ya da snapshot metadata.hasPendingWrites /
+    docChanges() ile yalnız değişen kaydı işle.
+
+KAZANIM: Büyük listeli kullanıcılarda snapshot başına CPU düşer.
+
+
+================================================================================
+P1-7  Agresif arka plan sekme ısıtması                                     [Efor: S]
+================================================================================
+
+DOSYA: screens/navigation/TabScreenNavigator.js:34-35,124-144
+
+KANIT:
+  - BACKGROUND_WARMUP_DELAY=6000, STEP=1200: açılıştan 6 sn sonra
+    ShareContentScreen, SettingsScreen, ProfileScreen, MovieScreen ardı ardına
+    arka planda mount ediliyor. Bunlar ağır ekranlar (Share 1634, Settings 1306,
+    Profile 978 satır + kendi provider/dinleyicileri).
+
+NEDEN ÖNEMLİ (düşük cihaz):
+  Kullanıcı hâlâ ilk sekmeyle etkileşirken arka plan mount'ları JS thread'de
+  iş kuyruğu yaratır → görünür jank dalgaları + bellek sıçraması.
+
+ÖNERİ:
+  - Lite mode'da ısıtmayı kapat veya tek "olası sonraki" sekme ile sınırla.
+  - Gecikmeleri artır ve her adımı InteractionManager + requestIdleCallback
+    benzeri boşta tetikle (kullanıcı etkileşimde değilken).
+
+KAZANIM: Açılış sonrası ilk 10-15 sn'deki tutukluk azalır.
+
+
+================================================================================
+P1-8  TVShowItem: network logoları "original" boyutta indiriliyor          [Efor: S]
+================================================================================
+
+DOSYA: components/TVShowItem.js:80-85
+
+KANIT:
+  source={{ uri: `https://image.tmdb.org/t/p/original/${network.logo_path}` }}
+  — 80x30 px'lik bir logo için "original" çözünürlük (yüzlerce KB) indiriliyor;
+  getTmdbUrl boru hattını atlıyor.
+
+ÖNERİ:
+  getTmdbUrl(network.logo_path, "logo", 80) kullan (w92/w154 seçilir).
+  Aynı tarama diğer ekranlarda da yapılmalı: ham "image.tmdb.org/t/p/original"
+  veya sabit "/w500" kullanımları getTmdbUrl'e çevrilmeli.
+
+KAZANIM: Logo/küçük görsel indirme ve decode maliyeti büyük oranda düşer.
+
+
+================================================================================
+P2-9  Asset / bundle hijyeni                                               [Efor: M]
+================================================================================
+
+KANIT:
+  - assets/ toplam 65 MB. iconBacground 6.2 MB (P0-1). Lottie'lerde büyük
+    dosyalar: confetti_1 357 KB, SearchScreen 239 KB, dizi_film_animation
+    151 KB, rainbow_fireworks 129 KB, confetti_3 123 KB...
+  - Bazı Lottie/asset'ler kullanılmıyor olabilir (git status'ta LottieJson/
+    silinmiş, assets/lottie/ yeni eklenmiş — geçişte ölü dosya kalmış olabilir).
+
+ÖNERİ:
+  - iconBacground PNG'lerini WebP'ye çevir (P0-1).
+  - Kullanılmayan Lottie/asset'leri tespit edip kaldır (referans taraması).
+  - Büyük tek-seferlik Lottie'leri (confetti vb.) gerektiğinde dinamik
+    import/lazy require ile yükle.
+
+KAZANIM: APK/IPA boyutu ve açılışta asset register süresi düşer.
+
+
+================================================================================
+P2-10 console çağrılarının tamamen kaldırılması                            [Efor: S]
+================================================================================
+
+KANIT:
+  - App.js:6-10 production'da console.log/info/warn'ı no-op yapıyor (iyi).
+    Ancak çağrı yerinde hâlâ argümanlar değerlendiriliyor (string birleştirme,
+    obje serialize maliyeti kalır).
+
+ÖNERİ:
+  - babel.config.js'e production için babel-plugin-transform-remove-console
+    ekle (console.error hariç tutularak). Böylece çağrılar derlemede tamamen
+    silinir, argüman değerlendirme maliyeti de kalkar.
+
+KAZANIM: Küçük ama bedava; özellikle sıcak yollardaki log'larda fayda.
+
+
+--------------------------------------------------------------------------------
+4. ÖNCELİKLENDİRİLMİŞ YOL HARİTASI
+--------------------------------------------------------------------------------
+
+ADIM 1 — HIZLI KAZANIMLAR (1 gün, düşük risk)
+  - P0-1(c): IconBacground'daki tekrarlı require bloğunu kaldır.
+  - P1-8   : TVShowItem (ve benzerleri) için getTmdbUrl'e geçiş.
+  - P1-6   : sameJson'ı ucuz imza ile değiştir.
+  - P2-10  : transform-remove-console ekle.
+
+ADIM 2 — "LITE MODE" ALTYAPISI (2-3 gün, orta risk) — EN YÜKSEK GETİRİ
+  - P0-5   : expo-device ile cihaz katmanı tespiti + AppSettings'e
+             performanceMode bayrağı + Ayarlar'da anahtar.
+  - Lite mode bağlandığında otomatik:
+       P0-1(d) IconBacground OFF, P0-4(b,c) pet+blur OFF/düz renk,
+       P1-7 ısıtma sınırla, görsel kalite "low/medium".
+
+ADIM 3 — GLOBAL DİNLEYİCİ / HESAPLAMA YENİDEN YAPILANDIRMA (3-5 gün, orta risk)
+  - P0-2(a): Lists kök+watchedMovies+watchedTv için tek dinleyici; ProfileStats
+             veriyi ListStatus'tan türetsin.
+  - P0-2(b): Profil'e özgü provider'ları (Stats/Notes/Reminders/Posts) global
+             App.js yerine ilgili route'lara taşı.
+  - P0-3   : ProfileStats ağır türetmelerini lazy/gate'li yap.
+
+ADIM 4 — ASSET OPTİMİZASYONU (1-2 gün)
+  - P0-1(a/b): IconBacground tek doku/tiled + WebP.
+  - P2-9   : Ölü asset temizliği + büyük Lottie lazy yükleme.
+
+
+--------------------------------------------------------------------------------
+5. DÜŞÜK CİHAZ "LITE MODE" — ÖNERİLEN VARSAYILAN MATRİSİ
+--------------------------------------------------------------------------------
+
+  Ayar / Davranış          | Standart (üst seg.) | Lite mode (düşük cihaz)
+  -------------------------|---------------------|-------------------------
+  imageQualityLevel        | good                | low (veya medium)
+  showIconBackground       | true                | false
+  Pet (PetCompanion)       | açık                | kapalı (statik AI butonu)
+  Tab bar blur             | BlurView            | düz rgba arka plan
+  Snow (Lottie)            | kullanıcı tercihi   | zorunlu kapalı
+  Arka plan sekme ısıtma   | 6s / 1.2s adım      | kapalı / yalnız 1 sonraki
+  Stats ağır türetme       | global              | lazy (yalnız ekranda)
+
+Not: Tüm bunlar kullanıcı tarafından Ayarlar'dan geri açılabilir olmalı;
+otomatik tespit yalnızca VARSAYILANI belirler.
+
+
+--------------------------------------------------------------------------------
+6. RİSK VE GERİ ALINABİLİRLİK
+--------------------------------------------------------------------------------
+
+  - Adım 1 değişiklikleri lokal ve davranışı korur (düşük risk).
+  - Lite mode (Adım 2) bir bayrağın arkasında; sorun çıkarsa bayrak kapatılır.
+  - En yüksek riskli kısım dinleyici birleştirme (Adım 3): ProfileStats'ın
+    ListStatus'tan türetilmesi, veri şekli (subcollection + eski array dual-read)
+    uyumu dikkatli test ister. Hafıza notu [[project_firestore_model]] ve
+    [[project_faz7_reminders]] dual-read kararlarına sadık kalınmalı.
+  - "Yapıyı bozma" ilkesi (hafıza: performans-fazlar-durumu) korunmalı: eski
+    veri modeli bozulmadan, yalnız dinleyici/hesaplama katmanı sadeleştirilmeli.
+
+
+--------------------------------------------------------------------------------
+7. ÖLÇÜM VE DOĞRULAMA (önce/sonra)
+--------------------------------------------------------------------------------
+
+Değişiklikleri SAYISAL doğrulamak için (statik analiz yeterli değil):
+
+  - Gerçek düşük cihazda test et (öykünücü değil): 2-3 GB RAM Android.
+  - Açılış süresi: soğuk başlangıçtan ilk etkileşime kadar (Lottie splash
+    kapanışı App.js zaten ~600ms min tutuyor; gerçek "interaktif" anı ölç).
+  - JS/FPS: __DEV__ Perf Monitor veya react-native-performance; ana sekme
+    kaydırma ve sekme geçişlerinde kare düşüşü.
+  - Bellek: Android Studio Profiler / adb ile RSS; IconBacground açık/kapalı
+    karşılaştırması.
+  - Firestore: Firebase konsolunda eşzamanlı dinleyici/okuma sayısı; Adım 3
+    sonrası açılıştaki ilk-snapshot sayısının düşüşü.
+  - Pil/CPU boşta: uygulama önde ama dokunulmuyorken CPU% (pet+blur etkisi).
+
+Her başlık için "önce" ölçümünü kaydet, değişiklik sonrası tekrarla; özellikle
+P0-1 ve P0-4'ün boşta CPU ve geçiş FPS'ine etkisi en görünür olacaktır.
+
+
+--------------------------------------------------------------------------------
+8. ÖZET TABLO
+--------------------------------------------------------------------------------
+
+  ID    Başlık                                   Şiddet  Efor  Ana Kazanım
+  ----  ---------------------------------------  ------  ----  -------------------
+  P0-1  IconBacground 45 view + 175 PNG          P0      M     Geçiş FPS, bellek, açılış
+  P0-2  Çakışan/erken global Firestore listener  P0      M     Açılış jank, ağ, pil
+  P0-3  ProfileStats global ağır türetme         P0      M     Ana sekme donması
+  P0-4  Tab bar sürekli animasyon + canlı blur   P0      M     Boşta CPU/GPU, pil
+  P0-5  Device tier / lite mode yok              P0      M     Hedefli düşük-cihaz iyileşmesi
+  P1-6  JSON.stringify eşitlik                   P1      S     Snapshot CPU
+  P1-7  Agresif arka plan sekme ısıtması         P1      S     Açılış sonrası tutukluk
+  P1-8  Logoların "original" indirilmesi         P1      S     İndirme/decode
+  P2-9  Asset/bundle hijyeni                     P2      M     Boyut, açılış
+  P2-10 console çağrılarının kaldırılması        P2      S     Sıcak yol mikro-kazanım
+
+================================================================================
+  EK A — FIRESTORE MALİYET MODELİ (10.000 AKTİF KULLANICI)
+================================================================================
+
+Bu ek, etkileşim hacmini KODDAKİ gerçek okuma/yazma desenlerine dayandırarak
+hesaplar. Önce kritik ilke:
+
+  >> Firestore faturasını esas olarak YAZMALAR değil, realtime listener'ların
+     teslim ettiği OKUMALAR belirler. Teslim edilen her doküman = 1 okuma.
+     Kullanıcı hiçbir şeye dokunmasa bile, uygulama açılışında tüm global
+     listener'lar mevcut durumlarını teslim eder → okuma faturası buradan doğar.
+
+
+--------------------------------------------------------------------------------
+A.1  VARSAYILAN ETKİLEŞİM PROFİLİ (ayarlanabilir)
+--------------------------------------------------------------------------------
+
+Tüm hesap, "ortalama engaged aktif kullanıcı / gün" profiline dayanır:
+
+  Davranış                        | Günlük adet
+  --------------------------------|------------------------
+  Uygulama açma (cold-ish)        | 3
+  Ön planda toplam süre           | ~30 dk
+  Gönderilen mesaj                | 10
+  Beğeni                          | 5
+  Yorum / yanıt                   | 2
+  Post paylaşma                   | 0.3
+  Listeye ekleme                  | 5
+  Arkadaşlık aksiyonu             | 0.5
+  Liste boyutları (ortalama)      | fav 30, watchlist 40, izlenen film 80,
+                                  | izlenen dizi 25, arkadaş 30
+
+
+--------------------------------------------------------------------------------
+A.2  AKSİYON BAŞINA FIRESTORE MALİYETİ (koddan birebir)
+--------------------------------------------------------------------------------
+
+  Aksiyon              | Yazma                         | Okuma                  | Kaynak
+  ---------------------|-------------------------------|------------------------|------------------------------
+  Post oluştur         | 2 (addDoc + Users.postsCount) | —                      | postsService.js:84,105
+  Beğeni toggle        | 3 (like+likedPosts+counter)   | viewer'lara counter    | postsService.js:274-291
+  Yorum / yanıt        | 2 (comment + commentsCount)   | 20/sayfa (manuel)      | postsService.js:320-345
+  Listeye ekleme       | 1-2                           | 2x (ListStatus +       | ListStatusContext +
+                       |                               | ProfileStats ÇİFT)     | ProfileStatsContext
+  Arkadaşlık isteği    | 5 (+4 okuma checkRelationship)| —                      | friendsService.js:145-207
+  İsteği kabul         | ~8 (set/delete/counter/notif) | —                      | friendsService.js:217-270
+  Mesaj gönder         | ~2 (addDoc + chat lastMessage)| alıcıya 1 + yansımalar  | ChatScreen.js:614-621
+  Mesaj seen/delivered | mesaj başına 1 yazma          | her yazma → karşıya 1  | ChatScreen.js:506-523
+  Typing               | burst başına 1 (600ms debounce)| karşıya 1             | ChatScreen.js:591-597
+  Presence heartbeat   | 60 sn'de 1 yazma              | —                      | presenceService.js:25
+  Chat aç/kapa         | 4 (online/offline x 2 doc)    | 3 listener (msg+chat+  | ChatScreen.js:458-486
+                       |                               | friend ~20+1+1)        |
+
+  NOT (çift okuma): "Listeye ekleme" tek yazmadır ama ListStatusContext ve
+  ProfileStatsContext aynı subcollection'ı AYRI dinlediği için değişiklik İKİ
+  kez okunur (Bölüm 3, P0-2). Bu, fatura israfının somut örneğidir.
+
+
+--------------------------------------------------------------------------------
+A.3  ENGAGED KULLANICI / GÜN TOPLAMI
+--------------------------------------------------------------------------------
+
+OKUMALAR (baskın kalem):
+  Açılış başına global listener init:
+    ListStatus ~176 + ProfileStats ÇİFT ~106 + Notes 10 + Reminders 30 +
+    Friends 34 + Notifications 30 + Feed 15 + UserProfile 1   ≈ ~400 okuma
+  x 3 açılış                                                  ≈ 1.200
+  Oturum içi (feed scroll, 2-3 chat, yorum okuma, realtime)   ≈ +200
+  -----------------------------------------------------------------------
+  TOPLAM                                                      ≈ 1.400 okuma/gün
+
+YAZMALAR:
+  Presence ~36 + mesaj/seen/typing ~60 + beğeni 15 +
+  listeye ekleme 10 + chat aç/kapa 12 + yorum 4 + diğer ~5    ≈ ~140 yazma/gün
+
+SİLMELER: ~5/gün (unlike, unfollow, mesaj/yorum silme)
+
+
+--------------------------------------------------------------------------------
+A.4  10.000 AKTİF KULLANICIYA ÖLÇEKLEME + FATURA
+--------------------------------------------------------------------------------
+
+  Metrik   | Gün     | Ay (x30)
+  ---------|---------|-----------
+  Okuma    | 14.0 M  | ~420 M
+  Yazma    | 1.4 M   | ~42 M
+  Silme    | 50 K    | ~1.5 M
+
+  Tahmini Firestore faturası (Blaze, US fiyatları):
+
+  Kalem               | Hesap                       | Aylık $
+  --------------------|-----------------------------|----------
+  Okuma               | 420M / 100k x $0.06         | ~$252
+  Yazma               | 42M / 100k x $0.18          | ~$76
+  Silme               | 1.5M / 100k x $0.02         | ~$0.30
+  Depolama + egress   | (orta)                      | ~$20-50
+  --------------------|-----------------------------|----------
+  TOPLAM              |                             | ~$350-400 / ay
+
+
+--------------------------------------------------------------------------------
+A.5  ARALIK VE DUYARLILIK (dürüst sınırlar)
+--------------------------------------------------------------------------------
+
+Tek en büyük değişken DONANIM değil, ETKİLEŞİM YOĞUNLUĞU:
+
+  - Sohbet yoğunsa (10 değil 50 mesaj/gün): yazma+okuma 2-3x →
+    ay sonu kolayca $800-1.500.
+  - "10k aktif" tanımı: yukarıda 10k DAU (günlük aktif) varsayıldı.
+      * 10k MAU (aylık aktif) ise fatura ~3-5x DÜŞER.
+      * 10k EŞZAMANLI (concurrent) ise bu, DAU'nun %3-8'idir (~300-800 kişi).
+  - Cache/persistence: firebase JS SDK RN'de varsayılan persistence KAPALI →
+    her açılış init okumalarını faturalandırır. Açılış sıklığı arttıkça okuma
+    şişer. (Persistence açmak okuma faturasını ciddi düşürebilir.)
+
+
+--------------------------------------------------------------------------------
+A.6  OPTİMİZASYONLARIN FATURAYA NET ETKİSİ
+--------------------------------------------------------------------------------
+
+Bölüm 3'teki performans bulguları doğrudan PARAYA dönüşür:
+
+  1. ProfileStats çift listener (P0-2): açılış init okumalarının ~106/400'ü =
+     %25'i saf israf. Düzeltilirse okuma faturası ~%25 düşer
+     → ~$252 yerine ~$190.
+  2. Profil/sosyal provider'ları lazy mount (P0-2/b): kullanıcı Profil'e
+     girmediği oturumlarda Stats/Notes/Reminders/Posts init okumaları
+     (~160/açılış) HİÇ olmaz → çok açıp profile girmeyenlerde büyük kazanç.
+  3. Presence (P0-4 ile ilişkili): ~36 yazma/gün/kullanıcı = 10k'da ~360k
+     yazma/gün (~11M/ay ≈ $20). Heartbeat 60→120 sn yapılırsa yarıya iner.
+
+  >> SONUÇ: Hiç migrasyon yapmadan, yalnız listener'ları optimize ederek
+     ~$350 bandındaki fatura ~$200 bandına çekilebilir.
+
+
+================================================================================
+  EK B — FIREBASE (FIRESTORE) vs SUPABASE KARŞILAŞTIRMASI
+================================================================================
+
+Bu karşılaştırma, EK A'da çıkan profile özeldir: uygulama OKUMA-AĞIRLIKLI
+(yazmaların ~10 katı okuma) ve realtime listener yoğun bir sosyal uygulamadır.
+
+
+--------------------------------------------------------------------------------
+B.1  TEMEL MALİYET MODELİ FARKI
+--------------------------------------------------------------------------------
+
+  FIRESTORE  : İşlem (okuma/yazma/silme) BAŞINA ücret. Okuma-ağırlıklı uygulama
+               = pahalı. Fatura kullanıcı etkileşimiyle DOĞRUSAL büyür.
+  SUPABASE   : Postgres tabanlı. Okumalar SATIR BAŞINA ÜCRETLENDİRİLMEZ —
+               instance'ın CPU/RAM (compute) maliyetini ödersin (çoğunlukla
+               SABİT). Asıl değişken maliyet: Realtime (eşzamanlı bağlantı +
+               mesaj sayısı) ve egress. DB yönetimi (indeks, pooling, sorgu
+               optimizasyonu, RLS) SENİN sorumluluğunda.
+
+
+--------------------------------------------------------------------------------
+B.2  BU UYGULAMANIN PROFİLİNE GÖRE YAN YANA
+--------------------------------------------------------------------------------
+
+  Kriter                     | Firestore                | Supabase
+  ---------------------------|--------------------------|---------------------------
+  Okuma faturası (420M/ay)   | ~$252/ay (doğrusal)      | ~$0 ek (compute'a dahil)
+  Yazma faturası (42M/ay)    | ~$76/ay                  | compute'a dahil
+  Realtime modeli            | listener doc başına okuma| eşzamanlı bağlantı + mesaj
+                             |                          | (Pro: 500 conn / 5M msg dahil)
+  10k DAU eşzamanlı (~%3-8)  | sorun değil (okuma sayar)| ~300-800 conn → Pro sınırına
+                             |                          | yakın, ölçeklenebilir
+  Analitik / istatistik      | zayıf (flatMap+çok okuma)| GÜÇLÜ (tek SQL agregasyon)
+  (ProfileStats tarzı)       |                          |
+  Operasyon yükü             | düşük (yönetilen)        | yüksek (DB'yi sen yönetirsin)
+  Tahmini toplam (10k DAU)   | ~$350-400/ay             | ~$100-400/ay (daha düz)
+                             | (yoğunlukla $1.500'e)    | (compute + realtime overage)
+  Ölçekle büyüme eğrisi      | doğrusal (okuma ile)     | basamaklı (instance upgrade)
+
+
+--------------------------------------------------------------------------------
+B.3  MİGRASYON MALİYETİ VE RİSKİ (göz ardı edilemez)
+--------------------------------------------------------------------------------
+
+Uygulama Firestore'a DERİNLEMESINE bağlı; Supabase'e geçiş bir veri katmanı
+yeniden yazımıdır:
+
+  - Auth: Firebase Auth + Google Sign-In → Supabase Auth (mevcut kullanıcı +
+    parola/OAuth göçü ayrı ve nazik bir iş).
+  - Veri modeli: doküman/subcollection (Lists/{uid}/watchedTv/...) → ilişkisel
+    şema. Denormalize sayaçlar (likesCount, friendsCount) → SQL/trigger.
+  - Realtime: her yerdeki onSnapshot → Supabase Realtime (satır-bazlı, kanal
+    mantığı farklı; "ilk snapshot tüm doc'lar" davranışı yok).
+  - Güvenlik: firestore.rules → RLS politikaları (tam yeniden yazım).
+  - Servisler: postsService / friendsService / presenceService / ChatScreen
+    listener'ları baştan kurulur.
+
+  >> Tahmini efor: HAFTALAR-AYLAR, yüksek regresyon riski. 10k ölçeğinde bu
+     mühendislik maliyeti, kazanılacak aylık $100-200 farkı kat kat aşar.
+
+
+--------------------------------------------------------------------------------
+B.4  KARAR VE ÖNERİ  (okuma/yazma oranına dayalı)
+--------------------------------------------------------------------------------
+
+ÖNERİ: 10k aktif kullanıcı ölçeğinde FIREBASE'DE KAL + listener'ları optimize et.
+
+  NEDEN:
+  (1) 10k DAU teknik olarak migrasyonu zorlayan bir ölçek değil; Firestore
+      bunun çok ötesine ölçeklenir. Sorun "kaldırır mı" değil, maliyet/efor.
+  (2) EK A gösteriyor ki fatura ~$350/ay — migrasyonun mühendislik maliyeti +
+      regresyon riskinin ÇOK ALTINDA. Üstelik P0-2/P0-4 düzeltmeleri faturayı
+      migrasyon YAPMADAN ~$200'e çekiyor (okumanın %25-40'ı).
+  (3) Okuma-ağırlıklı profil teoride Supabase'in düz-compute modeline yatkın
+      olsa da, asıl maliyet sürücüsü "fazla/erken listener" — bu Firebase'de
+      sıfır riskle çözülüyor. Migrasyon aynı sorunu çözmez, sadece taşır.
+
+SUPABASE'İ NE ZAMAN DÜŞÜN:
+  - Optimizasyona RAĞMEN fatura sürekli birkaç bin $/ay'ı aşarsa (yani
+    etkileşim/ölçek 5-10x büyürse), VEYA
+  - Analitik/istatistik/öneri motoru uygulamanın MERKEZİNE geçerse (SQL
+    agregasyon Firestore'da pahalı, Postgres'te ucuz ve doğal).
+
+EN DÜŞÜK RİSKLİ YOL — HİBRİT (gerekirse):
+  "Ya hep ya hiç" değil. Auth + chat + realtime + listeler Firebase'de kalır;
+  yalnız AĞIR ANALİTİK (ProfileStats tarzı toplama) ayrı bir Postgres'e
+  (Supabase veya BigQuery) taşınır. Bu, en pahalı/uyumsuz parçayı çözer,
+  çekirdek ürünü riske atmaz.
+
+KIRILMA NOKTASI (özet sezgi):
+  Supabase'in düz modeli, Firestore'da SADECE OKUMA faturası optimizasyona
+  rağmen sürekli ~$1-2k/ay'ı geçtiğinde net kazanır. 10k DAU bunun çok altında;
+  bu eşiğe ~50k+ DAU veya çok yüksek sohbet yoğunluğunda ulaşılır.
+
+
+================================================================================
+  EK C — ÖLÇEKTE (100K – 1M KULLANICI) GELECEĞE DÖNÜK MİMARİ KARARI
+================================================================================
+
+Soru: "Uygulama büyürse migrasyon için geç olabilir; geleceğe yatırım olarak
+şimdi hangisini seçmeliyim?" Bu, doğru ve olgun bir sorudur. Aşağıda hız,
+fatura, kullanılabilirlik (DX) ve özellik eksenlerinde ölçek gerçekleriyle
+cevaplanıyor.
+
+
+--------------------------------------------------------------------------------
+C.0  ÖNCE EN ÖNEMLİ İLKE: ASIL RİSK "DB SEÇİMİ" DEĞİL, "LOCK-IN"
+--------------------------------------------------------------------------------
+
+"Büyüyünce geç olur" korkusunun gerçek panzehiri Supabase'i bugün seçmek DEĞİL;
+VERİ KATMANINI TEMİZ TUTMAKTIR. İyi haber: proje bunu zaten kısmen yapıyor.
+
+  [+] services/postsService.js, friendsService.js, presenceService.js →
+      "UI hiçbir zaman Firestore'a doğrudan dokunmasın" ilkesi (postsService.js:2).
+      Bu repository/servis katmanı, gelecekteki HER migrasyonun en değerli
+      sigortasıdır: DB değişirse 70 ekran değil, yalnız bu dosyalar değişir.
+
+  [-] AMA bazı context'ler hâlâ Firestore'a DOĞRUDAN bağlı:
+      ListStatusContext (onSnapshot), ProfileStatsContext (onSnapshot),
+      ChatScreen (onSnapshot + writeBatch satır içinde). Bunlar lock-in'in
+      yoğunlaştığı yerlerdir.
+
+  >> GELECEĞE EN İYİ YATIRIM (hangi DB'yi seçersen seç): kalan tüm doğrudan
+     Firestore erişimini de servis/repository katmanının arkasına al. Böylece
+     "geç olur" senaryosu ortadan kalkar — migrasyon her zaman SINIRLI ve
+     yapılabilir kalır. Dağınık bir veri katmanı, hangi DB'yi seçersen seç,
+     migrasyonu imkânsız kılar.
+
+
+--------------------------------------------------------------------------------
+C.1  ÖLÇEKTE FATURA EĞRİSİ (EK A modelinin projeksiyonu)
+--------------------------------------------------------------------------------
+
+EK A: ~1.400 okuma + ~140 yazma / engaged kullanıcı / gün.
+
+  Ölçek (DAU) | Firestore (ham)   | Firestore (optimize) | Supabase (all-in*)
+  ------------|-------------------|----------------------|--------------------
+  10k         | ~$350-400/ay      | ~$200/ay             | ~$100-400/ay
+  100k        | ~$3.500/ay        | ~$2.000/ay           | ~$500-1.500/ay
+  1M          | ~$33.000/ay       | ~$18-22.000/ay       | ~$2.000-6.000/ay
+
+  * Supabase all-in = compute (büyük instance + read replica) + Realtime
+    (eşzamanlı bağlantı/mesaj) + egress. Rakamlar mertebe tahminidir; gerçek
+    değer sorgu verimine, indekslemeye ve realtime fan-out'una bağlıdır.
+
+  YORUM:
+  - Firestore maliyeti OKUMA ile DOĞRUSAL büyür → ölçekte agresif şişer.
+  - Supabase'de okuma ~bedava (compute'a dahil); eğri DÜZ/basamaklıdır →
+    ölçekte belirgin ucuzlar. AMA bu ucuzluk "bedava" değil: onu DB'yi
+    DOĞRU YÖNETEREK (indeks, replica, pooling) kazanırsın.
+  - KIRILMA NOKTASI: ~100k–300k DAU bandında Supabase maliyet olarak net öne
+    geçer. 1M'de fark dramatiktir (on binlerce $ vs birkaç bin $).
+
+
+--------------------------------------------------------------------------------
+C.2  ÖLÇEKTE TEKNİK GERÇEKLER (sadece fiyat değil)
+--------------------------------------------------------------------------------
+
+FIRESTORE — ölçekte:
+  (+) SIFIR OPS: Google yatay ölçekler; shard/replica/pooling/vacuum YOK.
+      Küçük ekip için en büyük avantaj. 1M kullanıcı tasarım zarfının içinde.
+  (+) Realtime built-in, sunucusuz; bağlantı ölçeği Google'ın derdi.
+  (-) PER-DOC LİMİTLERİ: doküman başına ~1 yazma/sn sürdürülebilir sınır.
+      Viral bir post'un likesCount sayacı bu sınıra çarpar → DAĞITILMIŞ SAYAÇ
+      (sharded counter) gerekir. Mevcut increment() sayaçları ölçekte hotspot.
+  (-) SORGU KISITLARI: join yok, gerçek agregasyon yok, full-text search yok
+      → Algolia/Typesense (ek maliyet) ve daha çok denormalizasyon = daha çok
+      doküman = daha çok okuma = daha çok fatura.
+  (-) FEED FAN-OUT: mevcut "takip feed'i" okuma-anında `in` chunk sorgusu
+      (postsService.js:188) çok takipte yavaşlar; ölçekte fan-out-on-write +
+      önbellek mimarisi gerekir.
+
+SUPABASE / POSTGRES — ölçekte:
+  (+) GERÇEK SQL: join, window fonksiyon, agregasyon → ProfileStats tarzı
+      istatistik TEK SORGU, ucuz. Full-text search Postgres'te DAHİLİ (tsvector)
+      → Algolia gerekmez. İlişkisel bütünlük + trigger ile sayaç/fan-out.
+  (+) DÜZ MALİYET: okuma satır başına ücretlenmez; ölçekte eğri yatay.
+  (-) OPS SENİN: indeks tasarımı, VACUUM/autovacuum, connection pooling
+      (Supavisor), read replica, büyük tabloların partition'ı (messages,
+      watch history), incident response. 1M'de bu CİDDİ bir iştir.
+  (-) DİKEY ÖLÇEK + REPLICA: Postgres esas dikey ölçeklenir; yazma tek primary'de
+      toplanır. Çok yüksek yazmada partition/sharding planı gerekir.
+  (-) REALTIME ÖLÇEĞİ EN ZOR KISIM: Supabase Realtime ayrı bir servistir;
+      on binlerce eşzamanlı bağlantı + yüksek mesaj (chat + her presence
+      heartbeat = broadcast) hacminde darboğaz ve maliyet sürücüsü olur.
+      Ölçekte presence/chat'i ayrı bir pub/sub'a taşımak gerekebilir.
+
+
+--------------------------------------------------------------------------------
+C.3  KAPSAMLI KARŞILAŞTIRMA TABLOSU (hız / fatura / DX / özellik)
+--------------------------------------------------------------------------------
+
+  Eksen                  | FIREBASE (Firestore)            | SUPABASE (Postgres)
+  -----------------------|---------------------------------|----------------------------------
+  HIZ (okuma gecikmesi)  | Çok iyi; global edge + SDK      | İyi; indeks + replica + bölgeye
+                         | cache. Tekil doc okuması hızlı. | yakınlığa bağlı. İyi tune'da hızlı.
+  HIZ (karmaşık sorgu)   | Zayıf (join/agregasyon yok)     | Çok iyi (SQL gücü)
+  HIZ (yazma)            | Düşük gecikme; ama doc başına    | Tek primary; iyi instance'ta hızlı,
+                         | ~1/sn sürdürülebilir tavan      | çok yüksek yazmada partition gerek
+  FATURA (10k DAU)       | ~$200-400/ay                    | ~$100-400/ay
+  FATURA (1M DAU)        | ~$18-33k/ay (okuma ile doğrusal)| ~$2-6k/ay (düz/basamaklı)
+  FATURA öngörülebilirlik| Düşük (kullanım patlarsa şişer) | Yüksek (büyük ölçüde sabit compute)
+  KULLANILABİLİRLİK (DX) | Mükemmel: kur-unut, SDK olgun,  | İyi: standart SQL/Postgres bilgisi,
+                         | RN entegrasyonu hazır           | RLS öğrenme eğrisi, ops bilgisi ister
+  OPERASYON YÜKÜ         | Neredeyse sıfır (yönetilen)     | Orta-Yüksek (DB'yi sen yönetirsin)
+  ÖLÇEKLENME             | Otomatik yatay (elinle bir şey  | Dikey + replica + manuel tuning;
+                         | yapmazsın)                      | yüksek ölçekte mühendislik ister
+  REALTIME               | Built-in, sınırsıza yakın ölçek | Güçlü ama yüksek concurrency'de
+                         | (Google taşır)                  | en zorlanan ve maliyetli parça
+  FULL-TEXT SEARCH       | Yok (Algolia/Typesense ek)      | Dahili (tsvector / pg_trgm)
+  ANALİTİK / İSTATİSTİK  | Zayıf (çok okuma + client hesap)| Çok güçlü (SQL agregasyon)
+  AUTH                   | Olgun; Google Sign-In hazır     | Olgun; OAuth + RLS ile sıkı entegre
+  VENDOR LOCK-IN         | Yüksek (tescilli model)         | Düşük (açık kaynak Postgres; self-host
+                         |                                 | edilebilir, taşınabilir)
+  STORAGE / DOSYA        | Firebase Storage                | Supabase Storage (S3 uyumlu)
+  EKİP UYGUNLUĞU         | Solo / küçük ekip için ideal    | Backend/devops kapasitesi olan ekip
+  GÖÇ KOLAYLIĞI (çıkış)  | Zor (model + realtime tescilli) | Kolay (standart SQL dump)
+
+
+--------------------------------------------------------------------------------
+C.4  BÜYÜYÜNCE ARTILAR / EKSİLER (özet)
+--------------------------------------------------------------------------------
+
+FIREBASE büyüyünce:
+  ARTILAR:
+    + Ekip büyümeden devasa ölçeğe çıkabilirsin; altyapı derdi yok.
+    + Realtime/chat/presence Google'ın sırtında; bağlantı patlaması seni vurmaz.
+    + Geliştirme hızı yüksek kalır; mühendislik enerjisi ürüne gider.
+  EKSİLER:
+    - Fatura okuma ile doğrusal → 1M'de on binlerce $/ay; "ucuzlatma" ancak
+      işlem AZALTMAKLA olur (mimari kısıtlanır).
+    - Hot-document (viral post sayacı) için sharded counter zorunlu hale gelir.
+    - Arama/analitik için ek servisler (Algolia, BigQuery) → mimari dağılır.
+    - Tescilli; çıkış maliyeti her geçen gün (ve her kullanıcı) artar.
+
+SUPABASE büyüyünce:
+  ARTILAR:
+    + Maliyet eğrisi düz → ölçekte dramatik tasarruf (okuma bedava sayılır).
+    + SQL gücü: analitik, arama, ilişkisel sorgu, leaderboard hepsi doğal/ucuz.
+    + Açık kaynak Postgres → vendor lock-in düşük, self-host/çıkış mümkün.
+    + Öngörülebilir fatura (sabit compute) → finansal planlama kolay.
+  EKSİLER:
+    - DB'yi SEN yönetirsin: indeks, replica, pooling, partition, vacuum,
+      incident → 1M'de gerçek bir backend/devops yükü.
+    - Realtime yüksek concurrency'de en zorlanan kısım; presence/chat için
+      ek mimari (dedike pub/sub) gerekebilir.
+    - Yazma tek primary'de toplanır; çok yüksek yazmada ölçek planı şart.
+    - Yanlış indeks/sorgu = ölçekte ani performans çöküşü (Firestore'da bu
+      sınıf hatayı platform massetler, Postgres'te sana yansır).
+
+
+--------------------------------------------------------------------------------
+C.5  NİHAİ ÖNERİ VE GEREKÇE
+--------------------------------------------------------------------------------
+
+KARAR (bu uygulama + büyük ihtimalle küçük ekip için):
+
+  >> ŞİMDİ: Firebase'de KAL. Asıl yatırımı DB değiştirmeye değil, VERİ
+     KATMANINI TEMİZLEMEYE yap (C.0): kalan onSnapshot/Firestore çağrılarını
+     servis katmanına çek + şemayı dokümante et. Bu, "geç olur" riskini yok
+     eder ve hangi DB'yi seçersen seç değer üretir.
+
+  >> 100k DAU YAKLAŞIRKEN (kırılma noktası): kararı tekrar ver. O noktada
+     büyük olasılıkla gelir + ekip vardır. İlk hamle TAM MİGRASYON değil,
+     HİBRİT olmalı:
+        - Ağır analitik + arama → Postgres/Supabase (en pahalı, Firestore'a
+          en uyumsuz parça).
+        - Auth + chat + presence + listeler → Firebase'de kalır (en iyi
+          yaptığı, taşıması en riskli kısım).
+
+  >> TAM SUPABASE'E GEÇİŞİ yalnızca şu KOŞULLAR BİRLİKTE sağlanırsa seç:
+        (a) Hızlı/yüksek büyümeye gerçek inanç (fatura eğrisi öne çıkacak),
+        (b) backend/devops kapasiten var ya da olacak,
+        (c) arama + analitik + ilişkisel sorgu ürünün MERKEZİNDE.
+     Bu üçü birden varsa, "küçükken göç daha ucuz" mantığı geçerlidir ve
+     greenfield Supabase teknik olarak daha iyi uzun-vade temelidir.
+
+NEDEN BU KARAR:
+  - 10k'da fatura farkı (birkaç yüz $) migrasyon riskini/eforunu HAK ETMİYOR.
+  - "Büyüyünce geç olur" sorununu, DB seçimi değil, TEMİZ REPOSITORY KATMANI
+    çözer. Bu yüzden gerçek gelecek-yatırımı orası.
+  - Küçük ekip için Firestore'un SIFIR-OPS değeri, ölçekte bile çoğu zaman
+    fatura farkından daha kıymetlidir — TA Kİ fatura gerçekten acıtana dek.
+    O acı eşiği (~100k+ DAU) geldiğinde, hibrit en düşük riskli ve en yüksek
+    getirili yoldur.
+  - Supabase'in kazandığı yer NET: ölçekte düz maliyet + SQL/arama/analitik.
+    Bunlar bu üründe değerli (istatistik özellikleri), ama HENÜZ değil —
+    önce repository katmanını temizleyip kırılma noktasını bekle.
+
+TEK CÜMLE:
+  Firebase'de kal, veri katmanını bugün temizle (gerçek gelecek-yatırımı bu),
+  100k DAU'da hibrit'e geç; tam Supabase'i ancak hızlı büyüme + devops
+  kapasitesi + arama/analitik-merkezli ürün üçlüsü birlikte varsa seç.
+
+
+================================================================================
+  RAPOR SONU
+================================================================================

@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { shouldPersistInternetData } from "./dataCacheSettings";
 
 /** TTL constants (milliseconds) */
 export const TTL = {
@@ -51,7 +52,8 @@ export const getCachedValue = async (key, ttlMs) => {
  * Writes data to memory and AsyncStorage.
  * Fire-and-forget — never throws.
  */
-export const setCachedValue = (key, data) => {
+export const setCachedValue = (key, data, { force = false } = {}) => {
+  if (!shouldPersistInternetData({ force })) return;
   const entry = { data, ts: Date.now() };
   mem.set(key, entry);
   AsyncStorage.setItem(storageKey(key), JSON.stringify(entry)).catch(() => {});
@@ -63,6 +65,23 @@ export const setCachedValue = (key, data) => {
 export const removeCachedValue = (key) => {
   mem.delete(key);
   AsyncStorage.removeItem(storageKey(key)).catch(() => {});
+};
+
+/**
+ * Belirli bir önekteki tüm apicache girdilerini (bellek + AsyncStorage) siler.
+ * prefix "" verilirse tüm apicache temizlenir. Örn: clearCachedByPrefix("movie_").
+ */
+export const clearCachedByPrefix = async (prefix = "") => {
+  for (const k of Array.from(mem.keys())) {
+    if (k.startsWith(prefix)) mem.delete(k);
+  }
+  try {
+    const all = await AsyncStorage.getAllKeys();
+    const target = all.filter((k) => k.startsWith(storageKey(prefix)));
+    if (target.length) await AsyncStorage.multiRemove(target);
+  } catch {
+    // yok say
+  }
 };
 
 // Singleton: preload sadece bir kez çalışır, sonraki çağrılar aynı Promise'i döner.

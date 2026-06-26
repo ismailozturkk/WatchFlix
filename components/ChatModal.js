@@ -27,7 +27,6 @@ import { useLanguage } from "../context/LanguageContext";
 import { useTheme } from "../context/ThemeContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import axios from "axios";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { LinearGradient } from "expo-linear-gradient";
 import Markdown from "react-native-markdown-display";
@@ -35,8 +34,6 @@ import Reanimated, {
   LinearTransition,
   FadeInDown,
   FadeOutDown,
-  FadeIn,
-  FadeOut,
 } from "react-native-reanimated";
 import LottieView from "lottie-react-native";
 import { useNavigation } from "@react-navigation/native";

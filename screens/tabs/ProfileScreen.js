@@ -1,46 +1,49 @@
+import { Image } from "expo-image";
 import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  Image,
   TouchableOpacity,
   Modal,
   FlatList,
   ScrollView,
-  Animated,
+  Animated
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 //import {} from "react-native-safe-area-context";
 import { useSnow } from "../../context/SnowContext";
 import LottieView from "lottie-react-native";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useLanguage } from "../../context/LanguageContext";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import AppIcon from "../../components/AppIcon";
 import { getAuth } from "firebase/auth";
 import ProfileLists from "./profile/ProfileLists";
 import { useAuth } from "../../context/AuthContext";
-import { LinearGradient } from "expo-linear-gradient";
+import { useFriends } from "../../context/FriendsContext";
 import { AvatarSkeleton, WatchedInfoSkeleton } from "../../components/Skeleton";
 import { useProfileStats } from "../../context/ProfileStatsContext";
 import { useProfileUi } from "../../context/ProfileUiContext";
 import * as Progress from "react-native-progress";
-import ProfileNotes from "./profile/ProfileNotes";
-import ProfileReminders from "./profile/ProfileReminders";
+import NotesCard from "./profile/NotesCard";
+import RemindersPreviewButton from "./profile/RemindersPreviewButton";
+import MyActivityButton from "./profile/MyActivityButton";
 import { useSnowSettings } from "../../context/AppSettingsContext";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import CircularProgress, {
   CircularProgressBase,
 } from "react-native-circular-progress-indicator";
-import { auth, db } from "../../firebase";
-import { doc, onSnapshot } from "firebase/firestore";
 import UserAvatar from "./profile/UserAvatar";
 import Avatar from "./profile/Avatar";
 import { BlurView } from "expo-blur";
 import IconBacground from "../../components/IconBacground";
+import BackButton from "../../components/BackButton";
 import CalendarWidget from "../../components/profile/CalendarWidget";
 import StatisticsSection from "./profile/StatisticsSection";
+import { useUserProfile } from "../../context/UserProfileContext";
+import { propagateProfileChange } from "../../services/profilePropagation";
+import { i18nText } from "../../utils/i18nText";
+import ProfileGamesModule from "../../components/profile/ProfileGamesModule";
+
 const ProfileScreen = ({ navigation }) => {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
@@ -48,6 +51,7 @@ const ProfileScreen = ({ navigation }) => {
   const [isloading, setIsLoading] = useState(false);
   const [modalVisibleLogout, setModalVisibleLogout] = useState(false);
   const { user } = useAuth();
+  const { profile } = useUserProfile();
   const {
     avatar,
     avatars,
@@ -143,27 +147,12 @@ const ProfileScreen = ({ navigation }) => {
     Math.min(Math.max(rawProgressMovie, 0), 1).toFixed(3) * 100,
   );
   //console.log("safeProgressTv:", safeProgressMovie);
-  const [friendCount, setFriendCount] = useState();
-  const [receivedCount, setReceivedCount] = useState();
-  const [sendCount, setSendCount] = useState();
-
-  const currentUser = auth.currentUser;
-  const currentUserRef = doc(db, "Users", currentUser.uid);
-  useEffect(() => {
-    const unsubscribe = onSnapshot(currentUserRef, (doc) => {
-      if (doc.exists()) {
-        const data = doc.data();
-        const count = data.friends?.length || 0;
-        const receivedCount = data.friendRequests?.receivedRequest?.length || 0;
-        const sendCount = data.friendRequests?.sendRequest?.length || 0;
-        setFriendCount(count);
-        setReceivedCount(receivedCount);
-        setSendCount(sendCount);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
+  const friendsState = useFriends();
+  const friendCount = friendsState?.friends?.length ?? profile?.friendsCount ?? 0;
+  const receivedCount =
+    friendsState?.incomingRequests?.length ?? profile?.pendingRequestsInCount ?? 0;
+  const sendCount =
+    friendsState?.outgoingRequests?.length ?? profile?.pendingRequestsOutCount ?? 0;
 
   return (
     <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
@@ -176,22 +165,6 @@ const ProfileScreen = ({ navigation }) => {
         <SafeAreaView
           style={[styles.container, { backgroundColor: "transparent" }]}
         >
-          {showSnow && (
-            <>
-              <LottieView
-                style={styles.lottie}
-                source={require("../../LottieJson/snow.json")}
-                autoPlay={true}
-                loop
-              />
-              <LottieView
-                style={styles.lottie1}
-                source={require("../../LottieJson/snow.json")}
-                autoPlay={true}
-                loop
-              />
-            </>
-          )}
           <View style={styles.images}>
             <TouchableOpacity
               onPress={() => {
@@ -273,7 +246,7 @@ const ProfileScreen = ({ navigation }) => {
                 allowFontScaling={false}
                 style={[styles.textName, { color: theme.text.primary }]}
               >
-                {user?.displayName}
+                {profile?.displayName || user?.displayName}
               </Text>
               <View
                 style={{
@@ -289,7 +262,8 @@ const ProfileScreen = ({ navigation }) => {
                   {user?.email}
                 </Text>
 
-                <MaterialIcons
+                <AppIcon
+                  family="MaterialIcons"
                   name="verified"
                   size={14}
                   color={
@@ -310,11 +284,38 @@ const ProfileScreen = ({ navigation }) => {
                 <Text
                   allowFontScaling={false}
                   style={[styles.textDate, { color: theme.text.primary }]}
-                >
-                  Katılma tarihi:{" "}
+                >{i18nText("autoI18n.katilma_tarihi", "Katılma tarihi:")}{" "}
                   {convertTimestampToDate(user.metadata.createdAt)}
                 </Text>
               )}
+              <TouchableOpacity
+                onPress={() => navigation.navigate("EditProfileScreen")}
+                activeOpacity={0.85}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 5,
+                  alignSelf: "flex-start",
+                  marginTop: 8,
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  backgroundColor: theme.accent + "1f",
+                  borderColor: theme.accent,
+                }}
+              >
+                <AppIcon
+                  family="Ionicons"
+                  name="create-outline"
+                  size={13}
+                  color={theme.accent}
+                />
+                <Text
+                  allowFontScaling={false}
+                  style={{ color: theme.accent, fontSize: 12, fontWeight: "700" }}
+                >{i18nText("autoI18n.profili_duzenle", "Profili Düzenle")}</Text>
+              </TouchableOpacity>
             </View>
           </View>
           {/* ── Arkadaş aksiyonları ── */}
@@ -334,7 +335,8 @@ const ProfileScreen = ({ navigation }) => {
                   { backgroundColor: theme.accent + "15" },
                 ]}
               >
-                <Ionicons
+                <AppIcon
+                  family="Ionicons"
                   name="search-outline"
                   size={18}
                   color={theme.accent}
@@ -343,9 +345,7 @@ const ProfileScreen = ({ navigation }) => {
               <Text
                 allowFontScaling={false}
                 style={[styles.friendBarLabel, { color: theme.text.secondary }]}
-              >
-                Ara
-              </Text>
+              >{i18nText("autoI18n.ara_2", "Ara")}</Text>
             </TouchableOpacity>
 
             {/* Dikey ayraç */}
@@ -368,14 +368,12 @@ const ProfileScreen = ({ navigation }) => {
                   { backgroundColor: "#64b4ff15" },
                 ]}
               >
-                <Ionicons name="people-outline" size={18} color="#64b4ff" />
+                <AppIcon family="Ionicons" name="people-outline" size={18} color="#64b4ff" />
               </View>
               <Text
                 allowFontScaling={false}
                 style={[styles.friendBarLabel, { color: theme.text.secondary }]}
-              >
-                Arkadaşlar
-              </Text>
+              >{i18nText("autoI18n.arkadaslar", "Arkadaşlar")}</Text>
               {friendCount > 0 && (
                 <View
                   style={[styles.friendBarPill, { backgroundColor: "#64b4ff" }]}
@@ -410,14 +408,12 @@ const ProfileScreen = ({ navigation }) => {
                   { backgroundColor: "#29b86415" },
                 ]}
               >
-                <Ionicons name="mail-outline" size={18} color="#29b864" />
+                <AppIcon family="Ionicons" name="mail-outline" size={18} color="#29b864" />
               </View>
               <Text
                 allowFontScaling={false}
                 style={[styles.friendBarLabel, { color: theme.text.secondary }]}
-              >
-                İstekler
-              </Text>
+              >{i18nText("autoI18n.istekler", "İstekler")}</Text>
               {(receivedCount > 0 || sendCount > 0) && (
                 <View style={styles.friendBarPillRow}>
                   {receivedCount > 0 && (
@@ -439,7 +435,7 @@ const ProfileScreen = ({ navigation }) => {
                     <View
                       style={[
                         styles.friendBarPill,
-                        { backgroundColor: "#64b4ff" },
+                        { backgroundColor: "#ff9650" },
                       ]}
                     >
                       <Text
@@ -454,6 +450,7 @@ const ProfileScreen = ({ navigation }) => {
               )}
             </TouchableOpacity>
           </View>
+
           {/* todo <Avatar /> */}
           <StatisticsSection
             theme={theme}
@@ -480,9 +477,11 @@ const ProfileScreen = ({ navigation }) => {
             t={t}
           />
           <ProfileLists navigation={navigation} />
+          <MyActivityButton navigation={navigation} />
           <CalendarWidget navigation={navigation} />
-          <ProfileReminders navigation={navigation} />
-          <ProfileNotes navigation={navigation} />
+          <RemindersPreviewButton navigation={navigation} />
+          <NotesCard navigation={navigation} />
+          <ProfileGamesModule navigation={navigation} />
           <View style={styles.section}>
             <Text
               allowFontScaling={false}
@@ -503,14 +502,15 @@ const ProfileScreen = ({ navigation }) => {
             >
               <Text
                 allowFontScaling={false}
-                style={[styles.settingText, { color: theme.text.primary }]}
+                style={[styles.settingText, { color: theme.colors.red }]}
               >
                 {t.logout}
               </Text>
-              <Ionicons
+              <AppIcon
+                family="Ionicons"
                 name={"log-out-outline"}
                 size={24}
-                color={theme.text.primary}
+                color={theme.colors.red}
               />
             </TouchableOpacity>
           </View>
@@ -541,7 +541,14 @@ const ProfileScreen = ({ navigation }) => {
                   showsVerticalScrollIndicator={false}
                   renderItem={({ item, index }) => (
                     <TouchableOpacity
-                      onPress={() => setSelectAvatarIndex(index)}
+                      onPress={() => {
+                        setSelectAvatarIndex(index);
+                        if (user?.uid) {
+                          propagateProfileChange(user.uid, { avatarIndex: index }).catch(
+                            () => {},
+                          );
+                        }
+                      }}
                     >
                       {item && (
                         <Image source={item} style={styles.avatarImage} />
@@ -625,6 +632,20 @@ const ProfileScreen = ({ navigation }) => {
           </Modal>
         </SafeAreaView>
       </ScrollView>
+
+      {/* Kar: scroll içinde 2 dev Lottie yerine tek sabit overlay (MovieScreen paterni) */}
+      {showSnow && (
+        <View style={styles.snowOverlay} pointerEvents="none">
+          <LottieView
+            style={{ flex: 1 }}
+            source={require("@lottie/snow.json")}
+            autoPlay
+            loop
+          />
+        </View>
+      )}
+
+      <BackButton />
     </View>
   );
 };
@@ -737,21 +758,13 @@ const styles = StyleSheet.create({
     gap: 10,
     color: "#000",
   },
-  lottie: {
+  snowOverlay: {
     position: "absolute",
-    top: -750,
-    left: -60,
-    right: -60,
-    bottom: -250,
-    zIndex: 0,
-  },
-  lottie1: {
-    position: "absolute",
-    top: 1150,
-    left: -60,
-    right: -60,
-    bottom: -250,
-    zIndex: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
   },
   profilImage: {
     width: 100,
@@ -808,12 +821,12 @@ const styles = StyleSheet.create({
 
   logout: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "center",
     alignItems: "center",
-    gap: 15,
+    gap: 20,
     paddingVertical: 10,
     paddingHorizontal: 15,
-    borderRadius: 12,
+    borderRadius: 25,
     marginBottom: 8,
     borderWidth: 1,
     shadowColor: "#000",
@@ -958,6 +971,32 @@ const styles = StyleSheet.create({
   durationLabel: {
     fontSize: 10,
     textTransform: "uppercase",
+  },
+  gameCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 14,
+    overflow: "hidden",
+  },
+  gameCardIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,165,0,0.12)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  gameCardTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  gameCardDesc: {
+    fontSize: 11,
+    fontWeight: "500",
   },
 });
 

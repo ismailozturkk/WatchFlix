@@ -16,6 +16,8 @@
 
  * ────────────────────────────────────────────────────────────────────────────*/
 
+import { clamp, hexToHsl, hslToHex, toHex } from "../utils/colorUtils";
+
 // ─── Temel renk sabitleri (raw) ───────────────────────────────────────────────
 
 const PALETTE = {
@@ -515,6 +517,145 @@ export const getThemeColors = (themeName) => themes[themeName] ?? themes.gray;
  */
 
 export const THEME_NAMES = Object.keys(themes);
+
+// ─── Özel Tema (kullanıcı tarafından oluşturulan) ─────────────────────────────
+
+/**
+ * Özel tema oluşturucuda düzenlenebilen renk token'ları. Her giriş, düz bir
+ * token anahtari (buildCustomTheme'in bekledigi) + UI grubu + etiket tasir.
+ * Türetilen degerler (secondaryt, ai, shadow) ve paylasilan setler (colors,
+ * notesColor) kullaniciya gosterilmez; otomatik uretilir.
+ */
+export const CUSTOM_THEME_TOKENS = [
+  { key: "primary", group: "surface", labelKey: "autoI18n.ct_arka_plan", fallback: "Arka Plan" },
+  { key: "secondary", group: "surface", labelKey: "autoI18n.ct_yuzey", fallback: "Yüzey / Kart" },
+  { key: "between", group: "surface", labelKey: "autoI18n.ct_ara_yuzey", fallback: "Ara Yüzey" },
+  { key: "tab", group: "surface", labelKey: "autoI18n.ct_sekme", fallback: "Sekme Çubuğu" },
+  { key: "border", group: "surface", labelKey: "autoI18n.ct_kenarlik", fallback: "Kenarlık" },
+  { key: "accent", group: "accent", labelKey: "autoI18n.ct_vurgu", fallback: "Vurgu" },
+  { key: "bold", group: "accent", labelKey: "autoI18n.ct_koyu_vurgu", fallback: "Koyu Vurgu" },
+  { key: "textPrimary", group: "text", labelKey: "autoI18n.ct_ana_metin", fallback: "Ana Metin" },
+  { key: "textSecondary", group: "text", labelKey: "autoI18n.ct_ikincil_metin", fallback: "İkincil Metin" },
+  { key: "textBetween", group: "text", labelKey: "autoI18n.ct_ara_metin", fallback: "Ara Metin" },
+  { key: "textMuted", group: "text", labelKey: "autoI18n.ct_soluk_metin", fallback: "Soluk Metin" },
+];
+
+export const CUSTOM_THEME_GROUPS = [
+  { id: "surface", labelKey: "autoI18n.ct_grup_yuzeyler", fallback: "Yüzeyler" },
+  { id: "accent", labelKey: "autoI18n.ct_grup_vurgu", fallback: "Vurgu Renkleri" },
+  { id: "text", labelKey: "autoI18n.ct_grup_metin", fallback: "Metin Renkleri" },
+];
+
+/**
+ * Bir temanın 11 düzenlenebilir token değerini (hepsi hex'e normalize) çıkarır.
+ * Özel tema oluşturucuda bir temel temadan başlatmak/sıfırlamak için kullanılır.
+ */
+export function themeToTokens(themeName) {
+  const tm = getThemeColors(themeName);
+  return {
+    primary: toHex(tm.primary),
+    secondary: toHex(tm.secondary),
+    between: toHex(tm.between),
+    tab: toHex(tm.tab),
+    border: toHex(tm.border),
+    accent: toHex(tm.accent),
+    bold: toHex(tm.bold || tm.accent),
+    textPrimary: toHex(tm.text.primary),
+    textSecondary: toHex(tm.text.secondary),
+    textBetween: toHex(tm.text.between),
+    textMuted: toHex(tm.text.muted),
+  };
+}
+
+/** Yeni özel temalar için varsayılan tohum (koyu/AMOLED temasından). */
+export const DEFAULT_CUSTOM_TOKENS = themeToTokens("dark");
+
+/**
+ * Bir token "bağıl" mı? Bağıl token, başka bir token'dan türetilir:
+ *   { from: "accent", l: +15, s: -5, h: 0 }
+ * l/s/h, kaynağın HSL değerine eklenen ofsetlerdir (% puan). Kullanıcı "bir
+ * rengin %X açık/koyu halini" başka bir alanda kullanmak istediğinde kurulur.
+ */
+export const isRelativeToken = (v) =>
+  Boolean(v) && typeof v === "object" && typeof v.from === "string";
+
+/**
+ * Kaynak hex + ofsetlerden bağıl rengi hesaplar.
+ */
+export function applyRelative(baseHex, { l = 0, s = 0, h = 0 } = {}) {
+  const hsl = hexToHsl(baseHex);
+  return hslToHex(
+    hsl.h + (Number(h) || 0),
+    clamp(hsl.s + (Number(s) || 0), 0, 100),
+    clamp(hsl.l + (Number(l) || 0), 0, 100),
+  );
+}
+
+/**
+ * Karışık (mutlak hex + bağıl) token setini, hepsi mutlak hex olan düz bir
+ * haritaya çözer. Bağıl token zinciri iteratif çözülür; döngü/eksik referans
+ * varsayılana düşer.
+ */
+export function resolveThemeTokens(tokens) {
+  const raw = { ...DEFAULT_CUSTOM_TOKENS, ...(tokens && typeof tokens === "object" ? tokens : {}) };
+  const resolved = {};
+  const pending = {};
+  for (const key of Object.keys(raw)) {
+    const v = raw[key];
+    if (isRelativeToken(v)) pending[key] = v;
+    else resolved[key] = toHex(v);
+  }
+  let guard = 0;
+  while (Object.keys(pending).length && guard < 24) {
+    guard += 1;
+    let progressed = false;
+    for (const key of Object.keys(pending)) {
+      const rel = pending[key];
+      const base = resolved[rel.from];
+      if (base) {
+        resolved[key] = applyRelative(base, rel);
+        delete pending[key];
+        progressed = true;
+      }
+    }
+    if (!progressed) break;
+  }
+  // Çözülemeyen (döngüsel/eksik referanslı) token'lar varsayılan değere düşer.
+  for (const key of Object.keys(pending)) {
+    resolved[key] = toHex(DEFAULT_CUSTOM_TOKENS[key] || "#808080");
+  }
+  return resolved;
+}
+
+/**
+ * Düz token setinden tam tema nesnesi üretir. Bağıl token'lar önce çözülür;
+ * türetilen yüzey/şeffaflık değerleri ve paylaşılan renk setleri otomatik
+ * eklenir; böylece özel tema uygulamanın geri kalanı için yerleşik temalarla
+ * bire bir aynı şekle sahiptir.
+ */
+export function buildCustomTheme(tokens) {
+  const t = resolveThemeTokens(tokens);
+  return {
+    primary: t.primary,
+    secondary: t.secondary,
+    secondaryt: alpha(t.secondary, 0.5),
+    between: t.between,
+    border: t.border,
+    tab: t.tab,
+    ai: alpha(t.tab, 0.4),
+    text: {
+      primary: t.textPrimary,
+      secondary: t.textSecondary,
+      between: t.textBetween,
+      muted: t.textMuted,
+    },
+    accent: t.accent,
+    bold: t.bold,
+    shadow: alpha(PALETTE.black, 0.7),
+    colors: SHARED_COLORS,
+    notesColor: SHARED_NOTES_COLORS,
+  };
+}
 
 /**
 

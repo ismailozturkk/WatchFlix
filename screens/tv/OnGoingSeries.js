@@ -24,6 +24,9 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Progress from "react-native-progress";
 import IconBacground from "../../components/IconBacground";
+import { OnGoingSeriesSkeleton } from "../../components/Skeleton";
+import { i18nText } from "../../utils/i18nText";
+
 
 const { width } = Dimensions.get("window");
 const POSTER_W = (width - 48) / 2;
@@ -124,9 +127,7 @@ function SeriesCard({ show, navigation, theme, language, API_KEY, imageQuality }
               ]}
             >
               <Ionicons name="checkmark-circle" size={11} color="#fff" />
-              <Text allowFontScaling={false} style={styles.completedText}>
-                Tamamlandı
-              </Text>
+              <Text allowFontScaling={false} style={styles.completedText}>{i18nText("autoI18n.tamamlandi", "Tamamlandı")}</Text>
             </View>
           )}
 
@@ -179,8 +180,7 @@ function SeriesCard({ show, navigation, theme, language, API_KEY, imageQuality }
               allowFontScaling={false}
               style={[styles.progressLabel, { color: progressColor }]}
             >
-              {watchedEps} / {totalEps} bölüm
-            </Text>
+              {watchedEps} / {totalEps}{i18nText("autoI18n.bolum_4", "bölüm")}</Text>
           </View>
 
           {/* Sezon sayısı */}
@@ -269,11 +269,9 @@ export default function OnGoingSeries({ navigation }) {
       <View style={[styles.root, { backgroundColor: theme.primary }]}>
         <StatusBar barStyle="light-content" />
         <IconBacground opacity={0.3} />
-        <ActivityIndicator
-          size="large"
-          color={theme.accent}
-          style={{ flex: 1 }}
-        />
+        <SafeAreaView style={{ flex: 1 }}>
+          <OnGoingSeriesSkeleton />
+        </SafeAreaView>
       </View>
     );
   }
@@ -310,8 +308,7 @@ export default function OnGoingSeries({ navigation }) {
               allowFontScaling={false}
               style={[styles.headerSub, { color: theme.text.muted }]}
             >
-              {totalShows} dizi izlendi
-            </Text>
+              {totalShows}{i18nText("autoI18n.dizi_izlendi", "dizi izlendi")}</Text>
           </View>
         </View>
 
@@ -381,9 +378,7 @@ export default function OnGoingSeries({ navigation }) {
             <Text
               allowFontScaling={false}
               style={[styles.statLabel, { color: theme.text.muted }]}
-            >
-              Tamamlandı
-            </Text>
+            >{i18nText("autoI18n.tamamlandi", "Tamamlandı")}</Text>
           </View>
           <View
             style={[
@@ -401,9 +396,7 @@ export default function OnGoingSeries({ navigation }) {
             <Text
               allowFontScaling={false}
               style={[styles.statLabel, { color: theme.text.muted }]}
-            >
-              Bölüm
-            </Text>
+            >{i18nText("autoI18n.bolum_2", "Bölüm")}</Text>
           </View>
         </View>
 
@@ -417,7 +410,7 @@ export default function OnGoingSeries({ navigation }) {
           <Ionicons name="search" size={16} color={theme.text.muted} />
           <TextInput
             style={[styles.searchInput, { color: theme.text.primary }]}
-            placeholder="Dizi ara..."
+            placeholder={i18nText("autoI18n.dizi_ara", "Dizi ara...")}
             placeholderTextColor={theme.text.muted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -436,9 +429,9 @@ export default function OnGoingSeries({ navigation }) {
         {/* ── Filtre ── */}
         <View style={styles.filterRow}>
           {[
-            { key: "all", label: "Tümü" },
+            { key: "all", label: i18nText("autoI18n.tumu", "Tümü") },
             { key: "ongoing", label: "Devam Ediyor" },
-            { key: "completed", label: "Tamamlandı" },
+            { key: "completed", label: i18nText("autoI18n.tamamlandi", "Tamamlandı") },
           ].map((f) => (
             <TouchableOpacity
               key={f.key}
@@ -476,15 +469,15 @@ export default function OnGoingSeries({ navigation }) {
               allowFontScaling={false}
               style={[styles.emptyTitle, { color: theme.text.primary }]}
             >
-              {searchQuery ? "Sonuç bulunamadı" : "Henüz dizi yok"}
+              {searchQuery ? i18nText("autoI18n.sonuc_bulunamadi", "Sonuç bulunamadı") : i18nText("autoI18n.henuz_dizi_yok", "Henüz dizi yok")}
             </Text>
             <Text
               allowFontScaling={false}
               style={[styles.emptySubt, { color: theme.text.muted }]}
             >
               {searchQuery
-                ? `"${searchQuery}" ile eşleşen dizi yok`
-                : "İzlediğiniz diziler burada görünecek"}
+                ? i18nText("autoI18n.no_tv_match_query", "\"{{query}}\" ile eşleşen dizi yok", { query: searchQuery })
+                : i18nText("autoI18n.watched_tv_will_appear", "İzlediğiniz diziler burada görünecek")}
             </Text>
           </View>
         ) : (

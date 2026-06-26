@@ -9,7 +9,13 @@ import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 import { useTheme } from "./ThemeContext";
 import { useLanguage } from "./LanguageContext";
+import { isAuthTransitionError } from "../utils/firestoreError";
 import Toast from "react-native-toast-message";
+import { i18nText } from "../utils/i18nText";
+import * as cacheStore from "../utils/cacheStore";
+import { cacheKeys } from "../utils/cacheKeys";
+import { shouldPersistInternetData } from "../utils/dataCacheSettings";
+
 
 const ProfileNotesContext = createContext();
 export const useProfileNotes = () => useContext(ProfileNotesContext);
@@ -64,7 +70,14 @@ export const ProfileNotesProvider = ({ children }) => {
 
   useEffect(() => {
     if (!uid) return;
-    setLoadingNotes(true);
+    // Offline-first: önce cache'ten seed.
+    const cached = cacheStore.getJSON(...cacheKeys.notes(uid));
+    if (Array.isArray(cached)) {
+      setNotes(cached);
+      setLoadingNotes(false);
+    } else {
+      setLoadingNotes(true);
+    }
 
     const unsub = onSnapshot(
       itemsCol(uid),
@@ -82,20 +95,28 @@ export const ProfileNotesProvider = ({ children }) => {
               }
             }
           } catch (err) {
-            console.error("Error checking old notes:", err);
+            if (!isAuthTransitionError(err) && __DEV__)
+              console.warn("Error checking old notes:", err?.message);
           }
           setNotes([]);
+          if (shouldPersistInternetData()) {
+            cacheStore.setJSON(...cacheKeys.notes(uid), []);
+          }
           setLoadingNotes(false);
         } else {
           const fetched = snap.docs
             .map((d) => ({ ...d.data(), id: d.id }))
             .sort((a, b) => b.createdAt - a.createdAt);
           setNotes(fetched);
+          if (shouldPersistInternetData()) {
+            cacheStore.setJSON(...cacheKeys.notes(uid), fetched);
+          }
           setLoadingNotes(false);
         }
       },
       (err) => {
-        console.error("Notes snapshot error:", err);
+        if (!isAuthTransitionError(err) && __DEV__)
+          console.warn("[Notes] snapshot error:", err?.message);
         setLoadingNotes(false);
       },
     );
@@ -106,7 +127,7 @@ export const ProfileNotesProvider = ({ children }) => {
   const handleAddNote = async () => {
     try {
       if (noteType === "note" && message.trim().length === 0) {
-        Toast.show({ type: "warning", text1: "Boş not oluşturulamaz" }); return;
+        Toast.show({ type: "warning", text1: i18nText("autoI18n.bos_not_olusturulamaz", "Boş not oluşturulamaz") }); return;
       }
       if (noteType === "todo" && todoItems.every((t) => t.text.trim() === "")) {
         Toast.show({ type: "warning", text1: "En az bir todo maddesi giriniz" }); return;
@@ -129,7 +150,7 @@ export const ProfileNotesProvider = ({ children }) => {
       setScheduledDate(null); setModalVisibleNotesAdd(false);
 
       await setDoc(itemDoc(uid, newId), newNote);
-    } catch (err) { Toast.show({ type: "error", text1: "Not eklenemedi", text2: err.message }); }
+    } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.not_eklenemedi", "Not eklenemedi"), text2: err.message }); }
   };
 
   const handleToggleTodoItem = async (noteId, todoId) => {
@@ -151,7 +172,7 @@ export const ProfileNotesProvider = ({ children }) => {
         t.id === todoId ? { ...t, done: !t.done } : t,
       );
       await updateDoc(itemDoc(uid, noteId), { todos: updatedTodos, updatedAt: Date.now() });
-    } catch (err) { Toast.show({ type: "error", text1: "Todo güncellenemedi" }); }
+    } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.todo_guncellenemedi", "Todo güncellenemedi") }); }
   };
 
   const handleAddTodoItem = async (noteId, newItemText) => {
@@ -217,7 +238,7 @@ export const ProfileNotesProvider = ({ children }) => {
         scheduledDate: scheduledDate !== undefined ? scheduledDate : null,
         updatedAt: now,
       });
-    } catch (err) { Toast.show({ type: "error", text1: "Not güncellenemedi" }); }
+    } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.not_guncellenemedi", "Not güncellenemedi") }); }
   };
 
   const handleUpdateTodoNote = async (noteId, newTitle, newTodos, newColor, newBg) => {
@@ -244,7 +265,7 @@ export const ProfileNotesProvider = ({ children }) => {
         scheduledDate: scheduledDate !== undefined ? scheduledDate : null,
         updatedAt: now,
       });
-    } catch (err) { Toast.show({ type: "error", text1: "Not güncellenemedi" }); }
+    } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.not_guncellenemedi", "Not güncellenemedi") }); }
   };
 
   const handleDeleteNote = async (noteId) => {
@@ -255,7 +276,37 @@ export const ProfileNotesProvider = ({ children }) => {
 
     try {
       await deleteDoc(itemDoc(uid, noteId));
-    } catch (err) { Toast.show({ type: "error", text1: "Not silinemedi" }); }
+    } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.not_silinemedi", "Not silinemedi") }); }
+  };
+
+  /**
+   * Tek noktadan upsert (ekle veya güncelle). Yeni NotesScreen (IslamicGuide
+   * düzeni) bunu kullanır: tam not objesini alır, createdAt/updatedAt'i ayarlar,
+   * optimistic günceller ve setDoc ile yazar. Hem "note" hem "todo" için çalışır.
+   */
+  const saveNote = async (note) => {
+    if (!uid || !note?.id) return;
+    const now = Date.now();
+    const exists = notesRef.current.some((n) => n.id === note.id);
+    const finalNote = {
+      ...note,
+      createdAt: note.createdAt || now,
+      updatedAt: now,
+    };
+
+    // Optimistic update
+    setNotes((prev) =>
+      exists
+        ? prev.map((n) => (n.id === note.id ? finalNote : n))
+        : [finalNote, ...prev],
+    );
+    setSelectedNote((prev) => (prev && prev.id === note.id ? finalNote : prev));
+
+    try {
+      await setDoc(itemDoc(uid, note.id), finalNote);
+    } catch (err) {
+      Toast.show({ type: "error", text1: i18nText("autoI18n.not_kaydedilemedi", "Not kaydedilemedi") });
+    }
   };
 
   const value = useMemo(() => ({
@@ -268,7 +319,7 @@ export const ProfileNotesProvider = ({ children }) => {
     backgroundColorNotes, setBackgroundColorNotes,
     noteType, setNoteType, todoItems, setTodoItems,
     todoTitle, setTodoTitle, scheduledDate, setScheduledDate,
-    handleAddNote, handleUpdateNote, handleDeleteNote,
+    handleAddNote, handleUpdateNote, handleDeleteNote, saveNote,
     handleToggleTodoItem, handleAddTodoItem, handleDeleteTodoItem, handleUpdateTodoNote,
     formatDate,
   }), [

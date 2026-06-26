@@ -17,19 +17,25 @@ import {
   View,
   LogBox,
   InteractionManager,
+  DeviceEventEmitter,
 } from "react-native";
 
-import { NavigationContainer } from "@react-navigation/native";
+import {
+  NavigationContainer,
+  createNavigationContainerRef,
+} from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
 import { LanguageProvider } from "./context/LanguageContext";
 import { ThemeProvider } from "./context/ThemeContext";
-import TabScreen from "./screens/TabScreen";
+import TabScreen from "@screens/navigation/TabScreen";
 import TvShowsDetails from "./screens/tv/TvShowsDetails";
 import SeasonDetails from "./screens/tv/SeasonDetails";
 import EpisodeDetails from "./screens/tv/EpisodeDetails";
 import MovieDetails from "./screens/movie/MovieDetail";
 import TvGraphDetailScreen from "./screens/tv/TvGraphDetailScreen";
+import StoryShareScreen from "@screens/story/StoryShareScreen";
+import StoryDraftsScreen from "@screens/story/StoryDraftsScreen";
 import MovieSearch from "./screens/search/MovieSearch";
 import TvShowSearch from "./screens/search/TvShowSearch";
 import LoginScreen from "./screens/auth/LoginScreen";
@@ -39,40 +45,71 @@ import LottieView from "lottie-react-native";
 import { useTheme } from "./context/ThemeContext";
 import { SnowProvider, useSnow } from "./context/SnowContext";
 import { AppSettingsProvider } from "./context/AppSettingsContext";
+import { ConnectivityProvider } from "./context/ConnectivityContext";
+import { PetProvider } from "./context/PetContext";
 import { ListStatusProvider } from "./context/ListStatusContext";
 import { auth, db } from "./firebase";
 import ProfileScreen from "./screens/tabs/ProfileScreen";
 import Toast from "react-native-toast-message";
+import { toastConfig } from "@components/AppToast";
+import { AppAlertHost } from "@components/AppAlert";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import ListsScreen from "./screens/ListsScreen";
+import ListsScreen from "@screens/lists/ListsScreen";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import ListsViewScreen from "./screens/ListsViewScreen";
+import ListsViewScreen from "@screens/lists/ListsViewScreen";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import SwipeView from "./screens/SwipeView";
+import SwipeView from "@screens/chat/SwipeView";
 import { ProfileStatsProvider }     from "./context/ProfileStatsContext";
 import { ProfileNotesProvider }     from "./context/ProfileNotesContext";
 import { ProfileRemindersProvider } from "./context/ProfileRemindersContext";
 import { ProfileUiProvider }        from "./context/ProfileUiContext";
+import { UserProfileProvider }      from "./context/UserProfileContext";
+import { FriendsProvider }          from "./context/FriendsContext";
+import { NotificationsProvider }    from "./context/NotificationsContext";
+import { DeviceNotificationsProvider } from "./context/DeviceNotificationsContext";
+import { PostsProvider }            from "./context/PostsContext";
 import { TvShowProvider } from "./context/TvShowContex";
 import ActorSearch from "./screens/search/ActorSearch";
 import ActorViewScreen from "./screens/actor/ActorViewScreen";
 import MovieStatisticsScreen from "./screens/tabs/profile/MovieStatisticsScreen";
 import TvStatisticsScreen from "./screens/tabs/profile/TvStatisticsScreen";
-import TabScreenNavigator from "./screens/TabScreenNavigator";
+import WrappedScreen from "@screens/wrapped/WrappedScreen";
+import TabScreenNavigator from "@screens/navigation/TabScreenNavigator";
 import SearchAll from "./screens/search/SearchAll";
 import FriendsListScreen from "./screens/tabs/profile/FriendsListScreen";
+import FriendProfileScreen from "./screens/tabs/profile/FriendProfileScreen";
+import RemindersScreen from "./screens/tabs/profile/RemindersScreen";
+import NotesScreen from "./screens/tabs/profile/NotesScreen";
+import EditProfileScreen from "./screens/tabs/profile/EditProfileScreen";
+import MyPostsScreen from "./screens/tabs/MyPostsScreen";
+import MyActivityScreen from "./screens/tabs/profile/MyActivityScreen";
 import SearchFriendsScreen from "./screens/search/SearchFriendsScreen";
+import SearchScreen from "./screens/tabs/SearchScreen";
 import FriendRequestsScreen from "./screens/tabs/profile/FriendRequestsScreen";
-import ChatScreen from "./screens/ChatScreen";
+import PrivacySettingsScreen from "./screens/tabs/profile/PrivacySettingsScreen";
+import ChatScreen from "@screens/chat/ChatScreen";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { enableFreeze } from "react-native-screens";
 import Comment from "./components/Comment";
 import MovieSearchScreen from "./screens/search/MovieSearchScreen";
 import IconBacground from "./components/IconBacground";
-import CalendarScreen from "./screens/CalendarScreen";
+import CalendarScreen from "@screens/calendar/CalendarScreen";
 import { CalendarProvider } from "./context/CalendarContext";
 import OnGoingSeries from "./screens/tv/OnGoingSeries";
+import SceneGuessGameScreen from "./screens/game/SceneGuessGameScreen";
+import GameHubScreen from "./screens/game/GameHubScreen";
+import SceneGameDetailScreen from "./screens/game/SceneGameDetailScreen";
+import SceneGameSetupScreen from "./screens/game/SceneGameSetupScreen";
+import SceneGamePlayScreen from "./screens/game/SceneGamePlayScreen";
+import SceneGameResultScreen from "./screens/game/SceneGameResultScreen";
+import GameLeaderboardScreen from "./screens/game/GameLeaderboardScreen";
+import GameStatsScreen from "./screens/game/GameStatsScreen";
+import GameAchievementsScreen from "./screens/game/GameAchievementsScreen";
+import CustomThemeScreen from "./screens/tabs/setting/CustomThemeScreen";
 import { preloadAllCache } from "./utils/apiCache";
+import { installAxiosDataCache } from "./utils/axiosDataCache";
+import { hydrateAutoDataCacheSetting } from "./utils/dataCacheSettings";
+import { startPresence, stopPresence } from "./services/presenceService";
 import * as ExpoSplashScreen from "expo-splash-screen";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -82,7 +119,11 @@ import Octicons from "@expo/vector-icons/Octicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 enableFreeze(true);
+installAxiosDataCache();
 ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Bildirime dokunulduğunda yönlendirme için global navigation ref.
+const navigationRef = createNavigationContainerRef();
 
 const preloadIconFont = (IconSet) => {
   if (typeof IconSet?.loadFont === "function") {
@@ -95,6 +136,7 @@ const preloadIconFont = (IconSet) => {
 // Provider'lar mount olmadan önce cache belleğe alınır; tab ikonları da
 // ilk TV ekranı açıldıktan sonra font beklemez.
 const startupPreloadPromise = Promise.allSettled([
+  hydrateAutoDataCacheSetting(),
   preloadAllCache(),
   preloadIconFont(Ionicons),
   preloadIconFont(MaterialCommunityIcons),
@@ -117,14 +159,14 @@ const SplashScreen = () => {
       {showSnow && (
         <LottieView
           style={styles.lottie}
-          source={require("./LottieJson/snow.json")}
+          source={require("@lottie/snow.json")}
           autoPlay={true}
           loop
         />
       )}
       <LottieView
         style={{ width: 350, height: 350 }}
-        source={require("./LottieJson/splash.json")} // Lottie dosyanızın yolu
+        source={require("@lottie/splash.json")} // Lottie dosyanızın yolu
         autoPlay
         loop
       />
@@ -167,36 +209,15 @@ function AppContent() {
       createList();
     }
   }, [user]);
-  const toastConfig = {
-    error: ({ text1, props }) => (
-      <View style={styles.toastError}>
-        <Text allowFontScaling={false} style={styles.toastText}>
-          {text1}
-        </Text>
-      </View>
-    ),
-    warning: ({ text1, props }) => (
-      <View style={styles.toastWarning}>
-        <Text allowFontScaling={false} style={styles.toastText}>
-          {text1}
-        </Text>
-      </View>
-    ),
-    success: ({ text1, props }) => (
-      <View style={styles.toastSuccess}>
-        <Text allowFontScaling={false} style={styles.toastText}>
-          {text1}
-        </Text>
-      </View>
-    ),
-  };
   useEffect(() => {
     if (user) {
       setShowChatModal(true);
-    } else {
+    } else if (!loading && !user) {
       setShowChatModal(false);
+      // Emit APP_READY if user is not logged in, as TvShowScreen won't load
+      DeviceEventEmitter.emit("APP_READY");
     }
-  }, [user]);
+  }, [user, loading]);
 
   useEffect(() => {
     if (!showChatModal) {
@@ -219,6 +240,7 @@ function AppContent() {
 
   return (
     <NavigationContainer
+      ref={navigationRef}
       onStateChange={(state) => {
         // Get the current route name
         const routeName = state.routes[state.index].name;
@@ -275,10 +297,7 @@ function AppContent() {
           name="TvShowsDetails"
           component={TvShowsDetails}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
             presentation: "transparentModal",
           }}
         />
@@ -286,92 +305,62 @@ function AppContent() {
           name="SeasonDetails"
           component={SeasonDetails}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="EpisodeDetails"
           component={EpisodeDetails}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="MovieDetails"
           component={MovieDetails}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="TvGraphDetailScreen"
           component={TvGraphDetailScreen}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
-          name="MovieSearch"
-          component={MovieSearch}
+          name="StoryShareScreen"
+          component={StoryShareScreen}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
+            presentation: "modal",
             animation: "slide_from_bottom",
           }}
         />
         <Stack.Screen
-          name="TvShowSearch"
-          component={TvShowSearch}
+          name="StoryDraftsScreen"
+          component={StoryDraftsScreen}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
-            animation: "slide_from_bottom",
+            headerShown: false,
+            animation: "slide_from_right",
           }}
         />
         <Stack.Screen
-          name="ActorSearch"
-          component={ActorSearch}
+          name="UnifiedSearch"
+          component={SearchScreen}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
-          }}
-        />
-        <Stack.Screen
-          name="SearchAll"
-          component={SearchAll}
-          options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
+            presentation: "transparentModal",
+            animation: "none",
+            contentStyle: { backgroundColor: "transparent" },
           }}
         />
         <Stack.Screen
           name="ActorViewScreen"
           component={ActorViewScreen}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
 
@@ -379,29 +368,20 @@ function AppContent() {
           name="RegisterScreen"
           component={RegisterScreen}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="ForgotPasswordScreen"
           component={ForgotPasswordScreen}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="ProfileScreen"
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         >
           {(props) => (
@@ -414,90 +394,109 @@ function AppContent() {
           name="ListsScreen"
           component={ListsScreen}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="ListsViewScreen"
           component={ListsViewScreen}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="MovieStatisticsScreen"
           component={MovieStatisticsScreen}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="TvStatisticsScreen"
           component={TvStatisticsScreen}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
+        />
+        <Stack.Screen
+          name="WrappedScreen"
+          component={WrappedScreen}
+          options={{
+            headerShown: false,
+            presentation: "modal",
+            animation: "slide_from_bottom",
+          }}
+        />
+        <Stack.Screen
+          name="RemindersScreen"
+          component={RemindersScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="NotesScreen"
+          component={NotesScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="EditProfileScreen"
+          component={EditProfileScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="MyPostsScreen"
+          component={MyPostsScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="MyActivityScreen"
+          component={MyActivityScreen}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="FriendsListScreen"
           component={FriendsListScreen}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="FriendProfileScreen"
+          component={FriendProfileScreen}
+          options={{
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="ChatScreen"
           component={ChatScreen}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="SearchFriendsScreen"
           component={SearchFriendsScreen}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="FriendRequestsScreen"
           component={FriendRequestsScreen}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
+        />
+        <Stack.Screen
+          name="PrivacySettingsScreen"
+          component={PrivacySettingsScreen}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="Comment"
           component={Comment}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
@@ -526,17 +525,73 @@ function AppContent() {
           name="OnGoingSeries"
           component={OnGoingSeries}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
             animation: "slide_from_right",
           }}
+        />
+        <Stack.Screen
+          name="SceneGuessGameScreen"
+          component={SceneGuessGameScreen}
+          options={{
+            headerShown: false,
+            animation: "slide_from_bottom",
+          }}
+        />
+        <Stack.Screen
+          name="GameHubScreen"
+          component={GameHubScreen}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="SceneGameDetailScreen"
+          component={SceneGameDetailScreen}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="SceneGameSetupScreen"
+          component={SceneGameSetupScreen}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="SceneGamePlayScreen"
+          component={SceneGamePlayScreen}
+          options={{ headerShown: false, animation: "slide_from_bottom", gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="SceneGameResultScreen"
+          component={SceneGameResultScreen}
+          options={{ headerShown: false, animation: "fade" }}
+        />
+        <Stack.Screen
+          name="GameLeaderboardScreen"
+          component={GameLeaderboardScreen}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="GameStatsScreen"
+          component={GameStatsScreen}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="GameAchievementsScreen"
+          component={GameAchievementsScreen}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="CustomThemeScreen"
+          component={CustomThemeScreen}
+          options={{ headerShown: false, animation: "slide_from_right" }}
         />
       </Stack.Navigator>
 
       {showChatModal && swipeViewReady && <SwipeView />}
-      <Toast visibilityTime={5000} config={toastConfig} position="top" />
+      <Toast
+        config={toastConfig}
+        position="top"
+        topOffset={54}
+        visibilityTime={3000}
+      />
+      <AppAlertHost />
       <StatusBar style="dark" />
     </NavigationContainer>
   );
@@ -554,6 +609,16 @@ export default function App() {
     // Minimum 600 ms göster; preload bitince (genellikle < 50 ms) kapat.
     const MIN_MS = 600;
     const startedAt = Date.now();
+    let preloadDone = false;
+    let dataReady = false;
+    let timeoutFinished = false;
+
+    const checkReady = () => {
+      if (preloadDone && dataReady && !timeoutFinished) {
+        timeoutFinished = true;
+        hideSplash();
+      }
+    };
 
     const hideSplash = () => {
       Animated.timing(fadeAnim, {
@@ -566,61 +631,67 @@ export default function App() {
     startupPreloadPromise.then(() => {
       const elapsed = Date.now() - startedAt;
       const wait = Math.max(0, MIN_MS - elapsed);
-      if (wait > 0) {
-        setTimeout(hideSplash, wait);
-      } else {
+      setTimeout(() => {
+        preloadDone = true;
+        checkReady();
+      }, wait);
+    });
+
+    const sub = DeviceEventEmitter.addListener("APP_READY", () => {
+      dataReady = true;
+      checkReady();
+    });
+
+    // Fallback: forcefully hide after 10 seconds just in case
+    setTimeout(() => {
+      if (!timeoutFinished) {
+        timeoutFinished = true;
         hideSplash();
       }
-    });
+    }, 10000);
+
+    return () => sub.remove();
   }, []);
 
-  // Çevrimiçi/Çevrimdışı durumu yönetimi
+  // Presence (heartbeat + AppState + lastSeen) — presenceService halleder.
   useEffect(() => {
-    let currentUserUID = null;
-
-    const updateStatus = async (isOnline) => {
-      if (!currentUserUID) return;
-      try {
-        await updateDoc(doc(db, "Users", currentUserUID), { isOnline });
-      } catch (_) {}
-    };
-
-    const authUnsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
-        currentUserUID = user.uid;
-        updateStatus(true);
-      } else if (currentUserUID) {
-        updateStatus(false);
-        currentUserUID = null;
+    const authUnsubscribe = auth.onAuthStateChanged((u) => {
+      if (u?.uid) {
+        startPresence(u.uid);
+      } else {
+        stopPresence();
       }
     });
-
-    const appStateSubscription = AppState.addEventListener("change", (next) => {
-      updateStatus(next === "active");
-    });
-
     return () => {
       authUnsubscribe();
-      appStateSubscription.remove();
-      updateStatus(false);
+      stopPresence();
     };
   }, []);
   return (
     <ErrorBoundary>
       <GestureHandlerRootView>
         <SafeAreaProvider>
+          <ConnectivityProvider>
           <AppSettingsProvider>
           <LanguageProvider>
             <ThemeProvider>
               <SnowProvider>
                 <AuthProvider>
+                  <UserProfileProvider>
+                  <FriendsProvider>
+                  <NotificationsProvider>
                   <ListStatusProvider>
                     <ProfileStatsProvider>
                       <ProfileNotesProvider>
                         <ProfileRemindersProvider>
                           <ProfileUiProvider>
+                            <PostsProvider>
                         <TvShowProvider>
-                            <AppContent />
+                          <PetProvider>
+                            <DeviceNotificationsProvider navigationRef={navigationRef}>
+                              <AppContent />
+                            </DeviceNotificationsProvider>
+                          </PetProvider>
                             {splashVisible && (
                               <Animated.View
                                 style={[
@@ -633,16 +704,21 @@ export default function App() {
                               </Animated.View>
                             )}
                         </TvShowProvider>
+                            </PostsProvider>
                           </ProfileUiProvider>
                         </ProfileRemindersProvider>
                       </ProfileNotesProvider>
                     </ProfileStatsProvider>
                   </ListStatusProvider>
+                  </NotificationsProvider>
+                  </FriendsProvider>
+                  </UserProfileProvider>
                 </AuthProvider>
               </SnowProvider>
             </ThemeProvider>
           </LanguageProvider>
         </AppSettingsProvider>
+          </ConnectivityProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>

@@ -1,35 +1,67 @@
+import { Image } from "expo-image";
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { useCalendar } from "../../context/CalendarContext";
+import { useLanguage } from "../../context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
+import { i18nText } from "../../utils/i18nText";
 
-function formatShortDate(dateStr) {
+// ─── Tarih yardımcıları ───────────────────────────────────────────────────────
+
+function locale(language) {
+  return language === "tr" ? "tr-TR" : "en-US";
+}
+
+/** Tarih tile'ı için { day, month } parçaları. */
+function dateParts(dateStr, language) {
+  if (!dateStr) return { day: "", month: "" };
+  const d = new Date(dateStr + "T00:00:00");
+  if (isNaN(d.getTime())) return { day: "", month: "" };
+  return {
+    day: d.getDate(),
+    month: d
+      .toLocaleDateString(locale(language), { month: "short" })
+      .replace(".", ""),
+  };
+}
+
+/** Meta satırı için "Cum · 12 Haz" gibi okunur tarih. */
+function formatLongDate(dateStr, language) {
   if (!dateStr) return "";
+  const d = new Date(dateStr + "T00:00:00");
+  if (isNaN(d.getTime())) return dateStr;
+  return d
+    .toLocaleDateString(locale(language), {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    })
+    .replace(".", "");
+}
+
+/** Geri sayım rozeti bilgisi. */
+function countdownInfo(dateStr) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const target = new Date(dateStr + "T00:00:00");
   const diff = Math.round((target - today) / 86400000);
-  if (diff === 0) return "Bugün";
-  if (diff === 1) return "Yarın";
-  if (diff < 0) return "Geçti";
-  return `${diff} gün`;
+  let label;
+  if (diff === 0) label = i18nText("autoI18n.bugun", "Bugün");
+  else if (diff === 1) label = i18nText("autoI18n.yarin", "Yarın");
+  else if (diff < 0) label = i18nText("autoI18n.past_short", "Geçti");
+  else label = i18nText("autoI18n.day_count_short", "{{count}} gün", { count: diff });
+  return { label, isToday: diff === 0, isPast: diff < 0 };
 }
 
-function getItemColor(item, theme) {
-  if (item.eventType === "note" || item.type === "todo")
-    return "rgb(19, 141, 240)";
-  if (item.eventType === "reminder_movie") return "rgb(255, 124, 37)";
-  if (item.eventType === "reminder_tv") return "rgba(175, 0, 175, 1)";
-  return theme.accent;
-}
-function getItemBackgroundColor(item, theme) {
-  if (item.eventType === "note" || item.type === "todo")
-    return "rgba(19, 141, 240, 0.3)";
-  if (item.eventType === "reminder_movie") return "rgba(255, 124, 37, 0.3)";
-  if (item.eventType === "reminder_tv") return "rgba(175, 0, 175, 0.3)";
-  return theme.accent;
+// ─── Tür yardımcıları ─────────────────────────────────────────────────────────
+
+function getItemColor(item) {
+  if (item.eventType === "note" || item.type === "todo") return "#138DF0";
+  if (item.eventType === "reminder_movie") return "#FF7C25";
+  if (item.eventType === "reminder_tv") return "#AF00AF";
+  return "#138DF0";
 }
 
 function getItemIcon(item) {
@@ -40,202 +72,171 @@ function getItemIcon(item) {
 }
 
 function getItemTitle(item) {
-  if (item.eventType === "note") return item.title || item.content || "Not";
+  if (item.eventType === "note")
+    return item.title || item.content || i18nText("autoI18n.not", "Not");
   return item.title;
 }
 
 function getTypeBadge(item) {
-  if (item.eventType === "reminder_movie") return "Film";
+  if (item.eventType === "reminder_movie") return i18nText("autoI18n.film", "Film");
   if (item.eventType === "reminder_tv") return "Dizi";
   if (item.type === "todo") return "Todo";
-  return "Not";
+  return i18nText("autoI18n.not", "Not");
 }
+
+// ─── Widget ───────────────────────────────────────────────────────────────────
 
 export default function CalendarWidget({ navigation }) {
   const { theme } = useTheme();
+  const { language } = useLanguage();
   const { upcomingItems } = useCalendar();
 
-  const displayItems = useMemo(
-    () => upcomingItems.slice(0, 3),
-    [upcomingItems],
-  );
+  const displayItems = useMemo(() => upcomingItems.slice(0, 3), [upcomingItems]);
+  const total = upcomingItems.length;
+
+  const openCalendar = () => navigation.navigate("CalendarScreen");
 
   return (
-    <View style={{ width: "90%" }}>
-      <Text
-        style={{
-          color: theme.text.muted,
-          marginVertical: 15,
-        }}
-      >
-        TAKVIM
+    <View style={styles.section}>
+      <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.text.muted }]}>
+        {i18nText("autoI18n.takvim_upper", "TAKVİM")}
       </Text>
+
       <View
         style={[
-          styles.container,
-          { backgroundColor: theme.secondary, borderColor: theme.border },
+          styles.card,
+          { backgroundColor: theme.secondary, borderColor: theme.border, shadowColor: theme.shadow },
         ]}
       >
-        {/* Arkaplan gradient */}
         <LinearGradient
-          colors={[theme.accent + "18", "transparent"]}
+          colors={[theme.accent + "1F", "transparent"]}
           style={StyleSheet.absoluteFill}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          end={{ x: 1, y: 0.7 }}
         />
 
-        {/* Header */}
+        {/* ── Header ── */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Ionicons name="calendar" size={16} color={theme.accent} />
-            <Text
-              allowFontScaling={false}
-              style={[styles.headerTitle, { color: theme.text.muted }]}
-            >
-              YAKLAŞAN ETKİNLİKLER
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[
-              styles.openBtn,
-              {
-                backgroundColor: theme.primary,
-                borderColor: theme.accent + "44",
-              },
-            ]}
-            onPress={() => navigation.navigate("CalendarScreen")}
-            activeOpacity={0.8}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.openBtnText, { color: theme.text.primary }]}
-            >
-              Takvimi Aç{" "}
-            </Text>
-            <Ionicons
-              name="chevron-forward"
-              size={12}
-              color={theme.text.primary}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* İçerik */}
-        {displayItems.length === 0 ? (
-          <View style={styles.emptyRow}>
-            <Ionicons
-              name="calendar-outline"
-              size={20}
-              color={theme.text.muted}
-            />
-            <View style={{ flex: 1 }}>
-              <Text
-                allowFontScaling={false}
-                style={[styles.emptyText, { color: theme.text.muted }]}
-              >
-                Yaklaşan etkinlik yok
+            <View style={[styles.iconTile, { backgroundColor: theme.accent + "22" }]}>
+              <Ionicons name="calendar" size={18} color={theme.accent} />
+            </View>
+            <View>
+              <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.text.primary }]}>
+                {i18nText("autoI18n.yaklasan_etkinlikler_title", "Yaklaşan Etkinlikler")}
               </Text>
-              <Text
-                allowFontScaling={false}
-                style={[styles.emptySubText, { color: theme.text.muted }]}
-              >
-                Not veya hatırlatıcı ekleyerek başlayın
+              <Text allowFontScaling={false} style={[styles.headerSub, { color: theme.text.muted }]}>
+                {total > 0
+                  ? i18nText("autoI18n.n_etkinlik", "{{count}} etkinlik", { count: total })
+                  : i18nText("autoI18n.bos_takvim", "Planlı bir şey yok")}
               </Text>
             </View>
           </View>
+
+          <TouchableOpacity
+            style={[styles.allBtn, { backgroundColor: theme.accent }]}
+            onPress={openCalendar}
+            activeOpacity={0.85}
+          >
+            <Text allowFontScaling={false} style={styles.allBtnText}>
+              {i18nText("autoI18n.tumu", "Tümü")}
+            </Text>
+            <Ionicons name="chevron-forward" size={13} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        {/* ── İçerik ── */}
+        {displayItems.length === 0 ? (
+          <TouchableOpacity style={styles.empty} onPress={openCalendar} activeOpacity={0.8}>
+            <View style={[styles.emptyIcon, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+              <Ionicons name="sparkles-outline" size={20} color={theme.accent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text allowFontScaling={false} style={[styles.emptyText, { color: theme.text.primary }]}>
+                {i18nText("autoI18n.yaklasan_etkinlik_yok", "Yaklaşan etkinlik yok")}
+              </Text>
+              <Text allowFontScaling={false} style={[styles.emptySubText, { color: theme.text.muted }]}>
+                {i18nText("autoI18n.not_veya_hatirlatici_ekleyerek_baslayin", "Not veya hatırlatıcı ekleyerek başlayın")}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={theme.text.muted} />
+          </TouchableOpacity>
         ) : (
           <View style={styles.itemList}>
             {displayItems.map((item, idx) => {
-              const color = getItemColor(item, theme);
-              const backgroundColor = getItemBackgroundColor(item, theme);
+              const color = getItemColor(item);
               const icon = getItemIcon(item);
               const title = getItemTitle(item);
-              const dateLabel = formatShortDate(item.date);
               const badge = getTypeBadge(item);
+              const { day, month } = dateParts(item.date, language);
+              const { label, isToday, isPast } = countdownInfo(item.date);
+              const hasPoster = !!item.poster;
 
               return (
                 <TouchableOpacity
-                  key={`widget-${item.id || idx}-${idx}`}
-                  style={[
-                    styles.itemRow,
-                    {
-                      borderBottomColor: theme.border,
-                      borderBottomWidth: idx < displayItems.length - 1 ? 1 : 0,
-                    },
-                  ]}
+                  key={`cal-${item.id || idx}-${idx}`}
+                  style={[styles.itemRow, { backgroundColor: theme.primary }]}
                   onPress={() => {
                     if (item.eventType === "reminder_movie") {
                       navigation.navigate("MovieDetails", { id: item.id });
                     } else if (item.eventType === "reminder_tv") {
                       navigation.navigate("TvShowsDetails", { id: item.id });
                     } else {
-                      navigation.navigate("CalendarScreen");
+                      openCalendar();
                     }
                   }}
-                  activeOpacity={0.7}
+                  activeOpacity={0.75}
                 >
-                  {/* İkon veya poster */}
-                  {item.poster ? (
-                    <Image
-                      source={{ uri: item.poster }}
-                      style={styles.miniPoster}
-                    />
+                  {/* Renk şeridi */}
+                  <View style={[styles.accentStrip, { backgroundColor: color }]} />
+
+                  {/* Sol: poster veya tarih tile'ı */}
+                  {hasPoster ? (
+                    <Image source={{ uri: item.poster }} style={styles.poster} contentFit="cover" transition={120} />
                   ) : (
-                    <View
-                      style={[
-                        styles.iconBox,
-                        { backgroundColor: backgroundColor },
-                      ]}
-                    >
-                      <Ionicons name={icon} size={16} color={color} />
+                    <View style={[styles.dateTile, { backgroundColor: color + "1A", borderColor: color + "33" }]}>
+                      <Text allowFontScaling={false} style={[styles.dateDay, { color }]}>
+                        {day}
+                      </Text>
+                      <Text allowFontScaling={false} style={[styles.dateMonth, { color }]}>
+                        {month}
+                      </Text>
                     </View>
                   )}
 
-                  {/* Bilgi */}
+                  {/* Orta: başlık + meta */}
                   <View style={styles.itemInfo}>
-                    <Text
-                      style={[styles.itemTitle, { color: theme.text.primary }]}
-                      numberOfLines={1}
-                    >
+                    <Text style={[styles.itemTitle, { color: theme.text.primary }]} numberOfLines={1}>
                       {title}
                     </Text>
                     <View style={styles.itemMeta}>
-                      <Text
-                        style={[styles.itemDate, { color: theme.text.muted }]}
-                      >
-                        {item.date}
-                      </Text>
-                      <View
-                        style={[
-                          styles.typePill,
-                          { backgroundColor: backgroundColor },
-                        ]}
-                      >
-                        <Text
-                          allowFontScaling={false}
-                          style={[styles.typePillText, { color }]}
-                        >
+                      <View style={[styles.typeChip, { backgroundColor: color + "1F" }]}>
+                        <Ionicons name={icon} size={10} color={color} />
+                        <Text allowFontScaling={false} style={[styles.typeChipText, { color }]}>
                           {badge}
                         </Text>
                       </View>
+                      <Text allowFontScaling={false} style={[styles.itemDate, { color: theme.text.muted }]} numberOfLines={1}>
+                        {formatLongDate(item.date, language)}
+                      </Text>
                     </View>
                   </View>
 
-                  {/* Gün sayacı */}
+                  {/* Sağ: geri sayım */}
                   <View
                     style={[
-                      styles.dayBadge,
-                      {
-                        backgroundColor: backgroundColor,
-                        borderColor: color + "55",
-                      },
+                      styles.countdown,
+                      isToday
+                        ? { backgroundColor: color }
+                        : { backgroundColor: color + "14", borderColor: color + "44", borderWidth: 1 },
+                      isPast && !isToday && { opacity: 0.6 },
                     ]}
                   >
                     <Text
                       allowFontScaling={false}
-                      style={[styles.dayBadgeText, { color }]}
+                      style={[styles.countdownText, { color: isToday ? "#fff" : color }]}
                     >
-                      {dateLabel}
+                      {label}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -249,82 +250,129 @@ export default function CalendarWidget({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  section: { width: "90%", marginTop: 4 },
+  sectionTitle: {
+    fontSize: 13,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: 10,
+    marginLeft: 4,
+  },
+
+  card: {
     width: "100%",
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     marginBottom: 12,
+    padding: 12,
     overflow: "hidden",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 4,
   },
+
+  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ffffff10",
+    marginBottom: 12,
   },
-  headerLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
-  headerTitle: {
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 1.5,
-    textTransform: "uppercase",
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
+  iconTile: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  openBtn: {
+  headerTitle: { fontSize: 15, fontWeight: "800", letterSpacing: -0.2 },
+  headerSub: { fontSize: 11, marginTop: 1, fontWeight: "500" },
+  allBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    gap: 2,
+    paddingLeft: 12,
+    paddingRight: 8,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+  allBtnText: { fontSize: 12, fontWeight: "700", color: "#fff" },
+
+  // Empty
+  empty: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 6,
+  },
+  emptyIcon: {
+    width: 44,
+    height: 44,
     borderRadius: 12,
     borderWidth: 1,
-  },
-  openBtnText: { fontSize: 11, fontWeight: "600" },
-
-  emptyRow: {
-    flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
-    gap: 10,
-    padding: 14,
   },
-  emptyText: { fontSize: 12, fontWeight: "600" },
-  emptySubText: { fontSize: 10, marginTop: 2 },
+  emptyText: { fontSize: 13, fontWeight: "700" },
+  emptySubText: { fontSize: 11, marginTop: 2 },
 
-  itemList: { paddingVertical: 4 },
+  // List
+  itemList: { gap: 8 },
   itemRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingRight: 10,
+    paddingLeft: 12,
     gap: 10,
+    overflow: "hidden",
   },
-  iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+  accentStrip: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+  },
+
+  dateTile: {
+    width: 42,
+    height: 48,
+    borderRadius: 11,
+    borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
-    flexShrink: 0,
   },
-  miniPoster: { width: 28, height: 42, borderRadius: 4, flexShrink: 0 },
-  itemInfo: { flex: 1, gap: 3 },
-  itemTitle: { fontSize: 13, fontWeight: "600" },
-  itemMeta: { flexDirection: "row", alignItems: "center", gap: 6 },
-  itemDate: { fontSize: 10 },
-  typePill: {
+  dateDay: { fontSize: 18, fontWeight: "800", lineHeight: 20 },
+  dateMonth: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+
+  poster: { width: 42, height: 48, borderRadius: 10 },
+
+  itemInfo: { flex: 1, gap: 4 },
+  itemTitle: { fontSize: 14, fontWeight: "700" },
+  itemMeta: { flexDirection: "row", alignItems: "center", gap: 8 },
+  typeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
     paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 6,
+    paddingVertical: 2,
+    borderRadius: 7,
   },
-  typePillText: { fontSize: 9, fontWeight: "700" },
-  dayBadge: {
+  typeChipText: { fontSize: 9, fontWeight: "800", letterSpacing: 0.2 },
+  itemDate: { fontSize: 10, fontWeight: "500", flexShrink: 1 },
+
+  countdown: {
+    minWidth: 52,
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
+    paddingVertical: 6,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
   },
-  dayBadgeText: { fontSize: 10, fontWeight: "700" },
+  countdownText: { fontSize: 11, fontWeight: "800" },
 });

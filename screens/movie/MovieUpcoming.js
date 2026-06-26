@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Text,
   TouchableOpacity,
@@ -15,11 +15,67 @@ import { useTheme } from "../../context/ThemeContext";
 import { Dropdown } from "react-native-element-dropdown";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { MovieUpComingSkeleton } from "../../components/Skeleton";
+import PaginatedRail from "../../components/PaginatedRail";
 //import { API_KEY } from "@env";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
-import { useListStatus } from "../../modules/UseListStatus";
+import ListBadges from "../../components/ListBadges";
+import { i18nText } from "../../utils/i18nText";
+
 const { width } = Dimensions.get("window");
+
+// Stable, module-scope item component → no remount → no flicker.
+const MovieUpcomingCard = memo(function MovieUpcomingCard({ item, navigation, theme, getTmdbUrl, RelaseCount }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const onPressIn = () =>
+    Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
+  const onPressOut = () =>
+    Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+
+  const source = useMemo(
+    () =>
+      item.poster_path
+        ? { uri: getTmdbUrl(item.poster_path, "poster", 200) }
+        : require("../../assets/image/no_image.png"),
+    [item.poster_path, getTmdbUrl]
+  );
+
+  return (
+    <TouchableOpacity
+      style={styles.similarItem}
+      activeOpacity={0.8}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      onPress={() => navigation.push("MovieDetails", { id: item.id })}
+    >
+      <Animated.View style={[{ transform: [{ scale }] }]}>
+        <Image
+          source={source}
+          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+          cachePolicy="memory-disk"
+          recyclingKey={`movieupcoming-${item.id}`}
+          transition={120}
+        />
+
+        <View style={[styles.relaseDateCount, { backgroundColor: theme.secondaryt }]}>
+          <Text style={[styles.similarRatingText, { color: theme.text.secondary }]}>
+            {RelaseCount(item.release_date)}{i18nText("autoI18n.gun", "gün")}</Text>
+        </View>
+        <View style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}>
+          <Text style={[styles.similarRatingText, { color: theme.text.primary }]}>
+            {item.release_date}
+          </Text>
+        </View>
+        <ListBadges
+          mediaId={item.id}
+          mediaType="movie"
+          theme={theme}
+          style={{ position: "absolute", left: 2, bottom: 8 }}
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+});
 
 export default function MovieUpcoming({ navigation }) {
   const { theme } = useTheme();
@@ -32,7 +88,9 @@ export default function MovieUpcoming({ navigation }) {
     isFocusUpcoming,
     setValueUpcoming,
     pageUpcoming,
-    setPageUpcoming,
+    totalPagesUpcoming,
+    loadMoreUpcoming,
+    loadingMoreUpcoming,
     setIsFocusUpcoming,
     valueUpcoming,
     RelaseCount,
@@ -43,37 +101,6 @@ export default function MovieUpcoming({ navigation }) {
   useEffect(() => {
     activateMovieSection("upcoming");
   }, [activateMovieSection]);
-
-  // Animated import'unun eklendiğinden emin olun
-  const [scaleValues, setScaleValues] = useState({});
-
-  useEffect(() => {
-    const newScaleValues = {};
-    if (moviesUpcoming && moviesUpcoming.length > 0) {
-      moviesUpcoming.forEach((item) => {
-        newScaleValues[item.id] = new Animated.Value(1);
-      });
-      setScaleValues(newScaleValues);
-    }
-  }, [moviesUpcoming]);
-
-  const onPressIn = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 0.9,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const onPressOut = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
 
   if (loadingUpcoming) {
     return (
@@ -103,7 +130,7 @@ export default function MovieUpcoming({ navigation }) {
             maxHeight={200}
             labelField="label"
             valueField="value"
-            placeholder={!isFocusUpcoming ? "Tarih Seçin" : "..."}
+            placeholder={!isFocusUpcoming ? i18nText("autoI18n.tarih_secin", "Tarih Seçin") : "..."}
             value={valueUpcoming}
             onFocus={() => setIsFocusUpcoming(true)}
             onBlur={() => setIsFocusUpcoming(false)}
@@ -132,304 +159,20 @@ export default function MovieUpcoming({ navigation }) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 15 }}
         />
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 5,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.muted }]}
-          >
-            ●●●
-          </Text>
-          {pageUpcoming > 5 && (
-            <>
-              <TouchableOpacity
-                onPress={() => setPageUpcoming(pageUpcoming - 5)}
-                style={{
-                  width: 25,
-                  height: 20,
-                  borderRadius: 10,
-                  backgroundColor: theme.secondary,
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.genreText, { color: theme.text.primary }]}
-                >
-                  {pageUpcoming - 5}
-                </Text>
-              </TouchableOpacity>
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.muted }]}
-              >
-                ●
-              </Text>
-            </>
-          )}
-
-          {pageUpcoming > 2 && (
-            <TouchableOpacity
-              onPress={() => setPageUpcoming(pageUpcoming - 2)}
-              style={{
-                width: 25,
-                height: 20,
-                borderRadius: 10,
-                backgroundColor: theme.secondary,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageUpcoming - 2}
-              </Text>
-            </TouchableOpacity>
-          )}
-          {pageUpcoming > 1 && (
-            <TouchableOpacity
-              onPress={() => setPageUpcoming(pageUpcoming - 1)}
-              style={{
-                width: 25,
-                height: 20,
-                borderRadius: 10,
-                justifyContent: "center",
-                backgroundColor: theme.secondary,
-
-                alignItems: "center",
-              }}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageUpcoming - 1}
-              </Text>
-            </TouchableOpacity>
-          )}
-          <Text
-            style={[
-              styles.genreText,
-              {
-                color: theme.text.secondary,
-                width: 25,
-                height: 20,
-                textAlign: "center",
-              },
-            ]}
-          >
-            {pageUpcoming}
-          </Text>
-          <TouchableOpacity
-            onPress={() => setPageUpcoming(pageUpcoming + 1)}
-            style={{
-              width: 25,
-              height: 20,
-              borderRadius: 10,
-              backgroundColor: theme.secondary,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageUpcoming + 1}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setPageUpcoming(pageUpcoming + 2)}
-            style={{
-              width: 25,
-              height: 20,
-              borderRadius: 10,
-              backgroundColor: theme.secondary,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageUpcoming + 2}
-            </Text>
-          </TouchableOpacity>
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.muted }]}
-          >
-            ●
-          </Text>
-          <TouchableOpacity
-            onPress={() => setPageUpcoming(pageUpcoming + 5)}
-            style={{
-              width: 25,
-              height: 20,
-              borderRadius: 10,
-              backgroundColor: theme.secondary,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageUpcoming + 5}
-            </Text>
-          </TouchableOpacity>
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.muted }]}
-          >
-            ●●●
-          </Text>
-        </View>
       </View>
     );
   }
-  const MovieItem = ({ item }) => {
-    const { inWatchList, inFavorites, isWatched, isInOtherLists } =
-      useListStatus(item.id, "movie");
-    return (
-      item.poster_path && (
-        <TouchableOpacity
-          style={styles.similarItem}
-          activeOpacity={0.8}
-          onPressIn={() => onPressIn(item.id)}
-          onPressOut={() => onPressOut(item.id)}
-          onPress={() => navigation.push("MovieDetails", { id: item.id })}
-        >
-          <Animated.View
-            style={[
-              {
-                transform: [{ scale: scaleValues[item.id] || 1 }],
-              },
-            ]}
-          >
-            <Image
-              source={
-                item.poster_path
-                  ? {
-                      uri: getTmdbUrl(item.poster_path, 'poster', 200),
-                    }
-                  : require("../../assets/image/no_image.png")
-              }
-              style={[styles.similarPoster, { shadowColor: theme.shadow }]}
-              cachePolicy="memory-disk"
-              transition={120}
-            />
-
-            <View
-              style={[
-                styles.relaseDateCount,
-                { backgroundColor: theme.secondaryt },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.similarRatingText,
-                  { color: theme.text.secondary },
-                ]}
-              >
-                {RelaseCount(item.release_date)} gün
-              </Text>
-            </View>
-            <View
-              style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}
-            >
-              <Text
-                style={[
-                  styles.similarRatingText,
-                  { color: theme.text.primary },
-                ]}
-              >
-                {item.release_date}
-              </Text>
-            </View>
-            <View
-              style={{
-                justifyContent: "center",
-                alignItems: "center",
-                position: "absolute",
-                left: 2,
-                bottom: 8,
-              }}
-            >
-              <View
-                style={{
-                  gap: 3,
-                  backgroundColor: theme.secondaryt,
-                  paddingVertical: 3,
-                  paddingHorizontal: 1,
-                  borderRadius: 7,
-                }}
-              >
-                {inWatchList && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      //updateTvSeriesList("watchList", "tv");
-                    }}
-                  >
-                    <Ionicons
-                      name="bookmark"
-                      size={12}
-                      color={theme.colors.blue}
-                    />
-                  </TouchableOpacity>
-                )}
-                {isWatched && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      //updateTvSeriesList("watchedTv", "tv");
-                    }}
-                  >
-                    <Ionicons name="eye" size={12} color={theme.colors.green} />
-                  </TouchableOpacity>
-                )}
-                {inFavorites && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      //updateTvSeriesList("favorites", "tv");
-                    }}
-                  >
-                    <Ionicons name="heart" size={12} color={theme.colors.red} />
-                  </TouchableOpacity>
-                )}
-                {isInOtherLists && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      //updateMovieList("favorites", "movie");
-                    }}
-                  >
-                    <Ionicons
-                      name="grid"
-                      size={12}
-                      color={theme.colors.orange}
-                    />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          </Animated.View>
-        </TouchableOpacity>
-      )
-    );
-  };
-  const renderMovieItem = ({ item, index, navigation }) => {
+  const renderMovieItem = ({ item }) => {
     if (!item.poster_path) return null;
-    return <MovieItem item={item} index={index} navigation={navigation} />;
+    return (
+      <MovieUpcomingCard
+        item={item}
+        navigation={navigation}
+        theme={theme}
+        getTmdbUrl={getTmdbUrl}
+        RelaseCount={RelaseCount}
+      />
+    );
   };
   return (
     <View style={styles.container}>
@@ -455,7 +198,7 @@ export default function MovieUpcoming({ navigation }) {
           maxHeight={200}
           labelField="label"
           valueField="value"
-          placeholder={!isFocusUpcoming ? "Tarih Seçin" : "..."}
+          placeholder={!isFocusUpcoming ? i18nText("autoI18n.tarih_secin", "Tarih Seçin") : "..."}
           value={valueUpcoming}
           onFocus={() => setIsFocusUpcoming(true)}
           onBlur={() => setIsFocusUpcoming(false)}
@@ -476,183 +219,19 @@ export default function MovieUpcoming({ navigation }) {
           )}
         />
       </View>
-      <FlatList
+      <PaginatedRail
         data={moviesUpcoming}
-        horizontal
         contentContainerStyle={{ paddingHorizontal: 15 }}
-        showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id.toString()}
+        renderItem={renderMovieItem}
+        onLoadMore={loadMoreUpcoming}
+        loadingMore={loadingMoreUpcoming}
+        hasMore={pageUpcoming < totalPagesUpcoming}
         initialNumToRender={3}
         maxToRenderPerBatch={3}
         updateCellsBatchingPeriod={80}
         windowSize={5}
-        removeClippedSubviews
-        renderItem={renderMovieItem}
       />
-      <View
-        style={{
-          flexDirection: "row",
-          gap: 5,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <Text
-          allowFontScaling={false}
-          style={[styles.genreText, { color: theme.text.muted }]}
-        >
-          ●●●
-        </Text>
-        {pageUpcoming > 5 && (
-          <>
-            <TouchableOpacity
-              onPress={() => setPageUpcoming(pageUpcoming - 5)}
-              style={{
-                width: 25,
-                height: 20,
-                borderRadius: 10,
-                backgroundColor: theme.secondary,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageUpcoming - 5}
-              </Text>
-            </TouchableOpacity>
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.muted }]}
-            >
-              ●
-            </Text>
-          </>
-        )}
-
-        {pageUpcoming > 2 && (
-          <TouchableOpacity
-            onPress={() => setPageUpcoming(pageUpcoming - 2)}
-            style={{
-              width: 25,
-              height: 20,
-              borderRadius: 10,
-              backgroundColor: theme.secondary,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageUpcoming - 2}
-            </Text>
-          </TouchableOpacity>
-        )}
-        {pageUpcoming > 1 && (
-          <TouchableOpacity
-            onPress={() => setPageUpcoming(pageUpcoming - 1)}
-            style={{
-              width: 25,
-              height: 20,
-              borderRadius: 10,
-              justifyContent: "center",
-              backgroundColor: theme.secondary,
-
-              alignItems: "center",
-            }}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageUpcoming - 1}
-            </Text>
-          </TouchableOpacity>
-        )}
-        <Text
-          style={[
-            styles.genreText,
-            {
-              color: theme.text.secondary,
-              width: 25,
-              height: 20,
-              textAlign: "center",
-            },
-          ]}
-        >
-          {pageUpcoming}
-        </Text>
-        <TouchableOpacity
-          onPress={() => setPageUpcoming(pageUpcoming + 1)}
-          style={{
-            width: 25,
-            height: 20,
-            borderRadius: 10,
-            backgroundColor: theme.secondary,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.primary }]}
-          >
-            {pageUpcoming + 1}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setPageUpcoming(pageUpcoming + 2)}
-          style={{
-            width: 25,
-            height: 20,
-            borderRadius: 10,
-            backgroundColor: theme.secondary,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.primary }]}
-          >
-            {pageUpcoming + 2}
-          </Text>
-        </TouchableOpacity>
-        <Text
-          allowFontScaling={false}
-          style={[styles.genreText, { color: theme.text.muted }]}
-        >
-          ●
-        </Text>
-        <TouchableOpacity
-          onPress={() => setPageUpcoming(pageUpcoming + 5)}
-          style={{
-            width: 25,
-            height: 20,
-            borderRadius: 10,
-            backgroundColor: theme.secondary,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.primary }]}
-          >
-            {pageUpcoming + 5}
-          </Text>
-        </TouchableOpacity>
-        <Text
-          allowFontScaling={false}
-          style={[styles.genreText, { color: theme.text.muted }]}
-        >
-          ●●●
-        </Text>
-      </View>
     </View>
   );
 }

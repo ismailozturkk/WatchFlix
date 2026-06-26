@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, memo, useMemo } from "react";
+import React, { useState, useEffect, useCallback, memo } from "react";
 import {
   StyleSheet,
   View,
@@ -12,8 +12,9 @@ import {
 import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
-import { SearchSkeleton } from "../../components/Skeleton";
+import { SeasonSkeleton } from "../../components/Skeleton";
 import RatingStars from "../../components/RatingStars";
+import BackButton from "../../components/BackButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -56,6 +57,7 @@ const EpisodeCard = memo(
     genres,
     theme,
     imageQuality,
+    getTmdbUrl,
     t,
     isPlaying,
     dateDiff,
@@ -83,13 +85,13 @@ const EpisodeCard = memo(
           <>
             <LottieView
               style={styles.fireworksLeft}
-              source={require("../../LottieJson/6_fireworks.json")}
+              source={require("@lottie/6_fireworks.json")}
               autoPlay
               loop={false}
             />
             <LottieView
               style={styles.fireworksRight}
-              source={require("../../LottieJson/6_fireworks.json")}
+              source={require("@lottie/6_fireworks.json")}
               autoPlay
               loop={false}
             />
@@ -404,14 +406,7 @@ export default function SeasonDetails({ route, navigation }) {
   }, [user, showId, seasonNumber]);
 
   // ── Kar efekti lottie sayısını sınırla ───────────────────────────────────
-  const snowIndices = useMemo(() => {
-    if (!details || !showSnow) return [];
-    return details.episodes
-      .map((ep, i) => i)
-      .filter((i) => (i + 7) % 7 === 0 || i < 4);
-  }, [details, showSnow]);
-
-  if (loading) return <SearchSkeleton />;
+  if (loading) return <SeasonSkeleton />;
 
   if (!details) {
     return (
@@ -427,8 +422,9 @@ export default function SeasonDetails({ route, navigation }) {
     isSeasonWatched === 1 ? theme.colors?.green : theme.colors?.orange;
 
   return (
+    <View style={[styles.container, { backgroundColor: theme.primary }]}>
     <ScrollView
-      style={[styles.container, { backgroundColor: theme.primary }]}
+      style={styles.container}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
@@ -442,7 +438,7 @@ export default function SeasonDetails({ route, navigation }) {
       {isSeasonWatched === 1 && (
         <LottieView
           style={styles.confetti}
-          source={require("../../LottieJson/confetti_2.json")}
+          source={require("@lottie/confetti_2.json")}
           autoPlay
           loop={false}
         />
@@ -491,20 +487,6 @@ export default function SeasonDetails({ route, navigation }) {
 
       {/* ── İçerik ───────────────────────────────────────────────────────── */}
       <View style={[styles.content, { backgroundColor: theme.primary }]}>
-        {/* Kar efekti */}
-        {snowIndices.map((i) => (
-          <LottieView
-            key={details.episodes[i].episode_number}
-            style={[
-              styles.lottie,
-              { top: 1000 * Math.floor(i < 7 ? i : i / 7) },
-            ]}
-            source={require("../../LottieJson/snow.json")}
-            autoPlay
-            loop
-          />
-        ))}
-
         {/* ── Başlık Bloğu ─────────────────────────────────────────────── */}
         <View style={styles.titleBlock}>
           <Text
@@ -690,6 +672,7 @@ export default function SeasonDetails({ route, navigation }) {
                 genres={genres}
                 theme={theme}
                 imageQuality={imageQuality}
+                getTmdbUrl={getTmdbUrl}
                 t={t}
                 isPlaying={episode.id === play}
                 dateDiff={dateDiff}
@@ -714,6 +697,21 @@ export default function SeasonDetails({ route, navigation }) {
         </View>
       </View>
     </ScrollView>
+
+    {/* Kar: bölüm sayısına göre N adet yerine tek sabit overlay */}
+    {showSnow && (
+      <View style={styles.snowOverlay} pointerEvents="none">
+        <LottieView
+          style={{ flex: 1 }}
+          source={require("@lottie/snow.json")}
+          autoPlay
+          loop
+        />
+      </View>
+    )}
+
+    <BackButton variant="blur" />
+    </View>
   );
 }
 
@@ -775,13 +773,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 16,
   },
-  lottie: {
+  snowOverlay: {
     position: "absolute",
-    height: 1000,
     top: 0,
-    left: -120,
-    right: -120,
-    zIndex: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
   },
 
   // ── Başlık ────────────────────────────────────────────────────────────────

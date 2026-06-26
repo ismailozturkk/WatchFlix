@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from "react";
 import {
   StyleSheet,
   View,
@@ -36,16 +36,27 @@ import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import Entypo from "@expo/vector-icons/Entypo";
 import { useAppSettings, useImageQualitySettings } from "../../context/AppSettingsContext";
-import DateTimePickerModal from "react-native-modal-datetime-picker";
+import DatePickerModal from "@components/modals/DatePickerModal";
 import ListViewTv from "../../components/ListViewTv";
 import { BlurView } from "expo-blur";
-import { useListStatus } from "../../modules/UseListStatus";
+import ListBadges from "../../components/ListBadges";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { useListStatusContext } from "../../context/ListStatusContext";
 import IconBacground from "../../components/IconBacground";
+import ImageGalleryModal from "@components/modals/ImageGalleryModal";
+import TrailerSection from "@components/video/TrailerSection";
+import CommentSheetModal from "@components/modals/CommentSheetModal";
+import RatingSheetModal from "@components/modals/RatingSheetModal";
+import RatingSummary from "@components/RatingSummary";
+import { i18nText } from "../../utils/i18nText";
+
 
 const { height, width } = Dimensions.get("window");
 const BACKDROP_HEIGHT = width * (9 / 16);
+// Fragman oynatıcısı: 16:9 oranını koruyarak cihaza göre boyutlanır
+// (tablette aşırı genişlememesi için üst sınır var).
+const VIDEO_WIDTH = Math.min(width - 24, 720);
+const VIDEO_HEIGHT = Math.round((VIDEO_WIDTH * 9) / 16);
 
 /* ─── Section header (aynı MovieDetails stili) ── */
 const SectionHeader = ({ title, right, theme }) => (
@@ -59,29 +70,30 @@ const SectionHeader = ({ title, right, theme }) => (
 );
 
 /* ─── Benzer dizi kartı ── */
-const SimilarTvShow = ({
-  item,
-  navigation,
-  scaleValues,
-  onPressIn,
-  onPressOut,
-  imageQuality,
-  theme,
-}) => {
+// Kart kendi press animasyonunu yönetir; memo sayesinde ekran re-render
+// olduğunda 40 kart yeniden çizilmez.
+const SimilarTvShow = memo(function SimilarTvShow({ item, navigation, theme }) {
   const { getTmdbUrl } = useImageQualitySettings();
-  const { inWatchList, inFavorites, isWatched, isInOtherLists } = useListStatus(
-    item.id,
-    "tv",
-  );
-  const isInAnyList = inWatchList || isWatched || inFavorites || isInOtherLists;
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () =>
+    Animated.timing(scale, {
+      toValue: 0.93,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+  const onPressOut = () =>
+    Animated.timing(scale, {
+      toValue: 1,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
 
   return (
-    <Animated.View
-      style={{ transform: [{ scale: scaleValues[item.id] || 1 }] }}
-    >
+    <Animated.View style={{ transform: [{ scale }] }}>
       <TouchableOpacity
-        onPressIn={() => onPressIn(item.id)}
-        onPressOut={() => onPressOut(item.id)}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
         activeOpacity={0.9}
         style={styles.similarItem}
         onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
@@ -104,58 +116,36 @@ const SimilarTvShow = ({
             {item.vote_average.toFixed(1)}
           </Text>
         </View>
-        {isInAnyList && (
-          <View style={[styles.stats]}>
-            <View
-              style={{
-                gap: 3,
-                backgroundColor: "rgba(0,0,0,0.72)",
-                paddingVertical: 4,
-                paddingHorizontal: 2,
-                borderRadius: 10,
-              }}
-            >
-              {inWatchList && (
-                <View>
-                  <Ionicons
-                    name="bookmark"
-                    size={12}
-                    color={theme.colors.blue}
-                  />
-                </View>
-              )}
-              {isWatched && (
-                <View>
-                  <Ionicons name="eye" size={12} color={theme.colors.green} />
-                </View>
-              )}
-              {inFavorites && (
-                <View>
-                  <Ionicons name="heart" size={12} color={theme.colors.red} />
-                </View>
-              )}
-              {isInOtherLists && (
-                <View>
-                  <Ionicons name="grid" size={12} color={theme.colors.orange} />
-                </View>
-              )}
-            </View>
-          </View>
-        )}
+        <View style={styles.stats}>
+          <ListBadges
+            mediaId={item.id}
+            mediaType="tv"
+            theme={theme}
+            style={{
+              gap: 3,
+              paddingVertical: 4,
+              paddingHorizontal: 2,
+              borderRadius: 10,
+              backgroundColor: "rgba(0,0,0,0.72)",
+            }}
+          />
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
-};
+});
 
 /* ─── Ana bileşen ── */
 export default function TvShowsDetails({ route, navigation }) {
   const { id } = route.params;
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [commentModalVisible, setCommentModalVisible] = useState(false);
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { API_KEY, showSnow, imageQuality } = useAppSettings();
+  const { API_KEY, showSnow } = useAppSettings();
   const { getTmdbUrl } = useImageQualitySettings();
   const { allLists } = useListStatusContext();
 
@@ -182,15 +172,12 @@ export default function TvShowsDetails({ route, navigation }) {
       }),
     ]).start();
   };
-  const [listStates, setListStates] = useState({});
-  const [scaleValues, setScaleValues] = useState({});
   const [isSeasonWatched, setIsSeasonWatched] = useState(0);
   const [showEpisodeCount, setShowEpisodeCount] = useState();
   const [showEpisodes, setShowEpisodes] = useState();
   const [isLoading, setIsLoading] = useState(false);
   const [reviewLength, setReviewLength] = useState(5);
   const [reviewTextLength, setReviewTextLength] = useState(null);
-  const [selectedVideo, setSelectedVideo] = useState(null);
 
   const [PosterModalVisible, setPosterModalVisible] = useState(false);
   const [backdropModalVisible, setBacdropModalVisible] = useState(false);
@@ -213,51 +200,17 @@ export default function TvShowsDetails({ route, navigation }) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
 
-  /* ── Press animasyonları ── */
-  const onPressIn = (id) => {
-    if (!scaleValues[id]) return;
-    Animated.timing(scaleValues[id], {
-      toValue: 0.93,
-      duration: 150,
-      useNativeDriver: true,
-    }).start();
-  };
-  const onPressOut = (id) => {
-    if (!scaleValues[id]) return;
-    Animated.timing(scaleValues[id], {
-      toValue: 1,
-      duration: 150,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  /* ── listStates ── */
-  useEffect(() => {
-    if (!allLists) {
-      setListStates({});
-      return;
-    }
+  /* ── listStates — useMemo: snapshot başına bir kez, ekstra render yok ── */
+  const listStates = useMemo(() => {
+    if (!allLists) return {};
     const s = {};
     Object.entries(allLists).forEach(([k, v]) => {
       s[k] = Array.isArray(v)
         ? v.some((i) => i.id === id && i.type === "tv")
         : false;
     });
-    setListStates(s);
+    return s;
   }, [allLists, id]);
-
-  /* ── scaleValues ── */
-  useEffect(() => {
-    if (!details) return;
-    const vals = {};
-    [
-      ...(details.recommendations?.results || []).slice(0, 20),
-      ...(details.similar?.results || []).slice(0, 20),
-    ].forEach((item) => {
-      if (item?.id) vals[item.id] = new Animated.Value(1);
-    });
-    setScaleValues(vals);
-  }, [details]);
 
   /* ── Fetch details ── */
   useEffect(() => {
@@ -334,7 +287,7 @@ export default function TvShowsDetails({ route, navigation }) {
         list.splice(idx, 1);
         Toast.show({
           type: "warning",
-          text1: `Dizi ${getName(listType)} listesinden kaldırıldı!`,
+          text1: i18nText("autoI18n.tv_removed_from_list", "Dizi {{list}} listesinden kaldırıldı!", { list: getName(listType) }),
         });
       } else {
         list.push({
@@ -347,12 +300,12 @@ export default function TvShowsDetails({ route, navigation }) {
         });
         Toast.show({
           type: "success",
-          text1: `Dizi ${getName(listType)} listesine eklendi!`,
+          text1: i18nText("autoI18n.tv_added_to_list", "Dizi {{list}} listesine eklendi!", { list: getName(listType) }),
         });
       }
       await updateDoc(ref, { [listType]: list });
     } catch (e) {
-      Toast.show({ type: "error", text1: "Hata: " + e.message });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.hata_2", "Hata: ") + e.message });
     }
   };
 
@@ -365,8 +318,10 @@ export default function TvShowsDetails({ route, navigation }) {
   const showDatePicker = () => setDatePickerVisibility(true);
   const hideDatePicker = () => setDatePickerVisibility(false);
   const handleConfirm = (date) => {
-    setSelectedDate(date);
-    addShowToFirestore(date);
+    // date artık ISO string ("YYYY-MM-DD") veya Date objesi olabilir
+    const isoDate = typeof date === "string" ? date : formatDateSave(date);
+    setSelectedDate(isoDate);
+    addShowToFirestore(isoDate);
     hideDatePicker();
   };
   const showReleaseDateTime = new Date(details?.first_air_date);
@@ -409,7 +364,7 @@ export default function TvShowsDetails({ route, navigation }) {
         await updateDoc(ref, { watchedTv: wTv });
         Toast.show({
           type: "warning",
-          text1: "Dizi izleme listesinden silindi",
+          text1: i18nText("autoI18n.dizi_izleme_listesinden_silindi", "Dizi izleme listesinden silindi"),
         });
         checkIfWatched();
         return;
@@ -457,7 +412,7 @@ export default function TvShowsDetails({ route, navigation }) {
       await updateDoc(ref, { watchedTv: wTv });
       Toast.show({
         type: "success",
-        text1: "Dizi bölümleri izlendi olarak işaretlendi",
+        text1: i18nText("autoI18n.dizi_bolumleri_izlendi_olarak_isaretlendi", "Dizi bölümleri izlendi olarak işaretlendi"),
       });
       checkIfWatched();
     } catch (e) {
@@ -468,46 +423,12 @@ export default function TvShowsDetails({ route, navigation }) {
   };
 
   /* ── renderVideo ── */
-  const renderVideo = ({ item }) => (
-    <TouchableOpacity
-      style={styles.videoItem}
-      onPress={() => setSelectedVideo(item.key)}
-      activeOpacity={0.88}
-    >
-      <View style={styles.videoThumbnail}>
-        <Image
-          source={{
-            uri: `https://img.youtube.com/vi/${item.key}/hqdefault.jpg`,
-          }}
-          style={styles.videoImage}
-        />
-        <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.6)"]}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={styles.playIconContainer}>
-          <LottieView
-            style={{ width: 56, height: 56 }}
-            source={require("../../LottieJson/play")}
-            opacity={0.9}
-            autoPlay
-            loop
-          />
-        </View>
-        <View style={styles.videoTypeBadge}>
-          <Text allowFontScaling={false} style={styles.videoTypeBadgeText}>
-            {item.type}
-          </Text>
-        </View>
-      </View>
-      <Text
-        allowFontScaling={false}
-        style={[styles.videoTitle, { color: theme.text.primary }]}
-        numberOfLines={2}
-      >
-        {item.name}
-      </Text>
-    </TouchableOpacity>
+
+  const renderSimilarTvShow = useCallback(
+    ({ item }) => (
+      <SimilarTvShow item={item} navigation={navigation} theme={theme} />
+    ),
+    [navigation, theme],
   );
 
   if (loading) return <DetailsSkeleton />;
@@ -571,35 +492,9 @@ export default function TvShowsDetails({ route, navigation }) {
             colors={["transparent", "rgba(0,0,0,0.15)", theme.primary]}
             locations={[0.3, 0.65, 1]}
             style={styles.heroGradient}
+            pointerEvents="none"
           />
 
-          {/* Geri butonu */}
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.8}
-          >
-            <BlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
-              <Ionicons name="chevron-back" size={22} color="#fff" />
-            </BlurView>
-          </TouchableOpacity>
-
-          {showSnow &&
-            details.seasons.map(
-              (se, i) =>
-                ((i + 4) % 4 === 0 || i < 4) && (
-                  <LottieView
-                    key={se.season_number}
-                    style={[
-                      styles.lottie,
-                      { top: 1000 * Math.floor(i < 4 ? i : i / 4) },
-                    ]}
-                    source={require("../../LottieJson/snow.json")}
-                    autoPlay
-                    loop
-                  />
-                ),
-            )}
         </View>
 
         {/* ── POSTER + INFO HEADER ── */}
@@ -666,21 +561,15 @@ export default function TvShowsDetails({ route, navigation }) {
                 </View>
               ))}
             </View>
+            {/* Rating row — hybrid (TMDB + uygulama oyları), dokununca puan ver */}
             <View style={styles.ratingRow}>
-              {details.vote_average > 0 && (
-                <RatingStars rating={details.vote_average} />
-              )}
-              <Text style={[styles.ratingNum, { color: theme.colors.orange }]}>
-                {details.vote_average > 0
-                  ? details.vote_average.toFixed(1)
-                  : t.tvShowsDetails?.notYetRated}
-              </Text>
-              <View style={styles.voteRow}>
-                <FontAwesome name="user" size={11} color={theme.colors.blue} />
-                <Text style={[styles.voteCount, { color: theme.colors.blue }]}>
-                  {details.vote_count?.toLocaleString() || 0}
-                </Text>
-              </View>
+              <RatingSummary
+                mediaType="tv"
+                mediaId={id}
+                tmdbAvg={details.vote_average}
+                tmdbCount={details.vote_count}
+                onPressRate={() => setRatingModalVisible(true)}
+              />
             </View>
           </View>
         </View>
@@ -831,6 +720,36 @@ export default function TvShowsDetails({ route, navigation }) {
             </View>
           </View>
 
+          {/* ── YORUMLAR BUTONU ── */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => setCommentModalVisible(true)}
+            style={[
+              styles.commentsBtn,
+              { backgroundColor: theme.secondary, borderColor: theme.border },
+            ]}
+          >
+            <View
+              style={[
+                styles.commentsIconWrap,
+                { backgroundColor: theme.accent + "20" },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="comment-text-multiple-outline"
+                size={18}
+                color={theme.accent}
+              />
+            </View>
+            <Text
+              allowFontScaling={false}
+              style={[styles.commentsBtnText, { color: theme.text.primary }]}
+            >
+              {t.comments || i18nText("autoI18n.yorumlar", "Yorumlar")}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={theme.text.muted} />
+          </TouchableOpacity>
+
           {/* ── TV SHOW ITEM ── */}
           <View style={styles.section}>
             <TVShowItem item={details} navigation={navigation} />
@@ -924,9 +843,7 @@ export default function TvShowsDetails({ route, navigation }) {
                       <Text
                         allowFontScaling={false}
                         style={styles.graphChevronText}
-                      >
-                        Detaylı İstatistikler
-                      </Text>
+                      >{i18nText("autoI18n.detayli_istatistikler", "Detaylı İstatistikler")}</Text>
                       <Ionicons
                         name="chevron-forward"
                         size={14}
@@ -966,7 +883,7 @@ export default function TvShowsDetails({ route, navigation }) {
                   allowFontScaling={false}
                   style={[styles.accordionTitle, { color: theme.text.primary }]}
                 >
-                  {t.overview || "Özet"}
+                  {t.overview || i18nText("autoI18n.ozet", "Özet")}
                 </Text>
                 <Ionicons
                   name={
@@ -997,36 +914,20 @@ export default function TvShowsDetails({ route, navigation }) {
                   ]}
                   numberOfLines={expandedCard === "overview" ? null : 2}
                 >
-                  {details.overview || "Özet bulunmuyor."}
+                  {details.overview || i18nText("autoI18n.ozet_bulunmuyor", "Özet bulunmuyor.")}
                 </Text>
               </Animated.View>
               {expandedCard !== "overview" && (
                 <Text
                   allowFontScaling={false}
                   style={[styles.accordionMore, { color: theme.accent }]}
-                >
-                  devamı...
-                </Text>
+                >{i18nText("autoI18n.devami", "devamı...")}</Text>
               )}
             </TouchableOpacity>
           </View>
 
           {/* ── VİDEOLAR ── */}
-          {details.videos?.results.length > 0 && (
-            <View style={styles.section}>
-              <SectionHeader title={t.videos} theme={theme} />
-              <FlatList
-                data={details.videos.results.filter(
-                  (v) => v.site === "YouTube",
-                )}
-                renderItem={renderVideo}
-                keyExtractor={(item) => item.id}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingVertical: 4, gap: 14 }}
-              />
-            </View>
-          )}
+          <TrailerSection mediaType="tv" id={id} apiKey={API_KEY} />
 
           {/* ── SEZONLAR LİSTESİ ── */}
           <View style={styles.section}>
@@ -1073,21 +974,15 @@ export default function TvShowsDetails({ route, navigation }) {
               <SectionHeader title={t.recommendedTvShows} theme={theme} />
               <FlatList
                 data={details.recommendations.results.slice(0, 20)}
-                renderItem={({ item }) => (
-                  <SimilarTvShow
-                    item={item}
-                    navigation={navigation}
-                    scaleValues={scaleValues}
-                    onPressIn={onPressIn}
-                    onPressOut={onPressOut}
-                    imageQuality={imageQuality}
-                    theme={theme}
-                  />
-                )}
+                renderItem={renderSimilarTvShow}
                 keyExtractor={(item) => item.id.toString()}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ paddingVertical: 4, gap: 10 }}
+                initialNumToRender={5}
+                maxToRenderPerBatch={5}
+                windowSize={5}
+                removeClippedSubviews
               />
             </View>
           )}
@@ -1098,21 +993,15 @@ export default function TvShowsDetails({ route, navigation }) {
               <SectionHeader title={t.similarTvShows} theme={theme} />
               <FlatList
                 data={details.similar.results.slice(0, 20)}
-                renderItem={({ item }) => (
-                  <SimilarTvShow
-                    item={item}
-                    navigation={navigation}
-                    scaleValues={scaleValues}
-                    onPressIn={onPressIn}
-                    onPressOut={onPressOut}
-                    imageQuality={imageQuality}
-                    theme={theme}
-                  />
-                )}
+                renderItem={renderSimilarTvShow}
                 keyExtractor={(item) => item.id.toString()}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ paddingVertical: 4, gap: 10 }}
+                initialNumToRender={5}
+                maxToRenderPerBatch={5}
+                windowSize={5}
+                removeClippedSubviews
               />
             </View>
           )}
@@ -1175,9 +1064,7 @@ export default function TvShowsDetails({ route, navigation }) {
                     <Text
                       allowFontScaling={false}
                       style={[styles.readMore, { color: theme.accent }]}
-                    >
-                      Devamını oku
-                    </Text>
+                    >{i18nText("autoI18n.devamini_oku", "Devamını oku")}</Text>
                   )}
                 </TouchableOpacity>
               ))}
@@ -1203,7 +1090,7 @@ export default function TvShowsDetails({ route, navigation }) {
                     color={theme.accent}
                   />
                   <Text style={[styles.expandBtnText, { color: theme.accent }]}>
-                    {reviewLength > 5 ? "Daha az" : "Tüm yorumlar"}
+                    {reviewLength > 5 ? "Daha az" : i18nText("autoI18n.tum_yorumlar", "Tüm yorumlar")}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -1212,45 +1099,54 @@ export default function TvShowsDetails({ route, navigation }) {
         </View>
       </ScrollView>
 
-      {/* ═══ MODALS ═══ */}
-
-      {/* Video */}
-      <Modal
-        visible={selectedVideo !== null}
-        onRequestClose={() => setSelectedVideo(null)}
-        animationType="fade"
-        transparent
-      >
-        <View style={styles.videoModal}>
-          <BlurView
-            tint="dark"
-            intensity={60}
-            experimentalBlurMethod="dimezisBlurView"
-            style={StyleSheet.absoluteFill}
+      {/* Kar: scroll boyunca N adet yerine tek sabit overlay (MovieScreen paterni) */}
+      {showSnow && (
+        <View style={styles.snowOverlay} pointerEvents="none">
+          <LottieView
+            style={{ flex: 1 }}
+            source={require("@lottie/snow.json")}
+            autoPlay
+            loop
           />
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            onPress={() => setSelectedVideo(null)}
-          />
-          <View style={styles.videoModalContent}>
-            <TouchableOpacity
-              style={styles.videoCloseBtn}
-              onPress={() => setSelectedVideo(null)}
-            >
-              <BlurView
-                tint="dark"
-                intensity={50}
-                style={styles.videoCloseBtnBlur}
-              >
-                <Ionicons name="close" size={20} color="#fff" />
-              </BlurView>
-            </TouchableOpacity>
-            {selectedVideo && (
-              <YoutubePlayer height={220} videoId={selectedVideo} play />
-            )}
-          </View>
         </View>
-      </Modal>
+      )}
+
+      {/* ─── ÜST OVERLAY BUTONLARI (her zaman tıklanabilir) ─── */}
+      <TouchableOpacity
+        style={styles.backBtn}
+        onPress={() => navigation.goBack()}
+        activeOpacity={0.8}
+      >
+        <BlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
+          <Ionicons name="chevron-back" size={22} color="#fff" />
+        </BlurView>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.storyBtn}
+        onPress={() =>
+          navigation.navigate("StoryShareScreen", {
+            id,
+            type: "tv",
+            title: details.name,
+            year: details.first_air_date
+              ? String(details.first_air_date).slice(0, 4)
+              : "",
+            rating: details.vote_average,
+            genres: details.genres?.map((g) => g.name) || [],
+            backdrop_path: details.backdrop_path,
+            poster_path: details.poster_path,
+            tagline: details.tagline || "",
+          })
+        }
+        activeOpacity={0.8}
+      >
+        <BlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
+          <Ionicons name="share-social-outline" size={20} color="#fff" />
+        </BlurView>
+      </TouchableOpacity>
+
+      {/* ═══ MODALS ═══ */}
 
       {/* İzleme tarihi */}
       <Modal
@@ -1280,9 +1176,7 @@ export default function TvShowsDetails({ route, navigation }) {
             <Text
               allowFontScaling={false}
               style={[styles.sheetTitle, { color: theme.text.primary }]}
-            >
-              İzleme Tarihi
-            </Text>
+            >{i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}</Text>
             <Text
               allowFontScaling={false}
               style={[styles.sheetSubtitle, { color: theme.text.muted }]}
@@ -1320,7 +1214,7 @@ export default function TvShowsDetails({ route, navigation }) {
                     { color: selectedDate ? theme.accent : theme.text.primary },
                   ]}
                 >
-                  {selectedDate ? formatDateSave(selectedDate) : "Tarih Seç"}
+                  {selectedDate ? formatDateSave(selectedDate) : i18nText("autoI18n.tarih_sec", "Tarih Seç")}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1355,9 +1249,7 @@ export default function TvShowsDetails({ route, navigation }) {
                     styles.dateOptionLabel,
                     { color: theme.text.primary },
                   ]}
-                >
-                  Şimdi
-                </Text>
+                >{i18nText("autoI18n.simdi", "Şimdi")}</Text>
                 <Text
                   allowFontScaling={false}
                   style={[styles.dateOptionSub, { color: theme.text.muted }]}
@@ -1397,9 +1289,7 @@ export default function TvShowsDetails({ route, navigation }) {
                     styles.dateOptionLabel,
                     { color: theme.text.primary },
                   ]}
-                >
-                  Yayın Tarihi
-                </Text>
+                >{i18nText("autoI18n.yayin_tarihi", "Yayın Tarihi")}</Text>
                 <Text
                   allowFontScaling={false}
                   style={[styles.dateOptionSub, { color: theme.text.muted }]}
@@ -1408,61 +1298,70 @@ export default function TvShowsDetails({ route, navigation }) {
                 </Text>
               </TouchableOpacity>
             </View>
-            <DateTimePickerModal
-              isVisible={isDatePickerVisible}
-              mode="date"
-              onConfirm={handleConfirm}
-              onCancel={hideDatePicker}
-              minimumDate={showReleaseDateTime}
-              maximumDate={new Date()}
+            <DatePickerModal
+              visible={isDatePickerVisible}
+              value={selectedDate || formatDateSave(new Date())}
+              onConfirm={(iso) => handleConfirm(iso)}
+              onClose={hideDatePicker}
+              title={i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}
+              subtitle={i18nText("autoI18n.bu_diziyi_ne_zaman_izlemeye_basladiniz", "Bu diziyi ne zaman izlemeye başladınız?")}
+              confirmLabel="Tarihi Onayla"
+              minDate={showReleaseDateTime}
+              maxDate={new Date()}
             />
           </View>
         </View>
       </Modal>
 
-      {/* Poster / Backdrop */}
-      <Modal
+      {/* Poster / Backdrop galerisi (tüm görseller + indir) */}
+      <ImageGalleryModal
         visible={PosterModalVisible || backdropModalVisible}
-        onRequestClose={() => {
+        onClose={() => {
           setPosterModalVisible(false);
           setBacdropModalVisible(false);
         }}
-        animationType="fade"
+        mediaId={id}
+        mediaType="tv"
+        imageType={PosterModalVisible ? "poster" : "backdrop"}
+        initialImage={
+          PosterModalVisible ? details.poster_path : details.backdrop_path
+        }
+      />
+
+      {/* Yorumlar (film ile aynı yapı, TvComment koleksiyonu) */}
+      <Modal
+        animationType="none"
         transparent
+        visible={commentModalVisible}
+        onRequestClose={() => setCommentModalVisible(false)}
+        statusBarTranslucent
       >
-        <BlurView
-          tint="dark"
-          intensity={60}
-          experimentalBlurMethod="dimezisBlurView"
-          style={StyleSheet.absoluteFill}
+        <CommentSheetModal
+          visible={commentModalVisible}
+          onClose={() => setCommentModalVisible(false)}
+          movieId={id}
+          details={details}
+          collectionName="TvComment"
         />
-        <TouchableOpacity
-          style={StyleSheet.absoluteFill}
-          onPress={() => {
-            setPosterModalVisible(false);
-            setBacdropModalVisible(false);
-          }}
+      </Modal>
+
+      {/* Derecelendirme */}
+      <Modal
+        animationType="none"
+        transparent
+        visible={ratingModalVisible}
+        onRequestClose={() => setRatingModalVisible(false)}
+        statusBarTranslucent
+      >
+        <RatingSheetModal
+          visible={ratingModalVisible}
+          onClose={() => setRatingModalVisible(false)}
+          mediaType="tv"
+          mediaId={id}
+          tmdbAvg={details.vote_average}
+          tmdbCount={details.vote_count}
+          details={details}
         />
-        <View
-          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-        >
-          <Image
-            source={
-              PosterModalVisible
-                ? {
-                    uri: getTmdbUrl(details.poster_path, 'poster', 200),
-                  }
-                : {
-                    uri: getTmdbUrl(details.backdrop_path, 'backdrop', 1000),
-                  }
-            }
-            style={{
-              width: PosterModalVisible ? 300 : 380,
-              height: PosterModalVisible ? 450 : 380 * (9 / 16),
-              borderRadius: 20,
-            }}
-          />
-        </View>
       </Modal>
     </View>
   );
@@ -1470,6 +1369,27 @@ export default function TvShowsDetails({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
+  /* Yorumlar butonu */
+  commentsBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginHorizontal: 4,
+    marginBottom: 16,
+  },
+  commentsIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  commentsBtnText: { flex: 1, fontSize: 15, fontWeight: "700" },
 
   /* Hero */
   heroContainer: { height: BACKDROP_HEIGHT, position: "relative" },
@@ -1491,7 +1411,15 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: Platform.OS === "ios" ? 52 : 36,
     left: 16,
-    zIndex: 10,
+    zIndex: 50,
+    elevation: 50,
+  },
+  storyBtn: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 52 : 36,
+    right: 16,
+    zIndex: 50,
+    elevation: 50,
   },
   backBtnBlur: {
     width: 38,
@@ -1501,12 +1429,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
-  lottie: {
+  snowOverlay: {
     position: "absolute",
-    height: 1000,
-    left: -120,
-    right: -120,
-    zIndex: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
   },
 
   /* Info header */
@@ -1749,8 +1678,8 @@ const styles = StyleSheet.create({
   readMore: { fontSize: 12, fontWeight: "600", marginTop: 8 },
 
   /* Video modal */
-  videoModal: { flex: 1, justifyContent: "center" },
-  videoModalContent: { backgroundColor: "#000", position: "relative" },
+  videoModal: { flex: 1, justifyContent: "center", alignItems: "center" },
+  videoModalContent: { backgroundColor: "#000", position: "relative", width: VIDEO_WIDTH, alignSelf: "center" },
   videoCloseBtn: { position: "absolute", top: -52, right: 12, zIndex: 10 },
   videoCloseBtnBlur: {
     width: 38,

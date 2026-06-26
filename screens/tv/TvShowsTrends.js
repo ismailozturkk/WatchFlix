@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { memo, useEffect, useMemo, useRef } from "react";
 import {
   StyleSheet,
   View,
@@ -17,16 +17,160 @@ import { useTheme } from "../../context/ThemeContext";
 import { useTvShow } from "../../context/TvShowContex";
 import RatingStars from "../../components/RatingStars";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { useListStatus } from "../../modules/UseListStatus";
+import ListBadges from "../../components/ListBadges";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
 const { width, height } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.6;
-const CARD_HEIHGT = height * 0.45;
+// Sarmalayıcı yüksekliği poster yüksekliğinden türetilir (ekran yüksekliğinden
+// değil); böylece farklı en/boy oranlı cihazlarda posterin altı kesilmez.
+// +50: derece/liste rozetlerinin sığması için pay.
+const CARD_HEIHGT = CARD_WIDTH * 1.5 + 50;
 const SPACING = width * 0.02;
 const ITEM_SIZE = CARD_WIDTH;
 const EMPTY_ITEM_SIZE = (width - CARD_WIDTH) / 2;
 const INITIAL_CARD_RENDER_COUNT = 4;
+
+// Stable, module-scope item component. Hoisted out of the parent so its
+// component type never changes between renders → no remount → no flicker.
+const TvTrendCard = memo(function TvTrendCard({
+  item,
+  index,
+  navigation,
+  theme,
+  getTmdbUrl,
+  scrollX,
+}) {
+  const inputRange = [
+    (index - 2) * ITEM_SIZE,
+    (index - 1) * ITEM_SIZE,
+    index * ITEM_SIZE,
+  ];
+
+  const scale = scrollX.interpolate({
+    inputRange,
+    outputRange: [0.7, 1, 0.7],
+    extrapolate: "clamp",
+  });
+
+  const opacity = scrollX.interpolate({
+    inputRange,
+    outputRange: [0.5, 1, 0.5],
+    extrapolate: "clamp",
+  });
+
+  const pressScale = useRef(new Animated.Value(1)).current;
+  const onPressIn = () =>
+    Animated.timing(pressScale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
+  const onPressOut = () =>
+    Animated.timing(pressScale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+
+  const rating = item.vote_average;
+
+  const source = useMemo(
+    () => ({ uri: getTmdbUrl(item.poster_path, "poster", 200) }),
+    [item.poster_path, getTmdbUrl]
+  );
+
+  return (
+    <Animated.View
+      style={{
+        width: ITEM_SIZE,
+        height: CARD_HEIHGT,
+        transform: [{ scale: pressScale }],
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={{ width: ITEM_SIZE }}
+        onPress={() => navigation.navigate("TvShowsDetails", { id: item.id })}
+      >
+        <Animated.View
+          style={[
+            styles.cardContainer,
+            {
+              shadowColor: theme.shadow,
+              transform: [{ scale }],
+              opacity,
+            },
+          ]}
+        >
+          <Image
+            style={styles.poster}
+            source={source}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={`tvtrend-${item.id}`}
+            transition={120}
+          />
+        </Animated.View>
+        <Animated.View
+          style={[
+            styles.infoContainer,
+            {
+              shadowColor: theme.shadow,
+              transform: [
+                { scale },
+                {
+                  translateY: scale.interpolate({
+                    inputRange: [0.9, 1],
+                    outputRange: [1, 20],
+                  }),
+                },
+              ],
+              opacity,
+            },
+          ]}
+        >
+          <View
+            style={{
+              position: "absolute",
+              top: -45,
+              right: 0,
+              borderRadius: 25,
+              paddingHorizontal: 5,
+              paddingVertical: 2,
+              backgroundColor: "rgba(0,0,0,0.6)",
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 5,
+            }}
+          >
+            <RatingStars rating={item.vote_average} />
+            <Text
+              allowFontScaling={false}
+              style={{ fontSize: 14, color: theme.colors.orange }}
+            >
+              {rating.toFixed(1)}
+            </Text>
+            <Text
+              allowFontScaling={false}
+              style={{ fontSize: 14, color: theme.text.secondary }}
+            >
+              •
+            </Text>
+            <FontAwesome name="user" size={14} color={theme.colors.blue} />
+            <Text
+              allowFontScaling={false}
+              style={{ fontSize: 14, color: theme.colors.blue }}
+            >
+              {item.vote_count}
+            </Text>
+          </View>
+          <ListBadges
+            mediaId={item.id}
+            mediaType="tv"
+            theme={theme}
+            style={{ position: "absolute", left: 10, bottom: 30 }}
+          />
+        </Animated.View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+});
 
 export default function TvShowsTrends({ navigation }) {
   const scrollX = React.useRef(new Animated.Value(0)).current;
@@ -41,35 +185,22 @@ export default function TvShowsTrends({ navigation }) {
     getCategoryTitleTrends,
     categoriesTrends,
     activateTvSection,
+    loadMoreTrend,
+    loadingMoreTrend,
+    pageTrend,
+    totalPagesTrend,
   } = useTvShow();
 
   useEffect(() => {
     activateTvSection("trends");
   }, [activateTvSection]);
 
-  // Animated import'unun eklendiğinden emin olun
-  const scaleValuesRef = useRef({});
-  const getScaleValue = (itemId) => {
-    if (!scaleValuesRef.current[itemId]) {
-      scaleValuesRef.current[itemId] = new Animated.Value(1);
-    }
-    return scaleValuesRef.current[itemId];
-  };
-
-  const onPressIn = (itemId) => {
-    Animated.timing(getScaleValue(itemId), {
-      toValue: 0.9,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const onPressOut = (itemId) => {
-    Animated.timing(getScaleValue(itemId), {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
+  // onEndReached'in mount'ta gereksiz tetiklenmesini engeller.
+  const canTrigger = React.useRef(false);
+  const handleTrendsEndReached = () => {
+    if (!canTrigger.current) return;
+    canTrigger.current = false;
+    if (pageTrend < totalPagesTrend && !loadingMoreTrend) loadMoreTrend();
   };
 
   const renderCategory = ({ item }) => (
@@ -100,193 +231,21 @@ export default function TvShowsTrends({ navigation }) {
     </TouchableOpacity>
   );
 
-  const TrendCard = ({ item, index }) => {
-    const inputRange = [
-      (index - 2) * ITEM_SIZE,
-      (index - 1) * ITEM_SIZE,
-      index * ITEM_SIZE,
-    ];
-
-    const scale = scrollX.interpolate({
-      inputRange,
-      outputRange: [0.7, 1, 0.7],
-      extrapolate: "clamp",
-    });
-
-    const opacity = scrollX.interpolate({
-      inputRange,
-      outputRange: [0.5, 1, 0.5],
-      extrapolate: "clamp",
-    });
-
-    const { inWatchList, inFavorites, isWatched, isInOtherLists } =
-      useListStatus(item.id, "tv");
-    const rating = item.vote_average;
-
-    return (
-      <Animated.View
-        style={{
-          width: ITEM_SIZE,
-          height: CARD_HEIHGT,
-          transform: [{ scale: getScaleValue(item.id) }],
-        }}
-      >
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPressIn={() => onPressIn(item.id)}
-          onPressOut={() => onPressOut(item.id)}
-          style={{ width: ITEM_SIZE }}
-          onPress={() => navigation.navigate("TvShowsDetails", { id: item.id })}
-        >
-          <Animated.View
-            style={[
-              styles.cardContainer,
-              {
-                shadowColor: theme.shadow,
-                transform: [{ scale }],
-                opacity,
-              },
-            ]}
-          >
-            <Image
-              style={styles.poster}
-              source={{
-                uri: getTmdbUrl(item.poster_path, 'poster', 200),
-              }}
-              cachePolicy="memory-disk"
-              transition={120}
-            />
-          </Animated.View>
-          <Animated.View
-            style={[
-              styles.infoContainer,
-              {
-                shadowColor: theme.shadow,
-                transform: [
-                  { scale },
-                  {
-                    translateY: scale.interpolate({
-                      inputRange: [0.9, 1],
-                      outputRange: [1, 20],
-                    }),
-                  },
-                ],
-                opacity,
-              },
-            ]}
-          >
-            <View
-              style={{
-                position: "absolute",
-                top: -45,
-                right: 0,
-                borderRadius: 25,
-                paddingHorizontal: 5,
-                paddingVertical: 2,
-                backgroundColor: "rgba(0,0,0,0.6)",
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 5,
-              }}
-            >
-              <RatingStars rating={item.vote_average} />
-              <Text
-                allowFontScaling={false}
-                style={{ fontSize: 14, color: theme.colors.orange }}
-              >
-                {rating.toFixed(1)}
-              </Text>
-              <Text
-                allowFontScaling={false}
-                style={{ fontSize: 14, color: theme.text.secondary }}
-              >
-                •
-              </Text>
-              <FontAwesome name="user" size={14} color={theme.colors.blue} />
-              <Text
-                allowFontScaling={false}
-                style={{ fontSize: 14, color: theme.colors.blue }}
-              >
-                {item.vote_count}
-              </Text>
-            </View>
-            <View
-              style={{
-                justifyContent: "center",
-                alignItems: "center",
-                position: "absolute",
-                left: 10,
-                bottom: 30,
-              }}
-            >
-              <View
-                style={{
-                  gap: 3,
-                  backgroundColor: theme.secondaryt,
-                  paddingVertical: 3,
-                  paddingHorizontal: 1,
-                  borderRadius: 7,
-                }}
-              >
-                {inWatchList && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      //updateTvSeriesList("watchList", "tv");
-                    }}
-                  >
-                    <Ionicons
-                      name="bookmark"
-                      size={12}
-                      color={theme.colors.blue}
-                    />
-                  </TouchableOpacity>
-                )}
-                {isWatched && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      //updateTvSeriesList("watchedTv", "tv");
-                    }}
-                  >
-                    <Ionicons name="eye" size={12} color={theme.colors.green} />
-                  </TouchableOpacity>
-                )}
-                {inFavorites && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      //updateTvSeriesList("favorites", "tv");
-                    }}
-                  >
-                    <Ionicons name="heart" size={12} color={theme.colors.red} />
-                  </TouchableOpacity>
-                )}
-                {isInOtherLists && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      //updateMovieList("favorites", "movie");
-                    }}
-                  >
-                    <Ionicons
-                      name="grid"
-                      size={12}
-                      color={theme.colors.orange}
-                    />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          </Animated.View>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  };
-
   const renderItem = ({ item, index }) => {
     if (item.id === "left-spacer" || item.id === "right-spacer") {
       return <View style={{ width: EMPTY_ITEM_SIZE }} />;
     }
 
-    return <TrendCard item={item} index={index} />;
+    return (
+      <TvTrendCard
+        item={item}
+        index={index}
+        navigation={navigation}
+        theme={theme}
+        getTmdbUrl={getTmdbUrl}
+        scrollX={scrollX}
+      />
+    );
   };
 
   if (loadingTrend) {
@@ -352,6 +311,11 @@ export default function TvShowsTrends({ navigation }) {
           { useNativeDriver: true },
         )}
         scrollEventThrottle={16}
+        onMomentumScrollBegin={() => {
+          canTrigger.current = true;
+        }}
+        onEndReached={handleTrendsEndReached}
+        onEndReachedThreshold={0.5}
       />
     </View>
   );
@@ -409,7 +373,6 @@ const styles = StyleSheet.create({
   poster: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
   },
   infoContainer: {
     justifyContent: "center",
