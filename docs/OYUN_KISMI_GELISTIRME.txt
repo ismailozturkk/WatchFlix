@@ -2344,6 +2344,61 @@ Dogrulama:
 PART 26 - UYGULAMA SIRASI
 =========================
 
+UYGULAMA DURUMU (2026-06-26): DEGERLENDIRME (Faz A-F durumu)
+-----------------------------------------------------------
+Bu part kod degildir; Part 01-25'in hangi sirayla yapilacagini anlatan faz
+yol haritasidir. Asagida her faz, gercekte uygulanan partlarla eslestirilip
+mevcut durumu isaretlenmistir.
+
+Faz A - Stabilizasyon: TAMAMLANDI
+- Part 02 (cift save, soru tekrari, prefetch yarisi, bos/error state, kisisel
+  liste sessiz fallback kaldirma, timer'i gorsel hazirligina baglama) + Part 23
+  temel unit testleri ile karsilandi. Cikis kriteri saglandi.
+
+Faz B - Oyun motoru ve veri modeli: TAMAMLANDI (kismi)
+- Engine/mod konfigurasyonu Part 08, soru uretim/normalize Part 10, session +
+  Firestore modeli Part 16, kaynak bazli soru gecmisi Part 02/16, cache Part 18.
+- Repository katmaninin tam ayrimi (features\games\ klasor tasimasi) Part 18'de
+  BILEREK yapilmadi (risk/deger dengesi). Cikis kriteri (oyun kurallari React
+  bilesenleri olmadan test edilebilir) gameScoring/gameConfig birim testleriyle
+  saglandi; useSceneGame React'e bagli oldugu icin izole test edilemiyor.
+
+Faz C - Premium temel ekranlar: TAMAMLANDI
+- Profil oyun modulu Part 04, GameHub Part 05, Detay Part 06, Setup Part 07,
+  Play Part 12, Result Part 13, ortak game tokenlari Part 20,
+  responsive/erisilebilirlik Part 21. Klasik mod yeni akisla bastan sona
+  oynanabiliyor; cikis kriteri saglandi.
+
+Faz D - Modlar ve ilerleme: TAMAMLANDI (kismi)
+- Zamana Karsi + Hayatta Kalma modlari Part 08, XP/seviye Part 11,
+  gorevler/basarimlar Part 15.
+- Gunluk Meydan Okuma (8.4) ERTELENDI: deterministik seed/backend gerektirir,
+  GameHub'da "Yakinda" olarak korunuyor.
+
+Faz E - Rekabet ve guvenlik: TAMAMLANDI (kismi)
+- Leaderboard ekranlari + arkadas/global filtreleri Part 14, Firestore modeli
+  Part 16, anomali/sanity kontrolleri ve owner-only kurallar Part 17.
+- Backend skor dogrulama ve sezon modeli ERTELENDI (projede backend yok).
+  Cikis kriteri (dereceli skor istemciden keyfi yazilamaz) backend olmadan TAM
+  saglanamaz; tablo bilincli olarak "verified: false" kabul edildi (Part 17.3).
+
+Faz F - Kalite ve yayin: TAMAMLANDI (kismi)
+- Lokalizasyon Part 22, otomatik birim testler Part 23, performans kod
+  optimizasyonlari Part 25.
+- Tum test matrisi / dusuk cihaz / yavas ag / tema / buyuk font dogrulamasi
+  manuel test matrisine birakildi (bu ortamda fiziksel cihaz yok).
+- Analitik event kontrolu (Part 24) bir analitik SDK secimine baglidir; repoda
+  SDK yok, ERTELENDI.
+- Firestore index/maliyet kontrolu ve kademeli yayin gercek yayin asamasi
+  aktiviteleridir; bu surumde kapsam disi.
+
+Dogrulama:
+- Her fazin gorevleri ilgili partlarin "UYGULAMA DURUMU" bloklariyla birebir
+  eslestirildi; kod tekrari yapilmadi.
+- Acik kalan tek mimari cikis kriteri Faz E'nin backend skor dogrulamasidir;
+  geri kalan ertelemeler backend/cihaz/yayin asamasina baglidir ve ilgili
+  partlarda ayrica belgelenmistir.
+
 26.1 Faz A - Stabilizasyon
 -------------------------
 Tahmin: 2-3 is gunu
@@ -2438,6 +2493,33 @@ Gorevler:
 PART 27 - ONERILEN MVP KAPSAMI
 ==============================
 
+UYGULAMA DURUMU (2026-06-26): TAMAMLANDI (kismi)
+-------------------------------------------------
+MVP kapsamindaki maddelerin gercek durumu (kod degil, kontrol/eslestirme):
+- Profilde genisleyebilir oyun modulu: TAMAM (Part 04, GAME_REGISTRY tabanli).
+- Oyun Merkezi: TAMAM (Part 05).
+- Sahne Tahmin detay ve kurulum ekrani: TAMAM (Part 06, Part 07).
+- Sabit 10 soruluk Klasik mod: TAMAM (Part 08).
+- Kolay/Normal/Zor seviyeleri: TAMAM (Part 09).
+- Yenilenmis aktif oyun ekrani: TAMAM (Part 12).
+- Ayrintili sonuc ekrani: TAMAM (Part 13).
+- Arkadaslar ve global liderlik: TAMAM (Part 14).
+- Session bazli tek kayit: TAMAM (Part 02, idempotent saveSession).
+- Kaynak bazli gecmis: TAMAM (Part 02 / Part 16, SceneGameHistory).
+- Hata ve cevrimdisi durumlari: Hata durumlari TAMAM (Part 02); tam cevrimdisi
+  antrenman akisi (Part 18.4) KISMI.
+- Temel XP: TAMAM (Part 11).
+- Unit testler: TAMAM (Part 23, 33/33). Firestore kural EMULATOR testleri:
+  ERTELENDI (repoda emulator/CI yok).
+
+Sonuc: Kod tarafiyla MVP kapsami, Firestore emulator kural testleri ve tam
+cevrimdisi akis disinda karsilandi.
+
+Not (MVP sonrasi): Zamana Karsi + Hayatta Kalma (Part 08), gorev/basarim
+katalogu (Part 15) zaten yapildi. Gunluk meydan okuma, sezonlar, arkadasa
+meydan okuma ve yeni oyun turleri planli sekilde ertelendi (backend/yeni
+gelistirme gerektirir).
+
 Ilk kaliteli yayin icin dahil edilmesi gerekenler:
 - Profilde genisleyebilir yeni oyun modulu
 - Oyun Merkezi
@@ -2465,6 +2547,24 @@ MVP sonrasi:
 
 PART 28 - GELECEK OYUN FIKIRLERI
 ================================
+
+UYGULAMA DURUMU (2026-06-26): KAPSAM DISI (gelecek) - ALTYAPI HAZIR
+------------------------------------------------------------------
+Bu parttaki yeni oyunlar (Poster Bulmaca, Oyuncuyu Tahmin Et, Hangisi Daha
+Yuksek, Film Siralama, Emoji ile Yapim) bu surumde BILEREK uygulanmadi; bunlar
+ayri, bagimsiz gelistirme gerektiren yeni oyunlardir ve mevcut hedef Sahne
+Tahmin'i kaliteli/guvenilir bitirmektir (Part 29.3 kapsam buyumesi riski).
+
+Tekrar kullanim altyapisi hazir:
+- gameRegistry (screens/game/gameRegistry.js) coklu oyun icin veri tabanlidir;
+  Part 04'te ikinci, kilitli "Poster Bulmaca" karti eklenerek coklu-oyun
+  yerlesimi profil ve Oyun Merkezi'nde zaten dogrulandi.
+- Session, leaderboard (boardId semasi) ve XP/seviye/basarim ilerleme yapilari
+  oyun bazli ayrilabilir (Part 11/15/16), yani yeni oyun ProfileScreen veya
+  oyun motoru bastan yazilmadan eklenebilir (Part 30 son kriteri).
+
+Yapilacaklar (her yeni oyun icin, gelecekte): kendi engine kurallari, soru/veri
+kaynagi (28.5 Emoji icin manuel veri seti), kendi setup/play/result ekranlari.
 
 Yeni oyunlar ayni Game Hub ve ilerleme sistemine eklenebilir:
 
@@ -2496,6 +2596,23 @@ leaderboard ve progress yapisi tekrar kullanilmalidir.
 PART 29 - RISKLER VE KARAR NOKTALARI
 ===================================
 
+UYGULAMA DURUMU (2026-06-26): DEGERLENDIRME (alinan kararlar)
+------------------------------------------------------------
+Her risk icin bu surumde verilen karar:
+- 29.1 Backend karari: Bu surumde backend KURULMADI. Karar: global tablo
+  "dogrulanmamis" kabul edildi; her leaderboard kaydi verified=false ile
+  yazilir (Part 17.3). Guvenilir dereceli rekabet istenirse backend ileride
+  zorunludur (Faz E acik cikis kriteri).
+- 29.2 TMDB gorsel bagimliligi: Cache + cevrimdisi fallback eklendi (Part 18),
+  gorsel kalite kontrolu ve hata durumlari ayrildi (Part 02/10). Gorsel
+  kullanim/attribution kontrolu yayin oncesi manuel adim olarak ACIK kaldi.
+- 29.3 Kapsam buyumesi: Riske gore Klasik mod once stabil/kaliteli yapildi
+  (Part 02-13), XP/gorev/basarim/ek modlar sonra eklendi; Gunluk meydan
+  okuma/sezon bilincli ertelendi. Kapsam kontrol altinda tutuldu.
+- 29.4 Eski veri migrasyonu: Part 16'da eski SceneGame belgesi SILINMEDI;
+  yeni gameProfile/gameStats belgelerine ayni transaction icinde lazy migration
+  yapiliyor, eski alanlar read fallback olarak korunuyor.
+
 29.1 Backend karari
 -------------------
 Guvenilir global rekabet isteniyorsa backend skor dogrulama zorunlu kabul
@@ -2522,6 +2639,37 @@ kadar eski alanlar read fallback olarak desteklenebilir.
 
 PART 30 - TAMAMLANMA KRITERLERI
 ==============================
+
+UYGULAMA DURUMU (2026-06-26): TAMAMLANDI (kismi) - kriter denetimi
+-----------------------------------------------------------------
+Tamamlanma kriterlerinin madde madde denetimi:
+- Profil oyun alani ikinci oyunu destekler (veri tabanli): SAGLANDI (Part 04).
+- Oyun Merkezi'nden oyun/mod/zorluk/kaynak anlasilarak secilir: SAGLANDI
+  (Part 05/06/07).
+- Soru gorseli yuklenmeden timer baslamaz: SAGLANDI (Part 02/12).
+- Bir oturumda soru tekrari olmaz: SAGLANDI (Part 02).
+- Ayni session istatistige ikinci kez eklenmez: SAGLANDI (Part 02).
+- Bos/hata/cevrimdisi durumlarinda anlamli UI: Bos/hata SAGLANDI (Part 02);
+  cevrimdisi antrenman akisi KISMI (Part 18.4).
+- Farkli mod/zorluk liderlik tablolari ayri: SAGLANDI (Part 16 boardId
+  scene_<mode>_<difficulty>; global tablo Klasik+Normal ile sinirli).
+- Kisisel liste oyunlari global tabloyu etkilemez: SAGLANDI (Part 08).
+- Dereceli skorlar backend dogrulanir VEYA acikca dogrulanmamis isaretlenir:
+  SAGLANDI - "acikca dogrulanmamis" dalindan (verified=false, Part 17).
+- Oyun motoru unit testlerle kapsanir: KISMI - gameScoring/gameConfig saf
+  mantigi test ediliyor (Part 23); useSceneGame React'e bagli oldugu icin
+  izole edilemiyor (acik).
+- Firestore kurallari emulator testlerinden gecer: ERTELENDI - repoda emulator
+  yok; kurallar statik incelendi (Part 16/17), canli emulator testi acik.
+- Kucuk telefon/tablet/temalar/TR-EN/buyuk font testi: KISMI - kod hazir
+  (Part 21/22), fiziksel cihaz dogrulamasi manuel test matrisinde (acik).
+- Sonuc ekrani tekrar oynama + paylasim aksiyonlari: SAGLANDI (Part 13).
+- Yeni oyun icin ProfileScreen/motor yeniden yazilmaz: SAGLANDI (Part 04/28).
+
+Sonuc: Istemci tarafindaki tamamlanma kriterleri buyuk olcude saglandi. ACIK
+kalan maddeler yalnizca backend (skor dogrulama), emulator/CI (kural testi) ve
+fiziksel cihaz (manuel test matrisi) gerektirenlerdir; hepsi ilgili partlarda
+gerekce ile belgelenmistir.
 
 Oyun kismi gelistirmesi asagidaki maddeler saglandiginda tamamlanmis kabul
 edilebilir:
