@@ -262,7 +262,7 @@ export default function SearchFriendsScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         />
       )}
-      <BackButton top={8} />
+      <BackButton />
     </SafeAreaView>
   );
 }

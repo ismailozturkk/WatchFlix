@@ -15,7 +15,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
-import ShareContentScreen from "@screens/tabs/ShareContentScreen";
+import HubScreen from "@screens/tabs/HubScreen";
 import SettingsScreen from "@screens/tabs/SettingsScreen";
 import AppIcon from "@components/AppIcon";
 import ProfileScreen from "@screens/tabs/ProfileScreen";
@@ -120,7 +120,7 @@ function TabScreenNavigator({ navigation, route }) {
           <MovieScreen navigation={navigation} />
         </MovieProvider>
       ),
-      share: <ShareContentScreen navigation={navigation} />,
+      share: <HubScreen navigation={navigation} />,
       settings: <SettingsScreen navigation={navigation} />,
       profile: (
         <CalendarProvider>
@@ -170,7 +170,7 @@ function TabScreenNavigator({ navigation, route }) {
       name: "share",
       label: t.share || i18nText("autoI18n.paylas", "Paylaş"),
       icon: (size, color) => (
-        <AppIcon family="Ionicons" name="add-circle-outline" size={size} color={color} />
+        <AppIcon family="Ionicons" name="apps-outline" size={size} color={color} />
       ),
     },
     {

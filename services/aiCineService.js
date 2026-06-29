@@ -15,6 +15,9 @@ import {
   GEMINI_TIMEOUT_MS,
   buildContents,
   parseResponse,
+  logUsage,
+  maskKey,
+  logHttpError,
 } from "./geminiService";
 
 export { GeminiError, isGeminiError } from "./geminiService";
@@ -319,7 +322,7 @@ general:
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function postOnce(url, body, signal) {
+async function postOnce(url, body, signal, meta = {}) {
   let res;
   try {
     res = await fetch(url, {
@@ -343,6 +346,8 @@ async function postOnce(url, body, signal) {
     } catch {
       /* yoksay */
     }
+    // Ayrıntılı, okunaklı hata çıktısı (model + maskeli anahtar + Gemini mesajı).
+    logHttpError(status, res.statusText, detail, meta);
     if (status === 429) {
       throw new GeminiError("RATE_LIMIT", `Rate limited (429): ${detail}`, { status });
     }
@@ -388,6 +393,14 @@ export async function askCineStructured({
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
 
+  const keyMask = maskKey(apiKey);
+  // İstek tanılaması: hangi model + hangi anahtar (maskeli) + endpoint kullanılıyor.
+  console.log(
+    `[CineMatch Pro] ➜ İstek | model: ${GEMINI_MODEL} | anahtar: ${keyMask} | ` +
+      `endpoint: ${url.split("?")[0]}`,
+  );
+  const meta = { model: GEMINI_MODEL, keyMask };
+
   const body = {
     contents: buildContents(history, userMessage),
     systemInstruction: {
@@ -425,14 +438,16 @@ export async function askCineStructured({
   try {
     let data;
     try {
-      data = await postOnce(url, body, controller.signal);
+      data = await postOnce(url, body, controller.signal, meta);
     } catch (err) {
       const retryable =
         err instanceof GeminiError && (err.code === "NETWORK" || err.transient === true);
       if (!retryable) throw err;
       await sleep(800);
-      data = await postOnce(url, body, controller.signal);
+      data = await postOnce(url, body, controller.signal, meta);
     }
+    // Maliyet analizi: token kullanımı + tahmini ücreti console'a yaz.
+    logUsage(data);
     return parseCineResponse(data);
   } finally {
     clearTimeout(timeoutId);

@@ -25,10 +25,11 @@ import LottieView from "lottie-react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useSnow } from "../../context/SnowContext";
 import Toast from "react-native-toast-message";
-import { getDoc, doc, updateDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { getDoc, doc, updateDoc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import DatePickerModal from "@components/modals/DatePickerModal";
 import ListView from "../../components/ListView";
+import PosterImage from "../../components/PosterImage";
 import { useAppSettings, useImageQualitySettings } from "../../context/AppSettingsContext";
 import RatingStars from "../../components/RatingStars";
 import AntDesign from "@expo/vector-icons/AntDesign";
@@ -40,6 +41,11 @@ import ListBadges from "../../components/ListBadges";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { BlurView } from "expo-blur";
 import { useListStatusContext } from "../../context/ListStatusContext";
+import {
+  addToList,
+  removeFromList,
+  PREDEFINED_MOVIE_LISTS,
+} from "../../services/listItemsService";
 import IconBacground from "../../components/IconBacground";
 import { useAuth } from "../../context/AuthContext";
 import CommentSheetModal from "@components/modals/CommentSheetModal";
@@ -87,14 +93,11 @@ const SimilarMovieItem = memo(function SimilarMovieItem({ item, navigation }) {
         style={styles.similarItem}
         onPress={() => navigation.push("MovieDetails", { id: item.id })}
       >
-        <Image
-          source={
-            item.poster_path
-              ? {
-                  uri: getTmdbUrl(item.poster_path, 'poster', 200),
-                }
-              : require("../../assets/image/no_image.png")
-          }
+        <PosterImage
+          path={item.poster_path}
+          type="movie"
+          size={200}
+          iconSize={46}
           style={[styles.similarPoster, { borderColor: theme.border + "55" }]}
         />
         {/* Rating pill */}
@@ -268,49 +271,36 @@ export default function MovieDetails({ navigation, route }) {
     fetchDetails();
   }, [id, language]);
 
+  // Yeni model: hatırlatmalar subcollection'da → Reminders/{uid}/movies/{movieId}
+  // (Eski kök-array `Reminders/{uid}.movieReminders[]` BIRAKILDI; okuyucular
+  // ProfileRemindersContext/CalendarContext yalnız subcollection'ı dinliyor.)
   useEffect(() => {
     if (!user.uid || !id) return;
-    const unsub = onSnapshot(doc(db, "Reminders", user.uid), (snap) => {
-      if (snap.exists()) {
-        const reminders = snap.data().movieReminders || [];
-        setIsReminderSet(
-          reminders.some((m) => m.movieId === id && m.type === "movie"),
-        );
-      } else setIsReminderSet(false);
-    });
+    const unsub = onSnapshot(
+      doc(db, "Reminders", user.uid, "movies", String(id)),
+      (snap) => setIsReminderSet(snap.exists()),
+    );
     return () => unsub();
   }, [user.uid, id]);
 
   const addReminder = async () => {
     try {
-      if (!user) return;
-      const ref = doc(db, "Reminders", user.uid);
-      const snap = await getDoc(ref);
-      const movieData = {
-        movieId: details.id || "",
-        movieName: details.title || "",
-        releaseDate: details.release_date || "",
-        movieMinutes: details.runtime || 0,
-        posterPath: details.poster_path || null,
-        type: "movie",
-        createdAt: formatDateSave(new Date()),
-      };
-      let reminders = snap.exists() ? snap.data().movieReminders || [] : [];
-      const idx = reminders.findIndex((i) => i.movieId === details.id);
-      if (idx === -1 && !isReminderSet) reminders.push(movieData);
-      else if (idx !== -1 && isReminderSet) reminders.splice(idx, 1);
-      if (!snap.exists())
-        await setDoc(ref, {
-          tvReminders: [],
-          movieReminders: reminders,
-          updatedAt: formatDateSave(new Date()),
+      if (!user?.uid || !details) return;
+      const movieRef = doc(db, "Reminders", user.uid, "movies", String(details.id));
+      if (!isReminderSet) {
+        await setDoc(movieRef, {
+          movieId: details.id || "",
+          movieName: details.title || "",
+          releaseDate: details.release_date || "",
+          movieMinutes: details.runtime || 0,
+          posterPath: details.poster_path || null,
+          type: "movie",
+          createdAt: formatDateSave(new Date()),
         });
-      else
-        await updateDoc(ref, {
-          movieReminders: reminders,
-          updatedAt: formatDateSave(new Date()),
-        });
-      setIsReminderSet(!isReminderSet);
+      } else {
+        await deleteDoc(movieRef);
+      }
+      // isReminderSet onSnapshot ile güncelleniyor; optimistic toast:
       Toast.show({
         type: isReminderSet ? "warning" : "success",
         text1: isReminderSet ? i18nText("autoI18n.hatirlatma_kaldirildi", "Hatırlatma kaldırıldı") : i18nText("autoI18n.hatirlatma_eklendi", "Hatırlatma eklendi"),
@@ -320,40 +310,74 @@ export default function MovieDetails({ navigation, route }) {
     }
   };
 
+  const { allLists, statusIndex } = useListStatusContext();
+
+  const getListName = (l) =>
+    ({
+      favorites: t.favorites,
+      watchList: t.watchList,
+      watchedMovies: t.watchedMovies,
+      watchedTv: t.watchedTv,
+    })[l] || l;
+
   const updateMovieList = async (listType, type, date = null) => {
-    setIsLoading(listType === "watchedMovies");
     if (!user.uid || !details) return;
-    const ref = doc(db, "Lists", user.uid);
+    closeModal();
+    const isPredefined = PREDEFINED_MOVIE_LISTS.includes(listType);
+    const toastRemove = () =>
+      Toast.show({
+        type: "warning",
+        text1: i18nText("autoI18n.media_removed_from_list", "{{media}} {{list}} listesinden kaldırıldı!", {
+          media: type === "movie" ? i18nText("autoI18n.film", "Film") : i18nText("autoI18n.dizi", "Dizi"),
+          list: getListName(listType),
+        }),
+      });
+    const toastAdd = () =>
+      Toast.show({
+        type: "success",
+        text1: `${type === "movie" ? i18nText("autoI18n.film", "Film") : i18nText("autoI18n.dizi", "Dizi")} ${getListName(listType)} listesine eklendi!`,
+      });
+
     try {
-      closeModal();
+      if (isPredefined) {
+        // Yeni model: her öğe ayrı doküman (listItemsService).
+        const isIn = !!listStates[listType];
+        setIsLoading(listType === "watchedMovies");
+        if (isIn) {
+          await removeFromList(user.uid, listType, type, details.id);
+          toastRemove();
+        } else {
+          if (!date) {
+            Toast.show({ type: "warning", text1: i18nText("autoI18n.lutfen_bir_tarih_secin", "Lütfen bir tarih seçin.") });
+            setIsLoading(false);
+            return;
+          }
+          await addToList(user.uid, listType, {
+            id: details.id,
+            type,
+            name: type === "movie" ? details.title : details.name,
+            imagePath: details.poster_path,
+            dateAdded: date,
+            minutes: type === "movie" ? details.runtime : undefined,
+            genres: details.genres?.map((g) => g.name) || [],
+          });
+          toastAdd();
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      // Özel listeler — eski kök-array yolu (Part B'de listItemsService'e taşınacak).
+      const ref = doc(db, "Lists", user.uid);
       const snap = await getDoc(ref);
-      let data = snap.exists()
-        ? snap.data()
-        : { watchedTv: [], favorites: [], watchList: [], watchedMovies: [] };
+      let data = snap.exists() ? snap.data() : {};
       if (!snap.exists()) await setDoc(ref, data);
       let list = data[listType] || [];
       const idx = list.findIndex((i) => i.id === details.id && i.type === type);
-      const getName = (l) =>
-        ({
-          favorites: t.favorites,
-          watchList: t.watchList,
-          watchedMovies: t.watchedMovies,
-          watchedTv: t.watchedTv,
-        })[l] || l;
       if (idx !== -1) {
         list.splice(idx, 1);
-        Toast.show({
-          type: "warning",
-          text1: i18nText("autoI18n.media_removed_from_list", "{{media}} {{list}} listesinden kaldırıldı!", {
-            media: type === "movie" ? i18nText("autoI18n.film", "Film") : i18nText("autoI18n.dizi", "Dizi"),
-            list: getName(listType),
-          }),
-        });
+        toastRemove();
       } else {
-        if (!date) {
-          Toast.show({ type: "warning", text1: i18nText("autoI18n.lutfen_bir_tarih_secin", "Lütfen bir tarih seçin.") });
-          return;
-        }
         list.push({
           id: details.id,
           imagePath: details.poster_path,
@@ -363,30 +387,37 @@ export default function MovieDetails({ navigation, route }) {
           type,
           genres: details.genres?.map((g) => g.name) || [],
         });
-        Toast.show({
-          type: "success",
-          text1: `${type === "movie" ? i18nText("autoI18n.film", "Film") : i18nText("autoI18n.dizi", "Dizi")} ${getName(listType)} listesine eklendi!`,
-        });
+        toastAdd();
       }
       await updateDoc(ref, { [listType]: list });
-      setIsLoading(false);
     } catch (error) {
+      setIsLoading(false);
       Toast.show({ type: "error", text1: i18nText("autoI18n.hata_2", "Hata: ") + error.message });
     }
   };
 
-  const { allLists } = useListStatusContext();
-  // useMemo: snapshot başına bir kez hesaplanır, ekstra setState render'ı yok.
+  // listStates: öntanımlı (favorites/watchList/watchedMovies) artık subcollection
+  // tabanlı statusIndex'ten; özel listeler Part B'ye kadar kök-array'den.
   const listStates = useMemo(() => {
-    if (!allLists) return {};
     const s = {};
-    Object.entries(allLists).forEach(([k, v]) => {
-      s[k] = Array.isArray(v)
-        ? v.some((i) => i.id === id && i.type === "movie")
-        : false;
-    });
+    const m = statusIndex?.movie?.[id] || {};
+    s.favorites = !!m.inFavorites;
+    s.watchList = !!m.inWatchList;
+    s.watchedMovies = !!m.isWatched;
+    if (allLists) {
+      Object.entries(allLists).forEach(([k, v]) => {
+        if (
+          PREDEFINED_MOVIE_LISTS.includes(k) ||
+          k === "watchedTv" ||
+          k === "customLists"
+        )
+          return;
+        if (Array.isArray(v))
+          s[k] = v.some((i) => i.id === id && i.type === "movie");
+      });
+    }
     return s;
-  }, [allLists, id]);
+  }, [allLists, statusIndex, id]);
 
   const renderCastMember = useCallback(({ item }) => (
     <TouchableOpacity

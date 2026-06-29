@@ -1,16 +1,12 @@
-import { createContext, useContext, useCallback, useEffect, useState, useRef, useMemo } from "react";
+import { createContext, useContext, useCallback, useEffect, useState, useMemo } from "react";
 import { useApiSettings } from "./AppSettingsContext";
 import Toast from "react-native-toast-message";
 import { useLanguage } from "./LanguageContext";
-import { useAuth } from "./AuthContext";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "../firebase";
-import { snapshotErrorHandler } from "../utils/firestoreError";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useListStatusContext } from "./ListStatusContext";
 import axios from "axios";
 import { getCachedValue, setCachedValue, TTL } from "../utils/apiCache";
 import { i18nText } from "../utils/i18nText";
-import { shouldPersistInternetData } from "../utils/dataCacheSettings";
+import { getWatchedShowActivityTime } from "../utils/watchState";
 
 
 const TvShowContext = createContext();
@@ -95,68 +91,26 @@ export const TvShowProvider = ({ children }) => {
   const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
   const tmdbRegion = language === "tr" ? "TR" : "US";
   const { t } = useLanguage();
-  const { user } = useAuth();
-
-  // ── İzlenen diziler (Firebase + AsyncStorage cache) ────────────────────────
-  const WATCHED_TV_CACHE = "cache_watchedTvShows";
-  const [watchedTvShows, setWatchedTvShows] = useState([]);
-  const [loadingWatchedTv, setLoadingWatchedTv] = useState(true);
-  const unsubRef = useRef(null);
-
-  const processShows = (raw) => {
-    const filtered = raw.filter((s) => s.type === "tv" || s.seasons !== undefined);
-    filtered.sort((a, b) => new Date(b.addedShowDate) - new Date(a.addedShowDate));
-    return filtered;
-  };
-
-  const startListener = (uid) => {
-    if (unsubRef.current) {
-      unsubRef.current();
-      unsubRef.current = null;
-    }
-    if (!uid) {
-      setWatchedTvShows([]);
-      setLoadingWatchedTv(false);
-      AsyncStorage.removeItem(WATCHED_TV_CACHE).catch(() => {});
-      return;
-    }
-    const docRef = doc(db, "Lists", uid);
-    unsubRef.current = onSnapshot(docRef, (snap) => {
-      const raw = processShows(snap.exists() ? snap.data().watchedTv || [] : []);
-      setIfChanged(setWatchedTvShows, raw);
-      setLoadingWatchedTv(false);
-      if (shouldPersistInternetData()) {
-        AsyncStorage.setItem(WATCHED_TV_CACHE, JSON.stringify(raw)).catch(() => {});
-      }
-    }, snapshotErrorHandler("TvShow/watchedTv"));
-  };
-
-  // Uygulama açılır açılmaz: önce cache'den yükle, sonra listener başlat
-  useEffect(() => {
-    Promise.all([
-      AsyncStorage.getItem(WATCHED_TV_CACHE),
-      AsyncStorage.getItem("cachedUserId"),
-    ]).then(([cached, cachedUid]) => {
-      if (cached) {
-        setIfChanged(setWatchedTvShows, JSON.parse(cached));
-        setLoadingWatchedTv(false);
-      }
-      if (cachedUid) startListener(cachedUid);
-      else if (!cached) setLoadingWatchedTv(false);
-    });
-    return () => {
-      if (unsubRef.current) unsubRef.current();
-    };
-  }, []);
-
-  // Auth değişince listener'ı güncelle
-  useEffect(() => {
-    if (user?.uid) {
-      startListener(user.uid);
-    } else if (user === null) {
-      startListener(null);
-    }
-  }, [user?.uid]);
+  // İzlenen dizilerin tek kaynağı yeni watchedTv subcollection listener'ıdır.
+  // Kök dokümandaki legacy watchedTv[] migration sonrasında boşaltıldığı için onu
+  // ayrıca dinlemek ana ekranda eksik/eski veri gösteriyordu.
+  const { watchedTvMap, watchedTvLoaded } = useListStatusContext();
+  const watchedTvShows = useMemo(
+    () =>
+      Object.entries(watchedTvMap || {})
+        .map(([docId, show]) => ({
+          ...show,
+          id: show?.id ?? docId,
+          type: show?.type || "tv",
+        }))
+        .filter((show) => show.id != null)
+        .sort(
+          (a, b) =>
+            getWatchedShowActivityTime(b) - getWatchedShowActivityTime(a),
+        ),
+    [watchedTvMap],
+  );
+  const loadingWatchedTv = !watchedTvLoaded;
   const [refreshing, setRefreshing] = useState(false);
 
   const categoriesTrends = ["week", "day"];

@@ -44,6 +44,8 @@ import {
   computeReminderFireMs,
   syncReminderNotifications,
 } from "../services/reminderNotificationScheduler";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "../firebase";
 
 const DeviceNotificationsContext = createContext({
   permissionStatus: "undetermined",
@@ -153,6 +155,41 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
       registerForPushNotificationsAsync(uid);
     }
   }, [uid, settings.enabled, permissionStatus]);
+
+  // ── 2b. Tür-bazlı ayarları Firestore'a yansıt (backend push bunlara saygı duysun) ──
+  // Cihazdaki sosyal bildirim ayarları AsyncStorage'da → Cloud Function göremez.
+  // İlgili sosyal anahtarları + master 'enabled'ı Users/{uid}.notificationSettings'e
+  // yazıyoruz; backend bir tür kapalıysa o push'u atmasın. Debounce'lu.
+  const settingsMirrorTimerRef = useRef(null);
+  useEffect(() => {
+    if (!uid) return undefined;
+    if (settingsMirrorTimerRef.current) clearTimeout(settingsMirrorTimerRef.current);
+    settingsMirrorTimerRef.current = setTimeout(() => {
+      updateDoc(doc(db, "Users", uid), {
+        notificationSettings: {
+          enabled: settings.enabled !== false,
+          friendRequestsEnabled: settings.friendRequestsEnabled !== false,
+          friendAcceptedEnabled: settings.friendAcceptedEnabled !== false,
+          postLikesEnabled: settings.postLikesEnabled !== false,
+          postCommentsEnabled: settings.postCommentsEnabled !== false,
+          mentionsEnabled: settings.mentionsEnabled !== false,
+          messagesEnabled: settings.messagesEnabled !== false,
+        },
+      }).catch(() => {});
+    }, 600);
+    return () => {
+      if (settingsMirrorTimerRef.current) clearTimeout(settingsMirrorTimerRef.current);
+    };
+  }, [
+    uid,
+    settings.enabled,
+    settings.friendRequestsEnabled,
+    settings.friendAcceptedEnabled,
+    settings.postLikesEnabled,
+    settings.postCommentsEnabled,
+    settings.mentionsEnabled,
+    settings.messagesEnabled,
+  ]);
 
   // ── 3. TV bölümlerini düzleştir ──────────────────────────────────────────
   const tvEpisodes = useMemo(() => {

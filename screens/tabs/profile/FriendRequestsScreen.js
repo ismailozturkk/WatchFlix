@@ -315,7 +315,7 @@ export default function FriendRequestsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
-      <BackButton top={8} />
+      <BackButton />
     </SafeAreaView>
   );
 }

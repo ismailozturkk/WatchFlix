@@ -13,9 +13,11 @@ import {
   Animated,
   PanResponder,
   ActivityIndicator,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../components/BackButton";
+import PosterImage from "@components/PosterImage";
 import { useTheme } from "@context/ThemeContext";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
@@ -30,7 +32,13 @@ import { BlurView } from "expo-blur";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import CaseOpeningModal from "@components/modals/CaseOpeningModal";
 import Feather from "@expo/vector-icons/Feather";
+import * as Haptics from "expo-haptics";
 import { i18nText } from "@utils/i18nText";
+import { reorderWatchedShows } from "../../services/watchedTvService";
+import {
+  reorderList,
+  PREDEFINED_MOVIE_LISTS,
+} from "../../services/listItemsService";
 
 const { width, height } = Dimensions.get("window");
 export default function ListsScreen({ route, navigation }) {
@@ -52,12 +60,20 @@ export default function ListsScreen({ route, navigation }) {
   const accent = theme.between || theme.accent || "#4b69ff";
   const { t, language } = useLanguage();
   const { user } = useAuth();
-  const { allLists, loading: listsLoading } = useListStatusContext();
+  const {
+    allLists,
+    combinedLists,
+    watchedTvMap,
+    watchedTvLoaded,
+    loading: listsLoading,
+  } = useListStatusContext();
   const [isLoading, setIsLoading] = useState(listsLoading);
   const [modalVisible, setModalVisible] = useState(false);
   const [reorderModalVisible, setReorderModalVisible] = useState(false);
   const [index, setIndex] = useState(0);
   const [reorderItems, setReorderItems] = useState(null);
+  const [isReordering, setIsReordering] = useState(false);
+  const suppressNextPressRef = useRef(false);
   const [randomModalVisible, setRandomModalVisible] = useState(false);
   const [filterType, setFilterType] = useState("mixed");
   // Gesture tracking removed in favor of a cleaner 3-way segmented toggle.
@@ -67,7 +83,21 @@ export default function ListsScreen({ route, navigation }) {
   const handleChange = (text) => {
     // Sadece rakamları al
     const numericValue = text.replace(/[^0-9]/g, "");
-    setValue(numericValue - 1);
+    setValue(numericValue);
+  };
+
+  const closeReorderModal = () => {
+    if (isReordering) return;
+    suppressNextPressRef.current = false;
+    setReorderModalVisible(false);
+    setValue("");
+  };
+
+  const stepTargetPosition = (delta) => {
+    const current = Number(value) || index + 1;
+    const next = Math.min(Math.max(current + delta, 1), listItems.length);
+    setValue(String(next));
+    Haptics.selectionAsync().catch(() => {});
   };
   const [tvShowStatus, setTvShowStatus] = useState(null);
 
@@ -148,55 +178,149 @@ export default function ListsScreen({ route, navigation }) {
   };
 
   useEffect(() => {
-    setIsLoading(listsLoading);
-    if (!listsLoading) {
-      setListItems(allLists?.[listName] || []);
+    const sourceLoading =
+      listsLoading || (listName === "watchedTv" && !watchedTvLoaded);
+    setIsLoading(sourceLoading);
+    if (!sourceLoading) {
+      // İzlenen diziler subcollection'da (gömülü seasons); diğer listeler kök doc'ta.
+      if (listName === "watchedTv") {
+        setListItems(
+          Object.entries(watchedTvMap || {})
+            .map(([docId, s]) => ({
+              ...s,
+              id: s.id ?? docId,
+              dateAdded: s.dateAdded ?? s.addedShowDate ?? null,
+            }))
+            .sort((a, b) => {
+              const aHasOrder = Number.isFinite(a.listOrder);
+              const bHasOrder = Number.isFinite(b.listOrder);
+              if (aHasOrder && bHasOrder) {
+                const orderDiff = a.listOrder - b.listOrder;
+                if (orderDiff !== 0) return orderDiff;
+              } else if (aHasOrder !== bHasOrder) {
+                return aHasOrder ? -1 : 1;
+              }
+
+              const aDate = new Date(a.dateAdded || 0).getTime() || 0;
+              const bDate = new Date(b.dateAdded || 0).getTime() || 0;
+              return aDate - bDate || String(a.id).localeCompare(String(b.id));
+            }),
+        );
+      } else {
+        // Öntanımlı film listeleri subcollection'dan (combinedLists), özel
+        // listeler kök-array'den (Part B'ye kadar). listOrder → dateAdded sırala.
+        const items = (combinedLists?.[listName] || []).slice().sort((a, b) => {
+          const aHasOrder = Number.isFinite(a.listOrder);
+          const bHasOrder = Number.isFinite(b.listOrder);
+          if (aHasOrder && bHasOrder) {
+            const orderDiff = a.listOrder - b.listOrder;
+            if (orderDiff !== 0) return orderDiff;
+          } else if (aHasOrder !== bHasOrder) {
+            return aHasOrder ? -1 : 1;
+          }
+          const aDate = new Date(a.dateAdded || 0).getTime() || 0;
+          const bDate = new Date(b.dateAdded || 0).getTime() || 0;
+          return aDate - bDate || String(a.id).localeCompare(String(b.id));
+        });
+        setListItems(items);
+      }
     }
-  }, [allLists, listName, listsLoading]);
+  }, [
+    allLists,
+    combinedLists,
+    watchedTvMap,
+    watchedTvLoaded,
+    listName,
+    listsLoading,
+  ]);
 
   const reorderWatchedTv = async (fromIndex, toIndex, listName) => {
+    const targetIndex = Number(toIndex) - 1;
+    const currentItems = [...listItems];
+
+    if (
+      fromIndex < 0 ||
+      fromIndex >= currentItems.length ||
+      !Number.isInteger(targetIndex) ||
+      targetIndex < 0 ||
+      targetIndex >= currentItems.length
+    ) {
+      Toast.show({
+        type: "error",
+        text1: i18nText(
+          "autoI18n.enter_index_range",
+          "Lütfen 1 ile {{count}} arasında indeksler girin.",
+          { count: currentItems.length },
+        ),
+      });
+      return;
+    }
+
+    const movedItem = currentItems.splice(fromIndex, 1)[0];
+    currentItems.splice(targetIndex, 0, movedItem);
+
+    Keyboard.dismiss();
+    setIsReordering(true);
     try {
-      const docRef = doc(db, "Lists", user.uid);
-      const docSnap = await getDoc(docRef);
+      if (listName === "watchedTv") {
+        // Snapshot gelene kadar kartın yeni yerini anında göster.
+        setListItems(currentItems);
+        await reorderWatchedShows(
+          user.uid,
+          currentItems,
+          fromIndex,
+          targetIndex,
+        );
+      } else if (PREDEFINED_MOVIE_LISTS.includes(listName)) {
+        // Yeni model: her öğe ayrı doküman → listOrder batch.
+        setListItems(currentItems);
+        await reorderList(user.uid, listName, currentItems, fromIndex, targetIndex);
+      } else {
+        // Özel liste — eski kök-array (Part B'de reorderCustomList).
+        const docRef = doc(db, "Lists", user.uid);
+        const docSnap = await getDoc(docRef);
 
-      if (!docSnap.exists()) {
-        console.warn(i18nText("autoI18n.belge_bulunamadi", "Belge bulunamadı."));
-        return;
+        if (!docSnap.exists()) {
+          console.warn(
+            i18nText("autoI18n.belge_bulunamadi", "Belge bulunamadı."),
+          );
+          return;
+        }
+
+        const data = docSnap.data();
+        const listReorder = [...(data[listName] || [])];
+        const item = listReorder.splice(fromIndex, 1)[0];
+        listReorder.splice(targetIndex, 0, item);
+        await updateDoc(docRef, { [listName]: listReorder });
       }
 
-      const data = docSnap.data();
-      let listReorder = data[listName] || [];
-
-      if (
-        fromIndex < 0 ||
-        fromIndex >= listReorder.length ||
-        toIndex < 0 ||
-        toIndex >= listReorder.length
-      ) {
-        Toast.show({
-          type: "error",
-          text1: i18nText("autoI18n.enter_index_range", "Lütfen 1 ile {{count}} arasında indeksler girin.", { count: listReorder.length }),
-        });
-        return;
-      }
-
-      const item = listReorder.splice(fromIndex, 1)[0]; // Elemanı çıkar
-      listReorder.splice(toIndex, 0, item); // Yeni index'e yerleştir
-
-      await updateDoc(docRef, { [listName]: listReorder });
-      setIndex(toIndex);
+      setIndex(targetIndex);
+      suppressNextPressRef.current = false;
+      setReorderModalVisible(false);
+      setValue("");
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success,
+      ).catch(() => {});
       Toast.show({
         type: "success",
         text1: i18nText("autoI18n.item_moved_to_position", "{{name}} başarıyla {{position}}. sıraya taşındı.", {
           name: reorderItems.name,
-          position: toIndex + 1,
+          position: targetIndex + 1,
         }),
       });
     } catch (error) {
+      // Optimistik güncellemeyi geri al (watchedTv + öntanımlı film listeleri).
+      if (listName === "watchedTv" || PREDEFINED_MOVIE_LISTS.includes(listName))
+        setListItems(listItems);
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Error,
+      ).catch(() => {});
       Toast.show({
         type: "error",
         text1: `${error.message}`,
       });
+    } finally {
+      setIsReordering(false);
     }
   };
   // Listede mevcut türler (genre) ve tarihli öğe var mı?
@@ -777,16 +901,27 @@ export default function ListsScreen({ route, navigation }) {
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPressIn={() => onPressIn(item.id)}
-                onPressOut={() => onPressOut(item.id)}
+                onPressOut={() => {
+                  onPressOut(item.id);
+                }}
                 onLongPress={() => {
+                  suppressNextPressRef.current = true;
+                  Haptics.impactAsync(
+                    Haptics.ImpactFeedbackStyle.Medium,
+                  ).catch(() => {});
                   setReorderModalVisible(true);
                   const originalIndex = listItems.findIndex(
-                    (i) => i.id === item.id,
+                    (i) => String(i.id) === String(item.id),
                   );
                   setIndex(originalIndex);
                   setReorderItems(item);
+                  setValue(String(originalIndex + 1));
                 }}
                 onPress={() => {
+                  if (suppressNextPressRef.current) {
+                    suppressNextPressRef.current = false;
+                    return;
+                  }
                   listName !== "watchedTv"
                     ? navigation.navigate(
                         item.type === "movie"
@@ -829,14 +964,10 @@ export default function ListsScreen({ route, navigation }) {
                             },
                     ]}
                   >
-                    <Image
-                      source={
-                        item.imagePath
-                          ? {
-                              uri: getTmdbUrl(item.imagePath, 'poster', 200),
-                            }
-                          : require("@assets/image/no_image.png")
-                      }
+                    <PosterImage
+                      path={item.imagePath}
+                      type={item.type}
+                      size={200}
                       style={styles.image}
                     />
                     {listName !== "watchedTv" &&
@@ -975,11 +1106,10 @@ export default function ListsScreen({ route, navigation }) {
                           });
                         }}
                       >
-                        <Image
-                          source={
-                            posterSource ||
-                            require("@assets/image/no_image.png")
-                          }
+                        <PosterImage
+                          path={item.imagePath}
+                          type="tv"
+                          size={200}
                           style={styles.heroPoster}
                         />
                         <View style={styles.heroInfo}>
@@ -1148,20 +1278,12 @@ export default function ListsScreen({ route, navigation }) {
                                 ]}
                               >
                                 <View style={styles.seasonPosterWrap}>
-                                  <Image
-                                    source={
-                                      season.seasonPosterPath
-                                        ? {
-                                            uri: getTmdbUrl(
-                                              season.seasonPosterPath,
-                                              "poster",
-                                              200,
-                                            ),
-                                            cache: "force-cache",
-                                          }
-                                        : require("@assets/image/no_image.png")
-                                    }
+                                  <PosterImage
+                                    path={season.seasonPosterPath}
+                                    type="tv"
+                                    size={200}
                                     style={styles.seasonPoster}
+                                    cachePolicy="memory-disk"
                                   />
                                   <LinearGradient
                                     colors={[
@@ -1256,114 +1378,268 @@ export default function ListsScreen({ route, navigation }) {
         animationType="fade"
         transparent={true}
         visible={reorderModalVisible}
-        onRequestClose={() => setReorderModalVisible(false)}
+        statusBarTranslucent
+        onRequestClose={closeReorderModal}
       >
         <BlurView
           tint="dark"
-          intensity={50}
+          intensity={65}
           experimentalBlurMethod="dimezisBlurView"
           style={StyleSheet.absoluteFill}
         />
         <TouchableOpacity
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-          }}
-          onPress={() => setReorderModalVisible(false)}
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          disabled={isReordering}
+          onPress={closeReorderModal}
         />
 
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
+        <View style={styles.reorderOverlay} pointerEvents="box-none">
           <View
-            style={{
-              width: 200,
-              //height: 320,
-              borderRadius: 30,
-              justifyContent: "center",
-              alignItems: "center",
-              //backgroundColor: theme.secondary,
-              gap: 10,
-            }}
+            style={[
+              styles.reorderCard,
+              {
+                backgroundColor: theme.secondary,
+                borderColor: theme.border,
+              },
+            ]}
           >
-            <Text
-              style={{
-                color: theme.text.primary,
-                fontWeight: "bold",
-                fontSize: 12,
-              }}
-            ></Text>
-            <Image
-              source={
-                reorderItems?.imagePath
-                  ? {
-                      uri: getTmdbUrl(reorderItems.imagePath, 'poster', 200),
-                    }
-                  : require("@assets/image/no_image.png")
-              }
-              style={styles.imageReorder}
+            <View
+              style={[styles.reorderHandle, { backgroundColor: theme.border }]}
             />
-            <Text
-              style={{
-                color: theme.text.primary,
-                fontWeight: "bold",
-                fontSize: 12,
-              }}
+
+            <View style={styles.reorderHeader}>
+              <View
+                style={[
+                  styles.reorderIcon,
+                  { backgroundColor: `${accent}20` },
+                ]}
+              >
+                <Feather name="move" size={18} color={accent} />
+              </View>
+              <View style={styles.reorderHeaderText}>
+                <Text
+                  style={[styles.reorderTitle, { color: theme.text.primary }]}
+                >
+                  {i18nText("autoI18n.sirayi_degistir", "Sırayı değiştir")}
+                </Text>
+                <Text
+                  style={[styles.reorderSubtitle, { color: theme.text.muted }]}
+                >
+                  {i18nText(
+                    "autoI18n.yeni_konumu_sec",
+                    "Dizinin listedeki yeni konumunu seçin",
+                  )}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={closeReorderModal}
+                disabled={isReordering}
+                style={[
+                  styles.reorderClose,
+                  { backgroundColor: theme.primary },
+                ]}
+              >
+                <Feather name="x" size={18} color={theme.text.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <View
+              style={[
+                styles.reorderPreview,
+                { backgroundColor: theme.primary, borderColor: theme.border },
+              ]}
             >
-              {reorderItems?.name}
+              <PosterImage
+                path={reorderItems?.imagePath}
+                type={reorderItems?.type}
+                size={200}
+                style={styles.imageReorder}
+                contentFit="cover"
+              />
+              <View style={styles.reorderPreviewInfo}>
+                <Text
+                  numberOfLines={2}
+                  style={[styles.reorderName, { color: theme.text.primary }]}
+                >
+                  {reorderItems?.name}
+                </Text>
+                <View
+                  style={[
+                    styles.currentPositionChip,
+                    { backgroundColor: `${accent}18` },
+                  ]}
+                >
+                  <Feather name="list" size={12} color={accent} />
+                  <Text
+                    style={[styles.currentPositionText, { color: accent }]}
+                  >
+                    {i18nText("autoI18n.mevcut_sira", "Mevcut sıra")}: {index + 1}
+                    /{listItems.length}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <Text
+              style={[styles.targetLabel, { color: theme.text.secondary }]}
+            >
+              {i18nText("autoI18n.hedef_sira", "Hedef sıra")}
             </Text>
-            <Text
-              style={{
-                color: theme.text.primary,
-                fontWeight: "bold",
-                fontSize: 12,
-              }}
-            >
-              {index + 1}{i18nText("autoI18n.sirada", ". sırada")}</Text>
-            <TextInput
-              value={value}
-              onChangeText={handleChange}
-              keyboardType="numeric"
-              placeholder={i18nText("autoI18n.move_between_range", "1 ile {{count}} arasında taşıyın", { count: listItems.length })}
-              placeholderTextColor={theme.text.muted}
-              style={{
-                width: 150,
-                color: theme.text.primary,
-                backgroundColor: theme.primary,
-                paddingVertical: 5,
-                paddingHorizontal: 10,
-                borderRadius: 10,
-              }}
-            />
-            <TouchableOpacity
-              onPress={() => {
-                reorderWatchedTv(index, value, listName);
-              }}
-              style={{
-                justifyContent: "center",
-                alignItems: "center",
-                marginBottom: 20,
-              }}
-            >
-              <Text
-                style={{
-                  color: theme.text.primary,
-                  fontWeight: "bold",
-                  textAlign: "center",
-                  backgroundColor: theme.between,
-                  paddingVertical: 10,
-                  paddingHorizontal: 30,
-                  borderRadius: 15,
+
+            <View style={styles.positionRow}>
+              <TouchableOpacity
+                onPress={() => stepTargetPosition(-1)}
+                disabled={isReordering || Number(value) <= 1}
+                style={[
+                  styles.positionStep,
+                  {
+                    backgroundColor: theme.primary,
+                    borderColor: theme.border,
+                    opacity: Number(value) <= 1 ? 0.45 : 1,
+                  },
+                ]}
+              >
+                <Feather name="minus" size={20} color={theme.text.primary} />
+              </TouchableOpacity>
+
+              <View
+                style={[
+                  styles.positionInputWrap,
+                  { backgroundColor: theme.primary, borderColor: accent },
+                ]}
+              >
+                <TextInput
+                  value={value}
+                  onChangeText={handleChange}
+                  editable={!isReordering}
+                  keyboardType="number-pad"
+                  selectTextOnFocus
+                  maxLength={String(listItems.length).length}
+                  style={[styles.positionInput, { color: theme.text.primary }]}
+                />
+                <Text
+                  style={[styles.positionTotal, { color: theme.text.muted }]}
+                >
+                  / {listItems.length}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => stepTargetPosition(1)}
+                disabled={
+                  isReordering || Number(value) >= listItems.length
+                }
+                style={[
+                  styles.positionStep,
+                  {
+                    backgroundColor: theme.primary,
+                    borderColor: theme.border,
+                    opacity: Number(value) >= listItems.length ? 0.45 : 1,
+                  },
+                ]}
+              >
+                <Feather name="plus" size={20} color={theme.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.quickPositionRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  setValue("1");
+                  Haptics.selectionAsync().catch(() => {});
                 }}
-              >{i18nText("autoI18n.tasi", "Taşı")}</Text>
-            </TouchableOpacity>
+                disabled={isReordering}
+                style={[
+                  styles.quickPositionButton,
+                  { backgroundColor: theme.primary, borderColor: theme.border },
+                ]}
+              >
+                <Feather name="chevrons-up" size={14} color={theme.text.muted} />
+                <Text
+                  style={[styles.quickPositionText, { color: theme.text.muted }]}
+                >
+                  {i18nText("autoI18n.ilk_sira", "İlk sıra")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setValue(String(listItems.length));
+                  Haptics.selectionAsync().catch(() => {});
+                }}
+                disabled={isReordering}
+                style={[
+                  styles.quickPositionButton,
+                  { backgroundColor: theme.primary, borderColor: theme.border },
+                ]}
+              >
+                <Feather
+                  name="chevrons-down"
+                  size={14}
+                  color={theme.text.muted}
+                />
+                <Text
+                  style={[styles.quickPositionText, { color: theme.text.muted }]}
+                >
+                  {i18nText("autoI18n.son_sira", "Son sıra")}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.reorderActions}>
+              <TouchableOpacity
+                onPress={closeReorderModal}
+                disabled={isReordering}
+                style={[
+                  styles.reorderCancel,
+                  { backgroundColor: theme.primary, borderColor: theme.border },
+                ]}
+              >
+                <Text
+                  style={[styles.reorderCancelText, { color: theme.text.muted }]}
+                >
+                  {i18nText("autoI18n.iptal", "İptal")}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => reorderWatchedTv(index, value, listName)}
+                disabled={
+                  isReordering ||
+                  !Number.isInteger(Number(value)) ||
+                  Number(value) < 1 ||
+                  Number(value) > listItems.length ||
+                  Number(value) === index + 1
+                }
+                style={[
+                  styles.reorderSubmit,
+                  {
+                    backgroundColor: accent,
+                    opacity:
+                      isReordering ||
+                      !Number.isInteger(Number(value)) ||
+                      Number(value) < 1 ||
+                      Number(value) > listItems.length ||
+                      Number(value) === index + 1
+                        ? 0.5
+                        : 1,
+                  },
+                ]}
+              >
+                {isReordering ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Feather name="move" size={16} color="#fff" />
+                )}
+              <Text
+                  style={styles.reorderSubmitText}
+                >
+                  {isReordering
+                    ? i18nText("autoI18n.tasiniyor", "Taşınıyor...")
+                    : i18nText("autoI18n.tasi", "Taşı")}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1597,7 +1873,7 @@ export default function ListsScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
-      <BackButton top={8} />
+      <BackButton />
     </SafeAreaView>
   );
 }
@@ -1700,6 +1976,144 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  reorderOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  reorderCard: {
+    width: "100%",
+    maxWidth: 390,
+    borderRadius: 26,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingTop: 9,
+    paddingBottom: 18,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.4,
+    shadowRadius: 28,
+    elevation: 16,
+  },
+  reorderHandle: {
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 14,
+    opacity: 0.8,
+  },
+  reorderHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  reorderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  reorderHeaderText: { flex: 1, marginHorizontal: 11 },
+  reorderTitle: { fontSize: 18, fontWeight: "800", letterSpacing: -0.3 },
+  reorderSubtitle: { fontSize: 11.5, marginTop: 2, lineHeight: 16 },
+  reorderClose: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  reorderPreview: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 17,
+    borderWidth: 1,
+    padding: 8,
+    marginBottom: 17,
+  },
+  reorderPreviewInfo: { flex: 1, marginLeft: 12, gap: 9 },
+  reorderName: { fontSize: 15, fontWeight: "800", lineHeight: 19 },
+  currentPositionChip: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  currentPositionText: { fontSize: 11, fontWeight: "700" },
+  targetLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+    marginBottom: 9,
+    textTransform: "uppercase",
+  },
+  positionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+  positionStep: {
+    width: 46,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  positionInputWrap: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+  positionInput: {
+    minWidth: 36,
+    paddingVertical: 0,
+    fontSize: 20,
+    fontWeight: "900",
+    textAlign: "right",
+  },
+  positionTotal: { fontSize: 13, fontWeight: "600", marginLeft: 3 },
+  quickPositionRow: { flexDirection: "row", gap: 8, marginTop: 9 },
+  quickPositionButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 8,
+  },
+  quickPositionText: { fontSize: 11.5, fontWeight: "700" },
+  reorderActions: { flexDirection: "row", gap: 9, marginTop: 18 },
+  reorderCancel: {
+    flex: 0.8,
+    minHeight: 48,
+    borderRadius: 15,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  reorderCancelText: { fontSize: 14, fontWeight: "700" },
+  reorderSubmit: {
+    flex: 1.35,
+    minHeight: 48,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  reorderSubmitText: { color: "#fff", fontSize: 14, fontWeight: "800" },
   skeletonImage: {
     width: 120,
     height: 180,
@@ -1740,14 +2154,10 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   imageReorder: {
-    width: width * 0.4,
-    height: height * 0.3,
-    borderRadius: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
+    width: 68,
+    height: 102,
+    borderRadius: 12,
+    backgroundColor: "#252525",
   },
   imageSelected: {
     width: 100,

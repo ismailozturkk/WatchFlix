@@ -36,7 +36,7 @@ const BIO_MAX = 160;
 export default function EditProfileScreen({ navigation }) {
   const { theme } = useTheme();
   const { profile, loading, updateField, changeUsername } = useUserProfile();
-  const { selectAvatarIndex, setSelectAvatarIndex } = useProfileUi();
+  const { selectAvatarIndex, selectAvatar } = useProfileUi();
 
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
@@ -134,7 +134,7 @@ export default function EditProfileScreen({ navigation }) {
 
       const avatarChanged = avatarIndex !== clampAvatarIndex(profile?.avatarIndex);
       if (avatarChanged) {
-        setSelectAvatarIndex(avatarIndex);
+        await selectAvatar(avatarIndex);
       }
 
       // İsim/avatar değiştiyse postlara ve arkadaşlık kayıtlarına yay (best-effort).
@@ -268,6 +268,15 @@ export default function EditProfileScreen({ navigation }) {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.avatarList}
+              initialNumToRender={10}
+              maxToRenderPerBatch={8}
+              windowSize={4}
+              removeClippedSubviews={Platform.OS === "android"}
+              getItemLayout={(_, index) => ({
+                length: 70,
+                offset: 70 * index,
+                index,
+              })}
               renderItem={({ item, index }) => {
                 const selected = index === avatarIndex;
                 return (

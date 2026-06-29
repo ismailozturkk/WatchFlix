@@ -9,6 +9,7 @@ import {
   Animated,
 } from "react-native";
 import { Image } from "expo-image";
+import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
 import { useTvShow } from "../../context/TvShowContex";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -16,6 +17,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Progress from "react-native-progress";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { i18nText } from "../../utils/i18nText";
+import {
+  getLastWatchedEpisode,
+  getWatchedShowProgress,
+} from "../../utils/watchState";
 
 
 const { width } = Dimensions.get("window");
@@ -31,14 +36,13 @@ const OngoingCard = ({
   onPressIn,
   onPressOut,
 }) => {
-  const watchedEps = (item.seasons || []).reduce(
-    (acc, s) => acc + (s.episodes ? s.episodes.length : 0),
-    0,
-  );
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
-  const totalEps = item.showEpisodeCount || 1;
-  const progress = Math.min(watchedEps / totalEps, 1);
-  const isCompleted = progress >= 1;
+  const { getTmdbUrl } = useImageQualitySettings();
+  const {
+    watched: watchedEps,
+    total: totalEps,
+    progress,
+    isCompleted,
+  } = getWatchedShowProgress(item);
 
   const progressColor = isCompleted
     ? "#4CAF50"
@@ -47,14 +51,9 @@ const OngoingCard = ({
       : theme.accent;
 
   // Son izlenen sezon/bölüm
-  const lastSeason = [...(item.seasons || [])]
-    .filter((s) => s.episodes && s.episodes.length > 0)
-    .sort((a, b) => b.seasonNumber - a.seasonNumber)[0];
-  const lastEp = lastSeason
-    ? [...lastSeason.episodes].sort(
-        (a, b) => b.episodeNumber - a.episodeNumber,
-      )[0]
-    : null;
+  const lastWatched = getLastWatchedEpisode(item);
+  const lastSeason = lastWatched?.season;
+  const lastEp = lastWatched?.episode;
 
   return (
     <TouchableOpacity
@@ -70,14 +69,10 @@ const OngoingCard = ({
         }}
       >
         {/* Poster */}
-        <Image
-          source={
-            item.imagePath
-              ? {
-                  uri: getTmdbUrl(item.imagePath, 'poster', 200),
-                }
-              : require("../../assets/image/no_image.png")
-          }
+        <PosterImage
+          path={item.imagePath}
+          type="tv"
+          size={200}
           style={[styles.similarPoster, { shadowColor: theme.shadow }]}
           contentFit="cover"
           cachePolicy="memory-disk"
@@ -122,7 +117,7 @@ const OngoingCard = ({
             allowFontScaling={false}
             style={[styles.badgeText, { color: progressColor }]}
           >
-            {watchedEps}/{totalEps}
+            {totalEps > 0 ? `${watchedEps}/${totalEps}` : watchedEps}
           </Text>
         </View>
 
@@ -177,12 +172,7 @@ export default function TvOngoingSection({ navigation }) {
 
   // ── Yalnızca devam eden (tamamlanmamış) diziler ─────────────────────────────
   const filtered = shows.filter((s) => {
-    const watched = (s.seasons || []).reduce(
-      (acc, ss) => acc + (ss.episodes ? ss.episodes.length : 0),
-      0,
-    );
-    const total = s.showEpisodeCount || 1;
-    return watched / total < 1;
+    return !getWatchedShowProgress(s).isCompleted;
   });
 
   // Devam eden dizi yoksa section'ı hiç gösterme

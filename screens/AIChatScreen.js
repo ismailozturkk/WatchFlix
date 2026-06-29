@@ -133,7 +133,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
     secondWatchedGenreTv,
     thirdWatchedGenreTv,
   } = useProfileStats();
-  const { allLists } = useListStatusContext();
+  const { combinedLists: allLists } = useListStatusContext();
 
   const [view, setView] = useState("chat"); // "chat" | "history"
   const [message, setMessage] = useState("");

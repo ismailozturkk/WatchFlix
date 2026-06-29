@@ -6,8 +6,10 @@ import { Animated } from "react-native";
 import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 import { useLanguage } from "./LanguageContext";
+import { useListStatusContext } from "./ListStatusContext";
 import Toast from "react-native-toast-message";
 import { snapshotErrorHandler } from "../utils/firestoreError";
+import { dedupeWatchedTvEntries } from "../services/watchedTvService";
 import { i18nText } from "../utils/i18nText";
 
 
@@ -85,6 +87,9 @@ export const ProfileStatsProvider = ({ children }) => {
   const { user } = useAuth();
   const uid = user?.uid;
   const { t, language } = useLanguage();
+  // Öntanımlı listeler (favorites/watchList/watchedMovies) artık subcollection'da;
+  // kök doc'tan kalkacakları için profil liste kartları combinedLists'ten beslenir.
+  const { combinedLists } = useListStatusContext();
 
   const [lists,              setLists]             = useState([]);
   const [selectedList,       setSelectedList]       = useState(null);
@@ -125,14 +130,9 @@ export const ProfileStatsProvider = ({ children }) => {
         // Özel listeler (custom list yönetimi için)
         setLists(Object.entries(data));
 
-        // Eski format film verisi — subcollection listener tarafından override edilir
-        const oldMovies = (data?.watchedMovies || []).filter((m) => m.type === "movie");
-        setListItems((prev) => {
-          const subIds = new Set(prev.filter((m) => m._src === "sub").map((m) => m.id));
-          const legacy = oldMovies.filter((m) => !subIds.has(m.id));
-          const subItems = prev.filter((m) => m._src === "sub");
-          return [...subItems, ...legacy];
-        });
+        // Film verisi artık YALNIZ subcollection'dan gelir (watchedMovies
+        // listener'ı). Eski kök-array merge'i kaldırıldı — migration array'i
+        // taşıyıp kök'ten siler (hibrit yok).
 
         // Eski format dizi verisi — subcollection listener tarafından override edilir
         const oldShows = data?.watchedTv || [];
@@ -175,11 +175,10 @@ export const ProfileStatsProvider = ({ children }) => {
   useEffect(() => {
     if (!uid) return;
     const unsub = onSnapshot(collection(db, "Lists", uid, "watchedTv"), (snap) => {
-      // Aynı sebep: doc.id'yi explicit ekle.
-      const subShows = snap.docs.map((d) => {
-        const data = d.data() || {};
-        return { ...data, id: data.id ?? d.id, _src: "sub" };
-      });
+      // bare+tv_ ikileme giderme: aynı dizi hem 1399 hem tv_1399 olarak
+      // durabilir → dedupeWatchedTvEntries ile tekilleştir.
+      const entries = snap.docs.map((d) => [d.id, { ...(d.data() || {}), id: (d.data() || {}).id ?? d.id }]);
+      const subShows = dedupeWatchedTvEntries(entries).map((s) => ({ ...s, _src: "sub" }));
       setListItemsTv((prev) => {
         const subIds = new Set(subShows.map((s) => s.id));
         const legacy = prev.filter((s) => s._src !== "sub" && !subIds.has(s.id));
@@ -339,9 +338,42 @@ export const ProfileStatsProvider = ({ children }) => {
     ...getDynamicRankColor(totalMinutesTimeTv, "tv"),
   }), [totalMinutesTime, totalMinutesTimeTv]);
 
+  // İzlenen diziler artık subcollection'da (Lists/{uid}/watchedTv/{showId}); kök
+  // doc'taki watchedTv[] dizisi migration ile boşaltılıyor. Liste ekranlarının (Profile
+  // Lists / ListsViewScreen / ListsScreen) gördüğü `lists`'te watchedTv girdisini
+  // subcollection show'larıyla (gömülü seasons) override ediyoruz; sıralama için
+  // dateAdded ekliyoruz.
+  const displayLists = useMemo(() => {
+    const tvItems = (listItemsTv || []).map((s) => ({
+      ...s,
+      dateAdded: s.dateAdded ?? s.addedShowDate ?? null,
+    }));
+    // Öntanımlı listeler subcollection'dan (combinedLists), watchedTv gömülü
+    // seasons'lı listItemsTv'den; özel listeler kök doc entry'lerinden (`lists`).
+    const result = [
+      ["favorites", combinedLists?.favorites || []],
+      ["watchList", combinedLists?.watchList || []],
+      ["watchedMovies", combinedLists?.watchedMovies || []],
+      ["watchedTv", tvItems],
+    ];
+    (lists || []).forEach(([k, v]) => {
+      if (
+        k === "favorites" ||
+        k === "watchList" ||
+        k === "watchedMovies" ||
+        k === "watchedTv" ||
+        k === "customLists" ||
+        !Array.isArray(v)
+      )
+        return;
+      result.push([k, v]);
+    });
+    return result;
+  }, [lists, listItemsTv, combinedLists]);
+
   const value = useMemo(() => ({
     // Lists / delete
-    lists, selectedList, setSelectedList, modalDeleteVisible, setModalDeleteVisible, deleteList, isLoading,
+    lists: displayLists, selectedList, setSelectedList, modalDeleteVisible, setModalDeleteVisible, deleteList, isLoading,
     // Movie stats
     watchedMovieCount, totalWatchedTime, totalMinutesTime, listItems, setListItems,
     isloadingMovieInfo, groupedData, uniqueDates, selectedDate, setSelectedDate,
@@ -356,7 +388,7 @@ export const ProfileStatsProvider = ({ children }) => {
     // Rank
     ...rankInfo,
   }), [
-    lists, selectedList, modalDeleteVisible, isLoading,
+    displayLists, selectedList, modalDeleteVisible, isLoading,
     watchedMovieCount, totalWatchedTime, totalMinutesTime, listItems,
     isloadingMovieInfo, groupedData, uniqueDates, selectedDate,
     mostWatchedGenre, secondWatchedGenre, threeWatchedGenre, scaleValues,

@@ -17,6 +17,15 @@ export const GEMINI_TIMEOUT_MS = 30000;
 // API'ye gönderilecek azami mesaj sayısı (6 gidiş-geliş). Token şişmesini önler.
 export const MAX_HISTORY_MESSAGES = 12;
 
+// ── Maliyet analizi ───────────────────────────────────────────────────────────
+// gemini-2.5-flash fiyatlandırması (USD / 1.000.000 token).
+// ⚠️ Bunlar referans değerlerdir; KENDİ Google AI / Vertex faturanıza göre
+// güncelleyin. Güncel fiyat: https://ai.google.dev/gemini-api/docs/pricing
+export const GEMINI_PRICING = {
+  inputPerMillion: 0.30,   // giriş (prompt) token'ı başına
+  outputPerMillion: 2.50,  // çıkış (yanıt + düşünme) token'ı başına
+};
+
 /**
  * Tipli Gemini hatası. `code` UI tarafında lokalize hata mesajına eşlenir.
  * code ∈ NO_API_KEY | NETWORK | TIMEOUT | RATE_LIMIT | BLOCKED | EMPTY | API_ERROR
@@ -39,6 +48,44 @@ export class GeminiError extends Error {
 /** Bir hatanın bizim tipli Gemini hatamız olup olmadığını güvenle anlar. */
 export function isGeminiError(err) {
   return err instanceof GeminiError || typeof err?.code === "string";
+}
+
+/**
+ * API anahtarını console'da göstermek için maskeler (sızıntı riskini azaltır).
+ * Başındaki 6 + sonundaki 4 karakter + uzunluk gösterilir → hangi anahtar
+ * olduğunu doğrulamaya yeter ama tamamını ifşa etmez.
+ */
+export function maskKey(key) {
+  if (key === undefined || key === null || key === "") return "(BOŞ / TANIMSIZ)";
+  const k = String(key);
+  if (k.length <= 12) return `${k.slice(0, 3)}…(${k.length} karakter)`;
+  return `${k.slice(0, 6)}…${k.slice(-4)} (${k.length} karakter)`;
+}
+
+/**
+ * Bir HTTP hata gövdesini (Gemini JSON formatı) ayrıntılı, okunaklı biçimde
+ * console'a yazar. Hem çağıran katmanlar hem de teşhis için.
+ */
+export function logHttpError(status, statusText, rawBody, { model, keyMask } = {}) {
+  let parsed = null;
+  try {
+    parsed = JSON.parse(rawBody);
+  } catch {
+    /* düz metin olabilir */
+  }
+  const e = parsed?.error || {};
+  const lines = [
+    `[Gemini] ❌ HTTP ${status}${statusText ? " " + statusText : ""}`,
+    model ? `  • model:   ${model}` : null,
+    keyMask ? `  • anahtar: ${keyMask}` : null,
+    `  • code:    ${e.code ?? status}`,
+    `  • status:  ${e.status ?? "-"}`,
+    `  • message: ${e.message ?? (rawBody || "-")}`,
+    Array.isArray(e.details) && e.details.length
+      ? `  • details: ${JSON.stringify(e.details)}`
+      : null,
+  ].filter(Boolean);
+  console.warn(lines.join("\n"));
 }
 
 // ── Sistem prompt'u ─────────────────────────────────────────────────────────
@@ -162,7 +209,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 /**
  * Tek istek dener. Geçici hatalarda (network / 503) çağıran tekrar dener.
  */
-async function postOnce(url, body, signal) {
+async function postOnce(url, body, signal, meta = {}) {
   let res;
   try {
     res = await fetch(url, {
@@ -186,6 +233,8 @@ async function postOnce(url, body, signal) {
     } catch {
       /* yoksay */
     }
+    // Ayrıntılı, okunaklı hata çıktısı (model + maskeli anahtar + Gemini mesajı).
+    logHttpError(status, res.statusText, detail, meta);
     if (status === 429) {
       throw new GeminiError("RATE_LIMIT", `Rate limited (429): ${detail}`, { status });
     }
@@ -232,6 +281,48 @@ export function parseResponse(data) {
   return { text, truncated: finishReason === "MAX_TOKENS" };
 }
 
+// ── Token & maliyet ───────────────────────────────────────────────────────────
+
+/**
+ * Gemini yanıtındaki `usageMetadata`'dan token sayımlarını çıkarır.
+ * @returns {{ promptTokens:number, outputTokens:number, thoughtsTokens:number, totalTokens:number }}
+ */
+export function extractUsage(data) {
+  const u = data?.usageMetadata || {};
+  const promptTokens = u.promptTokenCount || 0;
+  const outputTokens = u.candidatesTokenCount || 0;
+  const thoughtsTokens = u.thoughtsTokenCount || 0; // "thinking" token'ları (varsa)
+  const totalTokens =
+    u.totalTokenCount || promptTokens + outputTokens + thoughtsTokens;
+  return { promptTokens, outputTokens, thoughtsTokens, totalTokens };
+}
+
+/**
+ * Token sayımından tahmini USD maliyet hesaplar. Düşünme token'ları çıkış
+ * olarak faturalanır.
+ * @returns {{ inputCost:number, outputCost:number, totalCost:number }}
+ */
+export function estimateCost({ promptTokens = 0, outputTokens = 0, thoughtsTokens = 0 } = {}) {
+  const inputCost = (promptTokens / 1e6) * GEMINI_PRICING.inputPerMillion;
+  const outputCost =
+    ((outputTokens + thoughtsTokens) / 1e6) * GEMINI_PRICING.outputPerMillion;
+  return { inputCost, outputCost, totalCost: inputCost + outputCost };
+}
+
+/** Token kullanımı + tahmini maliyeti console'a okunaklı biçimde yazar. */
+export function logUsage(data) {
+  const usage = extractUsage(data);
+  const cost = estimateCost(usage);
+  console.log(
+    `[CineMatch/Gemini] 🎯 Token — giriş: ${usage.promptTokens} | ` +
+      `çıkış: ${usage.outputTokens}` +
+      (usage.thoughtsTokens ? ` | düşünme: ${usage.thoughtsTokens}` : "") +
+      ` | toplam: ${usage.totalTokens}  💰 Tahmini maliyet: $${cost.totalCost.toFixed(6)} ` +
+      `(giriş $${cost.inputCost.toFixed(6)} + çıkış $${cost.outputCost.toFixed(6)})`,
+  );
+  return { usage, cost };
+}
+
 /**
  * Asistana bir mesaj gönderir ve düz metin yanıtı döndürür.
  *
@@ -263,6 +354,13 @@ export async function askGemini({
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+
+  const keyMask = maskKey(apiKey);
+  console.log(
+    `[CineMatch/Gemini] ➜ İstek | model: ${GEMINI_MODEL} | anahtar: ${keyMask} | ` +
+      `endpoint: ${url.split("?")[0]}`,
+  );
+  const meta = { model: GEMINI_MODEL, keyMask };
 
   const body = {
     contents: buildContents(history, userMessage),
@@ -308,7 +406,7 @@ export async function askGemini({
   try {
     let data;
     try {
-      data = await postOnce(url, body, controller.signal);
+      data = await postOnce(url, body, controller.signal, meta);
     } catch (err) {
       // Geçici hatalarda (network / 5xx) tek retry
       const retryable =
@@ -316,9 +414,13 @@ export async function askGemini({
         (err.code === "NETWORK" || err.transient === true);
       if (!retryable) throw err;
       await sleep(800);
-      data = await postOnce(url, body, controller.signal);
+      data = await postOnce(url, body, controller.signal, meta);
     }
-    return parseResponse(data);
+    // Maliyet analizi: token kullanımı + tahmini ücreti console'a yaz.
+    // (parseResponse'tan ÖNCE — boş/engellenmiş yanıtta bile prompt token'ları
+    //  faturalanır, görmek isteriz.)
+    const { usage, cost } = logUsage(data);
+    return { ...parseResponse(data), usage, cost };
   } finally {
     clearTimeout(timeoutId);
   }

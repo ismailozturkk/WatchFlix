@@ -78,7 +78,9 @@ export default function SceneGuessGameScreen({ navigation, route }) {
   const { API_KEY } = useApiSettings();
   const { getTmdbUrl } = useImageQualitySettings();
   const { user } = useAuth();
-  const { allLists } = useListStatusContext();
+  // combinedLists: öntanımlı listeler + watchedTv subcollection'dan türetilir
+  // (yeni model — eski allLists kök-array yerine).
+  const { combinedLists: allLists } = useListStatusContext();
 
   const routeSourceId = route?.params?.sourceId;
   const routeGameId = route?.params?.gameId || SCENE_GAME_ID;

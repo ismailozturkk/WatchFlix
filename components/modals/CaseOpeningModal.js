@@ -1,4 +1,5 @@
 import { Image } from "expo-image";
+import PosterImage from "../PosterImage";
 import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -269,14 +270,6 @@ export default function CaseOpeningModal({
     startSelection(nextWinner);
   }, [filterType, items, startSelection]);
 
-  const posterSource = useCallback(
-    (item, size = 300) =>
-      item?.imagePath
-        ? { uri: getTmdbUrl(item.imagePath, "poster", size) }
-        : require("@assets/image/no_image.png"),
-    [getTmdbUrl],
-  );
-
   const backdropSource = winner?.imagePath
     ? { uri: getTmdbUrl(winner.imagePath, "poster", 500) }
     : null;
@@ -405,8 +398,10 @@ export default function CaseOpeningModal({
               >
                 {reel.map((item) => (
                   <View key={item._reelKey} style={styles.reelCard}>
-                    <Image
-                      source={posterSource(item, 200)}
+                    <PosterImage
+                      path={item?.imagePath}
+                      type={item?.type}
+                      size={200}
                       style={styles.reelPoster}
                       contentFit="cover"
                       transition={120}
@@ -497,8 +492,10 @@ export default function CaseOpeningModal({
                 }}
               >
                 <View style={styles.posterWrap}>
-                  <Image
-                    source={posterSource(winner, 300)}
+                  <PosterImage
+                    path={winner?.imagePath}
+                    type={winner?.type}
+                    size={300}
                     style={styles.resultPoster}
                     contentFit="cover"
                     transition={180}

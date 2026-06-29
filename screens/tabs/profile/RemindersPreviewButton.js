@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 1,
   },
-  daysNum: { fontSize: 18, fontWeight: "800" },
+  daysNum: { fontSize: 14, fontWeight: "700" },
   daysLabel: { fontSize: 9, fontWeight: "700" },
 
   dots: {

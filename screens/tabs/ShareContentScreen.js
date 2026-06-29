@@ -18,6 +18,7 @@ import {
   Pressable,
   ActivityIndicator,
   Modal,
+  Share,
 } from "react-native";
 import { Image } from "expo-image";
 import AppIcon from "../../components/AppIcon";
@@ -37,9 +38,13 @@ import {
 import CreatePostModal from "@components/modals/CreatePostModal";
 import PostCommentSheetModal from "@components/modals/PostCommentSheetModal";
 import StaggerItem from "@components/StaggerItem";
+import BackButton from "@components/BackButton";
 import RatingStars from "../../components/RatingStars";
 import { getAvatarSource } from "../../utils/avatars";
 import { i18nText } from "../../utils/i18nText";
+import { appAlert } from "@components/AppAlert";
+import { toast } from "@components/AppToast";
+import { reportPost } from "../../services/postsService";
 import axios from "axios";
 
 const { width } = Dimensions.get("window");
@@ -218,6 +223,8 @@ const PostCard = memo(function PostCard({
   onEdit,
   onDelete,
   onPressAuthor,
+  onShare,
+  onReport,
 }) {
   const [spoilerRevealed, setSpoilerRevealed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -503,7 +510,10 @@ const PostCard = memo(function PostCard({
                   menuStyles.actionFull,
                   { backgroundColor: theme.primary, borderColor: theme.border },
                 ]}
-                onPress={() => setMenuOpen(false)}
+                onPress={() => {
+                  setMenuOpen(false);
+                  onReport?.(post);
+                }}
               >
                 <View
                   style={[
@@ -840,7 +850,11 @@ const PostCard = memo(function PostCard({
             color={post.bookmarkedByMe ? theme.accent : theme.text.secondary}
           />
         </TouchableOpacity>
-        <TouchableOpacity style={postStyles.actionBtn} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={postStyles.actionBtn}
+          activeOpacity={0.7}
+          onPress={() => onShare?.(post)}
+        >
           <AppIcon
             family="Ionicons"
             name="share-social-outline"
@@ -1023,6 +1037,57 @@ export default function ShareContentScreen() {
     setCommentPost(null);
   }, []);
 
+  // Gönderiyi cihazın native paylaşım sayfasıyla paylaş (başlık + içerik).
+  const handleSharePost = useCallback(async (post) => {
+    if (!post) return;
+    try {
+      const lines = [post.title, post.content].filter(Boolean);
+      await Share.share({
+        message:
+          lines.join("\n\n") ||
+          i18nText("autoI18n.bir_paylasima_goz_at", "Bir paylaşıma göz at"),
+      });
+    } catch (e) {
+      if (__DEV__) console.warn("[Share] post:", e?.message);
+    }
+  }, []);
+
+  // Başkasının gönderisini şikayet et (onay → PostReports'a yaz).
+  const handleReportPost = useCallback(
+    (post) => {
+      if (!post?.id) return;
+      if (!user?.uid) {
+        toast.warning(i18nText("autoI18n.sikayet_icin_giris_yap", "Şikayet için giriş yap"));
+        return;
+      }
+      appAlert(
+        i18nText("autoI18n.gonderiyi_sikayet_et", "Gönderiyi şikayet et"),
+        i18nText("autoI18n.bu_gonderiyi_uygunsuz_olarak_bildirmek_istiyor_musun", "Bu gönderiyi uygunsuz olarak bildirmek istiyor musun?"),
+        [
+          { text: i18nText("autoI18n.vazgec", "Vazgeç"), style: "cancel" },
+          {
+            text: i18nText("autoI18n.sikayet_et", "Şikayet et"),
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await reportPost(post.id, user.uid, {
+                  postAuthorId: post.authorId || null,
+                });
+                toast.success(
+                  i18nText("autoI18n.sikayetin_alindi", "Şikayetin alındı"),
+                  i18nText("autoI18n.inceleyecegiz_tesekkurler", "İnceleyeceğiz, teşekkürler."),
+                );
+              } catch (e) {
+                toast.error(i18nText("autoI18n.sikayet_gonderilemedi", "Şikayet gönderilemedi"));
+              }
+            },
+          },
+        ],
+      );
+    },
+    [user?.uid],
+  );
+
   const greeting = useMemo(() => {
     const name = user?.displayName?.split(" ")[0] || "";
     return name ? `${ts.welcome}, ${name}` : ts.welcome;
@@ -1033,6 +1098,7 @@ export default function ShareContentScreen() {
       <View>
         {/* Greeting */}
         <View style={mainStyles.greetingRow}>
+          <BackButton absolute={false} style={{ marginRight: 12 }} />
           <View style={{ flex: 1 }}>
             <Text style={[mainStyles.greeting, { color: theme.text.primary }]}>
               {greeting}
@@ -1166,10 +1232,12 @@ export default function ShareContentScreen() {
           onEdit={handleEditRequest}
           onDelete={deletePost}
           onPressAuthor={handleOpenProfile}
+          onShare={handleSharePost}
+          onReport={handleReportPost}
         />
       </StaggerItem>
     ),
-    [theme, ts, user?.uid, toggleLike, toggleBookmark, handleOpenComments, handleOpenProfile, handleEditRequest, deletePost],
+    [theme, ts, user?.uid, toggleLike, toggleBookmark, handleOpenComments, handleOpenProfile, handleEditRequest, deletePost, handleSharePost, handleReportPost],
   );
 
   const listFooter = useMemo(() => {

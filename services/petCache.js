@@ -21,7 +21,12 @@ function ensureDir() {
   try {
     if (!PETS_DIR.exists) PETS_DIR.create({ intermediates: true });
   } catch {
-    // klasör zaten varsa / yarış durumunda sessizce geç
+    // .exists kontrolü ya da create yarış durumunda patlarsa ikinci kez dene.
+    try {
+      PETS_DIR.create({ intermediates: true });
+    } catch {
+      // klasör zaten varsa sessizce geç
+    }
   }
 }
 
@@ -52,13 +57,87 @@ export function getPetSize(id) {
   }
 }
 
-/** Pet'i R2'den indir ve local URI döndür. */
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// İçerik gerçekten WebP mi? (sihirli bayt: "RIFF" .... "WEBP"). R2 hız sınırı /
+// erişim engelinde sunucu .webp yerine KÜÇÜK bir hata gövdesi döndürebilir; bu
+// fonksiyon onu yakalar (yoksa geçersiz dosya "cache" işaretlenip boş render olur).
+function isWebp(b) {
+  return (
+    b.length > 12 &&
+    b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && // "RIFF"
+    b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50  // "WEBP"
+  );
+}
+
+/**
+ * Pet'i R2'den indir ve local URI döndür. Başarısızsa AÇIKLAYICI bir hata fırlatır
+ * (çağıran kullanıcıya gösterir — artık jenerik "internet kontrol et" değil, gerçek
+ * sebep: HTTP hatası / boş yanıt / geçersiz içerik).
+ *
+ * NOT: `File.downloadFileAsync` (expo-file-system 19 + new arch) release APK'de
+ * jenerik "...has been rejected" ile patlayabiliyor ve gerçek hatayı (HTTP durumu)
+ * gizliyor. Bunun yerine `fetch` ile indirip diske `write` ediyoruz: petler küçük
+ * (~1.5-2.5 MB) olduğu için bellek sorunu olmaz, üstelik HTTP 403/429 (R2 .r2.dev
+ * hız sınırı) gibi gerçek sebepler görünür olur.
+ * Adımlar: 1) fetch (HTTP durum kontrolü)  2) bytes>0  3) WebP doğrula  4) diske yaz
+ * Ağ/boş yanıt hatalarında bir kez yeniden dener; içerik/HTTP hatası tekrar denenmez.
+ */
 export async function downloadPet(id) {
   ensureDir();
   const file = petFile(id);
-  // idempotent: dosya zaten varsa hata vermeyip üzerine yazar.
-  await File.downloadFileAsync(petUrl(id), file, { idempotent: true });
-  return file.uri;
+  const url = petUrl(id);
+  let lastErr;
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try { if (file.exists) file.delete(); } catch { /* yarım dosyayı temizle */ }
+
+    let bytes;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        // 403/429 → R2 .r2.dev erişim/hız sınırı. Tekrar denemek hızlı çözmez.
+        throw new Error(`Sunucu hatası HTTP ${res.status} — R2 erişim/hız sınırı olabilir`);
+      }
+      bytes = new Uint8Array(await res.arrayBuffer());
+    } catch (e) {
+      lastErr = new Error(`İndirme başarısız: ${e?.message || e}`);
+      // HTTP durum hatası içerikseldir → tekrar deneme; salt ağ hatası → bir kez dene.
+      if (String(e?.message || "").includes("HTTP")) throw lastErr;
+      await wait(700);
+      continue;
+    }
+
+    if (!bytes || bytes.length <= 0) {
+      lastErr = new Error("Sunucudan boş yanıt geldi");
+      await wait(700);
+      continue;
+    }
+
+    if (!isWebp(bytes)) {
+      // Küçük/geçersiz gövde → neredeyse kesin sunucu taraflı (R2 .r2.dev hız sınırı
+      // veya erişim engeli). Yeniden denemek hızlı çözmez → açıkça bildir.
+      throw new Error(`Geçersiz içerik (${bytes.length}B) — R2 erişim/hız sınırı olabilir`);
+    }
+
+    try {
+      file.create({ overwrite: true });
+      file.write(bytes);
+    } catch (e) {
+      lastErr = new Error(`Diske yazılamadı: ${e?.message || e}`);
+      await wait(700);
+      continue;
+    }
+
+    if (!file.exists || (file.size ?? 0) <= 0) {
+      lastErr = new Error("Dosya diske yazılamadı");
+      await wait(700);
+      continue;
+    }
+
+    return file.uri; // başarı
+  }
+  throw lastErr || new Error("İndirme başarısız");
 }
 
 /** Pet'i önbellekten sil. */

@@ -115,7 +115,11 @@ export default function FriendsListScreen({ navigation }) {
   };
 
   const handleSendMessage = (friend) => {
-    navigation.navigate("ChatScreen", { friendUid: friend.uid, friendName: friend.displayName });
+    navigation.navigate("ChatScreen", {
+      friendUid: friend.uid,
+      friendName: friend.displayName,
+      friendAvatarIndex: friend.avatarIndex,
+    });
   };
 
   const renderFriend = ({ item }) => {
@@ -202,7 +206,7 @@ export default function FriendsListScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         />
       )}
-      <BackButton top={8} />
+      <BackButton />
     </SafeAreaView>
   );
 }

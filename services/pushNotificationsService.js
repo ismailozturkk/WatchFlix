@@ -12,7 +12,7 @@
 // Backend (Cloud Functions) yok → cihaz kapalıyken push gelmez. Push token
 // yine de kaydedilir ki ileride sunucu eklenince hazır olsun.
 
-import { Platform } from "react-native";
+import { Platform, AppState } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import Constants from "expo-constants";
@@ -38,14 +38,30 @@ export function configureNotificationHandler() {
   if (handlerConfigured) return;
   handlerConfigured = true;
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      // Yeni API (banner/list) + eski API (alert) birlikte — sürümler arası güvenli.
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-    }),
+    handleNotification: async (notification) => {
+      const data = notification?.request?.content?.data || {};
+      // Uygulama önplandayken backend'den gelen sosyal push'u GÖSTERME:
+      // aynı bildirimi yerel presentNow (data.local === true) zaten gösteriyor
+      // (üstelik tür ayarlarına saygı duyarak). Böylece çift bildirim olmaz.
+      // Arka planda handler çağrılmaz → backend push'u OS normal gösterir.
+      const isForeground = AppState.currentState === "active";
+      const isRemoteSocial = data?.kind === "social" && data?.local !== true;
+      if (isForeground && isRemoteSocial) {
+        return {
+          shouldShowBanner: false,
+          shouldShowList: false,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+        };
+      }
+      // Yeni API (banner/list) — shouldShowAlert kaldırıldı (deprecated uyarısı).
+      return {
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      };
+    },
   });
 }
 
@@ -207,7 +223,9 @@ export async function presentNow({
       content: {
         title,
         body,
-        data,
+        // local:true → handler bunu "yerel" olarak tanır, backend push'unun
+        // foreground kopyasını bastırırken bunu gösterir (çift bildirim önlenir).
+        data: { ...data, local: true },
         sound: true,
         ...(Platform.OS === "android" ? { channelId } : {}),
       },

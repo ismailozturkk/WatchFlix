@@ -1,9 +1,8 @@
 import { Modal, StyleSheet, TouchableOpacity, View, Text } from "react-native";
-import React, { useEffect, useState } from "react";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db } from "../../firebase";
+import React, { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAuth } from "../../context/AuthContext";
+import { markEpisodes, unmarkEpisode } from "../../services/watchedTvService";
 import { useTheme } from "../../context/ThemeContext";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import LottieView from "lottie-react-native";
@@ -32,11 +31,12 @@ export default function WatchedAdd({
   showReleaseDate,
   genres,
   size = 48,
+  // İzlenme durumu üstteki tek abonelikten (useWatchedShow) controlled gelir.
+  isWatched = false,
 }) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { language } = useLanguage();
-  const [isWatched, setIsWatched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const showReleaseDateTime = new Date(showReleaseDate);
   const [modalVisible, setModalVisible] = useState(false);
@@ -60,37 +60,6 @@ export default function WatchedAdd({
     hideDatePicker();
   };
 
-  const checkIfWatched = async () => {
-    try {
-      setIsLoading(true);
-      const userRef = doc(db, "Lists", user.uid);
-      const docSnap = await getDoc(userRef);
-
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const watchedTv = data.watchedTv || [];
-        const tvShow = watchedTv.find((show) => show.id === showId);
-        if (!tvShow) return setIsWatched(false);
-        const season = tvShow.seasons.find(
-          (s) => s.seasonNumber === seasonNumber,
-        );
-        if (!season) return setIsWatched(false);
-        const episode = season.episodes.find(
-          (ep) => ep.episodeNumber === episodeNumber,
-        );
-        setIsWatched(!!episode);
-      }
-    } catch (error) {
-      console.error(i18nText("autoI18n.hata_3", "Hata:"), error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    checkIfWatched();
-  }, []);
-
   const formatDate = (timestamp) => {
     const date = new Date(timestamp);
     return new Intl.DateTimeFormat(language, {
@@ -109,171 +78,46 @@ export default function WatchedAdd({
     return `${year}-${month}-${day}`;
   };
 
-  const markEpisodeAsWatched = async (selectedDate = null) => {
+  // İşaretle / kaldır — kanonik subcollection servisine yönlendirir (race-free).
+  const markEpisodeAsWatched = async (date = null) => {
+    if (!user?.uid) return;
     try {
       setIsLoading(true);
       closeModal();
 
-      const userRef = doc(db, "Lists", user.uid);
-      const docSnap = await getDoc(userRef);
-
-      let data = docSnap.exists() ? docSnap.data() : { watchedTv: [] };
-      let watchedTv = data.watchedTv || [];
-      let tvShowIndex = watchedTv.findIndex((show) => show.id === showId);
-
       if (isWatched) {
-        if (tvShowIndex !== -1) {
-          let show = watchedTv[tvShowIndex];
-          let seasons = show.seasons || [];
-          let seasonIndex = seasons.findIndex(
-            (season) => season.seasonNumber === seasonNumber,
-          );
-
-          if (seasonIndex !== -1) {
-            let season = seasons[seasonIndex];
-            let episodes = season.episodes || [];
-            let episodeIndex = episodes.findIndex(
-              (ep) => ep.episodeNumber === episodeNumber,
-            );
-
-            if (episodeIndex !== -1) {
-              episodes.splice(episodeIndex, 1);
-              season.seasonEpisodeCount = episodes.length;
-
-              if (episodes.length === 0) {
-                seasons.splice(seasonIndex, 1);
-              } else {
-                season.episodes = episodes;
-              }
-
-              show.seasons = seasons;
-              show.seasonCount = seasons.length;
-              show.episodeCount = seasons.reduce(
-                (acc, s) => acc + (s.episodes?.length || 0),
-                0,
-              );
-
-              if (show.episodeCount === 0) {
-                watchedTv.splice(tvShowIndex, 1);
-              } else {
-                watchedTv[tvShowIndex] = show;
-              }
-            }
-          }
-        }
-
-        await updateDoc(userRef, { watchedTv });
-        setIsWatched(false);
-        checkIfWatched();
+        await unmarkEpisode(user.uid, showId, seasonNumber, episodeNumber);
         return;
       }
 
-      if (!selectedDate) return;
-      const episodeDate = formatDateSave(selectedDate);
-
-      if (tvShowIndex === -1) {
-        watchedTv.push({
+      if (!date) return;
+      const episodeDate = formatDateSave(date);
+      await markEpisodes(
+        user.uid,
+        {
           id: showId,
           name: showName,
-          showEpisodeCount: showEpisodeCount,
-          showSeasonCount: showSeasonCount,
+          showEpisodeCount,
+          showSeasonCount,
           imagePath: showPosterPath,
-          type: "tv",
-          addedShowDate: episodeDate,
           genres: genres || [],
-          seasonCount: 1,
-          episodeCount: 1,
-          seasons: [
-            {
-              seasonNumber: seasonNumber,
-              seasonPosterPath: seasonPosterPath || null,
-              seasonEpisodes: seasonEpisodes,
-              addedSeasonDate: episodeDate,
-              seasonEpisodeCount: 1,
-              episodes: [
-                {
-                  episodeNumber: episodeNumber,
-                  episodePosterPath: episodePosterPath || null,
-                  episodeName: episodeName || "Unknown",
-                  episodeRatings: episodeRatings || 0,
-                  episodeMinutes: episodeMinutes || 0,
-                  episodeWatchTime: episodeDate,
-                },
-              ],
-            },
-          ],
-        });
-      } else {
-        let show = watchedTv[tvShowIndex];
-        if (!show.addedShowDate) show.addedShowDate = episodeDate;
-
-        let seasons = show.seasons || [];
-        let seasonIndex = seasons.findIndex(
-          (season) => season.seasonNumber === seasonNumber,
-        );
-
-        if (seasonIndex === -1) {
-          seasons.push({
-            seasonNumber: seasonNumber,
-            seasonPosterPath: seasonPosterPath || null,
-            seasonEpisodes: seasonEpisodes,
-            addedSeasonDate: episodeDate,
-            seasonEpisodeCount: 1,
-            episodes: [
-              {
-                episodeNumber: episodeNumber,
-                episodePosterPath: episodePosterPath || null,
-                episodeName: episodeName || "Unknown",
-                episodeRatings: episodeRatings || 0,
-                episodeMinutes: episodeMinutes || 0,
-                episodeWatchTime: episodeDate,
-              },
-            ],
-          });
-        } else {
-          let season = seasons[seasonIndex];
-          if (!season.addedSeasonDate) season.addedSeasonDate = episodeDate;
-
-          let episodes = season.episodes || [];
-          let episodeIndex = episodes.findIndex(
-            (ep) => ep.episodeNumber === episodeNumber,
-          );
-
-          if (episodeIndex === -1) {
-            episodes.push({
-              episodeNumber: episodeNumber,
-              episodePosterPath: episodePosterPath || null,
-              episodeName: episodeName || "Unknown",
-              episodeRatings: episodeRatings || 0,
-              episodeMinutes: episodeMinutes || 0,
-              episodeWatchTime: episodeDate,
-            });
-            season.episodes = episodes;
-            season.seasonEpisodeCount = episodes.length;
-          }
-        }
-
-        show.seasons = seasons
-          .map((season) => ({
-            ...season,
-            episodes: (season.episodes || []).sort(
-              (a, b) => a.episodeNumber - b.episodeNumber,
-            ),
-          }))
-          .sort((a, b) => a.seasonNumber - b.seasonNumber);
-
-        show.seasonCount = show.seasons.length;
-        show.episodeCount = show.seasons.reduce(
-          (acc, s) => acc + (s.episodes?.length || 0),
-          0,
-        );
-
-        watchedTv[tvShowIndex] = show;
-      }
-
-      await updateDoc(userRef, { watchedTv });
-      setIsWatched(true);
-      checkIfWatched();
+        },
+        {
+          seasonNumber,
+          seasonPosterPath: seasonPosterPath || null,
+          seasonEpisodes,
+        },
+        [
+          {
+            episodeNumber,
+            episodePosterPath: episodePosterPath || null,
+            episodeName: episodeName || "Unknown",
+            episodeRatings: episodeRatings || 0,
+            episodeMinutes: episodeMinutes || 0,
+          },
+        ],
+        episodeDate,
+      );
     } catch (error) {
       console.error(i18nText("autoI18n.hata_3", "Hata:"), error);
     } finally {

@@ -8,7 +8,6 @@ import {
   ScrollView,
   ActivityIndicator,
   StatusBar,
-  Modal,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import { useTheme } from "@context/ThemeContext";
@@ -18,6 +17,11 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { i18nText } from "@utils/i18nText";
+import {
+  CalendarFilterPanel,
+  CalendarRangePicker,
+  getCalendarRangeLabel,
+} from "@components/calendar/CalendarFilterPanel";
 
 import {
   buildEventKey,
@@ -29,21 +33,6 @@ import {
 } from "@utils/phoneCalendar";
 
 const TODAY = new Date().toISOString().split("T")[0];
-
-const FILTER_OPTIONS = [
-  { key: "all",   label: i18nText("autoI18n.tumu", "Tümü"),  icon: "calendar-outline" },
-  { key: "note",  label: "Notlar", icon: "document-text-outline" },
-  { key: "movie", label: i18nText("autoI18n.film", "Film"),  icon: "film-outline" },
-  { key: "tv",    label: i18nText("autoI18n.dizi", "Dizi"),  icon: "tv-outline" },
-];
-
-const RANGE_PRESETS = [
-  { value: 1,    label: "1 Ay"  },
-  { value: 3,    label: "3 Ay"  },
-  { value: 6,    label: "6 Ay"  },
-  { value: 12,   label: i18nText("autoI18n.1_yil", "1 Yıl") },
-  { value: "all", label: i18nText("autoI18n.tumu", "Tümü") },
-];
 
 /* ── Tarih formatlama ── */
 function formatDisplayDate(dateStr, lang) {
@@ -363,6 +352,19 @@ export default function CalendarScreen({ navigation }) {
     return n;
   }, [dateGroups, activeFilter]);
 
+  /* Filtre çiplerinde, seçili türden bağımsız aralık dağılımı */
+  const filterCounts = useMemo(() => {
+    let note = 0;
+    let movie = 0;
+    let tv = 0;
+    Object.values(dateGroups).forEach((events) => {
+      note += events.notes.length;
+      movie += events.movies.length;
+      tv += events.tvs.length;
+    });
+    return { all: note + movie + tv, note, movie, tv };
+  }, [dateGroups]);
+
   // Range tetikleyicileri focus modunu temizler
   const changeViewMode = useCallback((m) => {
     setViewMode(m);
@@ -439,8 +441,8 @@ export default function CalendarScreen({ navigation }) {
   }, [flatRangeItems, isBulkLoading, viewMode, savedSet]);
 
   const currentRangeLabel = useMemo(
-    () => RANGE_PRESETS.find((r) => r.value === rangeMonths)?.label || "1 Ay",
-    [rangeMonths],
+    () => getCalendarRangeLabel(rangeMonths),
+    [rangeMonths, language],
   );
 
   /* ── Takvim theme overrides ── */
@@ -592,196 +594,20 @@ export default function CalendarScreen({ navigation }) {
         </View>
 
         {/* Filtre paneli (sticky) */}
-        <View
-          style={[
-            styles.filterPanel,
-            { backgroundColor: theme.primary, borderBottomColor: theme.border },
-          ]}
-        >
-          {/* Gelecek / Geçmiş tabları + Aralık chip */}
-          <View style={styles.modeAndRangeRow}>
-            <View
-              style={[
-                styles.modeTabs,
-                { backgroundColor: theme.secondary, borderColor: theme.border },
-              ]}
-            >
-              <TouchableOpacity
-                onPress={() => changeViewMode("future")}
-                style={[
-                  styles.modeTab,
-                  viewMode === "future" && { backgroundColor: theme.accent },
-                ]}
-                activeOpacity={0.85}
-              >
-                <Ionicons
-                  name="arrow-forward-circle"
-                  size={13}
-                  color={viewMode === "future" ? "#fff" : theme.text.muted}
-                />
-                <Text
-                  allowFontScaling={false}
-                  style={[
-                    styles.modeTabText,
-                    { color: viewMode === "future" ? "#fff" : theme.text.muted },
-                  ]}
-                >
-                  Gelecek
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => changeViewMode("past")}
-                style={[
-                  styles.modeTab,
-                  viewMode === "past" && { backgroundColor: theme.accent },
-                ]}
-                activeOpacity={0.85}
-              >
-                <Ionicons
-                  name="arrow-back-circle"
-                  size={13}
-                  color={viewMode === "past" ? "#fff" : theme.text.muted}
-                />
-                <Text
-                  allowFontScaling={false}
-                  style={[
-                    styles.modeTabText,
-                    { color: viewMode === "past" ? "#fff" : theme.text.muted },
-                  ]}
-                >{i18nText("autoI18n.gecmis", "Geçmiş")}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              onPress={() => setShowRangeDropdown(true)}
-              style={[
-                styles.rangeChip,
-                {
-                  backgroundColor: theme.secondary,
-                  borderColor: theme.accent + "66",
-                },
-              ]}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="calendar" size={13} color={theme.accent} />
-              <Text
-                allowFontScaling={false}
-                style={[styles.rangeChipText, { color: theme.accent }]}
-              >
-                {currentRangeLabel}
-              </Text>
-              <Ionicons name="chevron-down" size={12} color={theme.accent} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Tip filtresi + Toplu aktar */}
-          <View style={styles.typeFilterRow}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterScroll}
-              style={{ flex: 1 }}
-            >
-              {FILTER_OPTIONS.map((f) => {
-                const active = activeFilter === f.key;
-                return (
-                  <TouchableOpacity
-                    key={f.key}
-                    onPress={() => setActiveFilter(f.key)}
-                    style={[
-                      styles.filterBtn,
-                      active
-                        ? {
-                            backgroundColor: theme.accent,
-                            borderColor: theme.accent,
-                          }
-                        : {
-                            backgroundColor: theme.secondary,
-                            borderColor: theme.border,
-                          },
-                    ]}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons
-                      name={f.icon}
-                      size={13}
-                      color={active ? "#fff" : theme.text.muted}
-                    />
-                    <Text
-                      style={[
-                        styles.filterText,
-                        { color: active ? "#fff" : theme.text.muted },
-                      ]}
-                    >
-                      {f.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            {(() => {
-              const isFuture     = viewMode === "future";
-              const actionLabel  = isFuture ? "Aktar"          : "Sil";
-              const actionIcon   = isFuture ? "phone-portrait" : "trash";
-              const activeColor  = isFuture ? theme.accent     : "#ef4444";
-              const disabled     = isBulkLoading || bulkActionCount === 0;
-
-              return (
-                <TouchableOpacity
-                  onPress={handleBulkAction}
-                  disabled={disabled}
-                  style={[
-                    styles.bulkBtn,
-                    {
-                      backgroundColor:
-                        bulkActionCount === 0 ? theme.secondary : activeColor,
-                      borderColor:
-                        bulkActionCount === 0 ? theme.border : activeColor,
-                      opacity: bulkActionCount === 0 ? 0.6 : 1,
-                    },
-                  ]}
-                  activeOpacity={0.85}
-                >
-                  {isBulkLoading ? (
-                    <ActivityIndicator
-                      size="small"
-                      color={bulkActionCount === 0 ? theme.text.muted : "#fff"}
-                    />
-                  ) : (
-                    <Ionicons
-                      name={actionIcon}
-                      size={13}
-                      color={bulkActionCount === 0 ? theme.text.muted : "#fff"}
-                    />
-                  )}
-                  <Text
-                    allowFontScaling={false}
-                    style={[
-                      styles.bulkBtnText,
-                      {
-                        color:
-                          bulkActionCount === 0 ? theme.text.muted : "#fff",
-                      },
-                    ]}
-                  >
-                    {actionLabel}
-                  </Text>
-                  {bulkActionCount > 0 && (
-                    <View style={styles.bulkBadge}>
-                      <Text
-                        allowFontScaling={false}
-                        style={styles.bulkBadgeText}
-                      >
-                        {bulkActionCount}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })()}
-          </View>
-        </View>
+        <CalendarFilterPanel
+          theme={theme}
+          viewMode={viewMode}
+          onViewModeChange={changeViewMode}
+          rangeLabel={currentRangeLabel}
+          onRangePress={() => setShowRangeDropdown(true)}
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+          filterCounts={filterCounts}
+          resultCount={totalCount}
+          bulkActionCount={bulkActionCount}
+          isBulkLoading={isBulkLoading}
+          onBulkAction={handleBulkAction}
+        />
 
         {/* Aralık özeti / Odak gün başlığı */}
         <View style={styles.dateHeader}>
@@ -974,71 +800,16 @@ export default function CalendarScreen({ navigation }) {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Aralık dropdown modal */}
-      <Modal
+      <CalendarRangePicker
         visible={showRangeDropdown}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowRangeDropdown(false)}
-        statusBarTranslucent
-      >
-        <TouchableOpacity
-          style={styles.dropdownBackdrop}
-          activeOpacity={1}
-          onPress={() => setShowRangeDropdown(false)}
-        >
-          <View
-            style={[
-              styles.dropdownPanel,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
-            ]}
-          >
-            <View style={styles.dropdownHandle} />
-            <Text
-              allowFontScaling={false}
-              style={[styles.dropdownTitle, { color: theme.text.muted }]}
-            >{i18nText("autoI18n.aralik_sec", "ARALIK SEÇ")}</Text>
-            {RANGE_PRESETS.map((r) => {
-              const active = rangeMonths === r.value;
-              return (
-                <TouchableOpacity
-                  key={String(r.value)}
-                  onPress={() => {
-                    changeRangeMonths(r.value);
-                    setShowRangeDropdown(false);
-                  }}
-                  style={[
-                    styles.dropdownItem,
-                    active && {
-                      backgroundColor: theme.accent + "22",
-                      borderColor: theme.accent + "55",
-                    },
-                  ]}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons
-                    name={active ? "radio-button-on" : "radio-button-off"}
-                    size={16}
-                    color={active ? theme.accent : theme.text.muted}
-                  />
-                  <Text
-                    allowFontScaling={false}
-                    style={[
-                      styles.dropdownItemText,
-                      {
-                        color: active ? theme.accent : theme.text.primary,
-                        fontWeight: active ? "700" : "500",
-                      },
-                    ]}
-                  >
-                    {r.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </TouchableOpacity>
-      </Modal>
+        theme={theme}
+        selectedValue={rangeMonths}
+        onSelect={(value) => {
+          changeRangeMonths(value);
+          setShowRangeDropdown(false);
+        }}
+        onClose={() => setShowRangeDropdown(false)}
+      />
     </View>
   );
 }
@@ -1111,88 +882,6 @@ const styles = StyleSheet.create({
   },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { fontSize: 11, fontWeight: "700" },
-
-  filterPanel: {
-    paddingVertical: 10,
-    gap: 10,
-    borderBottomWidth: 1,
-  },
-  modeAndRangeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-  },
-  modeTabs: {
-    flex: 1,
-    flexDirection: "row",
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 3,
-    gap: 4,
-    overflow: "hidden",
-  },
-  modeTab: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    paddingVertical: 7,
-    borderRadius: 18,
-  },
-  modeTabText: { fontSize: 12, fontWeight: "700" },
-  rangeChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-    borderRadius: 18,
-    borderWidth: 1,
-    minWidth: 86,
-  },
-  rangeChipText: { fontSize: 12, fontWeight: "700" },
-
-  typeFilterRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingRight: 16,
-  },
-  filterScroll: { paddingHorizontal: 16, gap: 8, alignItems: "center" },
-  filterBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  filterText: { fontSize: 11, fontWeight: "600" },
-
-  bulkBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 16,
-    borderWidth: 1,
-    minWidth: 96,
-  },
-  bulkBtnText: { fontSize: 11, fontWeight: "700" },
-  bulkBadge: {
-    backgroundColor: "#ffffff44",
-    borderRadius: 8,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    marginLeft: 2,
-  },
-  bulkBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
 
   dateHeader: {
     flexDirection: "row",
@@ -1344,45 +1033,4 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  /* Dropdown modal */
-  dropdownBackdrop: {
-    flex: 1,
-    backgroundColor: "#00000088",
-    justifyContent: "flex-end",
-  },
-  dropdownPanel: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    paddingTop: 8,
-    paddingBottom: 24,
-    paddingHorizontal: 16,
-    gap: 6,
-  },
-  dropdownHandle: {
-    width: 42,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#ffffff44",
-    alignSelf: "center",
-    marginBottom: 12,
-  },
-  dropdownTitle: {
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1,
-    marginBottom: 4,
-    paddingHorizontal: 6,
-  },
-  dropdownItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "transparent",
-  },
-  dropdownItemText: { fontSize: 14 },
 });

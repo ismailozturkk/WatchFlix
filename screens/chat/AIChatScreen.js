@@ -135,7 +135,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
     secondWatchedGenreTv,
     thirdWatchedGenreTv,
   } = useProfileStats();
-  const { allLists } = useListStatusContext();
+  const { combinedLists: allLists } = useListStatusContext();
 
   const [view, setView] = useState("chat"); // "chat" | "history"
   const [message, setMessage] = useState("");
@@ -520,9 +520,15 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
           },
         ]}
       >
+        {/* SafeAreaView edges, RN Modal içinde iOS'ta top inset'i güvenilir
+            vermiyor (header status bar/çentik altında kalıyordu). insets'i
+            useSafeAreaInsets'ten manuel paddingTop olarak uyguluyoruz. */}
         <SafeAreaView
-          style={[styles.screen, { backgroundColor: theme.primary }]}
-          edges={["top", "bottom"]}
+          style={[
+            styles.screen,
+            { backgroundColor: theme.primary, paddingTop: insets.top },
+          ]}
+          edges={["bottom"]}
           onLayout={onScreenLayout}
         >
           {/* Header */}

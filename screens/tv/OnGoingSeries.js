@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
+import PosterImage from "../../components/PosterImage";
 import {
   useApiSettings,
   useImageQualitySettings,
@@ -26,6 +27,11 @@ import * as Progress from "react-native-progress";
 import IconBacground from "../../components/IconBacground";
 import { OnGoingSeriesSkeleton } from "../../components/Skeleton";
 import { i18nText } from "../../utils/i18nText";
+import {
+  getLastWatchedEpisode,
+  getWatchedEpisodeCount,
+  getWatchedShowProgress,
+} from "../../utils/watchState";
 
 
 const { width } = Dimensions.get("window");
@@ -39,23 +45,17 @@ function SeriesCard({ show, navigation, theme, language, API_KEY, imageQuality }
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   // İlerleme hesabı
-  const watchedEps = (show.seasons || []).reduce(
-    (acc, s) => acc + (s.episodes ? s.episodes.length : 0),
-    0,
-  );
-  const totalEps = show.showEpisodeCount || 1;
-  const progress = Math.min(watchedEps / totalEps, 1);
-  const isCompleted = progress >= 1;
+  const {
+    watched: watchedEps,
+    total: totalEps,
+    progress,
+    isCompleted,
+  } = getWatchedShowProgress(show);
 
   // Son izlenen bölüm
-  const lastSeason = [...(show.seasons || [])]
-    .filter((s) => s.episodes && s.episodes.length > 0)
-    .sort((a, b) => b.seasonNumber - a.seasonNumber)[0];
-  const lastEp = lastSeason
-    ? [...lastSeason.episodes].sort(
-        (a, b) => b.episodeNumber - a.episodeNumber,
-      )[0]
-    : null;
+  const lastWatched = getLastWatchedEpisode(show);
+  const lastSeason = lastWatched?.season;
+  const lastEp = lastWatched?.episode;
 
   const pressIn = useCallback(
     () =>
@@ -104,14 +104,11 @@ function SeriesCard({ show, navigation, theme, language, API_KEY, imageQuality }
       >
         {/* Poster */}
         <View style={styles.posterContainer}>
-          <Image
-            source={
-              show.imagePath
-                ? { uri: getTmdbUrl(show.imagePath, 'poster', 200) }
-                : require("../../assets/image/no_image.png")
-            }
+          <PosterImage
+            path={show.imagePath}
+            type="tv"
+            size={200}
             style={styles.poster}
-            resizeMode="cover"
           />
           <LinearGradient
             colors={["transparent", "rgba(0,0,0,0.85)"]}
@@ -180,7 +177,9 @@ function SeriesCard({ show, navigation, theme, language, API_KEY, imageQuality }
               allowFontScaling={false}
               style={[styles.progressLabel, { color: progressColor }]}
             >
-              {watchedEps} / {totalEps}{i18nText("autoI18n.bolum_4", "bölüm")}</Text>
+              {totalEps > 0 ? `${watchedEps} / ${totalEps}` : watchedEps}{" "}
+              {i18nText("autoI18n.bolum_4", "bölüm")}
+            </Text>
           </View>
 
           {/* Sezon sayısı */}
@@ -216,15 +215,10 @@ export default function OnGoingSeries({ navigation }) {
 
   // ── Filtrele + Ara ──────────────────────────────────────────────────────────
   const filtered = shows.filter((s) => {
-    const watchedEps = (s.seasons || []).reduce(
-      (acc, ss) => acc + (ss.episodes ? ss.episodes.length : 0),
-      0,
-    );
-    const total = s.showEpisodeCount || 1;
-    const pct = watchedEps / total;
+    const { isCompleted } = getWatchedShowProgress(s);
 
-    if (activeFilter === "ongoing" && pct >= 1) return false;
-    if (activeFilter === "completed" && pct < 1) return false;
+    if (activeFilter === "ongoing" && isCompleted) return false;
+    if (activeFilter === "completed" && !isCompleted) return false;
 
     if (!searchQuery.trim()) return true;
     return (s.name || "").toLowerCase().includes(searchQuery.toLowerCase());
@@ -233,20 +227,11 @@ export default function OnGoingSeries({ navigation }) {
   // ── Üst istatistikler ──────────────────────────────────────────────────────
   const totalShows = shows.length;
   const completedShows = shows.filter((s) => {
-    const watched = (s.seasons || []).reduce(
-      (acc, ss) => acc + (ss.episodes ? ss.episodes.length : 0),
-      0,
-    );
-    return watched >= (s.showEpisodeCount || 1);
+    return getWatchedShowProgress(s).isCompleted;
   }).length;
   const ongoingShows = totalShows - completedShows;
   const totalEpsWatched = shows.reduce(
-    (acc, s) =>
-      acc +
-      (s.seasons || []).reduce(
-        (a, ss) => a + (ss.episodes ? ss.episodes.length : 0),
-        0,
-      ),
+    (total, show) => total + getWatchedEpisodeCount(show),
     0,
   );
 

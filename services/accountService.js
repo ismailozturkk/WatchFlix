@@ -232,6 +232,12 @@ export async function purgeUserData(uid) {
       );
     }
     await deleteCollection(collection(db, "Lists", uid, "watchedTv"));
+    // Yeni model: film/öntanımlı listeler + özel liste öğeleri ayrı koleksiyonlarda.
+    for (const sub of ["favorites", "watchList", "watchedMovies", "customItems"]) {
+      await safe(`lists-sub ${sub}`, () =>
+        deleteCollection(collection(db, "Lists", uid, sub)),
+      );
+    }
     await deleteDoc(doc(db, "Lists", uid));
   });
 

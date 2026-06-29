@@ -5,6 +5,7 @@ import React, {
   useContext,
   useMemo,
   useCallback,
+  useRef,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Toast from "react-native-toast-message";
@@ -106,6 +107,10 @@ export const AppSettingsProvider = ({ children }) => {
   const [adultContent, setAdultContent] = useState(false);
   const [showOngoingTvShows, setShowOngoingTvShows] = useState(true);
   const [showIconBackground, setShowIconBackground] = useState(true);
+  // İkon arka plan düzeni: "shared" (sabit, her ekranda aynı, performanslı) | "random" (her ekran farklı)
+  const [iconBackgroundMode, setIconBackgroundMode] = useState("shared");
+  // İkon saydamlık çarpanı (0.1–1). Ekranların kendi opaklık değerini ölçekler; 1 = değişiklik yok.
+  const [iconBackgroundOpacity, setIconBackgroundOpacity] = useState(1);
   const [imageQualityLevel, setImageQualityLevel] = useState("good");
   const [selectedAvatar, setSelectedAvatar] = useState(null);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
@@ -125,6 +130,8 @@ export const AppSettingsProvider = ({ children }) => {
           [, savedAdultContent],
           [, savedOngoingTvShows],
           [, savedIconBackground],
+          [, savedIconBackgroundMode],
+          [, savedIconBackgroundOpacity],
           [, savedLevel],
           [, savedLegacy],
           [, savedHapticsEnabled],
@@ -141,6 +148,8 @@ export const AppSettingsProvider = ({ children }) => {
           "adultContent",
           "showOngoingTvShows",
           "showIconBackground",
+          "iconBackgroundMode",
+          "iconBackgroundOpacity",
           "imageQualityLevel",
           "imageQuality", // legacy key — migrated on first read
           "hapticsEnabled",
@@ -159,6 +168,14 @@ export const AppSettingsProvider = ({ children }) => {
 
         if (savedIconBackground !== null)
           setShowIconBackground(JSON.parse(savedIconBackground));
+
+        if (savedIconBackgroundMode === "shared" || savedIconBackgroundMode === "random")
+          setIconBackgroundMode(savedIconBackgroundMode);
+
+        if (savedIconBackgroundOpacity !== null) {
+          const v = parseFloat(savedIconBackgroundOpacity);
+          if (!Number.isNaN(v)) setIconBackgroundOpacity(Math.min(1, Math.max(0.1, v)));
+        }
 
         if (savedLevel !== null && IMAGE_QUALITY_PRESETS[savedLevel]) {
           setImageQualityLevel(savedLevel);
@@ -315,6 +332,29 @@ export const AppSettingsProvider = ({ children }) => {
     );
   }, []);
 
+  const changeIconBackgroundMode = useCallback((mode) => {
+    if (mode !== "shared" && mode !== "random") return;
+    setIconBackgroundMode(mode);
+    AsyncStorage.setItem("iconBackgroundMode", mode).catch((e) =>
+      Toast.show({ type: "error", text1: i18nText("autoI18n.ikon_arka_plan_ayari_kaydedilemedi", "İkon arka plan ayarı kaydedilemedi: ") + e }),
+    );
+  }, []);
+
+  // Saydamlık kaydırıcısı her harekette tetiklenir → state'i anında günceller (canlı
+  // önizleme), ama AsyncStorage yazımını debounce eder (sürükleme sırasında yüzlerce
+  // gereksiz yazımdan kaçınır; yalnız durunca/bırakınca kalıcılaştırır).
+  const opacityPersistTimer = useRef(null);
+  const changeIconBackgroundOpacity = useCallback((val) => {
+    const v = Math.min(1, Math.max(0.1, Number(val) || 0.1));
+    setIconBackgroundOpacity(v);
+    if (opacityPersistTimer.current) clearTimeout(opacityPersistTimer.current);
+    opacityPersistTimer.current = setTimeout(() => {
+      AsyncStorage.setItem("iconBackgroundOpacity", String(v)).catch((e) =>
+        Toast.show({ type: "error", text1: i18nText("autoI18n.ikon_arka_plan_ayari_kaydedilemedi", "İkon arka plan ayarı kaydedilemedi: ") + e }),
+      );
+    }, 250);
+  }, []);
+
   const changeImageQuality = useCallback((level) => {
     if (!IMAGE_QUALITY_PRESETS[level]) return;
     setImageQualityLevel(level);
@@ -458,8 +498,19 @@ export const AppSettingsProvider = ({ children }) => {
     () => ({
       showIconBackground,
       changeShowIconBackground,
+      iconBackgroundMode,
+      changeIconBackgroundMode,
+      iconBackgroundOpacity,
+      changeIconBackgroundOpacity,
     }),
-    [showIconBackground, changeShowIconBackground],
+    [
+      showIconBackground,
+      changeShowIconBackground,
+      iconBackgroundMode,
+      changeIconBackgroundMode,
+      iconBackgroundOpacity,
+      changeIconBackgroundOpacity,
+    ],
   );
 
   const getTmdbUrl = useCallback(

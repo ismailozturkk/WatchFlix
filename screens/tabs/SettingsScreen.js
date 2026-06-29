@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   StyleSheet,
   View,
@@ -13,6 +13,7 @@ import {
   Platform,
   InteractionManager,
   ActivityIndicator,
+  PanResponder,
 } from "react-native";
 import { useLanguage } from "../../context/LanguageContext";
 import AppIcon from "../../components/AppIcon";
@@ -34,6 +35,7 @@ import { useDeviceNotifications } from "../../context/DeviceNotificationsContext
 import SwitchToggle from "@components/SwitchToggle";
 import SwipeCard from "@components/SwipeCard";
 import PetSettingsSection from "@components/pet/PetSettingsSection";
+import PermissionsSection from "@components/PermissionsSection";
 import { BlurView } from "expo-blur";
 import CountryFlag from "react-native-country-flag";
 import IconBacground from "../../components/IconBacground";
@@ -45,6 +47,8 @@ import CacheManagerModal from "../../components/CacheManagerModal";
 import { appAlert } from "@components/AppAlert";
 import { Image } from "expo-image";
 import { getBreakdown } from "../../services/cacheInspector";
+import { auth, db } from "../../firebase";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 
 const fmtBytes = (b) =>
   b >= 1024 * 1024
@@ -210,6 +214,61 @@ function SettingRow({
   );
 }
 
+// İkon saydamlık çarpanı için hafif kaydırıcı (0.1–1). Ek bağımlılık yok — PanResponder.
+function OpacitySlider({ value, onChange, colors }) {
+  const MIN = 0.1;
+  const MAX = 1;
+  const [trackW, setTrackW] = useState(0);
+  const widthRef = useRef(0);
+  const changeRef = useRef(onChange);
+  changeRef.current = onChange;
+
+  const emit = (x) => {
+    const w = widthRef.current;
+    if (!w) return;
+    const ratio = Math.min(1, Math.max(0, x / w));
+    changeRef.current(MIN + ratio * (MAX - MIN));
+  };
+
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => emit(e.nativeEvent.locationX),
+      onPanResponderMove: (e) => emit(e.nativeEvent.locationX),
+    }),
+  ).current;
+
+  const ratio = Math.min(1, Math.max(0, (value - MIN) / (MAX - MIN)));
+
+  return (
+    <View
+      {...pan.panHandlers}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width;
+        widthRef.current = w;
+        setTrackW(w);
+      }}
+      style={[s.opacityTrack, { backgroundColor: colors.cardAlt, borderColor: colors.border }]}
+      hitSlop={{ top: 12, bottom: 12 }}
+    >
+      <View
+        style={[s.opacityFill, { width: ratio * trackW, backgroundColor: colors.accent }]}
+      />
+      <View
+        style={[
+          s.opacityThumb,
+          {
+            left: Math.max(0, Math.min(ratio * trackW - 11, Math.max(0, trackW - 22))),
+            backgroundColor: colors.accent,
+            borderColor: colors.white,
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
 export default function SettingsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [langModalVisible, setLangModalVisible] = useState(false);
@@ -238,7 +297,14 @@ export default function SettingsScreen() {
   const { theme } = useTheme();
   const { adultContent, chaneAdultContent } = useContentSettings();
   const { showSnow, changeShowSnow } = useSnowSettings();
-  const { showIconBackground, changeShowIconBackground } = useIconBackgroundSettings();
+  const {
+    showIconBackground,
+    changeShowIconBackground,
+    iconBackgroundMode,
+    changeIconBackgroundMode,
+    iconBackgroundOpacity,
+    changeIconBackgroundOpacity,
+  } = useIconBackgroundSettings();
   const { showOngoingTvShows, changeShowOngoingTvShows } =
     useOngoingTvShowsSettings();
   const { imageQuality, imageQualityLevel, changeImageQuality } =
@@ -349,6 +415,40 @@ export default function SettingsScreen() {
     notificationsEnabled && permissionStatus === "denied"
       ? t.notifPermissionDenied
       : t.allNotificationsSubtitle;
+
+  // ── DEV-ONLY: arka plan push zincirini tek cihazla test eder ──
+  // Kendi uid'ine doğrudan bir notif dökümanı yazar (createSocialNotification'daki
+  // self-guard'ı atlar; firestore.rules fromUid==auth.uid istediği için kurala uygun).
+  // Cloud Function onSocialNotificationCreated tetiklenir → kendi token'ına push gelir.
+  // Test için: bas → uygulamayı TAMAMEN kapat → birkaç saniye içinde push düşmeli.
+  const [sendingTestPush, setSendingTestPush] = useState(false);
+  const handleSendTestPush = async () => {
+    if (sendingTestPush) return;
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      appAlert("Test push", "Oturum açık değil.");
+      return;
+    }
+    setSendingTestPush(true);
+    try {
+      await addDoc(collection(db, "Users", uid, "notifications"), {
+        type: "post_like",
+        fromUid: uid,
+        fromName: "Test (kendin)",
+        fromAvatarIndex: 0,
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+      appAlert(
+        "Test push gönderildi",
+        "Şimdi uygulamayı TAMAMEN kapat. Birkaç saniye içinde arka plan bildirimi gelmeli. Loglar: firebase functions:log",
+      );
+    } catch (e) {
+      appAlert("Test push hatası", e?.message || String(e));
+    } finally {
+      setSendingTestPush(false);
+    }
+  };
 
   return (
     <View style={[s.root, { backgroundColor: C.bg }]}>
@@ -652,7 +752,7 @@ export default function SettingsScreen() {
               iconName={row.iconName}
               title={t[row.titleKey]}
               subtitle={t[row.subtitleKey]}
-              last={index === NOTIFICATION_ROWS.length - 1}
+              last={index === NOTIFICATION_ROWS.length - 1 && !__DEV__}
               right={
                 <SwitchToggle
                   value={notificationsEnabled && notificationSettings[row.key]}
@@ -665,40 +765,34 @@ export default function SettingsScreen() {
               }
             />
           ))}
+          {__DEV__ && (
+            <SettingRow
+              colors={C}
+              iconBg={C.iconBlue}
+              iconColor={C.blue}
+              iconName={sendingTestPush ? "hourglass-outline" : "paper-plane-outline"}
+              title="Test push gönder (bana)"
+              subtitle="DEV-only · arka plan push zincirini test eder"
+              last
+              onPress={handleSendTestPush}
+              right={
+                sendingTestPush ? (
+                  <ActivityIndicator size="small" color={C.blue} />
+                ) : (
+                  <AppIcon name="chevron-forward" size={16} color={C.muted} />
+                )
+              }
+            />
+          )}
         </View>
 
-        <SectionLabel color={C.muted}>{t.content.toUpperCase()}</SectionLabel>
+        <SectionLabel color={C.muted}>
+          {(t.myPermissions || "İzinlerim").toUpperCase()}
+        </SectionLabel>
+        <PermissionsSection colors={C} />
+
+        <SectionLabel color={C.muted}>{t.general.toUpperCase()}</SectionLabel>
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
-          <SettingRow
-            colors={C}
-            iconBg={C.iconTeal}
-            iconColor={C.teal}
-            iconName={showSnow ? "snow-sharp" : "snow-outline"}
-            title={t.snow}
-            subtitle={t.snowSubtitle}
-            right={
-              <SwitchToggle
-                value={showSnow}
-                onValueChange={changeShowSnow}
-                size={36}
-              />
-            }
-          />
-          <SettingRow
-            colors={C}
-            iconBg={C.iconBlue}
-            iconColor={C.blue}
-            iconName={showIconBackground ? "image-outline" : "image-sharp"}
-            title={t.iconBackground}
-            subtitle={t.iconBackgroundSubtitle}
-            right={
-              <SwitchToggle
-                value={showIconBackground}
-                onValueChange={changeShowIconBackground}
-                size={36}
-              />
-            }
-          />
           <SettingRow
             colors={C}
             iconBg={C.iconAmber}
@@ -762,7 +856,127 @@ export default function SettingsScreen() {
           />
         </View>
 
-        <PetSettingsSection colors={C} />
+        {/* Kişiselleştirme: kar + ikon arka planı + pet aynı alanda toplandı */}
+        <SectionLabel color={C.muted}>{t.personalization.toUpperCase()}</SectionLabel>
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <SettingRow
+            colors={C}
+            iconBg={C.iconTeal}
+            iconColor={C.teal}
+            iconName={showSnow ? "snow-sharp" : "snow-outline"}
+            title={t.snow}
+            subtitle={t.snowSubtitle}
+            right={
+              <SwitchToggle
+                value={showSnow}
+                onValueChange={changeShowSnow}
+                size={36}
+              />
+            }
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconBlue}
+            iconColor={C.blue}
+            iconName={showIconBackground ? "image-outline" : "image-sharp"}
+            title={t.iconBackground}
+            subtitle={t.iconBackgroundSubtitle}
+            last={!showIconBackground}
+            right={
+              <SwitchToggle
+                value={showIconBackground}
+                onValueChange={changeShowIconBackground}
+                size={36}
+              />
+            }
+          />
+          {showIconBackground && (
+            <>
+            <View style={[s.iconBgOpacity, { borderBottomColor: C.borderMuted }]}>
+              <View style={s.iconBgModeHeader}>
+                <View style={[s.iconWrap, { backgroundColor: C.iconPurple }]}>
+                  <AppIcon name="contrast-outline" size={16} color={C.purple} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text allowFontScaling={false} style={[s.rowTitle, { color: C.text }]}>
+                    {t.iconBackgroundOpacity}
+                  </Text>
+                  <Text allowFontScaling={false} style={[s.rowSub, { color: C.muted }]}>
+                    {t.iconBackgroundOpacitySubtitle}
+                  </Text>
+                </View>
+                <View style={[s.qualityBadge, { backgroundColor: C.accentDim }]}>
+                  <Text
+                    allowFontScaling={false}
+                    style={[s.qualityBadgeText, { color: C.accentStrong }]}
+                  >
+                    {Math.round((iconBackgroundOpacity ?? 1) * 100)}%
+                  </Text>
+                </View>
+              </View>
+              <View style={s.iconBgSliderWrap}>
+                <OpacitySlider
+                  value={iconBackgroundOpacity ?? 1}
+                  onChange={changeIconBackgroundOpacity}
+                  colors={C}
+                />
+              </View>
+            </View>
+
+            <View style={s.iconBgMode}>
+              <View style={s.iconBgModeHeader}>
+                <View style={[s.iconWrap, { backgroundColor: C.iconBlue }]}>
+                  <AppIcon family="MaterialCommunityIcons" name="view-grid-outline" size={16} color={C.blue} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text allowFontScaling={false} style={[s.rowTitle, { color: C.text }]}>
+                    {t.iconBackgroundLayout}
+                  </Text>
+                  <Text allowFontScaling={false} style={[s.rowSub, { color: C.muted }]}>
+                    {iconBackgroundMode === "random"
+                      ? t.iconBackgroundRandomHint
+                      : t.iconBackgroundSharedHint}
+                  </Text>
+                </View>
+              </View>
+              <View
+                style={[
+                  s.segment,
+                  { backgroundColor: C.cardAlt, borderTopColor: C.border },
+                ]}
+              >
+                {[
+                  { value: "shared", label: t.iconBackgroundShared },
+                  { value: "random", label: t.iconBackgroundRandom },
+                ].map((o) => {
+                  const active = iconBackgroundMode === o.value;
+                  return (
+                    <TouchableOpacity
+                      key={o.value}
+                      style={[s.segOpt, active && { backgroundColor: C.accent }]}
+                      onPress={() => changeIconBackgroundMode(o.value)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        allowFontScaling={false}
+                        style={[
+                          s.segText,
+                          { color: active ? C.white : C.muted, fontWeight: active ? "700" : "500" },
+                        ]}
+                      >
+                        {o.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+            </>
+          )}
+        </View>
+
+        <View style={s.personalizationGap} />
+        <PetSettingsSection colors={C} showLabel={false} />
 
         <SectionLabel color={C.muted}>{t.data.toUpperCase()}</SectionLabel>
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
@@ -1057,6 +1271,49 @@ const s = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     overflow: "hidden",
+  },
+  personalizationGap: {
+    height: 10,
+  },
+  iconBgMode: {
+    paddingTop: 13,
+  },
+  iconBgModeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  iconBgOpacity: {
+    paddingTop: 13,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+  },
+  iconBgSliderWrap: {
+    paddingHorizontal: 16,
+  },
+  opacityTrack: {
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    overflow: "hidden",
+    justifyContent: "center",
+  },
+  opacityFill: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    opacity: 0.35,
+  },
+  opacityThumb: {
+    position: "absolute",
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 3,
+    top: 1,
   },
   row: {
     flexDirection: "row",

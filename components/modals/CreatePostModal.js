@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
   FlatList,
   ActivityIndicator,
   TouchableWithoutFeedback,
@@ -34,7 +33,13 @@ import Toast from "react-native-toast-message";
 import { Octicons } from "@expo/vector-icons";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
+import { appAlert } from "@components/AppAlert";
 import { i18nText } from "@utils/i18nText";
+
+// Karakter sınırları — büyük Firestore dökümanlarını ve aşırı uzun
+// içerikleri önler. Sayaçlar bu sabitlere göre gösterilir.
+const MAX_TITLE = 100;
+const MAX_CONTENT = 2000;
 
 
 // ─── Search Result Grid Item ────────────────────────────────────────────────
@@ -124,6 +129,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
       poster: m.poster || null,
       poster_path: m.poster_path || null,
       year: m.year || "",
+      genre_ids: m.genre_ids || [],
     }));
 
   // Form state
@@ -141,6 +147,11 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
   const [searchType, setSearchType] = useState("movie");
   const [searchResults, setSearchResults] = useState([]);
   const [loadingSearch, setLoadingSearch] = useState(false);
+  // Yarış koşulu koruması: her aramaya artan bir id verilir; yalnızca en güncel
+  // isteğin yanıtı uygulanır (eski/yavaş yanıt yeni sonucu ezemez).
+  const searchReqRef = useRef(0);
+  // Ana form ScrollView referansı — doğrulama hatasında en üste kaydırmak için.
+  const formScrollRef = useRef(null);
 
   // Drafts state
   const [drafts, setDrafts] = useState([]);
@@ -232,9 +243,9 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     setDrafts(updatedDrafts);
     try {
       await AsyncStorage.setItem("post_drafts", JSON.stringify(updatedDrafts));
-      Toast.show({ type: "success", text1: "Kaydedildi", text2: i18nText("autoI18n.taslaginiz_basariyla_kaydedildi", "Taslağınız başarıyla kaydedildi.") });
+      Toast.show({ type: "success", text1: i18nText("autoI18n.kaydedildi", "Kaydedildi"), text2: i18nText("autoI18n.taslaginiz_basariyla_kaydedildi", "Taslağınız başarıyla kaydedildi.") });
     } catch (e) {
-      Toast.show({ type: "error", text1: i18nText("autoI18n.hata", "Hata"), text2: "Taslak kaydedilemedi." });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.hata", "Hata"), text2: i18nText("autoI18n.taslak_kaydedilemedi", "Taslak kaydedilemedi.") });
     }
   };
 
@@ -259,16 +270,17 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!isSearchActive) return;
+      const reqId = ++searchReqRef.current;
       if (searchQuery.trim().length >= 2) {
-        fetchSearchResults();
+        fetchSearchResults(reqId);
       } else {
-        fetchPopularMedia();
+        fetchPopularMedia(reqId);
       }
     }, 450);
     return () => clearTimeout(timer);
   }, [searchQuery, searchType, isSearchActive]);
 
-  const fetchPopularMedia = async () => {
+  const fetchPopularMedia = async (reqId) => {
     setLoadingSearch(true);
     try {
       const endpoint = searchType === "movie" ? "movie/popular" : "tv/popular";
@@ -279,6 +291,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
         },
         headers: { Authorization: API_KEY },
       });
+      if (reqId !== searchReqRef.current) return; // eskimiş yanıt → yok say
       const results = response.data.results
         .map((item) => ({ ...item, media_type: searchType }))
         .sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0));
@@ -286,11 +299,11 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     } catch (err) {
       console.error(i18nText("autoI18n.populer_icerik_hatasi", "Popüler içerik hatası:"), err.message);
     } finally {
-      setLoadingSearch(false);
+      if (reqId === searchReqRef.current) setLoadingSearch(false);
     }
   };
 
-  const fetchSearchResults = async () => {
+  const fetchSearchResults = async (reqId) => {
     setLoadingSearch(true);
     try {
       const endpoint = searchType === "movie" ? "search/movie" : "search/tv";
@@ -303,6 +316,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
         },
         headers: { Authorization: API_KEY },
       });
+      if (reqId !== searchReqRef.current) return; // eskimiş yanıt → yok say
       const results = response.data.results
         .map((item) => ({ ...item, media_type: searchType }))
         .sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0));
@@ -310,7 +324,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     } catch (err) {
       console.error(i18nText("autoI18n.arama_hatasi", "Arama hatası:"), err.message);
     } finally {
-      setLoadingSearch(false);
+      if (reqId === searchReqRef.current) setLoadingSearch(false);
     }
   };
 
@@ -331,17 +345,24 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
 
   const [submitting, setSubmitting] = useState(false);
 
+  // Hata mesajını göster + hata kutusu görünür olsun diye en üste kaydır
+  // (klavye açıkken/aşağıdayken hatanın gözden kaçmasını önler).
+  const failWith = (msg) => {
+    setError(msg);
+    formScrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
   const handleShare = async () => {
     if (!title.trim() || !content.trim()) {
-      setError(i18nText("autoI18n.lutfen_baslik_ve_icerik_alanlarini_doldurun", "Lütfen başlık ve içerik alanlarını doldurun."));
+      failWith(i18nText("autoI18n.lutfen_baslik_ve_icerik_alanlarini_doldurun", "Lütfen başlık ve içerik alanlarını doldurun."));
       return;
     }
     if (postType === "review" && selectedMedia.length === 0) {
-      setError(i18nText("autoI18n.lutfen_incelemeniz_icin_bir_film_veya_dizi_secin", "Lütfen incelemeniz için bir film veya dizi seçin."));
+      failWith(i18nText("autoI18n.lutfen_incelemeniz_icin_bir_film_veya_dizi_secin", "Lütfen incelemeniz için bir film veya dizi seçin."));
       return;
     }
     if (postType === "list" && selectedMedia.length < 2) {
-      setError(i18nText("autoI18n.liste_olusturmak_icin_en_az_2_icerik_secmelisiniz", "Liste oluşturmak için en az 2 içerik seçmelisiniz."));
+      failWith(i18nText("autoI18n.liste_olusturmak_icin_en_az_2_icerik_secmelisiniz", "Liste oluşturmak için en az 2 içerik seçmelisiniz."));
       return;
     }
     setError("");
@@ -358,6 +379,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
         (m.release_date || m.first_air_date || "").split("-")[0] ||
         m.year ||
         "",
+      genre_ids: m.genre_ids || [],
     }));
 
     const payload = {
@@ -382,7 +404,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
         const result = await onSubmit(payload);
         if (result === null || result === undefined) {
           // submitPost null dönerse (auth yok / hata) → modal kapatma, error göster
-          setError(i18nText("autoI18n.paylasim_gonderilemedi_lutfen_tekrar_dene", "Paylaşım gönderilemedi. Lütfen tekrar dene."));
+          failWith(i18nText("autoI18n.paylasim_gonderilemedi_lutfen_tekrar_dene", "Paylaşım gönderilemedi. Lütfen tekrar dene."));
           setSubmitting(false);
           return;
         }
@@ -390,7 +412,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
         handleClose();
       } catch (e) {
         setSubmitting(false);
-        setError(i18nText("autoI18n.hata_2", "Hata: ") + (e?.message || "bilinmeyen"));
+        failWith(i18nText("autoI18n.hata_2", "Hata: ") + (e?.message || "bilinmeyen"));
       }
     } else {
       Toast.show({
@@ -412,6 +434,47 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     onClose();
   };
 
+  // Kullanıcı kaynaklı kapatma (İptal / backdrop / donanım geri). Formda
+  // kaydedilmemiş içerik varsa doğrudan kapatmaz; veri kaybını önlemek için
+  // onay/taslak seçeneği sunar.
+  const requestClose = () => {
+    if (isSearchActive) { closeSearch(); return; }
+    const hasContent = !!(
+      title.trim() ||
+      content.trim() ||
+      selectedMedia.length > 0 ||
+      userRating > 0
+    );
+    if (!hasContent) { handleClose(); return; }
+
+    if (isEditing) {
+      appAlert(
+        i18nText("autoI18n.degisiklikleri_iptal_et", "Değişiklikleri iptal et?"),
+        i18nText("autoI18n.yaptigin_degisiklikler_kaydedilmeyecek", "Yaptığın değişiklikler kaydedilmeyecek."),
+        [
+          { text: i18nText("autoI18n.vazgec", "Vazgeç"), style: "cancel" },
+          { text: i18nText("autoI18n.cik", "Çık"), style: "destructive", onPress: handleClose },
+        ],
+      );
+      return;
+    }
+
+    if (isSavedDraft) { handleClose(); return; }
+
+    appAlert(
+      i18nText("autoI18n.paylasimi_birak", "Paylaşımı bırak?"),
+      i18nText("autoI18n.degisikliklerini_taslak_olarak_kaydedebilirsin", "Değişikliklerini taslak olarak kaydedebilirsin."),
+      [
+        { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
+        { text: i18nText("autoI18n.cik", "Çık"), style: "destructive", onPress: handleClose },
+        {
+          text: i18nText("autoI18n.taslaga_kaydet", "Taslağa kaydet"),
+          onPress: async () => { await saveDraft(); handleClose(); },
+        },
+      ],
+    );
+  };
+
   // ─── Derived Colors ─────────────────────────────────────────────────────────
   const accentBlue = theme.colors?.blue || "#4a7cf6";
   const accentGreen = theme.colors?.green || "#34c87e";
@@ -422,26 +485,46 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     postType === "list" ? [accentGreen, "#1f8f5a"] : [accentBlue, "#2b5fb0"];
 
   // ─── GENRE MAP ───────────────────────────────────────────────────────────────
-  const GENRE_MAP = {
-    28: "Aksiyon", 12: "Macera", 16: "Animasyon", 35: "Komedi", 80: i18nText("autoI18n.suc", "Suç"),
-    99: "Belgesel", 18: "Dram", 10751: "Aile", 14: "Fantastik", 36: "Tarih",
-    27: "Korku", 10402: i18nText("autoI18n.muzik", "Müzik"), 9648: "Gizem", 10749: "Romantik", 878: "Bilim Kurgu",
-    53: "Gerilim", 10752: i18nText("autoI18n.savas", "Savaş"), 37: i18nText("autoI18n.vahsi_bati", "Vahşi Batı"), 10759: "Aksiyon & Macera",
-    10762: i18nText("autoI18n.cocuk", "Çocuk"), 10765: "Bilim Kurgu & Fantastik",
-  };
+  // useMemo([language]): dil değişince yeniden çözülür, her render'da kurulmaz.
+  const GENRE_MAP = useMemo(
+    () => ({
+      28: i18nText("autoI18n.aksiyon", "Aksiyon"),
+      12: i18nText("autoI18n.macera", "Macera"),
+      16: i18nText("autoI18n.animasyon", "Animasyon"),
+      35: i18nText("autoI18n.komedi", "Komedi"),
+      80: i18nText("autoI18n.suc", "Suç"),
+      99: i18nText("autoI18n.belgesel", "Belgesel"),
+      18: i18nText("autoI18n.dram", "Dram"),
+      10751: i18nText("autoI18n.aile", "Aile"),
+      14: i18nText("autoI18n.fantastik", "Fantastik"),
+      36: i18nText("autoI18n.tarih", "Tarih"),
+      27: i18nText("autoI18n.korku", "Korku"),
+      10402: i18nText("autoI18n.muzik", "Müzik"),
+      9648: i18nText("autoI18n.gizem", "Gizem"),
+      10749: i18nText("autoI18n.romantik", "Romantik"),
+      878: i18nText("autoI18n.bilim_kurgu", "Bilim Kurgu"),
+      53: i18nText("autoI18n.gerilim", "Gerilim"),
+      10752: i18nText("autoI18n.savas", "Savaş"),
+      37: i18nText("autoI18n.vahsi_bati", "Vahşi Batı"),
+      10759: i18nText("autoI18n.aksiyon_macera", "Aksiyon & Macera"),
+      10762: i18nText("autoI18n.cocuk", "Çocuk"),
+      10765: i18nText("autoI18n.bilim_kurgu_fantastik", "Bilim Kurgu & Fantastik"),
+    }),
+    [language],
+  );
 
   const listGenres = useMemo(() => {
     const ids = new Set();
     selectedMedia.forEach((m) => m.genre_ids?.forEach((id) => ids.add(id)));
     return Array.from(ids).map((id) => GENRE_MAP[id]).filter(Boolean).slice(0, 6);
-  }, [selectedMedia]);
+  }, [selectedMedia, GENRE_MAP]);
 
   // ─── RENDER ──────────────────────────────────────────────────────────────────
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={requestClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
         <View style={s.backdrop}>
-          <TouchableWithoutFeedback onPress={handleClose}>
+          <TouchableWithoutFeedback onPress={requestClose}>
             <View style={{ height: 60, width: "100%" }} />
           </TouchableWithoutFeedback>
 
@@ -460,7 +543,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                   <Ionicons name="arrow-back" size={22} color={theme.text.primary} />
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity onPress={handleClose} style={s.headerBtn}>
+                <TouchableOpacity onPress={requestClose} style={s.headerBtn}>
                   <Text style={[s.cancelText, { color: theme.text.secondary }]}>{t.cancel || i18nText("autoI18n.iptal", "İptal")}</Text>
                 </TouchableOpacity>
               )}
@@ -469,7 +552,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                 {isSearchActive
                   ? i18nText("autoI18n.icerik_ara", "İçerik Ara")
                   : showDrafts
-                    ? "Taslaklar"
+                    ? i18nText("autoI18n.taslaklar", "Taslaklar")
                     : isEditing
                       ? i18nText("autoI18n.gonderiyi_duzenle", "Gönderiyi Düzenle")
                       : i18nText("autoI18n.yeni_paylasim", "Yeni Paylaşım")}
@@ -520,7 +603,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                         )}
                         <View style={{ flex: 1 }}>
                           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                            <Text style={[s.draftName, { color: theme.text.primary }]}>{user?.displayName || "Siz"}</Text>
+                            <Text style={[s.draftName, { color: theme.text.primary }]}>{user?.displayName || i18nText("autoI18n.siz", "Siz")}</Text>
                             <View style={[s.badge, {
                               backgroundColor: draft.postType === "list"
                                 ? `${accentGreen}18` : `${accentBlue}18`,
@@ -647,7 +730,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                   </View>
                 </View>
 
-                <ScrollView style={s.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <ScrollView ref={formScrollRef} style={s.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                   {/* Error */}
                   {error ? (
                     <View style={s.errorBox}>
@@ -663,8 +746,11 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                     placeholderTextColor={theme.text.muted}
                     value={title}
                     onChangeText={(text) => { setTitle(text); setError(""); }}
-                    maxLength={100}
+                    maxLength={MAX_TITLE}
                   />
+                  <Text style={[s.counterText, { color: theme.text.muted }, title.length >= MAX_TITLE && { color: "#f04f4f" }]}>
+                    {title.length}/{MAX_TITLE}
+                  </Text>
 
                   {/* ── REVIEW LAYOUT ── */}
                   {postType === "review" ? (
@@ -720,8 +806,12 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                           onChangeText={(text) => { setContent(text); setError(""); }}
                           multiline
                           textAlignVertical="top"
+                          maxLength={MAX_CONTENT}
                         />
                       </View>
+                      <Text style={[s.counterText, { color: theme.text.muted }, content.length >= MAX_CONTENT && { color: "#f04f4f" }]}>
+                        {content.length}/{MAX_CONTENT}
+                      </Text>
                       {/* Stars + Spoiler row */}
                       <View style={[s.metaRow, userRating > 0 && { justifyContent: "flex-end", minHeight: 40 }]}>
                         {userRating === 0 && (
@@ -751,7 +841,11 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                         onChangeText={(text) => { setContent(text); setError(""); }}
                         multiline
                         textAlignVertical="top"
+                        maxLength={MAX_CONTENT}
                       />
+                      <Text style={[s.counterText, { color: theme.text.muted }, content.length >= MAX_CONTENT && { color: "#f04f4f" }]}>
+                        {content.length}/{MAX_CONTENT}
+                      </Text>
 
                       {/* Puan + Spoiler (liste için de) */}
                       <View style={s.listMetaRow}>
@@ -1006,6 +1100,9 @@ const s = StyleSheet.create({
 
   // Title input
   titleInput: { fontSize: 18, fontWeight: "700", paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16, borderWidth: 0.5, marginBottom: 14, letterSpacing: -0.3 },
+
+  // Karakter sayacı (başlık + içerik)
+  counterText: { alignSelf: "flex-end", fontSize: 11, fontWeight: "600", marginTop: -6, marginBottom: 8, marginRight: 2 },
 
   // Review layout
   metaRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 14 },

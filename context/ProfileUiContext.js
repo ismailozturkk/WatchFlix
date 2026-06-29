@@ -1,26 +1,35 @@
 import React, {
-  createContext, useContext, useEffect, useState, useMemo,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  useMemo,
+  useRef,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Toast from "react-native-toast-message";
 import { useAuth } from "./AuthContext";
+import { useUserProfile } from "./UserProfileContext";
 import { AVATARS as avatars, clampAvatarIndex } from "../utils/avatars";
 import { i18nText } from "../utils/i18nText";
-
 
 const ProfileUiContext = createContext();
 export const useProfileUi = () => useContext(ProfileUiContext);
 
 export const ProfileUiProvider = ({ children }) => {
   const { user } = useAuth();
+  const { profile, changeAvatarIndex } = useUserProfile();
   const uid = user?.uid;
 
-  const [avatar,            setAvatar]            = useState(avatars[0]);
   const [selectAvatarIndex, setSelectAvatarIndex] = useState(0);
-  const [isloadingAvatar,   setIsLoadingAvatar]   = useState(false);
-  const [modalVisible,      setModalVisible]      = useState(false);
-  const [gridStyle,         setGridStyle]         = useState(1);
+  const [avatarHydrating, setAvatarHydrating] = useState(false);
+  const [avatarSaving, setAvatarSaving] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [gridStyle, setGridStyle] = useState(1);
   const [allCornersRounded, setAllCornersRounded] = useState(false);
+  const firestoreAvatarUidRef = useRef(null);
+  const avatarSavingRef = useRef(false);
 
   // Load grid style preference
   useEffect(() => {
@@ -46,62 +55,153 @@ export const ProfileUiProvider = ({ children }) => {
       await AsyncStorage.setItem("listGridStyle", String(styleId));
       setGridStyle(styleId);
     } catch (err) {
-      Toast.show({ type: "error", text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi") });
+      Toast.show({
+        type: "error",
+        text1: i18nText(
+          "autoI18n.gorunum_ayari_kaydedilemedi",
+          "Görünüm ayarı kaydedilemedi"
+        ),
+      });
     }
   };
 
   const saveAllCornersRounded = async (isRounded) => {
     try {
-      await AsyncStorage.setItem("allCornersRounded", isRounded ? "true" : "false");
+      await AsyncStorage.setItem(
+        "allCornersRounded",
+        isRounded ? "true" : "false"
+      );
       setAllCornersRounded(isRounded);
     } catch (err) {
-      Toast.show({ type: "error", text1: i18nText("autoI18n.ayarlar_kaydedilemedi", "Ayar kaydedilemedi") });
+      Toast.show({
+        type: "error",
+        text1: i18nText("autoI18n.ayarlar_kaydedilemedi", "Ayar kaydedilemedi"),
+      });
     }
   };
 
-  // Load avatar from AsyncStorage
+  // AsyncStorage yalnız hızlı başlangıç önbelleğidir. Firestore profili geldiyse
+  // geç gelen local okuma güncel server index'inin üzerine yazamaz.
   useEffect(() => {
-    if (!uid) return;
-    setIsLoadingAvatar(true);
+    let cancelled = false;
+    firestoreAvatarUidRef.current = null;
+    if (!uid) {
+      setSelectAvatarIndex(0);
+      return undefined;
+    }
+    setAvatarHydrating(true);
     AsyncStorage.getItem(`avatar_${uid}`)
       .then((stored) => {
-        if (stored !== null) {
+        if (
+          !cancelled &&
+          stored !== null &&
+          firestoreAvatarUidRef.current !== uid
+        ) {
           const index = clampAvatarIndex(parseInt(stored, 10));
-          setAvatar(avatars[index]);
           setSelectAvatarIndex(index);
         }
       })
-      .catch(() => Toast.show({ type: "error", text1: i18nText("autoI18n.avatar_yuklenemedi", "Avatar yüklenemedi") }))
-      .finally(() => setIsLoadingAvatar(false));
+      .catch(() =>
+        Toast.show({
+          type: "error",
+          text1: i18nText("autoI18n.avatar_yuklenemedi", "Avatar yüklenemedi"),
+        })
+      )
+      .finally(() => {
+        if (!cancelled) setAvatarHydrating(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [uid]);
 
-  // Persist avatar when user picks a new one — hem AsyncStorage hem Firestore
+  // Firestore gerçek kaynak: profil snapshot'ı geldiğinde hem UI hem local cache
+  // aynı güvenli index'e çekilir. Bu ayrıca başka cihazdaki seçimi de taşır.
   useEffect(() => {
-    if (!uid) return;
-    setIsLoadingAvatar(true);
-    // 1) Hızlı local cache
-    AsyncStorage.setItem(`avatar_${uid}`, selectAvatarIndex.toString())
-      .then(() => {
-        setAvatar(avatars[selectAvatarIndex]);
+    if (
+      !uid ||
+      profile?.uid !== uid ||
+      typeof profile?.avatarIndex !== "number"
+    ) {
+      return;
+    }
+    const index = clampAvatarIndex(profile.avatarIndex);
+    firestoreAvatarUidRef.current = uid;
+    setSelectAvatarIndex(index);
+    setAvatarHydrating(false);
+    AsyncStorage.setItem(`avatar_${uid}`, String(index)).catch(() => {});
+  }, [uid, profile?.uid, profile?.avatarIndex]);
+
+  // Tek kalıcı seçim yolu. UI optimistic güncellenir; Firestore yazısı başarısız
+  // olursa hem state hem local cache önceki değere geri alınır.
+  const selectAvatar = useCallback(
+    async (nextIndex) => {
+      if (!uid || avatarSavingRef.current) return false;
+      const index = clampAvatarIndex(nextIndex);
+      if (index === selectAvatarIndex) {
         setModalVisible(false);
-      })
-      .catch(() => Toast.show({ type: "error", text1: "Avatar kaydedilemedi" }))
-      .finally(() => setIsLoadingAvatar(false));
+        return true;
+      }
 
-    // 2) Firestore'a yansıt — best effort. UserProfileContext snapshot ile
-    //    diğer ekranlara propagate eder. Hata Toast üretmiyoruz çünkü
-    //    AsyncStorage zaten kaydedildi.
-    import("../services/userService")
-      .then(({ setAvatarIndex }) => setAvatarIndex(uid, selectAvatarIndex))
-      .catch(() => {});
-  }, [selectAvatarIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+      const previous = selectAvatarIndex;
+      avatarSavingRef.current = true;
+      setAvatarSaving(true);
+      setSelectAvatarIndex(index);
+      try {
+        await changeAvatarIndex(index);
+        AsyncStorage.setItem(`avatar_${uid}`, String(index)).catch(() => {});
+        setModalVisible(false);
+        return true;
+      } catch (error) {
+        setSelectAvatarIndex(previous);
+        AsyncStorage.setItem(`avatar_${uid}`, String(previous)).catch(() => {});
+        Toast.show({
+          type: "error",
+          text1: i18nText(
+            "autoI18n.avatar_kaydedilemedi",
+            "Avatar kaydedilemedi"
+          ),
+          text2: error?.message,
+        });
+        throw error;
+      } finally {
+        avatarSavingRef.current = false;
+        setAvatarSaving(false);
+      }
+    },
+    [uid, selectAvatarIndex, changeAvatarIndex]
+  );
 
-  const value = useMemo(() => ({
-    avatar, avatars, selectAvatarIndex, setSelectAvatarIndex,
-    isloadingAvatar, modalVisible, setModalVisible,
-    gridStyle, setGridStyle, saveListGridStyle,
-    allCornersRounded, setAllCornersRounded, saveAllCornersRounded,
-  }), [avatar, selectAvatarIndex, isloadingAvatar, modalVisible, gridStyle, allCornersRounded]);
+  const avatar = avatars[selectAvatarIndex] || avatars[0];
+  const isloadingAvatar = avatarHydrating || avatarSaving;
+
+  const value = useMemo(
+    () => ({
+      avatar,
+      avatars,
+      selectAvatarIndex,
+      setSelectAvatarIndex,
+      selectAvatar,
+      isloadingAvatar,
+      modalVisible,
+      setModalVisible,
+      gridStyle,
+      setGridStyle,
+      saveListGridStyle,
+      allCornersRounded,
+      setAllCornersRounded,
+      saveAllCornersRounded,
+    }),
+    [
+      avatar,
+      selectAvatarIndex,
+      selectAvatar,
+      isloadingAvatar,
+      modalVisible,
+      gridStyle,
+      allCornersRounded,
+    ]
+  );
 
   return (
     <ProfileUiContext.Provider value={value}>

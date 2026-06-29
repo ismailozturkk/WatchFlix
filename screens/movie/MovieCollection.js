@@ -9,6 +9,7 @@ import {
   Animated,
 } from "react-native";
 import { Image } from "expo-image";
+import PosterImage from "../../components/PosterImage";
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useTheme } from "../../context/ThemeContext";
@@ -31,14 +32,6 @@ const MovieCollectionCard = memo(function MovieCollectionCard({ item, navigation
   const onPressOut = () =>
     Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
 
-  const source = useMemo(
-    () =>
-      item.poster_path
-        ? { uri: getTmdbUrl(item.poster_path, "poster", 200) }
-        : require("../../assets/image/no_image.png"),
-    [item.poster_path, getTmdbUrl]
-  );
-
   return (
     <TouchableOpacity
       style={styles.movieCollectionItem}
@@ -49,8 +42,10 @@ const MovieCollectionCard = memo(function MovieCollectionCard({ item, navigation
     >
       <Animated.View style={[{ transform: [{ scale }] }]}>
         <View style={{ flexDirection: "row" }}>
-          <Image
-            source={source}
+          <PosterImage
+            path={item.poster_path}
+            type="movie"
+            size={200}
             style={[styles.movieCollectionPoster, { shadowColor: theme.shadow }]}
             cachePolicy="memory-disk"
             recyclingKey={`moviecollection-${item.id}`}
@@ -198,14 +193,10 @@ export default function MovieCollection({ navigation }) {
                     },
                   ]}
                 >
-                  <Image
-                    source={
-                      item.poster_path
-                        ? {
-                            uri: getTmdbUrl(item.poster_path, 'poster', 200),
-                          }
-                        : require("../../assets/image/no_image.png")
-                    }
+                  <PosterImage
+                    path={item.poster_path}
+                    type="movie"
+                    size={200}
                     style={[
                       styles.similarPoster,
                       { shadowColor: theme.shadow },
@@ -250,14 +241,10 @@ export default function MovieCollection({ navigation }) {
                   },
                 ]}
               >
-                <Image
-                  source={
-                    selectedMovieCollection.poster_path
-                      ? {
-                          uri: getTmdbUrl(selectedMovieCollection.poster_path, 'poster', 200),
-                        }
-                      : require("../../assets/image/no_image.png")
-                  }
+                <PosterImage
+                  path={selectedMovieCollection.poster_path}
+                  type="movie"
+                  size={200}
                   style={[styles.similarPoster, { shadowColor: theme.shadow }]}
                   cachePolicy="memory-disk"
                   transition={120}

@@ -13,7 +13,7 @@ import {
   Dimensions,
   StatusBar
 } from "react-native";
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import {
   deleteField,
   doc,
@@ -33,6 +33,8 @@ import StaggerItem from "../../components/StaggerItem";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
+import { useListStatusContext } from "../../context/ListStatusContext";
+import { PREDEFINED_MOVIE_LISTS } from "../../services/listItemsService";
 import { BlurView } from "expo-blur";
 import { i18nText } from "@utils/i18nText";
 
@@ -300,9 +302,37 @@ export default function ListsViewScreen({ navigation }) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { watchedTvMap, combinedLists } = useListStatusContext();
   const [isLoading, setIsLoading] = useState(false);
 
-  const [lists, setLists] = useState([]);
+  // Kök doc'tan gelen ham listeler (watchedTv burada artık boş — subcollection'a taşındı).
+  const [rootLists, setRootLists] = useState([]);
+  // Öntanımlı listeler subcollection'dan (combinedLists), watchedTv map'ten;
+  // özel listeler kök doc array'lerinden (Part B'de customItems'a taşınacak).
+  const lists = useMemo(() => {
+    const tvItems = Object.values(watchedTvMap || {}).map((s) => ({
+      ...s,
+      dateAdded: s.dateAdded ?? s.addedShowDate ?? null,
+    }));
+    const result = [
+      ["favorites", combinedLists?.favorites || []],
+      ["watchList", combinedLists?.watchList || []],
+      ["watchedMovies", combinedLists?.watchedMovies || []],
+      ["watchedTv", tvItems],
+    ];
+    // Özel listeler: kök doc'taki öntanımlı olmayan array key'leri.
+    rootLists.forEach(([k, v]) => {
+      if (
+        PREDEFINED_MOVIE_LISTS.includes(k) ||
+        k === "watchedTv" ||
+        k === "customLists" ||
+        !Array.isArray(v)
+      )
+        return;
+      result.push([k, v]);
+    });
+    return result;
+  }, [rootLists, watchedTvMap, combinedLists]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedList, setSelectedList] = useState(null);
   const [listVisible, setListVisible] = useState({});
@@ -354,9 +384,9 @@ export default function ListsViewScreen({ navigation }) {
     const docRef = doc(db, "Lists", user.uid);
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
-        setLists(Object.entries(docSnap.data() || {}));
+        setRootLists(Object.entries(docSnap.data() || {}));
       } else {
-        setLists([]);
+        setRootLists([]);
       }
     });
     return () => unsubscribe();
@@ -662,7 +692,7 @@ export default function ListsViewScreen({ navigation }) {
           </Animated.View>
         </View>
       </Modal>
-      <BackButton top={8} />
+      <BackButton />
     </SafeAreaView>
   );
 }

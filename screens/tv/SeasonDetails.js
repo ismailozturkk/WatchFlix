@@ -21,9 +21,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import LottieView from "lottie-react-native";
 import { useSnow } from "../../context/SnowContext";
 import WatchedAdd from "./WatchedAdd";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "../../firebase";
-import { useAuth } from "../../context/AuthContext";
+import { useWatchedShow } from "../../hooks/useWatchedShow";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import {
   useApiSettings,
@@ -63,6 +61,7 @@ const EpisodeCard = memo(
     dateDiff,
     onPress,
     adjustOpacity,
+    isWatched,
   }) => {
     const ratingColor = getRatingColor(episode.vote_average);
     const isUpcoming = dateDiff?.isRemaining;
@@ -243,6 +242,7 @@ const EpisodeCard = memo(
                 episodePosterPath={episode.still_path}
                 genres={genres}
                 size={32}
+                isWatched={isWatched}
               />
             )}
           </View>
@@ -310,14 +310,20 @@ export default function SeasonDetails({ route, navigation }) {
   const [lineCount, setLineCount] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [play, setPlay] = useState("");
-  const [isSeasonWatched, setIsSeasonWatched] = useState(0);
 
   const { t, language } = useLanguage();
   const { theme } = useTheme();
-  const { user } = useAuth();
   const { API_KEY } = useApiSettings();
   const { showSnow } = useSnowSettings();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+
+  // Tek abonelik: bu dizinin tüm izlenme durumu (bölüm bazında getDoc yok).
+  const watched = useWatchedShow(showId);
+  const watchedSeasonCount = watched.seasonWatchedCount(seasonNumber);
+  const isSeasonWatched =
+    details?.episodes?.length > 0
+      ? watchedSeasonCount / details.episodes.length
+      : 0;
 
   // ── Yardımcılar ───────────────────────────────────────────────────────────
   const formatDate = useCallback(
@@ -385,25 +391,6 @@ export default function SeasonDetails({ route, navigation }) {
       cancelled = true;
     };
   }, [showId, seasonNumber, language, API_KEY]);
-
-  // ── Firestore İzleme ──────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!user || !showId || !seasonNumber) return;
-    const unsubscribe = onSnapshot(doc(db, "Lists", user.uid), (snap) => {
-      if (!snap.exists()) return;
-      const watchedTv = snap.data().watchedTv || [];
-      const tvShow = watchedTv.find((s) => s.id === showId);
-      if (tvShow?.seasons?.[seasonNumber - 1]) {
-        const season = tvShow.seasons[seasonNumber - 1];
-        if (season.episodes?.length && season.seasonEpisodes) {
-          setIsSeasonWatched(season.episodes.length / season.seasonEpisodes);
-        }
-      } else {
-        setIsSeasonWatched(0);
-      }
-    });
-    return unsubscribe;
-  }, [user, showId, seasonNumber]);
 
   // ── Kar efekti lottie sayısını sınırla ───────────────────────────────────
   if (loading) return <SeasonSkeleton />;
@@ -677,6 +664,7 @@ export default function SeasonDetails({ route, navigation }) {
                 isPlaying={episode.id === play}
                 dateDiff={dateDiff}
                 adjustOpacity={adjustOpacity}
+                isWatched={watched.isEpisodeWatched(seasonNumber, episode.episode_number)}
                 onPress={() =>
                   navigation.navigate("EpisodeDetails", {
                     showId,

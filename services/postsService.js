@@ -449,6 +449,22 @@ export async function updateComment(postId, commentId, text) {
 }
 
 /**
+ * Bir post yorumunu HEM asıl koleksiyonda HEM de "Etkinliklerim → Yorumlarım"
+ * denormalize kopyasında ({Users}/{uid}/myComments) güncelle. Activity ekranından
+ * düzenleme için: tek batch, iki yer senkron kalır.
+ */
+export async function editPostComment(postId, commentId, uid, text) {
+  if (!text?.trim()) throw new Error("editPostComment: text boş olamaz");
+  const t = text.trim();
+  const batch = writeBatch(db);
+  batch.update(doc(db, "Posts", postId, "comments", commentId), { text: t });
+  if (uid) {
+    batch.update(doc(db, "Users", uid, "myComments", commentId), { text: t });
+  }
+  await batch.commit();
+}
+
+/**
  * Bir post'un yorumlarını canlı dinler (createdAt artan — eskiden yeniye).
  * Flat model: hem üst yorumlar hem yanıtlar aynı koleksiyonda, parentId ile
  * ayrışır. UI parentId'ye göre gruplar.
@@ -531,4 +547,24 @@ export async function isFollowing(currentUid, targetUid) {
     doc(db, "Users", currentUid, "following", targetUid),
   );
   return snap.exists();
+}
+
+// ─── REPORT ─────────────────────────────────────────────────────────────────
+//
+// Kullanıcı bir gönderiyi şikayet eder. Sadece create izinli (rules) — okuma
+// yok. Moderasyon/inceleme manuel (konsol). Aynı kullanıcı aynı postu birden
+// çok kez şikayet edebilir; deduplikasyon şimdilik gerekmiyor.
+//
+// PostReports/{autoId}
+//   postId, postAuthorId, reporterId, reason, createdAt
+export async function reportPost(postId, reporterId, meta = {}) {
+  if (!postId) throw new Error("reportPost: postId eksik");
+  if (!reporterId) throw new Error("reportPost: reporterId eksik");
+  await addDoc(collection(db, "PostReports"), {
+    postId,
+    postAuthorId: meta.postAuthorId || null,
+    reporterId,
+    reason: meta.reason || "unspecified",
+    createdAt: serverTimestamp(),
+  });
 }

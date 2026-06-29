@@ -1,12 +1,11 @@
 import { Image } from "expo-image";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Modal,
-  FlatList,
   ScrollView,
   Animated
 } from "react-native";
@@ -42,7 +41,7 @@ import StatisticsSection from "./profile/StatisticsSection";
 import { useUserProfile } from "../../context/UserProfileContext";
 import { propagateProfileChange } from "../../services/profilePropagation";
 import { i18nText } from "../../utils/i18nText";
-import ProfileGamesModule from "../../components/profile/ProfileGamesModule";
+import ProfileAvatarPickerModal from "../../components/profile/ProfileAvatarPickerModal";
 
 const ProfileScreen = ({ navigation }) => {
   const { t, language } = useLanguage();
@@ -54,11 +53,11 @@ const ProfileScreen = ({ navigation }) => {
   const { profile } = useUserProfile();
   const {
     avatar,
-    avatars,
+    selectAvatarIndex,
     modalVisible,
     setModalVisible,
     isloadingAvatar,
-    setSelectAvatarIndex,
+    selectAvatar,
   } = useProfileUi();
   const {
     watchedMovieCount,
@@ -153,6 +152,21 @@ const ProfileScreen = ({ navigation }) => {
     friendsState?.incomingRequests?.length ?? profile?.pendingRequestsInCount ?? 0;
   const sendCount =
     friendsState?.outgoingRequests?.length ?? profile?.pendingRequestsOutCount ?? 0;
+
+  const handleAvatarSelect = useCallback(
+    async (index) => {
+      const changed = index !== selectAvatarIndex;
+      try {
+        const saved = await selectAvatar(index);
+        if (saved && changed && user?.uid) {
+          propagateProfileChange(user.uid, { avatarIndex: index }).catch(() => {});
+        }
+      } catch {
+        // Context seçimi geri alır ve kullanıcıya kalıcılık hatasını gösterir.
+      }
+    },
+    [selectAvatarIndex, selectAvatar, user?.uid],
+  );
 
   return (
     <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
@@ -344,6 +358,7 @@ const ProfileScreen = ({ navigation }) => {
               </View>
               <Text
                 allowFontScaling={false}
+                numberOfLines={1}
                 style={[styles.friendBarLabel, { color: theme.text.secondary }]}
               >{i18nText("autoI18n.ara_2", "Ara")}</Text>
             </TouchableOpacity>
@@ -372,20 +387,52 @@ const ProfileScreen = ({ navigation }) => {
               </View>
               <Text
                 allowFontScaling={false}
+                numberOfLines={1}
                 style={[styles.friendBarLabel, { color: theme.text.secondary }]}
               >{i18nText("autoI18n.arkadaslar", "Arkadaşlar")}</Text>
               {friendCount > 0 && (
-                <View
-                  style={[styles.friendBarPill, { backgroundColor: "#64b4ff" }]}
-                >
-                  <Text
-                    allowFontScaling={false}
-                    style={styles.friendBarPillText}
+                <View style={styles.friendBarPillRow}>
+                  <View
+                    style={[styles.friendBarPill, { backgroundColor: "#64b4ff" }]}
                   >
-                    {friendCount}
-                  </Text>
+                    <Text
+                      allowFontScaling={false}
+                      style={styles.friendBarPillText}
+                    >
+                      {friendCount}
+                    </Text>
+                  </View>
                 </View>
               )}
+            </TouchableOpacity>
+
+            {/* Dikey ayraç */}
+            <View
+              style={[
+                styles.friendBarDivider,
+                { backgroundColor: theme.text.secondary + "20" },
+              ]}
+            />
+
+            {/* Mesajlar — yatay (arkadaşlardan ayrı sohbet/grup alanı) */}
+            <TouchableOpacity
+              style={styles.friendBarBtnWide}
+              onPress={() => navigation.navigate("MessagesScreen")}
+              activeOpacity={0.6}
+            >
+              <View
+                style={[
+                  styles.friendBarIconWrap,
+                  { backgroundColor: "#6C63FF15" },
+                ]}
+              >
+                <AppIcon family="Ionicons" name="chatbubble-ellipses-outline" size={18} color="#6C63FF" />
+              </View>
+              <Text
+                allowFontScaling={false}
+                numberOfLines={1}
+                style={[styles.friendBarLabel, { color: theme.text.secondary }]}
+              >{i18nText("autoI18n.mesajlar", "Mesajlar")}</Text>
             </TouchableOpacity>
 
             {/* Dikey ayraç */}
@@ -412,6 +459,7 @@ const ProfileScreen = ({ navigation }) => {
               </View>
               <Text
                 allowFontScaling={false}
+                numberOfLines={1}
                 style={[styles.friendBarLabel, { color: theme.text.secondary }]}
               >{i18nText("autoI18n.istekler", "İstekler")}</Text>
               {(receivedCount > 0 || sendCount > 0) && (
@@ -481,7 +529,6 @@ const ProfileScreen = ({ navigation }) => {
           <CalendarWidget navigation={navigation} />
           <RemindersPreviewButton navigation={navigation} />
           <NotesCard navigation={navigation} />
-          <ProfileGamesModule navigation={navigation} />
           <View style={styles.section}>
             <Text
               allowFontScaling={false}
@@ -514,71 +561,13 @@ const ProfileScreen = ({ navigation }) => {
               />
             </TouchableOpacity>
           </View>
-          <Modal
-            animationType="fade"
-            transparent={true}
+          <ProfileAvatarPickerModal
             visible={modalVisible}
-            onRequestClose={() => {
-              setModalVisible(false);
-            }}
-          >
-            <View style={styles.modalContainer}>
-              <BlurView
-                tint="dark"
-                intensity={50}
-                experimentalBlurMethod="dimezisBlurView"
-                style={StyleSheet.absoluteFill}
-              />
-              <View style={[styles.modalContent, { marginVertical: 80 }]}>
-                <Text
-                  style={[styles.modalTitle, { color: theme.text.primary }]}
-                >
-                  {t.profileScreen.selectAvatar}
-                </Text>
-                <FlatList
-                  data={avatars || []}
-                  keyExtractor={(item, index) => index.toString()}
-                  showsVerticalScrollIndicator={false}
-                  renderItem={({ item, index }) => (
-                    <TouchableOpacity
-                      onPress={() => {
-                        setSelectAvatarIndex(index);
-                        if (user?.uid) {
-                          propagateProfileChange(user.uid, { avatarIndex: index }).catch(
-                            () => {},
-                          );
-                        }
-                      }}
-                    >
-                      {item && (
-                        <Image source={item} style={styles.avatarImage} />
-                      )}
-                    </TouchableOpacity>
-                  )}
-                  numColumns={4}
-                />
-
-                <TouchableOpacity
-                  onPress={() => {
-                    setModalVisible(false);
-                  }}
-                  style={[
-                    styles.closeButton,
-                    { backgroundColor: theme.accent },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.closeButtonText,
-                      { color: theme.text.primary },
-                    ]}
-                  >
-                    {t.profileScreen.close}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
+            selectedIndex={selectAvatarIndex}
+            saving={isloadingAvatar}
+            onSelect={handleAvatarSelect}
+            onClose={() => setModalVisible(false)}
+          />
           <Modal
             animationType="fade"
             transparent={true}
@@ -661,30 +650,32 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
 
-  // Ara butonu — dikey (kompakt)
+  // Tüm bar butonları — DİKEY kolon (icon üst, label alt). 4 buton sığsın diye
+  // yatay düzenden kolona geçildi (yatayda label'lar sarıp kayıyordu).
   friendBarBtnCompact: {
-    flexDirection: "row",
+    flex: 1,
+    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    gap: 7,
+    paddingVertical: 8,
+    paddingHorizontal: 2,
+    gap: 5,
+    position: "relative",
   },
-
-  // Arkadaşlar & İstekler — yatay (icon sol, label+badge sağ)
   friendBarBtnWide: {
     flex: 1,
-    flexDirection: "row", // ← yatay düzen
+    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-    gap: 7,
+    paddingVertical: 8,
+    paddingHorizontal: 2,
+    gap: 5,
+    position: "relative",
   },
 
   friendBarDivider: {
     width: 1,
-    height: 32,
+    height: 36,
     borderRadius: 1,
   },
   friendBarIconWrap: {
@@ -693,13 +684,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
+    position: "relative",
   },
   friendBarLabel: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: "600",
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
+  // Rozet(ler) — butonun sağ-üst köşesinde (icon üstünde)
   friendBarPillRow: {
+    position: "absolute",
+    top: 2,
+    right: 8,
     flexDirection: "row",
     gap: 3,
     alignItems: "center",
@@ -782,30 +778,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.94,
     shadowRadius: 10.32,
     elevation: 25,
-  },
-  modalContent: {
-    alignItems: "center",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 20,
-  },
-  avatarImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    margin: 5,
-  },
-  closeButton: {
-    marginTop: 20,
-    padding: 10,
-    backgroundColor: "#007bff",
-    borderRadius: 5,
-  },
-  closeButtonText: {
-    color: "#fff",
-    fontSize: 16,
   },
   images: {
     width: "100%",

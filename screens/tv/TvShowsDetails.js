@@ -38,10 +38,16 @@ import Entypo from "@expo/vector-icons/Entypo";
 import { useAppSettings, useImageQualitySettings } from "../../context/AppSettingsContext";
 import DatePickerModal from "@components/modals/DatePickerModal";
 import ListViewTv from "../../components/ListViewTv";
+import PosterImage from "../../components/PosterImage";
 import { BlurView } from "expo-blur";
 import ListBadges from "../../components/ListBadges";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { useListStatusContext } from "../../context/ListStatusContext";
+import {
+  addToList,
+  removeFromList,
+  PREDEFINED_MOVIE_LISTS,
+} from "../../services/listItemsService";
 import IconBacground from "../../components/IconBacground";
 import ImageGalleryModal from "@components/modals/ImageGalleryModal";
 import TrailerSection from "@components/video/TrailerSection";
@@ -49,6 +55,15 @@ import CommentSheetModal from "@components/modals/CommentSheetModal";
 import RatingSheetModal from "@components/modals/RatingSheetModal";
 import RatingSummary from "@components/RatingSummary";
 import { i18nText } from "../../utils/i18nText";
+import { useWatchedShow } from "../../hooks/useWatchedShow";
+import { markShow, unmarkShow } from "../../services/watchedTvService";
+import {
+  getWatchState,
+  isAired,
+  WATCH_STATE,
+  watchStateColor,
+} from "../../utils/watchState";
+import Reminder from "../../components/Reminder";
 
 
 const { height, width } = Dimensions.get("window");
@@ -98,14 +113,11 @@ const SimilarTvShow = memo(function SimilarTvShow({ item, navigation, theme }) {
         style={styles.similarItem}
         onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
       >
-        <Image
-          source={
-            item.poster_path
-              ? {
-                  uri: getTmdbUrl(item.poster_path, 'poster', 200),
-                }
-              : require("../../assets/image/no_image.png")
-          }
+        <PosterImage
+          path={item.poster_path}
+          type="tv"
+          size={200}
+          iconSize={46}
           style={[styles.similarPoster, { borderColor: theme.border + "55" }]}
         />
         <View
@@ -147,7 +159,10 @@ export default function TvShowsDetails({ route, navigation }) {
   const { user } = useAuth();
   const { API_KEY, showSnow } = useAppSettings();
   const { getTmdbUrl } = useImageQualitySettings();
-  const { allLists } = useListStatusContext();
+  const { allLists, statusIndex } = useListStatusContext();
+
+  // Tek abonelik: bu dizinin tüm izlenme durumu (kök-dizi yerine subcollection).
+  const watched = useWatchedShow(id);
 
   const [overviewExpanded, setOverviewExpanded] = useState(false);
   const overviewHeightAnim = useRef(new Animated.Value(80)).current;
@@ -172,9 +187,6 @@ export default function TvShowsDetails({ route, navigation }) {
       }),
     ]).start();
   };
-  const [isSeasonWatched, setIsSeasonWatched] = useState(0);
-  const [showEpisodeCount, setShowEpisodeCount] = useState();
-  const [showEpisodes, setShowEpisodes] = useState();
   const [isLoading, setIsLoading] = useState(false);
   const [reviewLength, setReviewLength] = useState(5);
   const [reviewTextLength, setReviewTextLength] = useState(null);
@@ -202,15 +214,25 @@ export default function TvShowsDetails({ route, navigation }) {
 
   /* ── listStates — useMemo: snapshot başına bir kez, ekstra render yok ── */
   const listStates = useMemo(() => {
-    if (!allLists) return {};
     const s = {};
-    Object.entries(allLists).forEach(([k, v]) => {
-      s[k] = Array.isArray(v)
-        ? v.some((i) => i.id === id && i.type === "tv")
-        : false;
-    });
+    const m = statusIndex?.tv?.[id] || {};
+    s.favorites = !!m.inFavorites;
+    s.watchList = !!m.inWatchList;
+    s.watchedMovies = !!m.isWatched;
+    if (allLists) {
+      Object.entries(allLists).forEach(([k, v]) => {
+        if (
+          PREDEFINED_MOVIE_LISTS.includes(k) ||
+          k === "watchedTv" ||
+          k === "customLists"
+        )
+          return;
+        if (Array.isArray(v))
+          s[k] = v.some((i) => i.id === id && i.type === "tv");
+      });
+    }
     return s;
-  }, [allLists, id]);
+  }, [allLists, statusIndex, id]);
 
   /* ── Fetch details ── */
   useEffect(() => {
@@ -237,58 +259,73 @@ export default function TvShowsDetails({ route, navigation }) {
     fetch();
   }, [id, language]);
 
-  /* ── İzlenme kontrolü ── */
-  const checkIfWatched = () => {
-    if (!allLists) {
-      setShowEpisodeCount();
-      setShowEpisodes();
-      setIsSeasonWatched(0);
-      return;
-    }
-    const tvShow = (allLists.watchedTv || []).find((s) => s.id === id);
-    if (tvShow) {
-      const total = tvShow.showEpisodeCount;
-      const watched = Array.isArray(tvShow.seasons)
-        ? tvShow.seasons.reduce((a, s) => a + (s.episodes?.length || 0), 0)
-        : 0;
-      setShowEpisodeCount(total);
-      setShowEpisodes(watched);
-      setIsSeasonWatched(total && watched ? watched / total : 0);
-    } else {
-      setShowEpisodeCount();
-      setShowEpisodes();
-      setIsSeasonWatched(0);
-    }
-  };
-  useEffect(() => {
-    checkIfWatched();
-  }, [allLists, id]);
+  /* ── İzlenme durumu — useWatchedShow'dan TÜRETİLİR (subcollection) ── */
+  const watchedEpisodeCount = watched.aggregates.watchedEpisodeCount;
+  const showTotalEpisodes = details?.number_of_episodes || 0;
+  const showAired = isAired(details?.first_air_date);
+  const showWatchState = getWatchState({
+    aired: showAired,
+    watched: watchedEpisodeCount,
+    total: showTotalEpisodes,
+  });
+  const isSeasonWatched =
+    showTotalEpisodes > 0
+      ? Math.min(1, watchedEpisodeCount / showTotalEpisodes)
+      : 0;
 
   /* ── updateTvSeriesList ── */
   const updateTvSeriesList = async (listType, type) => {
     if (!user.uid || !details) return;
-    const ref = doc(db, "Lists", user.uid);
+    const isPredefined = PREDEFINED_MOVIE_LISTS.includes(listType);
+    const getName = (l) =>
+      ({
+        favorites: t.tvShowsDetails?.favorites,
+        watchList: t.tvShowsDetails?.watchList,
+        watchedMovies: t.tvShowsDetails?.watched,
+        watchedTv: t.tvShowsDetails?.watchedTv,
+      })[l] || l;
+    const toastRemove = () =>
+      Toast.show({
+        type: "warning",
+        text1: i18nText("autoI18n.tv_removed_from_list", "Dizi {{list}} listesinden kaldırıldı!", { list: getName(listType) }),
+      });
+    const toastAdd = () =>
+      Toast.show({
+        type: "success",
+        text1: i18nText("autoI18n.tv_added_to_list", "Dizi {{list}} listesine eklendi!", { list: getName(listType) }),
+      });
+
     try {
+      if (isPredefined) {
+        // Yeni model: her öğe ayrı doküman (listItemsService).
+        const isIn = !!listStates[listType];
+        if (isIn) {
+          await removeFromList(user.uid, listType, type, details.id);
+          toastRemove();
+        } else {
+          await addToList(user.uid, listType, {
+            id: details.id,
+            type,
+            name: details.name,
+            imagePath: details.poster_path,
+            dateAdded: formatDateSave(new Date()),
+            genres: details.genres?.map((g) => g.name) || [],
+          });
+          toastAdd();
+        }
+        return;
+      }
+
+      // Özel listeler — eski kök-array yolu (Part B'de listItemsService'e taşınacak).
+      const ref = doc(db, "Lists", user.uid);
       const snap = await getDoc(ref);
-      let data = snap.exists()
-        ? snap.data()
-        : { watchedTv: [], favorites: [], watchList: [], watchedMovies: [] };
+      let data = snap.exists() ? snap.data() : {};
       if (!snap.exists()) await setDoc(ref, data);
       let list = data[listType] || [];
       const idx = list.findIndex((i) => i.id === details.id && i.type === type);
-      const getName = (l) =>
-        ({
-          favorites: t.tvShowsDetails?.favorites,
-          watchList: t.tvShowsDetails?.watchList,
-          watchedMovies: t.tvShowsDetails?.watched,
-          watchedTv: t.tvShowsDetails?.watchedTv,
-        })[l] || l;
       if (idx !== -1) {
         list.splice(idx, 1);
-        Toast.show({
-          type: "warning",
-          text1: i18nText("autoI18n.tv_removed_from_list", "Dizi {{list}} listesinden kaldırıldı!", { list: getName(listType) }),
-        });
+        toastRemove();
       } else {
         list.push({
           id: details.id,
@@ -298,10 +335,7 @@ export default function TvShowsDetails({ route, navigation }) {
           type,
           genres: details.genres?.map((g) => g.name) || [],
         });
-        Toast.show({
-          type: "success",
-          text1: i18nText("autoI18n.tv_added_to_list", "Dizi {{list}} listesine eklendi!", { list: getName(listType) }),
-        });
+        toastAdd();
       }
       await updateDoc(ref, { [listType]: list });
     } catch (e) {
@@ -347,39 +381,14 @@ export default function TvShowsDetails({ route, navigation }) {
       setExpandedCard(null);
     }
   };
-  /* ── addShowToFirestore ── */
+  /* ── Diziyi komple işaretle (tüm sezonların bölümlerini çek → markShow) ── */
   const addShowToFirestore = async (selDate = null) => {
-    if (!user || !details || !details.seasons || !selDate) return;
+    if (!user?.uid || !details?.seasons || !selDate) return;
     try {
       setIsLoading(true);
       closeModal();
-      const ref = doc(db, "Lists", user.uid);
-      const snap = await getDoc(ref);
-      let data = snap.exists() ? snap.data() : { watchedTv: [] };
-      let wTv = data.watchedTv || [];
-      const idx = wTv.findIndex((s) => s.id === details.id);
       const eDate = formatDateSave(selDate);
-      if (idx !== -1) {
-        wTv.splice(idx, 1);
-        await updateDoc(ref, { watchedTv: wTv });
-        Toast.show({
-          type: "warning",
-          text1: i18nText("autoI18n.dizi_izleme_listesinden_silindi", "Dizi izleme listesinden silindi"),
-        });
-        checkIfWatched();
-        return;
-      }
-      const newShow = {
-        id: details.id,
-        name: details.name,
-        showEpisodeCount: details.number_of_episodes,
-        showSeasonCount: details.number_of_seasons,
-        imagePath: details.poster_path,
-        type: "tv",
-        addedShowDate: eDate,
-        genres: details.genres?.map((g) => g.name) || [],
-        seasons: [],
-      };
+      const seasonsWithEpisodes = [];
       for (const seasonObj of details.seasons) {
         if (!seasonObj.season_number || seasonObj.episode_count === 0) continue;
         const res = await axios.get(
@@ -389,32 +398,53 @@ export default function TvShowsDetails({ route, navigation }) {
             headers: { accept: "application/json", Authorization: API_KEY },
           },
         );
-        const sd = {
+        seasonsWithEpisodes.push({
           seasonNumber: seasonObj.season_number,
           seasonPosterPath: seasonObj.poster_path || null,
           seasonEpisodes: seasonObj.episode_count,
-          addedSeasonDate: eDate,
-          episodes: [],
-        };
-        for (const ep of res.data.episodes) {
-          sd.episodes.push({
+          episodes: res.data.episodes.map((ep) => ({
             episodeNumber: ep.episode_number,
             episodePosterPath: ep.still_path || null,
             episodeName: ep.name || "Unknown",
-            episodeRatings: ep.vote_average?.toFixed(1) ?? 0,
+            episodeRatings: parseFloat(ep.vote_average?.toFixed(1)) || 0,
             episodeMinutes: ep.runtime || 0,
-            episodeWatchTime: eDate,
-          });
-        }
-        newShow.seasons.push(sd);
+          })),
+        });
       }
-      wTv.push(newShow);
-      await updateDoc(ref, { watchedTv: wTv });
+      await markShow(
+        user.uid,
+        {
+          id: details.id,
+          name: details.name,
+          showEpisodeCount: details.number_of_episodes,
+          showSeasonCount: details.number_of_seasons,
+          imagePath: details.poster_path,
+          genres: details.genres?.map((g) => g.name) || [],
+        },
+        seasonsWithEpisodes,
+        eDate,
+      );
       Toast.show({
         type: "success",
         text1: i18nText("autoI18n.dizi_bolumleri_izlendi_olarak_isaretlendi", "Dizi bölümleri izlendi olarak işaretlendi"),
       });
-      checkIfWatched();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /* ── Dizinin tüm izlenme kaydını kaldır ── */
+  const removeShowFromFirestore = async () => {
+    if (!user?.uid || !details) return;
+    try {
+      setIsLoading(true);
+      await unmarkShow(user.uid, details.id);
+      Toast.show({
+        type: "warning",
+        text1: i18nText("autoI18n.dizi_izleme_listesinden_silindi", "Dizi izleme listesinden silindi"),
+      });
     } catch (e) {
       console.error(e);
     } finally {
@@ -446,12 +476,7 @@ export default function TvShowsDetails({ route, navigation }) {
       </View>
     );
 
-  const watchedColor =
-    isSeasonWatched === 1
-      ? theme.colors.green
-      : showEpisodes
-        ? theme.colors.orange
-        : theme.colors.blue;
+  const watchedColor = watchStateColor(showWatchState, theme);
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
@@ -580,6 +605,24 @@ export default function TvShowsDetails({ route, navigation }) {
           <View style={{ marginBottom: 8 }}>
             <ListViewTv
               isSeasonWatched={isSeasonWatched}
+              showWatchState={showWatchState}
+              onMarkWatched={openModal}
+              onUnmarkWatched={removeShowFromFirestore}
+              watchedOverride={
+                showWatchState === WATCH_STATE.UNAIRED ? (
+                  <Reminder
+                    showId={details.id}
+                    showName={details.name}
+                    showPosterPath={details.poster_path}
+                    seasonNumber={1}
+                    episodeNumber={1}
+                    episodeName={details.name}
+                    airDate={details.first_air_date}
+                    seasonPosterPath={details.poster_path}
+                    type="tv"
+                  />
+                ) : null
+              }
               navigation={navigation}
               updateList={updateTvSeriesList}
               openModal={openModal}
@@ -665,12 +708,12 @@ export default function TvShowsDetails({ route, navigation }) {
                 >
                   {details.number_of_episodes || 0}
                 </Text>
-                {showEpisodes !== undefined && (
+                {watchedEpisodeCount > 0 && (
                   <Text
                     allowFontScaling={false}
                     style={[styles.statValSub, { color: theme.text.muted }]}
                   >
-                    /{showEpisodes}
+                    /{watchedEpisodeCount}
                   </Text>
                 )}
               </View>
@@ -941,6 +984,7 @@ export default function TvShowsDetails({ route, navigation }) {
                     season={season}
                     details={details}
                     navigation={navigation}
+                    watchedCount={watched.seasonWatchedCount(season.season_number)}
                   />
                 ))
             ) : (

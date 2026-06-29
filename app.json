@@ -29,6 +29,7 @@
         "backgroundColor": "#1E1E1E"
       },
       "package": "com.smlztrk.Watchify",
+      "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {

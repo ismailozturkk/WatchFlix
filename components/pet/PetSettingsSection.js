@@ -124,7 +124,7 @@ const PetCard = memo(function PetCard({
  * Ayarlar ekranındaki "Pet" bölümü: ana açma/kapama anahtarı + pet seçme
  * (yatay pencereli liste) + boyut. `colors` = SettingsScreen'in C paleti.
  */
-function PetSettingsSection({ colors: C }) {
+function PetSettingsSection({ colors: C, showLabel = true }) {
   const {
     catalog,
     petEnabled,
@@ -208,9 +208,11 @@ function PetSettingsSection({ colors: C }) {
 
   return (
     <>
-      <Text allowFontScaling={false} style={[ps.sectionLabel, { color: C.muted }]}>
-        {i18nText("autoI18n.petBolum", "PET / DOST").toUpperCase()}
-      </Text>
+      {showLabel && (
+        <Text allowFontScaling={false} style={[ps.sectionLabel, { color: C.muted }]}>
+          {i18nText("autoI18n.petBolum", "PET / DOST").toUpperCase()}
+        </Text>
+      )}
 
       <View style={[ps.card, { backgroundColor: C.card, borderColor: C.border }]}>
         {/* Ana açma/kapama */}

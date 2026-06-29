@@ -8,6 +8,8 @@ import React, {
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as petCache from "../services/petCache";
+import { toast } from "../components/AppToast";
+import { i18nText } from "../utils/i18nText";
 
 // Petler. Hepsi aynı 1536x1872 / 9 satır sprite düzeni.
 // Sprite sheet'ler bundle'da DEĞİL — Cloudflare R2'de (/pets/<id>.webp) barınır,
@@ -99,8 +101,20 @@ export const PetProvider = ({ children }) => {
         await petCache.downloadPet(id);
         setCachedPets((c) => ({ ...c, [id]: true }));
         setPetSizes((c) => ({ ...c, [id]: petCache.getPetSize(id) }));
-      } catch {
-        // indirme hatası — sessizce geç (UI tekrar denemeye izin verir)
+      } catch (e) {
+        // Hatayı YÜZEYE ÇIKAR — sessizce geçilince APK'da "hiçbir şey olmuyor"
+        // gibi görünüyordu; gerçek sebep (ağ/izin/depolama) artık görülebilir.
+        console.warn("pet download failed:", id, e?.message || e);
+        // Jenerik mesaj yerine GERÇEK sebebi göster (HTTP hatası / boş yanıt /
+        // geçersiz içerik). Böylece sorun teşhis edilebilir.
+        toast.error(
+          i18nText("autoI18n.indirilemedi", "Pet indirilemedi"),
+          e?.message ||
+            i18nText(
+              "autoI18n.pet_indirilemedi_kontrol",
+              "İnternet bağlantını kontrol edip tekrar dene.",
+            ),
+        );
       } finally {
         setDownloadingPets((c) => {
           const next = { ...c };

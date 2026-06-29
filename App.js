@@ -88,6 +88,9 @@ import SearchScreen from "./screens/tabs/SearchScreen";
 import FriendRequestsScreen from "./screens/tabs/profile/FriendRequestsScreen";
 import PrivacySettingsScreen from "./screens/tabs/profile/PrivacySettingsScreen";
 import ChatScreen from "@screens/chat/ChatScreen";
+import CreateGroupScreen from "@screens/chat/CreateGroupScreen";
+import GroupsListScreen from "@screens/chat/GroupsListScreen";
+import MessagesScreen from "@screens/chat/MessagesScreen";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { enableFreeze } from "react-native-screens";
 import Comment from "./components/Comment";
@@ -98,6 +101,8 @@ import { CalendarProvider } from "./context/CalendarContext";
 import OnGoingSeries from "./screens/tv/OnGoingSeries";
 import SceneGuessGameScreen from "./screens/game/SceneGuessGameScreen";
 import GameHubScreen from "./screens/game/GameHubScreen";
+import TournamentScreen from "./screens/tournament/TournamentScreen";
+import ShareContentScreen from "./screens/tabs/ShareContentScreen";
 import SceneGameDetailScreen from "./screens/game/SceneGameDetailScreen";
 import SceneGameSetupScreen from "./screens/game/SceneGameSetupScreen";
 import SceneGamePlayScreen from "./screens/game/SceneGamePlayScreen";
@@ -294,6 +299,14 @@ function AppContent() {
           }}
         />
         <Stack.Screen
+          name="TournamentScreen"
+          component={TournamentScreen}
+          options={{
+            headerShown: false,
+            animation: "slide_from_right",
+          }}
+        />
+        <Stack.Screen
           name="TvShowsDetails"
           component={TvShowsDetails}
           options={{
@@ -474,6 +487,21 @@ function AppContent() {
           }}
         />
         <Stack.Screen
+          name="MessagesScreen"
+          component={MessagesScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="GroupsListScreen"
+          component={GroupsListScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="CreateGroupScreen"
+          component={CreateGroupScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="SearchFriendsScreen"
           component={SearchFriendsScreen}
           options={{
@@ -536,6 +564,11 @@ function AppContent() {
             headerShown: false,
             animation: "slide_from_bottom",
           }}
+        />
+        <Stack.Screen
+          name="ShareContentScreen"
+          component={ShareContentScreen}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="GameHubScreen"
@@ -653,7 +686,7 @@ export default function App() {
     return () => sub.remove();
   }, []);
 
-  // Presence (heartbeat + AppState + lastSeen) — presenceService halleder.
+  // Presence (RTDB onDisconnect + AppState) — presenceService halleder.
   useEffect(() => {
     const authUnsubscribe = auth.onAuthStateChanged((u) => {
       if (u?.uid) {

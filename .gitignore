@@ -10,6 +10,8 @@ web-build/
 expo-env.d.ts
 
 # Native
+android/
+ios/
 *.orig.*
 *.jks
 *.p8
@@ -35,3 +37,10 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 .env
+
+# debug/build artifacts
+crash.txt
+.expo-check-export/
+
+# FCM / service account (gizli — asla commit etme)
+*-firebase-adminsdk-*.json

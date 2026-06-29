@@ -21,6 +21,11 @@ import { useHapticsSettings } from "../context/AppSettingsContext";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { i18nText } from "../utils/i18nText";
+import {
+  WATCH_STATE,
+  WATCH_STATE_LABEL_KEY,
+  watchStateColor,
+} from "../utils/watchState";
 
 
 /* ─── Küçük buton sarmalayıcı ─────────────────── */
@@ -124,6 +129,11 @@ const ListViewTv = ({
   isSeasonWatched,
   listStates,
   isLoading,
+  // İzlendi butonu 4 durumlu: showWatchState + handler'lar
+  showWatchState = WATCH_STATE.NONE,
+  onMarkWatched,
+  onUnmarkWatched,
+  watchedOverride = null,
 }) => {
   const { t } = useLanguage();
   const { theme } = useTheme();
@@ -229,9 +239,14 @@ const ListViewTv = ({
     ]).start(() => setModalVisible(false));
   };
 
-  /* ── İzlenme durumu rengi ── */
-  const watchedColor =
-    isSeasonWatched === 1 ? theme.colors.green : theme.colors.orange;
+  /* ── İzlenme durumu rengi/etiketi (4 durum) ── */
+  const watchedColor = watchStateColor(showWatchState, theme);
+  const watchedLabel =
+    t[WATCH_STATE_LABEL_KEY[showWatchState]] ||
+    i18nText("autoI18n.izledim", "İzledim");
+  const isWatchedActive =
+    showWatchState === WATCH_STATE.PARTIAL ||
+    showWatchState === WATCH_STATE.FULL;
 
   return (
     <View
@@ -245,7 +260,9 @@ const ListViewTv = ({
         scale={scaleValuesRef.current["watchList"]}
         opacity={opacityValuesRef.current["watchList"]}
         onPress={() => handleOptimisticPress("watchList", () => updateList("watchList", type))}
-        label={t.watchlist || i18nText("autoI18n.liste_2", "Liste")}
+        label={getIsActive("watchList")
+          ? i18nText("autoI18n.listede", "Listede")
+          : i18nText("autoI18n.izleme_listesi", "İzleme Listesi")}
         theme={theme}
       >
         <Ionicons
@@ -255,36 +272,57 @@ const ListViewTv = ({
         />
       </ActionButton>
 
-      {/* İzlendi */}
-      <ActionButton
-        scale={scaleValuesRef.current["watchedTv"]}
-        opacity={opacityValuesRef.current["watchedTv"]}
-        onPress={() =>
-          !getIsActive("watchedTv") ? handleOptimisticPress("watchedTv", openModal, false) : handleOptimisticPress("watchedTv", () => addShowToFirestore(new Date()))
-        }
-        label={t.watched || i18nText("autoI18n.izledim", "İzledim")}
-        theme={theme}
-      >
-        {isLoading ? (
-          <LottieView
-            source={require("@lottie/loading15.json")}
-            style={{ width: 30, height: 30 }}
-            autoPlay
-            loop
-          />
-        ) : getIsActive("watchedTv") ? (
-          <Ionicons name="eye" size={30} color={watchedColor} />
-        ) : (
-          <Ionicons name="eye-outline" size={30} color={theme.text.secondary} />
-        )}
-      </ActionButton>
+      {/* İzlendi / İzleniyor / İzle / Hatırlat (4 durum) */}
+      {watchedOverride ? (
+        // Yayınlanmadı → çan / Hatırlat (Reminder bileşeni dışarıdan gelir)
+        <View style={styles.iconCol}>
+          <View style={styles.actionButtonWrapper}>{watchedOverride}</View>
+          <Text
+            allowFontScaling={false}
+            style={[styles.iconLabel, { color: theme?.text?.muted || "#999" }]}
+          >
+            {t.remind || i18nText("autoI18n.hatirlat", "Hatırlat")}
+          </Text>
+        </View>
+      ) : (
+        <ActionButton
+          scale={scaleValuesRef.current["watchedTv"]}
+          opacity={opacityValuesRef.current["watchedTv"]}
+          onPress={() =>
+            handleOptimisticPress(
+              "watchedTv",
+              isWatchedActive ? onUnmarkWatched : onMarkWatched,
+              false,
+            )
+          }
+          label={watchedLabel}
+          theme={theme}
+        >
+          {isLoading ? (
+            <LottieView
+              source={require("@lottie/loading15.json")}
+              style={{ width: 30, height: 30 }}
+              autoPlay
+              loop
+            />
+          ) : (
+            <Ionicons
+              name={isWatchedActive ? "eye" : "eye-outline"}
+              size={30}
+              color={isWatchedActive ? watchedColor : theme.text.secondary}
+            />
+          )}
+        </ActionButton>
+      )}
 
       {/* Favoriler */}
       <ActionButton
         scale={scaleValuesRef.current["favorites"]}
         opacity={opacityValuesRef.current["favorites"]}
         onPress={() => handleOptimisticPress("favorites", () => updateList("favorites", type))}
-        label={t.favorites || "Favori"}
+        label={getIsActive("favorites")
+          ? i18nText("autoI18n.favorim", "Favorim")
+          : i18nText("autoI18n.favori", "Favori")}
         theme={theme}
       >
         <Ionicons

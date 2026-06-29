@@ -245,7 +245,9 @@ const ListView = ({
       key: "watchList",
       icon: getIsActive("watchList") ? "bookmark" : "bookmark-outline",
       color: getIsActive("watchList") ? theme.colors.blue : theme.text.secondary,
-      label: t.watchlist || i18nText("autoI18n.liste_2", "Liste"),
+      label: getIsActive("watchList")
+        ? i18nText("autoI18n.listede", "Listede")
+        : i18nText("autoI18n.izleme_listesi", "İzleme Listesi"),
       onPress: () => handleOptimisticPress("watchList", () => updateList("watchList", type, formatDateSave(new Date()))),
     },
     {
@@ -256,7 +258,9 @@ const ListView = ({
       key: "favorites",
       icon: getIsActive("favorites") ? "heart" : "heart-outline",
       color: getIsActive("favorites") ? theme.colors.red : theme.text.secondary,
-      label: t.favorites || "Favori",
+      label: getIsActive("favorites")
+        ? i18nText("autoI18n.favorim", "Favorim")
+        : i18nText("autoI18n.favori", "Favori"),
       onPress: () => handleOptimisticPress("favorites", () => updateList("favorites", type, formatDateSave(new Date()))),
     },
   ];
@@ -306,7 +310,11 @@ const ListView = ({
                 )}
               </ActionButton>
               <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>
-                {t.watched || i18nText("autoI18n.izledim", "İzledim")}
+                {isReminderMode
+                  ? (t.remind || i18nText("autoI18n.hatirlat", "Hatırlat"))
+                  : getIsActive("watchedMovies")
+                    ? (t.watched || i18nText("autoI18n.izlendi", "İzlendi"))
+                    : (t.watch || i18nText("autoI18n.izle", "İzle"))}
               </Text>
             </View>
           );

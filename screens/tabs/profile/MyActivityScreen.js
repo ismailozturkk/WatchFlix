@@ -16,6 +16,10 @@ import {
   ScrollView,
   Animated,
   Dimensions,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -27,13 +31,21 @@ import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { i18nText } from "@utils/i18nText";
 import RatingStars from "@components/RatingStars";
 import StaggerItem from "@components/StaggerItem";
+import { appAlert } from "@components/AppAlert";
+import { toast } from "@components/AppToast";
 import { subscribeToMyRatings } from "@services/ratingsService";
 import {
   subscribeToMyComments,
   subscribeToMyLikes,
   subscribeToMyBookmarks,
 } from "@services/activityService";
-import { fetchUserPosts } from "@services/postsService";
+import {
+  fetchUserPosts,
+  toggleLike,
+  toggleBookmark,
+  deleteComment,
+  editPostComment,
+} from "@services/postsService";
 import { StoryDraftService } from "@services/StoryDraftService";
 import { readCache, writeCache } from "@utils/cachedRead";
 import { cacheKeys } from "@utils/cacheKeys";
@@ -207,6 +219,106 @@ export default function MyActivityScreen({ navigation }) {
     [navigation],
   );
 
+  // ── Etkileşim kaldır (beğeni / kayıt) ──
+  // item.id = postId, item._kind = "like" | "bookmark". Canlı snapshot listeyi
+  // otomatik günceller; ekstra state tutmaya gerek yok.
+  const removeInteraction = useCallback(
+    (item) => {
+      if (!uid) return;
+      const isLike = item._kind === "like";
+      const name = item.postTitle || i18nText("autoI18n.gonderi", "Gönderi");
+      appAlert(
+        isLike
+          ? i18nText("autoI18n.begeniyi_kaldir", "Beğeniyi kaldır")
+          : i18nText("autoI18n.kaydi_kaldir", "Kaydı kaldır"),
+        isLike
+          ? i18nText("autoI18n.x_begenisi_kaldir_onay", '"{{name}}" gönderisinin beğenisini kaldırmak istiyor musun?', { name })
+          : i18nText("autoI18n.x_kaydi_kaldir_onay", '"{{name}}" gönderisini kayıtlardan kaldırmak istiyor musun?', { name }),
+        [
+          { text: i18nText("autoI18n.vazgec", "Vazgeç"), style: "cancel" },
+          {
+            text: i18nText("autoI18n.kaldir", "Kaldır"),
+            style: "destructive",
+            onPress: async () => {
+              try {
+                if (isLike) await toggleLike(item.id, uid, true);
+                else await toggleBookmark(item.id, uid, true);
+                toast.success(
+                  isLike
+                    ? i18nText("autoI18n.begeni_kaldirildi", "Beğeni kaldırıldı")
+                    : i18nText("autoI18n.kayit_kaldirildi", "Kayıt kaldırıldı"),
+                );
+              } catch (e) {
+                toast.error(i18nText("autoI18n.islem_basarisiz", "İşlem başarısız"), e?.message);
+              }
+            },
+          },
+        ],
+      );
+    },
+    [uid],
+  );
+
+  // ── Post yorumu sil ──
+  const removeComment = useCallback(
+    (item) => {
+      if (!uid) return;
+      appAlert(
+        i18nText("autoI18n.yorumu_sil", "Yorumu sil"),
+        i18nText("autoI18n.yorumu_sil_onay", "Bu yorumu kalıcı olarak silmek istiyor musun?"),
+        [
+          { text: i18nText("autoI18n.vazgec", "Vazgeç"), style: "cancel" },
+          {
+            text: i18nText("autoI18n.sil", "Sil"),
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await deleteComment(item.targetId, item.id, uid);
+                toast.success(i18nText("autoI18n.yorum_silindi", "Yorum silindi"));
+              } catch (e) {
+                toast.error(i18nText("autoI18n.silinemedi", "Silinemedi"), e?.message);
+              }
+            },
+          },
+        ],
+      );
+    },
+    [uid],
+  );
+
+  // ── Post yorumu düzenle (modal) ──
+  const [editing, setEditing] = useState(null); // myComments item | null
+  const [editText, setEditText] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const openEdit = useCallback((item) => {
+    setEditing(item);
+    setEditText(item.text || "");
+  }, []);
+
+  const saveEdit = useCallback(async () => {
+    if (!editing) return;
+    const t = editText.trim();
+    if (!t) {
+      toast.warning(i18nText("autoI18n.yorum_bos_olamaz", "Yorum boş olamaz"));
+      return;
+    }
+    if (t === (editing.text || "").trim()) {
+      setEditing(null);
+      return;
+    }
+    setSaving(true);
+    try {
+      await editPostComment(editing.targetId, editing.id, uid, t);
+      toast.success(i18nText("autoI18n.yorum_guncellendi", "Yorum güncellendi"));
+      setEditing(null);
+    } catch (e) {
+      toast.error(i18nText("autoI18n.guncellenemedi", "Güncellenemedi"), e?.message);
+    } finally {
+      setSaving(false);
+    }
+  }, [editing, editText, uid]);
+
   const data =
     tab === "ratings"
       ? ratings
@@ -253,6 +365,8 @@ export default function MyActivityScreen({ navigation }) {
             subtitle={item.text}
             date={item.createdAt}
             onPress={item.kind === "post" ? undefined : () => openMedia(item.kind, item.targetId)}
+            onEdit={item.kind === "post" ? () => openEdit(item) : undefined}
+            onDelete={item.kind === "post" ? () => removeComment(item) : undefined}
           />
         );
         break;
@@ -319,6 +433,7 @@ export default function MyActivityScreen({ navigation }) {
             content={item.postAuthorName ? `@${item.postAuthorName}` : null}
             date={item._ts}
             action={item._kind === "like" ? "like" : "bookmark"}
+            onRemove={() => removeInteraction(item)}
           />
         );
         break;
@@ -433,14 +548,82 @@ export default function MyActivityScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {/* ── Yorum düzenleme modalı ── */}
+      <Modal
+        visible={!!editing}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditing(null)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={st.editBackdrop}
+        >
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => !saving && setEditing(null)}
+          />
+          <View style={[st.editCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+            <View style={st.editHeader}>
+              <View style={[st.editIcon, { backgroundColor: theme.accent + "1A" }]}>
+                <Ionicons name="create-outline" size={18} color={theme.accent} />
+              </View>
+              <Text style={[st.editTitle, { color: theme.text.primary }]}>
+                {i18nText("autoI18n.yorumu_duzenle", "Yorumu düzenle")}
+              </Text>
+            </View>
+            <TextInput
+              value={editText}
+              onChangeText={setEditText}
+              multiline
+              autoFocus
+              placeholder={i18nText("autoI18n.yorumunu_yaz", "Yorumunu yaz…")}
+              placeholderTextColor={theme.text.muted}
+              style={[
+                st.editInput,
+                { backgroundColor: theme.primary, borderColor: theme.border, color: theme.text.primary },
+              ]}
+            />
+            <View style={st.editActions}>
+              <TouchableOpacity
+                onPress={() => setEditing(null)}
+                disabled={saving}
+                activeOpacity={0.85}
+                style={[st.editBtn, { backgroundColor: theme.primary, borderColor: theme.border }]}
+              >
+                <Text style={[st.editBtnText, { color: theme.text.secondary }]}>
+                  {i18nText("autoI18n.vazgec", "Vazgeç")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={saveEdit}
+                disabled={saving}
+                activeOpacity={0.85}
+                style={[st.editBtn, { backgroundColor: theme.accent, borderColor: theme.accent, opacity: saving ? 0.7 : 1 }]}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={[st.editBtnText, { color: "#fff" }]}>
+                    {i18nText("autoI18n.kaydet", "Kaydet")}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 // ─── Genel satır ──────────────────────────────────────────────────────────────
-function Row({ theme, poster, kind, title, subtitle, date, right, onPress, badge }) {
+function Row({ theme, poster, kind, title, subtitle, date, right, onPress, badge, onEdit, onDelete }) {
   const km = KIND_META[kind] || { label: "", color: theme.accent, icon: "ellipse" };
   const Wrapper = onPress ? TouchableOpacity : View;
+  const hasActions = !!(onEdit || onDelete);
   return (
     <Wrapper
       {...(onPress ? { onPress, activeOpacity: 0.8 } : {})}
@@ -493,7 +676,34 @@ function Row({ theme, poster, kind, title, subtitle, date, right, onPress, badge
       </View>
 
       {/* Sağ */}
-      {right ? right : onPress ? <Ionicons name="chevron-forward" size={18} color={theme.text.muted} /> : null}
+      {right ? (
+        right
+      ) : hasActions ? (
+        <View style={st.rowActions}>
+          {onEdit ? (
+            <TouchableOpacity
+              onPress={onEdit}
+              activeOpacity={0.8}
+              hitSlop={8}
+              style={[st.rowActionBtn, { backgroundColor: theme.primary, borderColor: theme.border }]}
+            >
+              <Ionicons name="create-outline" size={16} color={theme.accent} />
+            </TouchableOpacity>
+          ) : null}
+          {onDelete ? (
+            <TouchableOpacity
+              onPress={onDelete}
+              activeOpacity={0.8}
+              hitSlop={8}
+              style={[st.rowActionBtn, { backgroundColor: "rgba(239,68,68,0.10)", borderColor: "rgba(239,68,68,0.35)" }]}
+            >
+              <Ionicons name="trash-outline" size={16} color="#EF4444" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : onPress ? (
+        <Ionicons name="chevron-forward" size={18} color={theme.text.muted} />
+      ) : null}
     </Wrapper>
   );
 }
@@ -525,7 +735,7 @@ function PosterStack({ posters = [], theme }) {
 }
 
 // ── Post kartı (Postlar / Taslaklar / Beğeniler) — paylaşım ekranı görünümü ──
-function PostMini({ theme, type, posters = [], title, content, userRating, hasSpoiler, date, likes, comments, draft, action, onPress }) {
+function PostMini({ theme, type, posters = [], title, content, userRating, hasSpoiler, date, likes, comments, draft, action, onPress, onRemove }) {
   const isList = type === "list";
   const accent = isList ? theme.colors?.green || "#22C55E" : theme.colors?.blue || "#138DF0";
   const Wrapper = onPress ? TouchableOpacity : View;
@@ -583,6 +793,19 @@ function PostMini({ theme, type, posters = [], title, content, userRating, hasSp
                 ? i18nText("autoI18n.begendin", "Beğendin")
                 : i18nText("autoI18n.kaydettin", "Kaydettin")}
             </Text>
+            {onRemove ? (
+              <TouchableOpacity
+                onPress={onRemove}
+                activeOpacity={0.8}
+                hitSlop={8}
+                style={[st.removePill, { backgroundColor: theme.primary, borderColor: theme.border }]}
+              >
+                <Ionicons name="close-circle" size={13} color={theme.text.secondary} />
+                <Text style={[st.removePillText, { color: theme.text.secondary }]}>
+                  {i18nText("autoI18n.kaldir", "Kaldır")}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         ) : likes != null || comments != null ? (
           <View style={st.pStats}>
@@ -728,6 +951,67 @@ const st = StyleSheet.create({
 
   scorePill: { alignItems: "flex-end", gap: 3 },
   scoreTxt: { fontSize: 14, fontWeight: "800" },
+
+  // ── Satır aksiyon butonları (yorum düzenle/sil) ──
+  rowActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  rowActionBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // ── Etkileşim "Kaldır" pili ──
+  removePill: {
+    marginLeft: "auto",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 11,
+    borderWidth: 1,
+  },
+  removePillText: { fontSize: 11.5, fontWeight: "700" },
+
+  // ── Yorum düzenleme modalı ──
+  editBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  editCard: { borderRadius: 22, borderWidth: 1, padding: 18 },
+  editHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
+  editIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  editTitle: { fontSize: 17, fontWeight: "800" },
+  editInput: {
+    minHeight: 96,
+    maxHeight: 200,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    fontSize: 14.5,
+    textAlignVertical: "top",
+  },
+  editActions: { flexDirection: "row", gap: 10, marginTop: 16 },
+  editBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  editBtnText: { fontSize: 15, fontWeight: "800" },
   postStats: { flexDirection: "row", alignItems: "center", gap: 3 },
   statTxt: { fontSize: 11, fontWeight: "700" },
 

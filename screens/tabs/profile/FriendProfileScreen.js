@@ -544,7 +544,7 @@ export default function FriendProfileScreen({ route, navigation }) {
       <SafeAreaView style={[styles.container, styles.center, { backgroundColor: theme.primary }]}>
         <Ionicons name="person-outline" size={52} color={theme.text?.muted ?? "#444"} />
         <Text style={[styles.emptyText, { color: theme.text?.secondary ?? "#aaa" }]}>{i18nText("autoI18n.kullanici_bulunamadi", "Kullanıcı bulunamadı")}</Text>
-        <BackButton top={8} />
+        <BackButton />
       </SafeAreaView>
     );
   }
@@ -591,93 +591,103 @@ export default function FriendProfileScreen({ route, navigation }) {
               >
                 {displayName || i18nText("autoI18n.isimsiz_kullanici", "İsimsiz kullanıcı")}
               </Text>
-              {profile.username ? (
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.username, { color: theme.text?.secondary ?? "#aaa" }]}
-                  numberOfLines={1}
-                >
-                  @{profile.username}
-                </Text>
-              ) : null}
+              <View style={styles.identityMetaRow}>
+                {profile.username ? (
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.username, { color: theme.text?.secondary ?? "#aaa" }]}
+                    numberOfLines={1}
+                  >
+                    @{profile.username}
+                  </Text>
+                ) : null}
 
-              {showPresenceText && (
-                <View
+                {showPresenceText && (
+                  <View style={styles.presenceInline}>
+                    <View style={[styles.presenceTinyDot, { backgroundColor: online ? green : (theme.text?.muted ?? "#666") }]} />
+                    <Text
+                      allowFontScaling={false}
+                      numberOfLines={1}
+                      style={[styles.presenceText, { color: online ? green : (theme.text?.muted ?? "#666") }]}
+                    >
+                      {online
+                        ? i18nText("autoI18n.cevrimici", "Çevrimiçi")
+                        : lastSeenText
+                          ? lastSeenText
+                          : i18nText("autoI18n.cevrimdisi", "Çevrimdışı")}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.compactActionsRow}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={relationship.onPress}
                   style={[
-                    styles.presencePill,
+                    styles.compactActionBtn,
                     {
-                      backgroundColor: online ? green + "1F" : (theme.primary ?? "#111"),
-                      borderColor: online ? green + "55" : (theme.border ?? "rgba(255,255,255,0.08)"),
+                      backgroundColor: relationship.color + "1A",
+                      borderColor: relationship.color + "44",
                     },
                   ]}
                 >
-                  <View style={[styles.presenceTinyDot, { backgroundColor: online ? green : (theme.text?.muted ?? "#666") }]} />
+                  <Ionicons name={relationship.icon} size={14} color={relationship.color} />
                   <Text
                     allowFontScaling={false}
                     numberOfLines={1}
-                    style={[styles.presenceText, { color: online ? green : (theme.text?.muted ?? "#666") }]}
+                    style={[styles.compactActionText, { color: relationship.color }]}
                   >
-                    {online
-                      ? i18nText("autoI18n.cevrimici", "Çevrimiçi")
-                      : lastSeenText
-                        ? i18nText("autoI18n.last_seen_value", "Son görülme {{value}}", { value: lastSeenText })
-                        : i18nText("autoI18n.cevrimdisi", "Çevrimdışı")}
+                    {relationship.label}
                   </Text>
-                </View>
-              )}
+                </TouchableOpacity>
+
+                {friend && (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() =>
+                      navigation.navigate("ChatScreen", { friendUid, friendName: displayName })
+                    }
+                    style={[styles.compactMessageBtn, { backgroundColor: theme.accent }]}
+                    accessibilityLabel={i18nText("autoI18n.mesaj_2", "Mesaj")}
+                  >
+                    <Ionicons name="chatbubble-ellipses" size={15} color="#fff" />
+                    <Text allowFontScaling={false} style={styles.compactMessageText}>
+                      {i18nText("autoI18n.mesaj_2", "Mesaj")}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </View>
 
           {canViewProfile && profile.bio ? (
             <View style={[styles.bioBlock, { borderColor: theme.border ?? "rgba(255,255,255,0.08)" }]}>
-              <Text style={[styles.bio, { color: theme.text?.secondary ?? "#aaa" }]} numberOfLines={4}>
+              <Ionicons name="chatbox-ellipses-outline" size={14} color={theme.accent} />
+              <Text style={[styles.bio, { color: theme.text?.secondary ?? "#aaa" }]} numberOfLines={2}>
                 {profile.bio}
               </Text>
             </View>
           ) : null}
 
-          {canViewProfile && (
+          {canViewProfile && memberSince && (
             <View style={styles.profileMetaRow}>
-              {memberSince ? (
-                <View
-                  style={[
-                    styles.memberSinceRow,
-                    {
-                      backgroundColor: theme.primary ?? "#111",
-                      borderColor: theme.border ?? "rgba(255,255,255,0.08)",
-                    },
-                  ]}
-                >
-                  <Ionicons name="calendar-outline" size={12} color={theme.text?.muted ?? "#666"} />
-                  <Text
-                    allowFontScaling={false}
-                    numberOfLines={1}
-                    style={[styles.memberSinceText, { color: theme.text?.muted ?? "#666" }]}
-                  >
-                    {memberSince} {i18nText("autoI18n.tarihinden_beri_uye", "tarihinden beri üye")}
-                  </Text>
-                </View>
-              ) : null}
               <View
                 style={[
                   styles.memberSinceRow,
                   {
-                    backgroundColor: friend ? green + "1A" : theme.primary ?? "#111",
-                    borderColor: friend ? green + "44" : theme.border ?? "rgba(255,255,255,0.08)",
+                    backgroundColor: theme.primary ?? "#111",
+                    borderColor: theme.border ?? "rgba(255,255,255,0.08)",
                   },
                 ]}
               >
-                <Ionicons
-                  name={friend ? "people" : "person-outline"}
-                  size={12}
-                  color={friend ? green : (theme.text?.muted ?? "#666")}
-                />
+                <Ionicons name="calendar-outline" size={12} color={theme.text?.muted ?? "#666"} />
                 <Text
                   allowFontScaling={false}
                   numberOfLines={1}
-                  style={[styles.memberSinceText, { color: friend ? green : (theme.text?.muted ?? "#666") }]}
+                  style={[styles.memberSinceText, { color: theme.text?.muted ?? "#666" }]}
                 >
-                  {friend ? i18nText("autoI18n.ortak_baglanti", "Arkadaş bağlantısı") : relationship.label}
+                  {memberSince} {i18nText("autoI18n.tarihinden_beri_uye", "tarihinden beri üye")}
                 </Text>
               </View>
             </View>
@@ -709,36 +719,6 @@ export default function FriendProfileScreen({ route, navigation }) {
             </View>
           )}
 
-          {/* Aksiyon butonları */}
-          <View style={styles.actionsRow}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={relationship.onPress}
-              style={[styles.actionBtn, { backgroundColor: relationship.color + "20", borderColor: relationship.color + "55" }]}
-            >
-              <Ionicons name={relationship.icon} size={16} color={relationship.color} />
-              <Text
-                allowFontScaling={false}
-                numberOfLines={1}
-                style={[styles.actionBtnText, { color: relationship.color }]}
-              >
-                {relationship.label}
-              </Text>
-            </TouchableOpacity>
-
-            {friend && (
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() =>
-                  navigation.navigate("ChatScreen", { friendUid, friendName: displayName })
-                }
-                style={[styles.actionBtn, { backgroundColor: theme.accent }]}
-              >
-                <Ionicons name="chatbubble-ellipses-outline" size={16} color="#fff" />
-                <Text allowFontScaling={false} numberOfLines={1} style={[styles.actionBtnText, { color: "#fff" }]}>{i18nText("autoI18n.mesaj_2", "Mesaj")}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
         </View>
 
         {/* ── İçerik: gizlilik kilitleri / istatistik + listeler ───────────── */}
@@ -1076,7 +1056,7 @@ export default function FriendProfileScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
-      <BackButton top={8} />
+      <BackButton />
     </SafeAreaView>
   );
 }
@@ -1091,12 +1071,12 @@ const styles = StyleSheet.create({
 
   // ── Üst kart ───────────────────────────────────────────────────────────────
   headerCard: {
-    borderRadius: 22,
+    borderRadius: 20,
     borderWidth: 1,
     alignItems: "stretch",
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    marginBottom: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginBottom: 16,
     overflow: "hidden",
   },
   headerGlow: {
@@ -1104,22 +1084,22 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     top: 0,
-    height: 118,
+    height: 92,
   },
   profileTopRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 12,
   },
   avatarBlock: { position: "relative" },
   avatarWrapper: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    borderWidth: 2.5,
+    width: 68,
+    height: 68,
+    borderRadius: 23,
+    borderWidth: 2,
     overflow: "hidden",
   },
-  avatar: { width: "100%", height: "100%", borderRadius: 44 },
+  avatar: { width: "100%", height: "100%", borderRadius: 21 },
   avatarPlaceholder: {
     width: "100%",
     height: "100%",
@@ -1128,71 +1108,100 @@ const styles = StyleSheet.create({
   },
   onlineDot: {
     position: "absolute",
-    bottom: 4,
-    right: 4,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: "#29b864",
-    borderWidth: 3,
+    borderWidth: 2.5,
   },
   profileIdentity: {
     flex: 1,
     minWidth: 0,
   },
-  displayName: { fontSize: 21, fontWeight: "800", letterSpacing: 0, lineHeight: 26 },
-  username: { fontSize: 13.5, marginTop: 3 },
-  presencePill: {
-    alignSelf: "flex-start",
+  displayName: { fontSize: 18, fontWeight: "800", letterSpacing: -0.2, lineHeight: 22 },
+  identityMetaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginTop: 9,
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    maxWidth: "100%",
+    gap: 8,
+    marginTop: 2,
+    minWidth: 0,
   },
+  username: { fontSize: 12, flexShrink: 1 },
+  presenceInline: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
   presenceTinyDot: {
     width: 7,
     height: 7,
     borderRadius: 4,
   },
-  presenceText: { fontSize: 11.5, fontWeight: "700", flexShrink: 1 },
+  presenceText: { fontSize: 10.5, fontWeight: "700", flexShrink: 1 },
+  compactActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginTop: 8,
+  },
+  compactActionBtn: {
+    flex: 1,
+    minWidth: 0,
+    height: 32,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+  },
+  compactActionText: { fontSize: 10.5, fontWeight: "800", flexShrink: 1 },
+  compactMessageBtn: {
+    height: 32,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+  },
+  compactMessageText: { color: "#fff", fontSize: 10.5, fontWeight: "800" },
   bioBlock: {
     alignSelf: "stretch",
-    marginTop: 15,
-    paddingTop: 13,
-    borderTopWidth: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 7,
+    marginTop: 11,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   bio: {
-    fontSize: 13,
-    lineHeight: 20,
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
   },
   profileMetaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 13,
+    gap: 6,
+    marginTop: 9,
   },
   memberSinceRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    borderRadius: 14,
+    borderRadius: 11,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     maxWidth: "100%",
   },
-  memberSinceText: { fontSize: 11.5, fontWeight: "700", flexShrink: 1 },
+  memberSinceText: { fontSize: 10.5, fontWeight: "700", flexShrink: 1 },
 
   profileStatsGrid: {
     flexDirection: "row",
     alignItems: "stretch",
     gap: 8,
-    marginTop: 14,
+    marginTop: 11,
   },
   profileMetricPill: {
     flex: 1,
@@ -1213,26 +1222,6 @@ const styles = StyleSheet.create({
   },
   profileMetricValue: { fontSize: 16, fontWeight: "900" },
   profileMetricLabel: { fontSize: 10.5, fontWeight: "700", marginTop: 2 },
-
-  actionsRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 16,
-    alignSelf: "stretch",
-  },
-  actionBtn: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "transparent",
-  },
-  actionBtnText: { fontSize: 13, fontWeight: "700", flexShrink: 1, textAlign: "center" },
 
   // ── Bölüm başlıkları ───────────────────────────────────────────────────────
   sectionTitleRow: {

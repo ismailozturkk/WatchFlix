@@ -9,6 +9,7 @@ import {
   Animated,
 } from "react-native";
 import { Image } from "expo-image";
+import PosterImage from "../../components/PosterImage";
 import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -32,14 +33,6 @@ const MovieUpcomingCard = memo(function MovieUpcomingCard({ item, navigation, th
   const onPressOut = () =>
     Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
 
-  const source = useMemo(
-    () =>
-      item.poster_path
-        ? { uri: getTmdbUrl(item.poster_path, "poster", 200) }
-        : require("../../assets/image/no_image.png"),
-    [item.poster_path, getTmdbUrl]
-  );
-
   return (
     <TouchableOpacity
       style={styles.similarItem}
@@ -49,8 +42,10 @@ const MovieUpcomingCard = memo(function MovieUpcomingCard({ item, navigation, th
       onPress={() => navigation.push("MovieDetails", { id: item.id })}
     >
       <Animated.View style={[{ transform: [{ scale }] }]}>
-        <Image
-          source={source}
+        <PosterImage
+          path={item.poster_path}
+          type="movie"
+          size={200}
           style={[styles.similarPoster, { shadowColor: theme.shadow }]}
           cachePolicy="memory-disk"
           recyclingKey={`movieupcoming-${item.id}`}

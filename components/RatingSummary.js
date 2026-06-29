@@ -15,11 +15,13 @@ import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons, FontAwesome } from "@expo/vector-icons";
 import { useTheme } from "@context/ThemeContext";
+import { useAuth } from "@context/AuthContext";
 import { i18nText } from "@utils/i18nText";
 import RatingStars from "@components/RatingStars";
 import {
   mediaKey,
   subscribeToAggregate,
+  subscribeToMyRating,
   computeHybrid,
 } from "@services/ratingsService";
 
@@ -32,15 +34,28 @@ export default function RatingSummary({
   starSize = 16,
 }) {
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const uid = user?.uid;
   const [agg, setAgg] = useState({ count: 0, sum: 0 });
+  const [myRating, setMyRating] = useState(null); // kullanıcının kendi oyu (0-10) | null
 
   useEffect(() => {
     if (mediaId == null) return;
-    const unsub = subscribeToAggregate(mediaKey(mediaType, mediaId), setAgg);
-    return () => unsub();
-  }, [mediaType, mediaId]);
+    const key = mediaKey(mediaType, mediaId);
+    const unsubAgg = subscribeToAggregate(key, setAgg);
+    if (!uid) {
+      setMyRating(null);
+      return () => unsubAgg();
+    }
+    const unsubMine = subscribeToMyRating(key, uid, setMyRating);
+    return () => {
+      unsubAgg();
+      unsubMine();
+    };
+  }, [mediaType, mediaId, uid]);
 
   const hybrid = computeHybrid({ tmdbAvg, tmdbCount, count: agg.count, sum: agg.sum });
+  const hasMine = myRating != null && myRating > 0;
 
   return (
     <TouchableOpacity
@@ -71,13 +86,23 @@ export default function RatingSummary({
         </View>
       )}
 
-      {/* Puan ver çağrısı */}
-      <View style={[styles.rateBtn, { borderColor: theme.accent + "55", backgroundColor: theme.accent + "1A" }]}>
-        <Ionicons name="star" size={12} color={theme.accent} />
-        <Text allowFontScaling={false} style={[styles.rateBtnText, { color: theme.accent }]}>
-          {i18nText("autoI18n.puan_ver", "Puan ver")}
-        </Text>
-      </View>
+      {/* Kullanıcının kendi oyu: VERDİYSE belli et (dolu yıldız + puan), aksi halde "Puan ver" */}
+      {hasMine ? (
+        <View style={[styles.rateBtn, { borderColor: theme.accent, backgroundColor: theme.accent }]}>
+          <Ionicons name="checkmark-circle" size={13} color="#fff" />
+          <RatingStars rating={myRating} max={10} count={5} size={11} color="#fff" spacing={0.5} />
+          <Text allowFontScaling={false} style={[styles.rateBtnText, { color: "#fff" }]}>
+            {myRating.toFixed(1)}
+          </Text>
+        </View>
+      ) : (
+        <View style={[styles.rateBtn, { borderColor: theme.accent + "55", backgroundColor: theme.accent + "1A" }]}>
+          <Ionicons name="star" size={12} color={theme.accent} />
+          <Text allowFontScaling={false} style={[styles.rateBtnText, { color: theme.accent }]}>
+            {i18nText("autoI18n.puan_ver", "Puan ver")}
+          </Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 }

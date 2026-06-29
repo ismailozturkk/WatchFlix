@@ -9,6 +9,7 @@ import {
   Animated,
 } from "react-native";
 import { Image } from "expo-image";
+import PosterImage from "../../components/PosterImage";
 import React, { memo, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import { useTheme } from "../../context/ThemeContext";
@@ -44,14 +45,6 @@ const MovieOscarCard = memo(function MovieOscarCard({ item, index, navigation, t
   const onPressOut = () =>
     Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
 
-  const source = useMemo(
-    () =>
-      item.poster_path
-        ? { uri: getTmdbUrl(item.poster_path, "poster", 200) }
-        : require("../../assets/image/no_image.png"),
-    [item.poster_path, getTmdbUrl]
-  );
-
   return (
     <TouchableOpacity
       style={styles.similarItem}
@@ -71,8 +64,10 @@ const MovieOscarCard = memo(function MovieOscarCard({ item, index, navigation, t
             />
             <DikeyMetin metin={`${2026 - index}`} />
           </View>
-          <Image
-            source={source}
+          <PosterImage
+            path={item.poster_path}
+            type="movie"
+            size={200}
             style={[styles.similarPoster, { shadowColor: theme.shadow }]}
             cachePolicy="memory-disk"
             recyclingKey={`movieoscar-${item.id}`}

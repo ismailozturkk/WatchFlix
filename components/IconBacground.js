@@ -353,45 +353,46 @@ const PATTERN_IMAGES = [
     require("../assets/iconBacground/174.png"),
 ];
 
-const IconBacground = React.memo(({ opacity = 0.5 }) => {
-  const { showIconBackground } = useIconBackgroundSettings();
+// Grup avatarı seçicisinde tekrar eden ilk bloğu taşımadan 174 benzersiz
+// yerel görseli aynı 0-based index sözleşmesiyle paylaş.
+export const ICON_BACKGROUND_IMAGES = PATTERN_IMAGES.slice(-174);
 
-  // Izgara (Grid) mantığı ile öğeleri dağıtıyoruz (Üst üste binmeyi önlemek ve boşlukları doldurmak için)
-  const items = useMemo(() => {
-    const cols = 5; // Ekranı yatayda 5 bölmeye ayırıyoruz
-    const rows = 9; // Ekranı dikeyde 9 bölmeye ayırıyoruz
-    const cellWidth = SCREEN_WIDTH / cols;
-    const cellHeight = SCREEN_HEIGHT / rows;
-    const generatedItems = [];
+export function getIconBackgroundSource(index) {
+  return Number.isInteger(index) && index >= 0
+    ? ICON_BACKGROUND_IMAGES[index] || null
+    : null;
+}
 
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const size = Math.random() * 15 + 25; // 25px - 40px arası daha küçük ve zarif boyutlar
+const COLS = 5; // Ekranı yatayda 5 bölmeye ayırıyoruz
+const ROWS = 9; // Ekranı dikeyde 9 bölmeye ayırıyoruz
 
-        // Her hücrenin (cell) sol üst köşesini baz alıp, hücre içinde rastgele kaydırıyoruz
-        // Hücre sınırları dışına çıkmaması için 'size' değerini hesaba katıyoruz
-        const top = r * cellHeight + Math.random() * (cellHeight - size);
-        const left = c * cellWidth + Math.random() * (cellWidth - size);
+// Izgara (Grid) mantığı ile öğeleri dağıtır (üst üste binmeyi önler, boşlukları doldurur).
+// Her hücreyi baz alıp hücre içinde rastgele kaydırır; ardından sırayı karıştırır.
+function buildItems() {
+  const cellWidth = SCREEN_WIDTH / COLS;
+  const cellHeight = SCREEN_HEIGHT / ROWS;
+  const generatedItems = [];
 
-        const imgIndex = Math.floor(Math.random() * PATTERN_IMAGES.length);
-
-        generatedItems.push({ top, left, size, imgIndex });
-      }
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const size = Math.random() * 15 + 25; // 25px - 40px arası küçük, zarif boyutlar
+      const top = r * cellHeight + Math.random() * (cellHeight - size);
+      const left = c * cellWidth + Math.random() * (cellWidth - size);
+      const imgIndex = Math.floor(Math.random() * PATTERN_IMAGES.length);
+      generatedItems.push({ top, left, size, imgIndex });
     }
-    // Diziyi karıştırıyoruz ki görsel sıralama tamamen rastgele görünsün
-    return generatedItems.sort(() => Math.random() - 0.5);
-  }, []);
-
-  if (!showIconBackground) {
-    return null;
   }
+  // Görsel sıralama tamamen rastgele görünsün diye karıştır.
+  return generatedItems.sort(() => Math.random() - 0.5);
+}
 
+// Verilen öğe listesini desen View'larına dönüştürür.
+function renderItems(items, opacity) {
   return (
-    <View style={styles.background}>
-      {/* Rastgele dağıtılmış desenler */}
+    <View style={styles.background} pointerEvents="none">
       {items.map((item, index) => (
-        <View 
-          key={index} 
+        <View
+          key={index}
           style={[
             styles.desen,
             {
@@ -400,18 +401,65 @@ const IconBacground = React.memo(({ opacity = 0.5 }) => {
               top: item.top,
               left: item.left,
               opacity,
-            }
+            },
           ]}
         >
           <Image
             source={PATTERN_IMAGES[item.imgIndex]}
-            style={{ width: "100%", height: "100%" }}
+            style={styles.fill}
             contentFit="contain"
           />
         </View>
       ))}
     </View>
   );
+}
+
+// ── Paylaşımlı ("shared") mod ────────────────────────────────────────────────
+// Düzen UYGULAMA OTURUMUNDA BİR KEZ üretilir ve tüm ekranlarda AYNI kullanılır.
+// Ayrıca render edilen element ağacı opaklığa göre bir kez kurulup her ekranda
+// aynı referansla yeniden kullanılır → her ekran mount'unda 45 öğeyi yeniden
+// hesaplamak/kurmak yerine hazır ağaç paylaşılır (rastgele moddan daha hafif).
+let sharedItems = null;
+const sharedElementCache = new Map();
+
+function getSharedElement(opacity) {
+  if (!sharedItems) sharedItems = buildItems();
+  // Anahtarı 2 ondalığa yuvarla: saydamlık sürüklenirken sonsuz farklı float
+  // değeriyle cache'in şişmesini engeller (fark görsel olarak belirsiz).
+  const key = Math.round(opacity * 100) / 100;
+  if (!sharedElementCache.has(key)) {
+    sharedElementCache.set(key, renderItems(sharedItems, key));
+  }
+  return sharedElementCache.get(key);
+}
+
+const IconBacground = React.memo(({ opacity = 0.5 }) => {
+  const {
+    showIconBackground,
+    iconBackgroundMode,
+    iconBackgroundOpacity = 1,
+  } = useIconBackgroundSettings();
+
+  // Ekranın kendi opaklığı, kullanıcının saydamlık çarpanıyla ölçeklenir (çarpan 1 = değişiklik yok).
+  const effectiveOpacity = opacity * iconBackgroundOpacity;
+
+  // Rastgele mod: bu ekran örneğine özel düzen (mevcut davranış — mount başına bir kez).
+  const randomItems = useMemo(
+    () => (iconBackgroundMode === "random" ? buildItems() : null),
+    [iconBackgroundMode],
+  );
+
+  if (!showIconBackground) {
+    return null;
+  }
+
+  if (iconBackgroundMode === "random") {
+    return renderItems(randomItems, effectiveOpacity);
+  }
+
+  // Paylaşımlı (varsayılan, performanslı): bir kez üretilmiş ortak element (opaklığa göre cache'li).
+  return getSharedElement(effectiveOpacity);
 });
 
 export default IconBacground;
@@ -419,6 +467,10 @@ export default IconBacground;
 const styles = StyleSheet.create({
   desen: {
     position: "absolute",
+  },
+  fill: {
+    width: "100%",
+    height: "100%",
   },
   background: {
     position: "absolute",

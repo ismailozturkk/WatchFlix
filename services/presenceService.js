@@ -1,98 +1,103 @@
 // services/presenceService.js
 //
-// Presence (online/offline) için AYRI bir koleksiyon: Presence/{uid}.
+// Presence (online/offline) artık Realtime Database üzerinde: /presence/{uid}.
 //
-// NEDEN AYRI KOLEKSİYON:
-//   Heartbeat'i Users/{uid}'e yazınca, o dokümanı dinleyen TÜM listener'lar
-//   (UserProfileContext, FriendsContext, profil ekranı, vs.) her 60 sn'de bir
-//   re-render olurdu. Bu CPU + battery + Firestore listener trafiği israfı.
-//   Presence kendi dokümanına ayrılınca Users stabil kalır.
+// NEDEN RTDB (Firestore yerine):
+//   Firestore'da bağlantı kopunca otomatik temizlik PRIMITIFI YOKTUR; bu yüzden
+//   eskiden 60 sn'de bir heartbeat yazıp "stale window" ile online tahmini
+//   yapıyorduk (100 kullanıcı x 8 saat ≈ 48.000 yazma/gün). RTDB'nin
+//   `onDisconnect()` primitifi, socket koptuğu an sunucu tarafında isOnline:false
+//   + lastSeen yazar. Böylece:
+//     - Heartbeat write fırtınası TAMAMEN kalkar (yazma maliyeti ~0).
+//     - Crash/ağ kopması/uygulama öldürülmesi anında güvenilir offline.
+//     - isOnline boolean'ı artık GÜVENİLİR (tahmin/stale-window gerekmez).
 //
-// MALİYET:
-//   100 aktif kullanıcı x 8 saat x 60 yazma/saat = 48.000 yazma/gün
-//   (Eski 30sn'de 96k idi, neredeyse yarıya indi.)
+// PUBLIC API değişmedi — tüketiciler (App.js, ChatScreen, FriendProfileScreen)
+// aynen çalışır. Sadece backend Firestore→RTDB değişti ve zaman damgaları artık
+// number (ms) olarak gelir (helper'lar her iki tipi de tolere eder).
 //
 // ŞEMA:
-//   Presence/{uid}
+//   /presence/{uid}
 //     isOnline      : boolean
-//     lastActiveAt  : Timestamp   ← heartbeat
-//     lastSeen      : Timestamp   ← son offline
+//     lastActiveAt  : number (serverTimestamp)  ← son foreground/connect
+//     lastSeen      : number (serverTimestamp)  ← onDisconnect / background
 
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { AppState } from "react-native";
-import { db } from "../firebase";
+import { rtdb } from "../firebase";
+import {
+  ref,
+  onValue,
+  onDisconnect,
+  set,
+  get,
+  serverTimestamp as rtdbServerTimestamp,
+} from "firebase/database";
 
-const HEARTBEAT_MS = 60 * 1000;      // 60 sn (eski 30sn idi)
-const STALE_WINDOW_MS = 120 * 1000;  // 2 dakika — bundan eski lastActiveAt = offline
-
-let _heartbeatTimer = null;
+let _connectedUnsub = null;
 let _appStateSub = null;
 let _currentUid = null;
 
-const presenceRef = (uid) => doc(db, "Presence", uid);
+const presenceRef = (uid) => ref(rtdb, `presence/${uid}`);
 
-// `setDoc(..., { merge: true })` kullandık çünkü Presence doc'u ilk kez
-// yazıldığında oluşturulmalı, sonraki yazımlarda merge etmeli.
-const writePresence = (uid, partial) => {
-  if (!uid) return Promise.resolve();
-  return setDoc(presenceRef(uid), partial, { merge: true }).catch(() => {
-    // Network drop / permission — sessizce yut.
-  });
-};
+const OFFLINE = () => ({ isOnline: false, lastSeen: rtdbServerTimestamp() });
+const ONLINE = () => ({ isOnline: true, lastActiveAt: rtdbServerTimestamp() });
 
-const beat = () => {
-  if (!_currentUid) return;
-  writePresence(_currentUid, {
-    isOnline: true,
-    lastActiveAt: serverTimestamp(),
-  });
-};
-
-const goOffline = () => {
-  if (!_currentUid) return;
-  writePresence(_currentUid, {
-    isOnline: false,
-    lastSeen: serverTimestamp(),
-  });
-};
+const writeOnline = (uid) =>
+  set(presenceRef(uid), ONLINE()).catch(() => {});
+const writeOffline = (uid) =>
+  set(presenceRef(uid), OFFLINE()).catch(() => {});
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export function startPresence(uid) {
-  if (!uid) return () => {};
-  if (_currentUid === uid && _heartbeatTimer) return stopPresence;
+  if (!uid || !rtdb) return () => {};
+  if (_currentUid === uid && _connectedUnsub) return stopPresence;
 
+  // Hesap değişimi: önceki kullanıcıyı offline yap ve dinleyicileri temizle.
   if (_currentUid && _currentUid !== uid) {
-    goOffline();
-    _cleanupTimers();
+    writeOffline(_currentUid);
+    _cleanup();
   }
 
   _currentUid = uid;
 
-  beat();
-  _heartbeatTimer = setInterval(beat, HEARTBEAT_MS);
+  // Kanonik Firebase presence deseni: `.info/connected` dinle; bağlantı kurulunca
+  // ÖNCE onDisconnect'i kur (socket koparsa sunucu offline yazsın), SONRA online yaz.
+  const connectedRef = ref(rtdb, ".info/connected");
+  _connectedUnsub = onValue(connectedRef, (snap) => {
+    if (snap.val() !== true) return;
+    const myRef = presenceRef(uid);
+    onDisconnect(myRef)
+      .set(OFFLINE())
+      .then(() => set(myRef, ONLINE()))
+      .catch(() => {});
+  });
 
+  // Uygulama arka plana alınınca (socket hemen kopmayabilir) elle offline yaz;
+  // öne gelince tekrar online. onDisconnect armed kalır (zarar vermez).
   _appStateSub = AppState.addEventListener("change", (next) => {
-    if (next === "active") {
-      beat();
-    } else {
-      goOffline();
-    }
+    if (!_currentUid) return;
+    if (next === "active") writeOnline(_currentUid);
+    else writeOffline(_currentUid);
   });
 
   return stopPresence;
 }
 
 export function stopPresence() {
-  if (_currentUid) goOffline();
-  _cleanupTimers();
+  if (_currentUid) {
+    const myRef = presenceRef(_currentUid);
+    onDisconnect(myRef).cancel().catch(() => {});
+    writeOffline(_currentUid);
+  }
+  _cleanup();
   _currentUid = null;
 }
 
-function _cleanupTimers() {
-  if (_heartbeatTimer) {
-    clearInterval(_heartbeatTimer);
-    _heartbeatTimer = null;
+function _cleanup() {
+  if (_connectedUnsub) {
+    _connectedUnsub();
+    _connectedUnsub = null;
   }
   if (_appStateSub) {
     _appStateSub.remove?.();
@@ -100,18 +105,22 @@ function _cleanupTimers() {
   }
 }
 
+// ─── Zaman damgası yardımcısı (Firestore Timestamp | number ms) ───────────────
+const toMillis = (v) => {
+  if (v == null) return null;
+  if (typeof v === "number") return v;
+  if (typeof v.toMillis === "function") return v.toMillis();
+  return null;
+};
+
 // ─── Stale check helpers ─────────────────────────────────────────────────────
 
 /**
- * Presence dokümanından "gerçekten online mi?" kararı.
- *   - isOnline === false  → offline
- *   - lastActiveAt > 2 dk → offline (heartbeat'ler durmuş, crash/kapanma)
+ * "Gerçekten online mi?" — onDisconnect sayesinde isOnline boolean'ı artık
+ * güvenilir; tahmin/stale-window gerekmez.
  */
 export function isOnlineEffective(presence) {
-  if (!presence || presence.isOnline !== true) return false;
-  const ms = presence.lastActiveAt?.toMillis?.();
-  if (!ms) return false;
-  return Date.now() - ms < STALE_WINDOW_MS;
+  return !!presence && presence.isOnline === true;
 }
 
 /**
@@ -132,8 +141,7 @@ export function isOnlineVisible(
  * "5 dakika önce" gibi relative string.
  */
 export function formatLastSeen(presence, t = {}) {
-  if (!presence?.lastSeen) return t.unknown || "";
-  const ms = presence.lastSeen?.toMillis?.();
+  const ms = toMillis(presence?.lastSeen);
   if (!ms) return t.unknown || "";
   const diff = Date.now() - ms;
   const sec = Math.floor(diff / 1000);
@@ -148,18 +156,17 @@ export function formatLastSeen(presence, t = {}) {
 
 // ─── Diğer kullanıcıların presence'ini sorgulama ─────────────────────────────
 
-import { onSnapshot, getDoc } from "firebase/firestore";
-
 /**
  * Tek kullanıcının presence'ini realtime dinle.
  * Profil ekranlarında veya chat'te kullanılır. Liste ekranlarında
  * (örn. arkadaş listesi) AÇMA — N adet listener pahalıdır.
+ * Geri dönen fonksiyon dinleyiciyi kapatır.
  */
 export function subscribeToUserPresence(uid, callback) {
-  if (!uid) return () => {};
-  return onSnapshot(
+  if (!uid || !rtdb) return () => {};
+  return onValue(
     presenceRef(uid),
-    (snap) => callback(snap.exists() ? snap.data() : null),
+    (snap) => callback(snap.exists() ? snap.val() : null),
     (err) => __DEV__ && console.warn("subscribeToUserPresence:", err.message),
   );
 }
@@ -168,7 +175,11 @@ export function subscribeToUserPresence(uid, callback) {
  * Tek seferlik presence çekme (liste ekranlarında uygun).
  */
 export async function getUserPresence(uid) {
-  if (!uid) return null;
-  const snap = await getDoc(presenceRef(uid));
-  return snap.exists() ? snap.data() : null;
+  if (!uid || !rtdb) return null;
+  try {
+    const snap = await get(presenceRef(uid));
+    return snap.exists() ? snap.val() : null;
+  } catch {
+    return null;
+  }
 }

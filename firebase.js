@@ -6,9 +6,13 @@ import {
 } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getFirestore } from "firebase/firestore";
+import { getDatabase } from "firebase/database";
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
   authDomain: "movieandtv-2832a.firebaseapp.com",
+  // Realtime Database — ephemeral sinyaller (presence/typing/inChat) için.
+  // Console'da RTDB instance'ı oluşturulduktan sonra verilen URL .env'e konur.
+  databaseURL: process.env.EXPO_PUBLIC_FIREBASE_DATABASE_URL,
   projectId: "movieandtv-2832a",
   storageBucket: "movieandtv-2832a.firebasestorage.app",
   messagingSenderId: "427087836931",
@@ -25,4 +29,18 @@ const auth = initializeAuth(app, {
 
 const db = getFirestore(app);
 
-export { auth, db };
+// Realtime Database handle. databaseURL tanımlı değilse (env eksik) getDatabase
+// throw eder ve TÜM uygulamayı çökertir — bu yüzden guard'la. rtdb null ise
+// presence/chat servisleri sessizce no-op olur (uygulama normal çalışır).
+let rtdb = null;
+try {
+  rtdb = getDatabase(app);
+} catch (e) {
+  console.warn(
+    "Realtime Database başlatılamadı (EXPO_PUBLIC_FIREBASE_DATABASE_URL eksik?). " +
+      "Presence/typing devre dışı.",
+    e?.message,
+  );
+}
+
+export { auth, db, rtdb };

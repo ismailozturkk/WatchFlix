@@ -9,6 +9,7 @@ import {
   Animated,
 } from "react-native";
 import { Image } from "expo-image";
+import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
 import { MovieUpComingSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
@@ -29,14 +30,6 @@ const TvAiringTodayCard = memo(function TvAiringTodayCard({ item, navigation, th
   const onPressOut = () =>
     Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
 
-  const source = useMemo(
-    () =>
-      item.poster_path
-        ? { uri: getTmdbUrl(item.poster_path, "poster", 200) }
-        : require("../../assets/image/no_image.png"),
-    [item.poster_path, getTmdbUrl]
-  );
-
   return (
     <TouchableOpacity
       style={styles.similarItem}
@@ -46,8 +39,10 @@ const TvAiringTodayCard = memo(function TvAiringTodayCard({ item, navigation, th
       onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
     >
       <Animated.View style={[{ transform: [{ scale }] }]}>
-        <Image
-          source={source}
+        <PosterImage
+          path={item.poster_path}
+          type="tv"
+          size={200}
           style={[styles.similarPoster, { shadowColor: theme.shadow }]}
           cachePolicy="memory-disk"
           recyclingKey={`tvairing-${item.id}`}
