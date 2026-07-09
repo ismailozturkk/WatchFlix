@@ -443,19 +443,27 @@ export const ListStatusProvider = ({ children }) => {
     ? firestoreStatusIndex
     : cachedStatusIndex;
 
+  // Debounce'lu cache yazımı: açılışta 5 listener'ın snapshot'ları art arda
+  // gelirken her birinde büyük JSON.stringify + AsyncStorage yazmak JS thread'i
+  // kilitliyordu. Yazma yalnız veri duraklayınca (2,5 sn) bir kez yapılır;
+  // içerik/davranış aynı, sadece ara yazımlar birleştirilir.
   useEffect(() => {
-    if (!user?.uid || !hasFirestoreIndex) return;
+    if (!user?.uid || !hasFirestoreIndex) return undefined;
 
-    if (!shouldPersistInternetData()) return;
+    if (!shouldPersistInternetData()) return undefined;
 
-    AsyncStorage.setItem(
-      `${CACHE_PREFIX}${user.uid}`,
-      JSON.stringify({
-        allLists,
-        statusIndex: firestoreStatusIndex,
-        ts: Date.now(),
-      }),
-    ).catch(() => {});
+    const uid = user.uid;
+    const timer = setTimeout(() => {
+      AsyncStorage.setItem(
+        `${CACHE_PREFIX}${uid}`,
+        JSON.stringify({
+          allLists,
+          statusIndex: firestoreStatusIndex,
+          ts: Date.now(),
+        }),
+      ).catch(() => {});
+    }, 2500);
+    return () => clearTimeout(timer);
   }, [allLists, firestoreStatusIndex, hasFirestoreIndex, user?.uid]);
 
   const otherListKeys = useMemo(() => {

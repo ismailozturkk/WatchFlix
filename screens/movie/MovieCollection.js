@@ -3,70 +3,23 @@ import {
   Text,
   View,
   FlatList,
-  ActivityIndicator,
   Dimensions,
   TouchableOpacity,
-  Animated,
 } from "react-native";
-import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
-import React, { memo, useEffect, useMemo, useRef, useState } from "react";
-import axios from "axios";
+import React, { useEffect, useMemo, useState } from "react";
 import { useTheme } from "../../context/ThemeContext";
-import RatingStars from "../../components/RatingStars";
 import { useLanguage } from "../../context/LanguageContext";
 import { MovieCollectionSkeleton } from "../../components/Skeleton";
-//import { API_KEY } from "@env";
-import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 const { width } = Dimensions.get("window");
 
-// Stable, module-scope item component → no remount → no flicker.
-const MovieCollectionCard = memo(function MovieCollectionCard({ item, navigation, theme, getTmdbUrl }) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const onPressIn = () =>
-    Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
-  const onPressOut = () =>
-    Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-
-  return (
-    <TouchableOpacity
-      style={styles.movieCollectionItem}
-      activeOpacity={0.8}
-      onPressIn={onPressIn}
-      onPressOut={onPressOut}
-      onPress={() => navigation.push("MovieDetails", { id: item.id })}
-    >
-      <Animated.View style={[{ transform: [{ scale }] }]}>
-        <View style={{ flexDirection: "row" }}>
-          <PosterImage
-            path={item.poster_path}
-            type="movie"
-            size={200}
-            style={[styles.movieCollectionPoster, { shadowColor: theme.shadow }]}
-            cachePolicy="memory-disk"
-            recyclingKey={`moviecollection-${item.id}`}
-            transition={120}
-          />
-          <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
-            <Text allowFontScaling={false} style={styles.similarRatingText}>
-              {item.vote_average?.toFixed(1) ?? ""}
-            </Text>
-          </View>
-        </View>
-        <ListBadges
-          mediaId={item.id}
-          mediaType="movie"
-          theme={theme}
-          style={{ position: "absolute", left: 2, bottom: 8 }}
-        />
-      </Animated.View>
-    </TouchableOpacity>
-  );
-});
+const yearOf = (dateStr) =>
+  dateStr && dateStr.length >= 4 ? dateStr.slice(0, 4) : "";
 
 export default function MovieCollection({ navigation }) {
   const { t } = useLanguage();
@@ -77,44 +30,47 @@ export default function MovieCollection({ navigation }) {
     errorCollection,
     activateMovieSection,
   } = useMovie();
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const rp = useRailPosterStyle();
+
+  // Seçili koleksiyon (null → koleksiyon listesi, dolu → o serinin filmleri)
+  const [selected, setSelected] = useState(null);
 
   useEffect(() => {
     activateMovieSection("collection");
   }, [activateMovieSection]);
 
-  const [selectedMovieCollection, setSelectedMovieCollection] = useState(null);
+  // Yalnızca posteri ve en az 1 filmi olan koleksiyonlar.
+  const collections = useMemo(
+    () =>
+      (moviesCollection || []).filter(
+        (c) =>
+          c &&
+          c.poster_path &&
+          Array.isArray(c.parts) &&
+          c.parts.some((p) => p && p.poster_path),
+      ),
+    [moviesCollection],
+  );
 
-  // Press-scale for the inline collection-selector posters (rendered as inline
-  // JSX, not a custom component type, so they don't cause remount flicker).
-  const [scaleValues, setScaleValues] = useState({});
-  useEffect(() => {
-    const newScaleValues = {};
-    if (selectedMovieCollection && selectedMovieCollection.length > 0) {
-      selectedMovieCollection.forEach((item) => {
-        newScaleValues[item.id] = new Animated.Value(1);
+  const filmCount = (c) =>
+    (c?.parts || []).filter((p) => p && p.poster_path).length;
+
+  // Seçili serinin filmleri — kronolojik (yayın tarihine göre; tarihsizler sonda).
+  const parts = useMemo(() => {
+    if (!selected) return [];
+    return (selected.parts || [])
+      .filter((p) => p && p.poster_path)
+      .slice()
+      .sort((a, b) => {
+        const da = a.release_date ? new Date(a.release_date).getTime() : Infinity;
+        const db = b.release_date ? new Date(b.release_date).getTime() : Infinity;
+        if (da === db) return 0;
+        return da - db;
       });
-      setScaleValues(newScaleValues);
-    }
-  }, [selectedMovieCollection]);
+  }, [selected]);
 
-  const onPressIn = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 0.9,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const onPressOut = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
+  const countLabel = (n) =>
+    (t.movieScreens?.collectionFilmCount || "{count}").replace("{count}", n);
 
   if (loadingCollection) {
     return (
@@ -123,149 +79,190 @@ export default function MovieCollection({ navigation }) {
           allowFontScaling={false}
           style={[styles.title, { color: theme.text.secondary }]}
         >
-          {t.movieScreens.oscar}
+          {t.movieScreens.collection}
         </Text>
-
         <FlatList
           data={[1, 2, 3]}
           renderItem={() => <MovieCollectionSkeleton />}
+          keyExtractor={(i) => String(i)}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 15 }}
           initialNumToRender={3}
           maxToRenderPerBatch={3}
           windowSize={3}
-          removeClippedSubviews
         />
       </View>
     );
   }
 
-  if (errorCollection) {
-    return <Text>Error: {errorCollection}</Text>;
-  }
+  if (errorCollection || collections.length === 0) return null;
 
-  const renderMovieItem = ({ item }) => {
-    if (!item.poster_path) return null;
-    return (
-      <MovieCollectionCard
-        item={item}
-        navigation={navigation}
-        theme={theme}
-        getTmdbUrl={getTmdbUrl}
-      />
-    );
-  };
+  // ── Koleksiyon kartı (kapalı durum) ──
+  const renderCollection = ({ item }) => (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => setSelected(item)}
+      style={[styles.collCard, { width: rp.itemWidth }]}
+    >
+      <View>
+        <PosterImage
+          path={item.poster_path}
+          type="movie"
+          size={200}
+          style={[
+            styles.poster,
+            {
+              width: rp.posterWidth,
+              height: rp.posterHeight,
+              borderRadius: rp.radius,
+              shadowColor: theme.shadow,
+            },
+          ]}
+          cachePolicy="memory-disk"
+          recyclingKey={`collection-${item.id}`}
+          transition={120}
+        />
+        <View style={[styles.countBadge, { backgroundColor: theme.secondaryt }]}>
+          <Ionicons name="film-outline" size={11} color={theme.text.primary} />
+          <Text
+            allowFontScaling={false}
+            style={[styles.countText, { color: theme.text.primary }]}
+          >
+            {filmCount(item)}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  // ── Seri filmi kartı (açık durum) ──
+  const renderPart = ({ item }) => (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => navigation.push("MovieDetails", { id: item.id })}
+      style={{ width: rp.itemWidth }}
+    >
+      <View>
+        <PosterImage
+          path={item.poster_path}
+          type="movie"
+          size={200}
+          style={[
+            styles.poster,
+            {
+              width: rp.posterWidth,
+              height: rp.posterHeight,
+              borderRadius: rp.radius,
+              shadowColor: theme.shadow,
+            },
+          ]}
+          cachePolicy="memory-disk"
+          recyclingKey={`collectionpart-${item.id}`}
+          transition={120}
+        />
+        {typeof item.vote_average === "number" && item.vote_average > 0 ? (
+          <View style={[styles.ratingBadge, { backgroundColor: theme.secondaryt }]}>
+            <Text allowFontScaling={false} style={styles.ratingText}>
+              {item.vote_average.toFixed(1)}
+            </Text>
+          </View>
+        ) : null}
+        <ListBadges
+          mediaId={item.id}
+          mediaType="movie"
+          theme={theme}
+          style={{ position: "absolute", left: 2, bottom: 8 }}
+        />
+      </View>
+      <Text
+        allowFontScaling={false}
+        numberOfLines={1}
+        style={[styles.partTitle, { color: theme.text.primary, width: rp.posterWidth }]}
+      >
+        {item.title}
+      </Text>
+      {yearOf(item.release_date) ? (
+        <Text
+          allowFontScaling={false}
+          style={[styles.partYear, { color: theme.text.muted }]}
+        >
+          {yearOf(item.release_date)}
+        </Text>
+      ) : null}
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.container}>
-      <Text
-        allowFontScaling={false}
-        style={[styles.title, { color: theme.text.secondary }]}
-      >
-        Seri Filmler
-      </Text>
-
-      {selectedMovieCollection === null ? (
-        <FlatList
-          data={moviesCollection}
-          contentContainerStyle={{ paddingHorizontal: 15 }}
-          showsHorizontalScrollIndicator={false}
-          renderItem={({ item, index }) => (
-            <TouchableOpacity
-              style={styles.similarItem}
-              activeOpacity={0.8}
-              onPressIn={() => onPressIn(item.id)}
-              onPressOut={() => onPressOut(item.id)}
-              onPress={() => setSelectedMovieCollection(item)}
+      {selected ? (
+        // ── Açık: koleksiyon başlığı + kapat ──
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            onPress={() => setSelected(null)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={[styles.iconBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+          >
+            <Ionicons name="chevron-back" size={18} color={theme.text.primary} />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[styles.headerTitle, { color: theme.text.primary }]}
             >
-              <Animated.View
-                style={[
-                  {
-                    transform: [{ scale: scaleValues[item.id] || 1 }],
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    {
-                      flexDirection: "row",
-                    },
-                  ]}
-                >
-                  <PosterImage
-                    path={item.poster_path}
-                    type="movie"
-                    size={200}
-                    style={[
-                      styles.similarPoster,
-                      { shadowColor: theme.shadow },
-                    ]}
-                    cachePolicy="memory-disk"
-                    transition={120}
-                  />
-                </View>
-              </Animated.View>
-            </TouchableOpacity>
-          )}
-          keyExtractor={(item) => item.id.toString()}
+              {selected.name}
+            </Text>
+            <Text
+              allowFontScaling={false}
+              style={[styles.headerSub, { color: theme.text.muted }]}
+            >
+              {countLabel(parts.length)}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => setSelected(null)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={[styles.iconBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+          >
+            <Ionicons name="close" size={18} color={theme.text.secondary} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <Text
+          allowFontScaling={false}
+          style={[styles.title, { color: theme.text.secondary }]}
+        >
+          {t.movieScreens.collection}
+        </Text>
+      )}
+
+      {selected ? (
+        <FlatList
+          key="parts"
+          data={parts}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={renderPart}
           horizontal
-          initialNumToRender={3}
-          maxToRenderPerBatch={3}
-          updateCellsBatchingPeriod={80}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.railContent}
+          initialNumToRender={4}
+          maxToRenderPerBatch={4}
           windowSize={5}
-          removeClippedSubviews
         />
       ) : (
-        <View style={{ flexDirection: "row" }}>
-          <TouchableOpacity
-            style={styles.movieCollectionSeriesItem}
-            activeOpacity={0.8}
-            onPressIn={() => onPressIn(selectedMovieCollection.id)}
-            onPressOut={() => onPressOut(selectedMovieCollection.id)}
-            onPress={() => setSelectedMovieCollection(null)}
-          >
-            <Animated.View
-              style={[
-                {
-                  transform: [
-                    { scale: scaleValues[selectedMovieCollection.id] || 1 },
-                  ],
-                },
-              ]}
-            >
-              <View
-                style={[
-                  {
-                    flexDirection: "row",
-                  },
-                ]}
-              >
-                <PosterImage
-                  path={selectedMovieCollection.poster_path}
-                  type="movie"
-                  size={200}
-                  style={[styles.similarPoster, { shadowColor: theme.shadow }]}
-                  cachePolicy="memory-disk"
-                  transition={120}
-                />
-              </View>
-            </Animated.View>
-          </TouchableOpacity>
-          <FlatList
-            data={selectedMovieCollection.parts}
-            contentContainerStyle={{ paddingHorizontal: 20 }}
-            showsHorizontalScrollIndicator={false}
-            renderItem={renderMovieItem}
-            horizontal
-            keyExtractor={(item) => item?.id}
-            initialNumToRender={3}
-            maxToRenderPerBatch={3}
-            updateCellsBatchingPeriod={80}
-            windowSize={5}
-            removeClippedSubviews
-          />
-        </View>
+        <FlatList
+          key="collections"
+          data={collections}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={renderCollection}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.railContent}
+          initialNumToRender={4}
+          maxToRenderPerBatch={4}
+          windowSize={5}
+        />
       )}
     </View>
   );
@@ -276,98 +273,86 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
   },
-  containerYears: {
-    marginRight: 5,
-    justifyContent: "center",
-  },
-  movieItem: {
-    width: 200,
-    margin: 10,
-    padding: 10,
-    backgroundColor: "#ddd",
-    borderRadius: 5,
-  },
-  similarItem: {
-    width: width * 0.4,
-    height: width * 0.62,
-    marginRight: 15,
-  },
-  movieCollectionItem: {
-    width: width * 0.3,
-    height: width * 0.6,
-    marginRight: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  movieCollectionSeriesItem: {
-    width: width * 0.4,
-    height: width * 0.6,
-    marginLeft: 15,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
-  },
-  similarPoster: {
-    width: width * 0.4,
-    height: width * 0.6,
-    borderRadius: 15,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
-  },
-  movieCollectionPoster: {
-    width: "100%",
-    height: width * 0.45,
-    borderRadius: 15,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
-  },
   title: {
     fontSize: 18,
-    uppercase: true,
     marginBottom: 15,
     marginLeft: 15,
     fontWeight: "700",
   },
-  similarTitle: {
-    color: "#fff",
-    fontSize: 14,
-    paddingLeft: width * 0.05,
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 15,
+    marginBottom: 14,
   },
-  similarRating: {
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  headerSub: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+  iconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  railContent: {
+    paddingHorizontal: 15,
+    gap: 14,
+  },
+  collCard: {
+    alignItems: "flex-start",
+  },
+  poster: {
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.94,
+    shadowRadius: 10.32,
+    elevation: 5,
+  },
+  countBadge: {
     position: "absolute",
-    bottom: 5,
+    top: 6,
+    right: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  countText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  partTitle: {
+    marginTop: 6,
+    fontSize: 12.5,
+    fontWeight: "600",
+  },
+  partYear: {
+    marginTop: 1,
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  ratingBadge: {
+    position: "absolute",
+    bottom: 8,
     right: 5,
-    width: 30,
-    borderRadius: 15,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
   },
-  similarRatingText: {
+  ratingText: {
     color: "#ffd700",
-    fontSize: 12,
-  },
-  text: {
-    fontSize: 10,
-    lineHeight: 10, // Karakterler arasındaki boşluğu ayarlamak için kullanılabilir
-    fontWeight: "500",
-    color: "#ffd700",
-    textAlign: "center",
+    fontSize: 11,
+    fontWeight: "700",
   },
 });

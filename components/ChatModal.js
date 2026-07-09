@@ -264,7 +264,12 @@ export const ChatModal = () => {
 
     setLoading(true);
     try {
-      const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
+      // ⚠️ KULLANIMDAN KALKTI: Bu dosya aktif değil (aktif olan
+      // components/modals/ChatModal.js). Gemini anahtarı artık istemciye
+      // gömülmez; AI istekleri callGemini Cloud Function proxy'sinden geçer
+      // (bkz. services/geminiService.js). Bu eski doğrudan-çağrı yolu bilerek
+      // devre dışı bırakıldı.
+      const apiKey = "";
       if (!apiKey) {
         Toast.show({ type: "error", text1: "Gemini API anahtarı bulunamadı" });
         return;

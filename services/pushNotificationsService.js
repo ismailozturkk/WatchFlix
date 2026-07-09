@@ -143,6 +143,15 @@ function resolveProjectId() {
 export async function registerForPushNotificationsAsync(uid) {
   try {
     if (!Device.isDevice) return null;
+
+    // Expo Go'da üretilen token Expo Go uygulamasına bağlanır → backend o token'a
+    // gönderince bildirim standalone uygulamaya değil Expo Go'ya düşer. Bu yüzden
+    // Expo Go'da çalışırken token KAYDETME (eski kullanıcı sorunu buradan geldi).
+    if (Constants.appOwnership === "expo" || Constants.executionEnvironment === "storeClient") {
+      if (__DEV__) console.warn("registerForPush: Expo Go'da token kaydedilmez");
+      return null;
+    }
+
     const granted = await requestNotificationPermission();
     if (!granted) return null;
 

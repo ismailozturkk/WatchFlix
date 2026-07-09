@@ -63,8 +63,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   useApiSettings,
   useContentSettings,
+  useHapticsSettings,
   useImageQualitySettings,
 } from "@context/AppSettingsContext";
+import * as Haptics from "expo-haptics";
 import { useLanguage } from "@context/LanguageContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import { createSocialNotification } from "@services/socialNotificationsService";
@@ -103,7 +105,21 @@ import PollMessage from "@components/chat/PollMessage";
 import TextPollComposer from "@components/chat/TextPollComposer";
 import GroupInfoModal from "@components/chat/GroupInfoModal";
 import GroupAvatar from "@components/chat/GroupAvatar";
+import MessageReplyPreview from "@components/chat/MessageReplyPreview";
+import PinnedMessagesModal from "@components/chat/PinnedMessagesModal";
+import SwipeReplyContainer from "@components/chat/SwipeReplyContainer";
+import {
+  canManageGroup,
+  isGroupCreator,
+} from "@utils/groupRoles";
+import {
+  createMessageClientId,
+  mergeServerMessages,
+  removeOptimisticMessage,
+} from "@utils/chatOptimistic";
 import Reanimated, {
+  runOnJS,
+  useAnimatedReaction,
   useAnimatedKeyboard,
   useAnimatedStyle,
 } from "react-native-reanimated";
@@ -196,6 +212,22 @@ const formatDateLabel = (date, language) => {
   });
 };
 
+const messagePreview = (message) => {
+  if (!message) return i18nText("autoI18n.sohbet_mesaji", "Mesaj");
+  if (message.kind === "poll") {
+    return `📊 ${message.poll?.question || message.text || i18nText("autoI18n.anket", "Anket")}`;
+  }
+  if (Array.isArray(message.items) && message.items.length > 0) {
+    return message.listTitle || i18nText("autoI18n.n_icerik", "{{n}} içerik", { n: message.items.length });
+  }
+  if (message.media) {
+    return message.media.title || message.text || i18nText("autoI18n.medya", "Medya");
+  }
+  return String(message.text || i18nText("autoI18n.sohbet_mesaji", "Mesaj")).slice(0, 180);
+};
+
+const timestampMs = (value) => value?.toMillis?.() || value?.toDate?.()?.getTime?.() || 0;
+
 // ─── Mesaj balonu ────────────────────────────────────────────────────────────
 const MessageBubble = memo(
   ({
@@ -212,13 +244,23 @@ const MessageBubble = memo(
     dateLabel,
     isGroup,
     avatars,
+    memberInfo,
     onVote,
+    onReply,
+    onJumpToMessage,
+    highlighted,
   }) => {
     const isMe = item.senderId === currentUser.uid;
     const hasItems = Array.isArray(item.items) && item.items.length > 0;
     const hasPoll = item.kind === "poll" && !!item.poll;
     // Grupta gelen mesajda gönderen rengi (baloncuk + ad tutarlı renkte).
     const senderColor = isGroup && !isMe ? memberColor(item.senderId) : null;
+    // Gönderen ad/avatarı CANLI grup memberInfo'dan çöz (profil değişince eski
+    // mesajlar da güncel görünür); üye gruptan ayrıldıysa mesajdaki donmuş değere düş.
+    const minfo = isGroup ? memberInfo?.[item.senderId] : null;
+    const senderName = minfo?.name || item.senderName || "";
+    const senderAvatarIndex =
+      typeof minfo?.avatarIndex === "number" ? minfo.avatarIndex : item.senderAvatarIndex;
     // Gönderen başlığı yalnızca ardışık bloğun İLK mesajında (groupTop yokken).
     const showSenderHeader = isGroup && !isMe && !groupTop;
     const scaleAnim = useRef(new Animated.Value(0.88)).current;
@@ -241,6 +283,8 @@ const MessageBubble = memo(
     }, []);
 
     const getStatusIcon = () => {
+      if (item.status === "sending")
+        return <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.3)" />;
       if (item.status === "seen")
         return <Ionicons name="checkmark-done" size={13} color={SEEN_COLOR} />;
       if (item.status === "delivered")
@@ -297,6 +341,7 @@ const MessageBubble = memo(
             <View style={styles.dateSepLine} />
           </View>
         ) : null}
+        <SwipeReplyContainer onReply={() => onReply(item)}>
         <Animated.View
           style={[
             { transform: [{ scale: scaleAnim }], opacity: opacAnim },
@@ -309,17 +354,17 @@ const MessageBubble = memo(
         {/* Grupta gönderen başlığı (avatar + ad) */}
         {showSenderHeader && (
           <View style={styles.senderHeader}>
-            {avatars?.[item.senderAvatarIndex] ? (
-              <Image source={avatars[item.senderAvatarIndex]} style={styles.senderAvatar} />
+            {avatars?.[senderAvatarIndex] ? (
+              <Image source={avatars[senderAvatarIndex]} style={styles.senderAvatar} />
             ) : (
               <View style={[styles.senderAvatar, styles.senderAvatarPh, { backgroundColor: senderColor }]}>
                 <Text style={styles.senderAvatarInitial}>
-                  {(item.senderName || "?").charAt(0).toUpperCase()}
+                  {(senderName || "?").charAt(0).toUpperCase()}
                 </Text>
               </View>
             )}
             <Text style={[styles.senderName, { color: senderColor }]} numberOfLines={1}>
-              {item.senderName || i18nText("autoI18n.uye", "Üye")}
+              {senderName || i18nText("autoI18n.uye", "Üye")}
             </Text>
           </View>
         )}
@@ -328,6 +373,7 @@ const MessageBubble = memo(
             styles.message,
             (item.media || hasItems || hasPoll) && styles.mediaMessage,
             isMe ? styles.myMsg : styles.friendMsg,
+            highlighted && styles.highlightedMessage,
             // Grupta gelen baloncukta gönderen renginde ince sol vurgu.
             senderColor && { borderColor: senderColor + "66" },
             groupedCorner,
@@ -338,6 +384,10 @@ const MessageBubble = memo(
             item.media ? openMediaDetail(navigation, item.media) : null
           }
         >
+          <MessageReplyPreview
+            reply={item.replyTo}
+            onPress={item.replyTo?.messageId ? () => onJumpToMessage(item.replyTo.messageId) : undefined}
+          />
           {/* ── Anket ── */}
           {hasPoll ? (
             <PollMessage
@@ -375,6 +425,7 @@ const MessageBubble = memo(
           {meta}
         </TouchableOpacity>
         </Animated.View>
+        </SwipeReplyContainer>
       </View>
     );
   },
@@ -492,6 +543,7 @@ export default function ChatScreen({ route, navigation }) {
   const locale = language === "tr" ? "tr-TR" : "en-US";
 
   const { API_KEY } = useApiSettings();
+  const { hapticsEnabled } = useHapticsSettings();
   const [trailerMedia, setTrailerMedia] = useState(null);
   const { adultContent } = useContentSettings();
   const { selectAvatarIndex, avatars } = useProfileUi();
@@ -520,6 +572,11 @@ export default function ChatScreen({ route, navigation }) {
   const [pollMode, setPollMode] = useState(false); // medya anketi (compose toggle)
   const [textPollVisible, setTextPollVisible] = useState(false); // metin anketi modalı
   const [groupInfoVisible, setGroupInfoVisible] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [pinnedMessages, setPinnedMessages] = useState([]);
+  const [pinnedModalVisible, setPinnedModalVisible] = useState(false);
+  const [highlightedMessageId, setHighlightedMessageId] = useState(null);
+  const [busyPinId, setBusyPinId] = useState(null);
   const MAX_SELECT = 12;
 
   // Animasyon ref'leri
@@ -544,9 +601,122 @@ export default function ChatScreen({ route, navigation }) {
   const flatListRef = useRef();
   const typingTimerRef   = useRef(null);   // debounce typing writes
   const processedMsgIds  = useRef(new Set()); // guard against redundant seen/delivered writes
+  const messageInputRef  = useRef(null);
   const searchInputRef   = useRef(null);   // arama input — modal açıldıktan SONRA odakla
-  const searchKbAnim     = useRef(new Animated.Value(0)).current; // modal klavye padding
+  const pendingComposerRef = useRef(null); // "search" | "poll"
+  const composerTimerRef = useRef(null);
+  const searchFocusTimerRef = useRef(null);
+  const keyboardVisibleRef = useRef(Keyboard.isVisible());
+  const highlightTimerRef = useRef(null);
+  const pendingJumpIdRef = useRef(null);
+  const [composerTransitioning, setComposerTransitioning] = useState(false);
   const { theme } = useTheme();
+
+  // React Native Modal ayrı bir native katmanda açıldığı için ana ekranın
+  // inputAreaStyle padding'i modal sheet'lerine taşınmaz. Aynı klavye shared
+  // value'sunu modal köklerine de uygula; böylece edge-to-edge Android ve
+  // iOS'ta sheet'in alt kenarı klavyenin üstünde kalır.
+  const modalKeyboardStyle = useAnimatedStyle(() => ({
+    paddingBottom: keyboard.height.value,
+  }));
+
+  // Ana mesaj inputu odaktayken modalı aynı karede açmak iki farklı native
+  // katmanın klavye animasyonlarını çakıştırıyor. Modal isteğini sakla; klavye
+  // tamamen kapandıktan ve ana input alt konumuna döndükten bir kare sonra aç.
+  const commitPendingComposer = useCallback(() => {
+    const target = pendingComposerRef.current;
+    if (!target) return;
+
+    pendingComposerRef.current = null;
+    if (composerTimerRef.current) clearTimeout(composerTimerRef.current);
+    composerTimerRef.current = setTimeout(() => {
+      if (target === "search") {
+        setSearchOption(true);
+        setSearchModalVisible(true);
+      } else {
+        setTextPollVisible(true);
+      }
+      setComposerTransitioning(false);
+      composerTimerRef.current = null;
+    }, 48);
+  }, []);
+
+  // Native keyboardDidHide bazı üretici klavyelerinde gecikebilir veya hiç
+  // gelmeyebilir. Ana inputu da taşıyan shared height tam sıfıra indiğinde
+  // aynı tamamlayıcıyı çalıştırmak, modalın ancak görsel yerleşim sıfırlandıktan
+  // sonra açılmasını garanti eder.
+  useAnimatedReaction(
+    () => keyboard.height.value,
+    (height, previousHeight) => {
+      if (height <= 0 && previousHeight > 0) {
+        runOnJS(commitPendingComposer)();
+      }
+    },
+    [commitPendingComposer],
+  );
+
+  const openComposer = useCallback(
+    (target) => {
+      pendingComposerRef.current = target;
+      setComposerTransitioning(true);
+
+      const messageInputFocused =
+        messageInputRef.current?.isFocused?.() === true;
+      const keyboardIsOpen =
+        keyboardVisibleRef.current || Keyboard.isVisible() || messageInputFocused;
+
+      if (!keyboardIsOpen) {
+        commitPendingComposer();
+        return;
+      }
+
+      messageInputRef.current?.blur();
+      Keyboard.dismiss();
+
+      // Native event ve shared-height reaction beklenmedik biçimde gelmezse
+      // geçişin kilitli kalmaması için son güvenlik ağı.
+      if (composerTimerRef.current) clearTimeout(composerTimerRef.current);
+      composerTimerRef.current = setTimeout(commitPendingComposer, 900);
+    },
+    [commitPendingComposer],
+  );
+
+  const closeSearchModal = useCallback((clearHashText = false) => {
+    if (searchFocusTimerRef.current) {
+      clearTimeout(searchFocusTimerRef.current);
+      searchFocusTimerRef.current = null;
+    }
+    searchInputRef.current?.blur();
+    Keyboard.dismiss();
+    setSearchModalVisible(false);
+    setSearchResults([]);
+    setSearchText("");
+    setSearchOption(false);
+    if (clearHashText) setText((prev) => prev.replace(/#.*/g, ""));
+  }, []);
+
+  const closeTextPollModal = useCallback(() => {
+    Keyboard.dismiss();
+    setTextPollVisible(false);
+  }, []);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", () => {
+      keyboardVisibleRef.current = true;
+    });
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+      keyboardVisibleRef.current = false;
+      commitPendingComposer();
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+      pendingComposerRef.current = null;
+      if (composerTimerRef.current) clearTimeout(composerTimerRef.current);
+      if (searchFocusTimerRef.current) clearTimeout(searchFocusTimerRef.current);
+    };
+  }, [commitPendingComposer]);
 
   const [chatData, setChatData] = useState({
     messages: [],
@@ -572,7 +742,14 @@ export default function ChatScreen({ route, navigation }) {
     () => collection(db, rootCol, chatId, "messages"),
     [rootCol, chatId],
   );
+  const pinsRef = useMemo(
+    () => collection(db, rootCol, chatId, "pins"),
+    [rootCol, chatId],
+  );
   const chatRef = useMemo(() => doc(db, rootCol, chatId), [rootCol, chatId]);
+
+  const currentUserIsCreator = isGroupCreator(groupData, currentUser.uid);
+  const currentUserCanManageGroup = canManageGroup(groupData, currentUser.uid);
 
   // Çevrimiçi/typing/inChat (RTDB) yalnızca 1-1 modunda. Grupta per-üye presence
   // gösterilmez (üye sayısı header'da). enterChat/leaveChat sadece 1-1.
@@ -585,34 +762,6 @@ export default function ChatScreen({ route, navigation }) {
   // Clear processed-message guard when switching chats
   useEffect(() => { processedMsgIds.current.clear(); }, [chatId]);
 
-  // Arama modalı açıkken klavyeyi sheet'in üstünde tut.
-  // Android: app softwareKeyboardLayoutMode:"resize" → pencere ZATEN yeniden
-  //   boyutlanıp alttaki sheet'i klavyenin üstüne çekiyor. Manuel padding
-  //   EKLEMEK çift-yönetim olur ve sheet "çok yukarı" çıkar → Android'de no-op.
-  // iOS: pencere boyutlanmaz; klavye yüksekliği kadar paddingBottom ekle.
-  useEffect(() => {
-    if (!searchModalVisible || Platform.OS !== "ios") return;
-    const onShow = (e) =>
-      Animated.timing(searchKbAnim, {
-        toValue: e.endCoordinates?.height || 0,
-        duration: e.duration || 250,
-        useNativeDriver: false,
-      }).start();
-    const onHide = (e) =>
-      Animated.timing(searchKbAnim, {
-        toValue: 0,
-        duration: e.duration || 200,
-        useNativeDriver: false,
-      }).start();
-    const s = Keyboard.addListener("keyboardWillShow", onShow);
-    const h = Keyboard.addListener("keyboardWillHide", onHide);
-    return () => {
-      s.remove();
-      h.remove();
-      searchKbAnim.setValue(0);
-    };
-  }, [searchModalVisible, searchKbAnim]);
-
   useEffect(() => {
     const q = query(
       messagesRef,
@@ -621,11 +770,21 @@ export default function ChatScreen({ route, navigation }) {
     );
 
     const unsubscribeMessages = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data(),
+      const msgs = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          timestamp:
+            data.timestamp ||
+            (data.clientCreatedAt ? new Date(data.clientCreatedAt) : null),
+          _pendingWrite: docSnap.metadata.hasPendingWrites,
+        };
+      });
+      setChatData((prev) => ({
+        ...prev,
+        messages: mergeServerMessages(msgs, prev.messages, chatId),
       }));
-      setChatData((prev) => ({ ...prev, messages: msgs }));
 
       // seen/delivered yalnızca 1-1'de anlamlı (grupta çok alıcı → tek durum
       // paylaşılamaz; gereksiz yazma). Grupta atla.
@@ -686,6 +845,29 @@ export default function ChatScreen({ route, navigation }) {
     };
   }, [isGroup, groupId, chatId, friendUid, messageLimit]);
 
+  useEffect(() => {
+    const unsubscribePins = onSnapshot(
+      pinsRef,
+      (snapshot) => {
+        const pins = snapshot.docs.map((pinDoc) => ({
+          id: pinDoc.id,
+          ...pinDoc.data(),
+        }));
+        pins.sort((a, b) => timestampMs(b.pinnedAt) - timestampMs(a.pinnedAt));
+        setPinnedMessages(pins);
+      },
+      (error) => __DEV__ && console.warn("subscribePins:", error.message),
+    );
+    return unsubscribePins;
+  }, [pinsRef]);
+
+  useEffect(
+    () => () => {
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    },
+    [],
+  );
+
   // Arama paneli animasyonu
   useEffect(() => {
     Animated.spring(searchPanelAnim, {
@@ -734,6 +916,115 @@ export default function ChatScreen({ route, navigation }) {
     [isGroup, currentUser.displayName, selectAvatarIndex],
   );
 
+  const resolveSenderName = useCallback(
+    (message) => {
+      if (message?.senderId === currentUser.uid) {
+        return currentUser.displayName || i18nText("autoI18n.sen", "Sen");
+      }
+      if (isGroup) {
+        return (
+          groupData?.memberInfo?.[message?.senderId]?.name ||
+          message?.senderName ||
+          i18nText("autoI18n.uye", "Üye")
+        );
+      }
+      return friendName || i18nText("autoI18n.arkadas", "Arkadaş");
+    },
+    [currentUser.uid, currentUser.displayName, isGroup, groupData?.memberInfo, friendName],
+  );
+
+  const beginReply = useCallback(
+    (message) => {
+      if (!message?.id) return;
+      if (hapticsEnabled) Haptics.selectionAsync().catch(() => {});
+      setEditingMessage(null);
+      setReplyingTo({
+        messageId: message.id,
+        senderId: message.senderId || "",
+        senderName: resolveSenderName(message),
+        preview: messagePreview(message),
+        kind: message.kind || (message.media ? "media" : "text"),
+      });
+      setOptionsVisible(false);
+      setTimeout(() => messageInputRef.current?.focus(), 100);
+    },
+    [hapticsEnabled, resolveSenderName],
+  );
+
+  const replyFields = useCallback(
+    () => (replyingTo ? { replyTo: replyingTo } : {}),
+    [replyingTo],
+  );
+
+  const canRemovePin = useCallback(
+    (pin) =>
+      Boolean(
+        pin &&
+          (pin.pinnedBy === currentUser.uid || (isGroup && currentUserIsCreator)),
+      ),
+    [currentUser.uid, isGroup, currentUserIsCreator],
+  );
+
+  const pinMessage = useCallback(
+    async (message) => {
+      if (!message?.id || busyPinId) return;
+      if (isGroup && !currentUserCanManageGroup) {
+        toast.warning(
+          i18nText("autoI18n.yetki_gerekli", "Yetki gerekli"),
+          i18nText("autoI18n.sadece_yoneticiler_sabitleyebilir", "Grup mesajlarını yalnız kurucu veya yöneticiler sabitleyebilir"),
+        );
+        return;
+      }
+      setBusyPinId(message.id);
+      try {
+        await setDoc(doc(pinsRef, message.id), {
+          messageId: message.id,
+          senderId: message.senderId || "",
+          senderName: resolveSenderName(message),
+          preview: messagePreview(message),
+          kind: message.kind || (message.media ? "media" : "text"),
+          pinnedBy: currentUser.uid,
+          pinnedByName: currentUser.displayName || i18nText("autoI18n.bir_uye", "Bir üye"),
+          pinnedAt: serverTimestamp(),
+        });
+        toast.success(i18nText("autoI18n.mesaj_sabitlendi", "Mesaj sabitlendi"));
+        setOptionsVisible(false);
+      } catch (error) {
+        console.error("pinMessage:", error);
+        toast.error(i18nText("autoI18n.mesaj_sabitlenemedi", "Mesaj sabitlenemedi"));
+      } finally {
+        setBusyPinId(null);
+      }
+    },
+    [
+      busyPinId,
+      isGroup,
+      currentUserCanManageGroup,
+      pinsRef,
+      resolveSenderName,
+      currentUser.uid,
+      currentUser.displayName,
+    ],
+  );
+
+  const unpinMessage = useCallback(
+    async (pin) => {
+      if (!pin?.messageId || busyPinId || !canRemovePin(pin)) return;
+      setBusyPinId(pin.messageId);
+      try {
+        await deleteDoc(doc(pinsRef, pin.messageId));
+        toast.success(i18nText("autoI18n.sabitleme_kaldirildi", "Sabitleme kaldırıldı"));
+        setOptionsVisible(false);
+      } catch (error) {
+        console.error("unpinMessage:", error);
+        toast.error(i18nText("autoI18n.sabitleme_kaldirilamadi", "Sabitleme kaldırılamadı"));
+      } finally {
+        setBusyPinId(null);
+      }
+    },
+    [busyPinId, canRemovePin, pinsRef],
+  );
+
   // lastMessage yaz + bildirim gönder (moda göre). Grup ve 1-1 şemaları farklı.
   const finalizeThread = useCallback(
     async (previewText) => {
@@ -756,7 +1047,6 @@ export default function ChatScreen({ route, navigation }) {
         const others = (groupData?.members || []).filter(
           (u) => u !== currentUser.uid,
         );
-        const label = (groupData?.name ? groupData.name + ": " : "") + previewText;
         others.forEach((uid) =>
           createSocialNotification({
             toUid: uid,
@@ -764,7 +1054,9 @@ export default function ChatScreen({ route, navigation }) {
             fromName: currentUser.displayName || "",
             fromAvatarIndex,
             type: "message",
-            text: label,
+            text: previewText,
+            groupId: chatId,
+            groupName: groupData?.name || groupName || "",
           }).catch(() => {}),
         );
       } else {
@@ -843,13 +1135,14 @@ export default function ChatScreen({ route, navigation }) {
   // Metin anketi gönder (TextPollComposer'dan).
   const sendTextPoll = useCallback(
     async (question, optionLabels) => {
-      setTextPollVisible(false);
+      closeTextPollModal();
       const previewText = "📊 " + question;
       const messageData = {
         text: previewText,
         senderId: currentUser.uid,
         timestamp: serverTimestamp(),
         status: "sent",
+        ...replyFields(),
         ...senderFields(),
         kind: "poll",
         poll: {
@@ -862,12 +1155,13 @@ export default function ChatScreen({ route, navigation }) {
       try {
         await addDoc(messagesRef, messageData);
         await finalizeThread(previewText);
+        setReplyingTo(null);
       } catch (err) {
         console.error("textPoll:", err);
         appAlert(i18nText("autoI18n.hata", "Hata"), i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
       }
     },
-    [messagesRef, currentUser.uid, senderFields, finalizeThread],
+    [messagesRef, currentUser.uid, replyFields, senderFields, finalizeThread, closeTextPollModal],
   );
 
   const handleTyping = useCallback(
@@ -890,42 +1184,118 @@ export default function ChatScreen({ route, navigation }) {
     if (typingTimerRef.current) { clearTimeout(typingTimerRef.current); typingTimerRef.current = null; }
     if (!isGroup) setTyping(chatId, currentUser.uid, false);
     const outgoing = text;
-    try {
-      if (editingMessage) {
-        await updateDoc(doc(messagesRef, editingMessage.id), {
+    const replySnapshot = replyingTo;
+
+    if (editingMessage) {
+      const targetMessage = editingMessage;
+      const previousText = targetMessage.text || "";
+      // Düzenleme de ağ onayını beklemeden balona ve inputa yansır.
+      setChatData((prev) => ({
+        ...prev,
+        messages: prev.messages.map((message) =>
+          message.id === targetMessage.id
+            ? { ...message, text: outgoing, edited: true }
+            : message,
+        ),
+      }));
+      setEditingMessage(null);
+      setText("");
+      setTextLink(false);
+      try {
+        await updateDoc(doc(messagesRef, targetMessage.id), {
           text: outgoing,
           edited: true,
         });
-        setEditingMessage(null);
-        setText("");
-        setTextLink(false);
-        return;
+      } catch (error) {
+        setChatData((prev) => ({
+          ...prev,
+          messages: prev.messages.map((message) =>
+            message.id === targetMessage.id
+              ? { ...message, text: previousText, edited: targetMessage.edited }
+              : message,
+          ),
+        }));
+        setEditingMessage(targetMessage);
+        setText((current) => current || outgoing);
+        setTextLink(isLink(outgoing));
+        console.error(i18nText("autoI18n.mesaj_duzenleme_hatasi", "Mesaj düzenleme hatası:"), error);
+        appAlert(i18nText("autoI18n.hata", "Hata"), i18nText("autoI18n.mesaj_duzenlenemedi", "Mesaj düzenlenemedi."));
       }
+      return;
+    }
+
+    const clientId = createMessageClientId(currentUser.uid);
+    const messageData = {
+      clientId,
+      clientCreatedAt: Date.now(),
+      text: outgoing,
+      senderId: currentUser.uid,
+      ...senderFields(),
+      ...(replySnapshot ? { replyTo: replySnapshot } : {}),
+    };
+    const optimisticMessage = {
+      ...messageData,
+      id: `local-${clientId}`,
+      timestamp: new Date(),
+      status: "sending",
+      _optimistic: true,
+      _chatId: chatId,
+    };
+
+    // Balon ve input aynı karede güncellenir; Firestore/bildirim gecikmesi UI'ı
+    // bloke etmez. Server snapshot'ı clientId ile bu geçici balonu değiştirir.
+    setChatData((prev) => ({
+      ...prev,
+      messages: [optimisticMessage, ...prev.messages],
+    }));
+    setText("");
+    setTextLink(false);
+    setReplyingTo(null);
+    setSearchOption(false);
+    setSearchModalVisible(false);
+
+    try {
       await addDoc(messagesRef, {
+        ...messageData,
         text: outgoing,
-        senderId: currentUser.uid,
         timestamp: serverTimestamp(),
         status: "sent",
-        ...senderFields(),
       });
-      await finalizeThread(outgoing);
-      setText("");
-      setTextLink(false);
-      setSearchOption(false);
-      setSearchModalVisible(false);
+      // Mesaj zaten görünür ve kalıcı yazılmıştır; özet/bildirim hatası gönderim
+      // deneyimini geri almamalı.
+      finalizeThread(outgoing).catch((error) => {
+        if (__DEV__) console.warn("finalizeThread:", error?.message);
+      });
     } catch (error) {
+      setChatData((prev) => ({
+        ...prev,
+        messages: removeOptimisticMessage(prev.messages, clientId),
+      }));
+      setText((current) => current || outgoing);
+      setTextLink(isLink(outgoing));
+      if (replySnapshot) setReplyingTo((current) => current || replySnapshot);
       console.error(i18nText("autoI18n.mesaj_gonderme_hatasi", "Mesaj gönderme hatası:"), error);
       appAlert(i18nText("autoI18n.hata", "Hata"), i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
     }
-  }, [text, editingMessage, isGroup, chatId, messagesRef, currentUser.uid, senderFields, finalizeThread]);
+  }, [
+    text,
+    editingMessage,
+    replyingTo,
+    isGroup,
+    chatId,
+    messagesRef,
+    currentUser.uid,
+    isLink,
+    senderFields,
+    finalizeThread,
+  ]);
 
   const handleLongPress = useCallback(
     (item) => {
-      if (item.senderId !== currentUser.uid) return;
       setSelectedMessage(item);
       setOptionsVisible(true);
     },
-    [currentUser.uid],
+    [],
   );
 
   const formatDate = useCallback((timestamp) => {
@@ -1021,6 +1391,75 @@ export default function ChatScreen({ route, navigation }) {
     [chatData.messages],
   );
 
+  const scrollToMessage = useCallback(
+    (messageId) => {
+      const index = memoizedMessages.findIndex((message) => message.id === messageId);
+      if (index < 0) return false;
+      flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+      setHighlightedMessageId(messageId);
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = setTimeout(() => setHighlightedMessageId(null), 1500);
+      setPinnedModalVisible(false);
+      return true;
+    },
+    [memoizedMessages],
+  );
+
+  const jumpToMessage = useCallback(
+    (messageId) => {
+      if (scrollToMessage(messageId)) return;
+      pendingJumpIdRef.current = messageId;
+      setMessageLimit((current) => current + 50);
+      toast.warning(
+        i18nText("autoI18n.eski_mesaj_yukleniyor", "Eski mesaj yükleniyor"),
+      );
+    },
+    [scrollToMessage],
+  );
+
+  useEffect(() => {
+    const pendingId = pendingJumpIdRef.current;
+    if (!pendingId) return;
+    if (scrollToMessage(pendingId)) pendingJumpIdRef.current = null;
+  }, [memoizedMessages, scrollToMessage]);
+
+  const deleteMessage = useCallback(
+    async (message) => {
+      if (!message?.id) return;
+      const pin = pinnedMessages.find((item) => item.messageId === message.id);
+      try {
+        // Mesaj silinmeden önce pin kaydını temizle; kurallar mesaj sahibine ve
+        // grup kurucusuna bu temizlik için izin verir.
+        if (pin) await deleteDoc(doc(pinsRef, message.id));
+        await deleteDoc(doc(messagesRef, message.id));
+        if (replyingTo?.messageId === message.id) setReplyingTo(null);
+        setOptionsVisible(false);
+      } catch (error) {
+        console.error("deleteMessage:", error);
+        toast.error(i18nText("autoI18n.mesaj_silinemedi", "Mesaj silinemedi"));
+      }
+    },
+    [pinnedMessages, pinsRef, messagesRef, replyingTo?.messageId],
+  );
+
+  const selectedPin = selectedMessage
+    ? pinnedMessages.find((pin) => pin.messageId === selectedMessage.id)
+    : null;
+  const canPinSelected = Boolean(
+    selectedMessage && !selectedPin && (!isGroup || currentUserCanManageGroup),
+  );
+  const canUnpinSelected = Boolean(selectedPin && canRemovePin(selectedPin));
+  const canEditSelected = Boolean(
+    selectedMessage?.senderId === currentUser.uid &&
+      !selectedMessage?.media &&
+      !selectedMessage?.items &&
+      selectedMessage?.kind !== "poll",
+  );
+  const canDeleteSelected = Boolean(
+    selectedMessage &&
+      (selectedMessage.senderId === currentUser.uid || (isGroup && currentUserIsCreator)),
+  );
+
   const renderItem = useCallback(
     ({ item, index }) => {
       // Firestore desc + FlatList inverted:
@@ -1076,7 +1515,11 @@ export default function ChatScreen({ route, navigation }) {
           dateLabel={dateLabel}
           isGroup={isGroup}
           avatars={avatars}
+          memberInfo={groupData?.memberInfo}
           onVote={handleVote}
+          onReply={beginReply}
+          onJumpToMessage={jumpToMessage}
+          highlighted={highlightedMessageId === item.id}
         />
       );
     },
@@ -1091,7 +1534,11 @@ export default function ChatScreen({ route, navigation }) {
       language,
       isGroup,
       avatars,
+      groupData?.memberInfo,
       handleVote,
+      beginReply,
+      jumpToMessage,
+      highlightedMessageId,
     ],
   );
 
@@ -1227,6 +1674,8 @@ export default function ChatScreen({ route, navigation }) {
       };
     }
 
+    messageData = { ...messageData, ...replyFields() };
+
     // Modalı hemen kapat (optimistic), sonra yaz.
     resetCompose();
     setSearchResults([]);
@@ -1238,6 +1687,7 @@ export default function ChatScreen({ route, navigation }) {
     try {
       await addDoc(messagesRef, messageData);
       await finalizeThread(previewText);
+      setReplyingTo(null);
     } catch (err) {
       console.error(i18nText("autoI18n.arama_sonucu_gonderme_hatasi", "Arama sonucu gönderme hatası:"), err);
       appAlert(i18nText("autoI18n.hata", "Hata"), i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
@@ -1248,6 +1698,7 @@ export default function ChatScreen({ route, navigation }) {
     pollMode,
     messagesRef,
     currentUser.uid,
+    replyFields,
     senderFields,
     finalizeThread,
     resetCompose,
@@ -1407,11 +1858,38 @@ export default function ChatScreen({ route, navigation }) {
           <View style={styles.iconBgWrapper} pointerEvents="none">
             <IconBacground opacity={0.5} />
           </View>
+          {pinnedMessages.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setPinnedModalVisible(true)}
+              activeOpacity={0.82}
+              style={styles.pinnedBanner}
+              accessibilityRole="button"
+              accessibilityLabel={i18nText("autoI18n.sabitlenmis_mesajlar", "Sabitlenmiş mesajlar")}
+            >
+              <View style={styles.pinnedBannerIcon}>
+                <Ionicons name="pin" size={15} color="#B6B2FF" />
+              </View>
+              <View style={styles.pinnedBannerCopy}>
+                <Text style={styles.pinnedBannerTitle} numberOfLines={1}>
+                  {pinnedMessages[0].senderName || i18nText("autoI18n.sohbet_mesaji", "Mesaj")}
+                </Text>
+                <Text style={styles.pinnedBannerText} numberOfLines={1}>
+                  {pinnedMessages[0].preview}
+                </Text>
+              </View>
+              {pinnedMessages.length > 1 && (
+                <View style={styles.pinnedCountBadge}>
+                  <Text style={styles.pinnedCountText}>+{pinnedMessages.length - 1}</Text>
+                </View>
+              )}
+              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.3)" />
+            </TouchableOpacity>
+          )}
           <FlatList
             ref={flatListRef}
             style={styles.chatList}
             data={memoizedMessages}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item.clientId || item.id}
             renderItem={renderItem}
             contentContainerStyle={styles.listContent}
             inverted
@@ -1423,6 +1901,9 @@ export default function ChatScreen({ route, navigation }) {
             maxToRenderPerBatch={12}
             initialNumToRender={15}
             updateCellsBatchingPeriod={30}
+            onScrollToIndexFailed={() => {
+              setMessageLimit((current) => current + 50);
+            }}
             ListHeaderComponent={
               chatData.friendTyping ? (
                 <View style={styles.typingBubble}>
@@ -1443,6 +1924,19 @@ export default function ChatScreen({ route, navigation }) {
               <View style={styles.inputBlurBg} />
 
               {/* Düzenleme banner */}
+              {replyingTo && (
+                <View style={styles.replyingBanner}>
+                  <MessageReplyPreview reply={replyingTo} composer />
+                  <TouchableOpacity
+                    onPress={() => setReplyingTo(null)}
+                    hitSlop={8}
+                    style={styles.replyingClose}
+                    accessibilityLabel={i18nText("autoI18n.alintiyi_iptal_et", "Alıntıyı iptal et")}
+                  >
+                    <Ionicons name="close-circle" size={20} color="rgba(255,255,255,0.42)" />
+                  </TouchableOpacity>
+                </View>
+              )}
               {editingMessage && (
                 <View style={styles.editingBanner}>
                   <View style={styles.editingAccent} />
@@ -1470,10 +1964,8 @@ export default function ChatScreen({ route, navigation }) {
                 {/* Anket oluştur (metin) */}
                 <TouchableOpacity
                   style={styles.pollBtn}
-                  onPress={() => {
-                    Keyboard.dismiss();
-                    setTextPollVisible(true);
-                  }}
+                  onPress={() => openComposer("poll")}
+                  disabled={composerTransitioning}
                   activeOpacity={0.75}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
@@ -1499,14 +1991,8 @@ export default function ChatScreen({ route, navigation }) {
                     {/* Sol durum ikonu */}
                     <TouchableOpacity
                       style={styles.inputLeftIcon}
-                      onPress={() => {
-                        // Ana input klavyesi açıksa önce kapat — taşınan klavye
-                        // durumu modal sheet'ini yukarıda "asılı" bırakıyordu.
-                        // Modal onShow'da arama input'unu temiz şekilde odaklar.
-                        Keyboard.dismiss();
-                        setSearchOption(true);
-                        setSearchModalVisible(true);
-                      }}
+                      onPress={() => openComposer("search")}
+                      disabled={composerTransitioning}
                       activeOpacity={0.7}
                     >
                       {searchOption ? (
@@ -1523,6 +2009,7 @@ export default function ChatScreen({ route, navigation }) {
                     </TouchableOpacity>
 
                     <TextInput
+                      ref={messageInputRef}
                       style={styles.input}
                       value={text}
                       multiline
@@ -1567,25 +2054,21 @@ export default function ChatScreen({ route, navigation }) {
           // Aksi halde modal-slide + klavye + KAV aynı anda çakışıp açılışta
           // "bug"/zıplama yapıyordu.
           onShow={() => {
-            setTimeout(() => searchInputRef.current?.focus(), 260);
+            if (searchFocusTimerRef.current) {
+              clearTimeout(searchFocusTimerRef.current);
+            }
+            searchFocusTimerRef.current = setTimeout(() => {
+              searchInputRef.current?.focus();
+              searchFocusTimerRef.current = null;
+            }, 260);
           }}
-          onRequestClose={() => {
-            setSearchModalVisible(false);
-            setSearchResults([]);
-            setText(text.replace(/#.*/g, ""));
-            setSearchOption(false);
-          }}
+          onRequestClose={() => closeSearchModal(true)}
         >
           <Pressable
             style={styles.searchModalOverlay}
-            onPress={() => {
-              setSearchModalVisible(false);
-              setSearchResults([]);
-              setSearchText("");
-              setSearchOption(false);
-            }}
+            onPress={() => closeSearchModal()}
           >
-            <Animated.View style={{ paddingBottom: searchKbAnim }}>
+            <Reanimated.View style={modalKeyboardStyle}>
               <Pressable onPress={(e) => e.stopPropagation()}>
                 <View style={styles.searchModal}>
                   {/* Tutamaç */}
@@ -1598,12 +2081,7 @@ export default function ChatScreen({ route, navigation }) {
                     </View>
                     <Text style={styles.searchModalTitle}>{i18nText("autoI18n.film_dizi_ara", "Film & Dizi Ara")}</Text>
                     <TouchableOpacity
-                      onPress={() => {
-                        setSearchModalVisible(false);
-                        setSearchResults([]);
-                        setSearchText("");
-                        setSearchOption(false);
-                      }}
+                      onPress={() => closeSearchModal()}
                       style={styles.searchCloseBtn}
                     >
                       <Ionicons
@@ -1870,7 +2348,7 @@ export default function ChatScreen({ route, navigation }) {
                   )}
                 </View>
               </Pressable>
-            </Animated.View>
+            </Reanimated.View>
           </Pressable>
         </Modal>
 
@@ -1952,13 +2430,61 @@ export default function ChatScreen({ route, navigation }) {
 
                 {/* Aksiyon listesi */}
                 <View style={styles.actionList}>
+                  <TouchableOpacity
+                    style={styles.actionRowL}
+                    onPress={() => beginReply(selectedMessage)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.actionIconBox, { backgroundColor: "rgba(108,99,255,0.16)" }]}>
+                      <Ionicons name="arrow-undo" size={20} color="#A9A5FF" />
+                    </View>
+                    <View style={styles.actionRowText}>
+                      <Text style={styles.actionRowTitle}>{i18nText("autoI18n.yanitla", "Yanıtla")}</Text>
+                      <Text style={styles.actionRowSub}>{i18nText("autoI18n.mesaji_alintila", "Mesajı alıntılayarak yanıtla")}</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {(canPinSelected || canUnpinSelected) && (
+                    <TouchableOpacity
+                      style={styles.actionRowL}
+                      onPress={() =>
+                        canUnpinSelected
+                          ? unpinMessage(selectedPin)
+                          : pinMessage(selectedMessage)
+                      }
+                      disabled={busyPinId === selectedMessage.id}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.actionIconBox, { backgroundColor: "rgba(255,193,7,0.13)" }]}>
+                        <Ionicons
+                          name={canUnpinSelected ? "pin-outline" : "pin"}
+                          size={20}
+                          color="#FFD166"
+                        />
+                      </View>
+                      <View style={styles.actionRowText}>
+                        <Text style={styles.actionRowTitle}>
+                          {canUnpinSelected
+                            ? i18nText("autoI18n.sabitlemeyi_kaldir", "Sabitlemeyi kaldır")
+                            : i18nText("autoI18n.mesaji_sabitle", "Mesajı sabitle")}
+                        </Text>
+                        <Text style={styles.actionRowSub}>
+                          {canUnpinSelected
+                            ? i18nText("autoI18n.sabitlerden_cikar", "Sabitlenmiş mesajlardan çıkar")
+                            : i18nText("autoI18n.sohbetin_ustunde_goster", "Sohbetin üstünde göster")}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+
                   {/* Düzenleme yalnızca düz metin mesajlarda gösterilir;
                       paylaşılan media/koleksiyon mesajının metni başlıktır,
                       düzenlenmesi anlamsızdır. */}
-                  {!selectedMessage.media && !selectedMessage.items && selectedMessage.kind !== "poll" && (
+                  {canEditSelected && (
                     <TouchableOpacity
                       style={styles.actionRowL}
                       onPress={() => {
+                        setReplyingTo(null);
                         setEditingMessage(selectedMessage);
                         setText(selectedMessage.text);
                         setOptionsVisible(false);
@@ -1984,27 +2510,26 @@ export default function ChatScreen({ route, navigation }) {
                     </TouchableOpacity>
                   )}
 
-                  <TouchableOpacity
-                    style={styles.actionRowR}
-                    onPress={async () => {
-                      await deleteDoc(doc(messagesRef, selectedMessage.id));
-                      setOptionsVisible(false);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View
-                      style={[
-                        styles.actionIconBox,
-                        { backgroundColor: "rgba(255,107,107,0.15)" },
-                      ]}
+                  {canDeleteSelected && (
+                    <TouchableOpacity
+                      style={styles.actionRowR}
+                      onPress={() => deleteMessage(selectedMessage)}
+                      activeOpacity={0.7}
                     >
-                      <Feather name="trash-2" size={20} color={DANGER} />
-                    </View>
-                    <View style={styles.actionRowText}>
-                      <Text style={[styles.actionRowTitle, { color: DANGER }]}>{i18nText("autoI18n.sil", "Sil")}</Text>
-                      <Text style={styles.actionRowSub}>{i18nText("autoI18n.bu_mesaji_kaldir", "Bu mesajı kaldır")}</Text>
-                    </View>
-                  </TouchableOpacity>
+                      <View
+                        style={[
+                          styles.actionIconBox,
+                          { backgroundColor: "rgba(255,107,107,0.15)" },
+                        ]}
+                      >
+                        <Feather name="trash-2" size={20} color={DANGER} />
+                      </View>
+                      <View style={styles.actionRowText}>
+                        <Text style={[styles.actionRowTitle, { color: DANGER }]}>{i18nText("autoI18n.sil", "Sil")}</Text>
+                        <Text style={styles.actionRowSub}>{i18nText("autoI18n.bu_mesaji_kaldir", "Bu mesajı kaldır")}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {/* İptal butonu */}
@@ -2020,6 +2545,16 @@ export default function ChatScreen({ route, navigation }) {
           </Modal>
         )}
 
+        <PinnedMessagesModal
+          visible={pinnedModalVisible}
+          pins={pinnedMessages}
+          locale={locale}
+          onClose={() => setPinnedModalVisible(false)}
+          onJump={jumpToMessage}
+          onUnpin={unpinMessage}
+          canRemovePin={canRemovePin}
+        />
+
         <TrailerModal
           visible={!!trailerMedia}
           mediaType={trailerMedia?.media_type}
@@ -2030,8 +2565,9 @@ export default function ChatScreen({ route, navigation }) {
 
         <TextPollComposer
           visible={textPollVisible}
-          onClose={() => setTextPollVisible(false)}
+          onClose={closeTextPollModal}
           onCreate={sendTextPoll}
+          keyboardAvoidanceStyle={modalKeyboardStyle}
         />
 
         {isGroup && (
@@ -2110,6 +2646,42 @@ const styles = StyleSheet.create({
   // ── Mesaj listesi ──────────────────────────────────────
   chatList: { flex: 1 },
   listContent: { padding: 14, paddingBottom: 18 },
+  pinnedBanner: {
+    minHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 2,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(108,99,255,0.22)",
+    backgroundColor: "rgba(20,20,38,0.96)",
+    zIndex: 2,
+  },
+  pinnedBannerIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(108,99,255,0.16)",
+  },
+  pinnedBannerCopy: { flex: 1, marginHorizontal: 9 },
+  pinnedBannerTitle: { color: "#B8B4FF", fontSize: 10.5, fontWeight: "800" },
+  pinnedBannerText: { color: "rgba(255,255,255,0.7)", fontSize: 12.5, marginTop: 2 },
+  pinnedCountBadge: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+    marginRight: 5,
+    backgroundColor: "rgba(108,99,255,0.18)",
+  },
+  pinnedCountText: { color: "#C3C0FF", fontSize: 10.5, fontWeight: "800" },
 
   // wrapper — hizalama için
   myMsgWrapper: { alignItems: "flex-end", marginVertical: 3 },
@@ -2184,6 +2756,12 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 6,
   },
   messageText: { fontSize: 15, lineHeight: 22, color: "#fff" },
+  highlightedMessage: {
+    borderColor: "#FFD166",
+    borderWidth: 1.5,
+    shadowColor: "#FFD166",
+    shadowOpacity: 0.34,
+  },
   linkText: {
     color: "#82B4FF",
     textDecorationLine: "underline",
@@ -2323,6 +2901,18 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     zIndex: 20,
     elevation: 20,
+  },
+  replyingBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  replyingClose: {
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 4,
+    marginBottom: 9,
   },
   inputBlurBg: {
     ...StyleSheet.absoluteFillObject,
@@ -2798,9 +3388,8 @@ const styles = StyleSheet.create({
   },
   // Aksiyon listesi — dikey, iOS ayarlar stili
   actionList: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: "column",
+    alignItems: "stretch",
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 18,
     borderWidth: 1,
@@ -2811,7 +3400,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   actionRowL: {
-    flex: 1,
+    width: "100%",
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 14,
     flexDirection: "row",
@@ -2821,7 +3410,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   actionRowR: {
-    flex: 1,
+    width: "100%",
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 14,
     flexDirection: "row",
@@ -2837,6 +3426,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  actionRowText: { flex: 1 },
   actionRowTitle: {
     fontSize: 15,
     fontWeight: "600",

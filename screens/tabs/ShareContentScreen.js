@@ -175,6 +175,59 @@ const FilterChips = memo(function FilterChips({ theme, t, active, onChange }) {
   );
 });
 
+const SortChips = memo(function SortChips({ theme, t, active, onChange }) {
+  const items = [
+    { key: "recent", label: t.sort?.recent || "Tarih", icon: "calendar-outline" },
+    { key: "likes", label: t.sort?.likes || "Beğeni", icon: "heart-outline" },
+    { key: "comments", label: t.sort?.comments || "Yorum", icon: "chatbubble-outline" },
+  ];
+
+  return (
+    <View style={chipStyles.sortSection}>
+      <View style={chipStyles.sortLabelRow}>
+        <AppIcon family="Ionicons" name="swap-vertical" size={14} color={theme.text.muted} />
+        <Text style={[chipStyles.sortLabel, { color: theme.text.muted }]}>
+          {t.sort?.label || "Sırala"}
+        </Text>
+      </View>
+      <View style={chipStyles.sortOptions}>
+        {items.map((item) => {
+          const isActive = active === item.key;
+          return (
+            <Pressable
+              key={item.key}
+              onPress={() => onChange(item.key)}
+              style={({ pressed }) => [
+                chipStyles.sortChip,
+                {
+                  backgroundColor: isActive ? theme.accent + "1F" : theme.secondary,
+                  borderColor: isActive ? theme.accent : theme.border,
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
+            >
+              <AppIcon
+                family="Ionicons"
+                name={item.icon}
+                size={14}
+                color={isActive ? theme.accent : theme.text.secondary}
+              />
+              <Text
+                style={[
+                  chipStyles.sortChipText,
+                  { color: isActive ? theme.accent : theme.text.secondary },
+                ]}
+              >
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+});
+
 const LikeButton = memo(function LikeButton({ liked, count, onPress, theme }) {
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -961,7 +1014,9 @@ export default function ShareContentScreen() {
   const {
     posts,
     filter,
+    sort,
     setFilter,
+    setSort,
     loading,
     loadingMore,
     refreshing,
@@ -1213,9 +1268,10 @@ export default function ShareContentScreen() {
 
         {/* Filter Chips */}
         <FilterChips theme={theme} t={ts} active={filter} onChange={setFilter} />
+        <SortChips theme={theme} t={ts} active={sort} onChange={setSort} />
       </View>
     ),
-    [theme, ts, greeting, avatar, filter, navigation, trending, onPressTrending],
+    [theme, ts, greeting, avatar, filter, sort, navigation, trending, onPressTrending, setFilter, setSort],
   );
 
   const renderItem = useCallback(
@@ -1445,6 +1501,33 @@ const chipStyles = StyleSheet.create({
     borderWidth: 1,
   },
   label: { fontSize: 13 },
+  sortSection: {
+    marginHorizontal: 16,
+    marginTop: -6,
+    marginBottom: 16,
+    padding: 10,
+    borderRadius: 16,
+  },
+  sortLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 8,
+  },
+  sortLabel: { fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
+  sortOptions: { flexDirection: "row", gap: 8 },
+  sortChip: {
+    flex: 1,
+    minHeight: 36,
+    borderRadius: 11,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+  },
+  sortChipText: { fontSize: 11.5, fontWeight: "700" },
 });
 
 const postStyles = StyleSheet.create({

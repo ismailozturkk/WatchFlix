@@ -22,14 +22,14 @@ const mergeUniqueById = (prev, next) => {
   return [...prev, ...next.filter((x) => x && !seen.has(x.id))];
 };
 
-// Trend carousel'i için: kenar spacer'larını koruyarak yeni sayfayı sağ
-// spacer'dan ÖNCE ekler (mevcut kartların index/animasyonu bozulmaz).
-const rewrapTrends = (prev, next) => {
-  const raw = (prev || []).filter(
-    (x) => x && x.id !== "left-spacer" && x.id !== "right-spacer",
-  );
-  const merged = mergeUniqueById(raw, next);
-  return [{ id: "left-spacer" }, ...merged, { id: "right-spacer" }];
+// Trend state'i yalnızca gerçek TMDB kayıtlarını tutar. Eski cache sürümleri
+// spacer kayıtları içerebildiği için hem mevcut hem de yeni veriyi normalize et.
+const mergeTrendItems = (prev, next) => {
+  const realItems = (items) =>
+    (Array.isArray(items) ? items : []).filter(
+      (x) => x && x.id !== "left-spacer" && x.id !== "right-spacer",
+    );
+  return mergeUniqueById(realItems(prev), realItems(next));
 };
 
 // Sayfalı bölümlerin ortak yükleyicisi: cache okuma, loading bayrakları,
@@ -176,11 +176,11 @@ export const MovieProvider = ({ children }) => {
     const cached = await getCachedValue(cacheKey, TTL.TREND);
     if (cached) {
       if (append) {
-        setMovieTrends((prev) => rewrapTrends(prev, cached.results ?? cached));
+        setMovieTrends((prev) => mergeTrendItems(prev, cached.results ?? cached));
         setLoadingMoreTrends(false);
       } else {
-        // page 1 önbelleği spacer'lı tam dizi (offline indirme ile uyumlu)
-        setIfChanged(setMovieTrends, cached);
+        // Eski spacer'lı cache kayıtlarını da okurken temizle.
+        setIfChanged(setMovieTrends, mergeTrendItems([], cached.results ?? cached));
         setLoadingTrends(false);
         // toplam sayfa önbellekte yok → loadMore'a izin vermek için üst sınır
         setTotalPagesTrends((p) => (p > 1 ? p : 1000));
@@ -204,16 +204,11 @@ export const MovieProvider = ({ children }) => {
       const results = response.data.results || [];
       setTotalPagesTrends(response.data.total_pages || 1);
       if (append) {
-        setMovieTrends((prev) => rewrapTrends(prev, results));
+        setMovieTrends((prev) => mergeTrendItems(prev, results));
         setCachedValue(cacheKey, results);
       } else {
-        const data = [
-          { id: "left-spacer" },
-          ...results,
-          { id: "right-spacer" },
-        ];
-        setIfChanged(setMovieTrends, data);
-        setCachedValue(baseKey, data);
+        setIfChanged(setMovieTrends, results);
+        setCachedValue(baseKey, results);
       }
     } catch (error) {
       if (__DEV__) console.error("fetchSeriesTrends:", error?.message || error);
@@ -284,36 +279,87 @@ export const MovieProvider = ({ children }) => {
   //!------------------ movie collection --------------
 
   const moviesCollectionList = [
-    "10", //sw
-    "1241", //hp
-    "86311", //mar
-    "748", //
-    "263",
-    "9485",
-    "119",
-    "121938",
-    "87359",
-    "556",
-    "531241",
-    "295",
-    "645",
-    "2344",
-    "8650",
-    "131635",
-    "328",
-    "8354",
-    "14740",
+    // ── Kullanıcının küratörlü listesi ──
+    "10", // Star Wars
+    "1241", // Harry Potter
+    "86311", // The Avengers
+    "748", // X-Men
+    "263", // The Dark Knight
+    "9485", // The Fast and the Furious
+    "119", // The Lord of the Rings
+    "121938", // The Hobbit
+    "87359", // Mission: Impossible
+    "556", // Spider-Man
+    "531241", // Spider-Man (Home / MCU)
+    "295", // Pirates of the Caribbean
+    "645", // James Bond
+    "2344", // The Matrix
+    "8650", // Transformers
+    "131635", // The Hunger Games
+    "328", // Jurassic Park
+    "8354", // Ice Age
+    "14740", // Twilight
+    // ── Ek popüler seri filmler (TMDB'den doğrulandı) ──
+    "10194", // Toy Story
+    "86066", // Despicable Me
+    "2150", // Shrek
+    "528", // The Terminator
+    "1575", // Rocky
+    "230", // The Godfather
+    "8091", // Alien
+    "399", // Predator
+    "264", // Back to the Future
+    "84", // Indiana Jones
+    "31562", // The Bourne
+    "404609", // John Wick
+    "656", // Saw
+    "8945", // Mad Max
+    "87118", // Cars
+    "77816", // Kung Fu Panda
+    "89137", // How to Train Your Dragon
+    "313086", // The Conjuring
+    "1570", // Die Hard
+    "304", // Ocean's
+    "4246", // Scary Movie
+    "391860", // Kingsman
+    "448150", // Deadpool
+    "284433", // Guardians of the Galaxy
+    "137697", // Finding Nemo
+    "386382", // Frozen
+    "5547", // RoboCop
   ]; // koleksiyon ID'leri
 
   const [moviesCollection, setMoviesCollection] = useState([]);
   const [loadingCollection, setLoadingCollection] = useState(true);
   const [errorCollection, setErrorCollection] = useState(null);
 
+  // Bir koleksiyon kimliği listesini /collection/{id} ile detaya çevirir.
+  const fetchCollectionsByIds = async (ids, lang) => {
+    const results = await Promise.all(
+      ids.map((id) =>
+        axios
+          .get(`https://api.themoviedb.org/3/collection/${id}`, {
+            params: { language: lang },
+            headers: { Authorization: API_KEY },
+          })
+          .then((r) => r.data || null)
+          .catch(() => null),
+      ),
+    );
+    return results.filter(
+      (c) =>
+        c &&
+        c.poster_path &&
+        Array.isArray(c.parts) &&
+        c.parts.some((p) => p && p.poster_path),
+    );
+  };
+
   const fetchMoviesCollection = async () => {
     const lang = language === "tr" ? "tr-TR" : "en-US";
     const cacheKey = `movie_collection_${lang}`;
     const cached = await getCachedValue(cacheKey, TTL.COLLECTION);
-    if (cached) {
+    if (cached && cached.length) {
       setIfChanged(setMoviesCollection, cached);
       setErrorCollection(null);
       setLoadingCollection(false);
@@ -322,17 +368,11 @@ export const MovieProvider = ({ children }) => {
 
     setLoadingCollection(true);
     try {
-      const moviePromises = moviesCollectionList.map((filmId) =>
-        axios.get(`https://api.themoviedb.org/3/collection/${filmId}`, {
-          params: { language: lang },
-          headers: { Authorization: API_KEY },
-        }).then((r) => r.data || []),
-      );
-      const movieResults = await Promise.all(moviePromises);
-      const allMovies = movieResults.flat().filter(Boolean);
-      setIfChanged(setMoviesCollection, allMovies);
+      // Küratörlü sabit koleksiyon listesi (popüler seri filmler).
+      const collections = await fetchCollectionsByIds(moviesCollectionList, lang);
+      setIfChanged(setMoviesCollection, collections);
       setErrorCollection(null);
-      setCachedValue(cacheKey, allMovies);
+      if (collections.length) setCachedValue(cacheKey, collections);
     } catch (err) {
       const message =
         err.response?.data?.status_message || err.message || i18nText("autoI18n.bilinmeyen_hata", "Bilinmeyen hata");

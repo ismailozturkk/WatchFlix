@@ -1,10 +1,10 @@
 ================================================================================
-  WATCHFLIX — PERFORMANS & OPTİMİZASYON PLANI
+  WATCHIFY — PERFORMANS & OPTİMİZASYON PLANI
   Oluşturulma: 2026-04-09
   Analiz edilen dosyalar: tüm context/, screens/, components/, modules/
 ================================================================================
 
-Bu döküman, WatchFlix uygulamasının kodu incelenerek tespit edilen
+Bu döküman, Watchify uygulamasının kodu incelenerek tespit edilen
 performans sorunlarını ve bunların nasıl düzeltileceğini açıklar.
 Her madde "Sorun → Çözüm → Neden Önemli" formatında yazılmıştır.
 

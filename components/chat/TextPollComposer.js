@@ -13,15 +13,20 @@ import {
   StyleSheet,
   Pressable,
   Platform,
-  KeyboardAvoidingView,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import Reanimated from "react-native-reanimated";
 import { i18nText } from "../../utils/i18nText";
 
 const MAX_OPTS = 6;
 const ACCENT = "#6C63FF";
 
-export default function TextPollComposer({ visible, onClose, onCreate }) {
+export default function TextPollComposer({
+  visible,
+  onClose,
+  onCreate,
+  keyboardAvoidanceStyle,
+}) {
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", ""]);
 
@@ -53,10 +58,7 @@ export default function TextPollComposer({ visible, onClose, onCreate }) {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <Reanimated.View style={[styles.keyboardAvoider, keyboardAvoidanceStyle]}>
         <Pressable style={styles.overlay} onPress={close}>
           <Pressable onPress={(e) => e.stopPropagation()}>
             <View style={styles.sheet}>
@@ -125,12 +127,13 @@ export default function TextPollComposer({ visible, onClose, onCreate }) {
             </View>
           </Pressable>
         </Pressable>
-      </KeyboardAvoidingView>
+      </Reanimated.View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoider: { flex: 1 },
   overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.65)" },
   sheet: {
     backgroundColor: "#14142B",

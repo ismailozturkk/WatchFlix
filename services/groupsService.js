@@ -21,6 +21,7 @@ import {
   arrayUnion,
   arrayRemove,
   deleteField,
+  runTransaction,
 } from "firebase/firestore";
 
 // ─── Üye baloncuk rengi (uid'den deterministik) ──────────────────────────────
@@ -72,7 +73,8 @@ export async function createGroup({
     avatarIndex: Number.isInteger(avatarIndex) ? avatarIndex : 0,
     members,
     memberInfo: memberInfo || {},
-    admins: [createdBy],
+    // Kurucu ayrı ve daha üst bir roldür; admins yalnız atanmış yöneticileri tutar.
+    admins: [],
     createdBy,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -145,6 +147,31 @@ export async function updateGroupAvatar(groupId, avatarIndex) {
   }
   await updateDoc(doc(db, "groups", groupId), {
     avatarIndex,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// Yöneticiyi yalnız kurucu atayabilir/kaldırabilir. Firestore transaction aynı
+// anda yapılan üye/rol değişikliklerinde kayıp güncellemeyi önler ve eski
+// gruplarda admins içine yazılmış kurucuyu da normalize eder.
+export async function setGroupAdminRole(groupId, uid, shouldBeAdmin) {
+  if (!groupId || !uid) throw new Error("Geçersiz grup veya üye");
+  const groupRef = doc(db, "groups", groupId);
+
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(groupRef);
+    if (!snap.exists()) throw new Error("Grup bulunamadı");
+
+    const data = snap.data();
+    if (uid === data.createdBy) throw new Error("Kurucunun rolü değiştirilemez");
+    if (!Array.isArray(data.members) || !data.members.includes(uid)) {
+      throw new Error("Kullanıcı grup üyesi değil");
+    }
+
+    const current = Array.isArray(data.admins) ? data.admins : [];
+    const normalized = current.filter((id) => id && id !== data.createdBy && id !== uid);
+    const admins = shouldBeAdmin ? [...normalized, uid] : normalized;
+    transaction.update(groupRef, { admins, updatedAt: serverTimestamp() });
   });
 }
 

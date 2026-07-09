@@ -58,6 +58,7 @@ function PetCompanion() {
     getPetSource,
     downloadPet,
     downloadingPets,
+    cacheReady,
   } = usePet();
 
   const pet = catalog.find((p) => p.id === selectedPetId);
@@ -66,12 +67,13 @@ function PetCompanion() {
   const visible = petEnabled && !!pet && !!petSource;
 
   // Pet açıkken seçili pet henüz indirilmemişse arka planda indir (tek pet ~2MB).
-  // Geri kalanlar ayarlardan istek üzerine indirilir.
+  // Geri kalanlar ayarlardan istek üzerine indirilir. cacheReady şart: önbellek
+  // taraması bitmeden indirme başlatılırsa diskte zaten olan pet yeniden iner.
   useEffect(() => {
-    if (petEnabled && pet && !petSource && !downloadingPets[pet.id]) {
+    if (cacheReady && petEnabled && pet && !petSource && !downloadingPets[pet.id]) {
       downloadPet(pet.id);
     }
-  }, [petEnabled, pet, petSource, downloadingPets, downloadPet]);
+  }, [cacheReady, petEnabled, pet, petSource, downloadingPets, downloadPet]);
 
   // Boyuta bağlı sınırlar (her render'da güncellenir → gesture worklet'i yakalar).
   const petW = spriteFrameWidth(petSize);

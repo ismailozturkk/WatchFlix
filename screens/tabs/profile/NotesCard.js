@@ -27,7 +27,6 @@ export default function NotesCard({ navigation }) {
     pendingTodos,
     progressPct,
     totalTodos,
-    recentItems,
   } = useMemo(() => {
     const list = notes || [];
     const noteItems = list.filter((n) => n.type !== "todo");
@@ -45,9 +44,6 @@ export default function NotesCard({ navigation }) {
       totalTodos: total,
       pendingTodos: total - done,
       progressPct: total > 0 ? Math.round((done / total) * 100) : 0,
-      recentItems: [...list]
-        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-        .slice(0, 3),
     };
   }, [notes]);
 
@@ -121,139 +117,74 @@ export default function NotesCard({ navigation }) {
             </Text>
           </View>
         ) : (
-          <>
-            {/* Stat çubuğu */}
-            <View style={[styles.statRow, { backgroundColor: theme.primary }]}>
-              <View style={styles.statItem}>
-                <Ionicons name="document-text" size={14} color={accent} />
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.statValue, { color: theme.text.primary }]}
-                >
-                  {noteCount}
-                </Text>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.statLabel, { color: theme.text.muted }]}
-                >
-                  {i18nText("autoI18n.not_lower", "not")}
-                </Text>
-              </View>
-
-              <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-
-              <View style={styles.statItem}>
-                <Ionicons name="checkbox" size={14} color={green} />
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.statValue, { color: theme.text.primary }]}
-                >
-                  {todoCount}
-                </Text>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.statLabel, { color: theme.text.muted }]}
-                >
-                  {i18nText("autoI18n.liste_lower", "liste")}
-                </Text>
-              </View>
-
-              {totalTodos > 0 && (
-                <>
-                  <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-                  <View style={[styles.statItem, { flex: 2 }]}>
-                    <View style={styles.progressArea}>
-                      <View style={styles.progressLabelRow}>
-                        <Text
-                          allowFontScaling={false}
-                          style={[styles.statLabel, { color: theme.text.muted }]}
-                        >
-                          {i18nText("autoI18n.tamamlandi_lower", "tamamlandı")}
-                        </Text>
-                        <Text
-                          allowFontScaling={false}
-                          style={[styles.progressPct, { color: green }]}
-                        >
-                          %{progressPct}
-                        </Text>
-                      </View>
-                      <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
-                        <View
-                          style={[
-                            styles.progressFill,
-                            { backgroundColor: green, width: `${progressPct}%` },
-                          ]}
-                        />
-                      </View>
-                    </View>
-                  </View>
-                </>
-              )}
+          // Stat çubuğu
+          <View style={[styles.statRow, { backgroundColor: theme.primary }]}>
+            <View style={styles.statItem}>
+              <Ionicons name="document-text" size={14} color={accent} />
+              <Text
+                allowFontScaling={false}
+                style={[styles.statValue, { color: theme.text.primary }]}
+              >
+                {noteCount}
+              </Text>
+              <Text
+                allowFontScaling={false}
+                style={[styles.statLabel, { color: theme.text.muted }]}
+              >
+                {i18nText("autoI18n.not_lower", "not")}
+              </Text>
             </View>
 
-            {/* Son 3 öğe önizlemesi */}
-            <View style={styles.previewList}>
-              {recentItems.map((item) => {
-                const isTodo = item.type === "todo";
-                const pending = isTodo
-                  ? (item.todos || []).filter((todo) => !todo.done).length
-                  : 0;
-                const preview = isTodo
-                  ? (item.todos || [])
-                      .filter((todo) => !todo.done)
-                      .slice(0, 1)
-                      .map((todo) => todo.text)
-                      .join("") ||
-                    i18nText("autoI18n.tum_gorevler_tamamlandi", "Tüm görevler tamamlandı ✓")
-                  : item.content || i18nText("autoI18n.icerik_yok", "İçerik yok");
+            <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
 
-                return (
-                  <View
-                    key={item.id}
-                    style={[styles.previewItem, { backgroundColor: theme.primary }]}
-                  >
-                    <View style={[styles.previewBar, { backgroundColor: item.color }]} />
-                    <View style={styles.previewBody}>
-                      <View style={styles.previewHeaderRow}>
-                        <Text
-                          allowFontScaling={false}
-                          style={[styles.previewTitle, { color: theme.text.primary }]}
-                          numberOfLines={1}
-                        >
-                          {item.title ||
-                            (isTodo
-                              ? i18nText("autoI18n.basliksiz_liste", "Başlıksız Liste")
-                              : i18nText("autoI18n.basliksiz_not", "Başlıksız Not"))}
-                        </Text>
-                        <View style={[styles.typePill, { backgroundColor: item.color + "22" }]}>
-                          <Ionicons
-                            name={isTodo ? "checkbox-outline" : "document-text-outline"}
-                            size={10}
-                            color={item.color}
-                          />
-                          {isTodo && pending > 0 && (
-                            <Text
-                              allowFontScaling={false}
-                              style={[styles.typePillText, { color: item.color }]}
-                            >
-                              {pending}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
+            <View style={styles.statItem}>
+              <Ionicons name="checkbox" size={14} color={green} />
+              <Text
+                allowFontScaling={false}
+                style={[styles.statValue, { color: theme.text.primary }]}
+              >
+                {todoCount}
+              </Text>
+              <Text
+                allowFontScaling={false}
+                style={[styles.statLabel, { color: theme.text.muted }]}
+              >
+                {i18nText("autoI18n.liste_lower", "liste")}
+              </Text>
+            </View>
+
+            {totalTodos > 0 && (
+              <>
+                <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+                <View style={[styles.statItem, { flex: 2 }]}>
+                  <View style={styles.progressArea}>
+                    <View style={styles.progressLabelRow}>
                       <Text
                         allowFontScaling={false}
-                        style={[styles.previewContent, { color: theme.text.muted }]}
-                        numberOfLines={1}
+                        style={[styles.statLabel, { color: theme.text.muted }]}
                       >
-                        {preview}
+                        {i18nText("autoI18n.tamamlandi_lower", "tamamlandı")}
+                      </Text>
+                      <Text
+                        allowFontScaling={false}
+                        style={[styles.progressPct, { color: green }]}
+                      >
+                        %{progressPct}
                       </Text>
                     </View>
+                    <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
+                      <View
+                        style={[
+                          styles.progressFill,
+                          { backgroundColor: green, width: `${progressPct}%` },
+                        ]}
+                      />
+                    </View>
                   </View>
-                );
-              })}
-            </View>
-          </>
+                </View>
+              </>
+            )}
+          </View>
         )}
       </TouchableOpacity>
     </View>
@@ -335,35 +266,4 @@ const styles = StyleSheet.create({
   progressPct: { fontSize: 11, fontWeight: "800" },
   progressTrack: { height: 4, borderRadius: 2, overflow: "hidden" },
   progressFill: { height: 4, borderRadius: 2 },
-
-  // Preview list
-  previewList: { flexDirection: "row", gap: 8 },
-  previewItem: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    borderRadius: 10,
-    overflow: "hidden",
-    minHeight: 44,
-    alignItems: "center",
-  },
-  previewBar: { width: 3, alignSelf: "stretch" },
-  previewBody: { flex: 1, paddingHorizontal: 10, paddingVertical: 8, gap: 3 },
-  previewHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 6,
-  },
-  previewTitle: { fontSize: 13, fontWeight: "700", flex: 1 },
-  typePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  typePillText: { fontSize: 10, fontWeight: "800" },
-  previewContent: { fontSize: 11, lineHeight: 15 },
 });

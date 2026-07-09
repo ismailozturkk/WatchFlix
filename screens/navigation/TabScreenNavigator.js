@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useMemo, useState } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -25,7 +25,6 @@ import { MovieProvider } from "@context/MovieContex";
 import { CalendarProvider } from "@context/CalendarContext";
 import { BlurView } from "expo-blur";
 import { Screen, ScreenContainer } from "react-native-screens";
-import { i18nText } from "@utils/i18nText";
 import PetCompanion from "@components/pet/PetCompanion";
 
 
@@ -34,7 +33,7 @@ const TAB_NAMES = ["tvshows", "movies", "share", "settings", "profile"];
 const BACKGROUND_WARMUP_DELAY = 6000;
 const BACKGROUND_WARMUP_STEP = 1200;
 
-const TabItem = memo(({ label, icon, isActive, onPress, theme }) => {
+const TabItem = memo(({ name, label, icon, isActive, onPress, theme }) => {
   const scale = useSharedValue(isActive ? 1.2 : 1);
   const opacity = useSharedValue(isActive ? 1 : 0);
   const translateX = useSharedValue(isActive ? 0 : -20);
@@ -73,7 +72,7 @@ const TabItem = memo(({ label, icon, isActive, onPress, theme }) => {
           },
         ],
       ]}
-      onPress={onPress}
+      onPress={() => onPress(name)}
       activeOpacity={0.7}
     >
       {isActive ? (
@@ -153,43 +152,50 @@ function TabScreenNavigator({ navigation, route }) {
     };
   }, []);
 
-  const tabs = [
-    {
-      name: "tvshows",
-      label: t.tvShows,
-      icon: (size, color) => <AppIcon family="Ionicons" name="tv" size={size} color={color} />,
-    },
-    {
-      name: "movies",
-      label: t.movies,
-      icon: (size, color) => (
-        <AppIcon family="MaterialCommunityIcons" name="movie" size={size} color={color} />
-      ),
-    },
-    {
-      name: "share",
-      label: t.share || i18nText("autoI18n.paylas", "Paylaş"),
-      icon: (size, color) => (
-        <AppIcon family="Ionicons" name="apps-outline" size={size} color={color} />
-      ),
-    },
-    {
-      name: "settings",
-      label: t.settings,
-      icon: (size, color) => (
-        <AppIcon family="Ionicons" name="settings" size={size} color={color} />
-      ),
-    },
-    {
-      name: "profile",
-      label: t.profile,
-      icon: (size, color) => (
-        <AppIcon family="Ionicons" name="person" size={size} color={color} />
-      ),
-    },
-  ];
+  // useMemo: her render'da yeni icon closure'ları üretilirse memo'lu TabItem'lar
+  // boşuna yeniden render olur (özellikle warmup'ta mountedTabs 4 kez değişirken).
+  const tabs = useMemo(
+    () => [
+      {
+        name: "tvshows",
+        label: t.tvShows,
+        icon: (size, color) => <AppIcon family="Ionicons" name="tv" size={size} color={color} />,
+      },
+      {
+        name: "movies",
+        label: t.movies,
+        icon: (size, color) => (
+          <AppIcon family="MaterialCommunityIcons" name="movie" size={size} color={color} />
+        ),
+      },
+      {
+        name: "share",
+        label: t.hub || "Hub",
+        icon: (size, color) => (
+          <AppIcon family="Ionicons" name="apps-outline" size={size} color={color} />
+        ),
+      },
+      {
+        name: "settings",
+        label: t.settings,
+        icon: (size, color) => (
+          <AppIcon family="Ionicons" name="settings" size={size} color={color} />
+        ),
+      },
+      {
+        name: "profile",
+        label: t.profile,
+        icon: (size, color) => (
+          <AppIcon family="Ionicons" name="person" size={size} color={color} />
+        ),
+      },
+    ],
+    [t],
+  );
 
-  const handleTabPress = (index, name) => {
+  // useCallback: memo'lu TabItem'lara stabil referans gitsin — böylece tab
+  // değişiminde yalnız aktifliği değişen iki öğe yeniden render olur.
+  const handleTabPress = useCallback((name) => {
     setMountedTabs((current) => {
       if (current.has(name)) return current;
       const next = new Set(current);
@@ -197,7 +203,7 @@ function TabScreenNavigator({ navigation, route }) {
       return next;
     });
     setActiveTab(name);
-  };
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
@@ -259,14 +265,14 @@ function TabScreenNavigator({ navigation, route }) {
               },
             ]}
           >
-            {tabs.map((tab, index) => (
+            {tabs.map((tab) => (
               <TabItem
                 key={tab.name}
                 name={tab.name}
                 label={tab.label}
                 icon={tab.icon}
                 isActive={activeTab === tab.name}
-                onPress={() => handleTabPress(index, tab.name)}
+                onPress={handleTabPress}
                 theme={theme}
               />
             ))}

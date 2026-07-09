@@ -7,6 +7,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getFirestore } from "firebase/firestore";
 import { getDatabase } from "firebase/database";
+import { getFunctions } from "firebase/functions";
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
   authDomain: "movieandtv-2832a.firebaseapp.com",
@@ -29,6 +30,11 @@ const auth = initializeAuth(app, {
 
 const db = getFirestore(app);
 
+// Cloud Functions (callable) — Gemini proxy `callGemini` buradan çağrılır.
+// Bölge: functions varsayılanı (us-central1); sunucu tarafı bölge değişirse
+// getFunctions(app, "region") ile eşitlenmeli.
+const fns = getFunctions(app);
+
 // Realtime Database handle. databaseURL tanımlı değilse (env eksik) getDatabase
 // throw eder ve TÜM uygulamayı çökertir — bu yüzden guard'la. rtdb null ise
 // presence/chat servisleri sessizce no-op olur (uygulama normal çalışır).
@@ -43,4 +49,4 @@ try {
   );
 }
 
-export { auth, db, rtdb };
+export { auth, db, rtdb, fns };

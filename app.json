@@ -30,15 +30,25 @@
       },
       "package": "com.smlztrk.Watchify",
       "googleServicesFile": "./google-services.json",
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES"
+      ],
+      "blockedPermissions": [
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "extra": {
       "eas": {
-        //"projectId": "b0ff17ab-04b9-4e70-8e3d-588770bfdc5c"
-           "projectId": "3bbd3b81-8382-4788-bfc9-dbde13043eaf"
+        "projectId": "3bbd3b81-8382-4788-bfc9-dbde13043eaf"
       }
     },
     "plugins": [
@@ -64,7 +74,8 @@
         {
           "photosPermission": "Uygulamanın oluşturduğun story görselini galerine kaydetmesine izin ver.",
           "savePhotosPermission": "Uygulamanın oluşturduğun story görselini galerine kaydetmesine izin ver.",
-          "isAccessMediaLocationEnabled": false
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": ["photo"]
         }
       ]
     ],

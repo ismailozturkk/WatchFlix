@@ -219,6 +219,13 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
   const styles = getStyles(theme);
 
   const postId = post?.id;
+  const postPoster = post?.mediaList?.find((item) => item?.poster)?.poster || null;
+  const postAuthorAvatar =
+    typeof post?.authorAvatarIndex === "number"
+      ? getAvatarSource(post.authorAvatarIndex)
+      : typeof post?.authorAvatar === "string"
+        ? { uri: post.authorAvatar }
+        : post?.authorAvatar || getAvatarSource(0);
 
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -478,13 +485,21 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.postPill}>
-            <MaterialCommunityIcons
-              name={post?.type === "list" ? "format-list-bulleted" : "movie-open-outline"}
-              size={14}
-              color={theme.text.secondary}
-            />
-            <Text allowFontScaling={false} style={styles.postPillTitle} numberOfLines={1}>
-              {post?.title || i18nText("autoI18n.paylasim", "Paylaşım")}
+            {postPoster ? (
+              <Image source={{ uri: postPoster }} style={styles.postPillPoster} contentFit="cover" />
+            ) : (
+              <View style={styles.postPillPosterPlaceholder}>
+                <MaterialCommunityIcons
+                  name={post?.type === "list" ? "format-list-bulleted" : "movie-open-outline"}
+                  size={15}
+                  color={theme.text.secondary}
+                />
+              </View>
+            )}
+
+            <Image source={postAuthorAvatar} style={styles.postAuthorAvatar} />
+            <Text allowFontScaling={false} style={styles.postAuthorName} numberOfLines={1}>
+              {post?.authorName || i18nText("autoI18n.kullanici", "Kullanıcı")}
             </Text>
           </View>
 
@@ -640,20 +655,42 @@ const getStyles = (theme) =>
       flexDirection: "row",
       alignItems: "center",
       backgroundColor: alpha(theme.text.primary, 0.06),
-      borderRadius: 20,
+      borderRadius: 14,
       borderWidth: 1,
       borderColor: theme.border,
-      paddingVertical: 6,
-      paddingHorizontal: 10,
-      gap: 6,
+      paddingVertical: 5,
+      paddingLeft: 5,
+      paddingRight: 9,
+      gap: 7,
       flex: 1,
-      maxWidth: SCREEN_W * 0.5,
+      maxWidth: SCREEN_W * 0.54,
     },
-    postPillTitle: {
+    postPillPoster: {
+      width: 28,
+      height: 40,
+      borderRadius: 8,
+      backgroundColor: theme.primary,
+    },
+    postPillPosterPlaceholder: {
+      width: 28,
+      height: 40,
+      borderRadius: 8,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.primary,
+    },
+    postAuthorAvatar: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: alpha(theme.text.primary, 0.16),
+    },
+    postAuthorName: {
       flex: 1,
       fontSize: 12,
-      fontWeight: "600",
-      color: theme.text.secondary,
+      fontWeight: "700",
+      color: theme.text.primary,
       letterSpacing: 0.1,
     },
 

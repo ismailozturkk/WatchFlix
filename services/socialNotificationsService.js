@@ -37,6 +37,8 @@ export async function createSocialNotification({
   postId,
   commentId,
   text,
+  groupId,
+  groupName,
 }) {
   if (!toUid || !fromUid || !type) return;
   if (toUid === fromUid) return; // kendine bildirim yok
@@ -51,6 +53,10 @@ export async function createSocialNotification({
     ...(postId ? { postId } : {}),
     ...(commentId ? { commentId } : {}),
     ...(text ? { text: String(text).slice(0, 140) } : {}),
+    // Grup mesajı bildirimi: başlık=grup adı, gövde="gönderen: mesaj" (WhatsApp tarzı)
+    // ve dokunulunca doğru gruba yönlendirme için groupId/groupName saklanır.
+    ...(groupId ? { groupId } : {}),
+    ...(groupName ? { groupName: String(groupName).slice(0, 80) } : {}),
     read: false,
     createdAt: serverTimestamp(),
   });

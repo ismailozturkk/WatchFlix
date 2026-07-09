@@ -1,8 +1,31 @@
-# WatchFlix Cloud Functions — Push Bildirim Sunucusu
+# Watchify Cloud Functions — Push Bildirim + Gemini Proxy Sunucusu
 
-Uygulama kapalı/arka plandayken bile sosyal bildirimleri (beğeni, yorum, mention,
-arkadaşlık, mesaj) push olarak gönderir. İstemcide kayıtlı Expo push token'larını
-kullanır → **istemci tarafında kod değişikliği gerekmez.**
+1. **Push bildirim:** uygulama kapalı/arka plandayken bile sosyal bildirimleri
+   (beğeni, yorum, mention, arkadaşlık, mesaj) push olarak gönderir.
+2. **`callGemini` (callable):** AI sohbet proxy'si — Gemini API anahtarı YALNIZ
+   burada durur (Secret Manager), kullanıcı başına günlük kota uygular
+   (free 5 / premium 100, `AiUsage/{uid}` sayacı). Yayın blokeri çözümü:
+   `docs/YAYIN_VE_GELIR_YOL_HARITASI.md` §1.2 madde 1.
+
+## Gemini proxy kurulumu (Faz 0 — ZORUNLU)
+
+```bash
+# 1) Google AI Studio'dan YENİ bir Gemini anahtarı üret.
+# 2) ESKİ anahtarı (EXPO_PUBLIC_GEMINI_API_KEY ile dağıtılmış olanı) İPTAL ET.
+# 3) Yeni anahtarı yalnız sunucu secret'ına koy:
+firebase functions:secrets:set GEMINI_API_KEY
+# 4) Deploy:
+firebase deploy --only functions
+```
+
+Notlar:
+- İstemci artık `.env`'deki `EXPO_PUBLIC_GEMINI_API_KEY`'i KULLANMAZ; satırı
+  `.env`'den silebilirsin (eski anahtarın iptali yine de şart — eski APK'larda gömülü).
+- App Check (Play Integrity) istemcide kurulunca `functions/index.js` içindeki
+  `enforceAppCheck: false` → `true` yapılmalı (Faz 0 Hafta 2).
+- Kota sabitleri: `AI_DAILY_LIMIT_FREE` / `AI_DAILY_LIMIT_PREMIUM`
+  (`functions/index.js`). Premium tespiti `Users/{uid}.entitlements.premium`
+  alanından — Faz 1'de RevenueCat webhook'u bu alanı dolduracak.
 
 ## Mimari
 

@@ -6,6 +6,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import { InteractionManager } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as petCache from "../services/petCache";
 import { toast } from "../components/AppToast";
@@ -84,12 +85,52 @@ export const PetProvider = ({ children }) => {
   const [cachedPets, setCachedPets] = useState({});     // { id: true } — indirilmiş
   const [downloadingPets, setDownloadingPets] = useState({}); // { id: true } — indiriliyor
   const [petSizes, setPetSizes] = useState({});         // { id: bytes }
+  // Önbellek taraması bitti mi? Bitmeden otomatik indirme tetiklenmemeli
+  // (aksi halde zaten diskte olan pet gereksiz yere yeniden indirilir).
+  const [cacheReady, setCacheReady] = useState(false);
 
-  // Açılışta önbelleği tara — hangi petler zaten indirilmiş?
+  // Açılışta ayarları oku + önbelleği tara — ERTELENMİŞ: scanCached her pet için
+  // senkron dosya sistemi çağrısı yapar (26 pet × exists/size); splash sonrası
+  // donma penceresinde çalışmasın diye etkileşimler bitince + kısa gecikmeyle koşar.
+  // Ayarlar ve tarama aynı görevde uygulanır ki pet, kayıtlı konum/boyutuyla
+  // birlikte tek seferde görünsün.
   useEffect(() => {
-    const { cached, sizes } = petCache.scanCached(PET_IDS);
-    setCachedPets(cached);
-    setPetSizes(sizes);
+    let cancelled = false;
+    let timer = null;
+    const task = InteractionManager.runAfterInteractions(() => {
+      timer = setTimeout(async () => {
+        try {
+          const [[, en], [, owned], [, sel], [, pos], [, sz]] =
+            await AsyncStorage.multiGet([
+              STORAGE_KEYS.enabled,
+              STORAGE_KEYS.owned,
+              STORAGE_KEYS.selected,
+              STORAGE_KEYS.position,
+              STORAGE_KEYS.size,
+            ]);
+          if (cancelled) return;
+          if (en !== null) setPetEnabled(JSON.parse(en));
+          if (owned !== null)
+            setOwnedPets({ ...DEFAULT_OWNED, ...JSON.parse(owned) });
+          if (sel !== null) setSelectedPetId(sel);
+          if (pos !== null) setPosition(JSON.parse(pos));
+          if (sz !== null) setPetSize(JSON.parse(sz));
+        } catch {
+          // sessizce varsayılanlarla devam
+        }
+        if (cancelled) return;
+        const { cached, sizes } = petCache.scanCached(PET_IDS);
+        if (cancelled) return;
+        setCachedPets(cached);
+        setPetSizes(sizes);
+        setCacheReady(true);
+      }, 1600);
+    });
+    return () => {
+      cancelled = true;
+      task.cancel?.();
+      if (timer) clearTimeout(timer);
+    };
   }, []);
 
   // Bir peti R2'den indir (önbelleğe al). Zaten varsa/iniyorsa hiçbir şey yapmaz.
@@ -104,7 +145,12 @@ export const PetProvider = ({ children }) => {
       } catch (e) {
         // Hatayı YÜZEYE ÇIKAR — sessizce geçilince APK'da "hiçbir şey olmuyor"
         // gibi görünüyordu; gerçek sebep (ağ/izin/depolama) artık görülebilir.
-        console.warn("pet download failed:", id, e?.message || e);
+        console.warn(
+          "pet download failed:",
+          id,
+          e?.message || e,
+          e?.cause?.code ? `(cause: ${e.cause.code})` : "",
+        );
         // Jenerik mesaj yerine GERÇEK sebebi göster (HTTP hatası / boş yanıt /
         // geçersiz içerik). Böylece sorun teşhis edilebilir.
         toast.error(
@@ -159,30 +205,6 @@ export const PetProvider = ({ children }) => {
     () => Object.values(petSizes).reduce((a, b) => a + (b || 0), 0),
     [petSizes],
   );
-
-  // Tek multiGet ile tüm pet ayarlarını oku (AppSettingsContext paterni).
-  useEffect(() => {
-    (async () => {
-      try {
-        const [[, en], [, owned], [, sel], [, pos], [, sz]] =
-          await AsyncStorage.multiGet([
-            STORAGE_KEYS.enabled,
-            STORAGE_KEYS.owned,
-            STORAGE_KEYS.selected,
-            STORAGE_KEYS.position,
-            STORAGE_KEYS.size,
-          ]);
-        if (en !== null) setPetEnabled(JSON.parse(en));
-        if (owned !== null)
-          setOwnedPets({ ...DEFAULT_OWNED, ...JSON.parse(owned) });
-        if (sel !== null) setSelectedPetId(sel);
-        if (pos !== null) setPosition(JSON.parse(pos));
-        if (sz !== null) setPetSize(JSON.parse(sz));
-      } catch {
-        // sessizce varsayılanlarla devam
-      }
-    })();
-  }, []);
 
   const changePetEnabled = useCallback((value) => {
     setPetEnabled(value);
@@ -239,6 +261,7 @@ export const PetProvider = ({ children }) => {
       petSize,
       changePetSize,
       // İndirme / önbellek
+      cacheReady,
       cachedPets,
       downloadingPets,
       petSizes,
@@ -260,6 +283,7 @@ export const PetProvider = ({ children }) => {
       setPetPosition,
       petSize,
       changePetSize,
+      cacheReady,
       cachedPets,
       downloadingPets,
       petSizes,

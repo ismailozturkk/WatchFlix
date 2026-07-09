@@ -1,19 +1,23 @@
+// Kayıt ekranı — IslamicGuide auth tasarım diline göre sadeleştirildi:
+// dikeyde ortalanmış düzen, rozetli başlık bloğu, solid yüzeyli tek kart,
+// dolgulu input kabukları ve solid accent ana buton. Blur/gradyan yok.
 import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Dimensions,
-  StatusBar,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import LottieView from "lottie-react-native";
+import * as Haptics from "expo-haptics";
 import { useSnow } from "../../context/SnowContext";
 import {
   createUserWithEmailAndPassword,
@@ -33,8 +37,7 @@ import {
   isUsernameAvailable,
 } from "../../services/userService";
 import IconBacground from "../../components/IconBacground";
-import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
+import EmailSuffixRow from "../../components/auth/EmailSuffixRow";
 import { alpha } from "../../theme/colors";
 import {
   useAuthRequest,
@@ -44,7 +47,6 @@ import {
 import * as WebBrowser from "expo-web-browser";
 import { i18nText } from "../../utils/i18nText";
 
-
 WebBrowser.maybeCompleteAuthSession();
 
 const GOOGLE_DISCOVERY = {
@@ -52,10 +54,11 @@ const GOOGLE_DISCOVERY = {
   tokenEndpoint: "https://oauth2.googleapis.com/token",
 };
 
-const { width, height } = Dimensions.get("window");
-
 const SUCCESS = "rgb(37, 211, 102)";
 const ERROR = "rgb(189, 8, 28)";
+
+// Hafif dokunsal geri bildirim — desteklemeyen cihazlarda sessizce geç
+const buzz = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
 export default function RegisterScreen({ navigation }) {
   const { theme, selectedTheme } = useTheme();
@@ -64,9 +67,6 @@ export default function RegisterScreen({ navigation }) {
   const accent = theme.accent;
   const hairline = theme.border;
   const isLightTheme = selectedTheme === "light" || selectedTheme === "green";
-  const surface = isLightTheme ? "rgba(255,255,255,0.62)" : "rgba(255,255,255,0.055)";
-  const elevatedSurface = isLightTheme ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.075)";
-  const fieldSurface = isLightTheme ? "rgba(255,255,255,0.66)" : "rgba(0,0,0,0.18)";
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [usernameAvailable, setUsernameAvailable] = useState(null);
@@ -82,6 +82,25 @@ export default function RegisterScreen({ navigation }) {
 
   const [passwordCorrect, setPasswordCorrect] = useState(null);
   const [passwordCorrectAgain, setPasswordCorrectAgain] = useState(null);
+
+  // Klavye akışı: isim → soyisim → kullanıcı adı → e-posta → şifre → tekrar
+  const lastnameRef = useRef(null);
+  const usernameRef = useRef(null);
+  const emailRef = useRef(null);
+  const passwordRef = useRef(null);
+  const passwordAgainRef = useRef(null);
+
+  // Basit e-posta biçim kontrolü (boşken nötr)
+  const emailValid = email.length === 0 ? null : /^\S+@\S+\.\S+$/.test(email);
+  const usernameChecking = username.length >= 3 && usernameAvailable === null;
+  const canSubmit =
+    name.trim().length > 0 &&
+    lastname.trim().length > 0 &&
+    username.length >= 3 &&
+    usernameAvailable !== false &&
+    emailValid === true &&
+    passwordCorrect === true &&
+    passwordCorrectAgain === true;
 
   let usernameTimeout;
 
@@ -130,6 +149,7 @@ export default function RegisterScreen({ navigation }) {
   };
 
   const createAccount = async () => {
+    if (isloading) return; // çift dokunma koruması
     if (!username || username.length < 3) {
       Toast.show({
         type: "error",
@@ -260,6 +280,7 @@ export default function RegisterScreen({ navigation }) {
   };
 
   const signInWithGoogle = () => {
+    buzz();
     promptAsync();
   };
 
@@ -285,6 +306,12 @@ export default function RegisterScreen({ navigation }) {
     return hairline;
   };
 
+  const fieldSurface = theme.between;
+
+  // Input kabuğu arka planı: odaktayken hafif accent tonu
+  const shellBg = (field) =>
+    focusedField === field ? alpha(accent, 0.08) : fieldSurface;
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
       <StatusBar
@@ -293,596 +320,492 @@ export default function RegisterScreen({ navigation }) {
         backgroundColor="transparent"
       />
       <IconBacground opacity={isLightTheme ? 0.05 : 0.08} />
-      <View style={styles.backdropWash} pointerEvents="none">
-        <LinearGradient
-          colors={[
-            alpha(accent, isLightTheme ? 0.2 : 0.3),
-            alpha(theme.bold, isLightTheme ? 0.09 : 0.15),
-            "transparent",
-          ]}
-          start={{ x: 1, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={StyleSheet.absoluteFill}
+
+      {showSnow && (
+        <LottieView
+          style={styles.lottie}
+          source={require("@lottie/snow.json")}
+          autoPlay
+          loop
+          pointerEvents="none"
         />
-      </View>
-      <View style={styles.shapeLayer} pointerEvents="none">
-        <View
-          style={[
-            styles.colorShape,
-            styles.shapeOne,
-            { backgroundColor: alpha(accent, isLightTheme ? 0.2 : 0.26) },
-          ]}
-        />
-        <View
-          style={[
-            styles.colorShape,
-            styles.shapeTwo,
-            { backgroundColor: alpha(theme.colors.purple, isLightTheme ? 0.12 : 0.18) },
-          ]}
-        />
-        <View
-          style={[
-            styles.colorShape,
-            styles.shapeThree,
-            { backgroundColor: alpha(theme.colors.orange, isLightTheme ? 0.16 : 0.22) },
-          ]}
-        />
-      </View>
+      )}
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-      <ScrollView
-        style={{ flex: 1 }}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}
-      >
-        {/* Back button */}
-        <TouchableOpacity
-          style={[
-            styles.backButton,
-            {
-              top: insets.top + 8,
-              backgroundColor: theme.secondary,
-              borderColor: hairline,
-            },
+        <ScrollView
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingTop: insets.top + 52, paddingBottom: insets.bottom + 40 },
           ]}
-          onPress={() => navigation.navigate("LoginScreen")}
-          activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={18} color={theme.text.primary} />
-        </TouchableOpacity>
-
-        {showSnow && (
-          <LottieView
-            style={styles.lottie}
-            source={require("@lottie/snow.json")}
-            autoPlay
-            loop
-          />
-        )}
-
-        <View style={styles.heroHeader}>
-          <View
-            style={[
-              styles.brandPill,
-              {
-                backgroundColor: elevatedSurface,
-                borderColor: alpha(accent, 0.28),
-              },
-            ]}
-          >
-            <Ionicons name="sparkles-outline" size={15} color={accent} />
-            <Text style={[styles.brandPillText, { color: theme.text.primary }]}>
-              WATCHFLIX
+          {/* Başlık bloğu */}
+          <View style={styles.heroMark}>
+            <View
+              style={[
+                styles.heroIcon,
+                {
+                  backgroundColor: alpha(accent, 0.12),
+                  borderColor: alpha(accent, 0.3),
+                },
+              ]}
+            >
+              <Ionicons name="person-add-outline" size={28} color={accent} />
+            </View>
+            <Text allowFontScaling={false} style={[styles.brandTitle, { color: theme.text.primary }]}>
+              {i18nText("autoI18n.yeni_hesap_olustur", "Yeni hesap oluştur")}
+            </Text>
+            <Text allowFontScaling={false} style={[styles.brandSub, { color: theme.text.secondary }]}>
+              {i18nText("autoI18n.profilini_olusturup_listelerine_basla", "Profilini oluşturup listelerine başla.")}
             </Text>
           </View>
-          <Text style={[styles.heroTitle, { color: theme.text.primary }]}>
-            {i18nText("autoI18n.yeni_hesap_olustur", "Yeni hesap oluştur")}
-          </Text>
-          <Text style={[styles.heroSubtitle, { color: theme.text.secondary }]}>
-            {i18nText("autoI18n.profilini_olusturup_listelerine_basla", "Profilini oluşturup listelerine başla.")}
-          </Text>
-        </View>
 
-        <View
-          style={[
-            styles.logoContainer,
-            {
-              backgroundColor: surface,
-              borderColor: alpha(accent, 0.2),
-            },
-          ]}
-        >
-          <View style={styles.heroAccent} pointerEvents="none">
-            <LinearGradient
-              colors={[alpha(accent, 0.18), "transparent"]}
-              start={{ x: 1, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-          </View>
-          <LottieView
-            source={require("@lottie/register.json")}
-            style={styles.heroAnimation}
-            autoPlay
-            loop
-          />
-        </View>
-
-        {/* Card */}
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: isLightTheme
-                ? "rgba(255,255,255,0.18)"
-                : "rgba(18,18,18,0.28)",
-              borderColor: alpha(accent, isLightTheme ? 0.18 : 0.28),
-              shadowColor: accent,
-            },
-          ]}
-        >
-          <BlurView
-            tint="dark"
-            intensity={50}
-            experimentalBlurMethod="dimezisBlurView"
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={styles.cardEyebrowRow}>
-            <View style={[styles.statusChip, { backgroundColor: alpha(accent, 0.12) }]}>
-              <Ionicons name="person-add-outline" size={14} color={accent} />
-              <Text style={[styles.statusChipText, { color: accent }]}>
-                {i18nText("autoI18n.profil_kurulumu", "Profil kurulumu")}
-              </Text>
-            </View>
-            <View style={[styles.stepBadge, { borderColor: alpha(accent, 0.28) }]}>
-              <Text style={[styles.stepBadgeText, { color: theme.text.secondary }]}>1/1</Text>
-            </View>
-          </View>
-          <Text style={[styles.title, { color: theme.text.primary }]}>
-            {t.RegisterScreen.registerButton}
-          </Text>
-          <Text style={[styles.subtitle, { color: theme.text.muted }]}>
-            {i18nText("autoI18n.hesap_bilgilerini_tamamla", "Hesap bilgilerini tamamla.")}
-          </Text>
-
-          {/* Section: Kimlik */}
-          <Text style={[styles.sectionLabel, { color: theme.text.muted }]}>{i18nText("autoI18n.kisisel_bilgiler", "KİŞİSEL BİLGİLER")}</Text>
-
-          {/* İsim + Soyisim - yan yana */}
-          <View style={styles.rowInputs}>
-            <View
-              style={[
-                styles.inputWrapper,
-                styles.halfInput,
-                {
-                  backgroundColor: fieldSurface,
-                  borderColor: getBorderColor("name", null),
-                },
-              ]}
-            >
-              <Ionicons
-                name="person-outline"
-                size={18}
-                color={getIconColor("name", null)}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={[styles.textInput, { color: theme.text.primary }]}
-                placeholder={t.RegisterScreen.name}
-                placeholderTextColor={theme.text.muted}
-                onChangeText={setName}
-                onFocus={() => setFocusedField("name")}
-                onBlur={() => setFocusedField(null)}
-              />
-            </View>
-            <View
-              style={[
-                styles.inputWrapper,
-                styles.halfInput,
-                {
-                  backgroundColor: fieldSurface,
-                  borderColor: getBorderColor("lastname", null),
-                },
-              ]}
-            >
-              <Ionicons
-                name="person"
-                size={18}
-                color={getIconColor("lastname", null)}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={[styles.textInput, { color: theme.text.primary }]}
-                placeholder={t.RegisterScreen.lastName}
-                placeholderTextColor={theme.text.muted}
-                onChangeText={setLastname}
-                onFocus={() => setFocusedField("lastname")}
-                onBlur={() => setFocusedField(null)}
-              />
-            </View>
-          </View>
-
-          {/* Section: Hesap */}
-          <Text
-            style={[
-              styles.sectionLabel,
-              { color: theme.text.muted, marginTop: 8 },
-            ]}
-          >{i18nText("autoI18n.hesap_bilgileri", "HESAP BİLGİLERİ")}</Text>
-
-          {/* Kullanıcı adı */}
+          {/* Kart */}
           <View
             style={[
-              styles.inputWrapper,
-              {
-                backgroundColor: fieldSurface,
-                borderColor: getUsernameBorderColor(),
-              },
+              styles.card,
+              { backgroundColor: theme.secondary, borderColor: hairline },
             ]}
           >
-            <Ionicons
-              name="at-outline"
-              size={18}
-              color={
-                usernameAvailable === true
-                  ? SUCCESS
-                  : usernameAvailable === false
-                    ? ERROR
-                    : focusedField === "username"
-                      ? accent
-                      : theme.text.muted
-              }
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={[
-                styles.textInput,
-                {
-                  color:
-                    usernameAvailable === false ? ERROR : theme.text.primary,
-                  textDecorationLine:
-                    usernameAvailable === false ? "line-through" : "none",
-                  flex: 1,
-                },
-              ]}
-              placeholderTextColor={theme.text.muted}
-              placeholder={i18nText("autoI18n.kullanici_adi", "Kullanıcı Adı")}
-              onChangeText={handleUsernameChange}
-              autoCapitalize="none"
-              onFocus={() => setFocusedField("username")}
-              onBlur={() => setFocusedField(null)}
-            />
-            {usernameAvailable === true && (
-              <View style={styles.statusBadge}>
-                <Ionicons name="checkmark-circle" size={18} color={SUCCESS} />
-              </View>
-            )}
-            {usernameAvailable === false && (
-              <View style={styles.statusBadge}>
-                <Ionicons name="close-circle" size={18} color={ERROR} />
-              </View>
-            )}
-          </View>
-          {usernameAvailable === null &&
-            username.length > 0 &&
-            username.length < 3 && (
-              <Text style={[styles.hintText, { color: theme.text.muted }]}>{i18nText("autoI18n.en_az_3_karakter_yalnizca_a_z_0_9", "En az 3 karakter · yalnızca a–z, 0–9, _")}</Text>
-            )}
+            <Text allowFontScaling={false} style={[styles.cardTitle, { color: theme.text.primary }]}>
+              {t.RegisterScreen.registerButton}
+            </Text>
+            <Text allowFontScaling={false} style={[styles.cardSub, { color: theme.text.muted }]}>
+              {i18nText("autoI18n.hesap_bilgilerini_tamamla", "Hesap bilgilerini tamamla.")}
+            </Text>
 
-          {/* Email */}
-          <View
-            style={[
-              styles.inputWrapper,
-              {
-                backgroundColor: fieldSurface,
-                borderColor: getBorderColor("email", null),
-              },
-            ]}
-          >
-            <Ionicons
-              name="mail-outline"
-              size={18}
-              color={getIconColor("email", null)}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={[styles.textInput, { color: theme.text.primary }]}
-              placeholderTextColor={theme.text.muted}
-              placeholder={t.RegisterScreen.email}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              onChangeText={setEmail}
-              onFocus={() => setFocusedField("email")}
-              onBlur={() => setFocusedField(null)}
-            />
-          </View>
-
-          {/* Şifre */}
-          <View
-            style={[
-              styles.inputWrapper,
-              {
-                backgroundColor: fieldSurface,
-                borderColor: getBorderColor("password", passwordCorrect),
-              },
-            ]}
-          >
-            <Ionicons
-              name="lock-closed-outline"
-              size={18}
-              color={getIconColor("password", passwordCorrect)}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={[styles.textInput, { color: theme.text.primary }]}
-              placeholderTextColor={theme.text.muted}
-              placeholder={t.RegisterScreen.password}
-              secureTextEntry={!showPassword}
-              onChangeText={inputPassword}
-              onFocus={() => setFocusedField("password")}
-              onBlur={() => setFocusedField(null)}
-            />
-            <TouchableOpacity
-              onPress={() => setShowPassword(!showPassword)}
-              style={styles.eyeButton}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons
-                name={showPassword ? "eye-outline" : "eye-off-outline"}
-                size={18}
-                color={theme.text.muted}
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* Şifre Tekrar */}
-          <View
-            style={[
-              styles.inputWrapper,
-              {
-                backgroundColor: fieldSurface,
-                borderColor: getBorderColor(
-                  "passwordAgain",
-                  passwordCorrectAgain,
-                ),
-              },
-            ]}
-          >
-            <Ionicons
-              name="lock-closed"
-              size={18}
-              color={getIconColor("passwordAgain", passwordCorrectAgain)}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={[styles.textInput, { color: theme.text.primary }]}
-              placeholderTextColor={theme.text.muted}
-              placeholder={t.RegisterScreen.passwordAgain}
-              secureTextEntry={!showPasswordAgain}
-              onChangeText={inputPasswordAgain}
-              onFocus={() => setFocusedField("passwordAgain")}
-              onBlur={() => setFocusedField(null)}
-            />
-            <TouchableOpacity
-              onPress={() => setShowPasswordAgain(!showPasswordAgain)}
-              style={styles.eyeButton}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons
-                name={showPasswordAgain ? "eye-outline" : "eye-off-outline"}
-                size={18}
-                color={theme.text.muted}
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* Password strength indicator */}
-          {password.length > 0 && (
-            <View style={styles.strengthRow}>
-              {[...Array(4)].map((_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.strengthBar,
-                    {
-                      backgroundColor:
-                        password.length >= (i + 1) * 3
-                          ? i < 2
-                            ? ERROR
-                            : i < 3
-                              ? "#f39c12"
-                              : SUCCESS
-                          : hairline,
-                    },
-                  ]}
+            {/* İsim + Soyisim — yan yana */}
+            <View style={styles.rowInputs}>
+              <View
+                style={[
+                  styles.inputShell,
+                  styles.halfInput,
+                  {
+                    backgroundColor: shellBg("name"),
+                    borderColor: getBorderColor("name", null),
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="person-outline"
+                  size={18}
+                  color={getIconColor("name", null)}
                 />
-              ))}
-              <Text style={[styles.strengthLabel, { color: theme.text.muted }]}>
-                {password.length < 6
-                  ? i18nText("autoI18n.zayif", "Zayıf")
-                  : password.length < 9
-                    ? i18nText("autoI18n.orta", "Orta")
-                    : password.length < 12
-                      ? i18nText("autoI18n.iyi", "İyi")
-                      : i18nText("autoI18n.guclu", "Güçlü")}
-              </Text>
+                <TextInput
+                  allowFontScaling={false}
+                  style={[styles.textInput, { color: theme.text.primary }]}
+                  placeholder={t.RegisterScreen.name}
+                  placeholderTextColor={theme.text.muted}
+                  autoComplete="given-name"
+                  textContentType="givenName"
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => lastnameRef.current?.focus()}
+                  onChangeText={setName}
+                  onFocus={() => setFocusedField("name")}
+                  onBlur={() => setFocusedField(null)}
+                />
+              </View>
+              <View
+                style={[
+                  styles.inputShell,
+                  styles.halfInput,
+                  {
+                    backgroundColor: shellBg("lastname"),
+                    borderColor: getBorderColor("lastname", null),
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="person"
+                  size={18}
+                  color={getIconColor("lastname", null)}
+                />
+                <TextInput
+                  ref={lastnameRef}
+                  allowFontScaling={false}
+                  style={[styles.textInput, { color: theme.text.primary }]}
+                  placeholder={t.RegisterScreen.lastName}
+                  placeholderTextColor={theme.text.muted}
+                  autoComplete="family-name"
+                  textContentType="familyName"
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => usernameRef.current?.focus()}
+                  onChangeText={setLastname}
+                  onFocus={() => setFocusedField("lastname")}
+                  onBlur={() => setFocusedField(null)}
+                />
+              </View>
             </View>
-          )}
 
-          {/* Register button */}
-          <TouchableOpacity
-            style={[
-              styles.registerButton,
-              { shadowColor: accent },
-              usernameAvailable === false && { opacity: 0.5 },
-            ]}
-            onPress={createAccount}
-            disabled={usernameAvailable === false}
-            activeOpacity={0.85}
-          >
-            <LinearGradient
-              colors={[accent, theme.bold]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.registerGradient}
+            {/* Kullanıcı adı */}
+            <View
+              style={[
+                styles.inputShell,
+                {
+                  backgroundColor: shellBg("username"),
+                  borderColor: getUsernameBorderColor(),
+                },
+              ]}
+            >
+              <Ionicons
+                name="at-outline"
+                size={18}
+                color={
+                  usernameAvailable === true
+                    ? SUCCESS
+                    : usernameAvailable === false
+                      ? ERROR
+                      : focusedField === "username"
+                        ? accent
+                        : theme.text.muted
+                }
+              />
+              <TextInput
+                ref={usernameRef}
+                allowFontScaling={false}
+                style={[
+                  styles.textInput,
+                  {
+                    color:
+                      usernameAvailable === false ? ERROR : theme.text.primary,
+                    textDecorationLine:
+                      usernameAvailable === false ? "line-through" : "none",
+                  },
+                ]}
+                placeholderTextColor={theme.text.muted}
+                placeholder={i18nText("autoI18n.kullanici_adi", "Kullanıcı Adı")}
+                onChangeText={handleUsernameChange}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="username-new"
+                textContentType="username"
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => emailRef.current?.focus()}
+                onFocus={() => setFocusedField("username")}
+                onBlur={() => setFocusedField(null)}
+              />
+              {usernameChecking && (
+                <ActivityIndicator size="small" color={accent} />
+              )}
+              {usernameAvailable === true && (
+                <Ionicons name="checkmark-circle" size={18} color={SUCCESS} />
+              )}
+              {usernameAvailable === false && (
+                <Ionicons name="close-circle" size={18} color={ERROR} />
+              )}
+            </View>
+            {usernameAvailable === null &&
+              username.length > 0 &&
+              username.length < 3 && (
+                <Text style={[styles.hintText, { color: theme.text.muted }]}>{i18nText("autoI18n.en_az_3_karakter_yalnizca_a_z_0_9", "En az 3 karakter · yalnızca a–z, 0–9, _")}</Text>
+              )}
+
+            {/* E-posta */}
+            <View
+              style={[
+                styles.inputShell,
+                {
+                  backgroundColor: shellBg("email"),
+                  borderColor: getBorderColor("email", emailValid),
+                },
+              ]}
+            >
+              <Ionicons
+                name="mail-outline"
+                size={18}
+                color={getIconColor("email", emailValid)}
+              />
+              <TextInput
+                ref={emailRef}
+                allowFontScaling={false}
+                style={[styles.textInput, { color: theme.text.primary }]}
+                placeholderTextColor={theme.text.muted}
+                placeholder={t.RegisterScreen.email}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                onChangeText={setEmail}
+                onFocus={() => setFocusedField("email")}
+                onBlur={() => setFocusedField(null)}
+              />
+            </View>
+
+            {/* Hızlı e-posta soneki önerileri */}
+            <EmailSuffixRow
+              email={email}
+              onApply={setEmail}
+              theme={theme}
+              accent={accent}
+              fieldSurface={fieldSurface}
+            />
+
+            {/* Şifre */}
+            <View
+              style={[
+                styles.inputShell,
+                {
+                  backgroundColor: shellBg("password"),
+                  borderColor: getBorderColor("password", passwordCorrect),
+                },
+              ]}
+            >
+              <Ionicons
+                name="lock-closed-outline"
+                size={18}
+                color={getIconColor("password", passwordCorrect)}
+              />
+              <TextInput
+                ref={passwordRef}
+                allowFontScaling={false}
+                style={[styles.textInput, { color: theme.text.primary }]}
+                placeholderTextColor={theme.text.muted}
+                placeholder={t.RegisterScreen.password}
+                secureTextEntry={!showPassword}
+                autoComplete="new-password"
+                textContentType="newPassword"
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => passwordAgainRef.current?.focus()}
+                onChangeText={inputPassword}
+                onFocus={() => setFocusedField("password")}
+                onBlur={() => setFocusedField(null)}
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                style={styles.eyeButton}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons
+                  name={showPassword ? "eye-outline" : "eye-off-outline"}
+                  size={18}
+                  color={theme.text.muted}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Şifre Tekrar */}
+            <View
+              style={[
+                styles.inputShell,
+                {
+                  backgroundColor: shellBg("passwordAgain"),
+                  borderColor: getBorderColor(
+                    "passwordAgain",
+                    passwordCorrectAgain,
+                  ),
+                },
+              ]}
+            >
+              <Ionicons
+                name="shield-checkmark-outline"
+                size={18}
+                color={getIconColor("passwordAgain", passwordCorrectAgain)}
+              />
+              <TextInput
+                ref={passwordAgainRef}
+                allowFontScaling={false}
+                style={[styles.textInput, { color: theme.text.primary }]}
+                placeholderTextColor={theme.text.muted}
+                placeholder={t.RegisterScreen.passwordAgain}
+                secureTextEntry={!showPasswordAgain}
+                autoComplete="new-password"
+                textContentType="newPassword"
+                returnKeyType="done"
+                onSubmitEditing={() => {
+                  if (canSubmit) createAccount();
+                }}
+                onChangeText={inputPasswordAgain}
+                onFocus={() => setFocusedField("passwordAgain")}
+                onBlur={() => setFocusedField(null)}
+              />
+              <TouchableOpacity
+                onPress={() => setShowPasswordAgain(!showPasswordAgain)}
+                style={styles.eyeButton}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons
+                  name={showPasswordAgain ? "eye-outline" : "eye-off-outline"}
+                  size={18}
+                  color={theme.text.muted}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Şifre eşleşme uyarısı — yalnız renkle değil metinle de bildir */}
+            {passwordCorrectAgain === false && (
+              <Text style={[styles.hintText, { color: ERROR }]}>
+                {i18nText("autoI18n.sifreler_eslesmiyor", "Şifreler eşleşmiyor")}
+              </Text>
+            )}
+
+            {/* Şifre gücü göstergesi */}
+            {password.length > 0 && (
+              <View style={styles.strengthRow}>
+                {[...Array(4)].map((_, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.strengthBar,
+                      {
+                        backgroundColor:
+                          password.length >= (i + 1) * 3
+                            ? i < 2
+                              ? ERROR
+                              : i < 3
+                                ? "#f39c12"
+                                : SUCCESS
+                            : hairline,
+                      },
+                    ]}
+                  />
+                ))}
+                <Text style={[styles.strengthLabel, { color: theme.text.muted }]}>
+                  {password.length < 6
+                    ? i18nText("autoI18n.zayif", "Zayıf")
+                    : password.length < 9
+                      ? i18nText("autoI18n.orta", "Orta")
+                      : password.length < 12
+                        ? i18nText("autoI18n.iyi", "İyi")
+                        : i18nText("autoI18n.guclu", "Güçlü")}
+                </Text>
+              </View>
+            )}
+
+            {/* Kayıt ol butonu — solid accent */}
+            <TouchableOpacity
+              activeOpacity={0.86}
+              style={[
+                styles.primaryButton,
+                { backgroundColor: accent, shadowColor: accent },
+                !canSubmit && { opacity: 0.55 },
+              ]}
+              onPress={() => {
+                buzz();
+                createAccount();
+              }}
+              disabled={isloading || !canSubmit}
             >
               {isloading ? (
                 <LottieView
                   source={require("@lottie/loading15.json")}
-                  style={{ width: 36, height: 36 }}
+                  style={styles.loadingAnim}
                   autoPlay
                   loop
                 />
               ) : (
                 <>
-                  <Text
-                    allowFontScaling={false}
-                    style={styles.registerButtonText}
-                  >
+                  <Text allowFontScaling={false} style={styles.primaryText}>
                     {t.RegisterScreen.registerButton}
                   </Text>
-                  <Ionicons name="checkmark" size={18} color="#fff" />
+                  <Ionicons name="arrow-forward" size={16} color="#fff" />
                 </>
               )}
-            </LinearGradient>
-          </TouchableOpacity>
+            </TouchableOpacity>
 
-          {/* Login link */}
-          {/* OR divider */}
-          <View style={styles.orRow}>
-            <View
-              style={[
-                styles.orLine,
-                { backgroundColor: hairline },
-              ]}
-            />
-            <Text style={[styles.orText, { color: theme.text.muted }]}>
-              {i18nText("autoI18n.veya", "veya")}
-            </Text>
-            <View
-              style={[
-                styles.orLine,
-                { backgroundColor: hairline },
-              ]}
-            />
-          </View>
+            {/* veya */}
+            <View style={styles.orRow}>
+              <View style={[styles.orLine, { backgroundColor: hairline }]} />
+              <Text style={[styles.orText, { color: theme.text.muted }]}>
+                {i18nText("autoI18n.veya", "veya")}
+              </Text>
+              <View style={[styles.orLine, { backgroundColor: hairline }]} />
+            </View>
 
-          {/* Google Sign-In button */}
-          <TouchableOpacity
-            style={[
-              styles.googleButton,
-              {
-                backgroundColor: fieldSurface,
-                borderColor: hairline,
-              },
-            ]}
-            onPress={signInWithGoogle}
-            activeOpacity={0.8}
-            disabled={!request || isGoogleLoading}
-          >
-            {isGoogleLoading ? (
-              <LottieView
-                source={require("@lottie/loading15.json")}
-                style={{ width: 28, height: 28 }}
-                autoPlay
-                loop
-              />
-            ) : (
-              <>
-                <View style={styles.googleIconWrapper}>
-                  <Text style={styles.googleIconText}>G</Text>
-                </View>
-                <Text
-                  allowFontScaling={false}
-                  style={[
-                    styles.googleButtonText,
-                    { color: theme.text.primary },
-                  ]}
-                >{i18nText("autoI18n.google_ile_kayit_ol", "Google ile kayıt ol")}</Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          {/* Login link */}
-          <TouchableOpacity
-            style={[
-              styles.loginLink,
-              {
-                borderColor: hairline,
-                backgroundColor: fieldSurface,
-              },
-            ]}
-            onPress={() => navigation.navigate("LoginScreen")}
-            activeOpacity={0.75}
-          >
-            <Text
-              style={[styles.loginLinkText, { color: theme.text.secondary }]}
-            >{i18nText("autoI18n.zaten_hesabin_var_mi", "Zaten hesabın var mı?")}{" "}
-            </Text>
-            <Text
+            {/* Google ile kayıt */}
+            <TouchableOpacity
               style={[
-                styles.loginLinkText,
-                { color: accent, fontWeight: "700" },
+                styles.googleButton,
+                { backgroundColor: fieldSurface, borderColor: hairline },
               ]}
+              onPress={signInWithGoogle}
+              activeOpacity={0.8}
+              disabled={!request || isGoogleLoading}
             >
-              {t.RegisterScreen.loginButton}
-            </Text>
-          </TouchableOpacity>
-        </View>
+              {isGoogleLoading ? (
+                <LottieView
+                  source={require("@lottie/loading15.json")}
+                  style={{ width: 28, height: 28 }}
+                  autoPlay
+                  loop
+                />
+              ) : (
+                <>
+                  <View style={styles.googleIconWrapper}>
+                    <Text style={styles.googleIconText}>G</Text>
+                  </View>
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.googleButtonText, { color: theme.text.primary }]}
+                  >{i18nText("autoI18n.google_ile_kayit_ol", "Google ile kayıt ol")}</Text>
+                </>
+              )}
+            </TouchableOpacity>
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
+            {/* Giriş yap */}
+            <View style={styles.footerRow}>
+              <Text allowFontScaling={false} style={[styles.footerText, { color: theme.text.muted }]}>
+                {i18nText("autoI18n.zaten_hesabin_var_mi", "Zaten hesabın var mı?")}
+              </Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate("LoginScreen")}
+                hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+              >
+                <Text allowFontScaling={false} style={[styles.footerLink, { color: accent }]}>
+                  {t.RegisterScreen.loginButton}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Geri — sabit sol üst */}
+      <TouchableOpacity
+        style={[
+          styles.backButton,
+          {
+            top: insets.top + 8,
+            backgroundColor: theme.secondary,
+            borderColor: hairline,
+          },
+        ]}
+        onPress={() => navigation.navigate("LoginScreen")}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="arrow-back" size={18} color={theme.text.primary} />
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   scrollContent: {
-    alignItems: "center",
-    paddingHorizontal: 0,
-    paddingBottom: 24,
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 22,
+    gap: 18,
   },
-  backdropWash: {
+  lottie: {
     position: "absolute",
+    height: 1000,
     top: 0,
-    left: 0,
-    right: 0,
-    height: height * 0.46,
+    left: -60,
+    right: -60,
     zIndex: 0,
-  },
-  shapeLayer: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: "hidden",
-  },
-  colorShape: {
-    position: "absolute",
-    borderRadius: 18,
-  },
-  shapeOne: {
-    width: 178,
-    height: 72,
-    top: height * 0.18,
-    right: -48,
-    transform: [{ rotate: "18deg" }],
-  },
-  shapeTwo: {
-    width: 122,
-    height: 90,
-    top: height * 0.34,
-    left: -28,
-    transform: [{ rotate: "-20deg" }],
-  },
-  shapeThree: {
-    width: 218,
-    height: 52,
-    top: height * 0.51,
-    left: width * 0.34,
-    transform: [{ rotate: "9deg" }],
   },
   backButton: {
     position: "absolute",
@@ -895,176 +818,88 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     zIndex: 10,
   },
-  lottie: {
-    position: "absolute",
-    height: 1000,
-    top: 0,
-    left: -60,
-    right: -60,
-    zIndex: 0,
-  },
-  heroHeader: {
-    width: "100%",
-    maxWidth: 440,
+
+  // ── Başlık bloğu ──
+  heroMark: {
     alignItems: "center",
-    paddingHorizontal: 22,
-    paddingTop: 8,
-    marginBottom: 8,
+    gap: 8,
   },
-  brandPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: 999,
+  heroIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 22,
     borderWidth: 1,
-    marginBottom: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  brandPillText: {
-    fontSize: 11,
+  brandTitle: {
+    fontSize: 26,
     fontWeight: "900",
-    letterSpacing: 0,
-  },
-  heroTitle: {
-    fontSize: 24,
-    fontWeight: "900",
+    letterSpacing: -0.5,
     textAlign: "center",
-    letterSpacing: 0,
   },
-  heroSubtitle: {
+  brandSub: {
+    maxWidth: 320,
     fontSize: 13,
-    lineHeight: 18,
+    fontWeight: "600",
+    lineHeight: 19,
     textAlign: "center",
-    marginTop: 5,
-    paddingHorizontal: 10,
   },
-  logoContainer: {
-    width: Math.min(width - 104, 240),
-    height: 72,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  heroAccent: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heroAnimation: {
-    width: 108,
-    height: 108,
-  },
+
+  // ── Kart ──
   card: {
     width: "100%",
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
+    maxWidth: 440,
+    alignSelf: "center",
+    borderRadius: 24,
     borderWidth: 1,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 22,
-    marginBottom: 24,
-    overflow: "hidden",
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    elevation: 10,
+    padding: 18,
+    gap: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 5,
   },
-  cardEyebrowRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  statusChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-  },
-  statusChipText: {
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  stepBadge: {
-    minWidth: 40,
-    height: 28,
-    borderRadius: 999,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepBadgeText: {
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  title: {
+  cardTitle: {
     fontSize: 22,
     fontWeight: "900",
-    letterSpacing: 0,
-    marginBottom: 4,
   },
-  subtitle: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 14,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0,
-    marginBottom: 8,
+  cardSub: {
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: -6,
+    marginBottom: 2,
   },
   rowInputs: {
     flexDirection: "row",
     gap: 10,
-    marginBottom: 10,
   },
   halfInput: {
     flex: 1,
-    marginBottom: 0,
   },
-  inputWrapper: {
+  inputShell: {
+    minHeight: 52,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 47,
-    borderRadius: 15,
-    borderWidth: 1,
-    marginBottom: 9,
-    overflow: "hidden",
-  },
-  inputIcon: {
-    paddingHorizontal: 12,
+    gap: 10,
   },
   textInput: {
     flex: 1,
-    height: "100%",
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "700",
+    paddingVertical: 12,
   },
   eyeButton: {
-    paddingHorizontal: 12,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
+    padding: 4,
   },
   hintText: {
     fontSize: 11,
-    marginTop: -8,
-    marginBottom: 10,
+    fontWeight: "600",
+    marginTop: -6,
     marginLeft: 4,
   },
   strengthRow: {
@@ -1072,7 +907,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
     marginTop: -4,
-    marginBottom: 12,
   },
   strengthBar: {
     flex: 1,
@@ -1084,45 +918,31 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     minWidth: 32,
   },
-  registerButton: {
+  primaryButton: {
+    height: 52,
     borderRadius: 16,
-    overflow: "hidden",
-    marginTop: 8,
-    marginBottom: 12,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    elevation: 8,
-  },
-  registerGradient: {
-    height: 50,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.24,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  registerButtonText: {
-    fontSize: 16,
-    fontWeight: "800",
+  primaryText: {
     color: "#fff",
-    letterSpacing: 0,
-  },
-  loginLink: {
-    height: 46,
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  loginLinkText: {
     fontSize: 15,
+    fontWeight: "900",
+  },
+  loadingAnim: {
+    width: 36,
+    height: 36,
   },
   orRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginBottom: 12,
   },
   orLine: {
     flex: 1,
@@ -1130,18 +950,16 @@ const styles = StyleSheet.create({
   },
   orText: {
     fontSize: 12,
-    fontWeight: "600",
-    letterSpacing: 0,
+    fontWeight: "700",
   },
   googleButton: {
-    height: 48,
+    minHeight: 52,
     borderRadius: 16,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    marginBottom: 12,
   },
   googleIconWrapper: {
     width: 24,
@@ -1158,7 +976,22 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   googleButtonText: {
-    fontSize: 15,
-    fontWeight: "700",
+    fontSize: 14.5,
+    fontWeight: "800",
+  },
+  footerRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 5,
+    paddingTop: 2,
+  },
+  footerText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  footerLink: {
+    fontSize: 13,
+    fontWeight: "900",
   },
 });

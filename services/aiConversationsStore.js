@@ -1,6 +1,6 @@
 // services/aiConversationsStore.js
 //
-// WhatchFlix AI asistanı sohbet geçmişi — AsyncStorage kalıcılığı.
+// Watchify AI asistanı sohbet geçmişi — AsyncStorage kalıcılığı.
 //
 // Veri modeli (tek JSON blob altında saklanır):
 //   Conversation = {

@@ -44,3 +44,6 @@ crash.txt
 
 # FCM / service account (gizli — asla commit etme)
 *-firebase-adminsdk-*.json
+
+# Firebase hosting deploy onbellegi
+.firebase/

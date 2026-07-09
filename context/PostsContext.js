@@ -24,6 +24,7 @@ import * as PostsApi from "../services/postsService";
 import { useAuth } from "./AuthContext";
 import { i18nText } from "../utils/i18nText";
 import { shouldPersistInternetData } from "../utils/dataCacheSettings";
+import useStartupGate from "../hooks/useStartupGate";
 
 
 const PostsContext = createContext();
@@ -31,6 +32,26 @@ export const usePosts = () => useContext(PostsContext);
 
 const FEED_CACHE_KEY = "feed_cache_v1";
 const FILTERS = ["all", "review", "list", "following"];
+const SORTS = ["recent", "likes", "comments"];
+
+const sortLoadedPosts = (posts, sort) => {
+  const next = [...posts];
+  if (sort === "likes") {
+    return next.sort(
+      (a, b) =>
+        (b.likesCount || 0) - (a.likesCount || 0) ||
+        (b._createdAtMs || 0) - (a._createdAtMs || 0),
+    );
+  }
+  if (sort === "comments") {
+    return next.sort(
+      (a, b) =>
+        (b.commentsCount || 0) - (a.commentsCount || 0) ||
+        (b._createdAtMs || 0) - (a._createdAtMs || 0),
+    );
+  }
+  return next.sort((a, b) => (b._createdAtMs || 0) - (a._createdAtMs || 0));
+};
 
 const sameIds = (a, b) =>
   a.length === b.length && a.every((x, i) => x.id === b[i].id);
@@ -38,8 +59,14 @@ const sameIds = (a, b) =>
 export function PostsProvider({ children }) {
   const { user } = useAuth();
 
+  // Feed açılışta hiçbir ekranda görünmüyor (Hub sekmesi lazy mount).
+  // Cache parse + ilk fetch + realtime listener'ı splash sonrası donma
+  // penceresinin dışına ertele; kapı açılana dek loading=true kalır.
+  const startupReady = useStartupGate(2200);
+
   const [posts, setPosts] = useState([]);
   const [filter, setFilter] = useState("all");
+  const [sort, setSort] = useState("recent");
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -56,6 +83,7 @@ export function PostsProvider({ children }) {
 
   // ── 1. Cold start: cache + ilk fetch ─────────────────────────────────────
   useEffect(() => {
+    if (!startupReady) return undefined;
     let cancelled = false;
     (async () => {
       try {
@@ -89,11 +117,11 @@ export function PostsProvider({ children }) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [startupReady]);
 
   // ── 2. Realtime listener (sadece "all" filtresinde) ──────────────────────
   useEffect(() => {
-    if (filter !== "all") {
+    if (!startupReady || filter !== "all" || sort !== "recent") {
       unsubRef.current?.();
       unsubRef.current = null;
       return;
@@ -116,11 +144,11 @@ export function PostsProvider({ children }) {
       unsubRef.current?.();
       unsubRef.current = null;
     };
-  }, [filter]);
+  }, [startupReady, filter, sort]);
 
   // ── 3. Filter değişimi ────────────────────────────────────────────────────
   useEffect(() => {
-    if (filter === "all") return; // realtime hallediyor
+    if (filter === "all" && sort === "recent") return; // realtime hallediyor
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -131,13 +159,13 @@ export function PostsProvider({ children }) {
             if (!cancelled) setPosts([]);
             return;
           }
-          const { posts: p } = await PostsApi.fetchFollowingFeed(user.uid);
+          const { posts: p } = await PostsApi.fetchFollowingFeed(user.uid, sort);
           if (!cancelled) {
             setPosts(p);
             setHasMore(false); // following feed pagination şimdilik yok
           }
         } else {
-          const { posts: p, lastDoc } = await PostsApi.fetchFeed({ filter });
+          const { posts: p, lastDoc } = await PostsApi.fetchFeed({ filter, sort });
           if (!cancelled) {
             setPosts(p);
             lastDocRef.current = lastDoc;
@@ -153,7 +181,7 @@ export function PostsProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [filter, user?.uid]);
+  }, [filter, sort, user?.uid]);
 
   // ── 4. Liked + Bookmark ID set'leri (user değişince yenile) ──────────────
   useEffect(() => {
@@ -162,9 +190,10 @@ export function PostsProvider({ children }) {
       setBookmarkIds(new Set());
       return;
     }
+    if (!startupReady) return;
     PostsApi.fetchMyLikedPostIds(user.uid).then(setLikedIds).catch(() => {});
     PostsApi.fetchMyBookmarkIds(user.uid).then(setBookmarkIds).catch(() => {});
-  }, [user?.uid]);
+  }, [user?.uid, startupReady]);
 
   // ── 5. Pagination ────────────────────────────────────────────────────────
   const loadMore = useCallback(async () => {
@@ -176,6 +205,7 @@ export function PostsProvider({ children }) {
     try {
       const { posts: more, lastDoc } = await PostsApi.fetchFeed({
         filter,
+        sort,
         lastDoc: lastDocRef.current,
       });
       setPosts((prev) => [...prev, ...more]);
@@ -186,7 +216,7 @@ export function PostsProvider({ children }) {
     } finally {
       setLoadingMore(false);
     }
-  }, [filter, hasMore, loadingMore, loading]);
+  }, [filter, sort, hasMore, loadingMore, loading]);
 
   // ── 6. Pull-to-refresh ───────────────────────────────────────────────────
   const refresh = useCallback(async () => {
@@ -194,14 +224,14 @@ export function PostsProvider({ children }) {
     lastDocRef.current = null;
     try {
       if (filter === "following" && user?.uid) {
-        const { posts: p } = await PostsApi.fetchFollowingFeed(user.uid);
+        const { posts: p } = await PostsApi.fetchFollowingFeed(user.uid, sort);
         setPosts(p);
       } else {
-        const { posts: p, lastDoc } = await PostsApi.fetchFeed({ filter });
+        const { posts: p, lastDoc } = await PostsApi.fetchFeed({ filter, sort });
         setPosts(p);
         lastDocRef.current = lastDoc;
         setHasMore(p.length > 0);
-        if (filter === "all" && shouldPersistInternetData()) {
+        if (filter === "all" && sort === "recent" && shouldPersistInternetData()) {
           AsyncStorage.setItem(FEED_CACHE_KEY, JSON.stringify(p)).catch(
             () => {},
           );
@@ -212,7 +242,7 @@ export function PostsProvider({ children }) {
     } finally {
       setRefreshing(false);
     }
-  }, [filter, user?.uid]);
+  }, [filter, sort, user?.uid]);
 
   // ── 7. Like toggle (optimistic) ──────────────────────────────────────────
   const toggleLike = useCallback(
@@ -230,16 +260,19 @@ export function PostsProvider({ children }) {
         return next;
       });
       setPosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? {
-                ...p,
-                likesCount: Math.max(
-                  0,
-                  (p.likesCount || 0) + (wasLiked ? -1 : 1),
-                ),
-              }
-            : p,
+        sortLoadedPosts(
+          prev.map((p) =>
+            p.id === postId
+              ? {
+                  ...p,
+                  likesCount: Math.max(
+                    0,
+                    (p.likesCount || 0) + (wasLiked ? -1 : 1),
+                  ),
+                }
+              : p,
+          ),
+          sort,
         ),
       );
 
@@ -272,22 +305,25 @@ export function PostsProvider({ children }) {
           return next;
         });
         setPosts((prev) =>
-          prev.map((p) =>
-            p.id === postId
-              ? {
-                  ...p,
-                  likesCount: Math.max(
-                    0,
-                    (p.likesCount || 0) + (wasLiked ? 1 : -1),
-                  ),
-                }
-              : p,
+          sortLoadedPosts(
+            prev.map((p) =>
+              p.id === postId
+                ? {
+                    ...p,
+                    likesCount: Math.max(
+                      0,
+                      (p.likesCount || 0) + (wasLiked ? 1 : -1),
+                    ),
+                  }
+                : p,
+            ),
+            sort,
           ),
         );
         Toast.show({ type: "error", text1: i18nText("autoI18n.begeni_kaydedilemedi", "Beğeni kaydedilemedi") });
       }
     },
-    [user?.uid, likedIds, posts],
+    [user?.uid, likedIds, posts, sort],
   );
 
   // ── 8. Bookmark toggle (optimistic) ──────────────────────────────────────
@@ -394,7 +430,8 @@ export function PostsProvider({ children }) {
         const newId = await PostsApi.createPost(user, payload);
         // Realtime listener `all` filtresinde otomatik ekleyecek; başka
         // filtrelerde manuel optimistic insert.
-        if (filter !== "all") {
+        const matchesFilter = filter === "all" || filter === payload.type;
+        if (filter !== "following" && matchesFilter && (filter !== "all" || sort !== "recent")) {
           const optimistic = {
             id: newId,
             authorId: user.uid,
@@ -406,7 +443,7 @@ export function PostsProvider({ children }) {
             commentsCount: 0,
             _createdAtMs: Date.now(),
           };
-          setPosts((prev) => [optimistic, ...prev]);
+          setPosts((prev) => sortLoadedPosts([optimistic, ...prev], sort));
         }
         Toast.show({ type: "success", text1: i18nText("autoI18n.paylasildi", "Paylaşıldı!") });
         return newId;
@@ -418,7 +455,7 @@ export function PostsProvider({ children }) {
         return null;
       }
     },
-    [user, filter],
+    [user, filter, sort],
   );
 
   const value = useMemo(
@@ -426,6 +463,7 @@ export function PostsProvider({ children }) {
       // state
       posts,
       filter,
+      sort,
       loading,
       loadingMore,
       refreshing,
@@ -434,6 +472,7 @@ export function PostsProvider({ children }) {
       bookmarkIds,
       // setters / actions
       setFilter,
+      setSort,
       loadMore,
       refresh,
       toggleLike,
@@ -443,10 +482,12 @@ export function PostsProvider({ children }) {
       editPost,
       // constants
       FILTERS,
+      SORTS,
     }),
     [
       posts,
       filter,
+      sort,
       loading,
       loadingMore,
       refreshing,

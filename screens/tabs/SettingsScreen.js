@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
   PanResponder,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { useLanguage } from "../../context/LanguageContext";
 import AppIcon from "../../components/AppIcon";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -36,6 +37,7 @@ import SwitchToggle from "@components/SwitchToggle";
 import SwipeCard from "@components/SwipeCard";
 import PetSettingsSection from "@components/pet/PetSettingsSection";
 import PermissionsSection from "@components/PermissionsSection";
+import BatteryOptimizationNotice from "@components/BatteryOptimizationNotice";
 import { BlurView } from "expo-blur";
 import CountryFlag from "react-native-country-flag";
 import IconBacground from "../../components/IconBacground";
@@ -49,6 +51,7 @@ import { Image } from "expo-image";
 import { getBreakdown } from "../../services/cacheInspector";
 import { auth, db } from "../../firebase";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import TmdbLogo from "../../components/TmdbLogo";
 
 const fmtBytes = (b) =>
   b >= 1024 * 1024
@@ -270,6 +273,7 @@ function OpacitySlider({ value, onChange, colors }) {
 }
 
 export default function SettingsScreen() {
+  const navigation = useNavigation();
   const [modalVisible, setModalVisible] = useState(false);
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [langSearch, setLangSearch] = useState("");
@@ -574,223 +578,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <SectionLabel color={C.muted}>{t.notifications.toUpperCase()}</SectionLabel>
-        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
-          <SettingRow
-            colors={C}
-            iconBg={C.iconBlue}
-            iconColor={C.blue}
-            iconName={
-              notificationsEnabled
-                ? "notifications-outline"
-                : "notifications-off-outline"
-            }
-            title={t.allNotifications}
-            subtitle={masterSubtitle}
-            right={
-              <SwitchToggle
-                value={notificationsEnabled}
-                onValueChange={handleToggleMaster}
-                size={36}
-              />
-            }
-          />
-          <View style={[s.notificationGroup, { borderBottomColor: C.borderMuted }]}>
-            <Text allowFontScaling={false} style={[s.notificationGroupText, { color: C.muted }]}>
-              {t.reminderNotificationGroup}
-            </Text>
-          </View>
-          <SettingRow
-            colors={C}
-            iconBg={C.iconGreen}
-            iconColor={C.green}
-            iconName="alarm-outline"
-            title={t.reminderNotifications}
-            subtitle={t.reminderNotificationsSubtitle}
-            right={
-              <SwitchToggle
-                value={remindersEnabled}
-                onValueChange={(remindersEnabled) =>
-                  updateNotifications({ remindersEnabled })
-                }
-                disabled={!notificationsEnabled}
-                size={36}
-              />
-            }
-          />
-          <SettingRow
-            colors={C}
-            iconBg={C.iconAmber}
-            iconColor={C.amber}
-            iconName="film-outline"
-            title={t.movieReminderNotifications}
-            subtitle={t.movieReminderNotificationsSubtitle}
-            right={
-              <SwitchToggle
-                value={
-                  remindersEnabled &&
-                  notificationSettings.moviesEnabled
-                }
-                onValueChange={(moviesEnabled) =>
-                  updateNotifications({ moviesEnabled })
-                }
-                disabled={!remindersEnabled}
-                size={36}
-              />
-            }
-          />
-          <SettingRow
-            colors={C}
-            iconBg={C.iconPurple}
-            iconColor={C.purple}
-            iconName="tv-outline"
-            title={t.tvReminderNotifications}
-            subtitle={t.tvReminderNotificationsSubtitle}
-            right={
-              <SwitchToggle
-                value={
-                  remindersEnabled &&
-                  notificationSettings.tvShowsEnabled
-                }
-                onValueChange={(tvShowsEnabled) =>
-                  updateNotifications({ tvShowsEnabled })
-                }
-                disabled={!remindersEnabled}
-                size={36}
-              />
-            }
-          />
-          <SettingRow
-            colors={C}
-            iconBg={C.iconTeal}
-            iconColor={C.teal}
-            iconName="document-text-outline"
-            title={t.noteReminderNotifications}
-            subtitle={t.noteReminderNotificationsSubtitle}
-            right={
-              <SwitchToggle
-                value={
-                  remindersEnabled &&
-                  notificationSettings.noteRemindersEnabled
-                }
-                onValueChange={(noteRemindersEnabled) =>
-                  updateNotifications({ noteRemindersEnabled })
-                }
-                disabled={!remindersEnabled}
-                size={36}
-              />
-            }
-          />
-          <View style={s.notificationTiming}>
-            <View style={s.notificationTimingHeader}>
-              <View style={[s.iconWrap, { backgroundColor: C.iconGreen }]}>
-                <AppIcon name="time-outline" size={15} color={C.green} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text allowFontScaling={false} style={[s.rowTitle, { color: C.text }]}>
-                  {t.reminderNotificationTiming}
-                </Text>
-                <Text allowFontScaling={false} style={[s.rowSub, { color: C.muted }]}>
-                  {t.reminderNotificationTimingSubtitle}
-                </Text>
-              </View>
-            </View>
-            <View
-              style={[
-                s.segment,
-                s.notificationTimingSegment,
-                { backgroundColor: C.cardAlt, borderTopColor: C.border },
-              ]}
-            >
-              {REMINDER_NOTIFICATION_TIMINGS.map((item) => {
-                const active =
-                  notificationSettings.leadTimeDays === item.value;
-                return (
-                  <TouchableOpacity
-                    key={item.value}
-                    style={[
-                      s.segOpt,
-                      active && remindersEnabled && { backgroundColor: C.accent },
-                      !remindersEnabled && { opacity: 0.45 },
-                    ]}
-                    disabled={!remindersEnabled}
-                    onPress={() =>
-                      updateNotifications({ leadTimeDays: item.value })
-                    }
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      allowFontScaling={false}
-                      style={[
-                        s.segText,
-                        {
-                          color:
-                            active && remindersEnabled ? C.white : C.muted,
-                          fontWeight:
-                            active && remindersEnabled ? "700" : "500",
-                        },
-                      ]}
-                    >
-                      {t[item.labelKey]}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-          <View style={[s.notificationGroup, { borderBottomColor: C.borderMuted }]}>
-            <Text allowFontScaling={false} style={[s.notificationGroupText, { color: C.muted }]}>
-              {t.socialNotificationGroup}
-            </Text>
-          </View>
-          {NOTIFICATION_ROWS.map((row, index) => (
-            <SettingRow
-              key={row.key}
-              colors={C}
-              iconBg={C[row.bgKey]}
-              iconColor={C[row.colorKey]}
-              iconName={row.iconName}
-              title={t[row.titleKey]}
-              subtitle={t[row.subtitleKey]}
-              last={index === NOTIFICATION_ROWS.length - 1 && !__DEV__}
-              right={
-                <SwitchToggle
-                  value={notificationsEnabled && notificationSettings[row.key]}
-                  onValueChange={(value) =>
-                    updateNotifications({ [row.key]: value })
-                  }
-                  disabled={!notificationsEnabled}
-                  size={36}
-                />
-              }
-            />
-          ))}
-          {__DEV__ && (
-            <SettingRow
-              colors={C}
-              iconBg={C.iconBlue}
-              iconColor={C.blue}
-              iconName={sendingTestPush ? "hourglass-outline" : "paper-plane-outline"}
-              title="Test push gönder (bana)"
-              subtitle="DEV-only · arka plan push zincirini test eder"
-              last
-              onPress={handleSendTestPush}
-              right={
-                sendingTestPush ? (
-                  <ActivityIndicator size="small" color={C.blue} />
-                ) : (
-                  <AppIcon name="chevron-forward" size={16} color={C.muted} />
-                )
-              }
-            />
-          )}
-        </View>
-
-        <SectionLabel color={C.muted}>
-          {(t.myPermissions || "İzinlerim").toUpperCase()}
-        </SectionLabel>
-        <PermissionsSection colors={C} />
-
         <SectionLabel color={C.muted}>{t.general.toUpperCase()}</SectionLabel>
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <SettingRow
@@ -857,168 +644,72 @@ export default function SettingsScreen() {
         </View>
 
         {/* Kişiselleştirme: kar + ikon arka planı + pet aynı alanda toplandı */}
-        <SectionLabel color={C.muted}>{t.personalization.toUpperCase()}</SectionLabel>
+        {/* Genel'in altındaki yönlendirme grubu → ayrı ayar ekranları */}
+        <SectionLabel color={C.muted}>
+          {i18nText("autoI18n.dahaFazla", "Daha fazla").toUpperCase()}
+        </SectionLabel>
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <SettingRow
+            colors={C}
+            iconBg={C.iconGreen}
+            iconColor={C.green}
+            iconName="alarm-outline"
+            title={t.reminderNotificationGroup}
+            subtitle={i18nText(
+              "autoI18n.hatirlaticilar_aciklama",
+              "Film ve dizi hatırlatmaları, bildirim zamanı",
+            )}
+            onPress={() => navigation.navigate("ReminderNotificationsScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconAmber}
+            iconColor={C.amber}
+            iconName="chatbubbles-outline"
+            title={t.socialNotificationGroup}
+            subtitle={i18nText(
+              "autoI18n.sosyal_mesajlar_aciklama",
+              "Arkadaşlık, beğeni, yorum ve mesaj bildirimleri",
+            )}
+            onPress={() => navigation.navigate("SocialNotificationsScreen")}
+            right={<Chevron color={C.muted} />}
+          />
           <SettingRow
             colors={C}
             iconBg={C.iconTeal}
             iconColor={C.teal}
-            iconName={showSnow ? "snow-sharp" : "snow-outline"}
-            title={t.snow}
-            subtitle={t.snowSubtitle}
-            right={
-              <SwitchToggle
-                value={showSnow}
-                onValueChange={changeShowSnow}
-                size={36}
-              />
-            }
+            iconName="color-palette-outline"
+            title={t.personalization}
+            subtitle={i18nText(
+              "autoI18n.kisisellestirme_aciklama",
+              "Kar efekti, ikon arka planı ve pet",
+            )}
+            onPress={() => navigation.navigate("PersonalizationScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconPurple}
+            iconColor={C.purple}
+            iconName="images-outline"
+            title={i18nText("autoI18n.poster_gorunumu", "Poster görünümü")}
+            subtitle={i18nText("autoI18n.poster_gorunumu_aciklama", "Afiş boyutu, köşeler ve düzen")}
+            onPress={() => navigation.navigate("PosterSettingsScreen")}
+            right={<Chevron color={C.muted} />}
           />
           <SettingRow
             colors={C}
             iconBg={C.iconBlue}
             iconColor={C.blue}
-            iconName={showIconBackground ? "image-outline" : "image-sharp"}
-            title={t.iconBackground}
-            subtitle={t.iconBackgroundSubtitle}
-            last={!showIconBackground}
-            right={
-              <SwitchToggle
-                value={showIconBackground}
-                onValueChange={changeShowIconBackground}
-                size={36}
-              />
-            }
-          />
-          {showIconBackground && (
-            <>
-            <View style={[s.iconBgOpacity, { borderBottomColor: C.borderMuted }]}>
-              <View style={s.iconBgModeHeader}>
-                <View style={[s.iconWrap, { backgroundColor: C.iconPurple }]}>
-                  <AppIcon name="contrast-outline" size={16} color={C.purple} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text allowFontScaling={false} style={[s.rowTitle, { color: C.text }]}>
-                    {t.iconBackgroundOpacity}
-                  </Text>
-                  <Text allowFontScaling={false} style={[s.rowSub, { color: C.muted }]}>
-                    {t.iconBackgroundOpacitySubtitle}
-                  </Text>
-                </View>
-                <View style={[s.qualityBadge, { backgroundColor: C.accentDim }]}>
-                  <Text
-                    allowFontScaling={false}
-                    style={[s.qualityBadgeText, { color: C.accentStrong }]}
-                  >
-                    {Math.round((iconBackgroundOpacity ?? 1) * 100)}%
-                  </Text>
-                </View>
-              </View>
-              <View style={s.iconBgSliderWrap}>
-                <OpacitySlider
-                  value={iconBackgroundOpacity ?? 1}
-                  onChange={changeIconBackgroundOpacity}
-                  colors={C}
-                />
-              </View>
-            </View>
-
-            <View style={s.iconBgMode}>
-              <View style={s.iconBgModeHeader}>
-                <View style={[s.iconWrap, { backgroundColor: C.iconBlue }]}>
-                  <AppIcon family="MaterialCommunityIcons" name="view-grid-outline" size={16} color={C.blue} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text allowFontScaling={false} style={[s.rowTitle, { color: C.text }]}>
-                    {t.iconBackgroundLayout}
-                  </Text>
-                  <Text allowFontScaling={false} style={[s.rowSub, { color: C.muted }]}>
-                    {iconBackgroundMode === "random"
-                      ? t.iconBackgroundRandomHint
-                      : t.iconBackgroundSharedHint}
-                  </Text>
-                </View>
-              </View>
-              <View
-                style={[
-                  s.segment,
-                  { backgroundColor: C.cardAlt, borderTopColor: C.border },
-                ]}
-              >
-                {[
-                  { value: "shared", label: t.iconBackgroundShared },
-                  { value: "random", label: t.iconBackgroundRandom },
-                ].map((o) => {
-                  const active = iconBackgroundMode === o.value;
-                  return (
-                    <TouchableOpacity
-                      key={o.value}
-                      style={[s.segOpt, active && { backgroundColor: C.accent }]}
-                      onPress={() => changeIconBackgroundMode(o.value)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        allowFontScaling={false}
-                        style={[
-                          s.segText,
-                          { color: active ? C.white : C.muted, fontWeight: active ? "700" : "500" },
-                        ]}
-                      >
-                        {o.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-            </>
-          )}
-        </View>
-
-        <View style={s.personalizationGap} />
-        <PetSettingsSection colors={C} showLabel={false} />
-
-        <SectionLabel color={C.muted}>{t.data.toUpperCase()}</SectionLabel>
-        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
-          <SettingRow
-            colors={C}
-            iconBg={C.iconBlue}
-            iconColor={C.blue}
-            iconFamily="MaterialCommunityIcons"
-            iconName="cloud-download-outline"
-            title={i18nText("autoI18n.verileriIndir", "Verileri indir")}
-            subtitle={
-              downloading
-                ? `${i18nText("autoI18n.indiriliyor", "İndiriliyor")} · %${Math.round(
-                    downloadPct * 100,
-                  )}`
-                : i18nText(
-                    "autoI18n.verileriIndirAlt",
-                    "Çevrimdışı için listeler, notlar, hatırlatıcılar ve posterler",
-                  )
-            }
-            onPress={handleDownloadData}
-            right={
-              downloading ? (
-                <ActivityIndicator size="small" color={C.blue} />
-              ) : (
-                <Chevron color={C.muted} />
-              )
-            }
-          />
-          <SettingRow
-            colors={C}
-            iconBg={C.iconBlue}
-            iconColor={C.blue}
-            iconName="server-outline"
-            title={i18nText("autoI18n.onbellek", "Önbellek")}
-            subtitle={
-              cacheSize > 0
-                ? `${fmtBytes(cacheSize)} · ${i18nText("autoI18n.goruntuleVeTemizle", "görüntüle ve temizle")}`
-                : i18nText("autoI18n.goruntuleVeTemizle", "görüntüle ve temizle")
-            }
+            iconName="shield-checkmark-outline"
+            title={i18nText("autoI18n.izinlerVeVeriler", "İzinler & Veriler")}
+            subtitle={i18nText(
+              "autoI18n.izinler_veriler_aciklama",
+              "Cihaz izinleri, çevrimdışı veri ve önbellek",
+            )}
             last
-            onPress={() => setModalVisible(true)}
+            onPress={() => navigation.navigate("PermissionsDataScreen")}
             right={<Chevron color={C.muted} />}
           />
         </View>
@@ -1052,11 +743,19 @@ export default function SettingsScreen() {
               <Text allowFontScaling={false} style={[s.aboutMeta, { color: C.muted }]}>
                 created by ismail ozturk · © 2025
               </Text>
+              {/* TMDB koşulları: zorunlu atıf cümlesi + resmi logo birlikte */}
+              <TmdbLogo width={72} style={{ marginTop: 8 }} />
+              <Text
+                allowFontScaling={false}
+                style={[s.aboutMeta, { marginTop: 4, fontSize: 10, color: C.muted }]}
+              >
+                {t.tmdbAttribution}
+              </Text>
               <Text
                 allowFontScaling={false}
                 style={[s.aboutMeta, { marginTop: 2, fontSize: 10, color: C.muted }]}
               >
-                {t.tmdbAttribution}
+                {t.justwatchAttribution}
               </Text>
             </View>
             <View style={[s.versionBadge, { backgroundColor: C.borderMuted }]}>

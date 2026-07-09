@@ -1,5 +1,5 @@
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║              WATCHFLIX — TAM PROJE ANALİZ RAPORU                           ║
+║              WATCHIFY — TAM PROJE ANALİZ RAPORU                           ║
 ║              Tarih: 2026-05-17  |  Kapsam: Tüm kaynak dosyalar             ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
@@ -545,7 +545,7 @@ desteklenmiştir.
      User'ın watchedMovies + genres verisiyle Gemini'ye öneri sor.
 
 9.3  Deep Link Desteği
-     watchflix://movie/123 formatında link paylaşımı.
+     watchify://movie/123 formatında link paylaşımı.
      Arkadaşa film linki at, direkt açılsın.
 
 9.4  expo-image ile Görsel Cache

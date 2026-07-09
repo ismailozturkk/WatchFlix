@@ -30,6 +30,7 @@ const ApiSettingsContext = createContext();
 const HapticsSettingsContext = createContext();
 const NotificationSettingsContext = createContext();
 const AutoDataCacheSettingsContext = createContext();
+const ListLayoutSettingsContext = createContext();
 
 /**
  * TMDB Image Quality Presets
@@ -117,6 +118,15 @@ export const AppSettingsProvider = ({ children }) => {
   const [autoDataCacheEnabled, setAutoDataCacheEnabledState] = useState(false);
   const [notificationSettings, setNotificationSettings] =
     useState(DEFAULT_NOTIFICATION_SETTINGS);
+  // Liste görünümü: sütun sayısı (3 varsayılan | 4) ve afiş köşe yuvarlaklığı (2 | 10 varsayılan | 20)
+  const [listsGridColumns, setListsGridColumns] = useState(3);
+  const [listsPosterRadius, setListsPosterRadius] = useState(10);
+  // "Tümünü Gör" (poster grid) görünümü — listelerden bağımsız kendi ayarı
+  const [seeAllGridColumns, setSeeAllGridColumns] = useState(3);
+  const [seeAllPosterRadius, setSeeAllPosterRadius] = useState(10);
+  // TV/Film ana ekran yatay rail posterleri: boyut ("normal" | "small") ve köşe (4 | 15 varsayılan | 24)
+  const [railPosterSize, setRailPosterSize] = useState("normal");
+  const [railPosterRadius, setRailPosterRadius] = useState(15);
 
   // Single multiGet reads all persisted settings in one AsyncStorage round-trip.
   useEffect(() => {
@@ -140,6 +150,12 @@ export const AppSettingsProvider = ({ children }) => {
           [, savedAutoDataCache],
           [, savedCustomTheme],
           [, savedCustomThemes],
+          [, savedListsGridColumns],
+          [, savedListsPosterRadius],
+          [, savedSeeAllGridColumns],
+          [, savedSeeAllPosterRadius],
+          [, savedRailPosterSize],
+          [, savedRailPosterRadius],
         ] = await AsyncStorage.multiGet([
           "showSnow",
           "selectedLanguage",
@@ -158,6 +174,12 @@ export const AppSettingsProvider = ({ children }) => {
           AUTO_DATA_CACHE_KEY,
           "customThemeTokens", // legacy tek özel tema — çoklu yapıya migrate edilir
           "customThemes",
+          "listsGridColumns",
+          "listsPosterRadius",
+          "seeAllGridColumns",
+          "seeAllPosterRadius",
+          "railPosterSize",
+          "railPosterRadius",
         ]);
 
         if (savedAdultContent !== null)
@@ -220,6 +242,29 @@ export const AppSettingsProvider = ({ children }) => {
         }
         if (themesArr.length > 0) setCustomThemes(themesArr);
         if (savedAvatar !== null) setSelectedAvatar(JSON.parse(savedAvatar));
+        if (savedListsGridColumns !== null) {
+          const n = parseInt(savedListsGridColumns, 10);
+          if (n === 3 || n === 4) setListsGridColumns(n);
+        }
+        if (savedListsPosterRadius !== null) {
+          const n = parseInt(savedListsPosterRadius, 10);
+          if (n === 2 || n === 10 || n === 20) setListsPosterRadius(n);
+        }
+        if (savedSeeAllGridColumns !== null) {
+          const n = parseInt(savedSeeAllGridColumns, 10);
+          if (n === 3 || n === 4) setSeeAllGridColumns(n);
+        }
+        if (savedSeeAllPosterRadius !== null) {
+          const n = parseInt(savedSeeAllPosterRadius, 10);
+          if (n === 2 || n === 10 || n === 20) setSeeAllPosterRadius(n);
+        }
+        if (savedRailPosterSize === "normal" || savedRailPosterSize === "small") {
+          setRailPosterSize(savedRailPosterSize);
+        }
+        if (savedRailPosterRadius !== null) {
+          const n = parseInt(savedRailPosterRadius, 10);
+          if (n === 4 || n === 15 || n === 24) setRailPosterRadius(n);
+        }
         if (savedHapticsEnabled !== null) setHapticsEnabled(JSON.parse(savedHapticsEnabled));
         const autoCache = savedAutoDataCache === "true";
         setAutoDataCacheEnabledState(autoCache);
@@ -386,6 +431,54 @@ export const AppSettingsProvider = ({ children }) => {
       }),
     );
   }, [notificationSettings]);
+
+  const changeListsGridColumns = useCallback((n) => {
+    if (n !== 3 && n !== 4) return;
+    setListsGridColumns(n);
+    AsyncStorage.setItem("listsGridColumns", String(n)).catch((e) =>
+      Toast.show({ type: "error", text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi") }),
+    );
+  }, []);
+
+  const changeListsPosterRadius = useCallback((n) => {
+    if (n !== 2 && n !== 10 && n !== 20) return;
+    setListsPosterRadius(n);
+    AsyncStorage.setItem("listsPosterRadius", String(n)).catch((e) =>
+      Toast.show({ type: "error", text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi") }),
+    );
+  }, []);
+
+  const changeSeeAllGridColumns = useCallback((n) => {
+    if (n !== 3 && n !== 4) return;
+    setSeeAllGridColumns(n);
+    AsyncStorage.setItem("seeAllGridColumns", String(n)).catch((e) =>
+      Toast.show({ type: "error", text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi") }),
+    );
+  }, []);
+
+  const changeSeeAllPosterRadius = useCallback((n) => {
+    if (n !== 2 && n !== 10 && n !== 20) return;
+    setSeeAllPosterRadius(n);
+    AsyncStorage.setItem("seeAllPosterRadius", String(n)).catch((e) =>
+      Toast.show({ type: "error", text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi") }),
+    );
+  }, []);
+
+  const changeRailPosterSize = useCallback((size) => {
+    if (size !== "normal" && size !== "small") return;
+    setRailPosterSize(size);
+    AsyncStorage.setItem("railPosterSize", size).catch((e) =>
+      Toast.show({ type: "error", text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi") }),
+    );
+  }, []);
+
+  const changeRailPosterRadius = useCallback((n) => {
+    if (n !== 4 && n !== 15 && n !== 24) return;
+    setRailPosterRadius(n);
+    AsyncStorage.setItem("railPosterRadius", String(n)).catch((e) =>
+      Toast.show({ type: "error", text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi") }),
+    );
+  }, []);
 
   const changeAutoDataCacheEnabled = useCallback((newVal) => {
     const enabled = !!newVal;
@@ -564,6 +657,37 @@ export const AppSettingsProvider = ({ children }) => {
 
   const apiValue = useMemo(() => ({ API_KEY }), []);
 
+  const listLayoutValue = useMemo(
+    () => ({
+      listsGridColumns,
+      changeListsGridColumns,
+      listsPosterRadius,
+      changeListsPosterRadius,
+      seeAllGridColumns,
+      changeSeeAllGridColumns,
+      seeAllPosterRadius,
+      changeSeeAllPosterRadius,
+      railPosterSize,
+      changeRailPosterSize,
+      railPosterRadius,
+      changeRailPosterRadius,
+    }),
+    [
+      listsGridColumns,
+      changeListsGridColumns,
+      listsPosterRadius,
+      changeListsPosterRadius,
+      seeAllGridColumns,
+      changeSeeAllGridColumns,
+      seeAllPosterRadius,
+      changeSeeAllPosterRadius,
+      railPosterSize,
+      changeRailPosterSize,
+      railPosterRadius,
+      changeRailPosterRadius,
+    ],
+  );
+
   return (
     <ApiSettingsContext.Provider value={apiValue}>
       <LanguageSettingsContext.Provider value={languageValue}>
@@ -581,9 +705,13 @@ export const AppSettingsProvider = ({ children }) => {
                           <AutoDataCacheSettingsContext.Provider
                             value={autoDataCacheValue}
                           >
-                            <AppSettingsContext.Provider value={value}>
-                              {children}
-                            </AppSettingsContext.Provider>
+                            <ListLayoutSettingsContext.Provider
+                              value={listLayoutValue}
+                            >
+                              <AppSettingsContext.Provider value={value}>
+                                {children}
+                              </AppSettingsContext.Provider>
+                            </ListLayoutSettingsContext.Provider>
                           </AutoDataCacheSettingsContext.Provider>
                         </NotificationSettingsContext.Provider>
                       </HapticsSettingsContext.Provider>
@@ -659,5 +787,8 @@ export const useAutoDataCacheSettings = () =>
     AutoDataCacheSettingsContext,
     "useAutoDataCacheSettings",
   );
+
+export const useListLayoutSettings = () =>
+  useRequiredContext(ListLayoutSettingsContext, "useListLayoutSettings");
 
 export const useReminderNotificationSettings = useNotificationSettings;

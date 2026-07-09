@@ -46,6 +46,7 @@ import {
 } from "../services/reminderNotificationScheduler";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import useStartupGate from "../hooks/useStartupGate";
 
 const DeviceNotificationsContext = createContext({
   permissionStatus: "undetermined",
@@ -64,44 +65,48 @@ const SOCIAL_SETTING_KEY = {
   message: "messagesEnabled",
 };
 
+// WhatsApp/Instagram tarzı: BAŞLIK = kişi/grup adı, GÖVDE = aksiyon (emoji) / mesaj.
+// Backend buildContent (functions/index.js) ile birebir aynı mantık → foreground ve
+// background bildirimleri tutarlı görünür.
 function buildSocialContent(item, t) {
   const name = item.fromName || t.someone || "Birisi";
+  const text = item.text ? String(item.text) : "";
   switch (item.type) {
     case "friend_request":
-      return {
-        title: t.friendRequestNotifications,
-        body: (t.notifBodyFriendRequest || "{name} sana arkadaşlık isteği gönderdi").replace("{name}", name),
-      };
+      return { title: name, body: t.notifBodyFriendRequest || "👤 sana arkadaşlık isteği gönderdi" };
     case "friend_accepted":
-      return {
-        title: t.friendAcceptedNotifications,
-        body: (t.notifBodyFriendAccepted || "{name} arkadaşlık isteğini kabul etti").replace("{name}", name),
-      };
+      return { title: name, body: t.notifBodyFriendAccepted || "🤝 arkadaşlık isteğini kabul etti" };
     case "post_like":
-      return {
-        title: t.postLikeNotifications,
-        body: (t.notifBodyPostLike || "{name} gönderini beğendi").replace("{name}", name),
-      };
+      return { title: name, body: t.notifBodyPostLike || "❤️ gönderini beğendi" };
     case "post_comment":
       return {
-        title: t.postCommentNotifications,
-        body: (t.notifBodyPostComment || "{name} gönderine yorum yaptı").replace("{name}", name),
+        title: name,
+        body: text
+          ? (t.notifBodyPostCommentText || "💬 yorum yaptı: {text}").replace("{text}", text)
+          : (t.notifBodyPostComment || "💬 gönderine yorum yaptı"),
       };
     case "comment_reply":
       return {
-        title: t.postCommentNotifications,
-        body: (t.notifBodyCommentReply || "{name} yorumuna yanıt verdi").replace("{name}", name),
+        title: name,
+        body: text
+          ? (t.notifBodyCommentReplyText || "💬 yanıt verdi: {text}").replace("{text}", text)
+          : (t.notifBodyCommentReply || "💬 yorumuna yanıt verdi"),
       };
     case "mention":
       return {
-        title: t.mentionNotifications,
-        body: (t.notifBodyMention || "{name} senden bahsetti").replace("{name}", name),
+        title: name,
+        body: text
+          ? (t.notifBodyMentionText || "💬 senden bahsetti: {text}").replace("{text}", text)
+          : (t.notifBodyMention || "💬 senden bahsetti"),
       };
-    case "message":
-      return {
-        title: item.fromName || t.messageNotifications,
-        body: item.text || (t.notifBodyMessage || "{name} sana mesaj gönderdi").replace("{name}", name),
-      };
+    case "message": {
+      const fallback = t.notifBodyMessage || "sana bir mesaj gönderdi";
+      // Grup → başlık=grup adı, gövde="gönderen: mesaj"; 1-1 → başlık=isim, gövde=mesaj.
+      if (item.groupId) {
+        return { title: item.groupName || name, body: `${name}: ${text || fallback}` };
+      }
+      return { title: name, body: text || `${name} ${fallback}` };
+    }
     default:
       return { title: t.notifications, body: name };
   }
@@ -120,13 +125,18 @@ function buildReminderBody(leadTimeDays, t) {
 export function DeviceNotificationsProvider({ children, navigationRef }) {
   const { user } = useAuth();
   const uid = user?.uid;
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { notificationSettings: settings } = useNotificationSettings();
   const { items, loading: notifLoading } = useNotifications();
   const { reminders } = useProfileReminders();
   const { notes } = useProfileNotes();
 
   const [permissionStatus, setPermissionStatus] = useState("undetermined");
+
+  // Ayar aynalama (Firestore yazması) + reminder senkronu açılışta acil değil;
+  // splash sonrası donma penceresinin dışına ertele. Kapı açıldıktan sonra
+  // davranış birebir aynı (debounce'lar korunur).
+  const startupReady = useStartupGate(4200);
 
   // ── 1. Bir kerelik kurulum: handler + kanallar + mevcut izin durumu ───────
   useEffect(() => {
@@ -162,7 +172,7 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
   // yazıyoruz; backend bir tür kapalıysa o push'u atmasın. Debounce'lu.
   const settingsMirrorTimerRef = useRef(null);
   useEffect(() => {
-    if (!uid) return undefined;
+    if (!uid || !startupReady) return undefined;
     if (settingsMirrorTimerRef.current) clearTimeout(settingsMirrorTimerRef.current);
     settingsMirrorTimerRef.current = setTimeout(() => {
       updateDoc(doc(db, "Users", uid), {
@@ -175,6 +185,8 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
           mentionsEnabled: settings.mentionsEnabled !== false,
           messagesEnabled: settings.messagesEnabled !== false,
         },
+        // Backend push'unun dilini bilmesi için (foreground/background tutarlılığı).
+        notificationLanguage: language === "en" ? "en" : "tr",
       }).catch(() => {});
     }, 600);
     return () => {
@@ -182,6 +194,7 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
     };
   }, [
     uid,
+    startupReady,
     settings.enabled,
     settings.friendRequestsEnabled,
     settings.friendAcceptedEnabled,
@@ -189,6 +202,7 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
     settings.postCommentsEnabled,
     settings.mentionsEnabled,
     settings.messagesEnabled,
+    language,
   ]);
 
   // ── 3. TV bölümlerini düzleştir ──────────────────────────────────────────
@@ -210,6 +224,7 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
   // ── 4. Reminder local bildirimlerini senkronize et (debounce'lu) ─────────
   const syncTimerRef = useRef(null);
   useEffect(() => {
+    if (!startupReady) return undefined;
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
 
     syncTimerRef.current = setTimeout(() => {
@@ -293,6 +308,7 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     uid,
+    startupReady,
     permissionStatus,
     settings.enabled,
     settings.remindersEnabled,
@@ -355,6 +371,9 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
           notifId: item.id,
           postId: item.postId || null,
           fromUid: item.fromUid || null,
+          fromName: item.fromName || null,
+          groupId: item.groupId || null,
+          groupName: item.groupName || null,
         },
       });
     });
@@ -370,12 +389,34 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
       if (!nav?.isReady?.()) return;
       try {
         if (data.kind === "social") {
-          if (data.type === "friend_request") {
+          if (data.type === "message") {
+            // Grup mesajı → gruba; 1-1 → gönderenle sohbete (WhatsApp gibi).
+            if (data.groupId) {
+              nav.navigate("ChatScreen", {
+                groupId: data.groupId,
+                groupName: data.groupName || "",
+              });
+            } else if (data.fromUid) {
+              nav.navigate("ChatScreen", {
+                friendUid: data.fromUid,
+                friendName: data.fromName || "",
+              });
+            }
+          } else if (data.type === "friend_request") {
             nav.navigate("FriendRequestsScreen");
-          } else if (data.type === "message" && data.fromUid) {
-            nav.navigate("ChatScreen", { friendUid: data.fromUid });
+          } else if (
+            (data.type === "post_like" ||
+              data.type === "post_comment" ||
+              data.type === "comment_reply" ||
+              data.type === "mention") &&
+            data.postId
+          ) {
+            // Beğeni → gönderi; yorum/yanıt/mention → gönderi + yorumlar açık.
+            nav.navigate("PostDetailScreen", {
+              postId: data.postId,
+              openComments: data.type !== "post_like",
+            });
           }
-          // Diğer sosyal türler için ileride post/comment ekranına yönlendirme.
         }
         // Reminder dokunuşları uygulamayı açar; özel yönlendirme gerekmez.
       } catch {

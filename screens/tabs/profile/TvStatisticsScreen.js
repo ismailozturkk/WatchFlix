@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useProfileStats } from "../../../context/ProfileStatsContext";
 import { useTheme } from "../../../context/ThemeContext";
@@ -8,6 +8,7 @@ import { i18nText } from "../../../utils/i18nText";
 import BackButton from "../../../components/BackButton";
 import {
   StatsHeroCard,
+  StatsScreenHeader,
   StatsFilterBar,
   StatsDateSection,
   StatsEmptyState,
@@ -126,11 +127,17 @@ const TvStatisticsScreen = ({ navigation }) => {
 
   const collapsing = (
     <>
-      <View style={styles.titleBar}>
-        <Text allowFontScaling={false} style={[styles.titleText, { color: theme.text.primary }]}>
-          {i18nText("autoI18n.dizi_istatistikleri", "Dizi İstatistikleri")}
-        </Text>
-      </View>
+      <StatsScreenHeader
+        theme={theme}
+        title={i18nText("autoI18n.dizi_istatistikleri", "Dizi İstatistikleri")}
+        eyebrow={i18nText("autoI18n.dizi_arsivi", "Dizi arşivi")}
+        subtitle={i18nText(
+          "autoI18n.dizi_izleme_yolculugu_ozeti",
+          "Dizi ve bölüm geçmişinin ayrıntılı özeti",
+        )}
+        icon="tv-outline"
+        accentColor={borderColorTv}
+      />
 
       <StatsHeroCard
         theme={theme}
@@ -198,6 +205,4 @@ export default TvStatisticsScreen;
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  titleBar: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 4, alignItems: "center" },
-  titleText: { fontSize: 17, fontWeight: "800", letterSpacing: -0.3 },
 });

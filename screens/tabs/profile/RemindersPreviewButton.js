@@ -1,13 +1,21 @@
-import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  Animated,
-  PanResponder,
   Dimensions,
   TouchableOpacity,
 } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  Extrapolation,
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../../context/ThemeContext";
@@ -24,6 +32,8 @@ const CARD_H = 96;
 const PEEK = 9; // alttaki kartların aşağıdan göründüğü pay
 const THRESHOLD = 70; // bu kadar kaydırınca sonraki karta geçer
 const SWIPE_OUT = CARD_W * 1.1;
+const SNAP_SPRING = { damping: 18, stiffness: 190, mass: 0.75 };
+const ENTER_SPRING = { damping: 17, stiffness: 175, mass: 0.72 };
 
 // Kalan güne göre renk/ikon (ProfileReminders'taki mantığın kompakt hâli)
 function countdownStyle(diff, c) {
@@ -75,6 +85,137 @@ function buildItems(reminders) {
   return { items: [...upcoming, ...past].slice(0, 5), total: all.length };
 }
 
+/**
+ * Her kart kendi gesture değerlerini taşır. Böylece arkadaki kart öne geçtiğinde
+ * çıkan kartın son translate değerini devralmaz. Gesture ve dönüş animasyonları
+ * Reanimated ile UI thread'de çalışır; sürükleme sırasında React render edilmez.
+ */
+function ReminderStackCard({
+  isFront,
+  depth,
+  canAdvance,
+  onAdvance,
+  onOpen,
+  colors,
+  children,
+}) {
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  // Arkadaki kart öne geçmeden önce giriş konumunda hazır bekler.
+  const enter = useSharedValue(1);
+
+  useEffect(() => {
+    if (isFront) {
+      enter.value = withSpring(0, ENTER_SPRING);
+      return;
+    }
+
+    // Çıkan kart arkaya dönerse bir sonraki tur için görünmeden sıfırlanır.
+    translateX.value = 0;
+    translateY.value = 0;
+    enter.value = 1;
+  }, [enter, isFront, translateX, translateY]);
+
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(isFront)
+        .minDistance(6)
+        .onUpdate((event) => {
+          translateX.value = event.translationX;
+          translateY.value = event.translationY;
+        })
+        .onEnd((event) => {
+          if (Math.abs(event.translationX) > THRESHOLD && canAdvance) {
+            const direction = event.translationX > 0 ? 1 : -1;
+            translateX.value = withTiming(
+              direction * SWIPE_OUT,
+              { duration: 200 },
+              (finished) => {
+                if (finished) runOnJS(onAdvance)();
+              },
+            );
+            return;
+          }
+
+          translateX.value = withSpring(0, SNAP_SPRING);
+          translateY.value = withSpring(0, SNAP_SPRING);
+        })
+        .onFinalize((_event, success) => {
+          if (!success) {
+            translateX.value = withSpring(0, SNAP_SPRING);
+            translateY.value = withSpring(0, SNAP_SPRING);
+          }
+        }),
+    [canAdvance, isFront, onAdvance, translateX, translateY],
+  );
+
+  const tapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .enabled(isFront)
+        .maxDistance(6)
+        .onEnd((_event, success) => {
+          if (success) runOnJS(onOpen)();
+        }),
+    [isFront, onOpen],
+  );
+
+  const gesture = useMemo(
+    () => Gesture.Race(panGesture, tapGesture),
+    [panGesture, tapGesture],
+  );
+
+  const frontStyle = useAnimatedStyle(() => {
+    const enterOffset = interpolate(enter.value, [0, 1], [0, PEEK]);
+    const enterScale = interpolate(enter.value, [0, 1], [1, 0.95]);
+    const rotation = interpolate(
+      translateX.value,
+      [-CARD_W, 0, CARD_W],
+      [-6, 0, 6],
+      Extrapolation.CLAMP,
+    );
+    const opacity = interpolate(
+      translateX.value,
+      [-SWIPE_OUT, -THRESHOLD, 0, THRESHOLD, SWIPE_OUT],
+      [0, 1, 1, 1, 0],
+      Extrapolation.CLAMP,
+    );
+
+    return {
+      opacity,
+      transform: [
+        { translateX: translateX.value },
+        { translateY: translateY.value + enterOffset },
+        { scale: enterScale },
+        { rotate: `${rotation}deg` },
+      ],
+    };
+  });
+
+  const backStyle =
+    depth === 1
+      ? styles.secondCard
+      : depth === 2
+        ? styles.thirdCard
+        : null;
+
+  return (
+    <GestureDetector gesture={gesture}>
+      <Animated.View
+        style={[
+          styles.card,
+          colors,
+          isFront ? styles.frontCard : backStyle,
+          isFront ? frontStyle : null,
+        ]}
+      >
+        {children}
+      </Animated.View>
+    </GestureDetector>
+  );
+}
+
 export default function RemindersPreviewButton({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
@@ -85,68 +226,27 @@ export default function RemindersPreviewButton({ navigation }) {
   const { items, total } = useMemo(() => buildItems(reminders), [reminders]);
   const n = items.length;
   const [top, setTop] = useState(0);
-  const pan = useRef(new Animated.ValueXY()).current;
-  const enter = useRef(new Animated.Value(0)).current;
 
   const label = t.profileScreen?.ProfileReminder?.reminder ?? i18nText("autoI18n.hatirlatmalar", "Hatırlatmalar");
 
-  // Stale closure'ı önlemek için panResponder ref'lerden okur
+  // Liste gesture sırasında güncellense bile callback güncel eleman sayısını okur.
   const nRef = useRef(n);
   nRef.current = n;
-  const advanceRef = useRef(() => {});
-  advanceRef.current = () =>
+  const advance = useCallback(() => {
     setTop((tp) => (nRef.current ? (tp + 1) % nRef.current : 0));
-  const goAllRef = useRef(() => {});
-  goAllRef.current = () => navigation.navigate("RemindersScreen");
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, g) =>
-        Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4,
-      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], {
-        useNativeDriver: false,
-      }),
-      onPanResponderRelease: (_, g) => {
-        // Neredeyse hiç hareket yoksa → dokunma kabul et, sayfaya git
-        if (Math.abs(g.dx) < 6 && Math.abs(g.dy) < 6) {
-          pan.setValue({ x: 0, y: 0 });
-          goAllRef.current();
-          return;
-        }
-        if (Math.abs(g.dx) > THRESHOLD && nRef.current > 1) {
-          const dir = g.dx > 0 ? 1 : -1;
-          Animated.timing(pan, {
-            toValue: { x: dir * SWIPE_OUT, y: g.dy },
-            duration: 200,
-            useNativeDriver: false,
-          }).start(() => {
-            advanceRef.current();
-          });
-        } else {
-          Animated.spring(pan, {
-            toValue: { x: 0, y: 0 },
-            friction: 6,
-            useNativeDriver: false,
-          }).start();
-        }
-      },
+  }, []);
+  const goAll = useCallback(
+    () => navigation.navigate("RemindersScreen"),
+    [navigation],
+  );
+  const cardColors = useMemo(
+    () => ({
+      backgroundColor: theme.secondary,
+      borderColor: theme.border,
+      shadowColor: theme.shadow,
     }),
-  ).current;
-
-  // Sıradaki karta geçince: pan'i sıfırla ve yeni ön kartı peek konumundan
-  // (enter=1) merkeze (enter=0) yumuşakça getir. Arka kartlar pan'e bağlı
-  // olmadığından geçişte ortada "hayalet" kart oluşmaz.
-  useLayoutEffect(() => {
-    pan.setValue({ x: 0, y: 0 });
-    enter.setValue(1);
-    Animated.spring(enter, {
-      toValue: 0,
-      friction: 7,
-      tension: 70,
-      useNativeDriver: false,
-    }).start();
-  }, [top]);
+    [theme.border, theme.secondary, theme.shadow],
+  );
 
   // ── Boş durum ──
   if (n === 0) {
@@ -320,69 +420,18 @@ export default function RemindersPreviewButton({ navigation }) {
     const item = items[(start + p) % n];
     const isFront = p === 0;
 
-    let animStyle;
-    if (isFront) {
-      animStyle = {
-        zIndex: 30,
-        transform: [
-          { translateX: pan.x },
-          {
-            translateY: Animated.add(
-              pan.y,
-              enter.interpolate({ inputRange: [0, 1], outputRange: [0, PEEK] }),
-            ),
-          },
-          {
-            scale: enter.interpolate({
-              inputRange: [0, 1],
-              outputRange: [1, 0.95],
-            }),
-          },
-          {
-            rotate: pan.x.interpolate({
-              inputRange: [-CARD_W, 0, CARD_W],
-              outputRange: ["-6deg", "0deg", "6deg"],
-              extrapolate: "clamp",
-            }),
-          },
-        ],
-        opacity: pan.x.interpolate({
-          inputRange: [-SWIPE_OUT, -THRESHOLD, 0, THRESHOLD, SWIPE_OUT],
-          outputRange: [0, 1, 1, 1, 0],
-          extrapolate: "clamp",
-        }),
-      };
-    } else if (p === 1) {
-      // Sabit peek — pan'e bağlı DEĞİL (geçişte hayalet kartı önler)
-      animStyle = {
-        zIndex: 20,
-        transform: [{ translateY: PEEK }, { scale: 0.95 }],
-        opacity: 0.82,
-      };
-    } else {
-      animStyle = {
-        zIndex: 10,
-        transform: [{ translateY: 2 * PEEK }, { scale: 0.9 }],
-        opacity: 0.5,
-      };
-    }
-
     return (
-      <Animated.View
+      <ReminderStackCard
         key={item.key}
-        {...(isFront ? panResponder.panHandlers : {})}
-        style={[
-          styles.card,
-          {
-            backgroundColor: theme.secondary,
-            borderColor: theme.border,
-            shadowColor: theme.shadow,
-          },
-          animStyle,
-        ]}
+        isFront={isFront}
+        depth={p}
+        canAdvance={n > 1}
+        onAdvance={advance}
+        onOpen={goAll}
+        colors={cardColors}
       >
         {renderCardContent(item)}
-      </Animated.View>
+      </ReminderStackCard>
     );
   });
 
@@ -472,6 +521,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.22,
     shadowRadius: 6,
     elevation: 4,
+  },
+  frontCard: { zIndex: 30 },
+  secondCard: {
+    zIndex: 20,
+    transform: [{ translateY: PEEK }, { scale: 0.95 }],
+    opacity: 0.82,
+  },
+  thirdCard: {
+    zIndex: 10,
+    transform: [{ translateY: 2 * PEEK }, { scale: 0.9 }],
+    opacity: 0.5,
   },
 
   posterBox: {

@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
-import ShareContentScreen from "@screens/tabs/ShareContentScreen";
+import HubScreen from "@screens/tabs/HubScreen";
 import SettingsScreen from "@screens/tabs/SettingsScreen";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Feather from "@expo/vector-icons/Feather";
@@ -22,7 +22,6 @@ import TvShowScreen from "@screens/tabs/TvShowScreen";
 import { MovieProvider } from "@context/MovieContex";
 import { CalendarProvider } from "@context/CalendarContext";
 import { Screen, ScreenContainer } from "react-native-screens";
-import { i18nText } from "@utils/i18nText";
 
 const { width } = Dimensions.get("window");
 const TAB_NAMES = ["tvshows", "movies", "share", "settings", "profile"];
@@ -43,7 +42,7 @@ function TabScreen({ navigation }) {
           <MovieScreen navigation={navigation} />
         </MovieProvider>
       ),
-      share: <ShareContentScreen navigation={navigation} />,
+      share: <HubScreen navigation={navigation} />,
       settings: <SettingsScreen navigation={navigation} />,
       profile: (
         <CalendarProvider>
@@ -91,7 +90,7 @@ function TabScreen({ navigation }) {
     },
     {
       name: "share",
-      label: t.share || i18nText("autoI18n.paylas", "Paylaş"),
+      label: t.hub || "Hub",
       icon: (size, color) => (
         <Feather name="plus-square" size={size} color={color} />
       ),

@@ -1,5 +1,5 @@
 ================================================================================
-  WATCHFLIX — ASYNCSTORAGE KULLANIM ENVANTERİ ve MMKV GEÇİŞ REHBERİ
+  WATCHIFY — ASYNCSTORAGE KULLANIM ENVANTERİ ve MMKV GEÇİŞ REHBERİ
 ================================================================================
   Hazırlayan : Claude (Opus 4.8)
   Tarih      : 2026-06-13

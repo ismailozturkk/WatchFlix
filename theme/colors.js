@@ -1,6 +1,6 @@
 /* ─────────────────────────────────────────────────────────────────────────────
 
- * WatchFlix — Merkezi Renk & Tema Sistemi
+ * Watchify — Merkezi Renk & Tema Sistemi
 
  *
 

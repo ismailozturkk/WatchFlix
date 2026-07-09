@@ -1,5 +1,5 @@
 ================================================================================
-  WATCHFLIX / WATCHIFY — DÜŞÜK DONANIMLI CİHAZLARDA PERFORMANS İNCELEME RAPORU
+  WATCHIFY / WATCHIFY — DÜŞÜK DONANIMLI CİHAZLARDA PERFORMANS İNCELEME RAPORU
 ================================================================================
   Hazırlayan : Claude (Opus 4.8)
   Tarih      : 2026-06-13

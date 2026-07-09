@@ -20,6 +20,7 @@ import { MovieOscarSkeleton } from "../../components/Skeleton";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
+import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 const { width } = Dimensions.get("window");
@@ -39,6 +40,7 @@ const DikeyMetin = memo(function DikeyMetin({ metin }) {
 
 // Stable, module-scope item component → no remount → no flicker.
 const MovieOscarCard = memo(function MovieOscarCard({ item, index, navigation, theme, getTmdbUrl }) {
+  const rp = useRailPosterStyle();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -47,7 +49,7 @@ const MovieOscarCard = memo(function MovieOscarCard({ item, index, navigation, t
 
   return (
     <TouchableOpacity
-      style={styles.similarItem}
+      style={[styles.similarItem, { width: rp.posterWidth + width * 0.04, height: rp.posterHeight }]}
       activeOpacity={0.8}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
@@ -68,7 +70,10 @@ const MovieOscarCard = memo(function MovieOscarCard({ item, index, navigation, t
             path={item.poster_path}
             type="movie"
             size={200}
-            style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+            style={[
+              styles.similarPoster,
+              { width: rp.posterWidth, height: rp.posterHeight, borderRadius: rp.radius, shadowColor: theme.shadow },
+            ]}
             cachePolicy="memory-disk"
             recyclingKey={`movieoscar-${item.id}`}
             transition={120}

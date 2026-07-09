@@ -20,11 +20,14 @@ import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import PaginatedRail from "../../components/PaginatedRail";
+import SeeAllHeader from "../../components/SeeAllHeader";
+import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import Ionicons from "@expo/vector-icons/Ionicons";
 const { width } = Dimensions.get("window");
 
 // Stable, module-scope item component → no remount → no flicker.
 const MovieNowPlayingCard = memo(function MovieNowPlayingCard({ item, navigation, theme, getTmdbUrl }) {
+  const rp = useRailPosterStyle();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -33,7 +36,7 @@ const MovieNowPlayingCard = memo(function MovieNowPlayingCard({ item, navigation
 
   return (
     <TouchableOpacity
-      style={styles.similarItem}
+      style={[styles.similarItem, { width: rp.itemWidth, height: rp.itemHeight }]}
       activeOpacity={0.8}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
@@ -44,7 +47,10 @@ const MovieNowPlayingCard = memo(function MovieNowPlayingCard({ item, navigation
           path={item.poster_path}
           type="movie"
           size={200}
-          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+          style={[
+            styles.similarPoster,
+            { width: rp.posterWidth, height: rp.posterHeight, borderRadius: rp.radius, shadowColor: theme.shadow },
+          ]}
           cachePolicy="memory-disk"
           recyclingKey={`movienowplaying-${item.id}`}
           transition={120}
@@ -121,12 +127,16 @@ export default function MovieNowPlaying({ navigation }) {
   };
   return (
     <View style={{ flex: 1, paddingVertical: 10 }}>
-      <Text
-        allowFontScaling={false}
-        style={[styles.title, { color: theme.text.secondary }]}
-      >
-        {t.movieScreens.theaters}
-      </Text>
+      <SeeAllHeader
+        title={t.movieScreens.theaters}
+        onPress={() =>
+          navigation.navigate("SeeAllScreen", {
+            mediaType: "movie",
+            section: "nowPlaying",
+            title: t.movieScreens.theaters,
+          })
+        }
+      />
 
       <PaginatedRail
         data={moviesNowPlaying}

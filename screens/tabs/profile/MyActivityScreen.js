@@ -110,13 +110,23 @@ const STORY_ITEM_W =
   STORY_COLS;
 const STORY_ITEM_H = (STORY_ITEM_W * 16) / 9;
 
-export default function MyActivityScreen({ navigation }) {
+export default function MyActivityScreen({ navigation, route }) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { getTmdbUrl } = useImageQualitySettings();
   const uid = user?.uid;
 
-  const [tab, setTab] = useState("ratings");
+  const requestedInitialTab = TABS.some((item) => item.key === route?.params?.initialTab)
+    ? route.params.initialTab
+    : "ratings";
+  const [tab, setTab] = useState(requestedInitialTab);
+
+  // Profil kartındaki kategori kısayolları ekranı doğrudan ilgili sekmede açar.
+  useEffect(() => {
+    if (TABS.some((item) => item.key === route?.params?.initialTab)) {
+      setTab(route.params.initialTab);
+    }
+  }, [route?.params?.initialTab]);
 
   const [ratings, setRatings] = useState([]);
   const [comments, setComments] = useState([]);

@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { getAuth } from "firebase/auth";
 import { useTheme } from "../../context/ThemeContext";
-import SwipeCard from "@components/SwipeCard";
+import { appAlert } from "@components/AppAlert";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import IconBacground from "../../components/IconBacground";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -80,6 +80,25 @@ export default function SearchFriendsScreen({ navigation }) {
     [currentUser],
   );
 
+  // Görünür silme butonuna yanlışlıkla basılabilir (swipe'ın aksine) — onay iste.
+  const confirmRemove = (item) =>
+    appAlert(
+      i18nText("autoI18n.arkadasi_sil", "Arkadaşı Sil"),
+      i18nText(
+        "autoI18n.arkadas_silme_onay",
+        "{{name}} arkadaş listenden silinsin mi?",
+        { name: item.displayName },
+      ),
+      [
+        { text: i18nText("autoI18n.vazgec", "Vazgeç"), style: "cancel" },
+        {
+          text: i18nText("autoI18n.sil", "Sil"),
+          style: "destructive",
+          onPress: () => removeFriend(item.uid),
+        },
+      ],
+    );
+
   const renderItem = ({ item }) => {
     const alreadyFriend = isFriend(item.uid);
     const requestSent = hasOutgoingTo(item.uid);
@@ -97,15 +116,6 @@ export default function SearchFriendsScreen({ navigation }) {
         : null;
 
     return (
-      <SwipeCard
-        rightButton={
-          requestSent
-            ? { label: i18nText("autoI18n.geri_al", "Geri Al"), color: "#e56d35", onPress: () => cancelRequest(item.uid) }
-            : alreadyFriend
-              ? { label: i18nText("autoI18n.sil", "Sil"), color: "#fa3232", onPress: () => removeFriend(item.uid) }
-              : { label: i18nText("autoI18n.istek_gonder", "İstek Gönder"), color: "#30a75e", onPress: () => sendRequest(item.uid) }
-        }
-      >
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() =>
@@ -157,20 +167,42 @@ export default function SearchFriendsScreen({ navigation }) {
             ) : null}
           </View>
 
-          {/* Durum */}
+          {/* Durum rozeti */}
           {statusLabel ? (
             <View style={[styles.statusBadge, { backgroundColor: statusColor + "22" }]}>
               <Text style={[styles.statusText, { color: statusColor }]}>
                 {statusLabel}
               </Text>
             </View>
+          ) : null}
+
+          {/* İşlem butonu — eski kaydırma işlemlerinin yerine */}
+          {alreadyFriend ? (
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: "#fa323222" }]}
+              onPress={() => confirmRemove(item)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Ionicons name="trash-outline" size={17} color="#fa3232" />
+            </TouchableOpacity>
+          ) : requestSent ? (
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: "#e56d3522" }]}
+              onPress={() => cancelRequest(item.uid)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Ionicons name="arrow-undo-outline" size={17} color="#e56d35" />
+            </TouchableOpacity>
           ) : (
-            <View style={[styles.addHint, { backgroundColor: theme.primary }]}>
-              <Ionicons name="person-add-outline" size={18} color={theme.accent} />
-            </View>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: "#30a75e22" }]}
+              onPress={() => sendRequest(item.uid)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Ionicons name="person-add-outline" size={17} color="#30a75e" />
+            </TouchableOpacity>
           )}
         </TouchableOpacity>
-      </SwipeCard>
     );
   };
 
@@ -329,10 +361,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   statusText: { fontSize: 11, fontWeight: "700" },
-  addHint: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  actionBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: "center",
     alignItems: "center",
   },

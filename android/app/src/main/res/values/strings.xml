@@ -1,5 +1,10 @@
 <resources>
   <string name="app_name">Watchify</string>
+  <string name="reminder_widget_name">Watchify Yaklaşanlar</string>
+  <string name="reminder_widget_description">Yaklaşan film ve dizi bölümlerini gösterir</string>
+  <string name="reminder_widget_preview_title">Yaklaşanlar</string>
+  <string name="reminder_widget_preview_count">0 hatırlatma</string>
+  <string name="reminder_widget_empty">Yaklaşan film veya bölüm yok</string>
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
   <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>
 </resources>

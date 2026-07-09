@@ -24,6 +24,8 @@ const STRINGS = {
     introHello: "Bu yıl neler izledin?",
     introTap: "Başlamak için dokun",
     pickYear: "Bir yıl seç",
+    pickYearHint: "İzleme yolculuğuna kaldığın yerden devam et",
+    yearSelected: "yılı seçildi",
     // Toplam süre
     totalTitle: "Toplam izleme süren",
     totalThatsAbout: "Yani yaklaşık",
@@ -106,6 +108,8 @@ const STRINGS = {
     introHello: "What did you watch this year?",
     introTap: "Tap to begin",
     pickYear: "Pick a year",
+    pickYearHint: "Continue your watch journey from any year",
+    yearSelected: "selected",
     totalTitle: "Your total watch time",
     totalThatsAbout: "That's about",
     moviesTitle: "Your movie world",

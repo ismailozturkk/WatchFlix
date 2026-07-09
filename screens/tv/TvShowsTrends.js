@@ -30,6 +30,18 @@ const SPACING = width * 0.02;
 const ITEM_SIZE = CARD_WIDTH;
 const EMPTY_ITEM_SIZE = (width - CARD_WIDTH) / 2;
 const INITIAL_CARD_RENDER_COUNT = 4;
+// Kaydırırken odağa gelen posterin ulaştığı boyut; settle olunca 1.0'a iner.
+const FOCUS_PEAK = 1.15;
+const FOCUS_EXTRA = FOCUS_PEAK - 1;
+// Büyüyen posterin üstten taşan payı; dikey kırpılmayı önlemek için FlatList
+// içeriğine bu kadar üst boşluk verilir.
+const FOCUS_HEADROOM = Math.ceil((CARD_WIDTH * 1.5 * FOCUS_EXTRA) / 2) + 4;
+
+// Spacer'lar poster verisinin parçası değildir. Fabric'in farklı genişlikteki
+// sahte liste hücrelerini yeniden sıralamasını önlemek için header/footer kullan.
+const TrendEdgeSpacer = memo(function TrendEdgeSpacer() {
+  return <View style={{ width: EMPTY_ITEM_SIZE }} />;
+});
 
 // Stable, module-scope item component. Hoisted out of the parent so its
 // component type never changes between renders → no remount → no flicker.
@@ -40,16 +52,19 @@ const TvTrendCard = memo(function TvTrendCard({
   theme,
   getTmdbUrl,
   scrollX,
+  shrink,
+  focusedPos,
 }) {
   const inputRange = [
-    (index - 2) * ITEM_SIZE,
     (index - 1) * ITEM_SIZE,
     index * ITEM_SIZE,
+    (index + 1) * ITEM_SIZE,
   ];
 
+  // Kaydırırken poster odağa yaklaştıkça FOCUS_PEAK'e (1.15) kadar büyür.
   const scale = scrollX.interpolate({
     inputRange,
-    outputRange: [0.7, 1, 0.7],
+    outputRange: [0.7, FOCUS_PEAK, 0.7],
     extrapolate: "clamp",
   });
 
@@ -58,6 +73,37 @@ const TvTrendCard = memo(function TvTrendCard({
     outputRange: [0.5, 1, 0.5],
     extrapolate: "clamp",
   });
+
+  // Merkeze yakınlık (0 → kenar, 1 → tam ortada).
+  const centerness = scrollX.interpolate({
+    inputRange,
+    outputRange: [0, 1, 0],
+    extrapolate: "clamp",
+  });
+  // Bu kart o an odaktaki (settle olmuş) kart mı? `focusedPos` bu kartın merkez
+  // scroll konumuna eşitse 1 olur. React state yerine Animated ile yürütülür →
+  // yeniden render yok, "addViewAt" çökmesi olmaz.
+  const center = index * ITEM_SIZE;
+  const focusMatch = focusedPos
+    ? focusedPos.interpolate({
+        inputRange: [center - ITEM_SIZE / 2, center, center + ITEM_SIZE / 2],
+        outputRange: [0, 1, 0],
+        extrapolate: "clamp",
+      })
+    : 0;
+  // Büyüme kaydırma sırasında (scroll'a bağlı) olur. Yalnızca odak kartı `shrink`
+  // 0→1 animasyonuyla 1.15'ten normale iner (küçük bounce'lu). Diğer kartlar salt
+  // scroll ölçeğini izler → kalkan poster sıçramaz.
+  const finalScale =
+    shrink && focusedPos
+      ? Animated.subtract(
+          scale,
+          Animated.multiply(
+            Animated.multiply(centerness, focusMatch),
+            Animated.multiply(shrink, FOCUS_EXTRA),
+          ),
+        )
+      : scale;
 
   const pressScale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
@@ -92,7 +138,7 @@ const TvTrendCard = memo(function TvTrendCard({
             styles.cardContainer,
             {
               shadowColor: theme.shadow,
-              transform: [{ scale }],
+              transform: [{ scale: finalScale }],
               opacity,
             },
           ]}
@@ -112,9 +158,9 @@ const TvTrendCard = memo(function TvTrendCard({
             {
               shadowColor: theme.shadow,
               transform: [
-                { scale },
+                { scale: finalScale },
                 {
-                  translateY: scale.interpolate({
+                  translateY: finalScale.interpolate({
                     inputRange: [0.9, 1],
                     outputRange: [1, 20],
                   }),
@@ -174,6 +220,11 @@ const TvTrendCard = memo(function TvTrendCard({
 
 export default function TvShowsTrends({ navigation }) {
   const scrollX = React.useRef(new Animated.Value(0)).current;
+  // Odak posteri: kaydırırken FOCUS_PEAK'e büyür, settle olunca `shrink` 0→1 ile
+  // normale iner. `focusedPos` odaktaki kartın merkez scroll konumu (Animated →
+  // React state yok, yeniden render yok).
+  const shrink = React.useRef(new Animated.Value(1)).current;
+  const focusedPos = React.useRef(new Animated.Value(0)).current;
   const { t } = useLanguage();
   const { theme } = useTheme();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
@@ -201,6 +252,21 @@ export default function TvShowsTrends({ navigation }) {
     if (!canTrigger.current) return;
     canTrigger.current = false;
     if (pageTrend < totalPagesTrend && !loadingMoreTrend) loadMoreTrend();
+  };
+
+  // Poster odağa oturunca (settle): odak kartını `focusedPos` ile işaretle ve o
+  // kartı büyümüş hâlden (1.15) yumuşak bir spring ile normale indir. Spring'in
+  // hafif overshoot'u küçük bir bounce verir. Tümü Animated → React re-render yok.
+  const handleMomentumEnd = (e) => {
+    const snapped = Math.round(e.nativeEvent.contentOffset.x / ITEM_SIZE) * ITEM_SIZE;
+    focusedPos.setValue(snapped);
+    shrink.setValue(0); // büyümüş (1.15) hâlden başla
+    Animated.spring(shrink, {
+      toValue: 1,
+      friction: 7,
+      tension: 60,
+      useNativeDriver: true,
+    }).start();
   };
 
   const renderCategory = ({ item }) => (
@@ -232,10 +298,6 @@ export default function TvShowsTrends({ navigation }) {
   );
 
   const renderItem = ({ item, index }) => {
-    if (item.id === "left-spacer" || item.id === "right-spacer") {
-      return <View style={{ width: EMPTY_ITEM_SIZE }} />;
-    }
-
     return (
       <TvTrendCard
         item={item}
@@ -244,6 +306,8 @@ export default function TvShowsTrends({ navigation }) {
         theme={theme}
         getTmdbUrl={getTmdbUrl}
         scrollX={scrollX}
+        shrink={shrink}
+        focusedPos={focusedPos}
       />
     );
   };
@@ -262,17 +326,11 @@ export default function TvShowsTrends({ navigation }) {
             contentContainerStyle={styles.categoriesList}
           />
         </View>
-        <Animated.FlatList
-          data={[1, 2, 3]}
-          renderItem={(index) => <MovieCardSkeleton index={index} />}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: EMPTY_ITEM_SIZE }}
-          initialNumToRender={3}
-          maxToRenderPerBatch={3}
-          windowSize={3}
-          removeClippedSubviews
-        />
+        <View style={styles.skeletonRow}>
+          {[0, 1, 2].map((index) => (
+            <MovieCardSkeleton key={index} index={{ index }} />
+          ))}
+        </View>
       </View>
     );
   }
@@ -295,8 +353,16 @@ export default function TvShowsTrends({ navigation }) {
         data={seriesTrend}
         renderItem={renderItem}
         keyExtractor={(item) => item.id.toString()}
+        ListHeaderComponent={TrendEdgeSpacer}
+        ListFooterComponent={TrendEdgeSpacer}
+        getItemLayout={(_, index) => ({
+          length: ITEM_SIZE,
+          offset: EMPTY_ITEM_SIZE + ITEM_SIZE * index,
+          index,
+        })}
         horizontal
         showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: FOCUS_HEADROOM }}
         snapToInterval={ITEM_SIZE}
         snapToAlignment="start"
         decelerationRate="normal"
@@ -305,7 +371,7 @@ export default function TvShowsTrends({ navigation }) {
         maxToRenderPerBatch={INITIAL_CARD_RENDER_COUNT}
         updateCellsBatchingPeriod={80}
         windowSize={5}
-        removeClippedSubviews
+        removeClippedSubviews={false}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
           { useNativeDriver: true },
@@ -314,6 +380,7 @@ export default function TvShowsTrends({ navigation }) {
         onMomentumScrollBegin={() => {
           canTrigger.current = true;
         }}
+        onMomentumScrollEnd={handleMomentumEnd}
         onEndReached={handleTrendsEndReached}
         onEndReachedThreshold={0.5}
       />
@@ -345,7 +412,7 @@ const styles = StyleSheet.create({
     elevation: 16,
   },
   header: {
-    marginBottom: 20,
+    marginBottom: 8,
   },
   headerTitle: {
     fontSize: 24,
@@ -355,6 +422,11 @@ const styles = StyleSheet.create({
   },
   categoriesList: {
     paddingHorizontal: 15,
+  },
+  skeletonRow: {
+    flexDirection: "row",
+    paddingHorizontal: EMPTY_ITEM_SIZE,
+    overflow: "hidden",
   },
   categoryItem: {
     marginRight: 5,

@@ -239,6 +239,7 @@ export default function CommentSheetModal({
           <Comment
             contextId={movieId}
             collectionName={collectionName}
+            tmdbReviews={details?.reviews?.results || []}
             mediaTitle={details?.title || details?.name || ""}
             mediaPoster={
               details?.poster_path

@@ -1,8 +1,8 @@
 ================================================================
-WATCHFLIX - KAPSAMLI PERFORMANS VE KOD KALİTESİ ANALİZİ
+WATCHIFY - KAPSAMLI PERFORMANS VE KOD KALİTESİ ANALİZİ
 ================================================================
 Tarih: 10.04.2026
-Proje: WatchFlix - React Native (Expo SDK 54)
+Proje: Watchify - React Native (Expo SDK 54)
 Analiz: Tüm kaynak dosyalar tek tek incelenerek hazırlanmıştır.
 ================================================================
 

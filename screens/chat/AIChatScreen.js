@@ -19,7 +19,6 @@ import {
   ScrollView,
   FlatList,
   StyleSheet,
-  KeyboardAvoidingView,
   Platform,
   Keyboard,
   ActivityIndicator,
@@ -37,7 +36,11 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import LottieView from "lottie-react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import Reanimated, { FadeInUp } from "react-native-reanimated";
+import Reanimated, {
+  FadeInUp,
+  useAnimatedKeyboard,
+  useAnimatedStyle,
+} from "react-native-reanimated";
 import { useNavigation } from "@react-navigation/native";
 
 import { useLanguage } from "@context/LanguageContext";
@@ -152,53 +155,17 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
   const anim = useRef(new Animated.Value(0)).current;
   const [rendered, setRendered] = useState(false);
 
-  // Klavye yüksekliğini izle (Android). Sohbet statusBarTranslucent bir Modal
-  // içinde olduğundan cihaza/sürüme göre pencere klavyede ya kendiliğinden
-  // küçülüyor (resize) ya da hiç tepki vermiyor. Bu yüzden sabit padding
-  // yerine uyarlanabilir hesap yapıyoruz:
-  //   1) Klavyenin ekranı gerçekte ne kadar kapladığını endCoordinates.screenY
-  //      üzerinden ölç (height alanı bazı cihazlarda fazla raporlanıyor).
-  //   2) Ekran kabı onLayout ile pencerenin kendiliğinden ne kadar
-  //      küçüldüğünü ölç (resize çalışıyorsa fark zaten kapanmıştır).
-  //   3) Sadece kalan farkı paddingBottom olarak ekle; SafeAreaView'ın alt
-  //      inset'i de düşülür (yoksa input klavyenin üstünde asılı kalır).
+  // Modal ayrı native katmanda ve edge-to-edge çalıştığı için Keyboard event
+  // ölçümü bazı Android sürümlerinde klavyenin kapladığı alanı eksik veriyor.
+  // UI thread'deki gerçek yükseklikle sohbet gövdesini daralt; SafeAreaView
+  // zaten alt inset'i eklediğinden burada yalnızca kalan klavye payını uygula.
   const insets = useSafeAreaInsets();
-  const [kbHeight, setKbHeight] = useState(0);
-  const [layoutH, setLayoutH] = useState(0);
-  const baseLayoutH = useRef(0); // klavye kapalıyken görülen en büyük yükseklik
-  useEffect(() => {
-    const showEvt = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const onShow = (e) => {
-      const winH = Dimensions.get("window").height;
-      const screenY = e.endCoordinates?.screenY;
-      setKbHeight(
-        screenY != null
-          ? Math.max(0, winH - screenY)
-          : (e.endCoordinates?.height ?? 0),
-      );
-    };
-    const onHide = () => setKbHeight(0);
-    const showSub = Keyboard.addListener(showEvt, onShow);
-    const hideSub = Keyboard.addListener(hideEvt, onHide);
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
-
-  const onScreenLayout = useCallback((e) => {
-    const h = e.nativeEvent.layout.height;
-    baseLayoutH.current = Math.max(baseLayoutH.current, h);
-    setLayoutH(h);
-  }, []);
-
-  // Pencere resize ile zaten küçüldüyse o kadarını klavye payından düş.
-  const windowShrunk = Math.max(0, baseLayoutH.current - layoutH);
-  const androidKbPad =
-    Platform.OS === "android" && kbHeight > 0
-      ? Math.max(0, kbHeight - windowShrunk - insets.bottom)
-      : 0;
+  const keyboard = useAnimatedKeyboard({
+    isNavigationBarTranslucentAndroid: true,
+  });
+  const keyboardAvoidanceStyle = useAnimatedStyle(() => ({
+    paddingBottom: Math.max(0, keyboard.height.value - insets.bottom),
+  }));
 
   useEffect(() => {
     if (visible) {
@@ -339,8 +306,8 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
             return { role: m.role, text: m.text || m.display || "" };
           });
 
+        // API anahtarı istemcide değil — istek callGemini proxy'sinden geçer.
         const response = await askCineStructured({
-          apiKey: process.env.EXPO_PUBLIC_GEMINI_API_KEY || "",
           history: priorHistory,
           userMessage: userText,
           language,
@@ -529,7 +496,6 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
             { backgroundColor: theme.primary, paddingTop: insets.top },
           ]}
           edges={["bottom"]}
-          onLayout={onScreenLayout}
         >
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: theme.border }]}>
@@ -615,14 +581,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
             </View>
           ) : (
             // ── Sohbet ──
-            <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : undefined}
-              style={[
-                { flex: 1 },
-                androidKbPad > 0 ? { paddingBottom: androidKbPad } : null,
-              ]}
-              keyboardVerticalOffset={0}
-            >
+            <Reanimated.View style={[styles.chatBody, keyboardAvoidanceStyle]}>
               {settingsVisible && (
                 <View style={[styles.settings, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
                   <View style={styles.settingRow}>
@@ -788,7 +747,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
                   )}
                 </TouchableOpacity>
               </View>
-            </KeyboardAvoidingView>
+            </Reanimated.View>
           )}
         </SafeAreaView>
       </Animated.View>
@@ -798,6 +757,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  chatBody: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",

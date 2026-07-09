@@ -131,6 +131,75 @@ export function getPhaseInfo(periodId, ms = now()) {
   return { phase, activeRound, nextDeadlineMs, msToNext: Math.max(0, nextDeadlineMs - ms) };
 }
 
+// ─── Aday belirleme (nomination / "hype") oylaması ────────────────────────────
+// SELECTION fazında kullanıcılar havuzdaki adaylara hype verir; EN ÇOK HYPE
+// ALAN 32 yapı turnuvaya katılır. Oylar picks gibi kullanıcı başına TEK
+// dokümanda, `noms: { [nomineeId]: true }` map'inde tutulur.
+//
+// TEK OY MODELİ: kullanıcı başına TEK hype hakkı vardır ve seçim KESİNDİR
+// (değiştirilemez/geri alınamaz) — eleme maç oylarıyla aynı kural. Sunucu
+// tarafı yaptırım firestore.rules'ta (noms'a yalnız İLK anahtar eklenebilir).
+// tallyNominations tüm anahtarları saymaya devam eder ki eski ayların (10 hak
+// dönemindeki) bracket'ları retroaktif DEĞİŞMESİN.
+// Havuzu ≤32 olan ESKİ aylar için davranış DEĞİŞMEZ: selectFinalists listeyi
+// olduğu gibi döner, geçmiş bracket'lar aynı kalır.
+export const FINALIST_COUNT = 32;
+export const MAX_NOMINATIONS = 1; // kullanıcı başına hype (aday oyu) hakkı
+
+// voteDocs → { [nomineeId]: oySayısı }
+export function tallyNominations(voteDocs = []) {
+  const t = {};
+  for (const v of voteDocs) {
+    const noms = v?.noms;
+    if (!noms) continue;
+    for (const id of Object.keys(noms)) {
+      if (!noms[id]) continue;
+      t[id] = (t[id] || 0) + 1;
+    }
+  }
+  return t;
+}
+
+// Tek kullanıcının aday oyları → Set("id")
+export function getMyNominations(voteDocs = [], uid) {
+  const me = voteDocs.find((v) => (v.uid || v.id) === uid);
+  const noms = me?.noms || {};
+  return new Set(Object.keys(noms).filter((k) => noms[k]));
+}
+
+// Havuzu oy sayısına göre sırala (oy desc → havuz seed asc) ve her adaya
+// { nomVotes, rank, finalist } ekle. Seçim ekranındaki canlı sıralama bundan çizilir.
+export function rankPool(nominees = [], nomTally = {}) {
+  return [...nominees]
+    .sort((a, b) => {
+      const av = nomTally[String(a.id)] || 0;
+      const bv = nomTally[String(b.id)] || 0;
+      if (av !== bv) return bv - av;
+      return (a.seed || 0) - (b.seed || 0);
+    })
+    .map((n, i) => ({
+      ...n,
+      nomVotes: nomTally[String(n.id)] || 0,
+      rank: i + 1,
+      finalist: i < FINALIST_COUNT,
+    }));
+}
+
+// Havuz > 32 ise ilk 32'yi al ve 1..32 olarak YENİDEN seed'le (bracket eşleşmeleri
+// bu yeni seed'lerden türer; orijinal havuz sırası poolSeed'de saklanır).
+// Havuz ≤ 32 ise (eski aylar / henüz yükseltilmemiş doküman) dokunma.
+export function selectFinalists(nominees = [], nomTally = {}) {
+  if (!Array.isArray(nominees) || nominees.length <= FINALIST_COUNT) return nominees;
+  return rankPool(nominees, nomTally)
+    .slice(0, FINALIST_COUNT)
+    .map((n, i) => ({ ...n, poolSeed: n.seed, seed: i + 1 }));
+}
+
+// Kısayol: doc.nominees + tüm oy dokümanları → turnuvaya katılan 32 finalist.
+export function resolveFinalists({ nominees = [], voteDocs = [] }) {
+  return selectFinalists(nominees, tallyNominations(voteDocs));
+}
+
 // ─── Oyları say ───────────────────────────────────────────────────────────────
 // voteDocs: [{ uid, picks: { [matchId]: "a"|"b" } }] → { [matchId]: { a, b } }
 export function tallyVotes(voteDocs = []) {
@@ -211,6 +280,80 @@ export function buildBracket({ nominees = [], tallies = {}, periodId, ms = now()
     rounds: out,
     champion: finalMatch.winner || null,
     championDecided: finalMatch.decided && !!finalMatch.winner,
+  };
+}
+
+// ─── Yarışmacı başına TOPLAM oy ────────────────────────────────────────────────
+// Bir bracket'in tüm turlarında bir yarışmacının topladığı oyların toplamı
+// { [contestantId]: oySayısı }. Şampiyon kartı (bu ay) ve podyum modalı (geçmiş
+// ay) AYNI hesaplamayı paylaşır — burada tek yerde tutulur.
+export function computeContestantTotals(rounds = []) {
+  const totals = {};
+  rounds.forEach((r) =>
+    r.matches.forEach((m) => {
+      if (m.a) totals[m.a.id] = (totals[m.a.id] || 0) + m.aVotes;
+      if (m.b) totals[m.b.id] = (totals[m.b.id] || 0) + m.bVotes;
+    }),
+  );
+  return totals;
+}
+
+// ─── 3.'lük adayı ───────────────────────────────────────────────────────────────
+// Yarı final kaybedenlerinden DAHA İYİ olanı: YF oyu → turnuva boyu toplam oy →
+// seed (düşük=daha iyi). PodiumModal (geçmiş ay) ve getChampionStats (bu ay)
+// AYNI kuralı paylaşır. → { c, sfVotes, sfTotal } | null.
+export function computeThirdPlace(bracket, totals) {
+  const sfRound = bracket.rounds.find((r) => r.key === "sf");
+  const votesOf = (m, c) => (m.a?.id === c?.id ? m.aVotes : m.bVotes);
+  const sfLosers = (sfRound?.matches || [])
+    .filter((m) => m.winnerSide)
+    .map((m) => {
+      const loser = m.winnerSide === "a" ? m.b : m.a;
+      return loser
+        ? { c: loser, sfVotes: votesOf(m, loser), sfTotal: m.aVotes + m.bVotes }
+        : null;
+    })
+    .filter(Boolean)
+    .sort(
+      (x, y) =>
+        y.sfVotes - x.sfVotes ||
+        (totals[y.c.id] || 0) - (totals[x.c.id] || 0) ||
+        (x.c.seed || 0) - (y.c.seed || 0),
+    );
+  return sfLosers[0] || null;
+}
+
+// ─── Şampiyon kartı istatistikleri ─────────────────────────────────────────────
+// bracket → { totalVotes, runnerUp, finalVotes, finalTotal, pct, third } | null.
+// Final maçındaki skor + turnuva boyunca toplanan oy + ikincilik/üçüncülük
+// bilgisini tek çağrıda türetir (ChampionHero bunu kullanır).
+export function getChampionStats(bracket) {
+  if (!bracket?.champion) return null;
+  const totals = computeContestantTotals(bracket.rounds);
+  const finalMatch = bracket.rounds[bracket.rounds.length - 1].matches[0];
+  const champ = bracket.champion;
+  const runnerUp = finalMatch.winnerSide === "a" ? finalMatch.b : finalMatch.a;
+  const finalTotal = finalMatch.aVotes + finalMatch.bVotes;
+  const finalVotes = finalMatch.a?.id === champ.id ? finalMatch.aVotes : finalMatch.bVotes;
+
+  const thirdRaw = computeThirdPlace(bracket, totals);
+  const third = thirdRaw
+    ? {
+        c: thirdRaw.c,
+        totalVotes: totals[thirdRaw.c.id] || 0,
+        votes: thirdRaw.sfVotes,
+        total: thirdRaw.sfTotal,
+        pct: thirdRaw.sfTotal > 0 ? Math.round((thirdRaw.sfVotes / thirdRaw.sfTotal) * 100) : 0,
+      }
+    : null;
+
+  return {
+    totalVotes: totals[champ.id] || 0,
+    runnerUp,
+    finalVotes,
+    finalTotal,
+    pct: finalTotal > 0 ? Math.round((finalVotes / finalTotal) * 100) : 0,
+    third,
   };
 }
 

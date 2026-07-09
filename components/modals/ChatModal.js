@@ -581,6 +581,10 @@ export const ChatModal = () => {
           return e.timeout;
         case "RATE_LIMIT":
           return e.rateLimit;
+        case "QUOTA":
+          return e.quota || "Bugünlük AI hakkın doldu. Yarın tekrar dene.";
+        case "AUTH":
+          return e.authRequired || "AI sohbet için giriş yapman gerekiyor.";
         case "BLOCKED":
           return e.blocked;
         case "EMPTY":
@@ -623,8 +627,8 @@ export const ChatModal = () => {
           .slice(0, -1) // son kullanıcı mesajını çıkar (userText olarak ayrı gider)
           .map((m) => ({ role: m.role, text: m.text }));
 
+        // API anahtarı istemcide değil — istek callGemini proxy'sinden geçer.
         const { text: rawText } = await askGemini({
-          apiKey: process.env.EXPO_PUBLIC_GEMINI_API_KEY || "",
           history: priorHistory,
           userMessage: userText,
           language,

@@ -30,6 +30,7 @@ import WrappedYearPath from "./WrappedYearPath";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const PATH_W = SCREEN_W - 56;
+const YEAR_PATH_W = SCREEN_W - 24;
 const LIST_MAX_H = SCREEN_H * 0.6; // kaydırmalı slaytların (tür/dizi) iç yüksekliği
 
 // Slayt başına ana vurgu renkleri (canlı). Screen index % length ile seçer.
@@ -296,13 +297,18 @@ export const IntroSlide = memo(function IntroSlide({
             <Text style={introStyles.pickTitle} allowFontScaling={false}>
               {str.pickYear}
             </Text>
+            <Text style={introStyles.pickSubtitle} allowFontScaling={false}>
+              {str.pickYearHint}
+            </Text>
           </Reveal>
-          <Reveal delay={280} style={{ alignItems: "center", marginTop: 8 }}>
+          <Reveal delay={280} style={{ alignItems: "center", marginTop: 14 }}>
             <WrappedYearPath
               years={years}
               selectedYear={recap.year}
               onSelect={onSelectYear}
-              width={PATH_W}
+              width={YEAR_PATH_W}
+              accent={accent}
+              selectedText={str.yearSelected}
             />
           </Reveal>
         </>
@@ -333,7 +339,8 @@ export const IntroSlide = memo(function IntroSlide({
 const introStyles = StyleSheet.create({
   brandRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   brand: { color: "rgba(255,255,255,0.92)", fontSize: 19, fontWeight: "800", letterSpacing: 0.6 },
-  pickTitle: { color: "#fff", fontSize: 30, fontWeight: "900", letterSpacing: -0.8, marginTop: 14, marginBottom: 4 },
+  pickTitle: { color: "#fff", fontSize: 30, fontWeight: "900", letterSpacing: -0.8, marginTop: 14 },
+  pickSubtitle: { color: "rgba(255,255,255,0.65)", fontSize: 13, fontWeight: "600", marginTop: 4 },
   year: { color: "#fff", fontSize: 104, fontWeight: "900", letterSpacing: -5, includeFontPadding: false, marginTop: 6 },
   yearRow: { gap: 9, paddingRight: 14, alignItems: "center" },
   yearChip: {

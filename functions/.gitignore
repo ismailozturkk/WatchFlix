@@ -2,3 +2,7 @@ node_modules/
 .env
 *.log
 .runtimeconfig.json
+
+# Tek seferlik script'ler için indirilen service account anahtarları (asla commit etme)
+scripts/*.json
+*-firebase-adminsdk-*.json

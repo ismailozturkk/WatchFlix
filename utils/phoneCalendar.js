@@ -4,7 +4,7 @@ import Toast from "react-native-toast-message";
 import { Platform } from "react-native";
 
 const STORAGE_KEY = "phone_calendar_saved_events_v1";
-const CALENDAR_NAME = "WhatchFlix";
+const CALENDAR_NAME = "Watchify";
 
 async function getSavedMap() {
   try {
@@ -74,10 +74,10 @@ function buildEventPayload(item) {
     notes = item.content || "";
   } else if (item.eventType === "reminder_movie") {
     title = `🎬 ${item.title}`;
-    notes = "Film vizyona giriyor (WhatchFlix hatırlatması)";
+    notes = "Film vizyona giriyor (Watchify hatırlatması)";
   } else if (item.eventType === "reminder_tv") {
     title = `📺 ${item.title}`;
-    notes = "Yeni bölüm yayınlanıyor (WhatchFlix hatırlatması)";
+    notes = "Yeni bölüm yayınlanıyor (Watchify hatırlatması)";
   }
 
   return {

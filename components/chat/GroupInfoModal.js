@@ -6,6 +6,7 @@ import {
   Image,
   Modal,
   Pressable,
+  SectionList,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -20,8 +21,16 @@ import { useProfileUi } from "@context/ProfileUiContext";
 import {
   addGroupMember,
   removeGroupMember,
+  setGroupAdminRole,
   updateGroupAvatar,
 } from "@services/groupsService";
+import {
+  canManageGroup,
+  groupRoleOf,
+  isGroupAdmin,
+  isGroupCreator,
+  sortMembersByRole,
+} from "@utils/groupRoles";
 import { i18nText } from "@utils/i18nText";
 import { toast } from "@components/AppToast";
 import GroupAvatar from "@components/chat/GroupAvatar";
@@ -64,9 +73,9 @@ export default function GroupInfoModal({
   const [busyUid, setBusyUid] = useState(null);
   const [savingAvatar, setSavingAvatar] = useState(false);
 
-  const isAdmin =
-    groupData?.createdBy === currentUid ||
-    groupData?.admins?.includes(currentUid);
+  const isCreator = isGroupCreator(groupData, currentUid);
+  const isAdmin = isGroupAdmin(groupData, currentUid);
+  const canManage = canManageGroup(groupData, currentUid);
   const memberIds = groupData?.members || [];
 
   useEffect(() => {
@@ -74,7 +83,7 @@ export default function GroupInfoModal({
   }, [visible]);
 
   useEffect(() => {
-    if (!visible || !isAdmin || !currentUid) return undefined;
+    if (!visible || !canManage || !currentUid) return undefined;
     setLoadingFriends(true);
     return onSnapshot(
       collection(db, "Users", currentUid, "friends"),
@@ -94,11 +103,11 @@ export default function GroupInfoModal({
       },
       () => setLoadingFriends(false)
     );
-  }, [visible, isAdmin, currentUid]);
+  }, [visible, canManage, currentUid]);
 
   const members = useMemo(
     () =>
-      memberIds.map((uid) => ({
+      sortMembersByRole(memberIds.map((uid) => ({
         uid,
         displayName:
           groupData?.memberInfo?.[uid]?.name ||
@@ -106,9 +115,35 @@ export default function GroupInfoModal({
             ? i18nText("autoI18n.sen", "Sen")
             : i18nText("autoI18n.isimsiz_kullanici", "İsimsiz kullanıcı")),
         avatarIndex: groupData?.memberInfo?.[uid]?.avatarIndex ?? 0,
-      })),
+      })), groupData),
     [memberIds, groupData?.memberInfo, currentUid]
   );
+
+  const memberSections = useMemo(() => {
+    const creators = members.filter((item) => groupRoleOf(groupData, item.uid) === "creator");
+    const admins = members.filter((item) => groupRoleOf(groupData, item.uid) === "admin");
+    const regularMembers = members.filter((item) => groupRoleOf(groupData, item.uid) === "member");
+    return [
+      {
+        key: "creator",
+        title: i18nText("autoI18n.grup_kurucusu", "Grup Kurucusu"),
+        icon: "diamond-outline",
+        data: creators,
+      },
+      {
+        key: "admins",
+        title: i18nText("autoI18n.yoneticiler", "Yöneticiler"),
+        icon: "shield-checkmark-outline",
+        data: admins,
+      },
+      {
+        key: "members",
+        title: i18nText("autoI18n.uyeler", "Üyeler"),
+        icon: "people-outline",
+        data: regularMembers,
+      },
+    ].filter((section) => section.data.length > 0);
+  }, [members, groupData]);
 
   const availableFriends = useMemo(
     () => friends.filter((friend) => !memberIds.includes(friend.uid)),
@@ -200,9 +235,49 @@ export default function GroupInfoModal({
     [savingAvatar, groupData?.avatarIndex, groupId]
   );
 
+  const confirmAdminRole = useCallback(
+    (member, shouldBeAdmin) => {
+      const title = shouldBeAdmin
+        ? i18nText("autoI18n.yonetici_yap", "Yönetici yap")
+        : i18nText("autoI18n.yoneticilikten_al", "Yöneticilikten al");
+      const message = shouldBeAdmin
+        ? i18nText("autoI18n.yonetici_yap_onay", "{{name}} grup yöneticisi yapılsın mı?", { name: member.displayName })
+        : i18nText("autoI18n.yoneticilikten_al_onay", "{{name}} yöneticilikten alınsın mı?", { name: member.displayName });
+      Alert.alert(title, message, [
+        { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
+        {
+          text: i18nText("autoI18n.onayla", "Onayla"),
+          onPress: async () => {
+            setBusyUid(member.uid);
+            try {
+              await setGroupAdminRole(groupId, member.uid, shouldBeAdmin);
+              toast.success(
+                shouldBeAdmin
+                  ? i18nText("autoI18n.yonetici_yapildi", "Yönetici atandı")
+                  : i18nText("autoI18n.yoneticilik_kaldirildi", "Yöneticilik kaldırıldı"),
+              );
+            } catch (error) {
+              console.error("setGroupAdminRole:", error);
+              toast.error(i18nText("autoI18n.rol_guncellenemedi", "Rol güncellenemedi"));
+            } finally {
+              setBusyUid(null);
+            }
+          },
+        },
+      ]);
+    },
+    [groupId],
+  );
+
   const renderRow = ({ item, adding = false }) => {
-    const isCreator = item.uid === groupData?.createdBy;
-    const canRemove = isAdmin && item.uid !== currentUid && !isCreator;
+    const itemRole = groupRoleOf(groupData, item.uid);
+    const itemIsCreator = itemRole === "creator";
+    const itemIsAdmin = itemRole === "admin";
+    const canToggleAdmin = isCreator && item.uid !== currentUid && !itemIsCreator;
+    const canRemove =
+      item.uid !== currentUid &&
+      !itemIsCreator &&
+      (isCreator || (isAdmin && !itemIsAdmin));
     const loading = busyUid === item.uid;
     return (
       <TouchableOpacity
@@ -231,13 +306,14 @@ export default function GroupInfoModal({
             >
               {item.displayName}
             </Text>
-            {isCreator && (
+            {itemIsCreator && (
               <View
                 style={[
                   styles.roleBadge,
                   { backgroundColor: (groupData?.color || ACCENT) + "22" },
                 ]}
               >
+                <Ionicons name="diamond" size={9} color={groupData?.color || ACCENT} />
                 <Text
                   style={[
                     styles.roleText,
@@ -245,6 +321,14 @@ export default function GroupInfoModal({
                   ]}
                 >
                   {i18nText("autoI18n.kurucu", "Kurucu")}
+                </Text>
+              </View>
+            )}
+            {itemIsAdmin && (
+              <View style={[styles.roleBadge, styles.adminBadge]}>
+                <Ionicons name="shield-checkmark" size={9} color="#72D6A0" />
+                <Text style={[styles.roleText, { color: "#72D6A0" }]}>
+                  {i18nText("autoI18n.yonetici", "Yönetici")}
                 </Text>
               </View>
             )}
@@ -289,16 +373,43 @@ export default function GroupInfoModal({
               {i18nText("autoI18n.ekle", "Ekle")}
             </Text>
           </TouchableOpacity>
-        ) : canRemove ? (
-          <TouchableOpacity
-            onPress={(event) => {
-              event.stopPropagation();
-              confirmRemove(item);
-            }}
-            style={[styles.iconAction, { backgroundColor: DANGER + "18" }]}
-          >
-            <Ionicons name="person-remove-outline" size={18} color={DANGER} />
-          </TouchableOpacity>
+        ) : canToggleAdmin || canRemove ? (
+          <View style={styles.memberActions}>
+            {canToggleAdmin && (
+              <TouchableOpacity
+                onPress={(event) => {
+                  event.stopPropagation();
+                  confirmAdminRole(item, !itemIsAdmin);
+                }}
+                style={[
+                  styles.iconAction,
+                  { backgroundColor: itemIsAdmin ? "rgba(255,193,7,0.12)" : "rgba(114,214,160,0.12)" },
+                ]}
+                accessibilityLabel={
+                  itemIsAdmin
+                    ? i18nText("autoI18n.yoneticilikten_al", "Yöneticilikten al")
+                    : i18nText("autoI18n.yonetici_yap", "Yönetici yap")
+                }
+              >
+                <Ionicons
+                  name={itemIsAdmin ? "shield-outline" : "shield-checkmark-outline"}
+                  size={18}
+                  color={itemIsAdmin ? "#FFD166" : "#72D6A0"}
+                />
+              </TouchableOpacity>
+            )}
+            {canRemove && (
+              <TouchableOpacity
+                onPress={(event) => {
+                  event.stopPropagation();
+                  confirmRemove(item);
+                }}
+                style={[styles.iconAction, { backgroundColor: DANGER + "18" }]}
+              >
+                <Ionicons name="person-remove-outline" size={18} color={DANGER} />
+              </TouchableOpacity>
+            )}
+          </View>
         ) : item.uid !== currentUid ? (
           <Ionicons
             name="chevron-forward"
@@ -345,12 +456,12 @@ export default function GroupInfoModal({
           />
           <View style={styles.sheetHeader}>
             <TouchableOpacity
-              activeOpacity={isAdmin ? 0.75 : 1}
-              disabled={!isAdmin}
+              activeOpacity={canManage ? 0.75 : 1}
+              disabled={!canManage}
               onPress={() => setTab("avatar")}
               style={styles.groupAvatarButton}
               accessibilityLabel={
-                isAdmin
+                canManage
                   ? i18nText(
                       "autoI18n.grup_avatarini_degistir",
                       "Grup avatarını değiştir"
@@ -365,7 +476,7 @@ export default function GroupInfoModal({
                 borderRadius={16}
                 iconSize={32}
               />
-              {isAdmin && (
+              {canManage && (
                 <View
                   style={[
                     styles.avatarEditBadge,
@@ -444,7 +555,7 @@ export default function GroupInfoModal({
                 {i18nText("autoI18n.uyeler", "Üyeler")}
               </Text>
             </TouchableOpacity>
-            {isAdmin && (
+            {canManage && (
               <>
                 <TouchableOpacity
                   onPress={() => setTab("add")}
@@ -524,25 +635,59 @@ export default function GroupInfoModal({
             <View style={styles.loadingBox}>
               <ActivityIndicator color={groupData?.color || ACCENT} />
             </View>
+          ) : tab === "members" ? (
+            <SectionList
+              sections={memberSections}
+              keyExtractor={(item) => item.uid}
+              renderItem={(props) => renderRow({ ...props, adding: false })}
+              renderSectionHeader={({ section }) => (
+                <View
+                  style={[
+                    styles.sectionHeader,
+                    { backgroundColor: theme.secondary || "#171727" },
+                  ]}
+                >
+                  <Ionicons
+                    name={section.icon}
+                    size={13}
+                    color={section.key === "creator" ? groupData?.color || ACCENT : theme.text?.muted || "#888"}
+                  />
+                  <Text
+                    style={[
+                      styles.sectionHeaderText,
+                      { color: section.key === "creator" ? groupData?.color || ACCENT : theme.text?.muted || "#888" },
+                    ]}
+                  >
+                    {section.title}
+                  </Text>
+                  <View style={styles.sectionCount}>
+                    <Text style={styles.sectionCountText}>{section.data.length}</Text>
+                  </View>
+                </View>
+              )}
+              stickySectionHeadersEnabled={false}
+              style={styles.list}
+              contentContainerStyle={!members.length ? styles.emptyList : undefined}
+              ListEmptyComponent={
+                <View style={styles.empty}>
+                  <Ionicons name="people-outline" size={34} color={theme.text?.muted || "#555"} />
+                  <Text style={[styles.emptyText, { color: theme.text?.muted || "#888" }]}>{emptyText}</Text>
+                </View>
+              }
+            />
           ) : (
             <FlatList
-              data={tab === "add" ? availableFriends : members}
+              data={availableFriends}
               keyExtractor={(item) => item.uid}
-              renderItem={(props) =>
-                renderRow({ ...props, adding: tab === "add" })
-              }
+              renderItem={(props) => renderRow({ ...props, adding: true })}
               style={styles.list}
               contentContainerStyle={
-                !(tab === "add" ? availableFriends : members).length
-                  ? styles.emptyList
-                  : undefined
+                !availableFriends.length ? styles.emptyList : undefined
               }
               ListEmptyComponent={
                 <View style={styles.empty}>
                   <Ionicons
-                    name={
-                      tab === "add" ? "person-add-outline" : "people-outline"
-                    }
+                    name="person-add-outline"
                     size={34}
                     color={theme.text?.muted || "#555"}
                   />
@@ -650,8 +795,17 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: "row", alignItems: "center", gap: 7 },
   memberName: { flexShrink: 1, fontSize: 14.5, fontWeight: "700" },
   memberMeta: { fontSize: 11.5, fontWeight: "500", marginTop: 3 },
-  roleBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
+  roleBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  adminBadge: { backgroundColor: "rgba(114,214,160,0.12)" },
   roleText: { fontSize: 9.5, fontWeight: "800" },
+  memberActions: { flexDirection: "row", alignItems: "center", gap: 6 },
   iconAction: {
     width: 36,
     height: 36,
@@ -668,6 +822,16 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   smallActionText: { fontSize: 12, fontWeight: "800" },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minHeight: 34,
+    paddingTop: 7,
+  },
+  sectionHeaderText: { fontSize: 10.5, fontWeight: "900", letterSpacing: 0.7, textTransform: "uppercase" },
+  sectionCount: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.07)" },
+  sectionCountText: { color: "rgba(255,255,255,0.45)", fontSize: 9.5, fontWeight: "800" },
   loadingBox: {
     minHeight: 250,
     alignItems: "center",

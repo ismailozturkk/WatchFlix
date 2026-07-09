@@ -1,11 +1,16 @@
 // components/hub/TournamentWidget.js
 //
 // Hub ekranındaki interaktif turnuva widget'ı. Bu ayın türünü, fazını ve geri
-// sayımını gösterir; sonuç fazındaysa şampiyon posterini, değilse en üst seed'li
-// birkaç posteri önizler. Basınca TournamentScreen'e gider.
+// sayımını gösterir; faza göre KİŞİSEL durum satırı ekler:
+//   • selection → hype hakkın duruyor mu ("1 hype hakkın var" / "Hype'ın kayıtlı")
+//                 + en çok hype alan 3 posterin canlı önizlemesi
+//   • voting    → aktif turda kaç maça oy verdiğin (ör. "3/16 maç")
+//   • results   → şampiyon posteri
+// Basınca TournamentScreen'e gider.
 //
-// Hafiftir: aday listesini OLUŞTURMAZ (getTournamentDoc — yoksa null). Tür/faz/
-// geri sayım zaten motordan (ağ gerekmez) gelir.
+// Hafiftir: aday listesini OLUŞTURMAZ (getTournamentDoc — yoksa null); sayımlar
+// tek agregat dokümandan (fetchAggOnce), kişisel durum tek kendi-oy dokümanından
+// (fetchMyVoteOnce) okunur. Tür/faz/geri sayım motordan (ağ gerekmez) gelir.
 
 import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
@@ -14,13 +19,17 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 import { useTheme } from "@context/ThemeContext";
+import { useAuth } from "@context/AuthContext";
 import { useImageQualitySettings, useLanguageSettings } from "@context/AppSettingsContext";
 import { i18nText } from "@utils/i18nText";
 import {
   getPeriodId, parsePeriodId, getScheduleEntry, getPhaseInfo, ROUNDS,
-  roundLabel, mediaLabel, buildBracket, tallyVotes, now,
+  roundLabel, mediaLabel, buildBracket, tallyVotes, tallyNominations,
+  selectFinalists, now,
 } from "@services/tournamentEngine";
-import { getTournamentDoc, fetchVotesOnce } from "@services/tournamentService";
+import {
+  getTournamentDoc, fetchVotesOnce, fetchAggOnce, fetchMyVoteOnce,
+} from "@services/tournamentService";
 import CountdownTimer from "@components/tournament/CountdownTimer";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -29,8 +38,10 @@ const PHASE_COLOR = { selection: "#3B82F6", voting: "#F59E0B", results: "#F5C518
 
 export default function TournamentWidget({ navigation }) {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const { getTmdbUrl } = useImageQualitySettings();
   const { selectedLanguage: lang } = useLanguageSettings();
+  const uid = user?.uid;
 
   const periodId = useMemo(() => getPeriodId(), []);
   const { monthIndex } = useMemo(() => parsePeriodId(periodId), [periodId]);
@@ -39,6 +50,8 @@ export default function TournamentWidget({ navigation }) {
   const [nowMs, setNowMs] = useState(now());
   const [doc, setDoc] = useState(null);
   const [champion, setChampion] = useState(null);
+  const [agg, setAgg] = useState(null);       // { noms, picks, voters } | null
+  const [myVote, setMyVote] = useState(null); // kendi oy dokümanım | null
 
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -50,38 +63,94 @@ export default function TournamentWidget({ navigation }) {
 
   const phaseInfo = useMemo(() => getPhaseInfo(periodId, nowMs), [periodId, nowMs]);
 
-  // Hafif önizleme verisi (oluşturmadan oku).
+  // Hafif önizleme verisi (oluşturmadan oku): meta + agg + kendi oyum.
+  // Tally için oy koleksiyonunun tamamı YALNIZ agg yoksa (eski ay) çekilir.
   useEffect(() => {
     let active = true;
     (async () => {
-      const d = await getTournamentDoc(periodId);
+      const [d, a, mine] = await Promise.all([
+        getTournamentDoc(periodId),
+        fetchAggOnce(periodId),
+        uid ? fetchMyVoteOnce(periodId, uid) : Promise.resolve(null),
+      ]);
       if (!active) return;
       setDoc(d);
+      setAgg(a);
+      setMyVote(mine);
       if (d?.nominees?.length && phaseInfo.phase === "results") {
-        const votes = await fetchVotesOnce(periodId);
-        if (!active) return;
-        const b = buildBracket({ nominees: d.nominees, tallies: tallyVotes(votes), periodId, ms: nowMs });
+        let nomTally;
+        let tallies;
+        if (a) {
+          nomTally = a.noms;
+          tallies = a.picks;
+        } else {
+          const votes = await fetchVotesOnce(periodId);
+          if (!active) return;
+          nomTally = tallyNominations(votes);
+          tallies = tallyVotes(votes);
+        }
+        // Havuz > 32 ise finalistler hype oylarından türer (ekranla aynı kural).
+        const finalists = selectFinalists(d.nominees, nomTally);
+        const b = buildBracket({ nominees: finalists, tallies, periodId, ms: nowMs });
         setChampion(b.champion || null);
       }
     })();
     return () => { active = false; };
-  }, [periodId, phaseInfo.phase]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [periodId, phaseInfo.phase, uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const phaseColor = PHASE_COLOR[phaseInfo.phase] || PHASE_COLOR.selection;
   const theTheme = lang === "tr" ? entry.tr : entry.en;
+
+  // Kişisel durum: hype hakkı / aktif turdaki oy sayısı.
+  const myNomCount = useMemo(
+    () => Object.keys(myVote?.noms || {}).filter((k) => myVote.noms[k]).length,
+    [myVote],
+  );
+  const activeRoundDef =
+    phaseInfo.phase === "voting" ? ROUNDS[phaseInfo.activeRound] : null;
+  const myRoundPicks = useMemo(() => {
+    if (!activeRoundDef) return 0;
+    return Object.keys(myVote?.picks || {}).filter((k) =>
+      k.startsWith(`${activeRoundDef.key}_`),
+    ).length;
+  }, [myVote, activeRoundDef]);
+
   const phaseLabel =
     phaseInfo.phase === "selection"
-      ? i18nText("autoI18n.tournament_voting_soon", "Oylama yakında")
+      ? myNomCount > 0
+        ? i18nText("autoI18n.tournament_widget_hyped", "🔥 Hype'ın kayıtlı — sıralamayı izle")
+        : i18nText("autoI18n.tournament_widget_hype_left", "🔥 1 hype hakkın var — İlk 32'yi sen seç")
       : phaseInfo.phase === "voting"
-        ? roundLabel(ROUNDS[phaseInfo.activeRound], lang)
+        ? `${roundLabel(activeRoundDef, lang)}${
+            uid
+              ? ` · ${myRoundPicks}/${activeRoundDef.matches} ${i18nText("autoI18n.tournament_widget_match", "maç")}`
+              : ""
+          }`
         : i18nText("autoI18n.tournament_next_in", "Yeni turnuvaya");
 
-  // Önizleme posterleri: şampiyon (results) veya en üst 3 seed.
+  // Katılım satırı (agg varsa): "N katılımcı".
+  const votersLine =
+    agg?.voters > 0
+      ? `${agg.voters} ${i18nText("autoI18n.tournament_widget_voters", "katılımcı")}`
+      : null;
+
+  // Önizleme posterleri: şampiyon (results) → en çok HYPE alan 3 (selection,
+  // agg varsa) → en üst 3 seed (fallback).
   const previewPosters = useMemo(() => {
     if (champion?.posterPath) return [champion];
-    const noms = [...(doc?.nominees || [])].sort((a, b) => a.seed - b.seed).slice(0, 3);
-    return noms;
-  }, [champion, doc]);
+    const nominees = doc?.nominees || [];
+    if (phaseInfo.phase === "selection" && agg && Object.keys(agg.noms).length > 0) {
+      const hyped = [...nominees]
+        .sort(
+          (a, b) =>
+            (agg.noms[String(b.id)] || 0) - (agg.noms[String(a.id)] || 0) ||
+            (a.seed || 0) - (b.seed || 0),
+        )
+        .slice(0, 3);
+      if (hyped.length) return hyped;
+    }
+    return [...nominees].sort((a, b) => a.seed - b.seed).slice(0, 3);
+  }, [champion, doc, agg, phaseInfo.phase]);
 
   return (
     <AnimatedPressable
@@ -110,7 +179,15 @@ export default function TournamentWidget({ navigation }) {
             {theTheme} {mediaLabel(entry.mediaType, lang)}
           </Text>
           <Text style={styles.phaseLabel} numberOfLines={1}>{phaseLabel}</Text>
-          <CountdownTimer deadlineMs={phaseInfo.nextDeadlineMs} lang={lang} size="sm" />
+          <View style={styles.countdownRow}>
+            <CountdownTimer deadlineMs={phaseInfo.nextDeadlineMs} lang={lang} size="sm" />
+            {votersLine && (
+              <View style={styles.votersPill}>
+                <AppIcon family="Ionicons" name="people" size={10} color="#fff" />
+                <Text style={styles.votersText}>{votersLine}</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Poster önizleme */}
@@ -181,6 +258,13 @@ const styles = StyleSheet.create({
   kicker: { color: "rgba(255,255,255,0.9)", fontSize: 11, fontWeight: "900", letterSpacing: 1 },
   theme: { color: "#fff", fontSize: 20, fontWeight: "900", marginTop: 6 },
   phaseLabel: { color: "rgba(255,255,255,0.92)", fontSize: 11.5, fontWeight: "800", marginTop: 6, marginBottom: 5 },
+  countdownRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  votersPill: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 9,
+  },
+  votersText: { color: "#fff", fontSize: 10, fontWeight: "800" },
 
   posters: { width: 92, height: 84, alignItems: "flex-end", justifyContent: "center" },
   posterWrap: { position: "absolute" },

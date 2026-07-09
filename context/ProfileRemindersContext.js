@@ -14,6 +14,10 @@ import {
 import * as cacheStore from "../utils/cacheStore";
 import { cacheKeys } from "../utils/cacheKeys";
 import { shouldPersistInternetData } from "../utils/dataCacheSettings";
+import {
+  clearReminderWidget,
+  syncReminderWidget,
+} from "../services/reminderWidgetService";
 
 const ProfileRemindersContext = createContext();
 export const useProfileReminders = () => useContext(ProfileRemindersContext);
@@ -113,7 +117,13 @@ export const ProfileRemindersProvider = ({ children }) => {
   const epDataRef   = useRef({}); // showId → episode[]
 
   useEffect(() => {
-    if (!uid) { setLoading(false); return; }
+    if (!uid) {
+      setMovieReminders([]);
+      setAllTvEpisodes([]);
+      setLoading(false);
+      clearReminderWidget();
+      return;
+    }
 
     // Offline-first: önce cache'ten seed.
     const cachedMovies = cacheStore.getJSON(...cacheKeys.reminders(uid, "movies"));
@@ -222,6 +232,14 @@ export const ProfileRemindersProvider = ({ children }) => {
     movieReminders,
     tvReminders: buildTvReminders(allTvEpisodes),
   }), [movieReminders, allTvEpisodes]);
+
+  // Android ana ekran widget'ı Firestore'a ikinci bir bağlantı açmaz. Context'in
+  // canonical verisinin küçük bir özetini yerel native depoya aktarır; widget
+  // buradan çizilir ve uygulama kapalıyken de son senkronize listeyi gösterebilir.
+  useEffect(() => {
+    if (!uid) return;
+    syncReminderWidget(reminders, language);
+  }, [uid, reminders, language]);
 
   const formatDate = (timestamp) => {
     if (!timestamp) return "";

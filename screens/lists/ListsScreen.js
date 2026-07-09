@@ -26,10 +26,11 @@ import { useLanguage } from "@context/LanguageContext";
 import { useAuth } from "@context/AuthContext";
 import SkeletonPlaceholder from "react-native-skeleton-placeholder";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Progress from "react-native-progress";
 import Toast from "react-native-toast-message";
 import SwipeCard from "@components/SwipeCard";
 import { BlurView } from "expo-blur";
-import { useImageQualitySettings } from "@context/AppSettingsContext";
+import { useImageQualitySettings, useListLayoutSettings } from "@context/AppSettingsContext";
 import CaseOpeningModal from "@components/modals/CaseOpeningModal";
 import Feather from "@expo/vector-icons/Feather";
 import * as Haptics from "expo-haptics";
@@ -41,6 +42,15 @@ import {
 } from "../../services/listItemsService";
 
 const { width, height } = Dimensions.get("window");
+
+// Diziyi `size`'lık satırlara böler (elle grid için — Android'de dinamik
+// numColumns'lu FlatList "addViewAt: failed to insert view" çökmesine yol açıyor).
+const chunk = (arr, size) => {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+};
+
 export default function ListsScreen({ route, navigation }) {
   const { theme } = useTheme();
   const { listName } = route.params;
@@ -56,6 +66,17 @@ export default function ListsScreen({ route, navigation }) {
   const [genreFilter, setGenreFilter] = useState([]); // seçili tür isimleri
   const [filtering, setFiltering] = useState(false); // sıralama/filtre yükleniyor
   const filterFirstRef = useRef(true);
+  // ── Görünüm ayarları — uygulama açılışında hidrate edilen ortak ayardan gelir
+  // (yerel depoya kaydedilir, Ayarlar ekranıyla paylaşılır) ───────────────────
+  const {
+    listsGridColumns: gridColumns,
+    changeListsGridColumns: changeGridColumns,
+    listsPosterRadius: posterRadius,
+    changeListsPosterRadius: changePosterRadius,
+  } = useListLayoutSettings();
+  // Sütun sayısına göre afiş boyutu (3'lü varsayılan oranı korunur)
+  const posterW = gridColumns === 4 ? width * 0.225 : width * 0.3;
+  const posterH = gridColumns === 4 ? height * 0.165 : height * 0.22;
   // Görünür vurgu rengi (theme.between bazı temalarda tanımsız/kontrastsız olabilir)
   const accent = theme.between || theme.accent || "#4b69ff";
   const { t, language } = useLanguage();
@@ -423,6 +444,12 @@ export default function ListsScreen({ route, navigation }) {
     sortDir,
     language,
   ]);
+
+  // Filtrelenmiş öğeleri sütun sayısına göre satırlara böl (elle grid).
+  const gridRows = useMemo(
+    () => chunk(filteredItems, gridColumns),
+    [filteredItems, gridColumns],
+  );
 
   const resetFilters = () => {
     setSortBy("default");
@@ -883,22 +910,30 @@ export default function ListsScreen({ route, navigation }) {
             </View>
           )}
           <FlatList
-            key={listName}
-            data={filteredItems}
-            initialNumToRender={12}
-            maxToRenderPerBatch={12}
+            data={gridRows}
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
             windowSize={7}
-            removeClippedSubviews
-            keyExtractor={(item) => String(item.id)}
+            // Android'de dinamik numColumns'lu FlatList "addViewAt: failed to insert
+            // view" çökmesine yol açtığından, çok sütunlu görünüm numColumns yerine
+            // elle satırlara bölünüp tek sütunlu listede render edilir.
+            removeClippedSubviews={false}
+            keyExtractor={(row, i) => `${row[0] ? row[0].id : "r"}-${i}`}
             showsVerticalScrollIndicator={false}
-            numColumns={3}
             contentContainerStyle={{
-              alignItems: "center",
               paddingBottom: 40,
             }}
-            columnWrapperStyle={{ justifyContent: "space-between" }}
-            renderItem={({ item, index }) => (
-              <TouchableOpacity
+            renderItem={({ item: row }) => (
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  width: "100%",
+                }}
+              >
+                {row.map((item) => (
+                  <TouchableOpacity
+                    key={String(item.id)}
                 activeOpacity={0.8}
                 onPressIn={() => onPressIn(item.id)}
                 onPressOut={() => {
@@ -936,40 +971,62 @@ export default function ListsScreen({ route, navigation }) {
               >
                 <SwipeCard>
                   <Animated.View
-                    style={[
-                      {
-                        margin: 3,
-                        transform: [{ scale: scaleValues[item.id] || 1 }],
-                      },
-                      item.type === "movie"
-                        ? { borderWidth: 0 }
-                        : item.showEpisodeCount ===
-                            (watchedCountById[item.id] || 0)
-                          ? item.showEpisodeCount && {
-                              borderWidth: 1, // Border kalınlığını artırdım
-                              borderTopColor: theme.primary,
-                              borderLeftColor: theme.primary,
-                              borderRightColor: theme.primary,
-                              borderBottomColor: theme.colors.green,
-                              borderRadius: 11,
-                            }
-                          : item.showEpisodeCount && {
-                              borderWidth: 1, // Border kalınlığını artırdım
-                              borderTopColor: theme.primary,
-                              borderLeftColor: theme.primary,
-                              borderRightColor: theme.primary,
-                              borderBottomColor: theme.colors.orange,
-
-                              borderRadius: 11,
-                            },
-                    ]}
+                    style={{
+                      margin: 3,
+                      // Alta yapışık ilerleme çubuğu poster köşesinden taşmasın
+                      // diye köşe yarıçapıyla kırpılır.
+                      overflow: "hidden",
+                      borderRadius: posterRadius,
+                      transform: [{ scale: scaleValues[item.id] || 1 }],
+                    }}
                   >
                     <PosterImage
                       path={item.imagePath}
                       type={item.type}
                       size={200}
-                      style={styles.image}
+                      style={[
+                        styles.image,
+                        { width: posterW, height: posterH, borderRadius: posterRadius },
+                      ]}
                     />
+                    {/* İzlenme ilerlemesi — poster altına yapışık tam genişlik
+                        bar (yeşil=bitti, turuncu=devam ediyor) */}
+                    {listName === "watchedTv" && item.showEpisodeCount ? (
+                      <>
+                        <LinearGradient
+                          colors={["transparent", "rgba(0,0,0,0.80)"]}
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            height: posterH * 0.4,
+                            borderBottomLeftRadius: posterRadius,
+                            borderBottomRightRadius: posterRadius,
+                          }}
+                        />
+                        <View style={styles.posterProgress}>
+                          <Progress.Bar
+                            progress={Math.min(
+                              (watchedCountById[item.id] || 0) /
+                                item.showEpisodeCount,
+                              1,
+                            )}
+                            width={posterW}
+                            height={3}
+                            borderWidth={0}
+                            borderRadius={2}
+                            color={
+                              item.showEpisodeCount ===
+                              (watchedCountById[item.id] || 0)
+                                ? theme.colors.green
+                                : theme.colors.orange
+                            }
+                            unfilledColor="rgba(255,255,255,0.2)"
+                          />
+                        </View>
+                      </>
+                    ) : null}
                     {listName !== "watchedTv" &&
                     listName !== "watchedMovies" ? (
                       <Text
@@ -1012,7 +1069,14 @@ export default function ListsScreen({ route, navigation }) {
                     )}
                   </Animated.View>
                 </SwipeCard>
-              </TouchableOpacity>
+                  </TouchableOpacity>
+                ))}
+                {row.length < gridColumns
+                  ? Array.from({ length: gridColumns - row.length }).map((_, i) => (
+                      <View key={`sp-${i}`} style={{ width: posterW + 6 }} />
+                    ))
+                  : null}
+              </View>
             )}
           />
         </>
@@ -1739,6 +1803,94 @@ export default function ListsScreen({ route, navigation }) {
                 );
               })}
 
+              {/* Görünüm — sütun sayısı & köşe yuvarlaklığı */}
+              <Text style={[fStyles.section, { color: theme.text.muted }]}>
+                {i18nText("autoI18n.gorunum", "GÖRÜNÜM")}
+              </Text>
+              <View style={fStyles.segRow}>
+                {[
+                  { key: 3, label: i18nText("autoI18n.uclu_dizilim", "3'lü") },
+                  { key: 4, label: i18nText("autoI18n.dortlu_dizilim", "4'lü") },
+                ].map((opt) => {
+                  const sel = gridColumns === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      activeOpacity={0.8}
+                      onPress={() => changeGridColumns(opt.key)}
+                      style={[
+                        fStyles.segBtn,
+                        {
+                          flexDirection: "row",
+                          justifyContent: "center",
+                          gap: 7,
+                          backgroundColor: sel ? theme.between : theme.secondary,
+                          borderColor: sel ? theme.between : theme.border,
+                        },
+                      ]}
+                    >
+                      <Feather
+                        name="grid"
+                        size={15}
+                        color={sel ? "#fff" : theme.text.secondary}
+                      />
+                      <Text
+                        style={[
+                          fStyles.segText,
+                          { color: sel ? "#fff" : theme.text.secondary },
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <View style={[fStyles.segRow, { marginTop: 8 }]}>
+                {[
+                  { key: 2, label: i18nText("autoI18n.kose_koseli", "Köşeli"), r: 3 },
+                  { key: 10, label: i18nText("autoI18n.kose_normal", "Normal"), r: 8 },
+                  { key: 20, label: i18nText("autoI18n.kose_yuvarlak", "Yuvarlak"), r: 14 },
+                ].map((opt) => {
+                  const sel = posterRadius === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      activeOpacity={0.8}
+                      onPress={() => changePosterRadius(opt.key)}
+                      style={[
+                        fStyles.segBtn,
+                        {
+                          flexDirection: "row",
+                          justifyContent: "center",
+                          gap: 7,
+                          backgroundColor: sel ? theme.between : theme.secondary,
+                          borderColor: sel ? theme.between : theme.border,
+                        },
+                      ]}
+                    >
+                      <View
+                        style={{
+                          width: 15,
+                          height: 19,
+                          borderRadius: opt.r,
+                          borderWidth: 1.6,
+                          borderColor: sel ? "#fff" : theme.text.secondary,
+                        }}
+                      />
+                      <Text
+                        style={[
+                          fStyles.segText,
+                          { color: sel ? "#fff" : theme.text.secondary },
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
               {/* Tür (yalnız karışık listelerde) */}
               {listName !== "watchedMovies" && listName !== "watchedTv" ? (
                 <>
@@ -2152,6 +2304,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.94,
     shadowRadius: 10.32,
     elevation: 5,
+  },
+  posterProgress: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   imageReorder: {
     width: 68,

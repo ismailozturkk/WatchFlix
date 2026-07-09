@@ -9,9 +9,15 @@
 //     henüz oynanmamış/kaybeden yollar soluk (border) kalır.
 //   • Kazanan poster accent çerçeveli + kupa rozetli; kaybeden solar.
 //   • Final bittiyse finalin ÜSTÜNE şampiyonun büyük posteri (kupa + accent) konur.
+//
+// ETKİLEŞİM (genel yapı bozulmadan):
+//   • Her maç düğümü DOKUNULABİLİR → onMatchPress(match): ekran, MatchCard'lı
+//     detay/oy modalını açar (oy verme buradan da mümkün).
+//   • Şu an oylanabilir maçlar accent kesikli çerçeve + canlı nokta ile vurgulanır.
+//   • Oyumu kullandığım taraf posterinde küçük accent onay rozeti görünür.
 
 import React, { useMemo } from "react";
-import { View, StyleSheet, ScrollView, Text } from "react-native";
+import { View, StyleSheet, ScrollView, Text, Pressable } from "react-native";
 import { Image } from "expo-image";
 import AppIcon from "@components/AppIcon";
 import { roundLabel, ROUNDS } from "@services/tournamentEngine";
@@ -35,7 +41,7 @@ const CHAMP_H = 86;
 const SLOT_ROUND = [0, 1, 2, 3, 4, 3, 2, 1, 0];
 
 // ─── Tek poster ───────────────────────────────────────────────────────────────
-function PosterCell({ c, isWinner, isLoser, theme, getTmdbUrl, w = POSTER_W, h = POSTER_H }) {
+function PosterCell({ c, isWinner, isLoser, isMine, theme, getTmdbUrl, w = POSTER_W, h = POSTER_H }) {
   const empty = !c;
   const uri = !empty && c.posterPath ? getTmdbUrl(c.posterPath, "poster", w) : null;
   return (
@@ -60,22 +66,47 @@ function PosterCell({ c, isWinner, isLoser, theme, getTmdbUrl, w = POSTER_W, h =
           <AppIcon family="Ionicons" name="trophy" size={9} color="#F5C518" />
         </View>
       )}
+      {/* Benim oyum — kesinleşmiş seçim rozeti */}
+      {isMine && (
+        <View style={[styles.mineBadge, { backgroundColor: theme.accent }]}>
+          <AppIcon family="Ionicons" name="checkmark" size={8} color="#fff" />
+        </View>
+      )}
     </View>
   );
 }
 
-// ─── Maç (2 poster yan yana) ──────────────────────────────────────────────────
-function Node({ match, theme, getTmdbUrl, isFinal }) {
+// ─── Maç (2 poster yan yana) — dokunulabilir düğüm ───────────────────────────
+function Node({ match, theme, getTmdbUrl, isFinal, mySide, onPress }) {
   const dec = match.decided && !!match.winnerSide;
+  const hot = match.votable && !dec; // şu an oy verilebilir
   return (
-    <View style={[styles.node, { backgroundColor: theme.secondary, borderColor: isFinal ? "#F5C518" : theme.border, borderWidth: isFinal ? 1.5 : 1 }]}>
-      <PosterCell c={match.a} isWinner={dec && match.winnerSide === "a"} isLoser={dec && match.winnerSide === "b"} theme={theme} getTmdbUrl={getTmdbUrl} />
-      <PosterCell c={match.b} isWinner={dec && match.winnerSide === "b"} isLoser={dec && match.winnerSide === "a"} theme={theme} getTmdbUrl={getTmdbUrl} />
-    </View>
+    <Pressable
+      onPress={onPress ? () => onPress(match) : undefined}
+      disabled={!onPress}
+      style={({ pressed }) => [
+        styles.node,
+        {
+          backgroundColor: theme.secondary,
+          borderColor: hot ? theme.accent : isFinal ? "#F5C518" : theme.border,
+          borderWidth: hot || isFinal ? 1.5 : 1,
+          borderStyle: hot ? "dashed" : "solid",
+          opacity: pressed ? 0.75 : 1,
+        },
+      ]}
+      accessibilityRole="button"
+    >
+      <PosterCell c={match.a} isWinner={dec && match.winnerSide === "a"} isLoser={dec && match.winnerSide === "b"} isMine={mySide === "a"} theme={theme} getTmdbUrl={getTmdbUrl} />
+      <PosterCell c={match.b} isWinner={dec && match.winnerSide === "b"} isLoser={dec && match.winnerSide === "a"} isMine={mySide === "b"} theme={theme} getTmdbUrl={getTmdbUrl} />
+      {/* Canlı (oylanabilir) nokta */}
+      {hot && <View style={[styles.hotDot, { backgroundColor: theme.accent }]} />}
+    </Pressable>
   );
 }
 
-export default function BracketTree({ rounds = [], theme, getTmdbUrl, lang = "tr" }) {
+export default function BracketTree({
+  rounds = [], theme, getTmdbUrl, lang = "tr", myPicks = {}, onMatchPress,
+}) {
   const geo = useMemo(() => {
     if (rounds.length < 5) return null;
 
@@ -187,7 +218,14 @@ export default function BracketTree({ rounds = [], theme, getTmdbUrl, lang = "tr
         {/* Maç düğümleri */}
         {geo.nodes.map((n) => (
           <View key={n.key} style={{ position: "absolute", left: n.x, top: n.y, width: NODE_W, height: MATCH_H }}>
-            <Node match={n.match} isFinal={n.isFinal} theme={theme} getTmdbUrl={getTmdbUrl} />
+            <Node
+              match={n.match}
+              isFinal={n.isFinal}
+              mySide={myPicks[n.match?.matchId] || null}
+              onPress={onMatchPress}
+              theme={theme}
+              getTmdbUrl={getTmdbUrl}
+            />
           </View>
         ))}
 
@@ -235,6 +273,24 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.55)",
     borderRadius: 8,
     padding: 2,
+  },
+  mineBadge: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  hotDot: {
+    position: "absolute",
+    top: -3,
+    right: -3,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
   },
   champFrame: {
     width: CHAMP_W,

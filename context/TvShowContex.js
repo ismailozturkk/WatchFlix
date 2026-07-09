@@ -24,14 +24,14 @@ const mergeUniqueById = (prev, next) => {
   return [...prev, ...next.filter((x) => x && !seen.has(x.id))];
 };
 
-// Trend carousel'i için: kenar spacer'larını koruyarak yeni sayfayı sağ
-// spacer'dan ÖNCE ekler (mevcut kartların index/animasyonu bozulmaz).
-const rewrapTrends = (prev, next) => {
-  const raw = (prev || []).filter(
-    (x) => x && x.id !== "left-spacer" && x.id !== "right-spacer",
-  );
-  const merged = mergeUniqueById(raw, next);
-  return [{ id: "left-spacer" }, ...merged, { id: "right-spacer" }];
+// Trend state'i yalnızca gerçek TMDB kayıtlarını tutar. Eski cache sürümleri
+// spacer kayıtları içerebildiği için hem mevcut hem de yeni veriyi normalize et.
+const mergeTrendItems = (prev, next) => {
+  const realItems = (items) =>
+    (Array.isArray(items) ? items : []).filter(
+      (x) => x && x.id !== "left-spacer" && x.id !== "right-spacer",
+    );
+  return mergeUniqueById(realItems(prev), realItems(next));
 };
 
 // Sayfalı bölümlerin ortak yükleyicisi: cache okuma, loading bayrakları,
@@ -133,11 +133,11 @@ export const TvShowProvider = ({ children }) => {
     const cached = await getCachedValue(cacheKey, TTL.TREND);
     if (cached) {
       if (append) {
-        setSeriesTrend((prev) => rewrapTrends(prev, cached.results ?? cached));
+        setSeriesTrend((prev) => mergeTrendItems(prev, cached.results ?? cached));
         setLoadingMoreTrend(false);
       } else {
-        // page 1 önbelleği spacer'lı tam dizi (offline indirme ile uyumlu)
-        setIfChanged(setSeriesTrend, cached);
+        // Eski spacer'lı cache kayıtlarını da okurken temizle.
+        setIfChanged(setSeriesTrend, mergeTrendItems([], cached.results ?? cached));
         setLoadingTren(false);
         setTotalPagesTrend((p) => (p > 1 ? p : 1000));
       }
@@ -160,16 +160,11 @@ export const TvShowProvider = ({ children }) => {
       const results = response.data.results || [];
       setTotalPagesTrend(response.data.total_pages || 1);
       if (append) {
-        setSeriesTrend((prev) => rewrapTrends(prev, results));
+        setSeriesTrend((prev) => mergeTrendItems(prev, results));
         setCachedValue(cacheKey, results);
       } else {
-        const data = [
-          { id: "left-spacer" },
-          ...results,
-          { id: "right-spacer" },
-        ];
-        setIfChanged(setSeriesTrend, data);
-        setCachedValue(baseKey, data);
+        setIfChanged(setSeriesTrend, results);
+        setCachedValue(baseKey, results);
       }
     } catch (error) {
       if (__DEV__) console.error("fetchSeriesTrends:", error?.message || error);

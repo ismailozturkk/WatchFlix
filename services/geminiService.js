@@ -1,15 +1,21 @@
 // services/geminiService.js
 //
-// WhatchFlix yapay zeka asistanı ("CineMatch") için merkezi Gemini servisi.
+// Watchify yapay zeka asistanı ("CineMatch") için merkezi Gemini servisi.
+//
+// ⚠️ GÜVENLİK (Faz 0 — yayın blokeri çözümü): Gemini API anahtarı ARTIK
+// istemcide DEĞİL. Tüm istekler `callGemini` Cloud Function proxy'sinden
+// geçer (functions/index.js); anahtar yalnız sunucuda (Secret Manager) durur
+// ve kullanıcı başına GÜNLÜK kota sunucuda uygulanır (AiUsage/{uid}).
 //
 // Sorumluluklar:
 //   - Güçlü, yapılandırılmış sistem prompt'u üretmek (kullanıcı zevk profili dahil)
-//   - Konuşma geçmişini gerçek çok-turlu `contents` dizisine çevirmek (HAFIZA)
-//   - İsteği AbortController timeout + geçici hatalarda tek retry ile yapmak
+//   - Konuşma geçmişini proxy'ye gidecek sade {role, text} dizisine çevirmek (HAFIZA)
+//   - callGemini callable'ını çağırmak ve hatalarını GeminiError koduna eşlemek
 //   - Yanıtı savunmacı şekilde parse etmek (güvenlik bloğu, boş candidate, MAX_TOKENS)
 //   - Yanıttan film/dizi başlıklarını ayıklamak ve markdown'a hazırlamak
 //
 // Bu modül React'tan bağımsızdır (saf JS) — test edilebilir ve UI'dan ayrıktır.
+// (firebase bağımlılığı yalnız çağrı anında lazy-require edilir.)
 
 export const GEMINI_MODEL = "gemini-2.5-flash";
 export const GEMINI_TIMEOUT_MS = 30000;
@@ -28,7 +34,9 @@ export const GEMINI_PRICING = {
 
 /**
  * Tipli Gemini hatası. `code` UI tarafında lokalize hata mesajına eşlenir.
- * code ∈ NO_API_KEY | NETWORK | TIMEOUT | RATE_LIMIT | BLOCKED | EMPTY | API_ERROR
+ * code ∈ NO_API_KEY | NETWORK | TIMEOUT | RATE_LIMIT | QUOTA | AUTH |
+ *        BLOCKED | EMPTY | API_ERROR
+ * (QUOTA = günlük AI hakkı bitti; AUTH = oturum yok/geçersiz.)
  */
 export class GeminiError extends Error {
   constructor(code, message, { status, cause } = {}) {
@@ -130,7 +138,7 @@ export function buildSystemInstruction({
     : "USER TASTE PROFILE: unknown yet — infer preferences from the conversation.";
 
   return [
-    `ROLE: You are "CineMatch", a warm and knowledgeable film & TV companion living inside the WatchFlix app. You help users discover what to watch next and answer questions about movies and series.`,
+    `ROLE: You are "CineMatch", a warm and knowledgeable film & TV companion living inside the Watchify app. You help users discover what to watch next and answer questions about movies and series.`,
 
     `CAPABILITIES:
 - Recommend movies and TV series precisely tailored to the user's taste and request.
@@ -202,52 +210,108 @@ export function buildContents(history = [], userText = "") {
   return contents;
 }
 
-// ── Ağ katmanı ──────────────────────────────────────────────────────────────
+// ── Ağ katmanı: callGemini Cloud Function proxy'si ─────────────────────────
+// Doğrudan Gemini HTTP çağrısı KALDIRILDI (anahtar istemcide tutulamaz).
+// Retry/timeout üst akış tarafında (functions/index.js) yapılır.
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+export const CALLABLE_TIMEOUT_MS = 75000; // sunucu tavanı 70 sn + pay
 
 /**
- * Tek istek dener. Geçici hatalarda (network / 503) çağıran tekrar dener.
+ * Geçmişi proxy'ye gidecek sade [{role, text}] biçimine indirger.
+ * (UI mesaj nesnelerindeki cards/posterMap gibi ağır alanları taşımayız.)
  */
-async function postOnce(url, body, signal, meta = {}) {
-  let res;
+export function sanitizeHistory(history = []) {
+  return (Array.isArray(history) ? history : [])
+    .slice(-MAX_HISTORY_MESSAGES)
+    .filter((m) => m && typeof m.text === "string" && m.text.trim() !== "")
+    .map((m) => ({
+      role: m.role === "assistant" || m.role === "model" ? "model" : "user",
+      text: m.text,
+    }));
+}
+
+/** Firebase callable hatasını tipli GeminiError'a çevirir. */
+function mapCallableError(err) {
+  const code = String(err?.code || ""); // örn. "functions/resource-exhausted"
+  const details = err?.details;
+
+  if (code.endsWith("resource-exhausted")) {
+    if (details?.reason === "DAILY_QUOTA") {
+      const e = new GeminiError(
+        "QUOTA",
+        `Daily AI quota exceeded (${details.used}/${details.limit})`,
+      );
+      e.quota = details; // UI "3/5" gibi göstermek isterse
+      return e;
+    }
+    return new GeminiError("RATE_LIMIT", "Rate limited by server");
+  }
+  if (code.endsWith("deadline-exceeded")) {
+    return new GeminiError("TIMEOUT", "Proxy request timed out", { cause: err });
+  }
+  if (code.endsWith("unauthenticated")) {
+    return new GeminiError("AUTH", "Sign-in required for AI chat", { cause: err });
+  }
+  if (code.endsWith("failed-precondition")) {
+    // Sunucuda GEMINI_API_KEY secret'ı tanımsız.
+    return new GeminiError("NO_API_KEY", "AI is not configured on server");
+  }
+  if (code.endsWith("unavailable")) {
+    const e = new GeminiError("API_ERROR", "AI service unavailable", { cause: err });
+    e.transient = true;
+    return e;
+  }
+  // Callable'a hiç ulaşılamadı (uçak modu vb.) → FirebaseError "internal"
+  // ya da düz fetch TypeError'ı olarak gelir.
+  const msg = String(err?.message || "");
+  if (!code || /network|fetch|internet|ECONN|timeout/i.test(msg)) {
+    return new GeminiError("NETWORK", msg || "Network request failed", { cause: err });
+  }
+  return new GeminiError("API_ERROR", msg || code, { cause: err });
+}
+
+/**
+ * callGemini Cloud Function'ını çağırır ve HAM Gemini yanıt gövdesini döndürür
+ * (candidates/usageMetadata...). Parse, çağıran katmanda (parseResponse /
+ * parseCineResponse) yapılır — eski davranışla birebir aynı.
+ *
+ * @param {object} opts
+ * @param {"chat"|"cine"} opts.mode - text/plain sohbet | JSON (CineMatch Pro)
+ * @param {Array}  [opts.history]  - [{role, text}] (sanitizeHistory'den geçmiş)
+ * @param {string} opts.userMessage
+ * @param {string} opts.systemInstruction
+ * @returns {Promise<object>} Gemini generateContent yanıtı
+ * @throws {GeminiError}
+ */
+export async function callGeminiProxy({ mode, history = [], userMessage, systemInstruction }) {
+  let call;
   try {
-    res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal,
-    });
+    // Lazy require: bu modül saf JS kalsın (testler firebase'i yüklemesin).
+    // eslint-disable-next-line global-require
+    const { fns } = require("../firebase");
+    // eslint-disable-next-line global-require
+    const { httpsCallable } = require("firebase/functions");
+    call = httpsCallable(fns, "callGemini", { timeout: CALLABLE_TIMEOUT_MS });
   } catch (err) {
-    if (err?.name === "AbortError") {
-      throw new GeminiError("TIMEOUT", "Request aborted/timed out", { cause: err });
-    }
-    throw new GeminiError("NETWORK", "Network request failed", { cause: err });
+    throw new GeminiError("API_ERROR", "Cloud Functions başlatılamadı", { cause: err });
   }
 
-  if (!res.ok) {
-    const status = res.status;
-    let detail = "";
-    try {
-      detail = await res.text();
-    } catch {
-      /* yoksay */
-    }
-    // Ayrıntılı, okunaklı hata çıktısı (model + maskeli anahtar + Gemini mesajı).
-    logHttpError(status, res.statusText, detail, meta);
-    if (status === 429) {
-      throw new GeminiError("RATE_LIMIT", `Rate limited (429): ${detail}`, { status });
-    }
-    if (status === 503 || status === 500) {
-      // Çağıran retry edebilsin diye API_ERROR ama "geçici" işaretiyle
-      const e = new GeminiError("API_ERROR", `Server error (${status}): ${detail}`, { status });
-      e.transient = true;
-      throw e;
-    }
-    throw new GeminiError("API_ERROR", `API error (${status}): ${detail}`, { status });
+  let result;
+  try {
+    result = await call({ mode, history, userMessage, systemInstruction });
+  } catch (err) {
+    throw mapCallableError(err);
   }
 
-  return res.json();
+  const data = result?.data?.data;
+  if (!data) {
+    throw new GeminiError("EMPTY", "Proxy boş yanıt döndürdü");
+  }
+  const quota = result?.data?.quota;
+  if (quota) {
+    console.log(`[callGemini] 📊 Günlük AI kota: ${quota.used}/${quota.limit}`);
+  }
+  return data;
 }
 
 /**
@@ -325,9 +389,10 @@ export function logUsage(data) {
 
 /**
  * Asistana bir mesaj gönderir ve düz metin yanıtı döndürür.
+ * İstek `callGemini` Cloud Function proxy'sinden geçer — istemcide API
+ * anahtarı YOKTUR; günlük kota sunucuda uygulanır.
  *
  * @param {object} opts
- * @param {string} opts.apiKey
  * @param {Array}  [opts.history] - Önceki turlar [{ role, text }] (güncel mesaj HARİÇ)
  * @param {string} opts.userMessage - Bu turdaki kullanıcı metni (buildUserPrompt çıktısı)
  * @param {string} [opts.language]
@@ -338,92 +403,38 @@ export function logUsage(data) {
  * @throws {GeminiError}
  */
 export async function askGemini({
-  apiKey,
   history = [],
   userMessage,
   language = "en",
   movieGenres = [],
   tvGenres = [],
   offTopicReply,
-}) {
-  if (!apiKey) {
-    throw new GeminiError("NO_API_KEY", "Missing Gemini API key");
-  }
+} = {}) {
   if (!userMessage || userMessage.trim() === "") {
     throw new GeminiError("EMPTY", "Empty user message");
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
-
-  const keyMask = maskKey(apiKey);
   console.log(
-    `[CineMatch/Gemini] ➜ İstek | model: ${GEMINI_MODEL} | anahtar: ${keyMask} | ` +
-      `endpoint: ${url.split("?")[0]}`,
+    `[CineMatch/Gemini] ➜ İstek | model: ${GEMINI_MODEL} | proxy: callGemini (anahtar sunucuda)`,
   );
-  const meta = { model: GEMINI_MODEL, keyMask };
 
-  const body = {
-    contents: buildContents(history, userMessage),
-    systemInstruction: {
-      parts: [
-        {
-          text: buildSystemInstruction({
-            language,
-            movieGenres,
-            tvGenres,
-            offTopicReply,
-          }),
-        },
-      ],
-    },
-    generationConfig: {
-      temperature: 0.85,
-      topP: 0.95,
-      topK: 40,
-      maxOutputTokens: 8192,
-      responseMimeType: "text/plain",
-      // gemini-2.5-flash varsayılan olarak "thinking" yapar ve bu çıktı
-      // token bütçesini tüketir. Uzun sistem prompt'u + geçmişle birlikte
-      // model bazen tüm bütçeyi düşünmede harcayıp BOŞ yanıt (MAX_TOKENS)
-      // dönebiliyor. Öneri sohbeti için düşünmeyi kapatıyoruz → hem daha
-      // hızlı hem de boş-yanıt tuzağı ortadan kalkıyor.
-      thinkingConfig: { thinkingBudget: 0 },
-    },
-    // Öneri asistanı için katı engellemeleri gevşetiyoruz (film konuları
-    // bazen şiddet/korku temalı olabilir; yine de "BLOCK_ONLY_HIGH").
-    safetySettings: [
-      "HARM_CATEGORY_HARASSMENT",
-      "HARM_CATEGORY_HATE_SPEECH",
-      "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-      "HARM_CATEGORY_DANGEROUS_CONTENT",
-    ].map((category) => ({ category, threshold: "BLOCK_ONLY_HIGH" })),
-  };
+  const data = await callGeminiProxy({
+    mode: "chat",
+    history: sanitizeHistory(history),
+    userMessage,
+    systemInstruction: buildSystemInstruction({
+      language,
+      movieGenres,
+      tvGenres,
+      offTopicReply,
+    }),
+  });
 
-  // AbortController ile timeout
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
-
-  try {
-    let data;
-    try {
-      data = await postOnce(url, body, controller.signal, meta);
-    } catch (err) {
-      // Geçici hatalarda (network / 5xx) tek retry
-      const retryable =
-        err instanceof GeminiError &&
-        (err.code === "NETWORK" || err.transient === true);
-      if (!retryable) throw err;
-      await sleep(800);
-      data = await postOnce(url, body, controller.signal, meta);
-    }
-    // Maliyet analizi: token kullanımı + tahmini ücreti console'a yaz.
-    // (parseResponse'tan ÖNCE — boş/engellenmiş yanıtta bile prompt token'ları
-    //  faturalanır, görmek isteriz.)
-    const { usage, cost } = logUsage(data);
-    return { ...parseResponse(data), usage, cost };
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  // Maliyet analizi: token kullanımı + tahmini ücreti console'a yaz.
+  // (parseResponse'tan ÖNCE — boş/engellenmiş yanıtta bile prompt token'ları
+  //  faturalanır, görmek isteriz.)
+  const { usage, cost } = logUsage(data);
+  return { ...parseResponse(data), usage, cost };
 }
 
 // ── Yanıt sonrası yardımcılar ───────────────────────────────────────────────

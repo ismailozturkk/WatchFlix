@@ -1,6 +1,6 @@
 // services/aiCineService.js
 //
-// WhatchFlix "CineMatch Pro" — YAPILANDIRILMIŞ (JSON) AI cevap servisi.
+// Watchify "CineMatch Pro" — YAPILANDIRILMIŞ (JSON) AI cevap servisi.
 //
 // CineMatch'in (geminiService.js) markdown sohbetinin yanında, bu servis Gemini'den
 // SADECE geçerli JSON döndürmesini ister ve her "type" için zengin görsel kart render
@@ -12,12 +12,10 @@
 import {
   GeminiError,
   GEMINI_MODEL,
-  GEMINI_TIMEOUT_MS,
-  buildContents,
   parseResponse,
   logUsage,
-  maskKey,
-  logHttpError,
+  callGeminiProxy,
+  sanitizeHistory,
 } from "./geminiService";
 
 export { GeminiError, isGeminiError } from "./geminiService";
@@ -224,6 +222,10 @@ export function friendlyError(code, t) {
       return e.timeout || "İstek zaman aşımına uğradı, tekrar dene.";
     case "RATE_LIMIT":
       return e.rateLimit || "Çok fazla istek. Biraz sonra tekrar dene.";
+    case "QUOTA":
+      return e.quota || "Bugünlük AI hakkın doldu. Yarın tekrar dene.";
+    case "AUTH":
+      return e.authRequired || "AI sohbet için giriş yapman gerekiyor.";
     case "BLOCKED":
       return e.blocked || "Bu içerik güvenlik nedeniyle yanıtlanamadı.";
     case "EMPTY":
@@ -262,7 +264,7 @@ export function buildCineSystemInstruction({
     : "USER TASTE PROFILE: unknown — infer from the conversation.";
 
   return [
-    `ROLE: You are "CineMatch", a film & TV expert living inside the WatchFlix app. You help users discover and decide what to watch.`,
+    `ROLE: You are "CineMatch", a film & TV expert living inside the Watchify app. You help users discover and decide what to watch.`,
 
     `OUTPUT FORMAT (CRITICAL):
 - Respond with a SINGLE valid JSON object and NOTHING else. No markdown, no code fences, no commentary outside JSON.
@@ -318,48 +320,9 @@ general:
     .join("\n\n");
 }
 
-// ── Ağ katmanı ────────────────────────────────────────────────────────────────
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function postOnce(url, body, signal, meta = {}) {
-  let res;
-  try {
-    res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal,
-    });
-  } catch (err) {
-    if (err?.name === "AbortError") {
-      throw new GeminiError("TIMEOUT", "Request aborted/timed out", { cause: err });
-    }
-    throw new GeminiError("NETWORK", "Network request failed", { cause: err });
-  }
-
-  if (!res.ok) {
-    const status = res.status;
-    let detail = "";
-    try {
-      detail = await res.text();
-    } catch {
-      /* yoksay */
-    }
-    // Ayrıntılı, okunaklı hata çıktısı (model + maskeli anahtar + Gemini mesajı).
-    logHttpError(status, res.statusText, detail, meta);
-    if (status === 429) {
-      throw new GeminiError("RATE_LIMIT", `Rate limited (429): ${detail}`, { status });
-    }
-    if (status === 503 || status === 500) {
-      const e = new GeminiError("API_ERROR", `Server error (${status}): ${detail}`, { status });
-      e.transient = true;
-      throw e;
-    }
-    throw new GeminiError("API_ERROR", `API error (${status}): ${detail}`, { status });
-  }
-  return res.json();
-}
+// ── Ağ katmanı: callGemini Cloud Function proxy'si ───────────────────────────
+// Doğrudan Gemini HTTP çağrısı KALDIRILDI (anahtar istemcide tutulamaz).
+// Timeout/retry sunucuda (functions/index.js), kota da orada uygulanır.
 
 /** Gemini gövdesini güvenle parse edip JSON nesnesine çevirir. */
 function parseCineResponse(data) {
@@ -373,11 +336,12 @@ function parseCineResponse(data) {
 
 /**
  * CineMatch Pro asistanına mesaj gönderir ve YAPILANDIRILMIŞ JSON cevabı döndürür.
+ * İstek `callGemini` Cloud Function proxy'sinden geçer — istemcide API
+ * anahtarı YOKTUR; günlük kota sunucuda uygulanır.
  * @returns {Promise<object>} normalize edilmiş response nesnesi (type alanı garanti)
  * @throws {GeminiError}
  */
 export async function askCineStructured({
-  apiKey,
   history = [],
   userMessage,
   language = "en",
@@ -385,71 +349,29 @@ export async function askCineStructured({
   tvGenres = [],
   offTopicReply,
   userLibrary = "",
-}) {
-  if (!apiKey) throw new GeminiError("NO_API_KEY", "Missing Gemini API key");
+} = {}) {
   if (!userMessage || userMessage.trim() === "") {
     throw new GeminiError("EMPTY", "Empty user message");
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
-
-  const keyMask = maskKey(apiKey);
-  // İstek tanılaması: hangi model + hangi anahtar (maskeli) + endpoint kullanılıyor.
   console.log(
-    `[CineMatch Pro] ➜ İstek | model: ${GEMINI_MODEL} | anahtar: ${keyMask} | ` +
-      `endpoint: ${url.split("?")[0]}`,
+    `[CineMatch Pro] ➜ İstek | model: ${GEMINI_MODEL} | proxy: callGemini (anahtar sunucuda)`,
   );
-  const meta = { model: GEMINI_MODEL, keyMask };
 
-  const body = {
-    contents: buildContents(history, userMessage),
-    systemInstruction: {
-      parts: [
-        {
-          text: buildCineSystemInstruction({
-            language,
-            movieGenres,
-            tvGenres,
-            offTopicReply,
-            userLibrary,
-          }),
-        },
-      ],
-    },
-    generationConfig: {
-      temperature: 0.8,
-      topP: 0.95,
-      topK: 40,
-      maxOutputTokens: 8192,
-      responseMimeType: "application/json",
-      thinkingConfig: { thinkingBudget: 0 },
-    },
-    safetySettings: [
-      "HARM_CATEGORY_HARASSMENT",
-      "HARM_CATEGORY_HATE_SPEECH",
-      "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-      "HARM_CATEGORY_DANGEROUS_CONTENT",
-    ].map((category) => ({ category, threshold: "BLOCK_ONLY_HIGH" })),
-  };
+  const data = await callGeminiProxy({
+    mode: "cine",
+    history: sanitizeHistory(history),
+    userMessage,
+    systemInstruction: buildCineSystemInstruction({
+      language,
+      movieGenres,
+      tvGenres,
+      offTopicReply,
+      userLibrary,
+    }),
+  });
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
-
-  try {
-    let data;
-    try {
-      data = await postOnce(url, body, controller.signal, meta);
-    } catch (err) {
-      const retryable =
-        err instanceof GeminiError && (err.code === "NETWORK" || err.transient === true);
-      if (!retryable) throw err;
-      await sleep(800);
-      data = await postOnce(url, body, controller.signal, meta);
-    }
-    // Maliyet analizi: token kullanımı + tahmini ücreti console'a yaz.
-    logUsage(data);
-    return parseCineResponse(data);
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  // Maliyet analizi: token kullanımı + tahmini ücreti console'a yaz.
+  logUsage(data);
+  return parseCineResponse(data);
 }

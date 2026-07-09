@@ -13,6 +13,8 @@ import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
 import { MovieUpComingSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
+import SeeAllHeader from "../../components/SeeAllHeader";
+import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 //import { API_KEY } from "@env";
 import { useTvShow } from "../../context/TvShowContex";
 import { useLanguage } from "../../context/LanguageContext";
@@ -24,6 +26,7 @@ const { width } = Dimensions.get("window");
 
 // Stable, module-scope item component → no remount → no flicker.
 const TvAiringTodayCard = memo(function TvAiringTodayCard({ item, navigation, theme, getTmdbUrl }) {
+  const rp = useRailPosterStyle();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -32,7 +35,7 @@ const TvAiringTodayCard = memo(function TvAiringTodayCard({ item, navigation, th
 
   return (
     <TouchableOpacity
-      style={styles.similarItem}
+      style={[styles.similarItem, { width: rp.itemWidth, height: rp.itemHeight }]}
       activeOpacity={0.8}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
@@ -43,7 +46,10 @@ const TvAiringTodayCard = memo(function TvAiringTodayCard({ item, navigation, th
           path={item.poster_path}
           type="tv"
           size={200}
-          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+          style={[
+            styles.similarPoster,
+            { width: rp.posterWidth, height: rp.posterHeight, borderRadius: rp.radius, shadowColor: theme.shadow },
+          ]}
           cachePolicy="memory-disk"
           recyclingKey={`tvairing-${item.id}`}
           transition={120}
@@ -124,14 +130,16 @@ export default function TvShowsAiringToday({ navigation }) {
   };
   return (
     <View style={styles.container}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <Text
-          allowFontScaling={false}
-          style={[styles.title, { color: theme.text.secondary }]}
-        >
-          {t.tvShowScreens.airingToday}
-        </Text>
-      </View>
+      <SeeAllHeader
+        title={t.tvShowScreens.airingToday}
+        onPress={() =>
+          navigation.navigate("SeeAllScreen", {
+            mediaType: "tv",
+            section: "airingToday",
+            title: t.tvShowScreens.airingToday,
+          })
+        }
+      />
       <PaginatedRail
         data={moviesAiringToday}
         contentContainerStyle={{ paddingHorizontal: 15 }}

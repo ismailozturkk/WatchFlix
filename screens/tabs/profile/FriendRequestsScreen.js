@@ -17,7 +17,6 @@ const TAB_W = (SCREEN_W - 32) / 2;
 import { useTheme } from "../../../context/ThemeContext";
 import { useProfileUi } from "../../../context/ProfileUiContext";
 import { useFriends } from "../../../context/FriendsContext";
-import SwipeCard from "@components/SwipeCard";
 import IconBacground from "../../../components/IconBacground";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../../components/BackButton";
@@ -89,23 +88,6 @@ export default function FriendRequestsScreen() {
   const handleCancelSent = (friend) => cancelRequest(friend.uid);
 
   const renderItem = ({ item }) => (
-    <SwipeCard
-      rightButton={{
-        label: tab === "received" ? "Reddet" : i18nText("autoI18n.iptal_et", "İptal Et"),
-        color: "#c44f4f",
-        onPress: () =>
-          tab === "received" ? handleDecline(item) : handleCancelSent(item),
-      }}
-      leftButton={
-        tab === "received"
-          ? {
-              label: "Kabul Et",
-              color: "#30a75e",
-              onPress: () => handleAccept(item),
-            }
-          : undefined
-      }
-    >
       <View
         style={[
           styles.requestCard,
@@ -164,36 +146,45 @@ export default function FriendRequestsScreen() {
           </Text>
         </View>
 
-        {/* İşlem ipucu */}
-        <View style={styles.hintWrapper}>
+        {/* İşlem butonları — eski kaydırma işlemlerinin yerine */}
+        <View style={styles.actionsWrapper}>
           {tab === "received" ? (
-            <View style={styles.hintRow}>
-              <View
+            <View style={styles.actionsRow}>
+              <TouchableOpacity
                 style={[
-                  styles.hintBtn,
+                  styles.actionBtn,
                   {
                     backgroundColor: (theme.colors?.green ?? "#29b864") + "22",
                   },
                 ]}
+                onPress={() => handleAccept(item)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               >
                 <Ionicons
                   name="checkmark"
-                  size={16}
+                  size={18}
                   color={theme.colors?.green ?? "#29b864"}
                 />
-              </View>
-              <View style={[styles.hintBtn, { backgroundColor: "#c44f4f22" }]}>
-                <Ionicons name="close" size={16} color="#c44f4f" />
-              </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: "#c44f4f22" }]}
+                onPress={() => handleDecline(item)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Ionicons name="close" size={18} color="#c44f4f" />
+              </TouchableOpacity>
             </View>
           ) : (
-            <View style={[styles.hintBtn, { backgroundColor: "#ff965022" }]}>
-              <Ionicons name="hourglass-outline" size={16} color="#ff9650" />
-            </View>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: "#ff965022" }]}
+              onPress={() => handleCancelSent(item)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Ionicons name="close" size={18} color="#ff9650" />
+            </TouchableOpacity>
           )}
         </View>
       </View>
-    </SwipeCard>
   );
 
   const activeData = tab === "received" ? requests : sentRequests;
@@ -396,12 +387,12 @@ const styles = StyleSheet.create({
   userInfo: { flex: 1, gap: 3 },
   displayName: { fontSize: 15, fontWeight: "700" },
   username: { fontSize: 13 },
-  hintWrapper: { alignItems: "center", justifyContent: "center" },
-  hintRow: { flexDirection: "row", gap: 6 },
-  hintBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  actionsWrapper: { alignItems: "center", justifyContent: "center" },
+  actionsRow: { flexDirection: "row", gap: 8 },
+  actionBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: "center",
     alignItems: "center",
   },

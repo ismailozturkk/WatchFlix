@@ -33,6 +33,7 @@ import TvShowsDetails from "./screens/tv/TvShowsDetails";
 import SeasonDetails from "./screens/tv/SeasonDetails";
 import EpisodeDetails from "./screens/tv/EpisodeDetails";
 import MovieDetails from "./screens/movie/MovieDetail";
+import SeeAllScreen from "./screens/shared/SeeAllScreen";
 import TvGraphDetailScreen from "./screens/tv/TvGraphDetailScreen";
 import StoryShareScreen from "@screens/story/StoryShareScreen";
 import StoryDraftsScreen from "@screens/story/StoryDraftsScreen";
@@ -41,6 +42,7 @@ import TvShowSearch from "./screens/search/TvShowSearch";
 import LoginScreen from "./screens/auth/LoginScreen";
 import RegisterScreen from "./screens/auth/RegisterScreen";
 import ForgotPasswordScreen from "./screens/auth/ForgotPasswordScreen";
+import OnboardingScreen from "./screens/onboarding/OnboardingScreen";
 import LottieView from "lottie-react-native";
 import { useTheme } from "./context/ThemeContext";
 import { SnowProvider, useSnow } from "./context/SnowContext";
@@ -87,10 +89,16 @@ import SearchFriendsScreen from "./screens/search/SearchFriendsScreen";
 import SearchScreen from "./screens/tabs/SearchScreen";
 import FriendRequestsScreen from "./screens/tabs/profile/FriendRequestsScreen";
 import PrivacySettingsScreen from "./screens/tabs/profile/PrivacySettingsScreen";
+import ReminderNotificationsScreen from "./screens/tabs/settings/ReminderNotificationsScreen";
+import SocialNotificationsScreen from "./screens/tabs/settings/SocialNotificationsScreen";
+import PersonalizationScreen from "./screens/tabs/settings/PersonalizationScreen";
+import PosterSettingsScreen from "./screens/tabs/settings/PosterSettingsScreen";
+import PermissionsDataScreen from "./screens/tabs/settings/PermissionsDataScreen";
 import ChatScreen from "@screens/chat/ChatScreen";
 import CreateGroupScreen from "@screens/chat/CreateGroupScreen";
 import GroupsListScreen from "@screens/chat/GroupsListScreen";
 import MessagesScreen from "@screens/chat/MessagesScreen";
+import PostDetailScreen from "@screens/social/PostDetailScreen";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { enableFreeze } from "react-native-screens";
 import Comment from "./components/Comment";
@@ -129,6 +137,14 @@ ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Bildirime dokunulduğunda yönlendirme için global navigation ref.
 const navigationRef = createNavigationContainerRef();
+const linking = {
+  prefixes: ["watchify://"],
+  config: {
+    screens: {
+      RemindersScreen: "reminders",
+    },
+  },
+};
 
 const preloadIconFont = (IconSet) => {
   if (typeof IconSet?.loadFont === "function") {
@@ -232,7 +248,10 @@ function AppContent() {
 
     let timer = null;
     const task = InteractionManager.runAfterInteractions(() => {
-      timer = setTimeout(() => setSwipeViewReady(true), 1200);
+      // ChatModal (AI sohbet host'u) ~1400 satırlık ağır bir ağaç; 1,2 sn'de
+      // mount edilince splash sonrası donma penceresine denk geliyordu.
+      // Kullanıcının ilk saniyelerde ihtiyaç duymadığı bu katmanı daha geç kur.
+      timer = setTimeout(() => setSwipeViewReady(true), 3800);
     });
 
     return () => {
@@ -246,11 +265,13 @@ function AppContent() {
   return (
     <NavigationContainer
       ref={navigationRef}
+      linking={linking}
       onStateChange={(state) => {
         // Get the current route name
         const routeName = state.routes[state.index].name;
         // Control modal visibility based on the current screen
         if (
+          routeName === "OnboardingScreen" ||
           routeName === "ForgotPasswordScreen" || // Examples - Add other screens where you want to show the chat modal
           routeName === "RegisterScreen" ||
           routeName === "LoginScreen"
@@ -260,6 +281,7 @@ function AppContent() {
           setShowChatModal(true);
         }
         if (
+          routeName === "OnboardingScreen" ||
           routeName === "ForgotPasswordScreen" || // Examples - Add other screens where you want to show the chat modal
           routeName === "RegisterScreen" ||
           routeName === "LoginScreen" ||
@@ -281,6 +303,14 @@ function AppContent() {
           gestureDirection: "horizontal", // yatay hareket yönü
         })}
       >
+        <Stack.Screen
+          name="OnboardingScreen"
+          component={OnboardingScreen}
+          options={{
+            headerShown: false,
+            animation: "fade",
+          }}
+        />
         <Stack.Screen
           name="LoginScreen"
           component={LoginScreen}
@@ -333,6 +363,14 @@ function AppContent() {
           component={MovieDetails}
           options={{
             headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="SeeAllScreen"
+          component={SeeAllScreen}
+          options={{
+            headerShown: false,
+            animation: "slide_from_right",
           }}
         />
         <Stack.Screen
@@ -521,8 +559,40 @@ function AppContent() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="ReminderNotificationsScreen"
+          component={ReminderNotificationsScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="SocialNotificationsScreen"
+          component={SocialNotificationsScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PersonalizationScreen"
+          component={PersonalizationScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PosterSettingsScreen"
+          component={PosterSettingsScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PermissionsDataScreen"
+          component={PermissionsDataScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="Comment"
           component={Comment}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="PostDetailScreen"
+          component={PostDetailScreen}
           options={{
             headerShown: false,
           }}

@@ -1,11 +1,20 @@
 import React, { memo } from "react";
-import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+  Dimensions,
+} from "react-native";
 import { useTheme } from "../../../context/ThemeContext";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 
+const { width } = Dimensions.get("window");
+
 const MovieCastItem = memo(({ item, navigation }) => {
   const { theme } = useTheme();
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
 
   return (
     <TouchableOpacity
@@ -43,8 +52,19 @@ const MovieCastItem = memo(({ item, navigation }) => {
 export default MovieCastItem;
 
 const styles = StyleSheet.create({
-  castItem:      { width: 85, marginRight: 12, alignItems: "center" },
-  castImage:     { width: 70, height: 70, borderRadius: 35, borderWidth: 1, marginBottom: 6 },
-  castName:      { fontSize: 11, fontWeight: "600", textAlign: "center", marginBottom: 2 },
-  castCharacter: { fontSize: 10, textAlign: "center" },
+  castItem: { width: width * 0.26, alignItems: "center" },
+  castImage: {
+    width: width * 0.26,
+    height: width * 0.26 * 1.5,
+    borderRadius: 12,
+    marginBottom: 7,
+    borderWidth: 1.5,
+  },
+  castName: {
+    fontSize: 11.5,
+    textAlign: "center",
+    fontWeight: "700",
+    lineHeight: 15,
+  },
+  castCharacter: { fontSize: 10.5, textAlign: "center", lineHeight: 14 },
 });

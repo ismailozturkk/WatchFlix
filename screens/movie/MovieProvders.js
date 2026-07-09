@@ -17,11 +17,15 @@ import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import PaginatedRail from "../../components/PaginatedRail";
+import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { SeeAllButton } from "../../components/SeeAllHeader";
+import { i18nText } from "../../utils/i18nText";
 const { width } = Dimensions.get("window");
 
 // Stable, module-scope item component → no remount → no flicker.
 const MovieProvidersCard = memo(function MovieProvidersCard({ item, navigation, theme, getTmdbUrl }) {
+  const rp = useRailPosterStyle();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -30,7 +34,7 @@ const MovieProvidersCard = memo(function MovieProvidersCard({ item, navigation, 
 
   return (
     <TouchableOpacity
-      style={styles.similarItem}
+      style={[styles.similarItem, { width: rp.itemWidth, height: rp.itemHeight }]}
       activeOpacity={0.8}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
@@ -41,7 +45,10 @@ const MovieProvidersCard = memo(function MovieProvidersCard({ item, navigation, 
           path={item.poster_path}
           type="movie"
           size={200}
-          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+          style={[
+            styles.similarPoster,
+            { width: rp.posterWidth, height: rp.posterHeight, borderRadius: rp.radius, shadowColor: theme.shadow },
+          ]}
           cachePolicy="memory-disk"
           recyclingKey={`movieprovider-${item.id}`}
           transition={120}
@@ -172,18 +179,48 @@ export default function MovieProviders({ navigation }) {
     );
   }
 
+  const providerName =
+    providers.find((p) => p.provider_id === selectedProvider)?.provider_name ||
+    i18nText("autoI18n.saglayicilar", "Sağlayıcılar");
   return (
     <View style={{ flex: 1, paddingVertical: 10 }}>
       {/* İzleme sağlayıcıları */}
 
-      <FlatList
-        data={providers}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.provider_id.toString()}
-        renderItem={renderProvider}
-        contentContainerStyle={{ paddingHorizontal: 15 }}
-      />
+      <View style={{ flexDirection: "row", alignItems: "center", paddingRight: 12 }}>
+        <View style={{ flex: 1 }}>
+          <FlatList
+            data={providers}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item) => item.provider_id.toString()}
+            renderItem={renderProvider}
+            contentContainerStyle={{ paddingHorizontal: 15 }}
+          />
+        </View>
+        <SeeAllButton
+          onPress={() =>
+            navigation.navigate("SeeAllScreen", {
+              mediaType: "movie",
+              section: "providers",
+              title: providerName,
+              providerId: selectedProvider,
+            })
+          }
+        />
+      </View>
+
+      {/* TMDB koşulları: watch-provider verisi için zorunlu JustWatch atfı */}
+      <Text
+        allowFontScaling={false}
+        style={{
+          color: theme.text.muted,
+          fontSize: 10,
+          paddingHorizontal: 15,
+          marginTop: 6,
+        }}
+      >
+        {t.justwatchAttribution}
+      </Text>
 
       <PaginatedRail
         data={moviesProvider}

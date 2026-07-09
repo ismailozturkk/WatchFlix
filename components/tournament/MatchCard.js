@@ -131,7 +131,7 @@ function Cell({
               {i18nText("autoI18n.tournament_confirm", "Seçimi onayla")}
             </Text>
             <Text style={styles.confirmSub}>
-              {i18nText("autoI18n.tournament_confirm_sub", "tekrar bas")}
+              {i18nText("autoI18n.tournament_confirm_final_sub", "tekrar bas — değiştirilemez")}
             </Text>
           </Animated.View>
         )}

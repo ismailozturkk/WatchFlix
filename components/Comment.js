@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import React, { useState, useEffect, useCallback, memo, useRef } from "react";
+import React, { useState, useEffect, useCallback, memo, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -39,6 +39,99 @@ import { i18nText } from "../utils/i18nText";
 
 
 const { height: SCREEN_H } = Dimensions.get("window");
+
+const resolveTmdbAvatar = (path) => {
+  if (!path) return null;
+  if (path.startsWith("/http")) return path.slice(1);
+  if (path.startsWith("http")) return path;
+  return `https://image.tmdb.org/t/p/w185${path}`;
+};
+
+const getFeedTimestamp = (item) => {
+  if (item.source === "tmdb") {
+    return new Date(item.created_at || item.updated_at || 0).getTime() || 0;
+  }
+  if (typeof item.timestamp?.toMillis === "function") return item.timestamp.toMillis();
+  return (item.timestamp?.seconds || 0) * 1000;
+};
+
+const TmdbReviewItem = memo(({ item, theme }) => {
+  const styles = getStyles(theme);
+  const [expanded, setExpanded] = useState(false);
+  const avatarUri = resolveTmdbAvatar(item.author_details?.avatar_path);
+  const author =
+    item.author_details?.name ||
+    item.author ||
+    item.author_details?.username ||
+    i18nText("autoI18n.tmdb_kullanicisi", "TMDB kullanıcısı");
+  const rating = Number(item.author_details?.rating);
+  const canExpand = (item.content || "").length > 220;
+  const reviewDate = item.created_at
+    ? new Date(item.created_at).toLocaleDateString()
+    : "";
+
+  return (
+    <View style={[styles.itemContainer, styles.tmdbReviewContainer]}>
+      <View style={styles.itemHeader}>
+        <View style={styles.userInfo}>
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={[styles.avatar, styles.roundAvatar]} />
+          ) : (
+            <View style={[styles.avatar, styles.tmdbAvatarPlaceholder]}>
+              <Ionicons name="person" size={17} color={theme.accent} />
+            </View>
+          )}
+          <View style={styles.userTextGroup}>
+            <View style={styles.usernameRow}>
+              <Text allowFontScaling={false} style={styles.username} numberOfLines={1}>
+                {author}
+              </Text>
+              <View style={[styles.sourceBadge, styles.tmdbSourceBadge]}>
+                <Text allowFontScaling={false} style={[styles.sourceBadgeText, styles.tmdbSourceBadgeText]}>
+                  TMDB
+                </Text>
+              </View>
+            </View>
+            <Text allowFontScaling={false} style={styles.timestamp}>
+              {reviewDate}
+            </Text>
+          </View>
+        </View>
+        {Number.isFinite(rating) && rating > 0 && (
+          <View style={styles.tmdbRatingBadge}>
+            <Ionicons name="star" size={12} color="#FFD54F" />
+            <Text allowFontScaling={false} style={styles.tmdbRatingText}>
+              {rating.toFixed(1)}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      <Text
+        allowFontScaling={false}
+        style={styles.commentText}
+        numberOfLines={expanded ? undefined : 5}
+      >
+        {item.content}
+      </Text>
+
+      {canExpand && (
+        <TouchableOpacity style={styles.readMoreButton} onPress={() => setExpanded((value) => !value)}>
+          <Text allowFontScaling={false} style={styles.readMoreText}>
+            {expanded
+              ? i18nText("autoI18n.daha_az", "Daha az")
+              : i18nText("autoI18n.devamini_oku", "Devamını oku")}
+          </Text>
+          <Ionicons
+            name={expanded ? "chevron-up" : "chevron-down"}
+            size={14}
+            color={theme.accent}
+          />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+});
 
 // ── Yorum Satırı Bileşeni ──────────────────────────────────
 const CommentItem = memo(
@@ -106,10 +199,19 @@ const CommentItem = memo(
                 style={styles.avatar}
               />
             )) || <Feather name="user" size={32} color="#fff" />}
-            <View>
-              <Text allowFontScaling={false} style={styles.username}>
-                {item.username}
-              </Text>
+            <View style={styles.userTextGroup}>
+              <View style={styles.usernameRow}>
+                <Text allowFontScaling={false} style={styles.username} numberOfLines={1}>
+                  {item.username}
+                </Text>
+                {!isReply && (
+                  <View style={styles.sourceBadge}>
+                    <Text allowFontScaling={false} style={styles.sourceBadgeText}>
+                      {i18nText("autoI18n.topluluk", "Topluluk")}
+                    </Text>
+                  </View>
+                )}
+              </View>
               <Text allowFontScaling={false} style={styles.timestamp}>
                 {item.timestamp?.toDate
                   ? item.timestamp.toDate().toLocaleString()
@@ -247,12 +349,19 @@ const CommentItem = memo(
 
 // ── Ana Bileşen ───────────────────────────────────────────
 // collectionName: "MovieComment" (film) | "TvComment" (dizi). Yapı birebir aynı.
-const Comment = ({ contextId, collectionName = "MovieComment", mediaTitle = "", mediaPoster = null }) => {
+const Comment = ({
+  contextId,
+  collectionName = "MovieComment",
+  mediaTitle = "",
+  mediaPoster = null,
+  tmdbReviews = [],
+}) => {
   const { theme } = useTheme();
   const styles = getStyles(theme);
   const { user: currentUser } = useAuth();
   const [comments, setComments] = useState([]);
   const [isSending, setIsSending] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState("all");
   const [repliesMap, setRepliesMap] = useState({});
   const [replyVisibility, setReplyVisibility] = useState({});
   const [commentInputState, setCommentInputState] = useState({
@@ -267,6 +376,49 @@ const Comment = ({ contextId, collectionName = "MovieComment", mediaTitle = "", 
 
   // One ref per comment — stores its active onSnapshot unsubscribe fn
   const replyUnsubsRef = useRef({});
+
+  const normalizedTmdbReviews = useMemo(
+    () =>
+      (Array.isArray(tmdbReviews) ? tmdbReviews : [])
+        .filter((review) => review?.content)
+        .map((review, index) => ({
+          ...review,
+          source: "tmdb",
+          feedId: `tmdb:${review.id || index}`,
+        })),
+    [tmdbReviews],
+  );
+
+  const feedItems = useMemo(() => {
+    const communityItems = comments.map((comment) => ({
+      ...comment,
+      source: "community",
+      feedId: `community:${comment.id}`,
+    }));
+
+    if (sourceFilter === "community") return communityItems;
+    if (sourceFilter === "tmdb") return normalizedTmdbReviews;
+
+    return [...communityItems, ...normalizedTmdbReviews].sort((a, b) => {
+      const timeDiff = getFeedTimestamp(b) - getFeedTimestamp(a);
+      if (timeDiff !== 0) return timeDiff;
+      return a.source === "community" ? -1 : 1;
+    });
+  }, [comments, normalizedTmdbReviews, sourceFilter]);
+
+  const sourceFilters = [
+    {
+      key: "all",
+      label: i18nText("autoI18n.tumu", "Tümü"),
+      count: comments.length + normalizedTmdbReviews.length,
+    },
+    {
+      key: "community",
+      label: i18nText("autoI18n.topluluk", "Topluluk"),
+      count: comments.length,
+    },
+    { key: "tmdb", label: "TMDB", count: normalizedTmdbReviews.length },
+  ];
 
   // ── Comments listener ────────────────────────────────────
   useEffect(() => {
@@ -433,11 +585,62 @@ const Comment = ({ contextId, collectionName = "MovieComment", mediaTitle = "", 
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       style={styles.container}
     >
+      <View style={styles.sourceFilterRow}>
+        {sourceFilters.map((filter) => {
+          const selected = sourceFilter === filter.key;
+          return (
+            <TouchableOpacity
+              key={filter.key}
+              activeOpacity={0.8}
+              onPress={() => setSourceFilter(filter.key)}
+              style={[styles.sourceFilterButton, selected && styles.sourceFilterButtonActive]}
+            >
+              <Text
+                allowFontScaling={false}
+                style={[styles.sourceFilterText, selected && styles.sourceFilterTextActive]}
+              >
+                {filter.label}
+              </Text>
+              <View style={[styles.sourceFilterCount, selected && styles.sourceFilterCountActive]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.sourceFilterCountText, selected && styles.sourceFilterCountTextActive]}
+                >
+                  {filter.count}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       <FlatList
-        data={comments}
-        keyExtractor={(item) => item.id}
+        style={styles.commentList}
+        data={feedItems}
+        keyExtractor={(item) => item.feedId}
         contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => (
+        keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <MaterialCommunityIcons
+              name="comment-text-multiple-outline"
+              size={28}
+              color={theme.text.muted}
+            />
+            <Text allowFontScaling={false} style={styles.emptyStateTitle}>
+              {i18nText("autoI18n.henuz_yorum_yok", "Henüz yorum yok")}
+            </Text>
+            <Text allowFontScaling={false} style={styles.emptyStateText}>
+              {sourceFilter === "tmdb"
+                ? i18nText("autoI18n.tmdb_yorumu_bulunamadi", "Bu içerik için TMDB yorumu bulunamadı.")
+                : i18nText("autoI18n.ilk_yorumu_sen_yap", "İlk yorumu sen yap.")}
+            </Text>
+          </View>
+        }
+        renderItem={({ item }) =>
+          item.source === "tmdb" ? (
+            <TmdbReviewItem item={item} theme={theme} />
+          ) : (
           <View>
             <CommentItem
               item={item}
@@ -495,7 +698,8 @@ const Comment = ({ contextId, collectionName = "MovieComment", mediaTitle = "", 
                 />
               ))}
           </View>
-        )}
+          )
+        }
       />
 
       {/* Input Section */}
@@ -597,7 +801,48 @@ const Comment = ({ contextId, collectionName = "MovieComment", mediaTitle = "", 
 const getStyles = (theme) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.primary },
-    listContent: { padding: 15, paddingBottom: 160 },
+    commentList: { flex: 1 },
+    listContent: { padding: 15, paddingBottom: 160, flexGrow: 1 },
+
+    sourceFilterRow: {
+      flexDirection: "row",
+      gap: 8,
+      paddingHorizontal: 15,
+      paddingTop: 12,
+      paddingBottom: 4,
+      backgroundColor: theme.primary,
+    },
+    sourceFilterButton: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.secondary,
+    },
+    sourceFilterButtonActive: {
+      borderColor: alpha(theme.accent, 0.55),
+      backgroundColor: alpha(theme.accent, 0.16),
+    },
+    sourceFilterText: { color: theme.text.muted, fontSize: 12, fontWeight: "700" },
+    sourceFilterTextActive: { color: theme.text.primary },
+    sourceFilterCount: {
+      minWidth: 19,
+      height: 19,
+      paddingHorizontal: 5,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.primary,
+    },
+    sourceFilterCountActive: { backgroundColor: alpha(theme.accent, 0.3) },
+    sourceFilterCountText: { color: theme.text.muted, fontSize: 10, fontWeight: "800" },
+    sourceFilterCountTextActive: { color: theme.text.primary },
 
     itemContainer: {
       marginBottom: 18,
@@ -625,11 +870,53 @@ const getStyles = (theme) =>
       justifyContent: "space-between",
       marginBottom: 10,
     },
-    userInfo: { flexDirection: "row", alignItems: "center", gap: 10 },
+    userInfo: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
+    userTextGroup: { flex: 1, minWidth: 0 },
+    usernameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
     ownerActions: { flexDirection: "row", alignItems: "center" },
     avatar: { width: 34, height: 34 },
-    username: { color: theme.text.primary, fontSize: 13, fontWeight: "700" },
+    roundAvatar: { borderRadius: 17 },
+    username: { color: theme.text.primary, fontSize: 13, fontWeight: "700", flexShrink: 1 },
     timestamp: { color: theme.text.muted, fontSize: 10 },
+    sourceBadge: {
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 7,
+      backgroundColor: alpha(theme.accent, 0.16),
+    },
+    sourceBadgeText: { color: theme.accent, fontSize: 8, fontWeight: "800" },
+    tmdbSourceBadge: { backgroundColor: "rgba(1,180,228,0.14)" },
+    tmdbSourceBadgeText: { color: "#01B4E4" },
+
+    tmdbReviewContainer: {
+      borderColor: "rgba(1,180,228,0.28)",
+      borderLeftWidth: 3,
+      borderLeftColor: "#01B4E4",
+    },
+    tmdbAvatarPlaceholder: {
+      borderRadius: 17,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: alpha(theme.accent, 0.14),
+    },
+    tmdbRatingBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 7,
+      paddingVertical: 4,
+      borderRadius: 10,
+      backgroundColor: "rgba(255,213,79,0.1)",
+    },
+    tmdbRatingText: { color: "#FFD54F", fontSize: 11, fontWeight: "800" },
+    readMoreButton: {
+      alignSelf: "flex-start",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 3,
+      marginTop: 10,
+    },
+    readMoreText: { color: theme.accent, fontSize: 12, fontWeight: "700" },
 
     contentBody: { marginVertical: 8 },
     commentText: { color: theme.text.primary, fontSize: 14, lineHeight: 20 },
@@ -739,6 +1026,25 @@ const getStyles = (theme) =>
       borderRadius: 8,
     },
     indicatorText: { color: theme.accent, fontSize: 11, fontWeight: "700" },
+    emptyState: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 32,
+      paddingBottom: 80,
+    },
+    emptyStateTitle: {
+      color: theme.text.primary,
+      fontSize: 15,
+      fontWeight: "700",
+      marginTop: 10,
+    },
+    emptyStateText: {
+      color: theme.text.muted,
+      fontSize: 12,
+      textAlign: "center",
+      marginTop: 4,
+    },
   });
 
 export default Comment;

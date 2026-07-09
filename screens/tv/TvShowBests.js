@@ -15,6 +15,9 @@ import { useTheme } from "../../context/ThemeContext";
 const { width, height } = Dimensions.get("window");
 import { MovieUpComingSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
+import { SeeAllButton } from "../../components/SeeAllHeader";
+import useRailPosterStyle from "../../hooks/useRailPosterStyle";
+import { i18nText } from "../../utils/i18nText";
 import { useTvShow } from "../../context/TvShowContex";
 import { memo, useEffect, useMemo, useRef } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -27,6 +30,7 @@ import { useImageQualitySettings } from "../../context/AppSettingsContext";
 // component type never changes between renders → FlatList re-renders cells
 // instead of unmounting/remounting them → no poster flicker.
 const TvBestCard = memo(function TvBestCard({ item, navigation, theme, getTmdbUrl }) {
+  const rp = useRailPosterStyle();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -38,7 +42,7 @@ const TvBestCard = memo(function TvBestCard({ item, navigation, theme, getTmdbUr
       activeOpacity={0.8}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
-      style={styles.similarItem}
+      style={[styles.similarItem, { width: rp.itemWidth, height: rp.itemHeight }]}
       onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
     >
       <Animated.View style={[{ transform: [{ scale }] }]}>
@@ -46,7 +50,10 @@ const TvBestCard = memo(function TvBestCard({ item, navigation, theme, getTmdbUr
           path={item.poster_path}
           type="tv"
           size={200}
-          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+          style={[
+            styles.similarPoster,
+            { width: rp.posterWidth, height: rp.posterHeight, borderRadius: rp.radius, shadowColor: theme.shadow },
+          ]}
           cachePolicy="memory-disk"
           recyclingKey={`tvbest-${item.id}`}
           transition={120}
@@ -170,19 +177,33 @@ export default function TvShowBests({ navigation }) {
       <View
         style={{
           paddingLeft: 15,
-          justifyContent: "center",
+          paddingRight: 12,
+          marginBottom: 8,
+          flexDirection: "row",
+          alignItems: "center",
         }}
       >
-        <FlatList
-          data={categoriesBest}
-          renderItem={renderCategory}
-          keyExtractor={(item) => item}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.categoriesList,
-            { backgroundColor: theme.secondary },
-          ]}
+        <View style={{ flex: 1, justifyContent: "center" }}>
+          <FlatList
+            data={categoriesBest}
+            renderItem={renderCategory}
+            keyExtractor={(item) => item}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={[
+              styles.categoriesList,
+              { backgroundColor: theme.secondary },
+            ]}
+          />
+        </View>
+        <SeeAllButton
+          onPress={() =>
+            navigation.navigate("SeeAllScreen", {
+              mediaType: "tv",
+              section: "best",
+              title: i18nText("autoI18n.en_iyi_diziler", "En İyi Diziler"),
+            })
+          }
         />
       </View>
       <PaginatedRail

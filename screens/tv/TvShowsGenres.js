@@ -14,13 +14,17 @@ import { useTheme } from "../../context/ThemeContext";
 import { useTvShow } from "../../context/TvShowContex";
 import { MovieSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
+import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import ListBadges from "../../components/ListBadges";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { SeeAllButton } from "../../components/SeeAllHeader";
+import { i18nText } from "../../utils/i18nText";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
 const { width, height } = Dimensions.get("window");
 
 // Stable, module-scope item component → no remount → no flicker.
 const TvGenresCard = memo(function TvGenresCard({ item, navigation, theme, getTmdbUrl }) {
+  const rp = useRailPosterStyle();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -29,7 +33,7 @@ const TvGenresCard = memo(function TvGenresCard({ item, navigation, theme, getTm
 
   return (
     <TouchableOpacity
-      style={styles.similarItem}
+      style={[styles.similarItem, { width: rp.itemWidth, height: rp.itemHeight }]}
       activeOpacity={0.8}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
@@ -40,7 +44,10 @@ const TvGenresCard = memo(function TvGenresCard({ item, navigation, theme, getTm
           path={item.poster_path}
           type="tv"
           size={200}
-          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+          style={[
+            styles.similarPoster,
+            { width: rp.posterWidth, height: rp.posterHeight, borderRadius: rp.radius, shadowColor: theme.shadow },
+          ]}
           cachePolicy="memory-disk"
           recyclingKey={`tvgenres-${item.id}`}
           transition={120}
@@ -144,35 +151,55 @@ export default function TvShowsGenres({ navigation }) {
       />
     );
   };
+  const genreTitle = selectedGenres.length
+    ? genres
+        .filter((g) => selectedGenres.includes(g.id))
+        .map((g) => g.name)
+        .join(", ")
+    : i18nText("autoI18n.turler", "Türler");
   return (
     <View style={styles.container}>
-      <FlatList
-        data={genres}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 15 }}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              styles.genreButton,
-              {
-                backgroundColor: selectedGenres.includes(item.id)
-                  ? theme.accent
-                  : theme.secondary,
-              },
-            ]}
-            onPress={() => toggleGenre(item.id)}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {item.name}
-            </Text>
-          </TouchableOpacity>
-        )}
-      />
+      <View style={{ flexDirection: "row", alignItems: "center", paddingRight: 12 }}>
+        <View style={{ flex: 1 }}>
+          <FlatList
+            data={genres}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 15 }}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[
+                  styles.genreButton,
+                  {
+                    backgroundColor: selectedGenres.includes(item.id)
+                      ? theme.accent
+                      : theme.secondary,
+                  },
+                ]}
+                onPress={() => toggleGenre(item.id)}
+              >
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.genreText, { color: theme.text.primary }]}
+                >
+                  {item.name}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+        <SeeAllButton
+          onPress={() =>
+            navigation.navigate("SeeAllScreen", {
+              mediaType: "tv",
+              section: "genres",
+              title: genreTitle,
+              genreIds: selectedGenres,
+            })
+          }
+        />
+      </View>
       <PaginatedRail
         data={moviesGenres}
         contentContainerStyle={{ paddingHorizontal: 15 }}

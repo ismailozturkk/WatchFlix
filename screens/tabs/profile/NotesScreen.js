@@ -3,7 +3,7 @@
  *
  * Dikey tam-genişlik kart listesi + sekme çubuğu (Notlar / Yapılacaklar) +
  * FAB + alt-sheet ekle/düzenle modalı + silme onay modalı. Veri katmanı
- * WatchFlix'in mevcut `useProfileNotes()` (Firestore) context'idir; kalıcılık
+ * Watchify'in mevcut `useProfileNotes()` (Firestore) context'idir; kalıcılık
  * tek noktadan `saveNote` (upsert) ve `handleDeleteNote` ile yapılır.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";

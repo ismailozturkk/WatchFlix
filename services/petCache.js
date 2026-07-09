@@ -59,6 +59,22 @@ export function getPetSize(id) {
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Ayrıntılı tanı logu. Pet indirme sorunlarında (özellikle R2/.r2.dev erişim
+// engeli) gerçek sebebi görünür kılar: URL, deneme, HTTP durum, content-type,
+// byte, magic ve hata cause kodu (ör. ECONNRESET).
+const PET_LOG = "[petCache]";
+function plog(...args) {
+  console.log(PET_LOG, ...args);
+}
+// fetch/ağ hatasından okunabilir detay çıkar (RN'de message çoğu kez
+// "Network request failed"; cause varsa kod = ECONNRESET/ENOTFOUND vb.).
+function errDetail(e) {
+  const name = e?.name || "Error";
+  const msg = e?.message || String(e);
+  const code = e?.cause?.code || e?.code || e?.cause?.message || null;
+  return code ? `${name}: ${msg} (${code})` : `${name}: ${msg}`;
+}
+
 // İçerik gerçekten WebP mi? (sihirli bayt: "RIFF" .... "WEBP"). R2 hız sınırı /
 // erişim engelinde sunucu .webp yerine KÜÇÜK bir hata gövdesi döndürebilir; bu
 // fonksiyon onu yakalar (yoksa geçersiz dosya "cache" işaretlenip boş render olur).
@@ -89,18 +105,29 @@ export async function downloadPet(id) {
   const url = petUrl(id);
   let lastErr;
 
+  plog(`indirme başladı id=${id} url=${url}`);
+  const t0 = Date.now();
+
   for (let attempt = 1; attempt <= 2; attempt++) {
     try { if (file.exists) file.delete(); } catch { /* yarım dosyayı temizle */ }
 
     let bytes;
     try {
       const res = await fetch(url);
+      plog(
+        `deneme ${attempt} → HTTP ${res.status} ${res.statusText || ""} | ` +
+        `type=${res.headers?.get?.("content-type") || "?"} | ` +
+        `len=${res.headers?.get?.("content-length") || "?"} | ` +
+        `cf-ray=${res.headers?.get?.("cf-ray") || "yok"} | ${Date.now() - t0}ms`,
+      );
       if (!res.ok) {
         // 403/429 → R2 .r2.dev erişim/hız sınırı. Tekrar denemek hızlı çözmez.
         throw new Error(`Sunucu hatası HTTP ${res.status} — R2 erişim/hız sınırı olabilir`);
       }
       bytes = new Uint8Array(await res.arrayBuffer());
     } catch (e) {
+      // Ağ/TLS hatası (ör. ECONNRESET = ISP/DNS engeli, .r2.dev sinkhole) burada görünür.
+      plog(`deneme ${attempt} HATA (fetch): ${errDetail(e)} | url=${url}`);
       lastErr = new Error(`İndirme başarısız: ${e?.message || e}`);
       // HTTP durum hatası içerikseldir → tekrar deneme; salt ağ hatası → bir kez dene.
       if (String(e?.message || "").includes("HTTP")) throw lastErr;
@@ -109,6 +136,7 @@ export async function downloadPet(id) {
     }
 
     if (!bytes || bytes.length <= 0) {
+      plog(`deneme ${attempt} HATA: boş yanıt (0B)`);
       lastErr = new Error("Sunucudan boş yanıt geldi");
       await wait(700);
       continue;
@@ -117,6 +145,10 @@ export async function downloadPet(id) {
     if (!isWebp(bytes)) {
       // Küçük/geçersiz gövde → neredeyse kesin sunucu taraflı (R2 .r2.dev hız sınırı
       // veya erişim engeli). Yeniden denemek hızlı çözmez → açıkça bildir.
+      const head = Array.from(bytes.slice(0, 16))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join(" ");
+      plog(`deneme ${attempt} HATA: geçersiz içerik ${bytes.length}B | ilk16bayt=${head}`);
       throw new Error(`Geçersiz içerik (${bytes.length}B) — R2 erişim/hız sınırı olabilir`);
     }
 
@@ -124,19 +156,23 @@ export async function downloadPet(id) {
       file.create({ overwrite: true });
       file.write(bytes);
     } catch (e) {
+      plog(`deneme ${attempt} HATA (disk): ${errDetail(e)}`);
       lastErr = new Error(`Diske yazılamadı: ${e?.message || e}`);
       await wait(700);
       continue;
     }
 
     if (!file.exists || (file.size ?? 0) <= 0) {
+      plog(`deneme ${attempt} HATA: dosya diske yazılamadı (size=${file.size ?? 0})`);
       lastErr = new Error("Dosya diske yazılamadı");
       await wait(700);
       continue;
     }
 
+    plog(`BAŞARILI id=${id} | ${bytes.length}B | ${Date.now() - t0}ms`);
     return file.uri; // başarı
   }
+  plog(`BAŞARISIZ id=${id} | son hata: ${lastErr?.message || "?"} | ${Date.now() - t0}ms`);
   throw lastErr || new Error("İndirme başarısız");
 }
 

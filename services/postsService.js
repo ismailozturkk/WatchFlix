@@ -58,6 +58,24 @@ import {
 
 const PAGE = 15;
 
+const FEED_SORT_FIELDS = {
+  recent: "createdAt",
+  likes: "likesCount",
+  comments: "commentsCount",
+};
+
+const getFeedSortField = (sort) => FEED_SORT_FIELDS[sort] || FEED_SORT_FIELDS.recent;
+
+const comparePosts = (sort) => (a, b) => {
+  if (sort === "likes") {
+    return (b.likesCount || 0) - (a.likesCount || 0) || b._createdAtMs - a._createdAtMs;
+  }
+  if (sort === "comments") {
+    return (b.commentsCount || 0) - (a.commentsCount || 0) || b._createdAtMs - a._createdAtMs;
+  }
+  return b._createdAtMs - a._createdAtMs;
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // Firestore Timestamp → millis (createdAt sıralama için)
@@ -156,13 +174,16 @@ export async function updatePost(postId, partial) {
  * Public feed sayfasını çek.
  * @param {Object} opts
  * @param {'all'|'review'|'list'} opts.filter
+ * @param {'recent'|'likes'|'comments'} opts.sort
  * @param {DocumentSnapshot|null} opts.lastDoc Pagination kursoru
  * @returns {Promise<{posts: Array, lastDoc: DocumentSnapshot|null}>}
  */
-export async function fetchFeed({ filter = "all", lastDoc = null } = {}) {
+export async function fetchFeed({ filter = "all", sort = "recent", lastDoc = null } = {}) {
+  const sortField = getFeedSortField(sort);
   const base = [
     where("visibility", "==", "public"),
-    orderBy("createdAt", "desc"),
+    orderBy(sortField, "desc"),
+    ...(sortField === "createdAt" ? [] : [orderBy("createdAt", "desc")]),
   ];
   const typeFilter =
     filter === "review" || filter === "list"
@@ -188,11 +209,28 @@ export async function fetchFeed({ filter = "all", lastDoc = null } = {}) {
 }
 
 /**
+ * Tek bir post'u id ile getir (bildirim → post detay ekranı için).
+ * @returns {Promise<Object|null>} serializePost şeklinde nesne, yoksa null.
+ */
+export async function fetchPost(postId) {
+  if (!postId) return null;
+  try {
+    const snap = await getDoc(doc(db, "Posts", postId));
+    if (!snap.exists()) return null;
+    return serializePost(snap);
+  } catch (e) {
+    if (__DEV__) console.warn("fetchPost:", e?.message);
+    return null;
+  }
+}
+
+/**
  * "Takip Edilenler" feed'i. Firestore `in` operatörü max 30 ID alır,
  * o yüzden chunk halinde sorgu atıp client-side merge ediyoruz.
  */
-export async function fetchFollowingFeed(uid) {
+export async function fetchFollowingFeed(uid, sort = "recent") {
   if (!uid) return { posts: [], lastDoc: null };
+  const sortField = getFeedSortField(sort);
   const followSnap = await getDocs(collection(db, "Users", uid, "following"));
   const ids = followSnap.docs.map((d) => d.id);
   if (!ids.length) return { posts: [], lastDoc: null };
@@ -206,7 +244,8 @@ export async function fetchFollowingFeed(uid) {
         query(
           collection(db, "Posts"),
           where("authorId", "in", c),
-          orderBy("createdAt", "desc"),
+          orderBy(sortField, "desc"),
+          ...(sortField === "createdAt" ? [] : [orderBy("createdAt", "desc")]),
           limit(PAGE),
         ),
       ),
@@ -215,7 +254,7 @@ export async function fetchFollowingFeed(uid) {
 
   const merged = snaps
     .flatMap((s) => s.docs.map(serializePost))
-    .sort((a, b) => b._createdAtMs - a._createdAtMs)
+    .sort(comparePosts(sort))
     .slice(0, PAGE);
 
   return { posts: merged, lastDoc: null };
@@ -326,6 +365,19 @@ export async function fetchMyLikedPostIds(uid) {
   if (!uid) return new Set();
   const snap = await getDocs(collection(db, "Users", uid, "likedPosts"));
   return new Set(snap.docs.map((d) => d.id));
+}
+
+/**
+ * Tek bir post'u kullanıcı beğenmiş mi? (post detay ekranı başlangıç durumu)
+ */
+export async function isPostLiked(postId, uid) {
+  if (!postId || !uid) return false;
+  try {
+    const snap = await getDoc(doc(db, "Users", uid, "likedPosts", postId));
+    return snap.exists();
+  } catch {
+    return false;
+  }
 }
 
 // ─── BOOKMARK ─────────────────────────────────────────────────────────────────

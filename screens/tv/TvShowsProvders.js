@@ -11,17 +11,22 @@ import {
 import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
+import { useLanguage } from "../../context/LanguageContext";
 import { MovieSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
 import { useTvShow } from "../../context/TvShowContex";
 import ListBadges from "../../components/ListBadges";
 import PaginatedRail from "../../components/PaginatedRail";
+import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { SeeAllButton } from "../../components/SeeAllHeader";
+import { i18nText } from "../../utils/i18nText";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
 const { width } = Dimensions.get("window");
 
 // Stable, module-scope item component → no remount → no flicker.
 const TvProvidersCard = memo(function TvProvidersCard({ item, navigation, theme, getTmdbUrl }) {
+  const rp = useRailPosterStyle();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -33,7 +38,7 @@ const TvProvidersCard = memo(function TvProvidersCard({ item, navigation, theme,
       activeOpacity={0.8}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
-      style={styles.similarItem}
+      style={[styles.similarItem, { width: rp.itemWidth, height: rp.itemHeight }]}
       onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
     >
       <Animated.View style={[{ transform: [{ scale }] }]}>
@@ -41,7 +46,10 @@ const TvProvidersCard = memo(function TvProvidersCard({ item, navigation, theme,
           path={item.poster_path}
           type="tv"
           size={200}
-          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+          style={[
+            styles.similarPoster,
+            { width: rp.posterWidth, height: rp.posterHeight, borderRadius: rp.radius, shadowColor: theme.shadow },
+          ]}
           cachePolicy="memory-disk"
           recyclingKey={`tvprovider-${item.id}`}
           transition={120}
@@ -65,6 +73,7 @@ const TvProvidersCard = memo(function TvProvidersCard({ item, navigation, theme,
 
 export default function TvShowsProvders({ navigation }) {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const {
     providers,
@@ -171,18 +180,48 @@ export default function TvShowsProvders({ navigation }) {
     );
   }
 
+  const providerName =
+    providers.find((p) => p.provider_id === selectedProvider)?.provider_name ||
+    i18nText("autoI18n.saglayicilar", "Sağlayıcılar");
   return (
     <View style={{ flex: 1, paddingVertical: 10 }}>
       {/* İzleme sağlayıcıları */}
 
-      <FlatList
-        data={providers}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.provider_id.toString()}
-        renderItem={renderProvider}
-        contentContainerStyle={{ paddingHorizontal: 15 }}
-      />
+      <View style={{ flexDirection: "row", alignItems: "center", paddingRight: 12 }}>
+        <View style={{ flex: 1 }}>
+          <FlatList
+            data={providers}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item) => item.provider_id.toString()}
+            renderItem={renderProvider}
+            contentContainerStyle={{ paddingHorizontal: 15 }}
+          />
+        </View>
+        <SeeAllButton
+          onPress={() =>
+            navigation.navigate("SeeAllScreen", {
+              mediaType: "tv",
+              section: "providers",
+              title: providerName,
+              providerId: selectedProvider,
+            })
+          }
+        />
+      </View>
+
+      {/* TMDB koşulları: watch-provider verisi için zorunlu JustWatch atfı */}
+      <Text
+        allowFontScaling={false}
+        style={{
+          color: theme.text.muted,
+          fontSize: 10,
+          paddingHorizontal: 15,
+          marginTop: 6,
+        }}
+      >
+        {t.justwatchAttribution}
+      </Text>
 
       <PaginatedRail
         data={moviesProviders}

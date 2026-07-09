@@ -1,6 +1,6 @@
-# 🎬 Watch Flix
+# 🎬 Watchify
 
-**Watch Flix**, kullanıcıların film ve dizi izleme alışkanlıklarını takip etmelerini, yeni içerikler keşfetmelerini ve kişiselleştirilmiş bir deneyim yaşamalarını sağleyen kapsamlı bir React Native (Expo) uygulamasıdır.
+**Watchify**, kullanıcıların film ve dizi izleme alışkanlıklarını takip etmelerini, yeni içerikler keşfetmelerini ve kişiselleştirilmiş bir deneyim yaşamalarını sağleyen kapsamlı bir React Native (Expo) uygulamasıdır.
 
 ---
 

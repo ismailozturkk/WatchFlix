@@ -21,8 +21,8 @@ import { getAuth } from "firebase/auth";
 import { db } from "../../../firebase";
 import { useProfileUi } from "../../../context/ProfileUiContext";
 import { useTheme } from "../../../context/ThemeContext";
-import SwipeCard from "@components/SwipeCard";
 import Toast from "react-native-toast-message";
+import { appAlert } from "@components/AppAlert";
 import { useLanguage } from "../../../context/LanguageContext";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import IconBacground from "../../../components/IconBacground";
@@ -122,46 +122,72 @@ export default function FriendsListScreen({ navigation }) {
     });
   };
 
+  // Görünür silme butonuna yanlışlıkla basılabilir (swipe'ın aksine) — onay iste.
+  const confirmDelete = (friend) =>
+    appAlert(
+      i18nText("autoI18n.arkadasi_sil", "Arkadaşı Sil"),
+      i18nText(
+        "autoI18n.arkadas_silme_onay",
+        "{{name}} arkadaş listenden silinsin mi?",
+        { name: friend.displayName },
+      ),
+      [
+        { text: i18nText("autoI18n.vazgec", "Vazgeç"), style: "cancel" },
+        {
+          text: i18nText("autoI18n.sil", "Sil"),
+          style: "destructive",
+          onPress: () => handleDelete(friend),
+        },
+      ],
+    );
+
   const renderFriend = ({ item }) => {
     return (
-      <SwipeCard
-        leftButton={{ label: i18nText("autoI18n.sil", "Sil"), color: "#e53935", onPress: () => handleDelete(item) }}
-        rightButton={{ label: i18nText("autoI18n.mesaj_2", "Mesaj"), color: "#5aacf0", onPress: () => handleSendMessage(item) }}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() =>
+          navigation.navigate("FriendProfileScreen", {
+            friendUid: item.uid,
+            friendName: item.displayName,
+          })
+        }
+        style={[styles.friendCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}
       >
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() =>
-            navigation.navigate("FriendProfileScreen", {
-              friendUid: item.uid,
-              friendName: item.displayName,
-            })
-          }
-          style={[styles.friendCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-        >
-          <View style={[styles.avatarWrapper, { borderColor: theme.accent + "66" }]}>
-            {avatars?.[item.avatarIndex] ? (
-              <Image source={avatars[item.avatarIndex]} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatarPlaceholder, { backgroundColor: theme.primary }]}>
-                <Ionicons name="person" size={22} color={theme.text?.muted ?? "#555"} />
-              </View>
-            )}
-          </View>
-          <View style={styles.friendInfo}>
-            <Text style={[styles.friendName, { color: theme.text?.primary ?? "#fff" }]} numberOfLines={1}>
-              {item.displayName}
-            </Text>
-            <Text style={[styles.friendUsername, { color: theme.text?.secondary ?? "#aaa" }]} numberOfLines={1}>
-              @{item.username}
-            </Text>
-          </View>
-          <Ionicons
-            name="chevron-forward"
-            size={18}
-            color={theme.text?.muted ?? "#555"}
-          />
-        </TouchableOpacity>
-      </SwipeCard>
+        <View style={[styles.avatarWrapper, { borderColor: theme.accent + "66" }]}>
+          {avatars?.[item.avatarIndex] ? (
+            <Image source={avatars[item.avatarIndex]} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatarPlaceholder, { backgroundColor: theme.primary }]}>
+              <Ionicons name="person" size={22} color={theme.text?.muted ?? "#555"} />
+            </View>
+          )}
+        </View>
+        <View style={styles.friendInfo}>
+          <Text style={[styles.friendName, { color: theme.text?.primary ?? "#fff" }]} numberOfLines={1}>
+            {item.displayName}
+          </Text>
+          <Text style={[styles.friendUsername, { color: theme.text?.secondary ?? "#aaa" }]} numberOfLines={1}>
+            @{item.username}
+          </Text>
+        </View>
+        {/* Eylem butonları — eski kaydırma işlemlerinin yerine */}
+        <View style={styles.actionsRow}>
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: "#5aacf022" }]}
+            onPress={() => handleSendMessage(item)}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={17} color="#5aacf0" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: "#e5393522" }]}
+            onPress={() => confirmDelete(item)}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Ionicons name="trash-outline" size={17} color="#e53935" />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -264,6 +290,14 @@ const styles = StyleSheet.create({
   friendInfo: { flex: 1, gap: 3 },
   friendName: { fontSize: 15, fontWeight: "700" },
   friendUsername: { fontSize: 13 },
+  actionsRow: { flexDirection: "row", gap: 8 },
+  actionBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
   // ── Empty state ───────────────────────────────────────────────────────────
   emptyState: {

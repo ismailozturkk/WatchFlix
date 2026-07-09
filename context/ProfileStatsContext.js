@@ -11,6 +11,7 @@ import Toast from "react-native-toast-message";
 import { snapshotErrorHandler } from "../utils/firestoreError";
 import { dedupeWatchedTvEntries } from "../services/watchedTvService";
 import { i18nText } from "../utils/i18nText";
+import useStartupGate from "../hooks/useStartupGate";
 
 
 const ProfileStatsContext = createContext();
@@ -86,6 +87,11 @@ const getDynamicRankColor = (totalMinutes, type) => {
 export const ProfileStatsProvider = ({ children }) => {
   const { user } = useAuth();
   const uid = user?.uid;
+
+  // Bu context'in tüketicileri (Profil sekmesi, istatistik ekranları, AI sohbet)
+  // açılışta mount değil; listener'lar + flatEpisodesTv/groupBy türetmeleri ilk
+  // saniyelerde JS thread'i kilitliyordu. Splash sonrası pencerenin dışına ertele.
+  const startupReady = useStartupGate(3200);
   const { t, language } = useLanguage();
   // Öntanımlı listeler (favorites/watchList/watchedMovies) artık subcollection'da;
   // kök doc'tan kalkacakları için profil liste kartları combinedLists'ten beslenir.
@@ -118,7 +124,7 @@ export const ProfileStatsProvider = ({ children }) => {
 
   // ── Root doc listener — özel listeler + eski format veri ────────────────
   useEffect(() => {
-    if (!uid) return;
+    if (!uid || !startupReady) return;
     setIsLoadingMovieInfo(true);
     setIsLoadingShowInfo(true);
     setIsLoading(true);
@@ -150,11 +156,11 @@ export const ProfileStatsProvider = ({ children }) => {
       setIsLoading(false);
     }, snapshotErrorHandler("Stats/Lists"));
     return () => unsub();
-  }, [uid]);
+  }, [uid, startupReady]);
 
   // ── Subcollection listener: watchedMovies ────────────────────────────────
   useEffect(() => {
-    if (!uid) return;
+    if (!uid || !startupReady) return;
     const unsub = onSnapshot(collection(db, "Lists", uid, "watchedMovies"), (snap) => {
       // Firestore doc data'sında id alanı OLMAYABILIR — doc.id'yi explicit ekliyoruz.
       // Aksi halde item.id undefined olur, keyExtractor `item.id.toString()` crash eder.
@@ -169,11 +175,11 @@ export const ProfileStatsProvider = ({ children }) => {
       });
     }, snapshotErrorHandler("Stats/watchedMovies"));
     return () => unsub();
-  }, [uid]);
+  }, [uid, startupReady]);
 
   // ── Subcollection listener: watchedTv ────────────────────────────────────
   useEffect(() => {
-    if (!uid) return;
+    if (!uid || !startupReady) return;
     const unsub = onSnapshot(collection(db, "Lists", uid, "watchedTv"), (snap) => {
       // bare+tv_ ikileme giderme: aynı dizi hem 1399 hem tv_1399 olarak
       // durabilir → dedupeWatchedTvEntries ile tekilleştir.
@@ -187,7 +193,7 @@ export const ProfileStatsProvider = ({ children }) => {
       setLoadingTv(false);
     }, snapshotErrorHandler("Stats/watchedTv"));
     return () => unsub();
-  }, [uid]);
+  }, [uid, startupReady]);
 
   // ── Film istatistikleri — listItems'tan hesapla ──────────────────────────
   useEffect(() => {

@@ -16,6 +16,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Progress from "react-native-progress";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { i18nText } from "../../utils/i18nText";
 import {
   getLastWatchedEpisode,
@@ -37,6 +38,7 @@ const OngoingCard = ({
   onPressOut,
 }) => {
   const { getTmdbUrl } = useImageQualitySettings();
+  const rp = useRailPosterStyle();
   const {
     watched: watchedEps,
     total: totalEps,
@@ -57,7 +59,7 @@ const OngoingCard = ({
 
   return (
     <TouchableOpacity
-      style={styles.similarItem}
+      style={[styles.similarItem, { width: rp.posterWidth, height: rp.posterHeight }]}
       activeOpacity={0.85}
       onPressIn={() => onPressIn(item.id)}
       onPressOut={() => onPressOut(item.id)}
@@ -66,6 +68,10 @@ const OngoingCard = ({
       <Animated.View
         style={{
           transform: [{ scale: scaleValue }],
+          // Alta yapışık ilerleme çubuğu poster köşesinden taşmasın diye
+          // köşe yarıçapıyla kırpılır.
+          overflow: "hidden",
+          borderRadius: rp.radius,
         }}
       >
         {/* Poster */}
@@ -73,7 +79,10 @@ const OngoingCard = ({
           path={item.imagePath}
           type="tv"
           size={200}
-          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+          style={[
+            styles.similarPoster,
+            { width: rp.posterWidth, height: rp.posterHeight, borderRadius: rp.radius, shadowColor: theme.shadow },
+          ]}
           contentFit="cover"
           cachePolicy="memory-disk"
           recyclingKey={`tvongoing-${item.id}`}
@@ -83,14 +92,21 @@ const OngoingCard = ({
         {/* Gradient alt karartma */}
         <LinearGradient
           colors={["transparent", "rgba(0,0,0,0.80)"]}
-          style={styles.gradient}
+          style={[
+            styles.gradient,
+            {
+              height: rp.posterHeight * 0.4,
+              borderBottomLeftRadius: rp.radius,
+              borderBottomRightRadius: rp.radius,
+            },
+          ]}
         />
 
-        {/* İlerleme çubuğu — poster altında */}
+        {/* İlerleme çubuğu — poster altına yapışık, tam genişlik */}
         <View style={styles.progressBar}>
           <Progress.Bar
             progress={progress}
-            width={CARD_W - 16}
+            width={rp.posterWidth}
             height={3}
             borderWidth={0}
             borderRadius={2}
@@ -282,7 +298,6 @@ const styles = StyleSheet.create({
     width: CARD_W,
     height: CARD_H,
     borderRadius: 15,
-    marginBottom: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.94,
@@ -293,16 +308,16 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 5,
+    bottom: 0,
     height: CARD_H * 0.4,
     borderBottomLeftRadius: 15,
     borderBottomRightRadius: 15,
   },
   progressBar: {
     position: "absolute",
-    bottom: 8,
-    left: 8,
-    right: 8,
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
 
   // ── Rozetler (birebir TvShowBests konumları) ──

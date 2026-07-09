@@ -16,7 +16,6 @@ import {
   ScrollView,
   FlatList,
   SectionList,
-  Platform,
 } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -58,6 +57,98 @@ const withAlpha = (color, alpha = 1) => {
   return color;
 };
 
+// ─── SCREEN INTRO ────────────────────────────────────────────────────────────
+// Geri butonunun sağında kalan, film/TV kimliğini belirginleştiren ortak başlık.
+
+export const StatsScreenHeader = memo(function StatsScreenHeader({
+  theme,
+  title,
+  eyebrow,
+  subtitle,
+  icon,
+  accentColor,
+}) {
+  const accent = accentColor || theme.accent;
+
+  return (
+    <View style={introStyles.wrap}>
+      <View
+        pointerEvents="none"
+        style={[introStyles.glow, { backgroundColor: withAlpha(accent, 0.12) }]}
+      />
+
+      <View style={introStyles.copy}>
+        <View style={introStyles.eyebrowRow}>
+          <View style={[introStyles.eyebrowDot, { backgroundColor: accent }]} />
+          <Text
+            allowFontScaling={false}
+            style={[introStyles.eyebrow, { color: accent }]}
+          >
+            {eyebrow}
+          </Text>
+        </View>
+        <Text
+          allowFontScaling={false}
+          numberOfLines={1}
+          style={[introStyles.title, { color: theme.text.primary }]}
+        >
+          {title}
+        </Text>
+        <Text
+          allowFontScaling={false}
+          numberOfLines={1}
+          style={[introStyles.subtitle, { color: theme.text.muted }]}
+        >
+          {subtitle}
+        </Text>
+      </View>
+
+      <LinearGradient
+        colors={[withAlpha(accent, 0.28), withAlpha(accent, 0.08)]}
+        style={[introStyles.iconBox, { borderColor: withAlpha(accent, 0.32) }]}
+      >
+        <Ionicons name={icon} size={25} color={accent} />
+      </LinearGradient>
+    </View>
+  );
+});
+
+const introStyles = StyleSheet.create({
+  wrap: {
+    minHeight: 82,
+    paddingLeft: 68,
+    paddingRight: 16,
+    paddingTop: 6,
+    paddingBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  glow: {
+    position: "absolute",
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    right: -24,
+    top: -46,
+  },
+  copy: { flex: 1, paddingRight: 12 },
+  eyebrowRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 },
+  eyebrowDot: { width: 5, height: 5, borderRadius: 3 },
+  eyebrow: { fontSize: 9, fontWeight: "900", letterSpacing: 1.25, textTransform: "uppercase" },
+  title: { fontSize: 22, lineHeight: 27, fontWeight: "900", letterSpacing: -0.65 },
+  subtitle: { fontSize: 11, lineHeight: 15, fontWeight: "500", marginTop: 2 },
+  iconBox: {
+    width: 50,
+    height: 50,
+    borderRadius: 17,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    transform: [{ rotate: "3deg" }],
+  },
+});
+
 // ─── HERO STATS CARD ─────────────────────────────────────────────────────────
 //
 // Tepe noktasında büyük gradient kart. Watched count + zaman + rank rozeti.
@@ -91,13 +182,27 @@ export const StatsHeroCard = memo(function StatsHeroCard({
   const grad2 = theme.secondary;
 
   return (
-    <View style={heroStyles.wrap}>
+    <View
+      style={[
+        heroStyles.wrap,
+        { shadowColor: rankColor || theme.shadow, backgroundColor: theme.secondary },
+      ]}
+    >
       <LinearGradient
-        colors={[withAlpha(grad1, 0.2), grad2, theme.primary]}
+        colors={[withAlpha(grad1, 0.27), grad2, theme.primary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[heroStyles.card, { borderColor: theme.border }]}
       >
+        <View
+          pointerEvents="none"
+          style={[heroStyles.decorOrb, { backgroundColor: withAlpha(grad1, 0.11) }]}
+        />
+        <View
+          pointerEvents="none"
+          style={[heroStyles.accentLine, { backgroundColor: grad1 }]}
+        />
+
         {/* Rank badge — sağ üst */}
         {rankLevel != null && (
           <View
@@ -154,7 +259,15 @@ export const StatsHeroCard = memo(function StatsHeroCard({
         </View>
 
         {/* Time row */}
-        <View style={heroStyles.timeRow}>
+        <View
+          style={[
+            heroStyles.timeRow,
+            {
+              backgroundColor: withAlpha(theme.primary, 0.35),
+              borderColor: withAlpha(grad1, 0.16),
+            },
+          ]}
+        >
           {[
             { v: time.years, l: timeLabels.years },
             { v: time.months, l: timeLabels.months },
@@ -273,12 +386,38 @@ export const StatsHeroCard = memo(function StatsHeroCard({
 });
 
 const heroStyles = StyleSheet.create({
-  wrap: { paddingHorizontal: 12, marginTop: 14 },
+  wrap: {
+    marginHorizontal: 12,
+    marginTop: 4,
+    borderRadius: 24,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+    elevation: 5,
+  },
   card: {
-    borderRadius: 22,
-    padding: 16,
+    borderRadius: 24,
+    padding: 17,
     borderWidth: 1,
     overflow: "hidden",
+  },
+  decorOrb: {
+    position: "absolute",
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    right: -72,
+    top: -76,
+  },
+  accentLine: {
+    position: "absolute",
+    top: 0,
+    left: 28,
+    right: 28,
+    height: 2,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 3,
+    opacity: 0.8,
   },
   rankBadge: {
     position: "absolute",
@@ -317,6 +456,7 @@ const heroStyles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 6,
     borderRadius: 14,
+    borderWidth: 1,
     marginBottom: 10,
   },
   timeChunk: { alignItems: "center", minWidth: 40 },
@@ -929,7 +1069,7 @@ export const StatsDateSection = memo(function StatsDateSection({
         initialNumToRender={5}
         maxToRenderPerBatch={6}
         windowSize={5}
-        removeClippedSubviews
+        removeClippedSubviews={false}
       />
     </View>
   );
@@ -1003,7 +1143,7 @@ export function StatsCollapsingList({
         initialNumToRender={4}
         maxToRenderPerBatch={4}
         windowSize={7}
-        removeClippedSubviews={Platform.OS === "android"}
+        removeClippedSubviews={false}
         contentContainerStyle={contentContainerStyle}
       />
 

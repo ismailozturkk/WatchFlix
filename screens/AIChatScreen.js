@@ -287,8 +287,8 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
             return { role: m.role, text: m.text || m.display || "" };
           });
 
+        // API anahtarı istemcide değil — istek callGemini proxy'sinden geçer.
         const response = await askCineStructured({
-          apiKey: process.env.EXPO_PUBLIC_GEMINI_API_KEY || "",
           history: priorHistory,
           userMessage: userText,
           language,

@@ -17,11 +17,15 @@ import { MovieBestsSkeleton } from "../../components/Skeleton";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import PaginatedRail from "../../components/PaginatedRail";
+import { SeeAllButton } from "../../components/SeeAllHeader";
+import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { i18nText } from "../../utils/i18nText";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
 
 // Stable, module-scope item component → no remount → no flicker.
 const MovieBestCard = memo(function MovieBestCard({ item, navigation, theme, getTmdbUrl }) {
+  const rp = useRailPosterStyle();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -30,7 +34,7 @@ const MovieBestCard = memo(function MovieBestCard({ item, navigation, theme, get
 
   return (
     <TouchableOpacity
-      style={styles.similarItem}
+      style={[styles.similarItem, { width: rp.itemWidth, height: rp.itemHeight }]}
       activeOpacity={0.8}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
@@ -41,7 +45,10 @@ const MovieBestCard = memo(function MovieBestCard({ item, navigation, theme, get
           path={item.poster_path}
           type="movie"
           size={200}
-          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
+          style={[
+            styles.similarPoster,
+            { width: rp.posterWidth, height: rp.posterHeight, borderRadius: rp.radius, shadowColor: theme.shadow },
+          ]}
           cachePolicy="memory-disk"
           recyclingKey={`moviebest-${item.id}`}
           transition={120}
@@ -170,19 +177,33 @@ export default function MovieBests({ navigation }) {
       <View
         style={{
           paddingLeft: 15,
-          justifyContent: "center",
+          paddingRight: 12,
+          marginBottom: 8,
+          flexDirection: "row",
+          alignItems: "center",
         }}
       >
-        <FlatList
-          data={categorieBests}
-          renderItem={renderCategory}
-          keyExtractor={(item) => item}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.categoriesList,
-            { backgroundColor: theme.secondary },
-          ]}
+        <View style={{ flex: 1, justifyContent: "center" }}>
+          <FlatList
+            data={categorieBests}
+            renderItem={renderCategory}
+            keyExtractor={(item) => item}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={[
+              styles.categoriesList,
+              { backgroundColor: theme.secondary },
+            ]}
+          />
+        </View>
+        <SeeAllButton
+          onPress={() =>
+            navigation.navigate("SeeAllScreen", {
+              mediaType: "movie",
+              section: "bests",
+              title: i18nText("autoI18n.en_iyi_filmler", "En İyi Filmler"),
+            })
+          }
         />
       </View>
       <PaginatedRail
