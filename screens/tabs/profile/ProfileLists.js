@@ -21,6 +21,60 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 import SwitchToggle from "../../../components/SwitchToggle";
 
+const sortItemsByListOrder = (items) =>
+  (Array.isArray(items) ? items : []).slice().sort((a, b) => {
+    const aHasOrder = Number.isFinite(a?.listOrder);
+    const bHasOrder = Number.isFinite(b?.listOrder);
+
+    if (aHasOrder && bHasOrder) {
+      const orderDiff = a.listOrder - b.listOrder;
+      if (orderDiff !== 0) return orderDiff;
+    } else if (aHasOrder !== bHasOrder) {
+      return aHasOrder ? -1 : 1;
+    }
+
+    const aDate = new Date(a?.dateAdded || 0).getTime() || 0;
+    const bDate = new Date(b?.dateAdded || 0).getTime() || 0;
+    return aDate - bDate || String(a?.id ?? "").localeCompare(String(b?.id ?? ""));
+  });
+
+// Sabit kart boyutu: en geniş poster düzeni referans alınır (Büyük Kapaklar:
+// 3×60 poster + 2×2 boşluk + 2×10 dolgu = 204). Yükseklik tüm stillerde aynı
+// (poster bloğu 112 + ayırıcı/alt bilgi). Kartlar içerikten bağımsız aynı kalır.
+const CARD_W = 204;
+const CARD_H = 171;
+
+// ── Listeye özgü vurgu rengi/ikon — ListsViewScreen kartlarıyla birebir aynı ──
+const getListAccent = (listName) => {
+  switch (listName) {
+    case "watchedMovies":
+      return "#4fc3f7";
+    case "watchedTv":
+      return "#a78bfa";
+    case "favorites":
+      return "#f87171";
+    case "watchList":
+      return "#34d399";
+    default:
+      return "#fbbf24";
+  }
+};
+
+const getListIcon = (listName) => {
+  switch (listName) {
+    case "watchedMovies":
+      return "film";
+    case "watchedTv":
+      return "tv";
+    case "favorites":
+      return "heart";
+    case "watchList":
+      return "bookmark";
+    default:
+      return "list";
+  }
+};
+
 export default function ProfileLists({ navigation }) {
   const { t } = useLanguage();
   const { theme } = useTheme();
@@ -119,6 +173,19 @@ export default function ProfileLists({ navigation }) {
             contentContainerStyle={{ paddingHorizontal: 15, gap: 10 }}
             renderItem={({ item }) => {
               const [listName, items] = item;
+              const orderedItems = sortItemsByListOrder(items);
+              const accent = getListAccent(listName);
+              const icon = getListIcon(listName);
+              const displayName =
+                listName === "watchedMovies"
+                  ? t.profileScreen.ProfileLists.watchedMovies
+                  : listName === "watchedTv"
+                    ? t.profileScreen.ProfileLists.watchedTvSeries
+                    : listName === "favorites"
+                      ? t.profileScreen.ProfileLists.favorite
+                      : listName === "watchList"
+                        ? t.profileScreen.ProfileLists.watchList
+                        : listName;
               return (
                 <TouchableOpacity
                   activeOpacity={0.8}
@@ -135,15 +202,19 @@ export default function ProfileLists({ navigation }) {
                   }}
                 >
                   <Animated.View
-                    style={[
-                      styles.listContainer,
-                      {
-                        backgroundColor: theme.secondary,
-                        borderColor: theme.border,
-                        transform: [{ scale: scaleValues[listName] || 1 }],
-                      },
-                    ]}
+                    style={{
+                      paddingBottom: 4,
+                      transform: [{ scale: scaleValues[listName] || 1 }],
+                    }}
                   >
+                    {/* Aksan gölgesi — ListsViewScreen.cardGlow ile aynı çerçeve */}
+                    <View
+                      style={[
+                        styles.cardGlow,
+                        { backgroundColor: accent + "18", borderColor: accent + "25" },
+                      ]}
+                    />
+                    <View style={styles.card}>
                     {gridStyle === 1 ? (
                       <View
                         style={{
@@ -152,7 +223,7 @@ export default function ProfileLists({ navigation }) {
                         }}
                       >
                         {[0, 1, 2].map((index) => {
-                          const item = items && items[index];
+                          const item = orderedItems[index];
                           if (item && item.imagePath) {
                             return (
                               <Image
@@ -208,7 +279,7 @@ export default function ProfileLists({ navigation }) {
                           }}
                         >
                           {[0, 1, 2, 3].map((index) => {
-                            const item = items && items[index];
+                            const item = orderedItems[index];
                             if (item && item.imagePath) {
                               return (
                                 <Image
@@ -268,7 +339,7 @@ export default function ProfileLists({ navigation }) {
                           }}
                         >
                           {[4, 5, 6, 7].map((index) => {
-                            const item = items && items[index];
+                            const item = orderedItems[index];
                             if (item && item.imagePath) {
                               return (
                                 <Image
@@ -320,9 +391,9 @@ export default function ProfileLists({ navigation }) {
                     ) : gridStyle === 3 ? (
                       <View style={{ flexDirection: "row", gap: 2 }}>
                         <View style={{ width: 75, height: 112 }}>
-                          {items && items[0]?.imagePath ? (
+                          {orderedItems[0]?.imagePath ? (
                             <Image
-                              source={{ uri: getTmdbUrl(items[0].imagePath, 'poster', 200) }}
+                              source={{ uri: getTmdbUrl(orderedItems[0].imagePath, 'poster', 200) }}
                               style={[styles.image, { width: 75, height: 112 }, allCornersRounded ? { borderRadius: 10 } : { borderTopLeftRadius: 10, borderBottomLeftRadius: 10 }]}
                             />
                           ) : (
@@ -331,9 +402,9 @@ export default function ProfileLists({ navigation }) {
                         </View>
                         <View style={{ gap: 2 }}>
                           <View style={{ width: 37.5, height: 55 }}>
-                            {items && items[1]?.imagePath ? (
+                            {orderedItems[1]?.imagePath ? (
                               <Image
-                                source={{ uri: getTmdbUrl(items[1].imagePath, 'poster', 200) }}
+                                source={{ uri: getTmdbUrl(orderedItems[1].imagePath, 'poster', 200) }}
                                 style={[styles.image, { width: 37.5, height: 55 }, allCornersRounded ? { borderRadius: 10 } : { borderTopRightRadius: 10 }]}
                               />
                             ) : (
@@ -341,9 +412,9 @@ export default function ProfileLists({ navigation }) {
                             )}
                           </View>
                           <View style={{ width: 37.5, height: 55 }}>
-                            {items && items[2]?.imagePath ? (
+                            {orderedItems[2]?.imagePath ? (
                               <Image
-                                source={{ uri: getTmdbUrl(items[2].imagePath, 'poster', 200) }}
+                                source={{ uri: getTmdbUrl(orderedItems[2].imagePath, 'poster', 200) }}
                                 style={[styles.image, { width: 37.5, height: 55 }, allCornersRounded ? { borderRadius: 10 } : { borderBottomRightRadius: 10 }]}
                               />
                             ) : (
@@ -355,7 +426,7 @@ export default function ProfileLists({ navigation }) {
                     ) : (
                       <View style={{ width: 138, height: 112, alignItems: "center", justifyContent: "center" }}>
                         {[2, 1, 0].map((i) => {
-                          const item = items && items[i];
+                          const item = orderedItems[i];
                           const angles = [0, -6, 6];
                           const offsets = [0, -22, 22];
                           const zIndexes = [3, 2, 1];
@@ -391,107 +462,30 @@ export default function ProfileLists({ navigation }) {
                       </View>
                     )}
 
+                    {/* Ayırıcı + alt bilgi — ListsViewScreen kart yapısıyla aynı */}
                     <View
-                      style={{
-                        flex: 1,
-                        width: "100%",
-                        maxWidth: 140,
-                        marginTop: 3,
-                        flexDirection: "row",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        gap: 5,
-                      }}
-                    >
-                      {listName === "watchedMovies" ? (
-                        <View
-                          style={{ flexDirection: "row", alignItems: "center" }}
-                        >
-                          <MaterialCommunityIcons
-                            name="movie"
-                            size={16}
-                            color={theme.colors.green}
-                          />
-                          <Text
-                            allowFontScaling={false}
-                            style={{ color: theme.text.primary }}
-                          >
-                            {"  "}
-                            {t.profileScreen.ProfileLists.watchedMovies}
-                          </Text>
-                        </View>
-                      ) : listName === "watchedTv" ? (
-                        <View
-                          style={{ flexDirection: "row", alignItems: "center" }}
-                        >
-                          <Ionicons
-                            name="tv"
-                            size={15}
-                            color={theme.colors.green}
-                          />
-                          <Text
-                            allowFontScaling={false}
-                            style={{ color: theme.text.primary }}
-                          >
-                            {"  "}
-                            {t.profileScreen.ProfileLists.watchedTvSeries}
-                          </Text>
-                        </View>
-                      ) : listName === "favorites" ? (
-                        <View
-                          style={{ flexDirection: "row", alignItems: "center" }}
-                        >
-                          <Ionicons
-                            name="heart"
-                            size={16}
-                            color={theme.colors.red}
-                          />
-                          <Text
-                            allowFontScaling={false}
-                            style={{ color: theme.text.primary }}
-                          >
-                            {"  "}
-                            {t.profileScreen.ProfileLists.favorite}
-                          </Text>
-                        </View>
-                      ) : listName === "watchList" ? (
-                        <View
-                          style={{ flexDirection: "row", alignItems: "center" }}
-                        >
-                          <Ionicons
-                            name="bookmark"
-                            size={16}
-                            color={theme.colors.blue}
-                          />
-                          <Text
-                            allowFontScaling={false}
-                            style={{ color: theme.text.primary }}
-                          >
-                            {"  "}
-                            {t.profileScreen.ProfileLists.watchList}
-                          </Text>
-                        </View>
-                      ) : (
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                          }}
-                        >
-                          <Ionicons
-                            name="grid"
-                            size={16}
-                            color={theme.colors.orange}
-                          />
-                          <Text
-                            style={{ color: theme.text.primary }}
-                            numberOfLines={1}
-                          >
-                            {" "}
-                            {listName}
-                          </Text>
-                        </View>
-                      )}
+                      style={[styles.divider, { backgroundColor: accent + "30" }]}
+                    />
+                    <View style={styles.cardFooter}>
+                      <View
+                        style={[styles.iconDot, { backgroundColor: accent + "20" }]}
+                      >
+                        <Ionicons name={icon} size={12} color={accent} />
+                      </View>
+                      <Text
+                        allowFontScaling={false}
+                        style={styles.cardName}
+                        numberOfLines={1}
+                      >
+                        {displayName}
+                      </Text>
+                      <Text
+                        allowFontScaling={false}
+                        style={[styles.countBadge, { color: accent }]}
+                      >
+                        {orderedItems.length}
+                      </Text>
+                    </View>
                     </View>
                   </Animated.View>
                 </TouchableOpacity>
@@ -797,6 +791,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textTransform: "uppercase",
   },
+  // Görünüm modalındaki önizleme kartları hâlâ bu stili kullanır.
   listContainer: {
     padding: 7,
     alignItems: "center",
@@ -812,6 +807,60 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.94,
     shadowRadius: 10.32,
     elevation: 5,
+  },
+
+  // ── Raydaki liste kartı çerçevesi — ListsViewScreen kartlarıyla aynı ──────
+  cardGlow: {
+    position: "absolute",
+    top: 4,
+    left: 4,
+    right: 4,
+    bottom: 0,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  card: {
+    width: CARD_W,
+    height: CARD_H,
+    borderRadius: 20,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    padding: 10,
+    alignItems: "center",
+    gap: 2,
+  },
+  divider: {
+    height: 1,
+    alignSelf: "stretch",
+    marginHorizontal: 4,
+    marginTop: 7,
+    marginBottom: 5,
+  },
+  cardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "stretch",
+    gap: 6,
+  },
+  iconDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cardName: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+    flexShrink: 1,
+    maxWidth: 120,
+  },
+  countBadge: {
+    fontSize: 12,
+    fontWeight: "800",
+    marginLeft: "auto",
   },
   image: { width: 37.5, height: 55 },
   placeholder: { width: 37.5, height: 55 },
