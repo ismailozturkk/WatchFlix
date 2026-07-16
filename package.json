@@ -78,6 +78,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@babel/plugin-transform-private-methods": "^7.25.9",
+    "@bacons/apple-targets": "^4.0.7",
     "babel-plugin-module-resolver": "^5.0.3"
   },
   "overrides": {

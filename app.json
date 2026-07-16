@@ -14,7 +14,10 @@
     },
     "scheme": "watchify",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.smlztrk.Watchify"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -52,6 +55,7 @@
       }
     },
     "plugins": [
+      "@bacons/apple-targets",
       "@react-native-google-signin/google-signin",
       [
         "expo-video",

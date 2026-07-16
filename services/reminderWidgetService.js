@@ -1,6 +1,27 @@
 import { NativeModules, Platform } from "react-native";
 
-const nativeWidget = NativeModules.ReminderWidgetModule;
+// Android: klasik köprü modülü (android/.../widget/ReminderWidgetModule.kt).
+// iOS: yerel Expo modülü (modules/reminder-widget) — paylaşılan App Group'a
+// yazıp WidgetKit zaman çizelgelerini yeniler.
+const androidWidget = NativeModules.ReminderWidgetModule;
+
+let iosWidgetResolved = false;
+let iosWidget = null;
+const getIosWidget = () => {
+  if (iosWidgetResolved) return iosWidget;
+  iosWidgetResolved = true;
+  try {
+    // Tembel yüklenir: non-iOS platformlar ve Jest (bkz. jest.config.js — saf
+    // JS testleri) asla expo-modules-core'u import etmez.
+    const { requireOptionalNativeModule } = require("expo-modules-core");
+    iosWidget = requireOptionalNativeModule("ReminderWidget");
+  } catch (error) {
+    iosWidget = null;
+  }
+  return iosWidget;
+};
+
+const getWidget = () => (Platform.OS === "ios" ? getIosWidget() : androidWidget);
 
 const toEpoch = (value) => {
   if (!value) return null;
@@ -48,19 +69,21 @@ export const buildReminderWidgetItems = (reminders, language = "tr") => {
 };
 
 export const syncReminderWidget = async (reminders, language = "tr") => {
-  if (Platform.OS !== "android" || !nativeWidget?.updateReminders) return;
+  const widget = getWidget();
+  if (!widget?.updateReminders) return;
   const items = buildReminderWidgetItems(reminders, language);
   try {
-    await nativeWidget.updateReminders(JSON.stringify(items), language);
+    await widget.updateReminders(JSON.stringify(items), language);
   } catch (error) {
     if (__DEV__) console.warn("[ReminderWidget] sync failed:", error?.message);
   }
 };
 
 export const clearReminderWidget = async () => {
-  if (Platform.OS !== "android" || !nativeWidget?.clearReminders) return;
+  const widget = getWidget();
+  if (!widget?.clearReminders) return;
   try {
-    await nativeWidget.clearReminders();
+    await widget.clearReminders();
   } catch (error) {
     if (__DEV__) console.warn("[ReminderWidget] clear failed:", error?.message);
   }
