@@ -21,12 +21,17 @@ import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SeeAllButton } from "../../components/SeeAllHeader";
 import { i18nText } from "../../utils/i18nText";
-import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import {
+  useImageQualitySettings,
+  useListLayoutSettings,
+  useStreamingProviderSettings,
+} from "../../context/AppSettingsContext";
 const { width } = Dimensions.get("window");
 
 // Stable, module-scope item component → no remount → no flicker.
 const TvProvidersCard = memo(function TvProvidersCard({ item, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
+  const { posterBadges } = useListLayoutSettings();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -55,11 +60,13 @@ const TvProvidersCard = memo(function TvProvidersCard({ item, navigation, theme,
           transition={120}
         />
 
-        <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
-          <Text allowFontScaling={false} style={styles.similarRatingText}>
-            {item.vote_average.toFixed(1)}
-          </Text>
-        </View>
+        {posterBadges?.tmdbRating !== false && (
+          <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
+            <Text allowFontScaling={false} style={styles.similarRatingText}>
+              {item.vote_average.toFixed(1)}
+            </Text>
+          </View>
+        )}
         <ListBadges
           mediaId={item.id}
           mediaType="tv"
@@ -75,6 +82,7 @@ export default function TvShowsProvders({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { streamingProviderIds } = useStreamingProviderSettings();
   const {
     providers,
     selectedProvider,
@@ -88,6 +96,19 @@ export default function TvShowsProvders({ navigation }) {
     pageProvider,
     totalPagesProvider,
   } = useTvShow();
+
+  const displayedProviders = useMemo(
+    () =>
+      [...providers].sort((a, b) => {
+        const aSubscribed = streamingProviderIds.includes(a.provider_id) ? 1 : 0;
+        const bSubscribed = streamingProviderIds.includes(b.provider_id) ? 1 : 0;
+        return (
+          bSubscribed - aSubscribed ||
+          Number(a.display_priority ?? 9999) - Number(b.display_priority ?? 9999)
+        );
+      }),
+    [providers, streamingProviderIds],
+  );
 
   useEffect(() => {
     activateTvSection("providers");
@@ -105,7 +126,9 @@ export default function TvShowsProvders({ navigation }) {
         backgroundColor:
           selectedProvider === item.provider_id
             ? theme.accent
-            : theme.secondary,
+            : streamingProviderIds.includes(item.provider_id)
+              ? theme.between
+              : theme.secondary,
         borderRadius: 15,
       }}
       activeOpacity={0.8}
@@ -126,6 +149,13 @@ export default function TvShowsProvders({ navigation }) {
           height: 40,
         }}
       >
+        {streamingProviderIds.includes(item.provider_id) && (
+          <Ionicons
+            name="checkmark-circle"
+            size={14}
+            color={selectedProvider === item.provider_id ? "#FFFFFF" : theme.accent}
+          />
+        )}
         <Text
           style={{
             color: theme.text.primary,
@@ -154,7 +184,7 @@ export default function TvShowsProvders({ navigation }) {
     return (
       <View style={{ flex: 1, paddingVertical: 10 }}>
         <FlatList
-          data={providers}
+          data={displayedProviders}
           horizontal
           showsHorizontalScrollIndicator={false}
           keyExtractor={(item) => item.provider_id.toString()}
@@ -190,7 +220,7 @@ export default function TvShowsProvders({ navigation }) {
       <View style={{ flexDirection: "row", alignItems: "center", paddingRight: 12 }}>
         <View style={{ flex: 1 }}>
           <FlatList
-            data={providers}
+            data={displayedProviders}
             horizontal
             showsHorizontalScrollIndicator={false}
             keyExtractor={(item) => item.provider_id.toString()}

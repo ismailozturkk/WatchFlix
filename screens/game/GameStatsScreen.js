@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import AppIcon from "@components/AppIcon";
+import Skeleton from "@components/Skeleton";
 import { useAuth } from "@context/AuthContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
@@ -56,7 +57,7 @@ export default function GameStatsScreen({ navigation }) {
   return (
     <GameScreenShell navigation={navigation} title={tr ? "Oyuncu Profili" : "Player Profile"} subtitle={tr ? "Sahne Tahmin ilerlemen" : "Your Scene Guess progress"}>
       {state.loading ? (
-        <ActivityIndicator style={styles.loading} color={theme.accent} />
+        <StatsSkeleton theme={theme} />
       ) : (
         <>
           {/* Seviye / XP kartı (Part 15.1) */}
@@ -129,6 +130,23 @@ function formatLastPlayed(value, language) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return language === "en" ? "Last played" : "Son oynama";
   return new Intl.DateTimeFormat(language === "en" ? "en-US" : "tr-TR", { day: "numeric", month: "short" }).format(date);
+}
+
+// Kardeş oyun ekranlarıyla (SceneGameDetail DetailSkeleton) tutarlı:
+// seviye kartı + 2 sütun istatistik grid + mod paneli iskeleti.
+function StatsSkeleton({ theme }) {
+  const box = { backgroundColor: theme.secondary };
+  return (
+    <View style={{ gap: 12 }}>
+      <Skeleton height={122} style={[{ borderRadius: 20 }, box]} />
+      <View style={styles.grid}>
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} width="48.5%" height={145} style={[{ borderRadius: 19 }, box]} />
+        ))}
+      </View>
+      <Skeleton height={132} style={[{ borderRadius: 18 }, box]} />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

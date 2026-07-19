@@ -42,6 +42,9 @@ import {
 } from "../../services/listItemsService";
 
 const { width, height } = Dimensions.get("window");
+const GRID_SIDE_PADDING = 12;
+const GRID_COLUMN_GAP = 8;
+const POSTER_ASPECT_RATIO = 1.52;
 
 // Diziyi `size`'lık satırlara böler (elle grid için — Android'de dinamik
 // numColumns'lu FlatList "addViewAt: failed to insert view" çökmesine yol açıyor).
@@ -74,9 +77,12 @@ export default function ListsScreen({ route, navigation }) {
     listsPosterRadius: posterRadius,
     changeListsPosterRadius: changePosterRadius,
   } = useListLayoutSettings();
-  // Sütun sayısına göre afiş boyutu (3'lü varsayılan oranı korunur)
-  const posterW = gridColumns === 4 ? width * 0.225 : width * 0.3;
-  const posterH = gridColumns === 4 ? height * 0.165 : height * 0.22;
+  // Sütun sayısına göre afiş boyutu. Genişlik, sabit kolon boşluğu üzerinden
+  // hesaplanır; space-between kalan alanı şişirip poster aralarını açmasın.
+  const posterW =
+    (width - GRID_SIDE_PADDING * 2 - GRID_COLUMN_GAP * (gridColumns - 1)) /
+    gridColumns;
+  const posterH = posterW * POSTER_ASPECT_RATIO;
   // Görünür vurgu rengi (theme.between bazı temalarda tanımsız/kontrastsız olabilir)
   const accent = theme.between || theme.accent || "#4b69ff";
   const { t, language } = useLanguage();
@@ -230,19 +236,26 @@ export default function ListsScreen({ route, navigation }) {
       } else {
         // Öntanımlı film listeleri subcollection'dan (combinedLists), özel
         // listeler kök-array'den (Part B'ye kadar). listOrder → dateAdded sırala.
-        const items = (combinedLists?.[listName] || []).slice().sort((a, b) => {
-          const aHasOrder = Number.isFinite(a.listOrder);
-          const bHasOrder = Number.isFinite(b.listOrder);
-          if (aHasOrder && bHasOrder) {
-            const orderDiff = a.listOrder - b.listOrder;
-            if (orderDiff !== 0) return orderDiff;
-          } else if (aHasOrder !== bHasOrder) {
-            return aHasOrder ? -1 : 1;
-          }
-          const aDate = new Date(a.dateAdded || 0).getTime() || 0;
-          const bDate = new Date(b.dateAdded || 0).getTime() || 0;
-          return aDate - bDate || String(a.id).localeCompare(String(b.id));
-        });
+        const source = (combinedLists?.[listName] || []).slice();
+        const isCustomRootList = !PREDEFINED_MOVIE_LISTS.includes(listName);
+        // Özel (kök-array) listelerde Firestore dizisinin DOĞAL sırası esas:
+        // öğelerde listOrder yok ve dateAdded gün hassasiyetli olduğundan
+        // sort, kullanıcının elle verdiği sırayı (reorder) görünmez kılıyordu.
+        const items = isCustomRootList
+          ? source
+          : source.sort((a, b) => {
+              const aHasOrder = Number.isFinite(a.listOrder);
+              const bHasOrder = Number.isFinite(b.listOrder);
+              if (aHasOrder && bHasOrder) {
+                const orderDiff = a.listOrder - b.listOrder;
+                if (orderDiff !== 0) return orderDiff;
+              } else if (aHasOrder !== bHasOrder) {
+                return aHasOrder ? -1 : 1;
+              }
+              const aDate = new Date(a.dateAdded || 0).getTime() || 0;
+              const bDate = new Date(b.dateAdded || 0).getTime() || 0;
+              return aDate - bDate || String(a.id).localeCompare(String(b.id));
+            });
         setListItems(items);
       }
     }
@@ -308,11 +321,24 @@ export default function ListsScreen({ route, navigation }) {
           return;
         }
 
+        // currentItems görüntüdeki İSTENEN nihai sıradır. Ham diziye görüntü
+        // indeksleriyle splice uygulamak (eski kod) sıralar farklıyken yanlış
+        // öğeyi taşıyordu — ham öğeleri id eşleyerek görüntü sırasına diz.
         const data = docSnap.data();
-        const listReorder = [...(data[listName] || [])];
-        const item = listReorder.splice(fromIndex, 1)[0];
-        listReorder.splice(targetIndex, 0, item);
-        await updateDoc(docRef, { [listName]: listReorder });
+        const rawById = new Map(
+          (data[listName] || []).map((it) => [String(it?.id), it]),
+        );
+        const ordered = [];
+        for (const it of currentItems) {
+          const raw = rawById.get(String(it?.id));
+          if (raw) {
+            ordered.push(raw);
+            rawById.delete(String(it?.id));
+          }
+        }
+        rawById.forEach((leftover) => ordered.push(leftover));
+        setListItems(currentItems);
+        await updateDoc(docRef, { [listName]: ordered });
       }
 
       setIndex(targetIndex);
@@ -921,14 +947,17 @@ export default function ListsScreen({ route, navigation }) {
             keyExtractor={(row, i) => `${row[0] ? row[0].id : "r"}-${i}`}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{
+              paddingHorizontal: GRID_SIDE_PADDING,
               paddingBottom: 40,
             }}
             renderItem={({ item: row }) => (
               <View
                 style={{
                   flexDirection: "row",
-                  justifyContent: "space-between",
+                  justifyContent: "flex-start",
+                  gap: GRID_COLUMN_GAP,
                   width: "100%",
+                  marginBottom: 12,
                 }}
               >
                 {row.map((item) => (
@@ -967,12 +996,11 @@ export default function ListsScreen({ route, navigation }) {
                     : setModalVisible(true);
                   setListModalItems([item]); // Tek bir öğeyi modalda göstermek için diziye sarın
                 }}
-                style={styles.item}
+                style={[styles.item, { width: posterW }]}
               >
                 <SwipeCard>
                   <Animated.View
                     style={{
-                      margin: 3,
                       // Alta yapışık ilerleme çubuğu poster köşesinden taşmasın
                       // diye köşe yarıçapıyla kırpılır.
                       overflow: "hidden",
@@ -1073,7 +1101,7 @@ export default function ListsScreen({ route, navigation }) {
                 ))}
                 {row.length < gridColumns
                   ? Array.from({ length: gridColumns - row.length }).map((_, i) => (
-                      <View key={`sp-${i}`} style={{ width: posterW + 6 }} />
+                      <View key={`sp-${i}`} style={{ width: posterW }} />
                     ))
                   : null}
               </View>

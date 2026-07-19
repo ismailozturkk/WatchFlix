@@ -20,13 +20,14 @@ import { useTvShow } from "../../context/TvShowContex";
 import { useLanguage } from "../../context/LanguageContext";
 import ListBadges from "../../components/ListBadges";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 
 const { width } = Dimensions.get("window");
 
 // Stable, module-scope item component → no remount → no flicker.
 const TvAiringTodayCard = memo(function TvAiringTodayCard({ item, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
+  const { posterBadges } = useListLayoutSettings();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -55,16 +56,20 @@ const TvAiringTodayCard = memo(function TvAiringTodayCard({ item, navigation, th
           transition={120}
         />
 
-        <View style={[styles.relaseDateCount, { backgroundColor: theme.secondaryt }]}>
-          <Text style={[styles.similarRatingText, { color: theme.text.secondary }]}>
-            {item.first_air_date}
-          </Text>
-        </View>
-        <View style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}>
-          <Text style={[styles.similarRatingText, { color: theme.colors.orange }]}>
-            {item.vote_average}
-          </Text>
-        </View>
+        {posterBadges?.releaseDate !== false && (
+          <View style={[styles.relaseDateCount, { backgroundColor: theme.secondaryt }]}>
+            <Text style={[styles.similarRatingText, { color: theme.text.secondary }]}>
+              {item.first_air_date}
+            </Text>
+          </View>
+        )}
+        {posterBadges?.tmdbRating !== false && (
+          <View style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}>
+            <Text style={[styles.similarRatingText, { color: theme.colors.orange }]}>
+              {item.vote_average}
+            </Text>
+          </View>
+        )}
         <ListBadges
           mediaId={item.id}
           mediaType="tv"

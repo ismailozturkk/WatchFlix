@@ -8,8 +8,8 @@
     },
     "chatMeta": {
       "$chatId": {
-        ".read": "auth != null && $chatId.contains(auth.uid)",
-        ".write": "auth != null && $chatId.contains(auth.uid)"
+        ".read": "auth != null && ($chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid))",
+        ".write": "auth != null && ($chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid))"
       }
     }
   }

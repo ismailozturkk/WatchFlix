@@ -31,6 +31,8 @@ function formatCount(n) {
   return `${n}`;
 }
 
+// Kompakt mini hücre: renkli kategori ikonu + sayı. Etiket ekranda yok
+// (renk/ikon MyActivityScreen sekmeleriyle eşleşir), erişilebilirlikte korunur.
 function QuickAccessCell({ item, theme, onPress }) {
   return (
     <Pressable
@@ -50,25 +52,13 @@ function QuickAccessCell({ item, theme, onPress }) {
         pressed && styles.pressedCell,
       ]}
     >
-      <View style={styles.quickCellTop}>
-        <View style={[styles.quickIcon, { backgroundColor: item.color + "1F" }]}>
-          <Ionicons name={item.icon} size={16} color={item.color} />
-        </View>
-        <Text
-          allowFontScaling={false}
-          style={[styles.quickValue, { color: theme.text.primary }]}
-        >
-          {formatCount(item.value)}
-        </Text>
-      </View>
+      <Ionicons name={item.icon} size={15} color={item.color} />
       <Text
         allowFontScaling={false}
-        numberOfLines={1}
-        style={[styles.quickLabel, { color: theme.text.secondary }]}
+        style={[styles.quickValue, { color: theme.text.primary }]}
       >
-        {item.label}
+        {formatCount(item.value)}
       </Text>
-      <View style={[styles.cellAccent, { backgroundColor: item.color }]} />
     </Pressable>
   );
 }
@@ -214,10 +204,6 @@ export default function MyActivityButton({ navigation }) {
           style={StyleSheet.absoluteFill}
           pointerEvents="none"
         />
-        <View pointerEvents="none" style={styles.artwork}>
-          <View style={[styles.artworkLarge, { backgroundColor: theme.accent + "12" }]} />
-          <View style={[styles.artworkSmall, { backgroundColor: "#EC489914" }]} />
-        </View>
 
         <Pressable
           onPress={() => openActivity()}
@@ -235,17 +221,10 @@ export default function MyActivityButton({ navigation }) {
             end={{ x: 1, y: 1 }}
             style={styles.iconWrap}
           >
-            <Ionicons name="sparkles" size={22} color="#fff" />
+            <Ionicons name="sparkles" size={18} color="#fff" />
           </LinearGradient>
 
           <View style={styles.headerText}>
-            <Text
-              allowFontScaling={false}
-              style={[styles.eyebrow, { color: theme.accent }]}
-              numberOfLines={1}
-            >
-              {i18nText("autoI18n.aktivite_merkezi", "AKTİVİTE MERKEZİ")}
-            </Text>
             <Text
               allowFontScaling={false}
               style={[styles.title, { color: theme.text.primary }]}
@@ -268,11 +247,11 @@ export default function MyActivityButton({ navigation }) {
           </View>
 
           <View style={[styles.openButton, { backgroundColor: theme.accent + "1F" }]}>
-            <Ionicons name="arrow-forward" size={18} color={theme.accent} />
+            <Ionicons name="arrow-forward" size={16} color={theme.accent} />
           </View>
         </Pressable>
 
-        <View style={styles.quickGrid}>
+        <View style={styles.quickRow}>
           {stats.map((item) => (
             <QuickAccessCell
               key={item.key}
@@ -281,16 +260,6 @@ export default function MyActivityButton({ navigation }) {
               onPress={openActivity}
             />
           ))}
-        </View>
-
-        <View style={[styles.footer, { borderTopColor: theme.border }]}>
-          <Ionicons name="flash-outline" size={13} color={theme.accent} />
-          <Text allowFontScaling={false} style={[styles.footerText, { color: theme.text.muted }]}>
-            {i18nText(
-              "autoI18n.kategoriye_dokun",
-              "Detaylara gitmek için bir kategoriye dokun",
-            )}
-          </Text>
         </View>
       </View>
     </View>
@@ -307,106 +276,55 @@ const styles = StyleSheet.create({
   },
   card: {
     marginHorizontal: 16,
-    padding: 14,
-    borderRadius: 24,
+    padding: 12,
+    borderRadius: 20,
     borderWidth: 1,
     overflow: "hidden",
-    shadowOffset: { width: 0, height: 7 },
-    shadowOpacity: 0.17,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  artwork: { ...StyleSheet.absoluteFillObject, overflow: "hidden" },
-  artworkLarge: {
-    position: "absolute",
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    right: -52,
-    top: -72,
-  },
-  artworkSmall: {
-    position: "absolute",
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    left: -24,
-    bottom: 42,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.15,
+    shadowRadius: 9,
+    elevation: 4,
   },
   headerButton: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 58,
-    marginBottom: 13,
+    marginBottom: 10,
   },
   pressedHeader: { opacity: 0.72, transform: [{ scale: 0.99 }] },
   iconWrap: {
-    width: 50,
-    height: 50,
-    borderRadius: 17,
+    width: 38,
+    height: 38,
+    borderRadius: 13,
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 7,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 5,
+    elevation: 3,
   },
-  headerText: { flex: 1, marginLeft: 12, marginRight: 8 },
-  eyebrow: { fontSize: 9.5, fontWeight: "900", letterSpacing: 1.05, marginBottom: 2 },
-  title: { fontSize: 18, fontWeight: "900", letterSpacing: 0.1 },
-  subtitle: { fontSize: 10.5, fontWeight: "600", marginTop: 3 },
+  headerText: { flex: 1, marginLeft: 10, marginRight: 8 },
+  title: { fontSize: 15, fontWeight: "800", letterSpacing: 0.1 },
+  subtitle: { fontSize: 10.5, fontWeight: "600", marginTop: 1 },
   openButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  quickGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  quickCell: {
-    width: "31%",
-    flexGrow: 1,
-    minHeight: 72,
-    paddingHorizontal: 9,
-    paddingVertical: 9,
-    borderRadius: 15,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  pressedCell: { opacity: 0.76, transform: [{ scale: 0.97 }] },
-  quickCellTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  quickIcon: {
-    width: 29,
-    height: 29,
+    width: 30,
+    height: 30,
     borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
   },
-  quickValue: { fontSize: 17, fontWeight: "900", letterSpacing: -0.3 },
-  quickLabel: { fontSize: 10.5, fontWeight: "700", marginTop: 7 },
-  cellAccent: {
-    position: "absolute",
-    left: 10,
-    right: 10,
-    bottom: 0,
-    height: 2,
-    borderTopLeftRadius: 2,
-    borderTopRightRadius: 2,
-    opacity: 0.78,
-  },
-  footer: {
+  quickRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    marginTop: 11,
-    paddingTop: 10,
+    gap: 6,
   },
-  footerText: { fontSize: 10.5, fontWeight: "600" },
+  quickCell: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 3,
+  },
+  pressedCell: { opacity: 0.76, transform: [{ scale: 0.97 }] },
+  quickValue: { fontSize: 12, fontWeight: "800", letterSpacing: -0.2 },
 });

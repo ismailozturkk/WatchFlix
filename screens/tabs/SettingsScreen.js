@@ -1,36 +1,34 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   StyleSheet,
   View,
   Text,
   TouchableOpacity,
   ScrollView,
-  Alert,
   Modal,
   TextInput,
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  InteractionManager,
-  ActivityIndicator,
   PanResponder,
+  ActivityIndicator,
 } from "react-native";
+import axios from "axios";
 import { useNavigation } from "@react-navigation/native";
 import { useLanguage } from "../../context/LanguageContext";
 import AppIcon from "../../components/AppIcon";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../context/ThemeContext";
-import LottieView from "lottie-react-native";
 import SettingsTheme from "./setting/SettingsTheme";
 import {
   useContentSettings,
   useImageQualitySettings,
   useOngoingTvShowsSettings,
-  useSnowSettings,
-  useIconBackgroundSettings,
   useHapticsSettings,
   useNotificationSettings,
   useAutoDataCacheSettings,
+  useStreamingProviderSettings,
+  STREAMING_PROVIDERS,
+  useApiSettings,
 } from "../../context/AppSettingsContext";
 import { useDeviceNotifications } from "../../context/DeviceNotificationsContext";
 import SwitchToggle from "@components/SwitchToggle";
@@ -41,22 +39,13 @@ import BatteryOptimizationNotice from "@components/BatteryOptimizationNotice";
 import { BlurView } from "expo-blur";
 import CountryFlag from "react-native-country-flag";
 import IconBacground from "../../components/IconBacground";
+import ScreenSnow from "../../components/ScreenSnow";
 import { alpha } from "../../theme/colors";
-import { downloadAllData } from "../../services/dataDownloader";
-import { useConnectivity } from "../../context/ConnectivityContext";
 import { i18nText } from "../../utils/i18nText";
-import CacheManagerModal from "../../components/CacheManagerModal";
 import { appAlert } from "@components/AppAlert";
 import { Image } from "expo-image";
-import { getBreakdown } from "../../services/cacheInspector";
-import { auth, db } from "../../firebase";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import TmdbLogo from "../../components/TmdbLogo";
-
-const fmtBytes = (b) =>
-  b >= 1024 * 1024
-    ? `${(b / 1048576).toFixed(1)} MB`
-    : `${Math.max(0, Math.round(b / 1024))} KB`;
+import { getCachedValue, setCachedValue, TTL } from "../../utils/apiCache";
 
 const LANGUAGES = [
   { code: "tr", name: "Türkçe", nativeName: "Türkçe", flag: "tr" },
@@ -274,45 +263,28 @@ function OpacitySlider({ value, onChange, colors }) {
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
-  const [modalVisible, setModalVisible] = useState(false);
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [langSearch, setLangSearch] = useState("");
-  const [renderSnow, setRenderSnow] = useState(false);
-
-  // Offline-first: veri indirme + önbellek boyutu
-  const { isOnline } = useConnectivity();
-  const [cacheSize, setCacheSize] = useState(0);
-  const [downloading, setDownloading] = useState(false);
-  const [downloadPct, setDownloadPct] = useState(0);
-
-  const refreshCacheSize = async () => {
-    try {
-      const breakdown = await getBreakdown();
-      setCacheSize(breakdown.total);
-    } catch {
-      // yok say
-    }
-  };
-  useEffect(() => {
-    refreshCacheSize();
-  }, []);
+  const [providerModalVisible, setProviderModalVisible] = useState(false);
+  const [providerSearch, setProviderSearch] = useState("");
+  const [providerCatalog, setProviderCatalog] = useState(
+    STREAMING_PROVIDERS.map((provider, index) => ({
+      id: provider.id,
+      name: provider.name,
+      logoPath: null,
+      priority: index,
+    })),
+  );
+  const [providerCatalogLoading, setProviderCatalogLoading] = useState(true);
 
   const { t, language, toggleLanguage } = useLanguage();
   const { theme } = useTheme();
   const { adultContent, chaneAdultContent } = useContentSettings();
-  const { showSnow, changeShowSnow } = useSnowSettings();
-  const {
-    showIconBackground,
-    changeShowIconBackground,
-    iconBackgroundMode,
-    changeIconBackgroundMode,
-    iconBackgroundOpacity,
-    changeIconBackgroundOpacity,
-  } = useIconBackgroundSettings();
   const { showOngoingTvShows, changeShowOngoingTvShows } =
     useOngoingTvShowsSettings();
-  const { imageQuality, imageQualityLevel, changeImageQuality } =
+  const { imageQuality, imageQualityLevel, changeImageQuality, getTmdbUrl } =
     useImageQualitySettings();
+  const { API_KEY } = useApiSettings();
   const { hapticsEnabled, changeHapticsEnabled } = useHapticsSettings();
   const {
     notificationSettings,
@@ -323,19 +295,72 @@ export default function SettingsScreen() {
     changeAutoDataCacheEnabled,
   } = useAutoDataCacheSettings();
   const { permissionStatus, requestPermission } = useDeviceNotifications();
+  const { streamingProviderIds, changeStreamingProviderIds } =
+    useStreamingProviderSettings();
 
   useEffect(() => {
-    if (!showSnow) {
-      setRenderSnow(false);
-      return undefined;
-    }
+    let active = true;
+    const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
+    const tmdbRegion = language === "tr" ? "TR" : "US";
+    const cacheKey = `settings_provider_catalog_${tmdbLanguage}_${tmdbRegion}`;
 
-    const task = InteractionManager.runAfterInteractions(() => {
-      setRenderSnow(true);
-    });
+    const applyCatalog = (rawProviders) => {
+      const merged = new Map();
+      for (const provider of rawProviders || []) {
+        if (!provider?.provider_id) continue;
+        const current = merged.get(provider.provider_id);
+        merged.set(provider.provider_id, {
+          id: provider.provider_id,
+          name: provider.provider_name,
+          logoPath: provider.logo_path || current?.logoPath || null,
+          priority: Math.min(
+            Number(provider.display_priority ?? 9999),
+            Number(current?.priority ?? 9999),
+          ),
+        });
+      }
+      return [...merged.values()].sort(
+        (a, b) => a.priority - b.priority || a.name.localeCompare(b.name),
+      );
+    };
 
-    return () => task.cancel?.();
-  }, [showSnow]);
+    const loadProviderCatalog = async () => {
+      setProviderCatalogLoading(true);
+      try {
+        const cached = await getCachedValue(cacheKey, TTL.PROVIDERS);
+        if (cached?.length) {
+          if (active) setProviderCatalog(cached);
+          return;
+        }
+        const headers = { accept: "application/json", Authorization: API_KEY };
+        const [movieResponse, tvResponse] = await Promise.all([
+          axios.get("https://api.themoviedb.org/3/watch/providers/movie", {
+            params: { language: tmdbLanguage, watch_region: tmdbRegion },
+            headers,
+          }),
+          axios.get("https://api.themoviedb.org/3/watch/providers/tv", {
+            params: { language: tmdbLanguage, watch_region: tmdbRegion },
+            headers,
+          }),
+        ]);
+        const next = applyCatalog([
+          ...(movieResponse.data.results || []),
+          ...(tvResponse.data.results || []),
+        ]);
+        if (next.length && active) setProviderCatalog(next);
+        if (next.length) setCachedValue(cacheKey, next);
+      } catch (error) {
+        if (__DEV__) console.error("Settings provider catalog:", error?.message || error);
+      } finally {
+        if (active) setProviderCatalogLoading(false);
+      }
+    };
+
+    loadProviderCatalog();
+    return () => {
+      active = false;
+    };
+  }, [API_KEY, language]);
 
   const C = buildUiColors(theme);
 
@@ -346,47 +371,6 @@ export default function SettingsScreen() {
   );
   const currentLang =
     LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0];
-
-  const handleDownloadData = async () => {
-    if (downloading) return;
-    if (!isOnline) {
-      appAlert(
-        i18nText("autoI18n.cevrimdisi", "Çevrimdışı"),
-        i18nText(
-          "autoI18n.veriIndirmeInternet",
-          "Verileri indirmek için internet bağlantısı gerekli.",
-        ),
-      );
-      return;
-    }
-    setDownloading(true);
-    setDownloadPct(0);
-    try {
-      const res = await downloadAllData({
-        language,
-        onProgress: (p) => setDownloadPct(p),
-      });
-      await refreshCacheSize();
-      if (res.ok) {
-        appAlert(
-          i18nText("autoI18n.tamamlandi", "Tamamlandı"),
-          i18nText(
-            "autoI18n.verilerIndirildi",
-            "Veriler çevrimdışı kullanım için indirildi.",
-          ),
-        );
-      } else {
-        appAlert(
-          i18nText("autoI18n.kismenIndirildi", "Kısmen indirildi"),
-          res.errors.join("\n"),
-        );
-      }
-    } catch (e) {
-      appAlert(i18nText("autoI18n.hata", "Hata"), e?.message || "");
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   const handleSelectLanguage = (code) => {
     toggleLanguage(code);
@@ -399,6 +383,45 @@ export default function SettingsScreen() {
   const notificationsEnabled = notificationSettings.enabled;
   const remindersEnabled =
     notificationsEnabled && notificationSettings.remindersEnabled;
+  const selectedProviderNames = providerCatalog
+    .filter((provider) => streamingProviderIds.includes(provider.id))
+    .map((provider) => provider.name);
+  const providerSummary = streamingProviderIds.length
+    ? selectedProviderNames.length
+      ? selectedProviderNames.join(", ")
+      : language === "tr"
+        ? `${streamingProviderIds.length} platform seçili`
+        : `${streamingProviderIds.length} services selected`
+    : language === "tr"
+      ? "Henüz platform seçilmedi"
+      : "No services selected yet";
+
+  const filteredProviders = useMemo(() => {
+    const query = providerSearch.trim().toLocaleLowerCase(
+      language === "tr" ? "tr-TR" : "en-US",
+    );
+    return providerCatalog
+      .filter((provider) =>
+        query
+          ? provider.name
+              .toLocaleLowerCase(language === "tr" ? "tr-TR" : "en-US")
+              .includes(query)
+          : true,
+      )
+      .sort((a, b) => {
+        const aSelected = streamingProviderIds.includes(a.id) ? 1 : 0;
+        const bSelected = streamingProviderIds.includes(b.id) ? 1 : 0;
+        return bSelected - aSelected || a.priority - b.priority;
+      });
+  }, [language, providerCatalog, providerSearch, streamingProviderIds]);
+
+  const toggleStreamingProvider = (providerId) => {
+    changeStreamingProviderIds(
+      streamingProviderIds.includes(providerId)
+        ? streamingProviderIds.filter((id) => id !== providerId)
+        : [...streamingProviderIds, providerId],
+    );
+  };
 
   const updateNotifications = (patch) => {
     changeNotificationSettings(patch);
@@ -420,40 +443,6 @@ export default function SettingsScreen() {
       ? t.notifPermissionDenied
       : t.allNotificationsSubtitle;
 
-  // ── DEV-ONLY: arka plan push zincirini tek cihazla test eder ──
-  // Kendi uid'ine doğrudan bir notif dökümanı yazar (createSocialNotification'daki
-  // self-guard'ı atlar; firestore.rules fromUid==auth.uid istediği için kurala uygun).
-  // Cloud Function onSocialNotificationCreated tetiklenir → kendi token'ına push gelir.
-  // Test için: bas → uygulamayı TAMAMEN kapat → birkaç saniye içinde push düşmeli.
-  const [sendingTestPush, setSendingTestPush] = useState(false);
-  const handleSendTestPush = async () => {
-    if (sendingTestPush) return;
-    const uid = auth.currentUser?.uid;
-    if (!uid) {
-      appAlert("Test push", "Oturum açık değil.");
-      return;
-    }
-    setSendingTestPush(true);
-    try {
-      await addDoc(collection(db, "Users", uid, "notifications"), {
-        type: "post_like",
-        fromUid: uid,
-        fromName: "Test (kendin)",
-        fromAvatarIndex: 0,
-        read: false,
-        createdAt: serverTimestamp(),
-      });
-      appAlert(
-        "Test push gönderildi",
-        "Şimdi uygulamayı TAMAMEN kapat. Birkaç saniye içinde arka plan bildirimi gelmeli. Loglar: firebase functions:log",
-      );
-    } catch (e) {
-      appAlert("Test push hatası", e?.message || String(e));
-    } finally {
-      setSendingTestPush(false);
-    }
-  };
-
   return (
     <View style={[s.root, { backgroundColor: C.bg }]}>
       <IconBacground opacity={0.15} />
@@ -464,15 +453,6 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {renderSnow && (
-          <LottieView
-            style={s.lottie}
-            source={require("@lottie/snow.json")}
-            autoPlay
-            loop
-          />
-        )}
-
         <Text allowFontScaling={false} style={[s.pageTitle, { color: C.text }]}>
           {t.settings}
         </Text>
@@ -578,6 +558,37 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        <SectionLabel color={C.muted}>
+          {(language === "tr" ? "İZLEME PLATFORMLARIM" : "MY STREAMING SERVICES")}
+        </SectionLabel>
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <SettingRow
+            colors={C}
+            iconBg={C.iconTeal}
+            iconColor={C.teal}
+            iconName="play-circle-outline"
+            title={language === "tr" ? "Platform üyeliklerim" : "My subscriptions"}
+            subtitle={providerSummary}
+            onPress={() => {
+              setProviderSearch("");
+              setProviderModalVisible(true);
+            }}
+            last
+            right={
+              <View style={s.providerCountWrap}>
+                {streamingProviderIds.length > 0 && (
+                  <View style={[s.providerCount, { backgroundColor: C.accentDim }]}>
+                    <Text style={[s.providerCountText, { color: C.accent }]}>
+                      {streamingProviderIds.length}
+                    </Text>
+                  </View>
+                )}
+                <Chevron color={C.muted} />
+              </View>
+            }
+          />
+        </View>
+
         <SectionLabel color={C.muted}>{t.general.toUpperCase()}</SectionLabel>
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <SettingRow
@@ -649,6 +660,20 @@ export default function SettingsScreen() {
           {i18nText("autoI18n.dahaFazla", "Daha fazla").toUpperCase()}
         </SectionLabel>
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <SettingRow
+            colors={C}
+            iconBg={C.iconBlue}
+            iconColor={C.blue}
+            iconName="person-circle-outline"
+            title={language === "tr" ? "Hesap bağlantıları" : "Account connections"}
+            subtitle={
+              language === "tr"
+                ? "Google ve diğer giriş yöntemleri"
+                : "Google and other sign-in methods"
+            }
+            onPress={() => navigation.navigate("AccountConnectionsScreen")}
+            right={<Chevron color={C.muted} />}
+          />
           <SettingRow
             colors={C}
             iconBg={C.iconGreen}
@@ -769,14 +794,184 @@ export default function SettingsScreen() {
           </View>
         </SwipeCard>
 
-        <CacheManagerModal
-          visible={modalVisible}
-          onClose={() => {
-            setModalVisible(false);
-            refreshCacheSize();
+        <Modal
+          animationType="slide"
+          transparent
+          visible={providerModalVisible}
+          onRequestClose={() => {
+            setProviderModalVisible(false);
+            setProviderSearch("");
           }}
-          colors={C}
-        />
+        >
+          <View style={s.sheetOverlay}>
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={() => {
+                setProviderModalVisible(false);
+                setProviderSearch("");
+              }}
+            />
+            <BlurView
+              tint="dark"
+              intensity={40}
+              experimentalBlurMethod="dimezisBlurView"
+              style={StyleSheet.absoluteFill}
+            />
+            <View
+              style={[
+                s.sheet,
+                s.providerSheet,
+                { backgroundColor: C.card, borderColor: C.border },
+              ]}
+            >
+              <View style={[s.sheetHandle, { backgroundColor: C.handle }]} />
+              <View style={s.sheetHeader}>
+                <View style={s.sheetTitleRow}>
+                  <AppIcon name="play-circle-outline" size={20} color={C.text} />
+                  <Text allowFontScaling={false} style={[s.sheetTitle, { color: C.text }]}>
+                    {language === "tr" ? "Platform üyeliklerim" : "My subscriptions"}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[s.closeBtn, { backgroundColor: C.closeBg }]}
+                  onPress={() => {
+                    setProviderModalVisible(false);
+                    setProviderSearch("");
+                  }}
+                >
+                  <AppIcon name="close" size={16} color={C.muted} />
+                </TouchableOpacity>
+              </View>
+              <Text allowFontScaling={false} style={[s.providerHelp, { color: C.muted }]}>
+                {language === "tr"
+                  ? "Üyesi olduğun servisleri seç. Film ve dizi ana ekranlarında sana özel bir alan oluşturulur."
+                  : "Choose the services you subscribe to. A personalized rail will appear on movie and TV home screens."}
+              </Text>
+              <View
+                style={[
+                  s.providerSearchBox,
+                  { backgroundColor: C.cardAlt, borderColor: C.border },
+                ]}
+              >
+                <AppIcon name="search-outline" size={17} color={C.muted} />
+                <TextInput
+                  allowFontScaling={false}
+                  style={[s.providerSearchInput, { color: C.text }]}
+                  placeholder={
+                    language === "tr" ? "Platform ara..." : "Search services..."
+                  }
+                  placeholderTextColor={C.muted}
+                  value={providerSearch}
+                  onChangeText={setProviderSearch}
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                />
+                {providerSearch.length > 0 && (
+                  <TouchableOpacity onPress={() => setProviderSearch("")}>
+                    <AppIcon name="close-circle" size={17} color={C.muted} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={s.providerListMeta}>
+                <Text style={[s.providerListMetaText, { color: C.muted }]}>
+                  {language === "tr"
+                    ? `${filteredProviders.length} platform`
+                    : `${filteredProviders.length} services`}
+                </Text>
+                {streamingProviderIds.length > 0 && (
+                  <TouchableOpacity onPress={() => changeStreamingProviderIds([])}>
+                    <Text style={[s.providerClearText, { color: C.accent }]}>
+                      {language === "tr" ? "Seçimi temizle" : "Clear selection"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {providerCatalogLoading ? (
+                <View style={s.providerLoading}>
+                  <ActivityIndicator size="small" color={C.accent} />
+                </View>
+              ) : (
+                <FlatList
+                  data={filteredProviders}
+                  keyExtractor={(provider) => String(provider.id)}
+                  numColumns={3}
+                  style={s.providerList}
+                  contentContainerStyle={s.providerListContent}
+                  columnWrapperStyle={s.providerColumn}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                  ListEmptyComponent={
+                    <View style={s.providerEmpty}>
+                      <AppIcon name="search-outline" size={26} color={C.muted} />
+                      <Text style={[s.providerEmptyText, { color: C.muted }]}>
+                        {language === "tr" ? "Platform bulunamadı" : "No services found"}
+                      </Text>
+                    </View>
+                  }
+                  renderItem={({ item: provider }) => {
+                    const selected = streamingProviderIds.includes(provider.id);
+                    return (
+                      <TouchableOpacity
+                        activeOpacity={0.75}
+                        onPress={() => toggleStreamingProvider(provider.id)}
+                        style={[
+                          s.providerTile,
+                          {
+                            backgroundColor: selected ? C.accentDim : C.cardAlt,
+                            borderColor: selected ? C.accent : C.border,
+                          },
+                        ]}
+                      >
+                        {provider.logoPath ? (
+                          <Image
+                            source={{ uri: getTmdbUrl(provider.logoPath, "logo", 92) }}
+                            style={s.providerLogoImage}
+                            contentFit="cover"
+                            cachePolicy="memory-disk"
+                          />
+                        ) : (
+                          <View style={[s.providerLogo, { backgroundColor: C.accent }]}>
+                            <Text style={s.providerLogoText}>{provider.name.slice(0, 1)}</Text>
+                          </View>
+                        )}
+                        <Text
+                          allowFontScaling={false}
+                          numberOfLines={2}
+                          style={[s.providerName, { color: selected ? C.accent : C.text }]}
+                        >
+                          {provider.name}
+                        </Text>
+                        <View style={[s.providerSelectionIcon, { backgroundColor: C.card }]}>
+                          <AppIcon
+                            name={selected ? "checkmark-circle" : "ellipse-outline"}
+                            size={18}
+                            color={selected ? C.accent : C.muted}
+                          />
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }}
+                />
+              )}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  setProviderModalVisible(false);
+                  setProviderSearch("");
+                }}
+                style={[s.providerDone, { backgroundColor: C.accent }]}
+              >
+                <Text style={s.providerDoneText}>
+                  {language === "tr" ? "Tamam" : "Done"}
+                </Text>
+              </TouchableOpacity>
+              <Text allowFontScaling={false} style={[s.providerAttribution, { color: C.muted }]}>
+                Watch provider data by JustWatch
+              </Text>
+            </View>
+          </View>
+        </Modal>
 
         <Modal
           animationType="slide"
@@ -927,6 +1122,8 @@ export default function SettingsScreen() {
           </KeyboardAvoidingView>
         </Modal>
       </ScrollView>
+      {/* Kar efekti — sabit overlay (scroll dışında), optimize ortak bileşen */}
+      <ScreenSnow />
     </View>
   );
 }
@@ -941,14 +1138,6 @@ const s = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 110,
-  },
-  lottie: {
-    position: "absolute",
-    top: 0,
-    height: 1600,
-    left: -60,
-    right: -60,
-    zIndex: 0,
   },
   pageTitle: {
     fontSize: 26,
@@ -1051,6 +1240,31 @@ const s = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
+  providerCountWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
+  providerCount: { minWidth: 24, height: 24, paddingHorizontal: 7, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  providerCountText: { fontSize: 11, fontWeight: "800" },
+  providerSheet: { maxHeight: "88%" },
+  providerHelp: { fontSize: 12, lineHeight: 18, marginBottom: 12 },
+  providerSearchBox: { height: 44, borderRadius: 13, borderWidth: 1, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 9 },
+  providerSearchInput: { flex: 1, fontSize: 13, paddingVertical: 0 },
+  providerListMeta: { minHeight: 36, paddingHorizontal: 2, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  providerListMetaText: { fontSize: 10.5, fontWeight: "600" },
+  providerClearText: { fontSize: 11, fontWeight: "700" },
+  providerList: { flexGrow: 0, maxHeight: 410 },
+  providerListContent: { gap: 8, paddingBottom: 4 },
+  providerColumn: { gap: 8 },
+  providerLoading: { height: 180, alignItems: "center", justifyContent: "center" },
+  providerEmpty: { height: 150, alignItems: "center", justifyContent: "center", gap: 8 },
+  providerEmptyText: { fontSize: 12 },
+  providerTile: { width: "31.7%", minHeight: 108, borderWidth: 1, borderRadius: 14, paddingHorizontal: 7, paddingVertical: 10, alignItems: "center", justifyContent: "center", gap: 7 },
+  providerLogo: { width: 46, height: 46, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  providerLogoImage: { width: 46, height: 46, borderRadius: 12, backgroundColor: "#FFFFFF" },
+  providerLogoText: { color: "#FFFFFF", fontSize: 15, fontWeight: "900" },
+  providerName: { minHeight: 26, fontSize: 10.5, lineHeight: 13, fontWeight: "700", textAlign: "center" },
+  providerSelectionIcon: { position: "absolute", top: 5, right: 5, width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  providerDone: { height: 46, borderRadius: 14, alignItems: "center", justifyContent: "center", marginTop: 20 },
+  providerDoneText: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
+  providerAttribution: { textAlign: "center", fontSize: 9, marginTop: 10 },
   langCard: {
     flexDirection: "row",
     alignItems: "center",

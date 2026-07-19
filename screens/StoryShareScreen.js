@@ -13,6 +13,7 @@ import {
   Animated,
   PanResponder,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import ViewShot, { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
@@ -23,6 +24,8 @@ import axios from "axios";
 import Toast from "react-native-toast-message";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
+import { i18nText } from "../utils/i18nText";
+import { getRatingColors } from "../utils/ratingColors";
 import {
   useApiSettings,
   useImageQualitySettings,
@@ -110,6 +113,8 @@ const DEFAULTS = {
   textWidth: 0.7,
   posterRadius: 12,
   posterWidth: 0.42,
+  graphWidth: 0.86,
+  graphRadius: 3,
 };
 
 /* Paylaşılan/seçili içerik için kaliteyi ayardan bağımsız YÜKSEK tut
@@ -119,6 +124,88 @@ const hqUrl = (path, type) =>
   path ? `https://image.tmdb.org/t/p/${HQ_SIZE[type] || "w780"}${path}` : null;
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+/* ── Bölüm Graph bloğu ──
+   TvGraphDetailScreen ızgarasının story versiyonu: sütun = sezon,
+   satır = bölüm; kareler puana göre boyanır (ortak RATING_TIERS).
+   Veri blokta gömülü ({ s: sezonNo, r: [puanlar] }) → taslaklarda da
+   yeniden fetch gerekmeden çizilir. */
+function EpisodeGraph({ block, width }) {
+  const data = block.data || [];
+  const S = data.length;
+  if (!S) return null;
+  const maxE = Math.max(...data.map((d) => d.r.length), 0);
+  const gap = 2;
+  const cell = (width - gap * (S - 1)) / S;
+  const cellRadius = Math.min(block.radius ?? DEFAULTS.graphRadius, cell / 2);
+  const showText = cell >= 15;
+  const headerFont = clamp(cell * 0.32, 6, 10);
+
+  return (
+    <View style={{ width }}>
+      {/* Sezon başlıkları */}
+      <View style={{ flexDirection: "row", gap, marginBottom: 2 }}>
+        {data.map((d) => (
+          <View key={d.s} style={{ width: cell, alignItems: "center" }}>
+            <Text
+              allowFontScaling={false}
+              style={{
+                color: "#fff",
+                fontSize: headerFont,
+                fontWeight: "800",
+                textShadowColor: "rgba(0,0,0,0.6)",
+                textShadowOffset: { width: 0, height: 1 },
+                textShadowRadius: 3,
+              }}
+            >
+              S{d.s}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Bölüm kareleri */}
+      {[...Array(maxE)].map((_, ei) => (
+        <View key={ei} style={{ flexDirection: "row", gap, marginBottom: gap }}>
+          {data.map((d) => {
+            const r = d.r[ei];
+            if (r === undefined)
+              return (
+                <View key={d.s} style={{ width: cell, height: cell }} />
+              );
+            const { bg, text } = getRatingColors(r);
+            return (
+              <View
+                key={d.s}
+                style={{
+                  width: cell,
+                  height: cell,
+                  backgroundColor: bg,
+                  borderRadius: cellRadius,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {showText && (
+                  <Text
+                    allowFontScaling={false}
+                    style={{
+                      color: text,
+                      fontSize: cell * 0.34,
+                      fontWeight: "800",
+                    }}
+                  >
+                    {r ? r.toFixed(1) : "–"}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
 
 /* #RRGGBB + opaklık → #RRGGBBAA */
 const hexA = (hex, a) => {
@@ -363,7 +450,7 @@ export default function StoryShareScreen({ route, navigation }) {
 
   const handleSaveDraft = async () => {
     if (!draftName.trim()) {
-      Toast.show({ type: "warning", text1: "Taslak adı gerekli" });
+      Toast.show({ type: "warning", text1: i18nText("autoI18n.taslak_adi_gerekli", "Taslak adı gerekli") });
       return;
     }
     if (savingDraft) return;
@@ -408,15 +495,15 @@ export default function StoryShareScreen({ route, navigation }) {
           const nd = await StoryDraftService.saveDraft(data);
           setCurrentDraftId(nd.id);
         }
-        Toast.show({ type: "success", text1: "Taslak güncellendi", text2: data.name });
+        Toast.show({ type: "success", text1: i18nText("autoI18n.taslak_guncellendi", "Taslak güncellendi"), text2: data.name });
       } else {
         const nd = await StoryDraftService.saveDraft(data);
         setCurrentDraftId(nd.id);
-        Toast.show({ type: "success", text1: "Taslak kaydedildi", text2: data.name });
+        Toast.show({ type: "success", text1: i18nText("autoI18n.taslak_kaydedildi", "Taslak kaydedildi"), text2: data.name });
       }
       setSaveModalVisible(false);
     } catch (e) {
-      Toast.show({ type: "error", text1: "Taslak kaydedilemedi" });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.taslak_kaydedilemedi", "Taslak kaydedilemedi") });
     } finally {
       setSavingDraft(false);
     }
@@ -550,6 +637,68 @@ export default function StoryShareScreen({ route, navigation }) {
     setTimeout(() => editRef.current?.focus(), 200);
   };
 
+  /* ── Bölüm Graph ekle (yalnızca dizi) ──
+     Tüm sezonların bölüm puanları TMDB'den çekilir ve blokta gömülü
+     saklanır; graph tuvale sürüklenebilir/boyutlanabilir blok olarak iner. */
+  const [graphLoading, setGraphLoading] = useState(false);
+  const addEpisodeGraph = async () => {
+    if (graphLoading || blocks.some((b) => b.id === "epgraph")) return;
+    setGraphLoading(true);
+    try {
+      const showRes = await axios.get(
+        `https://api.themoviedb.org/3/tv/${id}`,
+        { headers: { accept: "application/json", Authorization: API_KEY } }
+      );
+      const seasons = (showRes.data.seasons || []).filter(
+        (s) => s.season_number > 0
+      );
+      if (!seasons.length) throw new Error("no-seasons");
+      const data = await Promise.all(
+        seasons.map(async (s) => {
+          const res = await axios.get(
+            `https://api.themoviedb.org/3/tv/${id}/season/${s.season_number}`,
+            { headers: { accept: "application/json", Authorization: API_KEY } }
+          );
+          return {
+            s: s.season_number,
+            r: (res.data.episodes || []).map((ep) => ep.vote_average || 0),
+          };
+        })
+      );
+
+      // Başlangıç genişliği: graph yüksekliği tuvalin ~%55'ini aşmasın.
+      const S = data.length;
+      const maxE = Math.max(...data.map((d) => d.r.length), 1);
+      let widthFrac = DEFAULTS.graphWidth;
+      const estH = ((widthFrac * CANVAS_W) / S) * maxE;
+      const maxH = CANVAS_H * 0.55;
+      if (estH > maxH)
+        widthFrac = clamp((maxH * S) / (maxE * CANVAS_W), 0.2, DEFAULTS.graphWidth);
+
+      const el = {
+        id: "epgraph",
+        type: "graph",
+        data,
+        widthFrac,
+        radius: DEFAULTS.graphRadius,
+        x: (1 - widthFrac) / 2,
+        y: 0.16,
+      };
+      setBlocks((prev) => [...prev, el]);
+      setSelectedId("epgraph");
+    } catch {
+      Toast.show({
+        type: "error",
+        text1: i18nText(
+          "autoI18n.bolum_verisi_alinamadi",
+          "Bölüm verisi alınamadı"
+        ),
+      });
+    } finally {
+      setGraphLoading(false);
+    }
+  };
+
   const setPosterImage = (path) => {
     setBlocks((prev) => {
       if (prev.some((b) => b.id === "poster"))
@@ -566,7 +715,14 @@ export default function StoryShareScreen({ route, navigation }) {
     setBackgrounds((prev) => {
       if (prev.includes(path)) return prev.filter((p) => p !== path);
       if (prev.length >= MAX_BACKGROUNDS) {
-        Toast.show({ type: "warning", text1: "En fazla 3 arka plan eklenebilir" });
+        Toast.show({
+          type: "warning",
+          text1: i18nText(
+            "autoI18n.en_fazla_n_arka_plan",
+            "En fazla {{count}} arka plan eklenebilir",
+            { count: MAX_BACKGROUNDS },
+          ),
+        });
         return prev;
       }
       return [...prev, path];
@@ -576,7 +732,7 @@ export default function StoryShareScreen({ route, navigation }) {
     if (!selected) return;
     if (selected.type === "text")
       updateSelected({ size: clamp(selected.size + delta * 3, 10, 80) });
-    else if (selected.type === "image")
+    else if (selected.type === "image" || selected.type === "graph")
       updateSelected({
         widthFrac: clamp(selected.widthFrac + delta * 0.04, 0.18, 0.95),
       });
@@ -604,12 +760,12 @@ export default function StoryShareScreen({ route, navigation }) {
       setBusy(true);
       const uri = await capture();
       if (!(await Sharing.isAvailableAsync())) {
-        Toast.show({ type: "error", text1: "Paylaşım kullanılamıyor" });
+        Toast.show({ type: "error", text1: i18nText("autoI18n.paylasim_kullanilamiyor", "Paylaşım kullanılamıyor") });
         return;
       }
       await Sharing.shareAsync(uri, { mimeType: "image/png", dialogTitle: title });
     } catch (e) {
-      Toast.show({ type: "error", text1: "Paylaşım hatası: " + e.message });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.paylasim_hatasi", "Paylaşım hatası: ") + e.message });
     } finally {
       setBusy(false);
     }
@@ -620,14 +776,20 @@ export default function StoryShareScreen({ route, navigation }) {
       setBusy(true);
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== "granted") {
-        Toast.show({ type: "error", text1: "Galeri izni gerekli" });
+        Toast.show({
+          type: "error",
+          text1: i18nText(
+            "autoI18n.galeriye_kaydetmek_icin_izin_gerekli",
+            "Galeriye kaydetmek için izin gerekli",
+          ),
+        });
         return;
       }
       const uri = await capture();
       await MediaLibrary.saveToLibraryAsync(uri);
-      Toast.show({ type: "success", text1: "Galeriye kaydedildi" });
+      Toast.show({ type: "success", text1: i18nText("autoI18n.galeriye_kaydedildi", "Galeriye kaydedildi") });
     } catch (e) {
-      Toast.show({ type: "error", text1: "Kaydetme hatası: " + e.message });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.kaydetme_hatasi", "Kaydetme hatası: ") + e.message });
     } finally {
       setBusy(false);
     }
@@ -669,6 +831,8 @@ export default function StoryShareScreen({ route, navigation }) {
               borderRadius: block.radius || 0,
             }}
           />
+        ) : block.type === "graph" ? (
+          <EpisodeGraph block={block} width={block.widthFrac * CANVAS_W} />
         ) : (
           <View>
             {block.bg && (
@@ -817,7 +981,7 @@ export default function StoryShareScreen({ route, navigation }) {
               allowFontScaling={false}
               style={[styles.sheetTitle, { color: theme.text.primary }]}
             >
-              Düzenle
+              {i18nText("autoI18n.duzenle", "Düzenle")}
             </Text>
             <TouchableOpacity
               onPress={closeSettings}
@@ -842,7 +1006,11 @@ export default function StoryShareScreen({ route, navigation }) {
           {activeTab === "background" && (
             <View>
               <Label theme={theme}>
-                Arka Plan ({backgrounds.length}/{MAX_BACKGROUNDS} — alt alta dizilir)
+                {i18nText(
+                  "autoI18n.arka_plan_sayaci",
+                  "Arka Plan ({{n}}/{{max}} — alt alta dizilir)",
+                  { n: backgrounds.length, max: MAX_BACKGROUNDS },
+                )}
               </Label>
               <FlatList
                 data={backdropChoices}
@@ -883,7 +1051,7 @@ export default function StoryShareScreen({ route, navigation }) {
               <SliderControl
                 theme={theme}
                 icon="contrast-outline"
-                label="Karartma"
+                label={i18nText("autoI18n.karartma", "Karartma")}
                 value={scrim}
                 min={0}
                 max={0.85}
@@ -895,7 +1063,7 @@ export default function StoryShareScreen({ route, navigation }) {
               <SliderControl
                 theme={theme}
                 icon="cloud-outline"
-                label="Bulanıklık"
+                label={i18nText("autoI18n.bulaniklik", "Bulanıklık")}
                 value={bgBlur}
                 min={0}
                 max={20}
@@ -906,7 +1074,7 @@ export default function StoryShareScreen({ route, navigation }) {
               <SliderControl
                 theme={theme}
                 icon="square-outline"
-                label="Köşe Yuvarlaklığı"
+                label={i18nText("autoI18n.kose_yuvarlakligi", "Köşe Yuvarlaklığı")}
                 value={bgRadius}
                 min={0}
                 max={48}
@@ -917,7 +1085,10 @@ export default function StoryShareScreen({ route, navigation }) {
               <SliderControl
                 theme={theme}
                 icon="scan-outline"
-                label="Çevre Boşluğu (içerik kenar mesafesi)"
+                label={i18nText(
+                  "autoI18n.cevre_boslugu_icerik_kenar_mesafesi",
+                  "Çevre Boşluğu (içerik kenar mesafesi)",
+                )}
                 value={bgPadding}
                 min={0}
                 max={40}
@@ -931,7 +1102,7 @@ export default function StoryShareScreen({ route, navigation }) {
           {/* ── POSTER ── */}
           {activeTab === "poster" && (
             <View>
-              <Label theme={theme}>Poster Seç</Label>
+              <Label theme={theme}>{i18nText("autoI18n.poster_sec", "Poster Seç")}</Label>
               <FlatList
                 data={posterChoices}
                 keyExtractor={(p) => p}
@@ -975,7 +1146,7 @@ export default function StoryShareScreen({ route, navigation }) {
                 >
                   <Ionicons name="image" size={18} color={theme.accent} />
                   <Text style={[styles.addBtnText, { color: theme.text.primary }]}>
-                    Posteri Geri Ekle
+                    {i18nText("autoI18n.posteri_geri_ekle", "Posteri Geri Ekle")}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -991,7 +1162,7 @@ export default function StoryShareScreen({ route, navigation }) {
                   onPress={addText}
                 >
                   <Ionicons name="add" size={18} color="#fff" />
-                  <Text style={styles.addBtnText}>Yazı Ekle</Text>
+                  <Text style={styles.addBtnText}>{i18nText("autoI18n.yazi_ekle", "Yazı Ekle")}</Text>
                 </TouchableOpacity>
                 {!blocks.some((b) => b.id === "poster") && poster_path && (
                   <TouchableOpacity
@@ -1000,11 +1171,37 @@ export default function StoryShareScreen({ route, navigation }) {
                   >
                     <Ionicons name="image" size={18} color={theme.accent} />
                     <Text style={[styles.addBtnText, { color: theme.text.primary }]}>
-                      Poster Ekle
+                      {i18nText("autoI18n.poster_ekle", "Poster Ekle")}
                     </Text>
                   </TouchableOpacity>
                 )}
               </View>
+
+              {/* Bölüm Graph — yalnızca dizilerde, tek örnek */}
+              {type === "tv" && !blocks.some((b) => b.id === "epgraph") && (
+                <TouchableOpacity
+                  style={[
+                    styles.addBtn,
+                    {
+                      backgroundColor: theme.secondary,
+                      borderColor: theme.border,
+                      borderWidth: 1,
+                      marginBottom: 6,
+                    },
+                  ]}
+                  onPress={addEpisodeGraph}
+                  disabled={graphLoading}
+                >
+                  {graphLoading ? (
+                    <ActivityIndicator size="small" color={theme.accent} />
+                  ) : (
+                    <Ionicons name="grid" size={18} color={theme.accent} />
+                  )}
+                  <Text style={[styles.addBtnText, { color: theme.text.primary }]}>
+                    {i18nText("autoI18n.bolum_graph_ekle", "Bölüm Graph Ekle")}
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               {blocks.map((b) => (
                 <TouchableOpacity
@@ -1023,7 +1220,13 @@ export default function StoryShareScreen({ route, navigation }) {
                   ]}
                 >
                   <Ionicons
-                    name={b.type === "image" ? "image-outline" : "text-outline"}
+                    name={
+                      b.type === "image"
+                        ? "image-outline"
+                        : b.type === "graph"
+                          ? "grid-outline"
+                          : "text-outline"
+                    }
                     size={18}
                     color={theme.accent}
                   />
@@ -1031,7 +1234,11 @@ export default function StoryShareScreen({ route, navigation }) {
                     numberOfLines={1}
                     style={[styles.blockRowText, { color: theme.text.primary }]}
                   >
-                    {b.type === "image" ? "Poster" : b.text || "Boş yazı"}
+                    {b.type === "image"
+                      ? "Poster"
+                      : b.type === "graph"
+                        ? i18nText("autoI18n.bolum_graph", "Bölüm Graph")
+                        : b.text || "Boş yazı"}
                   </Text>
                   <TouchableOpacity
                     onPress={() => deleteBlock(b.id)}
@@ -1053,7 +1260,7 @@ export default function StoryShareScreen({ route, navigation }) {
                     ref={editRef}
                     value={selected.text}
                     onChangeText={(txt) => updateSelected({ text: txt })}
-                    placeholder="Yazını gir..."
+                    placeholder={i18nText("autoI18n.yazini_gir", "Yazını gir...")}
                     placeholderTextColor={theme.text.muted}
                     multiline
                     style={[
@@ -1063,7 +1270,7 @@ export default function StoryShareScreen({ route, navigation }) {
                   />
                   <View style={[styles.ctrlHead, { marginTop: 14 }]}>
                     <Text allowFontScaling={false} style={[styles.ctrlLabel, { color: theme.text.muted }]}>
-                      Renk
+                      {i18nText("autoI18n.renk", "Renk")}
                     </Text>
                     <ResetBtn theme={theme} onPress={() => updateSelected({ color: DEFAULTS.textColor })} />
                   </View>
@@ -1084,7 +1291,7 @@ export default function StoryShareScreen({ route, navigation }) {
                   <SliderControl
                     theme={theme}
                     icon="text"
-                    label="Boyut"
+                    label={i18nText("autoI18n.boyut", "Boyut")}
                     value={selected.size}
                     min={10}
                     max={80}
@@ -1095,7 +1302,7 @@ export default function StoryShareScreen({ route, navigation }) {
                   <SliderControl
                     theme={theme}
                     icon="resize-outline"
-                    label="Genişlik"
+                    label={i18nText("autoI18n.genislik", "Genişlik")}
                     value={selected.width}
                     min={0.2}
                     max={1}
@@ -1117,13 +1324,17 @@ export default function StoryShareScreen({ route, navigation }) {
                     <Tool theme={theme} icon="trash-outline" danger onPress={() => deleteBlock(selected.id)} />
                   </View>
 
-                  <Label theme={theme}>Yazı Arka Planı</Label>
+                  <Label theme={theme}>{i18nText("autoI18n.yazi_arka_plani", "Yazı Arka Planı")}</Label>
                   <View style={styles.toolRow}>
                     <Tool
                       theme={theme}
                       icon={selected.bg ? "checkbox" : "square-outline"}
                       active={selected.bg}
-                      label={selected.bg ? "Açık" : "Kapalı"}
+                      label={
+                        selected.bg
+                          ? i18nText("autoI18n.acik", "Açık")
+                          : i18nText("autoI18n.kapali", "Kapalı")
+                      }
                       onPress={() => updateSelected({ bg: !selected.bg })}
                     />
                   </View>
@@ -1131,7 +1342,7 @@ export default function StoryShareScreen({ route, navigation }) {
                     <>
                       <View style={[styles.ctrlHead, { marginTop: 12 }]}>
                         <Text allowFontScaling={false} style={[styles.ctrlLabel, { color: theme.text.muted }]}>
-                          Arka Plan Rengi
+                          {i18nText("autoI18n.arka_plan_rengi", "Arka Plan Rengi")}
                         </Text>
                         <ResetBtn theme={theme} onPress={() => updateSelected({ bgColor: DEFAULTS.textBgColor })} />
                       </View>
@@ -1151,7 +1362,7 @@ export default function StoryShareScreen({ route, navigation }) {
                       <SliderControl
                         theme={theme}
                         icon="contrast-outline"
-                        label="Arka Plan Saydamlığı"
+                        label={i18nText("autoI18n.arka_plan_saydamligi", "Arka Plan Saydamlığı")}
                         value={selected.bgOpacity}
                         min={0}
                         max={1}
@@ -1166,7 +1377,7 @@ export default function StoryShareScreen({ route, navigation }) {
                   <SliderControl
                     theme={theme}
                     icon="square-outline"
-                    label="Köşe Yuvarlaklığı"
+                    label={i18nText("autoI18n.kose_yuvarlakligi", "Köşe Yuvarlaklığı")}
                     value={selected.radius}
                     min={0}
                     max={40}
@@ -1177,7 +1388,7 @@ export default function StoryShareScreen({ route, navigation }) {
                   <SliderControl
                     theme={theme}
                     icon="scan-outline"
-                    label="İç Boşluk"
+                    label={i18nText("autoI18n.ic_bosluk", "İç Boşluk")}
                     value={selected.padding}
                     min={0}
                     max={28}
@@ -1186,51 +1397,79 @@ export default function StoryShareScreen({ route, navigation }) {
                     onReset={() => updateSelected({ padding: DEFAULTS.textPadding })}
                   />
                 </>
-              ) : selected && selected.type === "image" ? (
+              ) : selected &&
+                (selected.type === "image" || selected.type === "graph") ? (
                 <>
                   <SliderControl
                     theme={theme}
                     icon="resize-outline"
-                    label="Poster Boyutu"
+                    label={
+                      selected.type === "graph"
+                        ? i18nText("autoI18n.graph_boyutu", "Graph Boyutu")
+                        : i18nText("autoI18n.poster_boyutu", "Poster Boyutu")
+                    }
                     value={selected.widthFrac}
                     min={0.18}
                     max={0.95}
                     step={0.02}
                     decimals={2}
                     onChange={(v) => updateSelected({ widthFrac: v })}
-                    onReset={() => updateSelected({ widthFrac: DEFAULTS.posterWidth })}
+                    onReset={() =>
+                      updateSelected({
+                        widthFrac:
+                          selected.type === "graph"
+                            ? DEFAULTS.graphWidth
+                            : DEFAULTS.posterWidth,
+                      })
+                    }
                   />
                   <SliderControl
                     theme={theme}
                     icon="square-outline"
-                    label={`Köşe Yuvarlaklığı${posterLinked ? " — bağlı" : ""}`}
+                    label={`Köşe Yuvarlaklığı${
+                      selected.type === "image" && posterLinked ? " — bağlı" : ""
+                    }`}
                     value={selected.radius}
                     min={0}
-                    max={48}
+                    max={selected.type === "graph" ? 24 : 48}
                     step={1}
-                    disabled={posterLinked}
+                    disabled={selected.type === "image" && posterLinked}
                     onChange={(v) => updateSelected({ radius: v })}
-                    onReset={() => updateSelected({ radius: DEFAULTS.posterRadius })}
+                    onReset={() =>
+                      updateSelected({
+                        radius:
+                          selected.type === "graph"
+                            ? DEFAULTS.graphRadius
+                            : DEFAULTS.posterRadius,
+                      })
+                    }
                   />
                   <View style={styles.toolRow}>
-                    <Tool
-                      theme={theme}
-                      icon="link"
-                      active={posterLinked}
-                      label={posterLinked ? "Arka plana bağlı" : "Arka plana bağla"}
-                      onPress={() => setPosterLinked((v) => !v)}
-                    />
+                    {selected.type === "image" && (
+                      <Tool
+                        theme={theme}
+                        icon="link"
+                        active={posterLinked}
+                        label={posterLinked ? "Arka plana bağlı" : "Arka plana bağla"}
+                        onPress={() => setPosterLinked((v) => !v)}
+                      />
+                    )}
                     <Tool theme={theme} icon="trash-outline" danger onPress={() => deleteBlock(selected.id)} />
                   </View>
                 </>
               ) : (
                 <Text style={[styles.hint, { color: theme.text.muted }]}>
-                  Düzenlemek için tuvalden bir yazı/poster seç ya da yeni yazı ekle.
+                  {i18nText(
+                    "autoI18n.duzenlemek_icin_tuvalden_bir_yazi_poster_sec_ya_da",
+                    "Düzenlemek için tuvalden bir yazı/poster seç ya da yeni yazı ekle.",
+                  )}
                 </Text>
               )}
 
               {/* Filigran konumu */}
-              <Label theme={theme}>Filigran Konumu (zorunlu)</Label>
+              <Label theme={theme}>
+                {i18nText("autoI18n.filigran_konumu_zorunlu", "Filigran Konumu (zorunlu)")}
+              </Label>
               <View style={styles.toolRow}>
                 {WM_POSITIONS.map((p) => (
                   <TouchableOpacity
@@ -1347,7 +1586,7 @@ function ResetBtn({ theme, onPress }) {
     >
       <Ionicons name="refresh" size={11} color={theme.text.muted} />
       <Text allowFontScaling={false} style={[styles.resetTxt, { color: theme.text.muted }]}>
-        Sıfırla
+        {i18nText("autoI18n.sifirla", "Sıfırla")}
       </Text>
     </TouchableOpacity>
   );

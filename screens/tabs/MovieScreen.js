@@ -24,6 +24,9 @@ import { useLanguage } from "../../context/LanguageContext";
 import AppIcon from "../../components/AppIcon";
 import IconBacground from "../../components/IconBacground";
 import usePullToSearch from "../../hooks/usePullToSearch";
+import DiscoveryMediaRail from "../../components/DiscoveryMediaRail";
+import { useStreamingProviderSettings } from "../../context/AppSettingsContext";
+import { useProfileStats } from "../../context/ProfileStatsContext";
 
 const INITIAL_SECTION_COUNT = 2;
 
@@ -32,6 +35,8 @@ export default function MovieScreen({ navigation }) {
   const { t } = useLanguage();
 
   const { showSnow } = useSnowSettings();
+  const { streamingProviderIds } = useStreamingProviderSettings();
+  const { topMovieGenres } = useProfileStats();
   const searchInputRef = useRef(null);
   const openSearch = useCallback(() => {
     const navigateToSearch = (searchOrigin) => {
@@ -58,6 +63,14 @@ export default function MovieScreen({ navigation }) {
     () => [
       { key: "trends", Component: MovieTrends },
       { key: "bests", Component: MovieBests },
+      ...(streamingProviderIds.length > 0
+        ? [{ key: "subscriptions", Component: DiscoveryMediaRail, preset: "subscriptions" }]
+        : []),
+      ...(topMovieGenres?.length === 3
+        ? [{ key: "topGenres", Component: DiscoveryMediaRail, preset: "topGenres", genreNames: topMovieGenres }]
+        : []),
+      { key: "recentFavorites", Component: DiscoveryMediaRail, preset: "recentFavorites" },
+      { key: "hiddenGems", Component: DiscoveryMediaRail, preset: "hiddenGems" },
       { key: "nowPlaying", Component: MovieNowPlaying },
       { key: "oscar", Component: MovieOscar },
       { key: "collection", Component: MovieCollection },
@@ -65,7 +78,7 @@ export default function MovieScreen({ navigation }) {
       { key: "genres", Component: MovieGenres },
       { key: "upcoming", Component: MovieUpcoming },
     ],
-    [],
+    [streamingProviderIds, topMovieGenres],
   );
 
   const [visibleSectionCount, setVisibleSectionCount] = useState(INITIAL_SECTION_COUNT);
@@ -78,7 +91,14 @@ export default function MovieScreen({ navigation }) {
   const renderSection = useCallback(
     ({ item }) => {
       const SectionComponent = item.Component;
-      return <SectionComponent navigation={navigation} />;
+      return (
+        <SectionComponent
+          navigation={navigation}
+          mediaType="movie"
+          preset={item.preset}
+          genreNames={item.genreNames}
+        />
+      );
     },
     [navigation],
   );

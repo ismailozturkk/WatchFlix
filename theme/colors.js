@@ -147,6 +147,18 @@ const PALETTE = {
  */
 
 export function alpha(hex, a = 1) {
+  if (typeof hex !== "string") return `rgba(0, 0, 0, ${a})`;
+
+  // Bazı tema token'ları (ör. gray temasının border/tab değerleri) zaten
+  // "rgba(...)" — hex parse etmeye kalkınca "rgba(NaN, NaN, NaN, a)" üretip
+  // stili geçersiz kılıyordu. rgb bileşenlerini koruyup opaklığı değiştir.
+  const rgbaMatch = hex.match(
+    /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*[\d.]+)?\s*\)/,
+  );
+  if (rgbaMatch) {
+    return `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${a})`;
+  }
+
   const clean = hex.replace("#", "");
 
   const r = parseInt(clean.substring(0, 2), 16);
@@ -154,6 +166,10 @@ export function alpha(hex, a = 1) {
   const g = parseInt(clean.substring(2, 4), 16);
 
   const b = parseInt(clean.substring(4, 6), 16);
+
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
+    return `rgba(0, 0, 0, ${a})`;
+  }
 
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 }

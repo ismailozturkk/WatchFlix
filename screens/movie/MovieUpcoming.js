@@ -19,7 +19,7 @@ import { MovieUpComingSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 //import { API_KEY } from "@env";
-import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import { i18nText } from "../../utils/i18nText";
@@ -29,6 +29,7 @@ const { width } = Dimensions.get("window");
 // Stable, module-scope item component → no remount → no flicker.
 const MovieUpcomingCard = memo(function MovieUpcomingCard({ item, navigation, theme, getTmdbUrl, RelaseCount }) {
   const rp = useRailPosterStyle();
+  const { posterBadges } = useListLayoutSettings();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -57,15 +58,19 @@ const MovieUpcomingCard = memo(function MovieUpcomingCard({ item, navigation, th
           transition={120}
         />
 
-        <View style={[styles.relaseDateCount, { backgroundColor: theme.secondaryt }]}>
-          <Text style={[styles.similarRatingText, { color: theme.text.secondary }]}>
-            {RelaseCount(item.release_date)}{i18nText("autoI18n.gun", "gün")}</Text>
-        </View>
-        <View style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}>
-          <Text style={[styles.similarRatingText, { color: theme.text.primary }]}>
-            {item.release_date}
-          </Text>
-        </View>
+        {posterBadges?.countdown !== false && (
+          <View style={[styles.relaseDateCount, { backgroundColor: theme.secondaryt }]}>
+            <Text style={[styles.similarRatingText, { color: theme.text.secondary }]}>
+              {RelaseCount(item.release_date)}{i18nText("autoI18n.gun", "gün")}</Text>
+          </View>
+        )}
+        {posterBadges?.releaseDate !== false && (
+          <View style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}>
+            <Text style={[styles.similarRatingText, { color: theme.text.primary }]}>
+              {item.release_date}
+            </Text>
+          </View>
+        )}
         <ListBadges
           mediaId={item.id}
           mediaType="movie"

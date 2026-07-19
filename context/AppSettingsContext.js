@@ -31,6 +31,16 @@ const HapticsSettingsContext = createContext();
 const NotificationSettingsContext = createContext();
 const AutoDataCacheSettingsContext = createContext();
 const ListLayoutSettingsContext = createContext();
+const StreamingProviderSettingsContext = createContext();
+
+export const STREAMING_PROVIDERS = Object.freeze([
+  { id: 8, name: "Netflix", color: "#E50914" },
+  { id: 337, name: "Disney+", color: "#113CCF" },
+  { id: 119, name: "Prime Video", color: "#00A8E1" },
+  { id: 350, name: "Apple TV+", color: "#6E6E73" },
+  { id: 1899, name: "Max", color: "#5B34DA" },
+  { id: 11, name: "MUBI", color: "#083B66" },
+]);
 
 /**
  * TMDB Image Quality Presets
@@ -67,8 +77,24 @@ const DEFAULT_NOTIFICATION_SETTINGS = {
   postLikesEnabled: true,
   postCommentsEnabled: true,
   mentionsEnabled: true,
+  streamingEnabled: false,
   leadTimeDays: 0,
 };
+
+const DEFAULT_POSTER_BADGES = Object.freeze({
+  watchlist: true,
+  watched: true,
+  favorite: true,
+  other: true,
+  shared: true,
+  rated: true,
+  commented: true,
+  tmdbRating: true,
+  voteCount: true,
+  releaseDate: true,
+  countdown: true,
+});
+const POSTER_BADGE_KEYS = Object.keys(DEFAULT_POSTER_BADGES);
 
 const genThemeId = () =>
   `ct_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -94,10 +120,33 @@ const normalizeNotificationSettings = (settings) => {
     postLikesEnabled: getBooleanSetting(next, "postLikesEnabled"),
     postCommentsEnabled: getBooleanSetting(next, "postCommentsEnabled"),
     mentionsEnabled: getBooleanSetting(next, "mentionsEnabled"),
+    streamingEnabled: getBooleanSetting(next, "streamingEnabled"),
     leadTimeDays: [0, 1, 3, 7].includes(next.leadTimeDays)
       ? next.leadTimeDays
       : DEFAULT_NOTIFICATION_SETTINGS.leadTimeDays,
   };
+};
+
+const normalizePosterBadges = (settings) => {
+  if (typeof settings === "boolean") {
+    return POSTER_BADGE_KEYS.reduce((acc, key) => {
+      acc[key] = settings;
+      return acc;
+    }, {});
+  }
+
+  const source =
+    settings && typeof settings === "object" && !Array.isArray(settings)
+      ? settings
+      : {};
+
+  return POSTER_BADGE_KEYS.reduce((acc, key) => {
+    acc[key] =
+      typeof source[key] === "boolean"
+        ? source[key]
+        : DEFAULT_POSTER_BADGES[key];
+    return acc;
+  }, {});
 };
 
 export const AppSettingsProvider = ({ children }) => {
@@ -127,6 +176,10 @@ export const AppSettingsProvider = ({ children }) => {
   // TV/Film ana ekran yatay rail posterleri: boyut ("normal" | "small") ve köşe (4 | 15 varsayılan | 24)
   const [railPosterSize, setRailPosterSize] = useState("normal");
   const [railPosterRadius, setRailPosterRadius] = useState(15);
+  // Poster üzerindeki rozetlerin (ListBadges) TÜR BAZINDA görünürlüğü —
+  // her rozet ayrı açılıp kapatılabilir; kapalı olan posterde çizilmez.
+  const [posterBadges, setPosterBadges] = useState(DEFAULT_POSTER_BADGES);
+  const [streamingProviderIds, setStreamingProviderIds] = useState([]);
 
   // Single multiGet reads all persisted settings in one AsyncStorage round-trip.
   useEffect(() => {
@@ -156,6 +209,8 @@ export const AppSettingsProvider = ({ children }) => {
           [, savedSeeAllPosterRadius],
           [, savedRailPosterSize],
           [, savedRailPosterRadius],
+          [, savedShowPosterBadges],
+          [, savedStreamingProviderIds],
         ] = await AsyncStorage.multiGet([
           "showSnow",
           "selectedLanguage",
@@ -180,6 +235,8 @@ export const AppSettingsProvider = ({ children }) => {
           "seeAllPosterRadius",
           "railPosterSize",
           "railPosterRadius",
+          "showPosterBadges",
+          "streamingProviderIds",
         ]);
 
         if (savedAdultContent !== null)
@@ -264,6 +321,20 @@ export const AppSettingsProvider = ({ children }) => {
         if (savedRailPosterRadius !== null) {
           const n = parseInt(savedRailPosterRadius, 10);
           if (n === 4 || n === 15 || n === 24) setRailPosterRadius(n);
+        }
+        if (savedShowPosterBadges !== null) {
+          const parsed = JSON.parse(savedShowPosterBadges);
+          setPosterBadges(normalizePosterBadges(parsed));
+        }
+        if (savedStreamingProviderIds !== null) {
+          const parsed = JSON.parse(savedStreamingProviderIds);
+          if (Array.isArray(parsed)) {
+            setStreamingProviderIds(
+              [...new Set(parsed.map(Number))].filter(
+                (id) => Number.isInteger(id) && id > 0,
+              ),
+            );
+          }
         }
         if (savedHapticsEnabled !== null) setHapticsEnabled(JSON.parse(savedHapticsEnabled));
         const autoCache = savedAutoDataCache === "true";
@@ -480,6 +551,35 @@ export const AppSettingsProvider = ({ children }) => {
     );
   }, []);
 
+  const showPosterBadges = useMemo(
+    () => POSTER_BADGE_KEYS.some((key) => posterBadges[key]),
+    [posterBadges],
+  );
+
+  const persistPosterBadges = useCallback((next) => {
+    AsyncStorage.setItem("showPosterBadges", JSON.stringify(next)).catch(
+      (e) =>
+        Toast.show({ type: "error", text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi") }),
+    );
+  }, []);
+
+  const changePosterBadges = useCallback((nextValue) => {
+    const next = normalizePosterBadges(nextValue);
+    setPosterBadges(next);
+    persistPosterBadges(next);
+  }, [persistPosterBadges]);
+
+  const changePosterBadge = useCallback((key, val) => {
+    if (!POSTER_BADGE_KEYS.includes(key)) return;
+    const next = normalizePosterBadges({ ...posterBadges, [key]: !!val });
+    setPosterBadges(next);
+    persistPosterBadges(next);
+  }, [posterBadges, persistPosterBadges]);
+
+  const changeShowPosterBadges = useCallback((val) => {
+    changePosterBadges(val);
+  }, [changePosterBadges]);
+
   const changeAutoDataCacheEnabled = useCallback((newVal) => {
     const enabled = !!newVal;
     setAutoDataCacheEnabledState(enabled);
@@ -488,6 +588,22 @@ export const AppSettingsProvider = ({ children }) => {
       Toast.show({
         type: "error",
         text1: i18nText("autoI18n.veri_indirme_ayari_kaydedilemedi", "Veri indirme ayarı kaydedilemedi: ") + e,
+      }),
+    );
+  }, []);
+
+  const changeStreamingProviderIds = useCallback((providerIds) => {
+    const next = [...new Set((providerIds || []).map(Number))].filter(
+      (id) => Number.isInteger(id) && id > 0,
+    );
+    setStreamingProviderIds(next);
+    AsyncStorage.setItem("streamingProviderIds", JSON.stringify(next)).catch((e) =>
+      Toast.show({
+        type: "error",
+        text1: i18nText(
+          "autoI18n.platform_uyelikleri_kaydedilemedi",
+          "Platform üyelikleri kaydedilemedi: ",
+        ) + e,
       }),
     );
   }, []);
@@ -657,6 +773,11 @@ export const AppSettingsProvider = ({ children }) => {
 
   const apiValue = useMemo(() => ({ API_KEY }), []);
 
+  const streamingProviderValue = useMemo(
+    () => ({ streamingProviderIds, changeStreamingProviderIds }),
+    [streamingProviderIds, changeStreamingProviderIds],
+  );
+
   const listLayoutValue = useMemo(
     () => ({
       listsGridColumns,
@@ -671,6 +792,11 @@ export const AppSettingsProvider = ({ children }) => {
       changeRailPosterSize,
       railPosterRadius,
       changeRailPosterRadius,
+      showPosterBadges,
+      changeShowPosterBadges,
+      posterBadges,
+      changePosterBadges,
+      changePosterBadge,
     }),
     [
       listsGridColumns,
@@ -685,6 +811,11 @@ export const AppSettingsProvider = ({ children }) => {
       changeRailPosterSize,
       railPosterRadius,
       changeRailPosterRadius,
+      showPosterBadges,
+      changeShowPosterBadges,
+      posterBadges,
+      changePosterBadges,
+      changePosterBadge,
     ],
   );
 
@@ -708,9 +839,13 @@ export const AppSettingsProvider = ({ children }) => {
                             <ListLayoutSettingsContext.Provider
                               value={listLayoutValue}
                             >
-                              <AppSettingsContext.Provider value={value}>
-                                {children}
-                              </AppSettingsContext.Provider>
+                              <StreamingProviderSettingsContext.Provider
+                                value={streamingProviderValue}
+                              >
+                                <AppSettingsContext.Provider value={value}>
+                                  {children}
+                                </AppSettingsContext.Provider>
+                              </StreamingProviderSettingsContext.Provider>
                             </ListLayoutSettingsContext.Provider>
                           </AutoDataCacheSettingsContext.Provider>
                         </NotificationSettingsContext.Provider>
@@ -790,5 +925,11 @@ export const useAutoDataCacheSettings = () =>
 
 export const useListLayoutSettings = () =>
   useRequiredContext(ListLayoutSettingsContext, "useListLayoutSettings");
+
+export const useStreamingProviderSettings = () =>
+  useRequiredContext(
+    StreamingProviderSettingsContext,
+    "useStreamingProviderSettings",
+  );
 
 export const useReminderNotificationSettings = useNotificationSettings;

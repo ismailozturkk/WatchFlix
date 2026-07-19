@@ -22,6 +22,17 @@ export function isAired(dateStr) {
   return d.getTime() <= Date.now();
 }
 
+// Yayın tarihi GELECEKTE mi? (puanlama kilidi vb. için) — sadece NET biçimde
+// ileri tarihli içerik kilitlenir. isAired'in tersi DEĞİLDİR: tarih yok/geçersizse
+// isAired false (unaired) döner ama burada false (kilitsiz) döneriz; böylece
+// yayın tarihi bilinmeyen eski içerikler yanlışlıkla kilitlenmez.
+export function isUnreleased(dateStr) {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return false;
+  return d.getTime() > Date.now();
+}
+
 /**
  * @param {{ aired:boolean, watched:number, total:number, allowPartial?:boolean }} p
  * @returns {"unaired"|"none"|"partial"|"full"}

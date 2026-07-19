@@ -10,6 +10,7 @@ import {
   StatsHeroCard,
   StatsScreenHeader,
   StatsFilterBar,
+  StatsFilterModal,
   StatsDateSection,
   StatsEmptyState,
   StatsCollapsingList,
@@ -30,6 +31,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
     mostWatchedGenre,
     secondWatchedGenre,
     threeWatchedGenre,
+    topMovieGenres,
     formatTotalDurationTime,
     timeDisplayMode,
     totalMinutesTime,
@@ -46,6 +48,8 @@ const MovieStatisticsScreen = ({ navigation }) => {
   const [searchVisible, setSearchVisible] = useState(false);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(false);
+  const [selectedGenre, setSelectedGenre] = useState(null);
+  const [filterVisible, setFilterVisible] = useState(false);
 
   const timeLabels = useMemo(
     () => ({
@@ -59,20 +63,38 @@ const MovieStatisticsScreen = ({ navigation }) => {
   );
 
   const heroGenres = useMemo(
-    () => [mostWatchedGenre, secondWatchedGenre, threeWatchedGenre],
-    [mostWatchedGenre, secondWatchedGenre, threeWatchedGenre],
+    () => topMovieGenres || [mostWatchedGenre, secondWatchedGenre, threeWatchedGenre].filter((g) => g && g !== "-"),
+    [topMovieGenres, mostWatchedGenre, secondWatchedGenre, threeWatchedGenre],
   );
 
-  // Tek geçişte filtrele + bölüm meta'sını (tür/dk) ve normalize poster'ları
-  // önceden hesapla. Dış liste yalnızca başlık render eder (data: []).
+  // Filtre modalı için tüm türler (izlenme sıklığına göre azalan).
+  const allGenres = useMemo(() => {
+    const counts = {};
+    (groupedData || []).forEach((section) =>
+      (section.data || []).forEach((item) =>
+        (item.genres || []).forEach((g) => {
+          if (g) counts[g] = (counts[g] || 0) + 1;
+        }),
+      ),
+    );
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map((e) => e[0]);
+  }, [groupedData]);
+
+  // Tek geçişte filtrele (arama + tür) + bölüm meta'sını (tür/dk) ve normalize
+  // poster'ları önceden hesapla. Dış liste yalnızca başlık render eder (data: []).
   const sections = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (groupedData || [])
       .map((section) => ({
         title: section.title,
-        items: q
-          ? section.data.filter((item) => item.name?.toLowerCase().includes(q))
-          : section.data,
+        items: (section.data || [])
+          .filter((item) => !q || item.name?.toLowerCase().includes(q))
+          .filter(
+            (item) =>
+              selectedGenre == null || (item.genres || []).includes(selectedGenre),
+          ),
       }))
       .filter((s) => s.items.length > 0)
       .filter((s) => selectedDate == null || s.title === selectedDate)
@@ -89,7 +111,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
           onPress: () => navigation.navigate("MovieDetails", { id: item.id }),
         })),
       }));
-  }, [groupedData, search, selectedDate, getTmdbUrl, navigation]);
+  }, [groupedData, search, selectedDate, selectedGenre, getTmdbUrl, navigation]);
 
   const renderSectionHeader = useCallback(
     ({ section }) => (
@@ -116,6 +138,12 @@ const MovieStatisticsScreen = ({ navigation }) => {
     },
     [setSelectedDate],
   );
+  const onSelectGenre = useCallback((g) => setSelectedGenre(g), []);
+  const onOpenFilters = useCallback(() => {
+    setSearchVisible(false);
+    setFilterVisible(true);
+  }, []);
+  const onCloseFilters = useCallback(() => setFilterVisible(false), []);
 
   const collapsing = (
     <>
@@ -159,10 +187,10 @@ const MovieStatisticsScreen = ({ navigation }) => {
       searchValue={search}
       onSearchChange={setSearch}
       searchPlaceholder={t.searchMovies}
-      dates={uniqueDates}
       selectedDate={selectedDate}
-      onSelectDate={onSelectDate}
+      selectedGenre={selectedGenre}
       formatDate={formatDate}
+      onOpenFilters={onOpenFilters}
     />
   );
 
@@ -183,6 +211,18 @@ const MovieStatisticsScreen = ({ navigation }) => {
             title={i18nText("autoI18n.henuz_film_yok", "Henüz izlenen film yok")}
           />
         }
+      />
+      <StatsFilterModal
+        visible={filterVisible}
+        onClose={onCloseFilters}
+        theme={theme}
+        dates={uniqueDates}
+        selectedDate={selectedDate}
+        onSelectDate={onSelectDate}
+        genres={allGenres}
+        selectedGenre={selectedGenre}
+        onSelectGenre={onSelectGenre}
+        formatDate={formatDate}
       />
       <BackButton />
     </View>

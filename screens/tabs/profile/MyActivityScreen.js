@@ -31,6 +31,7 @@ import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { i18nText } from "@utils/i18nText";
 import RatingStars from "@components/RatingStars";
 import StaggerItem from "@components/StaggerItem";
+import { ActivityListSkeleton } from "@components/Skeleton";
 import { appAlert } from "@components/AppAlert";
 import { toast } from "@components/AppToast";
 import { subscribeToMyRatings } from "@services/ratingsService";
@@ -530,9 +531,7 @@ export default function MyActivityScreen({ navigation, route }) {
       </ScrollView>
 
       {loading ? (
-        <View style={st.center}>
-          <ActivityIndicator color={theme.accent} />
-        </View>
+        <ActivityListSkeleton count={7} />
       ) : data.length === 0 ? (
         <View style={st.center}>
           <View style={[st.emptyCircle, { backgroundColor: theme.secondary, borderColor: theme.border }]}>

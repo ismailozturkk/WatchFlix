@@ -167,7 +167,12 @@ export default function EpisodeDetails({ route, navigation }) {
         const response = await axios.get(
           `https://api.themoviedb.org/3/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`,
           {
-            params: { language: language === "tr" ? "tr-TR" : "en-US" },
+            params: {
+              language: language === "tr" ? "tr-TR" : "en-US",
+              // credits.cast = bölümdeki ana kadro (dizinin düzenli oyuncuları);
+              // guest_stars/crew zaten kök yanıtta gelir.
+              append_to_response: "credits",
+            },
             headers: { accept: "application/json", Authorization: API_KEY },
           },
         );
@@ -349,6 +354,34 @@ export default function EpisodeDetails({ route, navigation }) {
           </Text>
         </View>
 
+        {/* ── Oyuncular (ana kadro) ─────────────────────────────────────── */}
+        {details.credits?.cast?.length > 0 && (
+          <View style={styles.section}>
+            <SectionTitle
+              label={t.cast}
+              theme={theme}
+              count={details.credits.cast.length}
+            />
+            <ScrollView
+              horizontal
+              contentContainerStyle={styles.personList}
+              showsHorizontalScrollIndicator={false}
+            >
+              {details.credits.cast.map((actor) => (
+                <PersonCard
+                  key={`cast-${actor.id}`}
+                  person={actor}
+                  role={actor.character}
+                  imageQuality={imageQuality}
+                  getTmdbUrl={getTmdbUrl}
+                  theme={theme}
+                  onPress={() => navigateToPerson(actor.id)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* ── Konuk Oyuncular ───────────────────────────────────────────── */}
         {details.guest_stars?.length > 0 && (
           <View style={styles.section}>
@@ -429,7 +462,8 @@ const SectionTitle = memo(({ label, theme, count }) => (
 ));
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const AVATAR = width * 0.18;
+// Kişi kartları MovieDetail oyuncu kartlarıyla aynı oranda (dikdörtgen portre).
+const PERSON_W = width * 0.2;
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -615,13 +649,13 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
   personCard: {
-    width: 90,
+    width: PERSON_W,
     alignItems: "center",
   },
   personImageWrapper: {
-    width: AVATAR,
-    height: AVATAR,
-    borderRadius: AVATAR / 2,
+    width: PERSON_W,
+    height: PERSON_W * 1.5,
+    borderRadius: 16,
     marginBottom: 8,
     overflow: "hidden",
     // subtle ring
@@ -631,6 +665,7 @@ const styles = StyleSheet.create({
   personImage: {
     width: "100%",
     height: "100%",
+    resizeMode: "cover",
   },
   personImagePlaceholder: {
     width: "100%",

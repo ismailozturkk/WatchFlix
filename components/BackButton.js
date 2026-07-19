@@ -10,7 +10,7 @@
 // Varsayılan olarak SafeArea üst boşluğuna göre absolute konumlanır (sol üst).
 // `absolute={false}` verilirse satır içi (header içinde) kullanılabilir.
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { TouchableOpacity, StyleSheet } from "react-native";
 import { BlurView } from "expo-blur";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -32,7 +32,20 @@ export default function BackButton({
   const { theme } = useTheme();
 
   // Geri gidilemiyorsa (ör. tab kökü / ilk ekran) ve özel onPress yoksa gizle.
-  const canGoBack = navigation?.canGoBack?.() ?? true;
+  // Değer yalnızca ekran odaklıyken tazelenir: stack kökündeki bir ekran,
+  // üstüne başka ekran push'luyken arka planda re-render olursa canGoBack()
+  // true döner ve buton dönüşte "hayalet" olarak görünür kalırdı. Odak
+  // dışındayken son değer dondurulur, odak gelince yeniden değerlendirilir.
+  const [canGoBack, setCanGoBack] = useState(
+    () => navigation?.canGoBack?.() ?? true,
+  );
+  useEffect(() => {
+    if (!navigation?.addListener) return undefined;
+    const update = () => setCanGoBack(navigation.canGoBack?.() ?? true);
+    update();
+    return navigation.addListener("focus", update);
+  }, [navigation]);
+
   if (!onPress && !canGoBack) return null;
 
   const handlePress = onPress || (() => navigation.goBack());

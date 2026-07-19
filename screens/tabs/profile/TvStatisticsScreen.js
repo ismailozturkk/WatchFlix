@@ -10,6 +10,7 @@ import {
   StatsHeroCard,
   StatsScreenHeader,
   StatsFilterBar,
+  StatsFilterModal,
   StatsDateSection,
   StatsEmptyState,
   StatsCollapsingList,
@@ -32,6 +33,7 @@ const TvStatisticsScreen = ({ navigation }) => {
     mostWatchedGenreTv,
     secondWatchedGenreTv,
     thirdWatchedGenreTv,
+    topTvGenres,
     totalEpisodesCount,
     totalSeasonsCount,
     selectedDateTv,
@@ -48,6 +50,8 @@ const TvStatisticsScreen = ({ navigation }) => {
   const [searchVisible, setSearchVisible] = useState(false);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(false);
+  const [selectedGenre, setSelectedGenre] = useState(null);
+  const [filterVisible, setFilterVisible] = useState(false);
 
   const timeLabels = useMemo(
     () => ({
@@ -61,23 +65,42 @@ const TvStatisticsScreen = ({ navigation }) => {
   );
 
   const heroGenres = useMemo(
-    () => [mostWatchedGenreTv, secondWatchedGenreTv, thirdWatchedGenreTv],
-    [mostWatchedGenreTv, secondWatchedGenreTv, thirdWatchedGenreTv],
+    () => topTvGenres || [mostWatchedGenreTv, secondWatchedGenreTv, thirdWatchedGenreTv].filter((g) => g && g !== "-"),
+    [topTvGenres, mostWatchedGenreTv, secondWatchedGenreTv, thirdWatchedGenreTv],
   );
+
+  // Filtre modalı için tüm türler (izlenme sıklığına göre azalan).
+  const allGenres = useMemo(() => {
+    const counts = {};
+    (groupedDataTv || []).forEach((section) =>
+      (section.data || []).forEach((item) =>
+        (item.genres || []).forEach((g) => {
+          if (g) counts[g] = (counts[g] || 0) + 1;
+        }),
+      ),
+    );
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map((e) => e[0]);
+  }, [groupedDataTv]);
 
   const sections = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (groupedDataTv || [])
       .map((section) => ({
         title: section.title,
-        items: q
-          ? section.data.filter(
-              (item) =>
-                item.showName?.toLowerCase().includes(q) ||
-                item.episodeName?.toLowerCase().includes(q) ||
-                item.seasonNumber == search,
-            )
-          : section.data,
+        items: (section.data || [])
+          .filter(
+            (item) =>
+              !q ||
+              item.showName?.toLowerCase().includes(q) ||
+              item.episodeName?.toLowerCase().includes(q) ||
+              item.seasonNumber == search,
+          )
+          .filter(
+            (item) =>
+              selectedGenre == null || (item.genres || []).includes(selectedGenre),
+          ),
       }))
       .filter((s) => s.items.length > 0)
       .filter((s) => selectedDateTv == null || s.title === selectedDateTv)
@@ -97,7 +120,7 @@ const TvStatisticsScreen = ({ navigation }) => {
           onPress: () => navigation.navigate("TvShowsDetails", { id: item.showId }),
         })),
       }));
-  }, [groupedDataTv, search, selectedDateTv, getTmdbUrl, navigation]);
+  }, [groupedDataTv, search, selectedDateTv, selectedGenre, getTmdbUrl, navigation]);
 
   const renderSectionHeader = useCallback(
     ({ section }) => (
@@ -124,6 +147,12 @@ const TvStatisticsScreen = ({ navigation }) => {
     },
     [setSelectedDateTv],
   );
+  const onSelectGenre = useCallback((g) => setSelectedGenre(g), []);
+  const onOpenFilters = useCallback(() => {
+    setSearchVisible(false);
+    setFilterVisible(true);
+  }, []);
+  const onCloseFilters = useCallback(() => setFilterVisible(false), []);
 
   const collapsing = (
     <>
@@ -171,10 +200,10 @@ const TvStatisticsScreen = ({ navigation }) => {
       searchValue={search}
       onSearchChange={setSearch}
       searchPlaceholder={t.searchMovies}
-      dates={uniqueDatesTv}
       selectedDate={selectedDateTv}
-      onSelectDate={onSelectDate}
+      selectedGenre={selectedGenre}
       formatDate={formatDate}
+      onOpenFilters={onOpenFilters}
     />
   );
 
@@ -195,6 +224,18 @@ const TvStatisticsScreen = ({ navigation }) => {
             title={i18nText("autoI18n.henuz_dizi_yok", "Henüz izlenen dizi yok")}
           />
         }
+      />
+      <StatsFilterModal
+        visible={filterVisible}
+        onClose={onCloseFilters}
+        theme={theme}
+        dates={uniqueDatesTv}
+        selectedDate={selectedDateTv}
+        onSelectDate={onSelectDate}
+        genres={allGenres}
+        selectedGenre={selectedGenre}
+        onSelectGenre={onSelectGenre}
+        formatDate={formatDate}
       />
       <BackButton />
     </View>

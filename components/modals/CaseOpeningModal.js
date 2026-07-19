@@ -71,7 +71,14 @@ function buildReel(items, filterType, winner) {
 
     let candidate = pool[Math.floor(Math.random() * pool.length)];
     if (pool.length > 1 && index === WINNER_POSITION - 1) {
-      while (candidate.id === winner.id) {
+      // Deneme sayısı sınırlı: havuzdaki HER öğe kazananla aynı id'yi
+      // paylaşıyorsa (film/dizi id uzayları çakışabilir) koşulsuz while
+      // sonsuz döngüye girip JS thread'ini kilitlerdi.
+      for (
+        let attempt = 0;
+        candidate.id === winner.id && attempt < 20;
+        attempt++
+      ) {
         candidate = pool[Math.floor(Math.random() * pool.length)];
       }
     }

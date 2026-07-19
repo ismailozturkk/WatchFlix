@@ -40,6 +40,7 @@ import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { i18nText } from "@utils/i18nText";
+import { isUnreleased } from "@utils/watchState";
 import { alpha } from "../../theme/colors";
 import RatingStars from "@components/RatingStars";
 import RatingInput from "@components/RatingInput";
@@ -56,6 +57,22 @@ import {
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get("window");
 const SHEET_RATIO = 0.7;
 
+// Yayın tarihini kullanıcının cihaz diline göre okunur biçime çevirir.
+const formatReleaseDate = (str) => {
+  if (!str) return "";
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return "";
+  try {
+    return d.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  } catch (e) {
+    return str;
+  }
+};
+
 export default function RatingSheetModal({
   visible,
   onClose,
@@ -64,6 +81,7 @@ export default function RatingSheetModal({
   tmdbAvg = 0,
   tmdbCount = 0,
   details,
+  releaseDate,
 }) {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -148,12 +166,19 @@ export default function RatingSheetModal({
     ]).start(() => onClose());
   }, [onClose, SHEET_H]);
 
+  // Yayın tarihi ileride olan içeriğe puan verilemez. Kullanıcının önceden
+  // verilmiş bir oyu varsa (nadir durum) yönetimine izin verilir.
+  // NOT: Bu tanım handleSave'in ÜSTÜNDE olmalı — deps dizisi render sırasında
+  // değerlendirildiği için sonra tanımlanırsa TDZ ReferenceError fırlatır.
+  const relDate = releaseDate ?? details?.release_date ?? details?.first_air_date;
+  const locked = isUnreleased(relDate) && myRating == null;
+
   const handleSave = useCallback(async () => {
     if (!user?.uid) {
       Toast.show({ type: "warning", text1: i18nText("autoI18n.puan_vermek_icin_giris_yap", "Puan vermek için giriş yap") });
       return;
     }
-    if (draft <= 0 || saving) return;
+    if (draft <= 0 || saving || locked) return;
     setSaving(true);
     try {
       await setMyRating({
@@ -171,7 +196,7 @@ export default function RatingSheetModal({
     } finally {
       setSaving(false);
     }
-  }, [user?.uid, draft, saving, mediaType, mediaId, details, handleClose]);
+  }, [user?.uid, draft, saving, locked, mediaType, mediaId, details, handleClose]);
 
   const handleRemove = useCallback(async () => {
     if (!user?.uid || saving) return;
@@ -191,6 +216,7 @@ export default function RatingSheetModal({
   const appAvg = userAverage(agg);
   const poster = details?.poster_path;
   const title = details?.title || details?.name || i18nText("autoI18n.icerik", "İçerik");
+  const relText = formatReleaseDate(relDate);
 
   return (
     <KeyboardAvoidingView
@@ -293,18 +319,39 @@ export default function RatingSheetModal({
               </View>
             </View>
 
-            {/* Kendi oyun */}
-            <View style={[styles.rateBox, { backgroundColor: theme.primary, borderColor: theme.border }]}>
-              <Text allowFontScaling={false} style={[styles.rateTitle, { color: theme.text.primary }]}>
-                {myRating != null
-                  ? i18nText("autoI18n.puanin", "Puanın")
-                  : i18nText("autoI18n.puan_ver", "Puan ver")}
-              </Text>
-              <RatingInput value={draft} onChange={setDraft} size={36} color={theme.colors.orange} />
-              <Text allowFontScaling={false} style={[styles.draftValue, { color: theme.text.secondary }]}>
-                {draft > 0 ? `${draft.toFixed(1)} / 10` : i18nText("autoI18n.yildizlara_dokun", "Yıldızlara dokun")}
-              </Text>
-            </View>
+            {/* Kendi oyun — yayınlanmadıysa kilitli bilgi kutusu */}
+            {locked ? (
+              <View style={[styles.rateBox, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+                <Ionicons name="lock-closed" size={30} color={theme.text.muted} />
+                <Text allowFontScaling={false} style={[styles.rateTitle, { color: theme.text.primary }]}>
+                  {i18nText("autoI18n.henuz_yayinlanmadi", "Henüz yayınlanmadı")}
+                </Text>
+                <Text allowFontScaling={false} style={[styles.draftValue, { color: theme.text.secondary, textAlign: "center" }]}>
+                  {relText
+                    ? i18nText(
+                        "autoI18n.puanlama_su_tarihte_acilir",
+                        "Puanlama {{date}} tarihinde açılır",
+                        { date: relText },
+                      )
+                    : i18nText(
+                        "autoI18n.yayinlandiginda_puan_verebilirsin",
+                        "Yayınlandığında puan verebilirsin",
+                      )}
+                </Text>
+              </View>
+            ) : (
+              <View style={[styles.rateBox, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+                <Text allowFontScaling={false} style={[styles.rateTitle, { color: theme.text.primary }]}>
+                  {myRating != null
+                    ? i18nText("autoI18n.puanin", "Puanın")
+                    : i18nText("autoI18n.puan_ver", "Puan ver")}
+                </Text>
+                <RatingInput value={draft} onChange={setDraft} size={36} color={theme.colors.orange} />
+                <Text allowFontScaling={false} style={[styles.draftValue, { color: theme.text.secondary }]}>
+                  {draft > 0 ? `${draft.toFixed(1)} / 10` : i18nText("autoI18n.yildizlara_dokun", "Yıldızlara dokun")}
+                </Text>
+              </View>
+            )}
 
             {/* Aksiyonlar */}
             <View style={styles.actions}>
@@ -324,10 +371,10 @@ export default function RatingSheetModal({
                 style={[
                   styles.saveBtn,
                   { backgroundColor: theme.accent },
-                  (draft <= 0 || saving) && styles.saveBtnDisabled,
+                  (draft <= 0 || saving || locked) && styles.saveBtnDisabled,
                 ]}
                 onPress={handleSave}
-                disabled={draft <= 0 || saving}
+                disabled={draft <= 0 || saving || locked}
               >
                 {saving ? (
                   <ActivityIndicator color="#fff" size="small" />

@@ -119,7 +119,7 @@ const ConversationRow = ({ conv, theme, t, isActive, onOpen, onDelete }) => (
   </TouchableOpacity>
 );
 
-export default function AIChatScreen({ visible, onClose, fabOrigin }) {
+export default function AIChatScreen({ visible, onClose, fabOrigin, initialPrompt }) {
   const navigation = useNavigation();
   const { t, language } = useLanguage();
   const { theme } = useTheme();
@@ -145,6 +145,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
   const [messages, setMessages] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [conversations, setConversations] = useState([]);
+  const initialPromptRef = useRef(null);
 
   // ── Aç/kapa animasyonu (FAB'dan büyür / FAB'a küçülür) ──────────────────────
   const anim = useRef(new Animated.Value(0)).current;
@@ -173,6 +174,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
     }).start(({ finished }) => {
       if (finished) {
         setRendered(false);
+        initialPromptRef.current = null;
         onClose?.();
       }
     });
@@ -377,6 +379,33 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
     [loading, message, activeId, messages, runAssistant],
   );
 
+  const startPromptChat = useCallback(
+    (promptText) => {
+      if (loading) return;
+      const text = String(promptText || "").trim();
+      if (!text) return;
+      const convId = makeId();
+      const userMsg = { id: makeId(), role: "user", text, display: text };
+      const msgs = [userMsg];
+      setView("chat");
+      setActiveId(convId);
+      setMessages(msgs);
+      setMessage("");
+      Keyboard.dismiss();
+      runAssistant(msgs, convId, text);
+    },
+    [loading, runAssistant],
+  );
+
+  useEffect(() => {
+    if (!visible || !initialPrompt) return;
+    const key = String(initialPrompt);
+    if (initialPromptRef.current === key) return;
+    initialPromptRef.current = key;
+    const timer = setTimeout(() => startPromptChat(key), 120);
+    return () => clearTimeout(timer);
+  }, [visible, initialPrompt, startPromptChat]);
+
   const handleRetry = useCallback(
     (userText) => {
       if (loading) return;
@@ -477,7 +506,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
               <LottieView
                 style={{ width: 28, height: 28 }}
-                source={require("../LottieJson/gemini.json")}
+                source={require("@lottie/gemini.json")}
                 autoPlay
                 loop
               />
@@ -618,7 +647,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
                   <View style={styles.welcome}>
                     <LottieView
                       style={{ width: 96, height: 96, opacity: 0.95 }}
-                      source={require("../LottieJson/gemini.json")}
+                      source={require("@lottie/gemini.json")}
                       autoPlay
                       loop
                     />

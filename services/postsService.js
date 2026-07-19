@@ -96,8 +96,8 @@ const serializePost = (docSnap) => {
 
 export async function createPost(user, payload) {
   if (!user?.uid) throw new Error("createPost: user yok");
-  if (!payload?.type || !["review", "list"].includes(payload.type))
-    throw new Error("createPost: type 'review' veya 'list' olmalı");
+  if (!payload?.type || !["review", "list", "text", "poll"].includes(payload.type))
+    throw new Error("createPost: geçersiz type");
   if (!payload?.title?.trim()) throw new Error("createPost: title boş olamaz");
 
   // Avatar index — payload'dan al, yoksa 0'a düşür. clamp güvenli.
@@ -105,7 +105,7 @@ export async function createPost(user, payload) {
     payload.authorAvatarIndex ?? DEFAULT_AVATAR_INDEX,
   );
 
-  const postRef = await addDoc(collection(db, "Posts"), {
+  const base = {
     authorId: user.uid,
     authorName: user.displayName || payload.authorName || "Kullanıcı",
     authorAvatarIndex,
@@ -115,12 +115,24 @@ export async function createPost(user, payload) {
     mediaList: payload.mediaList || [],
     userRating: payload.userRating ?? null,
     hasSpoiler: !!payload.hasSpoiler,
+    // Sıralı liste (#1, #2...) — yalnız "list" tipinde anlamlı.
+    ranked: payload.type === "list" ? !!payload.ranked : false,
     visibility: payload.visibility || "public",
     likesCount: 0,
     commentsCount: 0,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
+  };
+  // Anket: seçenekler + boş oy haritası (oylar UI'da sayılır, sayaç yok).
+  if (payload.type === "poll" && payload.poll) {
+    base.poll = {
+      type: payload.poll.type === "media" ? "media" : "text",
+      question: (payload.poll.question || payload.title || "").trim(),
+      options: Array.isArray(payload.poll.options) ? payload.poll.options : [],
+      votes: {},
+    };
+  }
+  const postRef = await addDoc(collection(db, "Posts"), base);
 
   // Kullanıcı dokümanını "denormalize cache" olarak güncelle: postsCount artır
   // ve avatarIndex'i son hâle senkronla (post'tan dolaylı olarak gelir).
@@ -156,6 +168,7 @@ export async function updatePost(postId, partial) {
     "mediaList",
     "userRating",
     "hasSpoiler",
+    "ranked",
     "visibility",
   ];
   const safe = {};
@@ -325,11 +338,19 @@ export async function toggleLike(postId, uid, currentlyLiked, notifyMeta = null,
   const postRef = doc(db, "Posts", postId);
   const userLikeRef = doc(db, "Users", uid, "likedPosts", postId);
 
+  // Post silinmiş olabilir (ör. Etkinliklerim → Beğeniler'den kaldırma):
+  // update(postRef) NOT_FOUND atar ve batch atomik olduğu için likedPosts
+  // temizliği de dahil HER ŞEY iptal olurdu — ölü beğeni asla kaldırılamazdı.
+  const postExists = await getDoc(postRef)
+    .then((s) => s.exists())
+    .catch(() => false);
+
   if (currentlyLiked) {
     batch.delete(likeRef);
     batch.delete(userLikeRef);
-    batch.update(postRef, { likesCount: increment(-1) });
+    if (postExists) batch.update(postRef, { likesCount: increment(-1) });
   } else {
+    if (!postExists) throw new Error("Post bulunamadı");
     batch.set(likeRef, { userId: uid, likedAt: serverTimestamp() });
     // Gösterim verisi ("Etkinliklerim → Beğeniler" için denormalize).
     batch.set(userLikeRef, {
@@ -401,6 +422,21 @@ export async function fetchMyBookmarkIds(uid) {
   if (!uid) return new Set();
   const snap = await getDocs(collection(db, "Users", uid, "bookmarks"));
   return new Set(snap.docs.map((d) => d.id));
+}
+
+// ─── POLL VOTE ────────────────────────────────────────────────────────────────
+//
+// Anket oyu: poll.votes.{uid} = optionId. Aynı seçeneğe tekrar oy → geri çeker
+// (toggle). Sayaç yok; yüzdeler UI'da (tallyVotes) hesaplanır. Sahibi olmayan
+// kullanıcı yalnız KENDİ oy anahtarını değiştirebilir (firestore.rules enforce).
+export async function votePoll(postId, uid, optionId, currentVote = null) {
+  if (!uid) throw new Error("votePoll: uid yok");
+  const ref = doc(db, "Posts", postId);
+  if (currentVote === optionId) {
+    await updateDoc(ref, { [`poll.votes.${uid}`]: deleteField() });
+  } else {
+    await updateDoc(ref, { [`poll.votes.${uid}`]: optionId });
+  }
 }
 
 // ─── COMMENTS ─────────────────────────────────────────────────────────────────
@@ -478,12 +514,35 @@ export async function fetchComments(postId, lastDoc = null) {
 }
 
 export async function deleteComment(postId, commentId, uid = null) {
+  // Flat modelde yanıtlar aynı koleksiyonda parentId ile durur. Yalnız üst
+  // yorumu silmek yanıtları orphan bırakır (UI'da kaybolur ama commentsCount
+  // içinde sonsuza dek sayılırdı) — yanıtları da sil.
+  let replyDocs = [];
+  try {
+    const repliesSnap = await getDocs(
+      query(
+        collection(db, "Posts", postId, "comments"),
+        where("parentId", "==", commentId),
+      ),
+    );
+    replyDocs = repliesSnap.docs;
+  } catch {
+    // Yanıtlar okunamadıysa en azından üst yorumu sil.
+  }
+
   const batch = writeBatch(db);
+  const postRef = doc(db, "Posts", postId);
   batch.delete(doc(db, "Posts", postId, "comments", commentId));
-  batch.update(doc(db, "Posts", postId), {
-    commentsCount: increment(-1),
-  });
-  // Denormalize kopyayı da kaldır (yalnız sahibinin kendi yorumu).
+  // Sayaç, rules'taki counterOk (±1) kısıtına uymak için silinen yorum başına
+  // AYRI increment(-1) operasyonuyla düşürülür (batch içinde sıralı uygulanır).
+  batch.update(postRef, { commentsCount: increment(-1) });
+  for (const replyDoc of replyDocs) {
+    batch.delete(replyDoc.ref);
+    batch.update(postRef, { commentsCount: increment(-1) });
+  }
+  // Denormalize kopyayı da kaldır (yalnız sahibinin kendi yorumu; yanıt
+  // sahiplerinin myComments kopyalarına iznimiz yok — onlar best-effort
+  // güncellemelerde zaten reddi yutuyor).
   if (uid) {
     batch.delete(doc(db, "Users", uid, "myComments", commentId));
   }
@@ -492,12 +551,21 @@ export async function deleteComment(postId, commentId, uid = null) {
 
 /**
  * Yorum metnini güncelle. Yalnız sahibi yapabilir (rules enforce).
+ * uid verilirse "Etkinliklerim → Yorumlarım" denormalize kopyası da
+ * güncellenir (best-effort: eski yorumlarda kopya olmayabilir; kopya
+ * güncellenemedi diye asıl düzenleme geri alınmaz).
  */
-export async function updateComment(postId, commentId, text) {
+export async function updateComment(postId, commentId, text, uid = null) {
   if (!text?.trim()) throw new Error("updateComment: text boş olamaz");
+  const t = text.trim();
   await updateDoc(doc(db, "Posts", postId, "comments", commentId), {
-    text: text.trim(),
+    text: t,
   });
+  if (uid) {
+    await updateDoc(doc(db, "Users", uid, "myComments", commentId), {
+      text: t,
+    }).catch(() => {});
+  }
 }
 
 /**

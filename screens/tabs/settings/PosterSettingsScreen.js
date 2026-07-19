@@ -41,6 +41,114 @@ function PreviewTile({ width, radius, colors }) {
   );
 }
 
+// Rozet önizlemesi: poster karesi + üzerinde ListBadges pill'inin taklidi.
+// Açık/kapalı durumu ve poster boyutu ayarı önizlemeye canlı yansır.
+function BadgePreviewTile({ width, radius, colors, badges, small }) {
+  const statusBadges = POSTER_BADGE_OPTIONS.filter((b) => b.group === "status" && badges?.[b.key] !== false);
+  const dense = statusBadges.length >= 5;
+  const height = width * 1.5;
+  const scale = width / 104;
+  const edge = Math.max(7, Math.round(width * 0.07));
+  const iconSize = Math.max(10, Math.round((dense ? 13 : 15) * scale));
+  const infoFontSize = Math.max(10, Math.round(12 * scale));
+  const miniIconSize = Math.max(10, Math.round(12 * scale));
+  const showRating = badges?.tmdbRating !== false;
+  const showVotes = badges?.voteCount !== false;
+  const showDate = badges?.releaseDate !== false;
+  const showCountdown = badges?.countdown !== false;
+  return (
+    <View style={{ width, height }}>
+      <PreviewTile width={width} radius={radius} colors={colors} />
+      {(showRating || showVotes) && (
+        <View style={[ps.previewRatingPill, { right: edge, bottom: edge, minHeight: Math.round(22 * scale), borderRadius: Math.round(11 * scale) }]}>
+          {showRating && (
+            <Text allowFontScaling={false} style={[ps.previewRatingText, { fontSize: infoFontSize }]}>★ 8.4</Text>
+          )}
+          {showRating && showVotes && (
+            <Text allowFontScaling={false} style={[ps.previewMutedText, { fontSize: infoFontSize }]}>•</Text>
+          )}
+          {showVotes && (
+            <AppIcon family="Ionicons" name="people" size={miniIconSize} color="#64b4ff" />
+          )}
+        </View>
+      )}
+      {showCountdown && (
+        <View style={[ps.previewCountdownPill, { top: edge, left: edge, borderRadius: Math.round(10 * scale) }]}>
+          <Text allowFontScaling={false} style={[ps.previewCountdownText, { fontSize: infoFontSize }]}>12g</Text>
+        </View>
+      )}
+      {showDate && (
+        <View style={[ps.previewDatePill, { top: edge, right: edge, borderRadius: Math.round(10 * scale) }]}>
+          <Text allowFontScaling={false} style={[ps.previewDateText, { fontSize: infoFontSize }]}>2026</Text>
+        </View>
+      )}
+      {statusBadges.length > 0 && (
+        <View
+          style={[
+            ps.badgePill,
+            dense && ps.badgePillDense,
+            {
+              left: edge,
+              bottom: edge,
+              gap: Math.max(2, Math.round(3 * scale)),
+              paddingVertical: Math.max(3, Math.round(4 * scale)),
+              paddingHorizontal: Math.max(2, Math.round(3 * scale)),
+              borderRadius: Math.round(9 * scale),
+            },
+          ]}
+        >
+          {statusBadges.map((b) => (
+            <AppIcon
+              key={b.key}
+              family="Ionicons"
+              name={b.icon}
+              size={iconSize}
+              color={b.color}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function BadgeToggleButton({ item, enabled, colors, onChange }) {
+  return (
+    <TouchableOpacity
+      style={[
+        ps.badgeButton,
+        {
+          backgroundColor: enabled ? item.color + "22" : colors.cardAlt,
+          borderColor: enabled ? item.color + "88" : colors.borderMuted,
+        },
+      ]}
+      activeOpacity={0.72}
+      onPress={() => onChange(item.key, !enabled)}
+    >
+      <View
+        style={[
+          ps.badgeButtonIcon,
+          { backgroundColor: enabled ? item.color : colors.closeBg },
+        ]}
+      >
+        <AppIcon
+          family="Ionicons"
+          name={item.icon}
+          size={17}
+          color={enabled ? colors.white : colors.muted}
+        />
+      </View>
+      <Text
+        allowFontScaling={false}
+        numberOfLines={1}
+        style={[ps.badgeButtonLabel, { color: enabled ? colors.text : colors.muted }]}
+      >
+        {item.label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 // Ayar kartlarında ortak segment kontrolü. Her seçenek isteğe bağlı bir köşe
 // önizleme kutucuğu (r) taşıyabilir.
 function Segmented({ options, value, onChange, colors }) {
@@ -137,6 +245,97 @@ const RAIL_SIZE_OPTIONS = [
   { value: "small", label: i18nText("autoI18n.kucuk", "Küçük") },
 ];
 
+const POSTER_BADGE_OPTIONS = [
+  {
+    key: "watchlist",
+    group: "status",
+    icon: "bookmark",
+    color: "#64b4ff",
+    label: i18nText("autoI18n.izleme_listesi_rozeti", "İzleme listesi"),
+    subtitle: i18nText("autoI18n.izleme_listesi_rozeti_aciklama", "İzleme listesine eklenen posterlerde göster"),
+  },
+  {
+    key: "watched",
+    group: "status",
+    icon: "eye",
+    color: "#29b864",
+    label: i18nText("autoI18n.izlendi_rozeti", "İzlendi"),
+    subtitle: i18nText("autoI18n.izlendi_rozeti_aciklama", "İzlenen film ve dizilerde göster"),
+  },
+  {
+    key: "favorite",
+    group: "status",
+    icon: "heart",
+    color: "#e33",
+    label: i18nText("autoI18n.favori_rozeti", "Favori"),
+    subtitle: i18nText("autoI18n.favori_rozeti_aciklama", "Favorilere alınan posterlerde göster"),
+  },
+  {
+    key: "other",
+    group: "status",
+    icon: "grid",
+    color: "#ff6400",
+    label: i18nText("autoI18n.diger_liste_rozeti", "Diğer listeler"),
+    subtitle: i18nText("autoI18n.diger_liste_rozeti_aciklama", "Özel listelerdeki posterlerde göster"),
+  },
+  {
+    key: "shared",
+    group: "status",
+    icon: "people",
+    color: "#38bdf8",
+    label: i18nText("autoI18n.ortak_liste_rozeti", "Ortak"),
+    subtitle: i18nText("autoI18n.ortak_liste_rozeti_aciklama", "Ortak listelerdeki posterlerde göster"),
+  },
+  {
+    key: "rated",
+    group: "status",
+    icon: "star",
+    color: "#FFEB3B",
+    label: i18nText("autoI18n.benim_puanim_rozeti", "Benim"),
+    subtitle: i18nText("autoI18n.puan_rozeti_aciklama", "Puanladığın içeriklerde göster"),
+  },
+  {
+    key: "commented",
+    group: "status",
+    icon: "chatbubble",
+    color: "#c060e0",
+    label: i18nText("autoI18n.yorum_rozeti", "Yorum"),
+    subtitle: i18nText("autoI18n.yorum_rozeti_aciklama", "Yorum yaptığın içeriklerde göster"),
+  },
+  {
+    key: "tmdbRating",
+    group: "info",
+    icon: "star-half",
+    color: "#f59e0b",
+    label: i18nText("autoI18n.tmdb_puani_rozeti", "TMDB"),
+    subtitle: i18nText("autoI18n.tmdb_puani_rozeti_aciklama", "Posterlerdeki TMDB puanını göster"),
+  },
+  {
+    key: "voteCount",
+    group: "info",
+    icon: "people",
+    color: "#3b82f6",
+    label: i18nText("autoI18n.oy_sayisi_rozeti", "Oy"),
+    subtitle: i18nText("autoI18n.oy_sayisi_rozeti_aciklama", "Puan pillindeki oy sayısını göster"),
+  },
+  {
+    key: "releaseDate",
+    group: "info",
+    icon: "calendar",
+    color: "#94a3b8",
+    label: i18nText("autoI18n.tarih_rozeti", "Tarih"),
+    subtitle: i18nText("autoI18n.tarih_rozeti_aciklama", "Poster tarih/yıl rozetlerini göster"),
+  },
+  {
+    key: "countdown",
+    group: "info",
+    icon: "timer",
+    color: "#22c55e",
+    label: i18nText("autoI18n.geri_sayim_rozeti", "Sayaç"),
+    subtitle: i18nText("autoI18n.geri_sayim_rozeti_aciklama", "Geri sayım ve kalan gün rozetlerini göster"),
+  },
+];
+
 export default function PosterSettingsScreen() {
   const { t } = useLanguage();
   const { theme } = useTheme();
@@ -154,11 +353,14 @@ export default function PosterSettingsScreen() {
     changeRailPosterSize,
     railPosterRadius,
     changeRailPosterRadius,
+    posterBadges,
+    changePosterBadge,
   } = useListLayoutSettings();
 
   // Önizleme genişlikleri: sütun sayısına göre ölçekli grid + boyuta göre raf.
   const gridPreviewWidth = (cols) => (cols === 4 ? 52 : 68);
   const railPreviewWidth = railPosterSize === "small" ? 52 : 70;
+  const badgePreviewWidth = railPosterSize === "small" ? 88 : 108;
 
   return (
     <SettingsSubScreen title={i18nText("autoI18n.poster_gorunumu", "Poster görünümü")}>
@@ -309,6 +511,45 @@ export default function PosterSettingsScreen() {
           colors={C}
         />
       </View>
+
+      {/* ── POSTER ROZETLERİ ── */}
+      <SectionLabel color={C.muted}>
+        {i18nText("autoI18n.poster_rozetleri", "POSTER ROZETLERİ").toUpperCase()}
+      </SectionLabel>
+      <View style={[ps.card, { backgroundColor: C.card, borderColor: C.border }]}>
+        <View style={[ps.preview, ps.badgePreview, { backgroundColor: C.cardAlt, borderBottomColor: C.borderMuted }]}>
+          <BadgePreviewTile
+            width={badgePreviewWidth}
+            radius={railPosterRadius}
+            colors={C}
+            badges={posterBadges}
+            small={railPosterSize === "small"}
+          />
+        </View>
+
+        <CardHeader
+          colors={C}
+          icon="bookmarks"
+          iconBg={C.iconGreen}
+          iconColor={C.accent}
+          title={i18nText("autoI18n.rozetleri_goster", "Rozetleri göster")}
+          subtitle={i18nText(
+            "autoI18n.rozetleri_goster_aciklama",
+            "Kapattığın rozet türü posterlerin üzerinde hiç görünmez",
+          )}
+        />
+        <View style={[ps.badgeButtonGrid, { borderTopColor: C.borderMuted }]}>
+          {POSTER_BADGE_OPTIONS.map((item) => (
+            <BadgeToggleButton
+              key={item.key}
+              item={item}
+              enabled={posterBadges?.[item.key] !== false}
+              colors={C}
+              onChange={changePosterBadge}
+            />
+          ))}
+        </View>
+      </View>
     </SettingsSubScreen>
   );
 }
@@ -328,6 +569,10 @@ const ps = StyleSheet.create({
     justifyContent: "flex-start",
     gap: 8,
     overflow: "hidden",
+  },
+  badgePreview: {
+    alignItems: "center",
+    paddingVertical: 24,
   },
   cardHeader: {
     flexDirection: "row",
@@ -361,4 +606,69 @@ const ps = StyleSheet.create({
     borderRadius: 10,
   },
   segText: { fontSize: 11, textAlign: "center" },
+  // Rozet önizlemesindeki pill — ListBadges.pill görünümünün taklidi
+  badgePill: {
+    position: "absolute",
+    alignItems: "center",
+    gap: 2,
+    paddingVertical: 2,
+    paddingHorizontal: 2,
+    borderRadius: 7,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  badgePillDense: {
+    gap: 1,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  previewRatingPill: {
+    position: "absolute",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    paddingHorizontal: 6,
+    backgroundColor: "rgba(0,0,0,0.62)",
+  },
+  previewRatingText: { color: "#f59e0b", fontSize: 8, fontWeight: "800" },
+  previewMutedText: { color: "rgba(255,255,255,0.65)", fontSize: 8, fontWeight: "800" },
+  previewCountdownPill: {
+    position: "absolute",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    backgroundColor: "rgba(34,197,94,0.88)",
+  },
+  previewCountdownText: { color: "#fff", fontSize: 8, fontWeight: "800" },
+  previewDatePill: {
+    position: "absolute",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    backgroundColor: "rgba(0,0,0,0.58)",
+  },
+  previewDateText: { color: "#fff", fontSize: 8, fontWeight: "800" },
+  badgeButtonGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    borderTopWidth: 1,
+    padding: 10,
+  },
+  badgeButton: {
+    width: "23%",
+    minWidth: 68,
+    height: 58,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 4,
+  },
+  badgeButtonIcon: {
+    width: 27,
+    height: 27,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeButtonLabel: { fontSize: 9.5, fontWeight: "700", textAlign: "center" },
 });

@@ -158,6 +158,11 @@ export async function downloadPet(id) {
     } catch (e) {
       plog(`deneme ${attempt} HATA (disk): ${errDetail(e)}`);
       lastErr = new Error(`Diske yazılamadı: ${e?.message || e}`);
+      // create başarılı + write başarısız → 0B/yarım dosya kalabilir;
+      // isPetCached yalnız exists'e baktığı için "indirilmiş" sanılırdı.
+      try {
+        if (file.exists) file.delete();
+      } catch {}
       await wait(700);
       continue;
     }
@@ -165,6 +170,9 @@ export async function downloadPet(id) {
     if (!file.exists || (file.size ?? 0) <= 0) {
       plog(`deneme ${attempt} HATA: dosya diske yazılamadı (size=${file.size ?? 0})`);
       lastErr = new Error("Dosya diske yazılamadı");
+      try {
+        if (file.exists) file.delete();
+      } catch {}
       await wait(700);
       continue;
     }

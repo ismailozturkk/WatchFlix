@@ -15,6 +15,7 @@ import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useListLayoutSettings } from "../../context/AppSettingsContext";
 
 const { width } = Dimensions.get("window");
 
@@ -24,6 +25,7 @@ const yearOf = (dateStr) =>
 export default function MovieCollection({ navigation }) {
   const { t } = useLanguage();
   const { theme } = useTheme();
+  const { posterBadges } = useListLayoutSettings();
   const {
     moviesCollection,
     loadingCollection,
@@ -161,7 +163,7 @@ export default function MovieCollection({ navigation }) {
           recyclingKey={`collectionpart-${item.id}`}
           transition={120}
         />
-        {typeof item.vote_average === "number" && item.vote_average > 0 ? (
+        {posterBadges?.tmdbRating !== false && typeof item.vote_average === "number" && item.vote_average > 0 ? (
           <View style={[styles.ratingBadge, { backgroundColor: theme.secondaryt }]}>
             <Text allowFontScaling={false} style={styles.ratingText}>
               {item.vote_average.toFixed(1)}
@@ -182,7 +184,7 @@ export default function MovieCollection({ navigation }) {
       >
         {item.title}
       </Text>
-      {yearOf(item.release_date) ? (
+      {posterBadges?.releaseDate !== false && yearOf(item.release_date) ? (
         <Text
           allowFontScaling={false}
           style={[styles.partYear, { color: theme.text.muted }]}

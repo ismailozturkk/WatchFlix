@@ -1,18 +1,93 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase"; // Firebase bağlantını ekle
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase";
+import {
+  GOOGLE_PROFILE_PENDING_KEY,
+  isGoogleProfileComplete,
+} from "../services/googleAuthService";
 
 const AuthContext = createContext();
+
+/**
+ * Google kullanıcısı profilini tamamlamadan uygulamaya giremez.
+ *
+ * GOOGLE_PROFILE_PENDING_KEY yalnızca bir İPUCU'dur, karar değil. Tek başına
+ * güvenilirse işaret bayatladığı anda (profil başka cihazda tamamlandı, ya da
+ * temizleme adımı hata aldı) kullanıcı tamamlama ekranına kilitlenir: kendi
+ * username'ini "alınmış" görür ve profilini yeniden yazmaya zorlanır. Bu yüzden
+ * işareti her açılışta Firestore'dan uzlaştırıyoruz.
+ */
+async function resolveInitialRoute(user) {
+  const isGoogleUser = user.providerData.some(
+    (provider) => provider.providerId === "google.com",
+  );
+  const pendingUid = await AsyncStorage.getItem(GOOGLE_PROFILE_PENDING_KEY).catch(
+    () => null,
+  );
+
+  if (!isGoogleUser) return "TabScreen";
+
+  try {
+    const profileSnap = await getDoc(doc(db, "Users", user.uid));
+    const profile = profileSnap.exists() ? profileSnap.data() : null;
+
+    if (isGoogleProfileComplete(profile)) {
+      // Profil tamam: bayat işareti temizle, yoksa her açılışta geri düşer.
+      if (pendingUid === user.uid) {
+        await AsyncStorage.removeItem(GOOGLE_PROFILE_PENDING_KEY).catch(() => {});
+      }
+      return "TabScreen";
+    }
+
+    await AsyncStorage.setItem(GOOGLE_PROFILE_PENDING_KEY, user.uid).catch(() => {});
+    return "GoogleProfileCompletionScreen";
+  } catch {
+    // Profil okunamadı (çevrimdışı / kural). İşaret varsa ona uy: onu yazarken
+    // profilin eksik olduğunu BİLİYORDUK. İşaret yoksa kullanıcıyı dışarıda
+    // bırakma — profil zaten çevrimdışı tamamlanamaz, kapıda tutmak da çözmez.
+    return pendingUid === user.uid ? "GoogleProfileCompletionScreen" : "TabScreen";
+  }
+}
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [initialRoute, setInitialRoute] = useState("LoginScreen");
+  // "Girişli ama profilsiz" gerçek bir durum: Google kullanıcısı tamamlama
+  // ekranındayken oturum açıktır. Bu bayrak, o aradaki kullanıcı için hesaba
+  // bağlı doküman yazılmasını engeller — profil hiç oluşmadan hesap silinirse
+  // (bkz. cancelGoogleRegistration) o dokümanlar sahipsiz kalır ve kural
+  // isOwner(uid) bir daha asla doğru olamayacağı için kalıcı olarak erişilemez
+  // hale gelir.
+  const [needsProfileCompletion, setNeedsProfileCompletion] = useState(false);
+
+  // Profil tamamlandığında onAuthStateChanged yeniden tetiklenmez; ekran bunu
+  // çağırarak kapıyı açar.
+  const markProfileCompleted = useCallback(() => {
+    setNeedsProfileCompletion(false);
+    setInitialRoute("TabScreen");
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        setInitialRoute("TabScreen");
+        let route = "TabScreen";
+        try {
+          route = await resolveInitialRoute(user);
+        } catch {
+          route = "TabScreen";
+        }
+        setInitialRoute(route);
+        setNeedsProfileCompletion(route === "GoogleProfileCompletionScreen");
         setUser(user);
         setLoading(false);
         AsyncStorage.setItem("cachedUserId", user.uid).catch(() => {});
@@ -26,15 +101,16 @@ export const AuthProvider = ({ children }) => {
           // okunamazsa güvenli varsayılan: giriş ekranı
         }
         // ⚠️ GELİŞTİRME MODU: onboarding'i her açılışta göster.
-        // Üretim için bu satırı sil ve alttaki satırı aç:
-        const FORCE_ONBOARDING_DEV = true;
-        // setInitialRoute(seenOnboarding ? "LoginScreen" : "OnboardingScreen");
+        // __DEV__ kapısı sayesinde release build'de normal akış çalışır:
+        // onboarding yalnızca ilk açılışta görünür.
+        const FORCE_ONBOARDING_DEV = __DEV__;
         setInitialRoute(
           FORCE_ONBOARDING_DEV || !seenOnboarding
             ? "OnboardingScreen"
             : "LoginScreen",
         );
         setUser(null);
+        setNeedsProfileCompletion(false);
         setLoading(false);
         AsyncStorage.removeItem("cachedUserId").catch(() => {});
       }
@@ -44,7 +120,15 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, initialRoute }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        initialRoute,
+        needsProfileCompletion,
+        markProfileCompleted,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

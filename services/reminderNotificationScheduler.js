@@ -61,6 +61,14 @@ export function computeReminderFireMs(
   return fireMs;
 }
 
+// Bir işin içerik imzası: fireMs + başlık + gövde. Yalnız fireMs değil metni de
+// kapsar; böylece dil değişince (aynı tetik zamanı olsa da başlık/gövde değişir)
+// imza değişir ve bildirim yeni dille yeniden zamanlanır. Aynı zamanda içerik
+// (film adı, bölüm adı) değişirse de yakalanır.
+function reminderSignature(job) {
+  return `${job.fireMs}|${job.title || ""}|${job.body || ""}`;
+}
+
 /**
  * `desired`: Array<{ identifier, title, body, fireMs, channelId, data }>
  * Cihazda zamanlanmış reminder_* bildirimleriyle senkronize eder.
@@ -75,12 +83,13 @@ export async function syncReminderNotifications(desired = []) {
     }
   }
 
-  // Mevcut zamanlanmış reminder_* bildirimleri.
+  // Mevcut zamanlanmış reminder_* bildirimleri (içerik imzasıyla).
   const all = await getAllScheduled();
   const existing = new Map();
   for (const n of all) {
     if (typeof n.identifier === "string" && n.identifier.startsWith(REMINDER_PREFIX)) {
-      existing.set(n.identifier, n?.content?.data?.fireMs ?? null);
+      // Eski kayıtlarda sig yoksa null → bir kez yeniden zamanlanır, sonra oturur.
+      existing.set(n.identifier, n?.content?.data?.sig ?? null);
     }
   }
 
@@ -90,8 +99,8 @@ export async function syncReminderNotifications(desired = []) {
 
   // Ekle / güncelle.
   for (const [identifier, job] of desiredById) {
-    const existingFireMs = existing.get(identifier);
-    if (existing.has(identifier) && existingFireMs === job.fireMs) {
+    const sig = reminderSignature(job);
+    if (existing.has(identifier) && existing.get(identifier) === sig) {
       kept += 1;
       continue;
     }
@@ -105,7 +114,7 @@ export async function syncReminderNotifications(desired = []) {
       body: job.body,
       date: new Date(job.fireMs),
       channelId: job.channelId,
-      data: { ...(job.data || {}), fireMs: job.fireMs },
+      data: { ...(job.data || {}), fireMs: job.fireMs, sig },
     });
     if (ok) scheduled += 1;
   }

@@ -21,13 +21,16 @@ const {
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret } = require("firebase-functions/params");
 // firebase-admin v14: eski namespaced API (admin.firestore()) KALDIRILDI —
 // modüler girişler kullanılır (firebase-admin/app + firebase-admin/firestore).
 const { initializeApp } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { Expo } = require("expo-server-sdk");
+const { extractRegionProviders, computeNewlyAvailable } = require("./streamingDiff");
 
 initializeApp();
 const db = getFirestore();
@@ -35,6 +38,74 @@ const expo = new Expo();
 
 // Aynı anda çok fazla instance açıp maliyeti şişirmemek için tavan.
 setGlobalOptions({ maxInstances: 10 });
+
+// Google native SDK'nin idToken'i bu web OAuth client'i icin uretilir.
+// Istemcideki googleAuthService WEB_CLIENT_ID ile ayni kalmali.
+const GOOGLE_WEB_CLIENT_ID =
+  "427087836931-in7lreg3vjgnvudn5h8gauradaeo58kc.apps.googleusercontent.com";
+
+/**
+ * Google ile giris yapilmadan ONCE hesap cakismasini guvenli bicimde denetler.
+ *
+ * Neden istemcide fetchSignInMethodsForEmail kullanmiyoruz?
+ * Firebase'in email-enumeration protection ayari bu metodu bilerek bos donmeye
+ * zorlar. Daha onemlisi, Google gibi guvenilir bir saglayici ayni Gmail adresli
+ * dogrulanmamis email/sifre hesabinin saglayicisini otomatik ezebilir. Bu callable
+ * yalniz gecerli bir Google idToken sahibinin KENDI emailini sorgulamasina izin
+ * verir; boylece email hesabi once normal giris yapip Ayarlar'dan Google'i acikca
+ * baglamadan Google credential Firebase'e hic gonderilmez.
+ */
+exports.checkGoogleSignInEligibility = onCall(async (request) => {
+  const idToken = request.data?.idToken;
+  if (typeof idToken !== "string" || idToken.length < 100 || idToken.length > 5000) {
+    throw new HttpsError("invalid-argument", "Valid Google idToken required");
+  }
+
+  let claims;
+  try {
+    const response = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
+      { signal: AbortSignal.timeout(8000) },
+    );
+    if (!response.ok) throw new Error(`tokeninfo:${response.status}`);
+    claims = await response.json();
+  } catch (error) {
+    console.warn("Google idToken verification failed", error?.message);
+    throw new HttpsError("unauthenticated", "Google identity could not be verified");
+  }
+
+  if (
+    claims?.aud !== GOOGLE_WEB_CLIENT_ID ||
+    !claims?.sub ||
+    !claims?.email ||
+    !(claims.email_verified === true || claims.email_verified === "true")
+  ) {
+    throw new HttpsError("unauthenticated", "Google identity is not valid");
+  }
+
+  let existingUser = null;
+  try {
+    existingUser = await getAuth().getUserByEmail(claims.email);
+  } catch (error) {
+    if (error?.code !== "auth/user-not-found") {
+      console.error("Google eligibility Auth lookup failed", error?.code);
+      throw new HttpsError("unavailable", "Account check is temporarily unavailable");
+    }
+  }
+
+  if (
+    existingUser &&
+    !existingUser.providerData.some((provider) => provider.providerId === "google.com")
+  ) {
+    throw new HttpsError(
+      "already-exists",
+      "Existing account must link Google after signing in",
+      { reason: "LINK_REQUIRED" },
+    );
+  }
+
+  return { allowed: true };
+});
 
 // ───────────────────────────────────────────────────────────────────────────
 // GEMINI PROXY (callGemini callable)
@@ -57,6 +128,9 @@ setGlobalOptions({ maxInstances: 10 });
 // ───────────────────────────────────────────────────────────────────────────
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
+// TMDB v4 "Read Access Token" — watch/providers sorgusu için (streaming
+// uygunluk bildirimleri). Kurulum: firebase functions:secrets:set TMDB_API_KEY
+const TMDB_API_KEY = defineSecret("TMDB_API_KEY");
 
 const AI_MODEL = "gemini-2.5-flash";
 const AI_DAILY_LIMIT_FREE = 5;
@@ -448,11 +522,15 @@ exports.onSocialNotificationCreated = onDocumentCreated(
     }
 
     // Uygulaması silinmiş/çıkış yapılmış cihazların token'larını temizle.
+    // Legacy tek alan (expoPushToken) da gönderim setine giriyor — yalnız
+    // diziden silersek ölü token oradan sonsuza dek yeniden denenir.
     if (deadTokens.length) {
       try {
-        await db.doc(`Users/${recipientUid}`).update({
-          expoPushTokens: FieldValue.arrayRemove(...deadTokens),
-        });
+        const patch = { expoPushTokens: FieldValue.arrayRemove(...deadTokens) };
+        if (userData.expoPushToken && deadTokens.includes(userData.expoPushToken)) {
+          patch.expoPushToken = FieldValue.delete();
+        }
+        await db.doc(`Users/${recipientUid}`).update(patch);
       } catch (e) {
         console.error("Ölü token temizliği hatası:", e);
       }
@@ -559,7 +637,17 @@ exports.onUserProfileUpdated = onDocumentUpdated("Users/{uid}", async (event) =>
     try {
       const s = await db.collection("Users").doc(uid).collection("friends").get();
       const refs = s.docs.map((d) => db.doc(`Users/${d.id}/friends/${uid}`));
-      log("friends", await commitRefs(refs, patchFriend));
+      // Refs sorgudan değil kendi listemden türetildi; karşı taraf mirror'ı
+      // eksikse update() NOT_FOUND atar ve batch atomik olduğu için chunk'taki
+      // diğer tüm arkadaş güncellemeleri de düşer. Önce var olanları süz.
+      const existing = [];
+      for (let i = 0; i < refs.length; i += 300) {
+        const snaps = await db.getAll(...refs.slice(i, i + 300));
+        snaps.forEach((snap) => {
+          if (snap.exists) existing.push(snap.ref);
+        });
+      }
+      log("friends", await commitRefs(existing, patchFriend));
     } catch (e) {
       console.error("fan-out friends:", e);
     }
@@ -722,5 +810,234 @@ exports.onTournamentVoteWritten = onDocumentWritten(
     } catch (e) {
       console.error(`turnuva agg (${periodId}):`, e);
     }
+  },
+);
+
+// ───────────────────────────────────────────────────────────────────────────
+// STREAMING UYGUNLUK BİLDİRİMLERİ (günlük zamanlanmış)
+//
+// Kullanıcının izleme listesindeki (Lists/{uid}/watchList) bir yapım, abone
+// olduğu bir platforma (Users/{uid}.streamingProviders.ids) EKLENDİĞİNDE push
+// gönderir. TMDB "yeni eklendi" olayı yayınlamadığı için anlık durumu periyodik
+// çekip ProviderWatch/{uid} snapshot'ıyla karşılaştırırız (diff mantığı saf +
+// test'li: streamingDiff.js).
+//
+// Opt-in: yalnız notificationSettings.streamingEnabled === true kullanıcılar.
+// Kurulum: firebase functions:secrets:set TMDB_API_KEY  (TMDB v4 Read Access Token)
+// ───────────────────────────────────────────────────────────────────────────
+
+const STREAM_MAX_WATCHLIST_PER_USER = 100; // kullanıcı başına maliyet freni
+const STREAM_MAX_USERS = 3000;             // tek çalışmada güvenlik tavanı
+
+const STREAM_STRINGS = {
+  tr: {
+    single: (p) => `📺 ${p} platformunda izlenebilir`,
+    multi: (ps) => `📺 Şu platformlarda izlenebilir: ${ps}`,
+    fallbackTitle: "İzleme listen",
+  },
+  en: {
+    single: (p) => `📺 Now streaming on ${p}`,
+    multi: (ps) => `📺 Now streaming on: ${ps}`,
+    fallbackTitle: "Your watchlist",
+  },
+};
+
+/** TMDB watch/providers — tek başlık (timeout'lu; hata → null). */
+async function fetchWatchProviders(mediaType, tmdbId, apiKey) {
+  const url = `https://api.themoviedb.org/3/${mediaType}/${tmdbId}/watch/providers`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${apiKey}`, accept: "application/json" },
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Bir kullanıcıyı işler; bildirilen benzersiz başlık sayısını döner. */
+async function processUserStreaming(userDoc, getProviders) {
+  const uid = userDoc.id;
+  const u = userDoc.data() || {};
+
+  // Geçerli Expo token'ları.
+  const tokenSet = new Set();
+  if (u.expoPushToken) tokenSet.add(u.expoPushToken);
+  if (Array.isArray(u.expoPushTokens)) u.expoPushTokens.forEach((t) => t && tokenSet.add(t));
+  const tokens = [...tokenSet].filter((t) => Expo.isExpoPushToken(t));
+  if (tokens.length === 0) return 0;
+
+  // Abone olunan sağlayıcılar + bölge.
+  const sp = u.streamingProviders || {};
+  const subscribedIds = (Array.isArray(sp.ids) ? sp.ids : [])
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n > 0);
+  if (subscribedIds.length === 0) return 0;
+  const region = typeof sp.region === "string" && sp.region ? sp.region : "US";
+  const lang = u.notificationLanguage === "en" ? "en" : "tr";
+  const S = STREAM_STRINGS[lang];
+
+  // İzleme listesi (maliyet freni).
+  const wlSnap = await db
+    .collection(`Lists/${uid}/watchList`)
+    .limit(STREAM_MAX_WATCHLIST_PER_USER)
+    .get();
+  if (wlSnap.empty) {
+    await db.doc(`ProviderWatch/${uid}`).set(
+      { items: {}, region, updatedAt: FieldValue.serverTimestamp() },
+      { merge: false },
+    );
+    return 0;
+  }
+
+  const snapRef = db.doc(`ProviderWatch/${uid}`);
+  const prevItems = ((await snapRef.get()).data() || {}).items || {};
+  const nextItems = {};
+  const messages = [];
+
+  for (const itemDoc of wlSnap.docs) {
+    const it = itemDoc.data() || {};
+    const type = it.type === "tv" ? "tv" : "movie";
+    const tmdbId = Number(it.id);
+    if (!Number.isInteger(tmdbId) || tmdbId <= 0) continue;
+
+    const key = itemDoc.id; // `${type}_${id}`
+    const { ids: currentIds, names } = await getProviders(region, type, tmdbId);
+
+    const prev = prevItems[key] || {};
+    const hasPrev = Array.isArray(prev.a);
+    const res = computeNewlyAvailable({
+      currentIds,
+      prevIds: prev.a || [],
+      notifiedIds: prev.n || [],
+      subscribedIds,
+      hasPrev,
+    });
+
+    // Snapshot yalnız izleme listesindeki başlıkları tutar → liste ile senkron.
+    nextItems[key] = { a: res.availableIds, n: res.notifiedIds };
+
+    if (res.toNotify.length > 0) {
+      const providerNames = res.toNotify.map((id) => names[id] || `#${id}`);
+      const body =
+        providerNames.length === 1
+          ? S.single(providerNames[0])
+          : S.multi(providerNames.join(", "));
+      const title = it.name || S.fallbackTitle;
+      for (const to of tokens) {
+        messages.push({
+          to,
+          sound: "default",
+          title,
+          body,
+          channelId: "reminders",
+          priority: "high",
+          data: {
+            kind: "streaming",
+            mediaType: type,
+            tmdbId: String(tmdbId),
+            providerIds: res.toNotify.join(","),
+          },
+        });
+      }
+    }
+  }
+
+  // Snapshot'ı yaz (izleme listesinden çıkanları düşürerek).
+  await snapRef.set(
+    { items: nextItems, region, updatedAt: FieldValue.serverTimestamp() },
+    { merge: false },
+  );
+
+  if (messages.length === 0) return 0;
+
+  // Gönder + ölü token temizliği (onSocialNotificationCreated ile aynı desen).
+  const deadTokens = [];
+  const chunks = expo.chunkPushNotifications(messages);
+  for (const chunk of chunks) {
+    try {
+      const tickets = await expo.sendPushNotificationsAsync(chunk);
+      tickets.forEach((ticket, i) => {
+        if (
+          ticket.status === "error" &&
+          ticket.details &&
+          ticket.details.error === "DeviceNotRegistered"
+        ) {
+          deadTokens.push(chunk[i].to);
+        }
+      });
+    } catch (e) {
+      console.error("[streaming] push hatası:", e && e.message);
+    }
+  }
+  if (deadTokens.length) {
+    const patch = { expoPushTokens: FieldValue.arrayRemove(...deadTokens) };
+    if (u.expoPushToken && deadTokens.includes(u.expoPushToken)) {
+      patch.expoPushToken = FieldValue.delete();
+    }
+    await db.doc(`Users/${uid}`).update(patch).catch(() => {});
+  }
+
+  return new Set(messages.map((m) => m.title)).size;
+}
+
+exports.dailyStreamingAvailability = onSchedule(
+  {
+    schedule: "0 18 * * *", // her gün 18:00
+    timeZone: "Europe/Istanbul",
+    secrets: [TMDB_API_KEY],
+    timeoutSeconds: 540,
+    memory: "512MiB",
+  },
+  async () => {
+    const apiKey = TMDB_API_KEY.value();
+    if (!apiKey) {
+      console.error("[streaming] TMDB_API_KEY secret tanımsız — atlandı.");
+      return;
+    }
+
+    const usersSnap = await db
+      .collection("Users")
+      .where("notificationSettings.streamingEnabled", "==", true)
+      .limit(STREAM_MAX_USERS)
+      .get();
+
+    if (usersSnap.empty) {
+      console.log("[streaming] özellik açık kullanıcı yok.");
+      return;
+    }
+
+    // Aynı (region|type|id) için TMDB'yi TEK kez çek (çalışma-içi cache →
+    // popüler başlıklar kullanıcılar arasında tekrar çekilmez).
+    const providerCache = new Map();
+    const getProviders = async (region, type, id) => {
+      const cacheKey = `${region}|${type}|${id}`;
+      if (providerCache.has(cacheKey)) return providerCache.get(cacheKey);
+      const resp = await fetchWatchProviders(type, id, apiKey);
+      const extracted = resp
+        ? extractRegionProviders(resp, region)
+        : { ids: [], names: {} };
+      providerCache.set(cacheKey, extracted);
+      return extracted;
+    };
+
+    let totalTitles = 0;
+    for (const userDoc of usersSnap.docs) {
+      try {
+        totalTitles += await processUserStreaming(userDoc, getProviders);
+      } catch (e) {
+        console.error(`[streaming] kullanıcı ${userDoc.id}:`, e && e.message);
+      }
+    }
+
+    console.log(
+      `[streaming] tamam — kullanıcı: ${usersSnap.size}, bildirilen başlık: ${totalTitles}, benzersiz TMDB sorgusu: ${providerCache.size}`,
+    );
   },
 );

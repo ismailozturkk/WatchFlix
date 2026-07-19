@@ -24,7 +24,13 @@ export const RANGE_OPTIONS = [
 ];
 
 function toDateStr(date) {
-  return date.toISOString().split("T")[0];
+  // Yerel tarih bileşenleri: toISOString UTC gösterdiği için UTC+3'te
+  // 00:00-03:00 arasında "bugün" bir gün geride kalıyordu (etkinlik
+  // anahtarları yerel YYYY-MM-DD formatında tutuluyor).
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 export const CalendarProvider = ({ children }) => {

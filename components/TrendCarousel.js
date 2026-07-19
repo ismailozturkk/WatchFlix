@@ -43,6 +43,7 @@ import { Image } from "expo-image";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import RatingStars from "./RatingStars";
 import ListBadges from "./ListBadges";
+import { useListLayoutSettings } from "../context/AppSettingsContext";
 
 const { width } = Dimensions.get("window");
 export const CARD_WIDTH = width * 0.6;
@@ -149,6 +150,10 @@ const TrendCard = memo(function TrendCard({
   });
 
   const rating = item.vote_average ?? 0;
+  const { posterBadges } = useListLayoutSettings();
+  const showRating = posterBadges?.tmdbRating !== false;
+  const showVotes = posterBadges?.voteCount !== false;
+  const showRatingPill = showRating || showVotes;
 
   return (
     <Animated.View
@@ -180,19 +185,31 @@ const TrendCard = memo(function TrendCard({
           />
         </Animated.View>
         <Animated.View style={[styles.infoContainer, infoStyle]}>
-          <View style={styles.ratingPill}>
-            <RatingStars rating={rating} />
-            <Text allowFontScaling={false} style={{ fontSize: 14, color: theme.colors.orange }}>
-              {rating.toFixed(1)}
-            </Text>
-            <Text allowFontScaling={false} style={{ fontSize: 14, color: theme.text.secondary }}>
-              •
-            </Text>
-            <FontAwesome name="user" size={14} color={theme.colors.blue} />
-            <Text allowFontScaling={false} style={{ fontSize: 14, color: theme.colors.blue }}>
-              {item.vote_count}
-            </Text>
-          </View>
+          {showRatingPill && (
+            <View style={styles.ratingPill}>
+              {showRating && (
+                <>
+                  <RatingStars rating={rating} />
+                  <Text allowFontScaling={false} style={{ fontSize: 14, color: theme.colors.orange }}>
+                    {rating.toFixed(1)}
+                  </Text>
+                </>
+              )}
+              {showRating && showVotes && (
+                <Text allowFontScaling={false} style={{ fontSize: 14, color: theme.text.secondary }}>
+                  •
+                </Text>
+              )}
+              {showVotes && (
+                <>
+                  <FontAwesome name="user" size={14} color={theme.colors.blue} />
+                  <Text allowFontScaling={false} style={{ fontSize: 14, color: theme.colors.blue }}>
+                    {item.vote_count}
+                  </Text>
+                </>
+              )}
+            </View>
+          )}
           <ListBadges
             mediaId={item.id}
             mediaType={mediaType}

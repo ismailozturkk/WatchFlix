@@ -23,8 +23,6 @@ import { useSnow } from "../../context/SnowContext";
 import {
   getAuth,
   signInWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithCredential,
 } from "firebase/auth";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
@@ -35,22 +33,11 @@ import IconBacground from "../../components/IconBacground";
 import EmailSuffixRow from "../../components/auth/EmailSuffixRow";
 import { alpha } from "../../theme/colors";
 import {
-  useAuthRequest,
-  makeRedirectUri,
-  ResponseType,
-} from "expo-auth-session";
-import * as WebBrowser from "expo-web-browser";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../../firebase";
-import { createUserProfile } from "../../services/userService";
+  describeGoogleAuthError,
+  GoogleAuthCode,
+  signInWithGoogle,
+} from "../../services/googleAuthService";
 import { i18nText } from "../../utils/i18nText";
-
-WebBrowser.maybeCompleteAuthSession();
-
-const GOOGLE_DISCOVERY = {
-  authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
-  tokenEndpoint: "https://oauth2.googleapis.com/token",
-};
 
 // Hafif dokunsal geri bildirim — desteklemeyen cihazlarda sessizce geç
 const buzz = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -84,8 +71,15 @@ export default function LoginScreen({ navigation }) {
 
   useEffect(() => {
     const loadUsers = async () => {
-      const stored = await AsyncStorage.getItem("recentUsers");
-      if (stored) setRecentUsers(JSON.parse(stored));
+      try {
+        const stored = await AsyncStorage.getItem("recentUsers");
+        if (!stored) return;
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) setRecentUsers(parsed);
+      } catch (e) {
+        // Bozuk kayıt: hızlı giriş çipleri yüklenmesin ama ekran çalışsın.
+        if (__DEV__) console.warn("recentUsers okunamadı:", e?.message);
+      }
     };
     loadUsers();
   }, []);
@@ -178,64 +172,31 @@ export default function LoginScreen({ navigation }) {
 
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-  const [request, response, promptAsync] = useAuthRequest(
-    {
-      clientId:
-        "427087836931-in7lreg3vjgnvudn5h8gauradaeo58kc.apps.googleusercontent.com",
-      scopes: ["openid", "profile", "email"],
-      responseType: ResponseType.Token,
-      redirectUri: makeRedirectUri({ scheme: "watchify" }),
-    },
-    GOOGLE_DISCOVERY,
-  );
-
-  useEffect(() => {
-    if (response?.type === "success") {
-      const { access_token } = response.params;
-      handleGoogleCredential(access_token);
-    }
-  }, [response]);
-
-  const handleGoogleCredential = async (accessToken) => {
+  const handleGoogleSignIn = async () => {
+    if (isGoogleLoading) return;
     setIsGoogleLoading(true);
     try {
-      const credential = GoogleAuthProvider.credential(null, accessToken);
-      const auth = getAuth();
-      const userCredential = await signInWithCredential(auth, credential);
-      const user = userCredential.user;
+      const result = await signInWithGoogle();
+      if (result.cancelled) return;
+      const { user, needsProfileCompletion } = result;
 
-      const userRef = doc(db, "Users", user.uid);
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) {
-        const base = (user.email?.split("@")[0] || "user").replace(/[^a-zA-Z0-9_]/g, "");
-        let attemptUsername = base;
-        for (let i = 0; i < 5; i++) {
-          try {
-            await createUserProfile({
-              uid: user.uid,
-              username: attemptUsername,
-              email: user.email,
-              displayName: user.displayName,
-              avatarIndex: 0,
-            });
-            break;
-          } catch (e) {
-            if (/alınmış/.test(e.message)) {
-              attemptUsername = `${base}_${Math.floor(Math.random() * 9999)}`;
-            } else {
-              throw e;
-            }
-          }
-        }
+      if (needsProfileCompletion) {
+        navigation.reset({ index: 0, routes: [{ name: "GoogleProfileCompletionScreen" }] });
+      } else {
+        Toast.show({
+          type: "success",
+          text1: i18nText("autoI18n.hos_geldin", "Hoş geldin, ") + (user.displayName || user.email),
+        });
+        navigation.reset({ index: 0, routes: [{ name: "TabScreen" }] });
       }
-
-      Toast.show({
-        type: "success",
-        text1: i18nText("autoI18n.hos_geldin", "Hoş geldin, ") + (user.displayName || user.email),
-      });
-      navigation.reset({ index: 0, routes: [{ name: "TabScreen" }] });
     } catch (error) {
-      Toast.show({ type: "error", text1: i18nText("autoI18n.google_ile_giris_basarisiz", "Google ile giriş başarısız.") });
+      // İptal bir hata değil — sessizce geç.
+      if (error?.code === GoogleAuthCode.CANCELLED) return;
+      Toast.show({
+        type: "error",
+        text1: i18nText("autoI18n.google_ile_giris_basarisiz", "Google ile giriş başarısız."),
+        text2: describeGoogleAuthError(error, language === "tr"),
+      });
     } finally {
       setIsGoogleLoading(false);
     }
@@ -555,10 +516,10 @@ export default function LoginScreen({ navigation }) {
               ]}
               onPress={() => {
                 buzz();
-                promptAsync();
+                handleGoogleSignIn();
               }}
               activeOpacity={0.8}
-              disabled={!request || isGoogleLoading}
+              disabled={isGoogleLoading}
             >
               {isGoogleLoading ? (
                 <LottieView

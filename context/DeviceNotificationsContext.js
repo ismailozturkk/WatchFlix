@@ -24,13 +24,17 @@ import React, {
 import { AppState } from "react-native";
 import { useAuth } from "./AuthContext";
 import { useLanguage } from "./LanguageContext";
-import { useNotificationSettings } from "./AppSettingsContext";
+import {
+  useNotificationSettings,
+  useStreamingProviderSettings,
+} from "./AppSettingsContext";
 import { useNotifications } from "./NotificationsContext";
 import { useProfileReminders } from "./ProfileRemindersContext";
 import { useProfileNotes } from "./ProfileNotesContext";
 import {
   configureNotificationHandler,
   ensureAndroidChannels,
+  setChannelNames,
   getPermissionStatus,
   requestNotificationPermission,
   registerForPushNotificationsAsync,
@@ -112,13 +116,17 @@ function buildSocialContent(item, t) {
   }
 }
 
+// Lead-time'a göre "ne zaman yayında" bilgisini doğal dilde üretir.
+// Kullanıcı ayarlardan "3 gün önce" seçtiyse bildirim tam da o an tetiklendiği
+// için içerik gerçekten `leadTimeDays` gün sonra yayınlanır.
 function buildReminderBody(leadTimeDays, t) {
-  if (!leadTimeDays || leadTimeDays === 0) {
-    return t.notifReminderBodyToday || "Bugün yayında!";
-  }
-  return (t.notifReminderBodyBefore || "{days} gün içinde yayında").replace(
+  const days = Number(leadTimeDays) || 0;
+  if (days <= 0) return t.notifReminderBodyToday || "Bugün yayında!";
+  if (days === 1) return t.notifReminderBodyTomorrow || "Yarın yayında";
+  if (days === 7) return t.notifReminderBodyWeek || "1 hafta sonra yayında";
+  return (t.notifReminderBodyBefore || "{days} gün sonra yayında").replace(
     "{days}",
-    String(leadTimeDays),
+    String(days),
   );
 }
 
@@ -127,6 +135,7 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
   const uid = user?.uid;
   const { t, language } = useLanguage();
   const { notificationSettings: settings } = useNotificationSettings();
+  const { streamingProviderIds } = useStreamingProviderSettings();
   const { items, loading: notifLoading } = useNotifications();
   const { reminders } = useProfileReminders();
   const { notes } = useProfileNotes();
@@ -138,12 +147,24 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
   // davranış birebir aynı (debounce'lar korunur).
   const startupReady = useStartupGate(4200);
 
-  // ── 1. Bir kerelik kurulum: handler + kanallar + mevcut izin durumu ───────
+  // ── 1. Bir kerelik kurulum: handler + mevcut izin durumu ──────────────────
   useEffect(() => {
     configureNotificationHandler();
-    ensureAndroidChannels();
     getPermissionStatus().then(setPermissionStatus);
   }, []);
+
+  // ── 1b. Android kanalları — adları dile göre yerelleştir ──────────────────
+  // Kanal adları OS bildirim ayarlarında görünür. Dil değişince yeniden uygula
+  // (Android var olan kanalın adını günceller). Mount'ta da çalışır → ilk kurulum.
+  useEffect(() => {
+    setChannelNames({
+      default: t.notifChannelGeneral,
+      reminders: t.notifChannelReminders,
+      social: t.notifChannelSocial,
+    });
+    ensureAndroidChannels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language]);
 
   // İzin durumunu uygulama öne geldikçe tazele (kullanıcı OS ayarından değiştirebilir).
   useEffect(() => {
@@ -184,9 +205,17 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
           postCommentsEnabled: settings.postCommentsEnabled !== false,
           mentionsEnabled: settings.mentionsEnabled !== false,
           messagesEnabled: settings.messagesEnabled !== false,
+          // Streaming uygunluk push'u (opt-in, varsayılan kapalı). Backend
+          // (dailyStreamingAvailability) yalnız true olanları işler.
+          streamingEnabled: settings.streamingEnabled === true,
         },
         // Backend push'unun dilini bilmesi için (foreground/background tutarlılığı).
         notificationLanguage: language === "en" ? "en" : "tr",
+        // Streaming bildirimleri: abone olunan sağlayıcılar + TMDB bölgesi.
+        streamingProviders: {
+          ids: streamingProviderIds,
+          region: language === "en" ? "US" : "TR",
+        },
       }).catch(() => {});
     }, 600);
     return () => {
@@ -202,6 +231,8 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
     settings.postCommentsEnabled,
     settings.mentionsEnabled,
     settings.messagesEnabled,
+    settings.streamingEnabled,
+    streamingProviderIds,
     language,
   ]);
 
@@ -259,11 +290,16 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
             if (!ep?.episodeId) return;
             const fireMs = computeReminderFireMs(ep.airDate, { leadTimeDays: lead });
             if (!fireMs) return;
-            const epLabel = `S${ep.seasonNumber ?? "?"}·B${ep.episodeNumber ?? "?"}`;
+            const epLabel = (t.notifEpisodeShort || "S{s}·B{e}")
+              .replace("{s}", String(ep.seasonNumber ?? "?"))
+              .replace("{e}", String(ep.episodeNumber ?? "?"));
+            // Zamanlama bilgisi (kaç gün sonra) bölüm etiketinin hemen ardında —
+            // bildirim kısalsa bile "kaç gün sonra" görünür, bölüm adı en sonda.
+            const timing = buildReminderBody(lead, t);
             jobs.push({
               identifier: `${REMINDER_PREFIX}tv_${ep.episodeId}`,
               title: ep.showName || t.tvReminderNotifications,
-              body: ep.episodeName ? `${epLabel} · ${ep.episodeName}` : epLabel,
+              body: `${epLabel} · ${timing}${ep.episodeName ? ` · ${ep.episodeName}` : ""}`,
               fireMs,
               channelId: CHANNELS.reminders,
               data: {
@@ -319,6 +355,9 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
     movieReminders,
     tvEpisodes,
     notes,
+    // Dil değişince reminder metinleri (buildReminderBody, bölüm etiketi, not
+    // başlığı) yeni dile göre yeniden üretilip yeniden zamanlansın.
+    language,
   ]);
 
   // ── 5. Foreground sosyal bildirim gösterimi ──────────────────────────────
@@ -417,6 +456,12 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
               openComments: data.type !== "post_like",
             });
           }
+        } else if (data.kind === "streaming" && data.tmdbId) {
+          // İzleme listesi yapımı bir platforma geldi → detay ekranına git.
+          nav.navigate(
+            data.mediaType === "movie" ? "MovieDetails" : "TvShowsDetails",
+            { id: Number(data.tmdbId) },
+          );
         }
         // Reminder dokunuşları uygulamayı açar; özel yönlendirme gerekmez.
       } catch {

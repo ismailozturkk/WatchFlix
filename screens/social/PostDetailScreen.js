@@ -15,7 +15,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Modal,
 } from "react-native";
 import { Image } from "expo-image";
@@ -28,6 +27,7 @@ import { i18nText } from "@utils/i18nText";
 import AppIcon from "@components/AppIcon";
 import RatingStars from "@components/RatingStars";
 import PostCommentSheetModal from "@components/modals/PostCommentSheetModal";
+import { PostCardSkeleton } from "@components/Skeleton";
 import { fetchPost, isPostLiked, toggleLike } from "@services/postsService";
 
 // Basit göreli zaman (MyPostsScreen ile aynı kısaltmalar).
@@ -146,8 +146,8 @@ export default function PostDetailScreen({ route, navigation }) {
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={theme.text.muted} />
+        <View style={{ paddingTop: 8 }}>
+          <PostCardSkeleton />
         </View>
       ) : !post ? (
         <View style={styles.center}>

@@ -16,6 +16,7 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
   writeBatch,
   doc,
 } from "firebase/firestore";
@@ -36,6 +37,25 @@ async function commitInChunks(items) {
     }
   }
   if (n) await batch.commit();
+}
+
+// update() hedef doküman yoksa NOT_FOUND atar ve batch atomik olduğu için
+// chunk'taki DİĞER herkesin güncellemesi de iptal olur. Karşı tarafın mirror
+// dokümanı eksik olabilir (asimetrik unfriend/purge kalıntısı) — mevcut
+// olmayanları güncelleme listesinden çıkar. set+merge KULLANMIYORUZ: yoksa
+// hayalet arkadaş dokümanı oluştururdu.
+async function filterExistingRefs(items) {
+  const checks = await Promise.all(
+    items.map(async (item) => {
+      try {
+        const snap = await getDoc(item.ref);
+        return snap.exists() ? item : null;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return checks.filter(Boolean);
 }
 
 /**
@@ -79,7 +99,7 @@ export async function propagateProfileChange(uid, { displayName, avatarIndex } =
       if (avaSet) patch.friendAvatarIndex = idx;
       return { ref: doc(db, "Users", friendUid, "friends", uid), patch };
     });
-    await commitInChunks(items);
+    await commitInChunks(await filterExistingRefs(items));
   } catch (e) {
     if (__DEV__) console.warn("propagateProfileChange friends:", e?.message);
   }

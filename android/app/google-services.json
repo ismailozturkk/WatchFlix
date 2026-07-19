@@ -15,6 +15,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "427087836931-6f3bui0ruo2arq47vu9b4br94e5c4g71.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.smlztrk.Watchify",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
           "client_id": "427087836931-in7lreg3vjgnvudn5h8gauradaeo58kc.apps.googleusercontent.com",
           "client_type": 3
         }

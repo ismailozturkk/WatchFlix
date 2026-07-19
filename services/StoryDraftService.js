@@ -13,7 +13,13 @@ const readAll = async () => {
 };
 
 const writeAll = async (list) => {
-  await AsyncStorage.setItem(KEY, JSON.stringify(list));
+  // Çağrı yerleri (ör. StoryDraftsScreen onPress) await'i try/catch'siz
+  // kullanıyor — depolama hatası unhandled promise rejection olmasın.
+  try {
+    await AsyncStorage.setItem(KEY, JSON.stringify(list));
+  } catch (e) {
+    if (__DEV__) console.warn("StoryDraftService write failed:", e?.message);
+  }
 };
 
 export const StoryDraftService = {

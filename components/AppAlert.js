@@ -96,18 +96,33 @@ export function AppAlertHost() {
   const scale = useRef(new Animated.Value(0.9)).current;
   const backdrop = useRef(new Animated.Value(0)).current;
 
+  // Görünür bir alert varken gelenler burada bekler; kapanınca sıradaki
+  // gösterilir. Önceki davranış: yeni alert görünenin içeriğini anında ezer,
+  // ilkinin buton callback'leri kaybolurdu; mount kuyruğundan da yalnız ilk
+  // kayıt gösterilir, kalanı sonsuza dek asılı kalırdı.
+  const pendingRef = useRef([]);
+  const visibleRef = useRef(false);
+
+  const showNow = (payload) => {
+    setData(payload);
+    setVisible(true);
+    visibleRef.current = true;
+  };
+
   useEffect(() => {
     listener = (payload) => {
-      setData(payload);
-      setVisible(true);
+      if (visibleRef.current) pendingRef.current.push(payload);
+      else showNow(payload);
     };
     if (queue.length) {
-      setData(queue.shift());
-      setVisible(true);
+      const first = queue.shift();
+      pendingRef.current.push(...queue.splice(0));
+      showNow(first);
     }
     return () => {
       listener = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -147,9 +162,14 @@ export function AppAlertHost() {
         }),
       ]).start(() => {
         setVisible(false);
+        visibleRef.current = false;
         if (typeof cb === "function") cb();
+        // Bekleyen alert varsa modal tamamen kapandıktan sonra göster.
+        const next = pendingRef.current.shift();
+        if (next) setTimeout(() => showNow(next), 80);
       });
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [scale, backdrop],
   );
 

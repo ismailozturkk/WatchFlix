@@ -98,7 +98,11 @@ function TabScreenNavigator({ navigation, route }) {
     ? route.params.initialTab
     : "tvshows";
   const [activeTab, setActiveTab] = useState(requestedInitialTab);
-  const [mountedTabs, setMountedTabs] = useState(() => new Set(["tvshows"]));
+  // İstenen sekme baştan mount edilmeli; yoksa initialTab ile açılışta ilk
+  // kare boş kalır (aktif sekme mount listesinde olmaz, effect sonradan ekler).
+  const [mountedTabs, setMountedTabs] = useState(
+    () => new Set(["tvshows", requestedInitialTab]),
+  );
   const { t, language, toggleLanguage } = useLanguage();
   const { theme } = useTheme();
 

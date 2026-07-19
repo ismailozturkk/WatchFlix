@@ -5,12 +5,11 @@
 //     TMDB videoları seçilen dile göre ayrıca çekilir (append_to_response yerine
 //     bağımsız /videos isteği), böylece uygulama dili Türkçe olsa bile orijinal /
 //     İngilizce fragmanlara erişilebilir.
-//   • Oynatıcı tam ekran açılır; varsayılan olarak YATAY (landscape) gelir.
-//     Kapatma tuşunun karşısında bir "yan çevir" tuşu vardır; basınca dikey/yatay
-//     arasında geçiş yapar. (Cihaz yönelimi kilidi gerektirmeyen transform tabanlı
-//     yaklaşım — yeniden derleme gerektirmez.)
+//   • Oynatıcı karartılmış sinema modalında açılır; cihazın mevcut yönüne göre
+//     16:9 oranını taşmadan sığdırır ve YouTube dışa açma/kapatma kontrollerini
+//     videodan bağımsız sabit tutar.
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -21,11 +20,14 @@ import {
   Pressable,
   ActivityIndicator,
   ScrollView,
+  Animated,
+  Linking,
   useWindowDimensions,
 } from "react-native";
 import axios from "axios";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { BlurView } from "expo-blur";
+import { Image } from "expo-image";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -62,29 +64,50 @@ const sortVideos = (list) =>
   );
 
 /* ───────────────────────── Tam ekran oynatıcı ───────────────────────── */
-function TrailerPlayerModal({ visible, videoId, onClose, theme }) {
+function TrailerPlayerModal({ visible, video, onClose, theme }) {
   const { width: SW, height: SH } = useWindowDimensions();
-  const [landscape, setLandscape] = useState(true);
+  const videoId = video?.key || null;
+  const videoTitle = video?.name || i18nText("autoI18n.fragman", "Fragman");
+  // "loading" → player hazır olana dek kapak + spinner; "error" → tekrar dene /
+  // YouTube'da aç. Player remount olduğunda tekrar "loading".
+  const [playerState, setPlayerState] = useState("loading");
+  const [retryKey, setRetryKey] = useState(0);
+  const appearAnim = useRef(new Animated.Value(0)).current;
 
-  // Her yeni video açılışında yatay başlasın.
   useEffect(() => {
-    if (visible) setLandscape(true);
-  }, [visible, videoId]);
+    if (!visible) return;
+    setRetryKey(0);
+    appearAnim.setValue(0);
+    Animated.timing(appearAnim, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [visible, videoId, appearAnim]);
 
-  const portraitW = Math.min(SW - 24, 720);
-  const portraitH = Math.round((portraitW * 9) / 16);
+  // Player remount eden her değişiklikte yükleme katmanına dön.
+  useEffect(() => {
+    setPlayerState("loading");
+  }, [videoId, retryKey]);
 
-  // 16:9'u yatay tuvale (SH x SW) sığdır.
-  const landscapeFit = useMemo(() => {
+  const playerFit = useMemo(() => {
     const ar = 16 / 9;
-    let w = SH;
-    let h = SH / ar;
-    if (h > SW) {
-      h = SW;
-      w = SW * ar;
+    const maxW = Math.min(SW - 24, 980);
+    const reservedH = SW > SH ? 88 : 160;
+    const maxH = Math.max(210, SH - reservedH);
+    let w = maxW;
+    let h = w / ar;
+    if (h > maxH) {
+      h = maxH;
+      w = h * ar;
     }
     return { w: Math.round(w), h: Math.round(h) };
   }, [SH, SW]);
+
+  const appearScale = appearAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.96, 1],
+  });
 
   return (
     <Modal
@@ -103,53 +126,126 @@ function TrailerPlayerModal({ visible, videoId, onClose, theme }) {
         />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-        <View
+        <Animated.View
           style={[
-            styles.playerStage,
-            landscape
-              ? { width: SH, height: SW, transform: [{ rotate: "90deg" }] }
-              : { width: portraitW, height: portraitH, borderRadius: 14 },
+            styles.playerCard,
+            {
+              width: Math.min(SW - 24, 1020),
+              opacity: appearAnim,
+              transform: [{ scale: appearScale }],
+            },
           ]}
         >
-          {videoId ? (
+          <View style={styles.playerTopBar}>
+            <View style={styles.playerTitleWrap}>
+              <Text style={styles.playerKicker} allowFontScaling={false}>
+                {video?.type || i18nText("autoI18n.video", "Video")}
+              </Text>
+              <Text style={styles.playerTitle} allowFontScaling={false} numberOfLines={1}>
+                {videoTitle}
+              </Text>
+            </View>
+            <View style={styles.playerTopActions}>
+              <TouchableOpacity
+                onPress={() =>
+                  videoId &&
+                  Linking.openURL(`https://www.youtube.com/watch?v=${videoId}`).catch(
+                    () => {},
+                  )
+                }
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel={i18nText("autoI18n.youtube_da_ac", "YouTube'da aç")}
+              >
+                <BlurView tint="dark" intensity={45} style={styles.playerBtn}>
+                  <Ionicons name="logo-youtube" size={19} color="#fff" />
+                </BlurView>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={onClose}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
+              >
+                <BlurView tint="dark" intensity={45} style={styles.playerBtn}>
+                  <Ionicons name="close" size={20} color="#fff" />
+                </BlurView>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View
+            style={[
+              styles.playerStage,
+              { width: playerFit.w, height: playerFit.h },
+            ]}
+          >
+          {videoId && playerState !== "error" ? (
             <YoutubePlayer
-              key={`${videoId}-${landscape}`}
-              width={landscape ? landscapeFit.w : portraitW}
-              height={landscape ? landscapeFit.h : portraitH}
+              key={`${videoId}-${retryKey}`}
+              width={playerFit.w}
+              height={playerFit.h}
               videoId={videoId}
               play
+              onReady={() => setPlayerState("ready")}
+              onError={() => setPlayerState("error")}
             />
           ) : null}
 
-          {/* Kontroller: solda yan çevir, karşısında (sağda) kapat */}
-          <View style={styles.playerControls} pointerEvents="box-none">
-            <TouchableOpacity
-              onPress={() => setLandscape((v) => !v)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              accessibilityRole="button"
-              accessibilityLabel={i18nText("autoI18n.yan_cevir", "Yan çevir")}
+          {/* Player hazır olana dek siyah kutu yerine video kapağı + spinner;
+              hata durumunda tekrar dene / YouTube'a git seçenekleri. */}
+          {playerState !== "ready" && videoId && (
+            <View
+              style={styles.playerOverlay}
+              pointerEvents={playerState === "error" ? "box-none" : "none"}
             >
-              <BlurView tint="dark" intensity={50} style={styles.playerBtn}>
-                <Ionicons
-                  name={landscape ? "phone-portrait-outline" : "phone-landscape-outline"}
-                  size={20}
-                  color="#fff"
-                />
-              </BlurView>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={onClose}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              accessibilityRole="button"
-              accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
-            >
-              <BlurView tint="dark" intensity={50} style={styles.playerBtn}>
-                <Ionicons name="close" size={20} color="#fff" />
-              </BlurView>
-            </TouchableOpacity>
+              <Image
+                source={{ uri: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                transition={150}
+              />
+              <View style={styles.playerOverlayDim} />
+              {playerState === "loading" ? (
+                <ActivityIndicator size="large" color="#fff" />
+              ) : (
+                <View style={styles.playerErrorBox}>
+                  <Ionicons name="cloud-offline-outline" size={30} color="#fff" />
+                  <Text style={styles.playerErrorText} allowFontScaling={false}>
+                    {i18nText("autoI18n.video_yuklenemedi", "Video yüklenemedi")}
+                  </Text>
+                  <View style={styles.playerErrorActions}>
+                    <TouchableOpacity
+                      style={[styles.playerErrorBtn, { backgroundColor: theme.accent }]}
+                      onPress={() => setRetryKey((k) => k + 1)}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="refresh" size={15} color="#fff" />
+                      <Text style={styles.playerErrorBtnText} allowFontScaling={false}>
+                        {i18nText("autoI18n.tekrar_dene", "Tekrar Dene")}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.playerErrorBtn, styles.playerErrorBtnGhost]}
+                      onPress={() =>
+                        Linking.openURL(
+                          `https://www.youtube.com/watch?v=${videoId}`,
+                        ).catch(() => {})
+                      }
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="logo-youtube" size={15} color="#fff" />
+                      <Text style={styles.playerErrorBtnText} allowFontScaling={false}>
+                        {i18nText("autoI18n.youtube_da_ac", "YouTube'da aç")}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -323,7 +419,7 @@ export default function TrailerSection({ mediaType, id, apiKey }) {
 
       <TrailerPlayerModal
         visible={selectedVideo !== null}
-        videoId={selectedVideo}
+        video={selectedVideo}
         theme={theme}
         onClose={() => setSelectedVideo(null)}
       />
@@ -362,21 +458,43 @@ const styles = StyleSheet.create({
 
   // Oynatıcı
   playerRoot: { flex: 1, alignItems: "center", justifyContent: "center" },
+  playerCard: {
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 12,
+  },
+  playerTopBar: {
+    width: "100%",
+    maxWidth: 980,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  playerTitleWrap: { flex: 1 },
+  playerKicker: {
+    color: "rgba(255,255,255,0.64)",
+    fontSize: 10,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  playerTitle: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  playerTopActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   playerStage: {
     backgroundColor: "#000",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
-  },
-  playerControls: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 14,
-    zIndex: 20,
+    borderRadius: 16,
   },
   playerBtn: {
     width: 40,
@@ -386,6 +504,34 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
+  // Yükleme/hata katmanı — kontrol butonlarının (zIndex 20) altında kalır.
+  playerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  playerOverlayDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  playerErrorBox: { alignItems: "center", gap: 10, paddingHorizontal: 20 },
+  playerErrorText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  playerErrorActions: { flexDirection: "row", gap: 10, marginTop: 4 },
+  playerErrorBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 12,
+  },
+  playerErrorBtnGhost: {
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  playerErrorBtnText: { color: "#fff", fontSize: 12.5, fontWeight: "800" },
 
   // Dil sayfası
   sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },

@@ -8,7 +8,7 @@ const MovieVideoItem = memo(({ item, onPress }) => {
   const { theme } = useTheme();
 
   return (
-    <TouchableOpacity style={styles.videoItem} onPress={() => onPress(item.key)} activeOpacity={0.88}>
+    <TouchableOpacity style={styles.videoItem} onPress={() => onPress(item)} activeOpacity={0.88}>
       <View style={styles.videoThumbnail}>
         <Image
           source={{ uri: `https://img.youtube.com/vi/${item.key}/hqdefault.jpg` }}

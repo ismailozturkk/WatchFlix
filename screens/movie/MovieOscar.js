@@ -17,7 +17,7 @@ import RatingStars from "../../components/RatingStars";
 import { useLanguage } from "../../context/LanguageContext";
 import { MovieOscarSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
-import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
@@ -41,6 +41,7 @@ const DikeyMetin = memo(function DikeyMetin({ metin }) {
 // Stable, module-scope item component → no remount → no flicker.
 const MovieOscarCard = memo(function MovieOscarCard({ item, index, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
+  const { posterBadges } = useListLayoutSettings();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -78,11 +79,13 @@ const MovieOscarCard = memo(function MovieOscarCard({ item, index, navigation, t
             recyclingKey={`movieoscar-${item.id}`}
             transition={120}
           />
-          <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
-            <Text allowFontScaling={false} style={styles.similarRatingText}>
-              {item.vote_average.toFixed(1)}
-            </Text>
-          </View>
+          {posterBadges?.tmdbRating !== false && (
+            <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
+              <Text allowFontScaling={false} style={styles.similarRatingText}>
+                {item.vote_average.toFixed(1)}
+              </Text>
+            </View>
+          )}
         </View>
 
         <ListBadges

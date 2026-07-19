@@ -1,11 +1,13 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { Animated, StyleSheet } from "react-native";
 
 const Skeleton = ({ width, height, style }) => {
-  const animatedValue = new Animated.Value(0);
+  // useRef: her render'da yeni Animated.Value üretmek shimmer'ı ilk değerde
+  // donduruyor ve mount'taki loop sahipsiz kalıp sızıntı yapıyordu.
+  const animatedValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(animatedValue, {
           toValue: 1,
@@ -18,8 +20,10 @@ const Skeleton = ({ width, height, style }) => {
           useNativeDriver: true,
         }),
       ])
-    ).start();
-  }, []);
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [animatedValue]);
 
   const opacity = animatedValue.interpolate({
     inputRange: [0, 1],

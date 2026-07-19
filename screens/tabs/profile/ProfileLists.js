@@ -19,7 +19,11 @@ import { useProfileStats } from "../../../context/ProfileStatsContext";
 import { useProfileUi }    from "../../../context/ProfileUiContext";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
+import { useSharedLists } from "../../../context/SharedListsContext";
 import SwitchToggle from "../../../components/SwitchToggle";
+import { i18nText } from "../../../utils/i18nText";
+import { collection, getDocs, limit, query } from "firebase/firestore";
+import { db } from "../../../firebase";
 
 const sortItemsByListOrder = (items) =>
   (Array.isArray(items) ? items : []).slice().sort((a, b) => {
@@ -38,11 +42,27 @@ const sortItemsByListOrder = (items) =>
     return aDate - bDate || String(a?.id ?? "").localeCompare(String(b?.id ?? ""));
   });
 
-// Sabit kart boyutu: en geniş poster düzeni referans alınır (Büyük Kapaklar:
-// 3×60 poster + 2×2 boşluk + 2×10 dolgu = 204). Yükseklik tüm stillerde aynı
-// (poster bloğu 112 + ayırıcı/alt bilgi). Kartlar içerikten bağımsız aynı kalır.
-const CARD_W = 204;
+// Kart yüksekliği tüm düzenlerde sabit (poster bloğu 112 + ayırıcı/alt bilgi).
 const CARD_H = 171;
+
+// Kart genişliği aktif poster düzenine orantılı: poster alanı + 2×10 dolgu.
+// Aynı anda tek düzen aktif olduğundan raydaki tüm kartlar yine eşit kalır.
+const getCardWidth = (gridStyle) => {
+  switch (gridStyle) {
+    case 1:
+      return 204; // Büyük Kapaklar: 3×60 + 2×2 boşluk
+    case 2:
+      return 176; // Küçük Kapaklar: 4×37.5 + 3×2 boşluk
+    case 3:
+      return 134.5; // Karışık: 75 + 2 + 37.5
+    default:
+      return 158; // Yığın: 138 sabit blok
+  }
+};
+
+// Ortak liste kartlarının aksanı — ListsViewScreen.SHARED_ACCENT ile aynı.
+const SHARED_ACCENT = "#38bdf8";
+const SHARED_KEY_PREFIX = "shared:";
 
 // ── Listeye özgü vurgu rengi/ikon — ListsViewScreen kartlarıyla birebir aynı ──
 const getListAccent = (listName) => {
@@ -84,19 +104,57 @@ export default function ProfileLists({ navigation }) {
     modalDeleteVisible, setModalDeleteVisible, deleteList,
   } = useProfileStats();
   const { gridStyle, setGridStyle, saveListGridStyle, allCornersRounded, saveAllCornersRounded } = useProfileUi();
+  const cardW = getCardWidth(gridStyle);
   const [layoutModalVisible, setLayoutModalVisible] = useState(false);
   // ...existing code...
   const [scaleValues, setScaleValues] = useState({});
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+
+  // ── Ortak listeler — ListsViewScreen ile aynı önizleme deseni ────────────
+  // listId → ilk 8 öğe (küçük kapaklar düzeni 8 poster gösterir).
+  // updatedAt değişince tazelenir.
+  const { sharedLists } = useSharedLists();
+  const [sharedPreviews, setSharedPreviews] = useState({});
+  const sharedPreviewKey = sharedLists
+    .map((l) => `${l.id}:${l.updatedAt?.toMillis?.() ?? 0}`)
+    .join("|");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const previews = {};
+      await Promise.all(
+        sharedLists.map(async (l) => {
+          try {
+            const snap = await getDocs(
+              query(collection(db, "SharedLists", l.id, "items"), limit(8)),
+            );
+            previews[l.id] = snap.docs.map((d) => d.data());
+          } catch {
+            previews[l.id] = [];
+          }
+        }),
+      );
+      if (!cancelled) setSharedPreviews(previews);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharedPreviewKey]);
+
   useEffect(() => {
     const newScaleValues = {};
     lists.forEach((list) => {
       newScaleValues[list[0]] = new Animated.Value(1);
     });
+    sharedLists.forEach((l) => {
+      newScaleValues[SHARED_KEY_PREFIX + l.id] = new Animated.Value(1);
+    });
     setScaleValues(newScaleValues);
-  }, [lists]);
+  }, [lists, sharedLists]);
 
   const onPressIn = (listName) => {
+    if (!scaleValues[listName]) return;
     Animated.timing(scaleValues[listName], {
       toValue: 0.9,
       duration: 200,
@@ -105,6 +163,7 @@ export default function ProfileLists({ navigation }) {
   };
 
   const onPressOut = (listName) => {
+    if (!scaleValues[listName]) return;
     Animated.timing(scaleValues[listName], {
       toValue: 1,
       duration: 200,
@@ -166,6 +225,11 @@ export default function ProfileLists({ navigation }) {
               ...lists
                 .filter(([listName]) => !protectedLists.includes(listName))
                 .sort((a, b) => a[0].localeCompare(b[0])),
+              // Ortak listeler rayın sonunda; context zaten isme göre sıralı.
+              ...sharedLists.map((l) => [
+                SHARED_KEY_PREFIX + l.id,
+                sharedPreviews[l.id] || [],
+              ]),
             ]}
             keyExtractor={([listName]) => listName}
             horizontal
@@ -173,11 +237,19 @@ export default function ProfileLists({ navigation }) {
             contentContainerStyle={{ paddingHorizontal: 15, gap: 10 }}
             renderItem={({ item }) => {
               const [listName, items] = item;
+              // Ortak liste kartı — üye sayısı rozeti ve SharedListScreen yönlendirmesi
+              // dışında kişisel kartla aynı çerçeveyi kullanır.
+              const shared = listName.startsWith(SHARED_KEY_PREFIX)
+                ? sharedLists.find(
+                    (l) => SHARED_KEY_PREFIX + l.id === listName,
+                  )
+                : null;
               const orderedItems = sortItemsByListOrder(items);
-              const accent = getListAccent(listName);
-              const icon = getListIcon(listName);
-              const displayName =
-                listName === "watchedMovies"
+              const accent = shared ? SHARED_ACCENT : getListAccent(listName);
+              const icon = shared ? "people" : getListIcon(listName);
+              const displayName = shared
+                ? shared.name
+                : listName === "watchedMovies"
                   ? t.profileScreen.ProfileLists.watchedMovies
                   : listName === "watchedTv"
                     ? t.profileScreen.ProfileLists.watchedTvSeries
@@ -192,10 +264,16 @@ export default function ProfileLists({ navigation }) {
                   onPressIn={() => onPressIn(listName)} // Add arrow function
                   onPressOut={() => onPressOut(listName)} // Add arrow function
                   onPress={() => {
-                    navigation.navigate("ListsScreen", { listName });
+                    if (shared) {
+                      navigation.navigate("SharedListScreen", {
+                        listId: shared.id,
+                      });
+                    } else {
+                      navigation.navigate("ListsScreen", { listName });
+                    }
                   }}
                   onLongPress={() => {
-                    if (!protectedLists.includes(listName)) {
+                    if (!shared && !protectedLists.includes(listName)) {
                       setSelectedList(listName);
                       setModalDeleteVisible(true);
                     }
@@ -214,7 +292,7 @@ export default function ProfileLists({ navigation }) {
                         { backgroundColor: accent + "18", borderColor: accent + "25" },
                       ]}
                     />
-                    <View style={styles.card}>
+                    <View style={[styles.card, { width: cardW }]}>
                     {gridStyle === 1 ? (
                       <View
                         style={{
@@ -479,12 +557,31 @@ export default function ProfileLists({ navigation }) {
                       >
                         {displayName}
                       </Text>
-                      <Text
-                        allowFontScaling={false}
-                        style={[styles.countBadge, { color: accent }]}
-                      >
-                        {orderedItems.length}
-                      </Text>
+                      {shared ? (
+                        <View style={styles.sharedCountWrap}>
+                          <Ionicons
+                            name="person"
+                            size={11}
+                            color="rgba(255,255,255,0.4)"
+                          />
+                          <Text
+                            allowFontScaling={false}
+                            style={[
+                              styles.countBadge,
+                              { color: accent, marginLeft: 0 },
+                            ]}
+                          >
+                            {shared.memberIds?.length ?? 1}
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text
+                          allowFontScaling={false}
+                          style={[styles.countBadge, { color: accent }]}
+                        >
+                          {orderedItems.length}
+                        </Text>
+                      )}
                     </View>
                     </View>
                   </Animated.View>
@@ -521,7 +618,11 @@ export default function ProfileLists({ navigation }) {
               allowFontScaling={false}
               style={[styles.modalText, { color: theme.text.primary }]}
             >
-              "{selectedList}" listesini silmek istiyor musunuz?
+              {i18nText(
+                "autoI18n.liste_silme_onay",
+                '"{{name}}" listesini silmek istiyor musunuz?',
+                { name: selectedList },
+              )}
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -556,7 +657,9 @@ export default function ProfileLists({ navigation }) {
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setLayoutModalVisible(false)} />
           <View style={[styles.bottomModalSheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
             <View style={[styles.modalDragHandle, { backgroundColor: theme.text.muted }]} />
-            <Text style={[styles.bottomModalTitle, { color: theme.text.primary }]}>Liste Görünümü Seçin</Text>
+            <Text style={[styles.bottomModalTitle, { color: theme.text.primary }]}>
+              {i18nText("autoI18n.liste_gorunumu_secin", "Liste Görünümü Seçin")}
+            </Text>
 
             <View style={{ width: "100%", paddingHorizontal: 20, gap: 10 }}>
               {/* Üst Sıra */}
@@ -596,7 +699,9 @@ export default function ProfileLists({ navigation }) {
                     </View>
                     <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 5 }}>
                       <MaterialCommunityIcons name="movie" size={16} color={theme.colors.green} />
-                      <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>Büyük Kapaklar</Text>
+                      <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>
+                        {i18nText("autoI18n.buyuk_kapaklar", "Büyük Kapaklar")}
+                      </Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -630,7 +735,9 @@ export default function ProfileLists({ navigation }) {
                     </View>
                     <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 5 }}>
                       <MaterialCommunityIcons name="view-dashboard" size={16} color={theme.colors.blue} />
-                      <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>Karışık</Text>
+                      <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>
+                        {i18nText("autoI18n.karisik_gorunum", "Karışık")}
+                      </Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -689,7 +796,9 @@ export default function ProfileLists({ navigation }) {
                     </View>
                     <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 5 }}>
                       <MaterialCommunityIcons name="layers" size={16} color={theme.colors.purple || "#a78bfa"} />
-                      <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>Yığın</Text>
+                      <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>
+                        {i18nText("autoI18n.yigin_gorunum", "Yığın")}
+                      </Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -744,7 +853,9 @@ export default function ProfileLists({ navigation }) {
                     </View>
                     <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 5 }}>
                       <Ionicons name="grid" size={16} color={theme.colors.orange} />
-                      <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>Küçük Kapaklar</Text>
+                      <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>
+                        {i18nText("autoI18n.kucuk_kapaklar", "Küçük Kapaklar")}
+                      </Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -767,7 +878,9 @@ export default function ProfileLists({ navigation }) {
               >
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                   <Ionicons name="crop-outline" size={20} color={theme.text.primary} />
-                  <Text style={{ color: theme.text.primary, fontSize: 14, fontWeight: "600" }}>Ayrı Köşeli Afişler</Text>
+                  <Text style={{ color: theme.text.primary, fontSize: 14, fontWeight: "600" }}>
+                    {i18nText("autoI18n.ayri_koseli_afisler", "Ayrı Köşeli Afişler")}
+                  </Text>
                 </View>
                 <SwitchToggle
                   value={allCornersRounded}
@@ -786,7 +899,7 @@ export default function ProfileLists({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  section: { width: "100%" },
+  section: { width: "100%", marginBottom: 14 },
   sectionTitle: {
     fontSize: 14,
     textTransform: "uppercase",
@@ -820,7 +933,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   card: {
-    width: CARD_W,
     height: CARD_H,
     borderRadius: 20,
     overflow: "hidden",
@@ -862,6 +974,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginLeft: "auto",
   },
+  sharedCountWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginLeft: "auto",
+  },
   image: { width: 37.5, height: 55 },
   placeholder: { width: 37.5, height: 55 },
   sectionView: {
@@ -898,6 +1016,7 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   modalView: { padding: 20, borderRadius: 10, alignItems: "center" },
+  modalText: { marginBottom: 15, textAlign: "center", fontSize: 18 },
   modalButtons: { flexDirection: "row", marginTop: 10 },
   button: { padding: 10, marginHorizontal: 5, borderRadius: 5 },
 

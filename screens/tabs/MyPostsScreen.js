@@ -17,6 +17,7 @@ import AppIcon from "../../components/AppIcon";
 import RatingStars from "../../components/RatingStars";
 import StaggerItem from "../../components/StaggerItem";
 import CreatePostModal from "@components/modals/CreatePostModal";
+import { MyPostsSkeleton } from "@components/Skeleton";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { usePosts } from "../../context/PostsContext";
@@ -292,9 +293,7 @@ export default function MyPostsScreen({ navigation }) {
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={theme.text.muted} />
-        </View>
+        <MyPostsSkeleton count={5} />
       ) : (
         <FlatList
           data={posts}

@@ -30,6 +30,7 @@ import IconBacground from "../../components/IconBacground";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { i18nText } from "../../utils/i18nText";
+import { searchMediaWithFuzzyFallback } from "../../services/fuzzyMediaSearch";
 
 
 const { width } = Dimensions.get("window");
@@ -503,6 +504,7 @@ export default function ActorSearch({ navigation, route, isUnified, unifiedQuery
   const { adultContent } = useContentSettings();
   const { imageQuality } = useImageQualitySettings();
   const searchTimeout = useRef(null);
+  const searchRequestRef = useRef(0);
   const inputRef = useRef(null);
 
   const searchBarAnim = useRef(new Animated.Value(0)).current;
@@ -537,14 +539,20 @@ export default function ActorSearch({ navigation, route, isUnified, unifiedQuery
   }, [unifiedQuery, isUnified]);
 
   const handleSearch = useCallback((text) => {
+    searchRequestRef.current += 1;
     setSearch(text);
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    if (text.trim() === "") {
-      setResults([]);
-      setLoading(false);
-    } else if (text.trim().length >= 2) {
+    if (text.trim().length >= 2) {
+      setError(null);
       setLoading(true);
       searchTimeout.current = setTimeout(() => fetchResults(text), 500);
+    } else {
+      // Boş veya 1 karakter: bekleyen istek iptal edildi. loading/error'ı
+      // burada sıfırlamazsak ekran skeleton'da ya da eski hatada takılı kalır
+      // (2+ karakterden geri silme senaryosu).
+      setResults([]);
+      setLoading(false);
+      setError(null);
     }
   }, []);
 
@@ -554,22 +562,23 @@ export default function ActorSearch({ navigation, route, isUnified, unifiedQuery
         setLoading(false);
         return;
       }
+      const requestId = ++searchRequestRef.current;
       try {
-        const response = await axios.get(
-          "https://api.themoviedb.org/3/search/person",
-          {
-            params: {
-              query: searchText,
-              include_adult: adultContent,
-              language: language === "tr" ? "tr-TR" : "en-US",
-              page: "1",
-            },
-            headers: { Authorization: API_KEY },
-          },
+        const { results: foundResults, usedFuzzyFallback } =
+          await searchMediaWithFuzzyFallback({
+            mediaType: "person",
+            query: searchText,
+            adultContent,
+            language: language === "tr" ? "tr-TR" : "en-US",
+            API_KEY,
+          });
+        if (requestId !== searchRequestRef.current) return;
+        const actors = foundResults.filter(
+          (person) => person.known_for_department === "Acting",
         );
-        const sorted = response.data.results
-          .filter((p) => p.known_for_department === "Acting")
-          .sort((a, b) => b.popularity - a.popularity);
+        const sorted = usedFuzzyFallback
+          ? actors
+          : actors.sort((a, b) => b.popularity - a.popularity);
         setResults(sorted);
         setError(null);
         setLastSearch((prev) => {
@@ -585,9 +594,10 @@ export default function ActorSearch({ navigation, route, isUnified, unifiedQuery
           return filtered.slice(0, 5);
         });
       } catch (err) {
+        if (requestId !== searchRequestRef.current) return;
         setError(err.message);
       } finally {
-        setLoading(false);
+        if (requestId === searchRequestRef.current) setLoading(false);
       }
     },
     [language, adultContent, API_KEY],

@@ -13,6 +13,7 @@ import {
   Animated,
   PanResponder,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import ViewShot, { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
@@ -34,6 +35,7 @@ import { SaveDraftModal } from "@components/storyShare/SaveDraftModal";
 import StorySlider from "@components/storyShare/StorySlider";
 import { StoryDraftService } from "@services/StoryDraftService";
 import { i18nText } from "@utils/i18nText";
+import { getRatingColors } from "@utils/ratingColors";
 
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
@@ -130,6 +132,8 @@ const DEFAULTS = {
   textWidth: 0.7,
   posterRadius: 12,
   posterWidth: 0.42,
+  graphWidth: 0.86,
+  graphRadius: 3,
 };
 
 /* Paylaşılan/seçili içerik için kaliteyi ayardan bağımsız YÜKSEK tut
@@ -147,6 +151,135 @@ const hexA = (hex, a) => {
     .padStart(2, "0");
   return `${hex}${v}`;
 };
+
+/* ── Hex renk kodu girişi ──
+   Renk seçim satırlarının en başında serbest kod girişi: 6 haneli hex
+   yazılıp onaylanınca uygulanır; geçersiz girişte mevcut renge geri döner. */
+function HexColorInput({ theme, color, onChange }) {
+  const [text, setText] = useState((color || "").replace(/^#/, ""));
+  useEffect(() => {
+    setText((color || "").replace(/^#/, ""));
+  }, [color]);
+  const valid = /^[0-9a-fA-F]{6}$/.test(text);
+  const commit = () => {
+    if (valid) onChange("#" + text.toUpperCase());
+    else setText((color || "").replace(/^#/, ""));
+  };
+  return (
+    <View
+      style={[
+        styles.hexBox,
+        { borderColor: theme.border, backgroundColor: theme.secondary },
+      ]}
+    >
+      <View
+        style={[
+          styles.hexPreview,
+          { backgroundColor: valid ? "#" + text : color || "#000000" },
+        ]}
+      />
+      <Text
+        allowFontScaling={false}
+        style={[styles.hexHash, { color: theme.text.muted }]}
+      >
+        #
+      </Text>
+      <TextInput
+        value={text}
+        onChangeText={(v) =>
+          setText(v.replace(/[^0-9a-fA-F]/g, "").slice(0, 6))
+        }
+        onSubmitEditing={commit}
+        onBlur={commit}
+        placeholder="FF5E7E"
+        placeholderTextColor={theme.text.muted}
+        autoCapitalize="characters"
+        autoCorrect={false}
+        style={[styles.hexInput, { color: theme.text.primary }]}
+      />
+    </View>
+  );
+}
+
+/* ── Bölüm Graph bloğu ──
+   TvGraphDetailScreen ızgarasının story versiyonu: sütun = sezon,
+   satır = bölüm; kareler puana göre boyanır (ortak RATING_TIERS).
+   Veri blokta gömülü ({ s: sezonNo, r: [puanlar] }) → taslaklarda da
+   yeniden fetch gerekmeden çizilir. */
+function EpisodeGraph({ block, width }) {
+  const data = block.data || [];
+  const S = data.length;
+  if (!S) return null;
+  const maxE = Math.max(...data.map((d) => d.r.length), 0);
+  const gap = 2;
+  const cell = (width - gap * (S - 1)) / S;
+  const cellRadius = Math.min(block.radius ?? DEFAULTS.graphRadius, cell / 2);
+  const showText = cell >= 15;
+  const headerFont = clamp(cell * 0.32, 6, 10);
+
+  return (
+    <View style={{ width }}>
+      {/* Sezon başlıkları */}
+      <View style={{ flexDirection: "row", gap, marginBottom: 2 }}>
+        {data.map((d) => (
+          <View key={d.s} style={{ width: cell, alignItems: "center" }}>
+            <Text
+              allowFontScaling={false}
+              style={{
+                color: "#fff",
+                fontSize: headerFont,
+                fontWeight: "800",
+                textShadowColor: "rgba(0,0,0,0.6)",
+                textShadowOffset: { width: 0, height: 1 },
+                textShadowRadius: 3,
+              }}
+            >
+              S{d.s}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Bölüm kareleri */}
+      {[...Array(maxE)].map((_, ei) => (
+        <View key={ei} style={{ flexDirection: "row", gap, marginBottom: gap }}>
+          {data.map((d) => {
+            const r = d.r[ei];
+            if (r === undefined)
+              return <View key={d.s} style={{ width: cell, height: cell }} />;
+            const { bg, text } = getRatingColors(r);
+            return (
+              <View
+                key={d.s}
+                style={{
+                  width: cell,
+                  height: cell,
+                  backgroundColor: bg,
+                  borderRadius: cellRadius,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {showText && (
+                  <Text
+                    allowFontScaling={false}
+                    style={{
+                      color: text,
+                      fontSize: cell * 0.34,
+                      fontWeight: "800",
+                    }}
+                  >
+                    {r ? r.toFixed(1) : "–"}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
 
 export default function StoryShareScreen({ route, navigation }) {
   const { theme } = useTheme();
@@ -192,6 +325,10 @@ export default function StoryShareScreen({ route, navigation }) {
   const [bgBlur, setBgBlur] = useState(0);
   const [bgRadius, setBgRadius] = useState(22);
   const [bgPadding, setBgPadding] = useState(0);
+  // Arka plan görseli seçilmediğinde kullanılan zemin gradyanı renkleri;
+  // üst null = tema varsayılanı (accent), alt null = siyah.
+  const [bgColor, setBgColor] = useState(null);
+  const [bgColorBottom, setBgColorBottom] = useState(null);
   const [posterLinked, setPosterLinked] = useState(false);
 
   /* ── Bloklar ── */
@@ -265,6 +402,9 @@ export default function StoryShareScreen({ route, navigation }) {
   const [watermarkPos, setWatermarkPos] = useState("bottom-right");
   const [busy, setBusy] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  // Sticker modu: yakalama sırasında arka plan katmanları gizlenir, tuval
+  // şeffaf olur → yalnızca içerik bloklarından oluşan saydam PNG çıkar.
+  const [stickerCapturing, setStickerCapturing] = useState(false);
   const editRef = useRef(null);
 
   /* ── Taslak ── */
@@ -313,6 +453,7 @@ export default function StoryShareScreen({ route, navigation }) {
 
   const selected = blocks.find((b) => b.id === selectedId) || null;
   const posterBlock = blocks.find((b) => b.id === "poster") || null;
+  const graphBlock = blocks.find((b) => b.id === "epgraph") || null;
 
   /* En güncel değerlere drag sırasında erişim */
   const dragStateRef = useRef({ blocks });
@@ -369,6 +510,8 @@ export default function StoryShareScreen({ route, navigation }) {
       if (typeof e.bgBlur === "number") setBgBlur(e.bgBlur);
       if (typeof e.bgRadius === "number") setBgRadius(e.bgRadius);
       if (typeof e.bgPadding === "number") setBgPadding(e.bgPadding);
+      if (typeof e.bgColor === "string") setBgColor(e.bgColor);
+      if (typeof e.bgColorBottom === "string") setBgColorBottom(e.bgColorBottom);
       if (typeof e.posterLinked === "boolean") setPosterLinked(e.posterLinked);
       if (e.watermarkPos) setWatermarkPos(e.watermarkPos);
       setDraftName(d.name || "");
@@ -418,6 +561,8 @@ export default function StoryShareScreen({ route, navigation }) {
           bgBlur,
           bgRadius,
           bgPadding,
+          bgColor,
+          bgColorBottom,
           posterLinked,
           blocks,
           watermarkPos,
@@ -584,6 +729,72 @@ export default function StoryShareScreen({ route, navigation }) {
     });
   };
 
+  /* ── Bölüm Graph ekle (yalnızca dizi) ──
+     Tüm sezonların bölüm puanları TMDB'den çekilir ve blokta gömülü
+     saklanır; graph tuvale sürüklenebilir/boyutlanabilir blok olarak iner. */
+  const [graphLoading, setGraphLoading] = useState(false);
+  const addEpisodeGraph = async () => {
+    if (graphLoading || blocks.some((b) => b.id === "epgraph")) return;
+    setGraphLoading(true);
+    try {
+      const showRes = await axios.get(
+        `https://api.themoviedb.org/3/tv/${id}`,
+        { headers: { accept: "application/json", Authorization: API_KEY } }
+      );
+      const seasons = (showRes.data.seasons || []).filter(
+        (s) => s.season_number > 0
+      );
+      if (!seasons.length) throw new Error("no-seasons");
+      const data = await Promise.all(
+        seasons.map(async (s) => {
+          const res = await axios.get(
+            `https://api.themoviedb.org/3/tv/${id}/season/${s.season_number}`,
+            { headers: { accept: "application/json", Authorization: API_KEY } }
+          );
+          return {
+            s: s.season_number,
+            r: (res.data.episodes || []).map((ep) => ep.vote_average || 0),
+          };
+        })
+      );
+
+      // Başlangıç genişliği: graph yüksekliği tuvalin ~%55'ini aşmasın.
+      const S = data.length;
+      const maxE = Math.max(...data.map((d) => d.r.length), 1);
+      let widthFrac = DEFAULTS.graphWidth;
+      const estH = ((widthFrac * CANVAS_W) / S) * maxE;
+      const maxH = CANVAS_H * 0.55;
+      if (estH > maxH)
+        widthFrac = clamp(
+          (maxH * S) / (maxE * CANVAS_W),
+          0.2,
+          DEFAULTS.graphWidth
+        );
+
+      const el = {
+        id: "epgraph",
+        type: "graph",
+        data,
+        widthFrac,
+        radius: DEFAULTS.graphRadius,
+        x: (1 - widthFrac) / 2,
+        y: 0.16,
+      };
+      setBlocks((prev) => [...prev, el]);
+      setSelectedId("epgraph");
+    } catch {
+      Toast.show({
+        type: "error",
+        text1: i18nText(
+          "autoI18n.bolum_verisi_alinamadi",
+          "Bölüm verisi alınamadı"
+        ),
+      });
+    } finally {
+      setGraphLoading(false);
+    }
+  };
+
   const MAX_BACKGROUNDS = 5;
   const toggleBackground = (path) =>
     setBackgrounds((prev) => {
@@ -606,16 +817,17 @@ export default function StoryShareScreen({ route, navigation }) {
     if (!selected) return;
     if (selected.type === "text")
       updateSelected({ size: clamp(selected.size + delta * 3, 10, 80) });
-    else if (selected.type === "image")
+    else if (selected.type === "image" || selected.type === "graph")
       updateSelected({
         widthFrac: clamp(selected.widthFrac + delta * 0.04, 0.18, 0.95),
       });
   };
 
   /* ── Yakalama ── */
-  const capture = async () => {
+  const capture = async (asSticker = false) => {
     setSelectedId(null);
     setCapturing(true);
+    if (asSticker) setStickerCapturing(true);
     await new Promise((r) => requestAnimationFrame(() => r()));
     await new Promise((r) => setTimeout(r, 120));
     try {
@@ -626,6 +838,7 @@ export default function StoryShareScreen({ route, navigation }) {
       });
     } finally {
       setCapturing(false);
+      if (asSticker) setStickerCapturing(false);
     }
   };
 
@@ -658,6 +871,37 @@ export default function StoryShareScreen({ route, navigation }) {
       Toast.show({ type: "success", text1: "Galeriye kaydedildi" });
     } catch (e) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.kaydetme_hatasi", "Kaydetme hatası: ") + e.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /* Sticker: içerik blokları saydam zeminli PNG olarak paylaşılır.
+     Instagram/WhatsApp'ta galeri-çıkartma özelliğiyle story üzerine
+     yerleştirilebilir (saydamlık korunur). */
+  const handleShareSticker = async () => {
+    try {
+      setBusy(true);
+      const uri = await capture(true);
+      if (!(await Sharing.isAvailableAsync())) {
+        Toast.show({
+          type: "error",
+          text1: i18nText(
+            "autoI18n.paylasim_kullanilamiyor",
+            "Paylaşım kullanılamıyor",
+          ),
+        });
+        return;
+      }
+      await Sharing.shareAsync(uri, {
+        mimeType: "image/png",
+        dialogTitle: title,
+      });
+    } catch (e) {
+      Toast.show({
+        type: "error",
+        text1: i18nText("autoI18n.paylasim_hatasi", "Paylaşım hatası: ") + e.message,
+      });
     } finally {
       setBusy(false);
     }
@@ -699,6 +943,8 @@ export default function StoryShareScreen({ route, navigation }) {
               borderRadius: block.radius || 0,
             }}
           />
+        ) : block.type === "graph" ? (
+          <EpisodeGraph block={block} width={block.widthFrac * CANVAS_W} />
         ) : (
           <View>
             {block.bg && (
@@ -759,7 +1005,14 @@ export default function StoryShareScreen({ route, navigation }) {
           <ViewShot
             ref={viewShotRef}
             options={{ format: "png", quality: 1 }}
-            style={[styles.canvas, { borderRadius: bgRadius, backgroundColor: "#000" }]}
+            style={[
+              styles.canvas,
+              {
+                borderRadius: bgRadius,
+                // Sticker yakalamada tuval saydam — PNG alfa kanalı korunur.
+                backgroundColor: stickerCapturing ? "transparent" : "#000",
+              },
+            ]}
           >
             <TouchableOpacity
               activeOpacity={1}
@@ -775,6 +1028,8 @@ export default function StoryShareScreen({ route, navigation }) {
                   bottom: bgPadding,
                   borderRadius: Math.max(0, bgRadius - bgPadding),
                   overflow: "hidden",
+                  // Sticker yakalamada arka plan katmanları gizlenir.
+                  opacity: stickerCapturing ? 0 : 1,
                 }}
               >
                 {backgrounds.length > 0 ? (
@@ -791,7 +1046,14 @@ export default function StoryShareScreen({ route, navigation }) {
                   </View>
                 ) : (
                   <LinearGradient
-                    colors={[theme.accent + "AA", theme.primary, "#000"]}
+                    colors={
+                      bgColor || bgColorBottom
+                        ? [
+                            bgColor ?? theme.accent + "AA",
+                            bgColorBottom ?? "#000000",
+                          ]
+                        : [theme.accent + "AA", theme.primary, "#000"]
+                    }
                     style={StyleSheet.absoluteFill}
                   />
                 )}
@@ -823,6 +1085,7 @@ export default function StoryShareScreen({ route, navigation }) {
         <StoryActionBar
           busy={busy}
           onShare={handleShare}
+          onShareSticker={handleShareSticker}
           onOpenSettings={openSettings}
           onSaveImage={handleSave}
         />
@@ -908,6 +1171,103 @@ export default function StoryShareScreen({ route, navigation }) {
                   );
                 }}
               />
+
+              {/* Görsel seçilmediğinde zemin gradyanının üst/alt renkleri */}
+              {backgrounds.length === 0 && (
+                <>
+                  <View style={[styles.ctrlHead, { marginTop: 14 }]}>
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.ctrlLabel, { color: theme.text.muted }]}
+                    >
+                      {i18nText("autoI18n.zemin_rengi_ust", "Zemin Rengi (Üst)")}
+                    </Text>
+                    <ResetBtn theme={theme} onPress={() => setBgColor(null)} />
+                  </View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    <HexColorInput
+                      theme={theme}
+                      color={bgColor}
+                      onChange={setBgColor}
+                    />
+                    {/* Tema varsayılanı (accent gradyanı) */}
+                    <TouchableOpacity
+                      onPress={() => setBgColor(null)}
+                      style={[
+                        styles.swatch,
+                        { backgroundColor: theme.accent },
+                        bgColor === null && {
+                          borderColor: theme.accent,
+                          borderWidth: 3,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name="color-wand"
+                        size={14}
+                        color="#fff"
+                        style={{ alignSelf: "center", marginTop: 7 }}
+                      />
+                    </TouchableOpacity>
+                    {BG_COLORS.map((c) => (
+                      <TouchableOpacity
+                        key={c}
+                        onPress={() => setBgColor(c)}
+                        style={[
+                          styles.swatch,
+                          { backgroundColor: c },
+                          bgColor === c && {
+                            borderColor: theme.accent,
+                            borderWidth: 3,
+                          },
+                        ]}
+                      />
+                    ))}
+                  </ScrollView>
+
+                  <View style={[styles.ctrlHead, { marginTop: 12 }]}>
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.ctrlLabel, { color: theme.text.muted }]}
+                    >
+                      {i18nText("autoI18n.zemin_rengi_alt", "Zemin Rengi (Alt)")}
+                    </Text>
+                    <ResetBtn
+                      theme={theme}
+                      onPress={() => setBgColorBottom(null)}
+                    />
+                  </View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    <HexColorInput
+                      theme={theme}
+                      color={bgColorBottom}
+                      onChange={setBgColorBottom}
+                    />
+                    {BG_COLORS.map((c) => (
+                      <TouchableOpacity
+                        key={c}
+                        onPress={() => setBgColorBottom(c)}
+                        style={[
+                          styles.swatch,
+                          { backgroundColor: c },
+                          bgColorBottom === c && {
+                            borderColor: theme.accent,
+                            borderWidth: 3,
+                          },
+                        ]}
+                      />
+                    ))}
+                  </ScrollView>
+                </>
+              )}
 
               <SliderControl
                 theme={theme}
@@ -1075,13 +1435,41 @@ export default function StoryShareScreen({ route, navigation }) {
                 )}
               </View>
 
+              {/* Bölüm Graph — yalnızca dizilerde, tek örnek */}
+              {type === "tv" && !graphBlock && (
+                <TouchableOpacity
+                  style={[
+                    styles.addBtn,
+                    {
+                      backgroundColor: theme.secondary,
+                      borderColor: theme.border,
+                      borderWidth: 1,
+                      marginBottom: 6,
+                    },
+                  ]}
+                  onPress={addEpisodeGraph}
+                  disabled={graphLoading}
+                >
+                  {graphLoading ? (
+                    <ActivityIndicator size="small" color={theme.accent} />
+                  ) : (
+                    <Ionicons name="grid" size={18} color={theme.accent} />
+                  )}
+                  <Text style={[styles.addBtnText, { color: theme.text.primary }]}>
+                    {i18nText("autoI18n.bolum_graph_ekle", "Bölüm Graph Ekle")}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
               {blocks.map((b) => (
                 <TouchableOpacity
                   key={b.id}
                   activeOpacity={0.8}
                   onPress={() => {
                     setSelectedId(b.id);
-                    setActiveTab(b.type === "text" ? "style" : "poster");
+                    if (b.type === "text") setActiveTab("style");
+                    else if (b.type === "image") setActiveTab("poster");
+                    // graph: kontrolleri bu sekmede (aşağıda) — sekme değişmez
                   }}
                   style={[
                     styles.blockRow,
@@ -1092,7 +1480,13 @@ export default function StoryShareScreen({ route, navigation }) {
                   ]}
                 >
                   <Ionicons
-                    name={b.type === "image" ? "image-outline" : "text-outline"}
+                    name={
+                      b.type === "image"
+                        ? "image-outline"
+                        : b.type === "graph"
+                          ? "grid-outline"
+                          : "text-outline"
+                    }
                     size={18}
                     color={theme.accent}
                   />
@@ -1100,7 +1494,11 @@ export default function StoryShareScreen({ route, navigation }) {
                     numberOfLines={1}
                     style={[styles.blockRowText, { color: theme.text.primary }]}
                   >
-                    {b.type === "image" ? "Poster" : b.text || i18nText("autoI18n.bos_yazi", "Boş yazı")}
+                    {b.type === "image"
+                      ? "Poster"
+                      : b.type === "graph"
+                        ? i18nText("autoI18n.bolum_graph", "Bölüm Graph")
+                        : b.text || i18nText("autoI18n.bos_yazi", "Boş yazı")}
                   </Text>
                   <TouchableOpacity
                     onPress={() => deleteBlock(b.id)}
@@ -1110,6 +1508,42 @@ export default function StoryShareScreen({ route, navigation }) {
                   </TouchableOpacity>
                 </TouchableOpacity>
               ))}
+
+              {/* Bölüm Graph özelleştirme — poster sekmesindeki desenle aynı */}
+              {graphBlock && (
+                <>
+                  <SliderControl
+                    theme={theme}
+                    icon="resize-outline"
+                    label={i18nText("autoI18n.graph_boyutu", "Graph Boyutu")}
+                    value={graphBlock.widthFrac}
+                    min={0.18}
+                    max={0.95}
+                    step={0.02}
+                    decimals={2}
+                    onChange={(v) => updateBlock("epgraph", { widthFrac: v })}
+                    onReset={() =>
+                      updateBlock("epgraph", { widthFrac: DEFAULTS.graphWidth })
+                    }
+                  />
+                  <SliderControl
+                    theme={theme}
+                    icon="square-outline"
+                    label={i18nText(
+                      "autoI18n.kare_yuvarlakligi",
+                      "Kare Yuvarlaklığı"
+                    )}
+                    value={graphBlock.radius}
+                    min={0}
+                    max={24}
+                    step={1}
+                    onChange={(v) => updateBlock("epgraph", { radius: v })}
+                    onReset={() =>
+                      updateBlock("epgraph", { radius: DEFAULTS.graphRadius })
+                    }
+                  />
+                </>
+              )}
             </View>
           )}
 
@@ -1141,7 +1575,16 @@ export default function StoryShareScreen({ route, navigation }) {
                     </Text>
                     <ResetBtn theme={theme} onPress={() => updateSelected({ color: DEFAULTS.textColor })} />
                   </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    <HexColorInput
+                      theme={theme}
+                      color={selected.color}
+                      onChange={(c) => updateSelected({ color: c })}
+                    />
                     {TEXT_COLORS.map((c) => (
                       <TouchableOpacity
                         key={c}
@@ -1249,7 +1692,16 @@ export default function StoryShareScreen({ route, navigation }) {
                         </Text>
                         <ResetBtn theme={theme} onPress={() => updateSelected({ bgColor: DEFAULTS.textBgColor })} />
                       </View>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                      >
+                        <HexColorInput
+                          theme={theme}
+                          color={selected.bgColor}
+                          onChange={(c) => updateSelected({ bgColor: c })}
+                        />
                         {BG_COLORS.map((c) => (
                           <TouchableOpacity
                             key={c}
@@ -1656,6 +2108,32 @@ const styles = StyleSheet.create({
     marginRight: 10,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.2)",
+  },
+  /* Hex renk girişi — swatch satırlarının başındaki kutu */
+  hexBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    marginRight: 10,
+  },
+  hexPreview: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
+  hexHash: { fontSize: 12, fontWeight: "800" },
+  hexInput: {
+    fontSize: 12,
+    fontWeight: "700",
+    minWidth: 58,
+    padding: 0,
+    height: "100%",
   },
   fontChip: {
     width: 60,

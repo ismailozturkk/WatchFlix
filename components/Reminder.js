@@ -95,7 +95,11 @@ export default function Reminder({
     }
   };
 
-  useEffect(() => { checkExistingReminder(); }, []);
+  // uid mount anında henüz çözülmemiş olabilir (auth resolve süreci) ve aynı
+  // bileşen farklı bölüm/film için yeniden kullanılabilir — [] deps ile kontrol
+  // tek sefer koşup zil yanlışlıkla "kurulmamış" görünüyordu.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { checkExistingReminder(); }, [uid, type, epId, movieId]);
 
   // ── Add / Remove ──────────────────────────────────────────────────────────
   const addReminder = async () => {

@@ -54,6 +54,7 @@ import {
   writeBatch,
   limit,
   deleteField,
+  increment,
 } from "firebase/firestore";
 import { useTheme } from "@context/ThemeContext";
 import LottieView from "lottie-react-native";
@@ -715,6 +716,10 @@ export default function ChatScreen({ route, navigation }) {
       pendingComposerRef.current = null;
       if (composerTimerRef.current) clearTimeout(composerTimerRef.current);
       if (searchFocusTimerRef.current) clearTimeout(searchFocusTimerRef.current);
+      // Typing debounce'u da temizle: leaveChat typing=false yazıp onDisconnect
+      // guard'larını iptal ettikten SONRA bu timer ateşlenirse karşı tarafta
+      // kalıcı hayalet "yazıyor…" göstergesi kalıyordu.
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     };
   }, [commitPendingComposer]);
 
@@ -759,6 +764,24 @@ export default function ChatScreen({ route, navigation }) {
     return () => leaveChat(chatId, currentUser.uid);
   }, [isGroup, chatId, currentUser.uid]);
 
+  // Sohbet açıkken gelen kutusu index'imdeki okunmamış sayacını sıfır tut:
+  // girişte birikmiş sayacı, sohbet açıkken de yeni gelen artışları temizler
+  // (profildeki rozet ve Mesajlar ekranındaki renkli border bu alana bakar).
+  useEffect(() => {
+    if (isGroup) return undefined;
+    const myConvRef = doc(db, "Users", currentUser.uid, "conversations", friendUid);
+    const unsub = onSnapshot(
+      myConvRef,
+      (snap) => {
+        if (snap.exists() && (snap.data()?.unreadCount || 0) > 0) {
+          updateDoc(myConvRef, { unreadCount: 0 }).catch(() => {});
+        }
+      },
+      () => {},
+    );
+    return () => unsub();
+  }, [isGroup, currentUser.uid, friendUid]);
+
   // Clear processed-message guard when switching chats
   useEffect(() => { processedMsgIds.current.clear(); }, [chatId]);
 
@@ -769,7 +792,9 @@ export default function ChatScreen({ route, navigation }) {
       limit(messageLimit),
     );
 
-    const unsubscribeMessages = onSnapshot(q, (snapshot) => {
+    const unsubscribeMessages = onSnapshot(
+      q,
+      (snapshot) => {
       const msgs = snapshot.docs.map((docSnap) => {
         const data = docSnap.data();
         return {
@@ -797,22 +822,32 @@ export default function ChatScreen({ route, navigation }) {
         // fail eder. Sunucu commit'ini bekle — bir sonraki (server-confirmed)
         // snapshot'ta işlenir (processedMsgIds'e de eklenmez, atlanmış sayılmaz).
         if (docSnap.metadata.hasPendingWrites) return;
-        if (processedMsgIds.current.has(docSnap.id)) return;
         const msg = docSnap.data();
         if (msg.senderId === currentUser.uid && msg.status === "sent") {
+          // Gönderen tarafı one-shot: aynı mesaja tekrar delivered yazma.
+          if (processedMsgIds.current.has(docSnap.id)) return;
           batch.update(doc(messagesRef, docSnap.id), {
             status: "delivered",
             deliveredAt: serverTimestamp(),
           });
           hasBatch = true;
+          processedMsgIds.current.add(docSnap.id);
         } else if (msg.senderId !== currentUser.uid && msg.status !== "seen") {
+          // Alıcı tarafı one-shot DEĞİL: gönderenin gecikmiş "delivered"
+          // yazımı bizim "seen"i ezebilir; snapshot'ta seen değilse yeniden
+          // yaz (idempotent) ki durum "seen"de sabitlensin.
           batch.update(doc(messagesRef, docSnap.id), { status: "seen" });
           hasBatch = true;
         }
-        processedMsgIds.current.add(docSnap.id);
       });
       if (hasBatch) batch.commit().catch(console.error);
-    });
+      },
+      (err) => {
+        // Örn. gruptan çıkarılınca permission-denied: listener sessizce ölür,
+        // ekran bayat mesajlarda donardı — en azından logla.
+        if (__DEV__) console.warn("messages listener error:", err?.message);
+      },
+    );
 
     // Grup: doc'u dinle (header + memberInfo). 1-1: typing + presence.
     let unsubMeta = () => {};
@@ -1099,7 +1134,12 @@ export default function ChatScreen({ route, navigation }) {
         ).catch(() => {});
         setDoc(
           doc(db, "Users", friendUid, "conversations", currentUser.uid),
-          convEntry(currentUser.uid, currentUser.displayName, fromAvatarIndex),
+          {
+            ...convEntry(currentUser.uid, currentUser.displayName, fromAvatarIndex),
+            // Alıcı sohbeti açana dek biriken okunmamış sayacı; alıcının
+            // ChatScreen'i sohbet açıkken sıfırlar.
+            unreadCount: increment(1),
+          },
           { merge: true },
         ).catch(() => {});
       }
@@ -1405,10 +1445,12 @@ export default function ChatScreen({ route, navigation }) {
     [memoizedMessages],
   );
 
+  const pendingJumpTriesRef = useRef(0);
   const jumpToMessage = useCallback(
     (messageId) => {
       if (scrollToMessage(messageId)) return;
       pendingJumpIdRef.current = messageId;
+      pendingJumpTriesRef.current = 0;
       setMessageLimit((current) => current + 50);
       toast.warning(
         i18nText("autoI18n.eski_mesaj_yukleniyor", "Eski mesaj yükleniyor"),
@@ -1420,7 +1462,19 @@ export default function ChatScreen({ route, navigation }) {
   useEffect(() => {
     const pendingId = pendingJumpIdRef.current;
     if (!pendingId) return;
-    if (scrollToMessage(pendingId)) pendingJumpIdRef.current = null;
+    if (scrollToMessage(pendingId)) {
+      pendingJumpIdRef.current = null;
+      return;
+    }
+    // Hedef bu sayfada da yok: tavana kadar (6×50) sayfa büyütmeye devam et.
+    // Önceki tek seferlik +50, bir sayfadan eski hedeflerde sonsuza dek
+    // "yükleniyor" toast'ında takılı kalıyordu.
+    if (pendingJumpTriesRef.current >= 6) {
+      pendingJumpIdRef.current = null;
+      return;
+    }
+    pendingJumpTriesRef.current += 1;
+    setMessageLimit((current) => current + 50);
   }, [memoizedMessages, scrollToMessage]);
 
   const deleteMessage = useCallback(

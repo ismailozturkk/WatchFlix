@@ -21,11 +21,12 @@ import { SeeAllButton } from "../../components/SeeAllHeader";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { i18nText } from "../../utils/i18nText";
-import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 
 // Stable, module-scope item component → no remount → no flicker.
 const MovieBestCard = memo(function MovieBestCard({ item, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
+  const { posterBadges } = useListLayoutSettings();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -54,11 +55,13 @@ const MovieBestCard = memo(function MovieBestCard({ item, navigation, theme, get
           transition={120}
         />
 
-        <View style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}>
-          <Text style={[styles.similarRatingText, { color: theme.colors.orange }]}>
-            {item.vote_average.toFixed(1)}
-          </Text>
-        </View>
+        {posterBadges?.tmdbRating !== false && (
+          <View style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}>
+            <Text style={[styles.similarRatingText, { color: theme.colors.orange }]}>
+              {item.vote_average.toFixed(1)}
+            </Text>
+          </View>
+        )}
         <ListBadges
           mediaId={item.id}
           mediaType="movie"

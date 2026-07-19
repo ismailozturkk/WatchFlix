@@ -6,7 +6,6 @@ import {
   FlatList,
   Text,
   TouchableOpacity,
-  ActivityIndicator,
   Animated,
   Keyboard
 } from "react-native";
@@ -18,6 +17,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import LottieView from "lottie-react-native";
 import { i18nText } from "../../utils/i18nText";
+import { SearchSkeleton } from "../../components/Skeleton";
 
 
 const SearchAll = ({ navigation }) => {
@@ -57,29 +57,15 @@ const SearchAll = ({ navigation }) => {
     }).start();
   };
 
-  const handleSearch = useCallback(
-    (text) => {
-      setQuery(text);
-      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+  // Sorgu değişince eski in-flight yanıtın sonuçları/loading'i ezmemesi için
+  // istek kimliği tutulur (handleSearch her çağrıda artırır).
+  const searchRequestRef = useRef(0);
 
-      if (text.trim() === "") {
-        setResults([]);
-        setLoading(false);
-        return;
-      }
-
-      if (text.trim().length >= 2) {
-        setLoading(true);
-        searchTimeout.current = setTimeout(() => {
-          fetchResults(text);
-        }, 500);
-      }
-    },
-    [fetchResults],
-  );
-
+  // Not: fetchResults, handleSearch'ün deps dizisinde kullanıldığı için ondan
+  // ÖNCE tanımlanmalı — aksi halde deps render sırasında TDZ'ye düşer.
   const fetchResults = useCallback(
     async (searchText) => {
+      const requestId = ++searchRequestRef.current;
       try {
         const url = `https://api.themoviedb.org/3/search/multi`;
         const params = {
@@ -90,6 +76,7 @@ const SearchAll = ({ navigation }) => {
         };
         const headers = { Authorization: API_KEY };
         const response = await axios.get(url, { params, headers });
+        if (requestId !== searchRequestRef.current) return;
         const filtered = response.data.results.filter(
           (item) => item.media_type !== "unknown",
         );
@@ -100,10 +87,31 @@ const SearchAll = ({ navigation }) => {
       } catch (err) {
         console.error("Multi search error:", err.message);
       } finally {
-        setLoading(false);
+        if (requestId === searchRequestRef.current) setLoading(false);
       }
     },
     [API_KEY, adultContent, language],
+  );
+
+  const handleSearch = useCallback(
+    (text) => {
+      searchRequestRef.current += 1;
+      setQuery(text);
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+
+      if (text.trim().length >= 2) {
+        setLoading(true);
+        searchTimeout.current = setTimeout(() => {
+          fetchResults(text);
+        }, 500);
+      } else {
+        // Boş veya 1 karakter: bekleyen istek iptal edildi; loading'i
+        // sıfırlamazsak skeleton takılı kalır.
+        setResults([]);
+        setLoading(false);
+      }
+    },
+    [fetchResults],
   );
 
   const renderItem = ({ item }) => {
@@ -231,14 +239,14 @@ const SearchAll = ({ navigation }) => {
           onChangeText={handleSearch}
         />
         {query.length > 0 && (
-          <TouchableOpacity onPress={() => setQuery("")}>
+          <TouchableOpacity onPress={() => handleSearch("")}>
             <Ionicons name="close-outline" size={30} color={theme.text.muted} />
           </TouchableOpacity>
         )}
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#f1c40f" />
+        <SearchSkeleton />
       ) : query === "" ? (
         <View style={{ justifyContent: "center", alignItems: "center" }}>
           <LottieView

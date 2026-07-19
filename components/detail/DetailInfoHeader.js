@@ -27,6 +27,7 @@ export default function DetailInfoHeader({
   mediaId,
   tmdbAvg,
   tmdbCount,
+  releaseDate,
   onPosterPress,
   onPressRate,
 }) {
@@ -109,6 +110,7 @@ export default function DetailInfoHeader({
             mediaId={mediaId}
             tmdbAvg={tmdbAvg}
             tmdbCount={tmdbCount}
+            releaseDate={releaseDate}
             onPressRate={onPressRate}
           />
         </View>

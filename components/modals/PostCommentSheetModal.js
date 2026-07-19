@@ -329,7 +329,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
     setIsSending(true);
     try {
       if (editId) {
-        await updateComment(postId, editId, text);
+        await updateComment(postId, editId, text, user.uid);
       } else {
         await addComment(postId, user, text, {
           parentId: parentId || null,

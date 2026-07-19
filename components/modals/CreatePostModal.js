@@ -35,11 +35,16 @@ import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import { appAlert } from "@components/AppAlert";
 import { i18nText } from "@utils/i18nText";
+import { validatePost, buildPollObject, reorderArray } from "@utils/postComposer";
 
 // Karakter sınırları — büyük Firestore dökümanlarını ve aşırı uzun
 // içerikleri önler. Sayaçlar bu sabitlere göre gösterilir.
 const MAX_TITLE = 100;
 const MAX_CONTENT = 2000;
+
+// Post tipi → segmented control indeksi (kayan gösterge konumu 0..3).
+const TYPE_INDEX = { review: 0, list: 1, text: 2, poll: 3 };
+const MAX_POLL = 4;
 
 
 // ─── Search Result Grid Item ────────────────────────────────────────────────
@@ -98,7 +103,7 @@ const StarRow = ({ rating, onRate, theme }) => (
 );
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function CreatePostModal({ visible, onClose, onSubmit, editingPost }) {
+export default function CreatePostModal({ visible, onClose, onSubmit, editingPost, initialPost }) {
   const { theme } = useTheme();
   const { t, language } = useLanguage();
   const locale = language === "tr" ? "tr-TR" : "en-US";
@@ -132,14 +137,28 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
       genre_ids: m.genre_ids || [],
     }));
 
+  // Kayıtlı anketin seçeneklerini composer şekline çevir (düzenleme için).
+  const pollOptionsFromPost = (poll) =>
+    (poll?.options || []).map((o) => ({
+      id: o.id,
+      label: o.label || "",
+      media: o.media
+        ? { id: o.media.id, type: o.media.type, poster_path: o.media.poster_path }
+        : null,
+    }));
+
   // Form state
-  const [postType, setPostType] = useState("review"); // 'review' | 'list'
+  const [postType, setPostType] = useState("review"); // review | list | text | poll
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [error, setError] = useState("");
   const [userRating, setUserRating] = useState(0);
   const [hasSpoiler, setHasSpoiler] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState([]);
+  const [ranked, setRanked] = useState(false); // sıralı liste (#1, #2...)
+  // Anket: seçenekler [{ id, label, media }] + tip ("media" | "text")
+  const [pollOptions, setPollOptions] = useState([]);
+  const [pollKind, setPollKind] = useState("media");
 
   // Search state
   const [isSearchActive, setIsSearchActive] = useState(false);
@@ -168,11 +187,11 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     setUserRating(0);
   };
 
-  const postTypeAnim = useRef(new Animated.Value(postType === "review" ? 0 : 1)).current;
+  const postTypeAnim = useRef(new Animated.Value(TYPE_INDEX[postType] ?? 0)).current;
   const searchTypeAnim = useRef(new Animated.Value(searchType === "movie" ? 0 : 1)).current;
 
   useEffect(() => {
-    Animated.spring(postTypeAnim, { toValue: postType === "review" ? 0 : 1, useNativeDriver: false, friction: 8, tension: 60 }).start();
+    Animated.spring(postTypeAnim, { toValue: TYPE_INDEX[postType] ?? 0, useNativeDriver: false, friction: 8, tension: 60 }).start();
   }, [postType]);
 
   useEffect(() => {
@@ -184,19 +203,48 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
   // Düzenleme: modal açıldığında gönderiyi forma yükle (yeni oluşturmada dokunma).
   useEffect(() => {
     if (visible && editingPost) {
-      const type = editingPost.type === "list" ? "list" : "review";
+      const type = ["review", "list", "text", "poll"].includes(editingPost.type)
+        ? editingPost.type
+        : "review";
       setPostType(type);
       setTitle(editingPost.title || "");
       setContent(editingPost.content || "");
       setUserRating(editingPost.userRating || 0);
       setHasSpoiler(!!editingPost.hasSpoiler);
+      setRanked(!!editingPost.ranked);
       setSelectedMedia(postMediaToSelected(editingPost.mediaList));
+      setPollKind(editingPost.poll?.type === "text" ? "text" : "media");
+      setPollOptions(pollOptionsFromPost(editingPost.poll));
       setError("");
       setShowDrafts(false);
       setCurrentDraftId(null);
-      postTypeAnim.setValue(type === "list" ? 1 : 0);
+      postTypeAnim.setValue(TYPE_INDEX[type] ?? 0);
     }
   }, [visible, editingPost]);
+
+  // Detay ekranından gelen hazır inceleme akışı: medya seçili gelir, kullanıcı
+  // başlığı/içeriği düzenleyip mevcut Hub paylaşım yapısıyla gönderir.
+  useEffect(() => {
+    if (!visible || editingPost || !initialPost) return;
+    const type = ["review", "list", "text", "poll"].includes(initialPost.postType)
+      ? initialPost.postType
+      : "review";
+    setPostType(type);
+    setTitle(initialPost.title || "");
+    setContent(initialPost.content || "");
+    setUserRating(initialPost.userRating || 0);
+    setHasSpoiler(!!initialPost.hasSpoiler);
+    setRanked(!!initialPost.ranked);
+    setSelectedMedia(
+      initialPost.selectedMedia || postMediaToSelected(initialPost.mediaList),
+    );
+    setPollKind(initialPost.pollKind === "text" ? "text" : "media");
+    setPollOptions(initialPost.pollOptions || []);
+    setError("");
+    setShowDrafts(false);
+    setCurrentDraftId(null);
+    postTypeAnim.setValue(TYPE_INDEX[type] ?? 0);
+  }, [visible, editingPost, initialPost]);
 
   const loadDrafts = async () => {
     try {
@@ -329,17 +377,30 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
   };
 
   const handleSelectMedia = (item) => {
-    if (postType === "review") {
+    if (postType === "poll") {
+      // Anket medya seçeneği ekle (max 4, tekrar yok).
+      setPollOptions((prev) => {
+        if (prev.length >= MAX_POLL || prev.find((o) => o.media?.id === item.id)) return prev;
+        return [
+          ...prev,
+          {
+            id: `opt_${item.id}`,
+            label: item.title || item.name || "",
+            media: { id: item.id, type: item.media_type || "movie", poster_path: item.poster_path || null },
+          },
+        ];
+      });
+    } else if (postType === "review") {
       setSelectedMedia([item]);
-    } else {
-      if (!selectedMedia.find((m) => m.id === item.id)) {
-        setSelectedMedia([...selectedMedia, item]);
-      }
+    } else if (!selectedMedia.find((m) => m.id === item.id)) {
+      setSelectedMedia([...selectedMedia, item]);
     }
     closeSearch();
   };
 
   const handleRemoveMedia = (id) => setSelectedMedia(selectedMedia.filter((m) => m.id !== id));
+  // Sıralı listede öğeyi bir adım sola/sağa taşı (reorderArray saf + test'li).
+  const moveMedia = (idx, dir) => setSelectedMedia((prev) => reorderArray(prev, idx, idx + dir));
   const openSearch = (type) => { setSearchType(type); setIsSearchActive(true); };
   const closeSearch = () => { setIsSearchActive(false); setSearchQuery(""); setSearchResults([]); };
 
@@ -353,16 +414,23 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
   };
 
   const handleShare = async () => {
-    if (!title.trim() || !content.trim()) {
-      failWith(i18nText("autoI18n.lutfen_baslik_ve_icerik_alanlarini_doldurun", "Lütfen başlık ve içerik alanlarını doldurun."));
-      return;
-    }
-    if (postType === "review" && selectedMedia.length === 0) {
-      failWith(i18nText("autoI18n.lutfen_incelemeniz_icin_bir_film_veya_dizi_secin", "Lütfen incelemeniz için bir film veya dizi seçin."));
-      return;
-    }
-    if (postType === "list" && selectedMedia.length < 2) {
-      failWith(i18nText("autoI18n.liste_olusturmak_icin_en_az_2_icerik_secmelisiniz", "Liste oluşturmak için en az 2 içerik seçmelisiniz."));
+    const { ok, error: vErr } = validatePost({
+      type: postType,
+      title,
+      content,
+      selectedMedia,
+      pollOptions,
+    });
+    if (!ok) {
+      const messages = {
+        title: i18nText("autoI18n.lutfen_bir_baslik_gir", "Lütfen bir başlık gir."),
+        content: i18nText("autoI18n.lutfen_baslik_ve_icerik_alanlarini_doldurun", "Lütfen başlık ve içerik alanlarını doldurun."),
+        reviewMedia: i18nText("autoI18n.lutfen_incelemeniz_icin_bir_film_veya_dizi_secin", "Lütfen incelemeniz için bir film veya dizi seçin."),
+        listMedia: i18nText("autoI18n.liste_olusturmak_icin_en_az_2_icerik_secmelisiniz", "Liste oluşturmak için en az 2 içerik seçmelisiniz."),
+        pollOptions: i18nText("autoI18n.anket_icin_en_az_2_secenek_ekle", "Anket için en az 2 seçenek ekle."),
+        type: i18nText("autoI18n.gecersiz_paylasim_tipi", "Geçersiz paylaşım tipi."),
+      };
+      failWith(messages[vErr] || messages.content);
       return;
     }
     setError("");
@@ -386,15 +454,28 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
       type: postType,
       title: title.trim(),
       content: content.trim(),
-      mediaList,
-      userRating: userRating > 0 ? userRating : null,
+      mediaList: postType === "poll" ? [] : mediaList,
+      userRating:
+        postType === "text" || postType === "poll"
+          ? null
+          : userRating > 0
+            ? userRating
+            : null,
       hasSpoiler,
+      ranked: postType === "list" ? ranked : false,
       visibility: "public",
       // Avatar tam URL değil sadece index olarak gider.
       // utils/avatars.js içinde clampAvatarIndex bir güvenlik ağı.
       authorAvatarIndex:
         typeof selectAvatarIndex === "number" ? selectAvatarIndex : 0,
     };
+    if (postType === "poll") {
+      payload.poll = buildPollObject({
+        pollType: pollKind,
+        question: title,
+        options: pollOptions,
+      });
+    }
 
     // Eğer parent `onSubmit` verdiyse (PostsContext.submitPost) onu kullan;
     // vermediyse fallback olarak sadece toast göster.
@@ -428,6 +509,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     setError(""); setTitle(""); setContent(""); setSelectedMedia([]);
     setPostType("review"); setShowDrafts(false); setCurrentDraftId(null);
     setHasSpoiler(false); setUserRating(0);
+    setRanked(false); setPollOptions([]); setPollKind("media");
     postTypeAnim.setValue(0);
     searchTypeAnim.setValue(0);
     closeSearch();
@@ -478,11 +560,10 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
   // ─── Derived Colors ─────────────────────────────────────────────────────────
   const accentBlue = theme.colors?.blue || "#4a7cf6";
   const accentGreen = theme.colors?.green || "#34c87e";
-  const currentAccent = postType === "list" ? accentGreen : accentBlue;
-  // Paylaş butonu degrade'i aktif post tipine göre değişir → segmented
-  // kontrolle görsel tutarlılık (inceleme = mavi, liste = yeşil).
+  const currentAccent = postType === "list" || postType === "poll" ? accentGreen : accentBlue;
+  // Paylaş butonu degrade'i aktif post tipine göre değişir (liste/anket = yeşil).
   const shareGradient =
-    postType === "list" ? [accentGreen, "#1f8f5a"] : [accentBlue, "#2b5fb0"];
+    postType === "list" || postType === "poll" ? [accentGreen, "#1f8f5a"] : [accentBlue, "#2b5fb0"];
 
   // ─── GENRE MAP ───────────────────────────────────────────────────────────────
   // useMemo([language]): dil değişince yeniden çözülür, her render'da kurulmaz.
@@ -698,35 +779,35 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
             ══════════════════════════════════════════════ */}
             {!isSearchActive && !showDrafts && (
               <>
-                {/* Segmented control */}
+                {/* Segmented control (4 tip) */}
                 <View style={[s.segmentedControlContainer, { backgroundColor: theme.secondary }]}>
                   <View style={{ flex: 1, position: 'relative', flexDirection: 'row' }}>
-                    <Animated.View 
+                    <Animated.View
                       style={[
-                        s.segmentedButtonActiveIndicator, 
-                        { 
+                        s.segmentedButtonActiveIndicator,
+                        {
+                          width: "25%",
                           backgroundColor: theme.primary,
-                          left: postTypeAnim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "50%"] })
-                        }
-                      ]} 
+                          left: postTypeAnim.interpolate({ inputRange: [0, 1, 2, 3], outputRange: ["0%", "25%", "50%", "75%"] }),
+                        },
+                      ]}
                     />
-                    <TouchableOpacity
-                      style={s.segmentedButton}
-                      onPress={() => setPostType("review")}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="create" size={18} color={postType === "review" ? accentBlue : theme.text.secondary} />
-                      <Text style={[s.segmentedButtonText, { color: postType === "review" ? theme.text.primary : theme.text.secondary, fontWeight: postType === "review" ? "700" : "500" }]}>{i18nText("autoI18n.inceleme", "İnceleme")}</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={s.segmentedButton}
-                      onPress={() => setPostType("list")}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="list" size={18} color={postType === "list" ? accentGreen : theme.text.secondary} />
-                      <Text style={[s.segmentedButtonText, { color: postType === "list" ? theme.text.primary : theme.text.secondary, fontWeight: postType === "list" ? "700" : "500" }]}>{i18nText("autoI18n.liste_2", "Liste")}</Text>
-                    </TouchableOpacity>
+                    {[
+                      { key: "review", icon: "create", label: i18nText("autoI18n.inceleme", "İnceleme"), color: accentBlue },
+                      { key: "list", icon: "list", label: i18nText("autoI18n.liste_2", "Liste"), color: accentGreen },
+                      { key: "text", icon: "chatbubble-ellipses", label: i18nText("autoI18n.sohbet", "Sohbet"), color: accentBlue },
+                      { key: "poll", icon: "stats-chart", label: i18nText("autoI18n.anket", "Anket"), color: accentGreen },
+                    ].map((seg) => (
+                      <TouchableOpacity
+                        key={seg.key}
+                        style={s.segmentedButton}
+                        onPress={() => setPostType(seg.key)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name={seg.icon} size={16} color={postType === seg.key ? seg.color : theme.text.secondary} />
+                        <Text style={[s.segmentedButtonText, { fontSize: 11.5, color: postType === seg.key ? theme.text.primary : theme.text.secondary, fontWeight: postType === seg.key ? "700" : "500" }]}>{seg.label}</Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
                 </View>
 
@@ -742,7 +823,15 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                   {/* Title input */}
                   <TextInput
                     style={[s.titleInput, { color: theme.text.primary, backgroundColor: theme.secondary, borderColor: theme.border }]}
-                    placeholder={postType === "review" ? i18nText("autoI18n.inceleme_basligi", "İnceleme başlığı...") : i18nText("autoI18n.liste_basligi_orn_en_iyi_10_bilim_kurgu", "Liste başlığı (Örn: En İyi 10 Bilim Kurgu)...")}
+                    placeholder={
+                      postType === "review"
+                        ? i18nText("autoI18n.inceleme_basligi", "İnceleme başlığı...")
+                        : postType === "poll"
+                          ? i18nText("autoI18n.anket_sorusu", "Anket sorusu (Örn: Bu akşam hangisi?)...")
+                          : postType === "text"
+                            ? i18nText("autoI18n.baslik", "Başlık...")
+                            : i18nText("autoI18n.liste_basligi_orn_en_iyi_10_bilim_kurgu", "Liste başlığı (Örn: En İyi 10 Bilim Kurgu)...")
+                    }
                     placeholderTextColor={theme.text.muted}
                     value={title}
                     onChangeText={(text) => { setTitle(text); setError(""); }}
@@ -753,7 +842,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                   </Text>
 
                   {/* ── REVIEW LAYOUT ── */}
-                  {postType === "review" ? (
+                  {postType === "review" && (
                     <View>
                       {/* Poster + Textarea */}
                       <View style={s.reviewRow}>
@@ -830,8 +919,127 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                         </TouchableOpacity>
                       </View>
                     </View>
-                  ) : (
-                    /* ── LIST LAYOUT ── */
+                  )}
+
+                  {/* ── TEXT (SOHBET) LAYOUT ── */}
+                  {postType === "text" && (
+                    <>
+                      <TextInput
+                        style={[s.listTextarea, { color: theme.text.primary, backgroundColor: theme.secondary, borderColor: theme.border, minHeight: 150 }]}
+                        placeholder={i18nText("autoI18n.aklindan_gecenleri_paylas", "Aklından geçenleri paylaş...")}
+                        placeholderTextColor={theme.text.muted}
+                        value={content}
+                        onChangeText={(text) => { setContent(text); setError(""); }}
+                        multiline
+                        textAlignVertical="top"
+                        maxLength={MAX_CONTENT}
+                      />
+                      <Text style={[s.counterText, { color: theme.text.muted }, content.length >= MAX_CONTENT && { color: "#f04f4f" }]}>
+                        {content.length}/{MAX_CONTENT}
+                      </Text>
+                      <View style={s.listMetaRow}>
+                        <TouchableOpacity
+                          style={[s.spoilerBtn, { backgroundColor: theme.secondary, borderColor: theme.border },
+                            hasSpoiler && { backgroundColor: "rgba(240,79,79,0.1)", borderColor: "rgba(240,79,79,0.4)" }]}
+                          onPress={() => setHasSpoiler(!hasSpoiler)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name={hasSpoiler ? "warning" : "warning-outline"} size={14} color={hasSpoiler ? "#f04f4f" : theme.text.muted} />
+                          <Text style={[s.spoilerText, { color: hasSpoiler ? "#f04f4f" : theme.text.muted }]}>Spoiler</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  )}
+
+                  {/* ── POLL (ANKET) LAYOUT ── */}
+                  {postType === "poll" && (
+                    <>
+                      <View style={s.pollKindRow}>
+                        <TouchableOpacity
+                          style={[s.pollKindBtn, { borderColor: theme.border, backgroundColor: theme.secondary }, pollKind === "media" && { borderColor: accentGreen, backgroundColor: `${accentGreen}14` }]}
+                          onPress={() => setPollKind("media")}
+                          activeOpacity={0.85}
+                        >
+                          <Ionicons name="film-outline" size={15} color={pollKind === "media" ? accentGreen : theme.text.secondary} />
+                          <Text style={[s.pollKindText, { color: pollKind === "media" ? accentGreen : theme.text.secondary }]}>{i18nText("autoI18n.film_dizi", "Film / Dizi")}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[s.pollKindBtn, { borderColor: theme.border, backgroundColor: theme.secondary }, pollKind === "text" && { borderColor: accentGreen, backgroundColor: `${accentGreen}14` }]}
+                          onPress={() => setPollKind("text")}
+                          activeOpacity={0.85}
+                        >
+                          <Ionicons name="text-outline" size={15} color={pollKind === "text" ? accentGreen : theme.text.secondary} />
+                          <Text style={[s.pollKindText, { color: pollKind === "text" ? accentGreen : theme.text.secondary }]}>{i18nText("autoI18n.metin", "Metin")}</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <Text style={[s.sectionLabel, { color: theme.text.muted, marginTop: 4 }]}>
+                        {i18nText("autoI18n.anket_secenekleri_2_4", "ANKET SEÇENEKLERİ (2-4)")}
+                      </Text>
+
+                      {pollKind === "media" ? (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.posterScroll}>
+                          {pollOptions.map((opt) => (
+                            <View key={opt.id} style={s.listPosterWrapper}>
+                              {opt.media?.poster_path ? (
+                                <Image source={{ uri: getTmdbUrl(opt.media.poster_path, "poster", 200) }} style={s.listPosterImg} />
+                              ) : (
+                                <View style={[s.listPosterImg, { backgroundColor: theme.border, justifyContent: "center", alignItems: "center" }]}>
+                                  <Ionicons name="film-outline" size={28} color={theme.text.muted} />
+                                </View>
+                              )}
+                              <LinearGradient colors={["transparent", "rgba(0,0,0,0.75)"]} style={s.listPosterOverlay}>
+                                <Text style={s.listPosterTitle} numberOfLines={2}>{opt.label}</Text>
+                              </LinearGradient>
+                              <TouchableOpacity style={s.removeBadge} onPress={() => setPollOptions((prev) => prev.filter((o) => o.id !== opt.id))}>
+                                <Ionicons name="close-circle" size={22} color="#f04f4f" />
+                              </TouchableOpacity>
+                            </View>
+                          ))}
+                          {pollOptions.length < MAX_POLL && (
+                            <TouchableOpacity
+                              style={[s.addMoreBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+                              onPress={() => openSearch("movie")}
+                            >
+                              <Ionicons name="add" size={30} color={theme.text.muted} />
+                              <Text style={[s.addMoreText, { color: theme.text.muted }]}>{i18nText("autoI18n.ekle", "Ekle")}</Text>
+                            </TouchableOpacity>
+                          )}
+                        </ScrollView>
+                      ) : (
+                        <View style={{ gap: 10 }}>
+                          {pollOptions.map((opt, idx) => (
+                            <View key={opt.id} style={s.pollTextRow}>
+                              <TextInput
+                                style={[s.pollTextInput, { color: theme.text.primary, backgroundColor: theme.secondary, borderColor: theme.border }]}
+                                placeholder={`${i18nText("autoI18n.secenek", "Seçenek")} ${idx + 1}`}
+                                placeholderTextColor={theme.text.muted}
+                                value={opt.label}
+                                onChangeText={(text) => setPollOptions((prev) => prev.map((o) => (o.id === opt.id ? { ...o, label: text } : o)))}
+                                maxLength={60}
+                              />
+                              <TouchableOpacity onPress={() => setPollOptions((prev) => prev.filter((o) => o.id !== opt.id))} style={s.pollTextDel}>
+                                <Ionicons name="close-circle" size={22} color="#f04f4f" />
+                              </TouchableOpacity>
+                            </View>
+                          ))}
+                          {pollOptions.length < MAX_POLL && (
+                            <TouchableOpacity
+                              style={[s.pollAddText, { borderColor: theme.border, backgroundColor: theme.secondary }]}
+                              onPress={() => setPollOptions((prev) => [...prev, { id: `opt_t_${prev.length}_${Date.now()}`, label: "", media: null }])}
+                              activeOpacity={0.85}
+                            >
+                              <Ionicons name="add" size={18} color={accentGreen} />
+                              <Text style={[s.pollAddTextLabel, { color: accentGreen }]}>{i18nText("autoI18n.secenek_ekle", "Seçenek ekle")}</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      )}
+                    </>
+                  )}
+
+                  {/* ── LIST LAYOUT ── */}
+                  {postType === "list" && (
                     <>
                       <TextInput
                         style={[s.listTextarea, { color: theme.text.primary, backgroundColor: theme.secondary, borderColor: theme.border }]}
@@ -877,6 +1085,19 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                       <View style={s.listSection}>
                         <Text style={[s.sectionLabel, { color: theme.text.muted }]}>{i18nText("autoI18n.liste_icerikleri", "LİSTE İÇERİKLERİ")}</Text>
 
+                        {/* Sıralı liste toggle (#1, #2...) */}
+                        <TouchableOpacity
+                          style={[s.rankedToggle, { borderColor: theme.border, backgroundColor: theme.secondary }, ranked && { borderColor: accentGreen, backgroundColor: `${accentGreen}14` }]}
+                          onPress={() => setRanked((v) => !v)}
+                          activeOpacity={0.85}
+                        >
+                          <Ionicons name={ranked ? "podium" : "podium-outline"} size={16} color={ranked ? accentGreen : theme.text.secondary} />
+                          <Text style={[s.rankedToggleText, { color: ranked ? accentGreen : theme.text.secondary }]}>
+                            {i18nText("autoI18n.sirali_liste", "Sıralı liste (#1, #2...)")}
+                          </Text>
+                          <Ionicons name={ranked ? "checkmark-circle" : "ellipse-outline"} size={18} color={ranked ? accentGreen : theme.text.muted} />
+                        </TouchableOpacity>
+
                         {/* Genre chips */}
                         {listGenres.length > 0 && (
                           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
@@ -902,7 +1123,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                           </View>
                         ) : (
                           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.posterScroll}>
-                            {selectedMedia.map((item) => (
+                            {selectedMedia.map((item, idx) => (
                               <View key={item.id} style={s.listPosterWrapper}>
                                 {posterUri(item) ? (
                                   <Image source={{ uri: posterUri(item) }} style={s.listPosterImg} />
@@ -911,12 +1132,28 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                                     <Ionicons name="film-outline" size={28} color={theme.text.muted} />
                                   </View>
                                 )}
-                                <View style={[s.mediaTypeBadge, { backgroundColor: item.media_type === 'tv' ? (theme.colors?.orange || '#f5a623') : accentBlue }]}>
-                                  <Text style={s.mediaTypeText}>{item.media_type === 'tv' ? 'Dizi' : 'Film'}</Text>
-                                </View>
+                                {ranked ? (
+                                  <View style={[s.rankBadge, { backgroundColor: accentGreen }]}>
+                                    <Text style={s.rankBadgeText}>{idx + 1}</Text>
+                                  </View>
+                                ) : (
+                                  <View style={[s.mediaTypeBadge, { backgroundColor: item.media_type === 'tv' ? (theme.colors?.orange || '#f5a623') : accentBlue }]}>
+                                    <Text style={s.mediaTypeText}>{item.media_type === 'tv' ? 'Dizi' : 'Film'}</Text>
+                                  </View>
+                                )}
                                 <LinearGradient colors={["transparent", "rgba(0,0,0,0.75)"]} style={s.listPosterOverlay}>
                                   <Text style={s.listPosterTitle} numberOfLines={2}>{item.title || item.name}</Text>
                                 </LinearGradient>
+                                {ranked && (
+                                  <View style={s.reorderRow}>
+                                    <TouchableOpacity disabled={idx === 0} onPress={() => moveMedia(idx, -1)} style={[s.reorderBtn, idx === 0 && { opacity: 0.3 }]}>
+                                      <Ionicons name="chevron-back" size={15} color="#fff" />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity disabled={idx === selectedMedia.length - 1} onPress={() => moveMedia(idx, 1)} style={[s.reorderBtn, idx === selectedMedia.length - 1 && { opacity: 0.3 }]}>
+                                      <Ionicons name="chevron-forward" size={15} color="#fff" />
+                                    </TouchableOpacity>
+                                  </View>
+                                )}
                                 <TouchableOpacity style={s.removeBadge} onPress={() => handleRemoveMedia(item.id)}>
                                   <Ionicons name="close-circle" size={22} color="#f04f4f" />
                                 </TouchableOpacity>
@@ -1190,4 +1427,22 @@ const s = StyleSheet.create({
   footer: { paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1 },
   shareBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 15, borderRadius: 18, gap: 8, elevation: 6, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8 },
   shareBtnText: { fontWeight: "700", fontSize: 16, color: "#FFF" },
+
+  // Sıralı liste
+  rankedToggle: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 0.5, marginBottom: 14 },
+  rankedToggleText: { flex: 1, fontSize: 13, fontWeight: "700" },
+  rankBadge: { position: "absolute", top: 6, left: 6, minWidth: 22, height: 22, paddingHorizontal: 5, borderRadius: 8, alignItems: "center", justifyContent: "center", zIndex: 4 },
+  rankBadgeText: { color: "#fff", fontSize: 12, fontWeight: "900" },
+  reorderRow: { position: "absolute", bottom: 6, alignSelf: "center", flexDirection: "row", gap: 6, zIndex: 5 },
+  reorderBtn: { width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center" },
+
+  // Anket composer
+  pollKindRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
+  pollKindBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 11, borderRadius: 12, borderWidth: 1 },
+  pollKindText: { fontSize: 13, fontWeight: "700" },
+  pollTextRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  pollTextInput: { flex: 1, fontSize: 15, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, borderWidth: 0.5 },
+  pollTextDel: { padding: 2 },
+  pollAddText: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderStyle: "dashed" },
+  pollAddTextLabel: { fontSize: 13, fontWeight: "700" },
 });

@@ -1,5 +1,8 @@
-import { createContext, useContext, useCallback, useEffect, useState, useMemo } from "react";
-import { useApiSettings } from "./AppSettingsContext";
+import { createContext, useContext, useCallback, useEffect, useState, useMemo, useRef } from "react";
+import {
+  useApiSettings,
+  useStreamingProviderSettings,
+} from "./AppSettingsContext";
 import Toast from "react-native-toast-message";
 import { useLanguage } from "./LanguageContext";
 import { useListStatusContext } from "./ListStatusContext";
@@ -36,6 +39,8 @@ const mergeTrendItems = (prev, next) => {
 
 // Sayfalı bölümlerin ortak yükleyicisi: cache okuma, loading bayrakları,
 // append/replace + dedup mantığını tek yerde toplar.
+// `isStale`: kategori/dil değişince eski (in-flight) isteğin sonucu yeni
+// listeye karışmasın diye sonuç uygulanmadan önce kontrol edilir.
 const loadPage = async ({
   cacheKey,
   ttl,
@@ -45,8 +50,10 @@ const loadPage = async ({
   setTotal,
   setLoading,
   setLoadingMore,
+  isStale,
 }) => {
   const apply = (results, totalPages) => {
+    if (isStale?.()) return;
     if (setTotal) setTotal(totalPages || 1);
     if (append) setData((prev) => mergeUniqueById(prev, results));
     else setIfChanged(setData, results);
@@ -78,6 +85,16 @@ export const TvShowProvider = ({ children }) => {
     });
   }, []);
 
+  // Bölüm başına istek jenerasyonu: fresh (sayfa 1) fetch jenerasyonu artırır,
+  // append aynı jenerasyonda kalır. Kategori/dil değişince eski in-flight
+  // isteklerin sonuçları stale sayılır ve state'e uygulanmaz.
+  const requestGenRef = useRef({});
+  const beginFreshRequest = (key) => {
+    requestGenRef.current[key] = (requestGenRef.current[key] || 0) + 1;
+    return requestGenRef.current[key];
+  };
+  const currentGen = (key) => requestGenRef.current[key] || 0;
+
   const [seriesTrend, setSeriesTrend] = useState([]);
   const [loadingTrend, setLoadingTren] = useState(true);
   const [loadingMoreTrend, setLoadingMoreTrend] = useState(false);
@@ -87,6 +104,7 @@ export const TvShowProvider = ({ children }) => {
   const [selectedCategoryTrendShow, setSelectedCategoryTrendShow] =
     useState("trending");
   const { API_KEY } = useApiSettings();
+  const { streamingProviderIds } = useStreamingProviderSettings();
   const { language } = useLanguage();
   const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
   const tmdbRegion = language === "tr" ? "TR" : "US";
@@ -127,11 +145,14 @@ export const TvShowProvider = ({ children }) => {
 
   const fetchSeriesTrends = async (page = 1, append = false) => {
     const lang = language === "tr" ? "tr-TR" : "en-US";
+    const gen = append ? currentGen("trends") : beginFreshRequest("trends");
+    const isStale = () => currentGen("trends") !== gen;
     const baseKey = `tv_trends_${lang}_${selectedCategoryTrend}_${selectedCategoryTrendShow}`;
     const cacheKey = page === 1 ? baseKey : `${baseKey}_p${page}`;
 
     const cached = await getCachedValue(cacheKey, TTL.TREND);
     if (cached) {
+      if (isStale()) return;
       if (append) {
         setSeriesTrend((prev) => mergeTrendItems(prev, cached.results ?? cached));
         setLoadingMoreTrend(false);
@@ -158,13 +179,14 @@ export const TvShowProvider = ({ children }) => {
         headers: { accept: "application/json", Authorization: API_KEY },
       });
       const results = response.data.results || [];
+      // Cache doğru anahtara yazılabilir; yalnızca state güncellemesi stale'de atlanır.
+      setCachedValue(append ? cacheKey : baseKey, results);
+      if (isStale()) return;
       setTotalPagesTrend(response.data.total_pages || 1);
       if (append) {
         setSeriesTrend((prev) => mergeTrendItems(prev, results));
-        setCachedValue(cacheKey, results);
       } else {
         setIfChanged(setSeriesTrend, results);
-        setCachedValue(baseKey, results);
       }
     } catch (error) {
       if (__DEV__) console.error("fetchSeriesTrends:", error?.message || error);
@@ -208,10 +230,12 @@ export const TvShowProvider = ({ children }) => {
 
   const fetchSeriesBest = (page = 1, append = false) => {
     const lang = language === "tr" ? "tr-TR" : "en-US";
+    const gen = append ? currentGen("best") : beginFreshRequest("best");
     return loadPage({
       cacheKey: `tv_bests_${lang}_${selectedCategoryBestShow}_${selectedCategoryBest}_page_${page}`,
       ttl: TTL.TREND,
       append,
+      isStale: () => currentGen("best") !== gen,
       setData: setSeriesBest,
       setTotal: setTotalPagesBest,
       setLoading: setLoadingBest,
@@ -257,10 +281,12 @@ export const TvShowProvider = ({ children }) => {
   const [pageAiringToday, setPageAiringToday] = useState(1);
 
   const fetchAiringToday = (page = 1, append = false) => {
+    const gen = append ? currentGen("airingToday") : beginFreshRequest("airingToday");
     return loadPage({
       cacheKey: `tv_airing_today_${tmdbLanguage}_${tmdbRegion}_page_${page}`,
       ttl: TTL.NOW_PLAYING,
       append,
+      isStale: () => currentGen("airingToday") !== gen,
       setData: setMoviesAiringToday,
       setTotal: setTotalPagesAiringToday,
       setLoading: setLoadingAiringToday,
@@ -302,7 +328,7 @@ export const TvShowProvider = ({ children }) => {
   useEffect(() => {
     if (!activeSections.providers) return;
     fetchProviders();
-  }, [activeSections.providers, language]);
+  }, [activeSections.providers, language, streamingProviderIds]);
 
   const fetchProviders = async () => {
     const cacheKey = `tv_providers_${tmdbLanguage}_${tmdbRegion}`;
@@ -310,8 +336,12 @@ export const TvShowProvider = ({ children }) => {
     if (cached) {
       setIfChanged(setProviders, cached);
       if (cached.length > 0) {
-        setSelectedProvider(cached[0].provider_id);
-        fetchMoviesByProvider(cached[0].provider_id);
+        const preferred =
+          cached.find((provider) =>
+            streamingProviderIds.includes(provider.provider_id),
+          ) || cached[0];
+        setSelectedProvider(preferred.provider_id);
+        fetchMoviesByProvider(preferred.provider_id);
       }
       setLoadingProvider(false);
       return;
@@ -325,8 +355,12 @@ export const TvShowProvider = ({ children }) => {
       setIfChanged(setProviders, results);
       setCachedValue(cacheKey, results);
       if (results.length > 0) {
-        setSelectedProvider(results[0].provider_id);
-        fetchMoviesByProvider(results[0].provider_id);
+        const preferred =
+          results.find((provider) =>
+            streamingProviderIds.includes(provider.provider_id),
+          ) || results[0];
+        setSelectedProvider(preferred.provider_id);
+        fetchMoviesByProvider(preferred.provider_id);
       }
     } catch (err) {
       if (__DEV__) console.error(i18nText("autoI18n.saglayicilari_cekerken_hata", "Sağlayıcıları çekerken hata:"), err.message);
@@ -341,10 +375,12 @@ export const TvShowProvider = ({ children }) => {
       setSelectedProvider(providerId);
       setPageProvider(1);
     }
+    const gen = append ? currentGen("provider") : beginFreshRequest("provider");
     return loadPage({
       cacheKey: `tv_provider_${tmdbLanguage}_${tmdbRegion}_${providerId}_p${page}`,
       ttl: TTL.PROVIDERS,
       append,
+      isStale: () => currentGen("provider") !== gen,
       setData: setMoviesProviders,
       setTotal: setTotalPagesProvider,
       setLoading: setLoadingMoviesByProvider,
@@ -406,10 +442,12 @@ export const TvShowProvider = ({ children }) => {
 
   const fetchTvByGenres = (page = 1, append = false) => {
     const genresKey = [...selectedGenres].sort().join(",");
+    const gen = append ? currentGen("genres") : beginFreshRequest("genres");
     return loadPage({
       cacheKey: `tv_genres_content_${tmdbLanguage}_p${page}_g${genresKey}`,
       ttl: TTL.TREND,
       append,
+      isStale: () => currentGen("genres") !== gen,
       setData: setMoviesGenres,
       setTotal: setTotalPagesGenres,
       setLoading: setLoadingGenres,
@@ -446,10 +484,12 @@ export const TvShowProvider = ({ children }) => {
   const [pageOnTheAir, setPageOnTheAir] = useState(1);
 
   const fetchOnTheAir = (page = 1, append = false) => {
+    const gen = append ? currentGen("onTheAir") : beginFreshRequest("onTheAir");
     return loadPage({
       cacheKey: `tv_on_the_air_${tmdbLanguage}_${tmdbRegion}_page_${page}`,
       ttl: TTL.NOW_PLAYING,
       append,
+      isStale: () => currentGen("onTheAir") !== gen,
       setData: setMoviesOnTheAir,
       setTotal: setTotalPagesOnTheAir,
       setLoading: setLoadingOnTheAir,

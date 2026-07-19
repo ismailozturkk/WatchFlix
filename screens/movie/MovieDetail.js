@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback, memo } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef, memo } from "react";
 import {
   StyleSheet,
   View,
@@ -22,18 +22,16 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import LottieView from "lottie-react-native";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useSnow } from "../../context/SnowContext";
 import Toast from "react-native-toast-message";
 import { getDoc, doc, updateDoc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
-import DatePickerModal from "@components/modals/DatePickerModal";
+import WatchedDateSheet from "@components/detail/WatchedDateSheet";
 import ListView from "../../components/ListView";
 import PosterImage from "../../components/PosterImage";
-import { useAppSettings, useImageQualitySettings } from "../../context/AppSettingsContext";
+import { useAppSettings, useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 import RatingStars from "../../components/RatingStars";
 import AntDesign from "@expo/vector-icons/AntDesign";
-import Entypo from "@expo/vector-icons/Entypo";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import Comment from "../../components/Comment";
 import SwipeCard from "@components/SwipeCard";
@@ -53,7 +51,9 @@ import RatingSheetModal from "@components/modals/RatingSheetModal";
 import RatingSummary from "@components/RatingSummary";
 import ImageGalleryModal from "@components/modals/ImageGalleryModal";
 import TrailerSection from "@components/video/TrailerSection";
+import PaginatedRail from "../../components/PaginatedRail";
 import { i18nText } from "../../utils/i18nText";
+import AIChatScreen from "../AIChatScreen";
 
 
 const { width, height } = Dimensions.get("window");
@@ -69,6 +69,7 @@ const VIDEO_HEIGHT = Math.round((VIDEO_WIDTH * 9) / 16);
 const SimilarMovieItem = memo(function SimilarMovieItem({ item, navigation }) {
   const { theme } = useTheme();
   const { getTmdbUrl } = useImageQualitySettings();
+  const { posterBadges } = useListLayoutSettings();
   const scale = React.useRef(new Animated.Value(1)).current;
 
   const onPressIn = () =>
@@ -101,14 +102,16 @@ const SimilarMovieItem = memo(function SimilarMovieItem({ item, navigation }) {
           style={[styles.similarPoster, { borderColor: theme.border + "55" }]}
         />
         {/* Rating pill */}
-        <View
-          style={[styles.ratingPill, { backgroundColor: "rgba(0,0,0,0.72)" }]}
-        >
-          <Ionicons name="star" size={9} color="#FFD700" />
-          <Text allowFontScaling={false} style={styles.ratingPillText}>
-            {item.vote_average.toFixed(1)}
-          </Text>
-        </View>
+        {posterBadges?.tmdbRating !== false && (
+          <View
+            style={[styles.ratingPill, { backgroundColor: "rgba(0,0,0,0.72)" }]}
+          >
+            <Ionicons name="star" size={9} color="#FFD700" />
+            <Text allowFontScaling={false} style={styles.ratingPillText}>
+              {item.vote_average.toFixed(1)}
+            </Text>
+          </View>
+        )}
         {/* List indicators */}
         <View style={styles.stats}>
           <ListBadges
@@ -154,8 +157,6 @@ export default function MovieDetails({ navigation, route }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showFullCast, setShowFullCast] = useState(false);
-  const [reviewLength, setReviewLength] = useState(5);
-  const [reviewTextLength, setReviewTextLength] = useState(null);
   const [commandModalVisible, setCommentModalVisible] = useState(false);
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
   const [headerScale] = useState(new Animated.Value(1));
@@ -187,22 +188,19 @@ export default function MovieDetails({ navigation, route }) {
   const { getTmdbUrl } = useImageQualitySettings();
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [aiVisible, setAiVisible] = useState(false);
   const [PosterModalVisible, setPosterModalVisible] = useState(false);
   const [backdropModalVisible, setBacdropModalVisible] = useState(false);
-  const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isReminderSet, setIsReminderSet] = useState(false);
 
   const openModal = () => setModalVisible(true);
-  const closeModal = () => {
-    setModalVisible(false);
-    setSelectedDate(null);
-  };
-  const showDatePicker = () => setDatePickerVisibility(true);
-  const hideDatePicker = () => setDatePickerVisibility(false);
+  const closeModal = () => setModalVisible(false);
 
   const formatDateSave = (timestamp) => {
+    if (typeof timestamp === "string" && /^\d{4}-\d{2}-\d{2}/.test(timestamp)) {
+      return timestamp.slice(0, 10);
+    }
     const date = new Date(timestamp);
     if (isNaN(date.getTime())) return "";
     const day = String(date.getDate()).padStart(2, "0");
@@ -239,15 +237,13 @@ export default function MovieDetails({ navigation, route }) {
     return { text, isRemaining: true };
   };
 
-  const handleConfirm = (date) => {
-    // date artık DatePickerModal'dan ISO string olarak geliyor ("YYYY-MM-DD")
-    const isoDate = typeof date === "string" ? date : formatDateSave(date);
-    setSelectedDate(isoDate);
-    updateMovieList("watchedMovies", "movie", isoDate);
-    hideDatePicker();
-  };
+  const handleConfirm = (date) =>
+    updateMovieList("watchedMovies", "movie", date);
 
   useEffect(() => {
+    // Aynı ekran örneği yeni id ile yeniden kullanılabildiği için geç gelen
+    // eski yanıtın yeni filmi ezmemesi adına cancelled bayrağı gerekli.
+    let cancelled = false;
     const fetchDetails = async () => {
       setLoading(true);
       try {
@@ -257,31 +253,104 @@ export default function MovieDetails({ navigation, route }) {
           params: {
             language: language === "tr" ? "tr-TR" : "en-US",
             append_to_response:
-              "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,release_dates,reviews,similar,translations,videos,watch/providers",
+              "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,release_dates,similar,translations,videos,watch/providers",
           },
           headers: { accept: "application/json", Authorization: API_KEY },
         });
-        setDetails(response.data);
+        if (!cancelled) setDetails(response.data);
       } catch (error) {
-        Toast.show({ type: "error", text1: "error:" + error });
+        if (!cancelled) Toast.show({ type: "error", text1: "error:" + error });
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchDetails();
+    return () => {
+      cancelled = true;
+    };
   }, [id, language]);
+
+  // Önerilen/Benzer rayları: append_to_response yalnız ilk sayfayı getirir.
+  // Ana ekran raylarındaki gibi (PaginatedRail) sona yaklaşınca sonraki TMDB
+  // sayfası çekilip mevcut listenin sonuna eklenir.
+  const [railState, setRailState] = useState({
+    recommendations: { items: [], page: 1, totalPages: 1, loading: false },
+    similar: { items: [], page: 1, totalPages: 1, loading: false },
+  });
+  const railBusyRef = useRef({ recommendations: false, similar: false });
+
+  useEffect(() => {
+    const seed = (block) => ({
+      items: block?.results || [],
+      page: block?.page || 1,
+      totalPages: block?.total_pages || 1,
+      loading: false,
+    });
+    railBusyRef.current = { recommendations: false, similar: false };
+    setRailState({
+      recommendations: seed(details?.recommendations),
+      similar: seed(details?.similar),
+    });
+  }, [details]);
+
+  const loadMoreRail = useCallback(
+    async (kind) => {
+      const rail = railState[kind];
+      if (railBusyRef.current[kind] || rail.page >= rail.totalPages) return;
+      railBusyRef.current[kind] = true;
+      setRailState((cur) => ({
+        ...cur,
+        [kind]: { ...cur[kind], loading: true },
+      }));
+      try {
+        const res = await axios.request({
+          method: "GET",
+          url: `https://api.themoviedb.org/3/movie/${id}/${kind}`,
+          params: {
+            language: language === "tr" ? "tr-TR" : "en-US",
+            page: rail.page + 1,
+          },
+          headers: { accept: "application/json", Authorization: API_KEY },
+        });
+        const fresh = res.data?.results || [];
+        setRailState((cur) => {
+          const current = cur[kind];
+          const seen = new Set(current.items.map((it) => it.id));
+          return {
+            ...cur,
+            [kind]: {
+              items: [...current.items, ...fresh.filter((it) => !seen.has(it.id))],
+              page: res.data?.page || rail.page + 1,
+              totalPages: res.data?.total_pages || current.totalPages,
+              loading: false,
+            },
+          };
+        });
+      } catch {
+        setRailState((cur) => ({
+          ...cur,
+          [kind]: { ...cur[kind], loading: false },
+        }));
+      } finally {
+        railBusyRef.current[kind] = false;
+      }
+    },
+    [railState, id, language, API_KEY],
+  );
 
   // Yeni model: hatırlatmalar subcollection'da → Reminders/{uid}/movies/{movieId}
   // (Eski kök-array `Reminders/{uid}.movieReminders[]` BIRAKILDI; okuyucular
   // ProfileRemindersContext/CalendarContext yalnız subcollection'ı dinliyor.)
   useEffect(() => {
-    if (!user.uid || !id) return;
+    // user null olabilir (oturum düşmesi ekran açıkken) — optional chaining
+    // olmadan hem effect gövdesi hem deps dizisi render'da crash ederdi.
+    if (!user?.uid || !id) return;
     const unsub = onSnapshot(
       doc(db, "Reminders", user.uid, "movies", String(id)),
       (snap) => setIsReminderSet(snap.exists()),
     );
     return () => unsub();
-  }, [user.uid, id]);
+  }, [user?.uid, id]);
 
   const addReminder = async () => {
     try {
@@ -321,7 +390,7 @@ export default function MovieDetails({ navigation, route }) {
     })[l] || l;
 
   const updateMovieList = async (listType, type, date = null) => {
-    if (!user.uid || !details) return;
+    if (!user?.uid || !details) return;
     closeModal();
     const isPredefined = PREDEFINED_MOVIE_LISTS.includes(listType);
     const toastRemove = () =>
@@ -459,6 +528,41 @@ export default function MovieDetails({ navigation, route }) {
     ({ item }) => <SimilarMovieItem item={item} navigation={navigation} />,
     [navigation],
   );
+
+  const openReviewComposer = useCallback(() => {
+    if (!details) return;
+    const title = details.title || "";
+    navigation.navigate("ShareContentScreen", {
+      composePost: {
+        composeKey: `movie-${id}-${Date.now()}`,
+        postType: "review",
+        title: title ? `${title} incelemesi` : i18nText("autoI18n.yeni_inceleme", "Yeni inceleme"),
+        content: "",
+        selectedMedia: [
+          {
+            id: details.id,
+            media_type: "movie",
+            type: "movie",
+            title,
+            name: title,
+            poster_path: details.poster_path,
+            poster: details.poster_path
+              ? getTmdbUrl(details.poster_path, "poster", 500)
+              : null,
+            release_date: details.release_date,
+            year: details.release_date ? String(details.release_date).slice(0, 4) : "",
+            genre_ids: details.genres?.map((g) => g.id).filter(Boolean) || [],
+          },
+        ],
+      },
+    });
+  }, [details, getTmdbUrl, id, navigation]);
+
+  const aiPrompt = useMemo(() => {
+    if (!details?.title) return "";
+    const year = details.release_date ? ` (${String(details.release_date).slice(0, 4)})` : "";
+    return `${details.title}${year} filmi hakkında spoiler vermeden bilgi ver. Konusu, türü, öne çıkan oyuncuları, atmosferi, kimlere uygun olduğu ve neden izlenebileceğini kısa başlıklarla anlat.`;
+  }, [details]);
 
   if (loading) return <DetailsSkeleton />;
   if (!details)
@@ -612,6 +716,7 @@ export default function MovieDetails({ navigation, route }) {
                 mediaId={id}
                 tmdbAvg={details.vote_average}
                 tmdbCount={details.vote_count}
+                releaseDate={details.release_date}
                 onPressRate={() => setRatingModalVisible(true)}
               />
             </View>
@@ -631,7 +736,91 @@ export default function MovieDetails({ navigation, route }) {
             listStates={listStates}
             isLoading={isLoading}
             type={"movie"}
+            sharedItem={{
+              id: details.id,
+              type: "movie",
+              name: details.title,
+              imagePath: details.poster_path,
+              minutes: details.runtime,
+              genres: details.genres?.map((g) => g.name) || [],
+            }}
           />
+
+          <View style={styles.detailActionRow}>
+            <TouchableOpacity
+              activeOpacity={0.88}
+              onPress={openReviewComposer}
+              style={[
+                styles.detailActionBtn,
+                { backgroundColor: theme.secondary, borderColor: theme.border },
+              ]}
+            >
+              <View
+                style={[
+                  styles.detailActionIcon,
+                  { backgroundColor: (theme.colors?.blue || theme.accent) + "20" },
+                ]}
+              >
+                <Ionicons
+                  name="create-outline"
+                  size={18}
+                  color={theme.colors?.blue || theme.accent}
+                />
+              </View>
+              <View style={styles.detailActionCopy}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.detailActionTitle, { color: theme.text.primary }]}
+                >
+                  {i18nText("autoI18n.inceleme", "İnceleme")}
+                </Text>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.detailActionSub, { color: theme.text.muted }]}
+                  numberOfLines={1}
+                >
+                  {i18nText("autoI18n.hubda_paylas", "Hub'da paylaş")}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.88}
+              onPress={() => setAiVisible(true)}
+              style={[
+                styles.detailActionBtn,
+                { backgroundColor: theme.secondary, borderColor: theme.border },
+              ]}
+            >
+              <View
+                style={[
+                  styles.detailActionIcon,
+                  { backgroundColor: (theme.colors?.purple || theme.accent) + "20" },
+                ]}
+              >
+                <Ionicons
+                  name="sparkles-outline"
+                  size={18}
+                  color={theme.colors?.purple || theme.accent}
+                />
+              </View>
+              <View style={styles.detailActionCopy}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.detailActionTitle, { color: theme.text.primary }]}
+                >
+                  {i18nText("autoI18n.yapay_zeka", "Yapay Zeka")}
+                </Text>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.detailActionSub, { color: theme.text.muted }]}
+                  numberOfLines={1}
+                >
+                  {i18nText("autoI18n.bilgi_al", "Bilgi al")}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
 
           {/* ── STAT PILLS ── */}
           <View
@@ -1004,135 +1193,48 @@ export default function MovieDetails({ navigation, route }) {
           )}
 
           {/* ── ÖNERİLEN FİLMLER ── */}
-          {details.recommendations?.results.length > 0 && (
+          {railState.recommendations.items.length > 0 && (
             <View style={styles.section}>
               <SectionHeader title={t.recommendedMovies} theme={theme} />
-              <FlatList
-                data={details.recommendations.results.slice(0, 20)}
+              <PaginatedRail
+                data={railState.recommendations.items}
                 renderItem={renderSimilarMovie}
                 keyExtractor={(item) => item.id.toString()}
-                horizontal
-                showsHorizontalScrollIndicator={false}
+                onLoadMore={() => loadMoreRail("recommendations")}
+                loadingMore={railState.recommendations.loading}
+                hasMore={
+                  railState.recommendations.page <
+                  railState.recommendations.totalPages
+                }
                 contentContainerStyle={{ paddingVertical: 4, gap: 10 }}
                 initialNumToRender={5}
                 maxToRenderPerBatch={5}
                 windowSize={5}
-                removeClippedSubviews
               />
             </View>
           )}
 
           {/* ── BENZER FİLMLER ── */}
-          {details.similar?.results.length > 0 && (
+          {railState.similar.items.length > 0 && (
             <View style={styles.section}>
               <SectionHeader title={t.similarMovies} theme={theme} />
-              <FlatList
-                data={details.similar.results.slice(0, 20)}
+              <PaginatedRail
+                data={railState.similar.items}
                 renderItem={renderSimilarMovie}
                 keyExtractor={(item) => item.id.toString()}
-                horizontal
-                showsHorizontalScrollIndicator={false}
+                onLoadMore={() => loadMoreRail("similar")}
+                loadingMore={railState.similar.loading}
+                hasMore={railState.similar.page < railState.similar.totalPages}
                 contentContainerStyle={{ paddingVertical: 4, gap: 10 }}
                 initialNumToRender={5}
                 maxToRenderPerBatch={5}
                 windowSize={5}
-                removeClippedSubviews
               />
             </View>
           )}
 
-          {/* ── KRİTİKLER ── */}
-          {details.reviews?.results.length > 0 && (
-            <View style={[styles.section, { marginBottom: 40 }]}>
-              <SectionHeader title={t.reviews} theme={theme} />
-              {details.reviews.results.slice(0, reviewLength).map((review) => (
-                <TouchableOpacity
-                  key={review.id}
-                  activeOpacity={0.85}
-                  onPress={() =>
-                    setReviewTextLength(
-                      review.id === reviewTextLength ? null : review.id,
-                    )
-                  }
-                  style={[
-                    styles.reviewCard,
-                    {
-                      backgroundColor: theme.secondary,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                >
-                  <View style={styles.reviewTop}>
-                    <View
-                      style={[
-                        styles.reviewAvatar,
-                        { backgroundColor: theme.accent + "28" },
-                      ]}
-                    >
-                      <Ionicons name="person" size={13} color={theme.accent} />
-                    </View>
-                    <Text
-                      allowFontScaling={false}
-                      style={[
-                        styles.reviewAuthor,
-                        { color: theme.text.primary },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {review.author}
-                    </Text>
-                    <Text
-                      allowFontScaling={false}
-                      style={[styles.reviewDate, { color: theme.text.muted }]}
-                    >
-                      {review.created_at
-                        ? new Date(review.created_at).toLocaleDateString()
-                        : ""}
-                    </Text>
-                  </View>
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.reviewBody, { color: theme.text.secondary }]}
-                    numberOfLines={review.id === reviewTextLength ? null : 3}
-                  >
-                    {review.content}
-                  </Text>
-                  {review.id !== reviewTextLength && (
-                    <Text
-                      allowFontScaling={false}
-                      style={[styles.readMore, { color: theme.accent }]}
-                    >{i18nText("autoI18n.devamini_oku", "Devamını oku")}</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-              {details.reviews.results.length > 5 && (
-                <TouchableOpacity
-                  onPress={() =>
-                    setReviewLength(
-                      details.reviews.results.length === reviewLength
-                        ? 5
-                        : details.reviews.results.length,
-                    )
-                  }
-                  style={[styles.expandBtn, { marginTop: 4 }]}
-                  activeOpacity={0.8}
-                >
-                  <MaterialIcons
-                    name={
-                      reviewLength > 5
-                        ? "keyboard-arrow-up"
-                        : "keyboard-arrow-down"
-                    }
-                    size={22}
-                    color={theme.accent}
-                  />
-                  <Text style={[styles.expandBtnText, { color: theme.accent }]}>
-                    {reviewLength > 5 ? "Daha az" : i18nText("autoI18n.tum_yorumlar", "Tüm yorumlar")}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+          {/* TMDB kritikleri kaldırıldı — yorumlar uygulamanın kendi yorum
+              modalında gösteriliyor. */}
         </View>
       </ScrollView>
 
@@ -1217,185 +1319,28 @@ export default function MovieDetails({ navigation, route }) {
           tmdbAvg={details.vote_average}
           tmdbCount={details.vote_count}
           details={details}
+          releaseDate={details.release_date}
         />
       </Modal>
 
       {/* İzleme tarihi */}
-      <Modal
+      <WatchedDateSheet
         visible={modalVisible}
-        onRequestClose={closeModal}
-        animationType="slide"
-        transparent
-      >
-        <View style={styles.dateModalWrap}>
-          <LinearGradient
-            colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.85)"]}
-            style={StyleSheet.absoluteFill}
-          />
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            onPress={closeModal}
-          />
-          <View
-            style={[
-              styles.dateSheet,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
-            ]}
-          >
-            <View
-              style={[styles.sheetHandle, { backgroundColor: theme.border }]}
-            />
-            <Text
-              allowFontScaling={false}
-              style={[styles.sheetTitle, { color: theme.text.primary }]}
-            >{i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}</Text>
-            <Text
-              allowFontScaling={false}
-              style={[styles.sheetSubtitle, { color: theme.text.muted }]}
-            >
-              Bu filmi ne zaman izlediniz?
-            </Text>
-            <View style={styles.dateOptions}>
-              <TouchableOpacity
-                style={[
-                  styles.dateOption,
-                  {
-                    backgroundColor: theme.primary,
-                    borderColor: selectedDate ? theme.accent : theme.border,
-                  },
-                ]}
-                onPress={showDatePicker}
-                activeOpacity={0.85}
-              >
-                <View
-                  style={[
-                    styles.dateOptionIcon,
-                    { backgroundColor: theme.accent + "20" },
-                  ]}
-                >
-                  <Ionicons
-                    name="calendar-outline"
-                    size={24}
-                    color={theme.accent}
-                  />
-                </View>
-                <Text
-                  allowFontScaling={false}
-                  style={[
-                    styles.dateOptionLabel,
-                    { color: selectedDate ? theme.accent : theme.text.primary },
-                  ]}
-                >
-                  {selectedDate || i18nText("autoI18n.tarih_sec", "Tarih Seç")}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.dateOption,
-                  { backgroundColor: theme.primary, borderColor: theme.border },
-                ]}
-                onPress={() =>
-                  updateMovieList(
-                    "watchedMovies",
-                    "movie",
-                    formatDateSave(new Date()),
-                  )
-                }
-                activeOpacity={0.85}
-              >
-                <View
-                  style={[
-                    styles.dateOptionIcon,
-                    {
-                      backgroundColor:
-                        (theme.colors?.blue || theme.accent) + "20",
-                    },
-                  ]}
-                >
-                  <Entypo
-                    name="stopwatch"
-                    size={24}
-                    color={theme.colors?.blue || theme.accent}
-                  />
-                </View>
-                <Text
-                  allowFontScaling={false}
-                  style={[
-                    styles.dateOptionLabel,
-                    { color: theme.text.primary },
-                  ]}
-                >{i18nText("autoI18n.simdi", "Şimdi")}</Text>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.dateOptionSub, { color: theme.text.muted }]}
-                >
-                  {formatDate(new Date())}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.dateOption,
-                  { backgroundColor: theme.primary, borderColor: theme.border },
-                ]}
-                onPress={() =>
-                  updateMovieList(
-                    "watchedMovies",
-                    "movie",
-                    formatDateSave(new Date(details.release_date)),
-                  )
-                }
-                activeOpacity={0.85}
-              >
-                <View
-                  style={[
-                    styles.dateOptionIcon,
-                    {
-                      backgroundColor:
-                        (theme.colors?.orange || theme.accent) + "20",
-                    },
-                  ]}
-                >
-                  <Ionicons
-                    name="film-outline"
-                    size={24}
-                    color={theme.colors?.orange || theme.accent}
-                  />
-                </View>
-                <Text
-                  allowFontScaling={false}
-                  style={[
-                    styles.dateOptionLabel,
-                    { color: theme.text.primary },
-                  ]}
-                >{i18nText("autoI18n.yayin_tarihi", "Yayın Tarihi")}</Text>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.dateOptionSub, { color: theme.text.muted }]}
-                >
-                  {formatDate(details.release_date)}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Custom Drum Picker – Tarih Seç butonuna basıldığında açılır */}
-            <DatePickerModal
-              visible={isDatePickerVisible}
-              value={selectedDate || formatDateSave(new Date())}
-              onConfirm={(iso) => {
-                handleConfirm(iso);
-              }}
-              onClose={hideDatePicker}
-              title={i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}
-              subtitle="Bu filmi ne zaman izlediniz?"
-              confirmLabel="Tarihi Onayla"
-              minDate={details?.release_date}
-              maxDate={new Date()}
-            />
-          </View>
-        </View>
-      </Modal>
+        onClose={closeModal}
+        subtitle={i18nText(
+          "autoI18n.bu_filmi_ne_zaman_izlediniz",
+          "Bu filmi ne zaman izlediniz?",
+        )}
+        pickerSubtitle={i18nText(
+          "autoI18n.film_izleme_tarihini_sec",
+          "Filmi izlediğiniz tarihi seçin",
+        )}
+        releaseDate={details?.release_date}
+        minDate={details?.release_date}
+        mediaType="movie"
+        busy={isLoading}
+        onConfirm={handleConfirm}
+      />
 
       {/* Poster / Backdrop galerisi (tüm görseller + indir) */}
       <ImageGalleryModal
@@ -1410,6 +1355,12 @@ export default function MovieDetails({ navigation, route }) {
         initialImage={
           PosterModalVisible ? details.poster_path : details.backdrop_path
         }
+      />
+
+      <AIChatScreen
+        visible={aiVisible}
+        onClose={() => setAiVisible(false)}
+        initialPrompt={aiPrompt}
       />
     </View>
   );
@@ -1546,6 +1497,33 @@ const styles = StyleSheet.create({
   statLbl: { fontSize: 11 },
   statDivider: { width: 1, height: 44, opacity: 0.4 },
 
+  detailActionRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 16,
+  },
+  detailActionBtn: {
+    flex: 1,
+    minHeight: 64,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+  detailActionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailActionCopy: { flex: 1, minWidth: 0 },
+  detailActionTitle: { fontSize: 13.5, fontWeight: "800" },
+  detailActionSub: { fontSize: 11, fontWeight: "700", marginTop: 2 },
+
   /* Comments btn */
   commentsBtn: {
     flexDirection: "row",
@@ -1628,23 +1606,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   tagText: { fontSize: 12, fontWeight: "500" },
-  expandBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    alignSelf: "center",
-    marginTop: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-  },
-  expandBtnText: { fontSize: 13, fontWeight: "600" },
 
   /* Cast */
-  castItem: { width: width * 0.26, alignItems: "center" },
+  castItem: { width: width * 0.2, alignItems: "center" },
   castImage: {
-    width: width * 0.26,
-    height: width * 0.26 * 1.5,
-    borderRadius: 12,
+    width: width * 0.2,
+    height: width * 0.2 * 1.5,
+    borderRadius: 16,
     marginBottom: 7,
     borderWidth: 1.5,
   },
@@ -1734,35 +1702,6 @@ const styles = StyleSheet.create({
   providerLogo: { width: 44, height: 44, borderRadius: 10 },
   providerName: { fontSize: 10, textAlign: "center", fontWeight: "500" },
 
-  /* Reviews */
-  reviewCard: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  reviewTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    marginBottom: 10,
-  },
-  reviewAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  reviewAuthor: { fontSize: 13, fontWeight: "700", flex: 1 },
-  reviewDate: { fontSize: 11 },
-  reviewBody: { fontSize: 13, lineHeight: 20 },
-  readMore: { fontSize: 12, fontWeight: "600", marginTop: 8 },
-
   /* Video modal */
   videoModal: { flex: 1, justifyContent: "center", alignItems: "center" },
   videoModalContent: { backgroundColor: "#000", position: "relative", width: VIDEO_WIDTH, alignSelf: "center" },
@@ -1776,48 +1715,4 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 
-  /* Date modal */
-  dateModalWrap: { flex: 1, justifyContent: "flex-end" },
-  dateSheet: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    padding: 20,
-    paddingBottom: 40,
-  },
-  sheetHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 20,
-  },
-  sheetTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    textAlign: "center",
-    letterSpacing: -0.3,
-    marginBottom: 4,
-  },
-  sheetSubtitle: { fontSize: 13, textAlign: "center", marginBottom: 20 },
-  dateOptions: { flexDirection: "row", gap: 10 },
-  dateOption: {
-    flex: 1,
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-    gap: 8,
-    alignItems: "center",
-    borderWidth: 1,
-  },
-  dateOptionIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dateOptionLabel: { fontSize: 12, fontWeight: "700", textAlign: "center" },
-  dateOptionSub: { fontSize: 10.5, textAlign: "center" },
 });

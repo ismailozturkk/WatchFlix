@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Dimensions,
   Animated,
-  ActivityIndicator,
 } from "react-native";
 import React, { useRef, useEffect, useCallback } from "react";
 import { useTheme } from "../../../context/ThemeContext";
@@ -15,8 +14,9 @@ import { useLanguage } from "../../../context/LanguageContext";
 import { useProfileReminders } from "../../../context/ProfileRemindersContext";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useImageQualitySettings } from "../../../context/AppSettingsContext";
+import { useImageQualitySettings, useListLayoutSettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
+import Skeleton from "../../../components/Skeleton";
 
 
 const { width } = Dimensions.get("window");
@@ -81,6 +81,7 @@ function MovieCard({
   calculateDateDifference,
 }) {
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { posterBadges } = useListLayoutSettings();
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const diff = calculateDateDifference(reminder.releaseDate);
   const countdown = getCountdownStyle(diff, theme.notesColor);
@@ -156,19 +157,21 @@ function MovieCard({
             {reminder.movieName}
           </Text>
 
-          <View style={styles.infoRow}>
-            <Ionicons
-              name="calendar-outline"
-              size={10}
-              color={theme.text.muted}
-            />
-            <Text
-              allowFontScaling={false}
-              style={[styles.infoText, { color: theme.text.muted }]}
-            >
-              {formatDate(reminder.releaseDate)}
-            </Text>
-          </View>
+          {posterBadges?.releaseDate !== false && (
+            <View style={styles.infoRow}>
+              <Ionicons
+                name="calendar-outline"
+                size={10}
+                color={theme.text.muted}
+              />
+              <Text
+                allowFontScaling={false}
+                style={[styles.infoText, { color: theme.text.muted }]}
+              >
+                {formatDate(reminder.releaseDate)}
+              </Text>
+            </View>
+          )}
 
           {reminder.movieMinutes > 0 && (
             <View style={styles.infoRow}>
@@ -186,23 +189,25 @@ function MovieCard({
             </View>
           )}
 
-          <View
-            style={[
-              styles.countdownBadge,
-              {
-                backgroundColor: countdown.background,
-                borderColor: countdown.color,
-              },
-            ]}
-          >
-            <Ionicons name={countdown.icon} size={10} color={countdown.color} />
-            <Text
-              style={[styles.countdownText, { color: countdown.color }]}
-              numberOfLines={1}
+          {posterBadges?.countdown !== false && (
+            <View
+              style={[
+                styles.countdownBadge,
+                {
+                  backgroundColor: countdown.background,
+                  borderColor: countdown.color,
+                },
+              ]}
             >
-              {countdown.label}
-            </Text>
-          </View>
+              <Ionicons name={countdown.icon} size={10} color={countdown.color} />
+              <Text
+                style={[styles.countdownText, { color: countdown.color }]}
+                numberOfLines={1}
+              >
+                {countdown.label}
+              </Text>
+            </View>
+          )}
         </View>
       </Animated.View>
     </TouchableOpacity>
@@ -220,6 +225,7 @@ function EpisodeCard({
   calculateDateDifference,
 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const { posterBadges } = useListLayoutSettings();
   const diff = calculateDateDifference(episode.airDate);
   const countdown = getCountdownStyle(diff, theme.colors);
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
@@ -306,19 +312,21 @@ function EpisodeCard({
           >
             {episode.episodeNumber}{i18nText("autoI18n.bolum_3", ". Bölüm")}</Text>
 
-          <View style={styles.infoRow}>
-            <Ionicons
-              name="calendar-outline"
-              size={10}
-              color={theme.text.muted}
-            />
-            <Text
-              allowFontScaling={false}
-              style={[styles.infoText, { color: theme.text.muted }]}
-            >
-              {formatDate(episode.airDate)}
-            </Text>
-          </View>
+          {posterBadges?.releaseDate !== false && (
+            <View style={styles.infoRow}>
+              <Ionicons
+                name="calendar-outline"
+                size={10}
+                color={theme.text.muted}
+              />
+              <Text
+                allowFontScaling={false}
+                style={[styles.infoText, { color: theme.text.muted }]}
+              >
+                {formatDate(episode.airDate)}
+              </Text>
+            </View>
+          )}
 
           {episode.episodeMinutes > 0 && (
             <View style={styles.infoRow}>
@@ -336,23 +344,25 @@ function EpisodeCard({
             </View>
           )}
 
-          <View
-            style={[
-              styles.countdownBadge,
-              {
-                backgroundColor: countdown.background,
-                borderColor: countdown.color,
-              },
-            ]}
-          >
-            <Ionicons name={countdown.icon} size={10} color={countdown.color} />
-            <Text
-              style={[styles.countdownText, { color: countdown.color }]}
-              numberOfLines={1}
+          {posterBadges?.countdown !== false && (
+            <View
+              style={[
+                styles.countdownBadge,
+                {
+                  backgroundColor: countdown.background,
+                  borderColor: countdown.color,
+                },
+              ]}
             >
-              {countdown.label}
-            </Text>
-          </View>
+              <Ionicons name={countdown.icon} size={10} color={countdown.color} />
+              <Text
+                style={[styles.countdownText, { color: countdown.color }]}
+                numberOfLines={1}
+              >
+                {countdown.label}
+              </Text>
+            </View>
+          )}
         </View>
       </Animated.View>
     </TouchableOpacity>
@@ -480,6 +490,15 @@ export default function ProfileReminders({ navigation }) {
               </Text>
             </View>
           )}
+
+          {/* Takvim butonu — profil önizleme başlığındakiyle aynı */}
+          <TouchableOpacity
+            style={[styles.calendarBtn, { backgroundColor: theme.accent + "22" }]}
+            onPress={() => navigation.navigate("CalendarScreen")}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="calendar" size={15} color={theme.accent} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -587,13 +606,7 @@ export default function ProfileReminders({ navigation }) {
 
       {/* ── Liste ── */}
       {loading ? (
-        <View style={styles.emptyContainer}>
-          <ActivityIndicator size="small" color={theme.accent} />
-          <Text
-            allowFontScaling={false}
-            style={[styles.emptyText, { color: theme.text.muted }]}
-          >{i18nText("autoI18n.yukleniyor", "Yükleniyor...")}</Text>
-        </View>
+        <ReminderGridSkeleton />
       ) : activeTab === "movie" ? (
         sortedMovieReminders.length > 0 ? (
           <View style={styles.gridWrap}>
@@ -666,6 +679,17 @@ const GRID_GAP = 10;
 const CARD_W = (width - GRID_PAD * 2 - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
 const CARD_H = CARD_W * 1.62;
 
+// İlk yükleme: 3 sütunlu poster grid iskeleti (gerçek hatırlatma kartlarıyla aynı ölçü).
+function ReminderGridSkeleton() {
+  return (
+    <View style={styles.gridWrap}>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Skeleton key={i} width={CARD_W} height={CARD_H} style={{ borderRadius: 14 }} />
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   section: { width: "100%", marginBottom: 14 },
 
@@ -679,7 +703,14 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 13, textTransform: "uppercase", letterSpacing: 1 },
 
-  countRow: { flexDirection: "row", gap: 6 },
+  countRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  calendarBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   countBadge: {
     flexDirection: "row",
     alignItems: "center",

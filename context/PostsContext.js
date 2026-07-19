@@ -81,6 +81,11 @@ export function PostsProvider({ children }) {
   // Realtime listener — sadece "all" filtresinde aktif.
   const unsubRef = useRef(null);
 
+  // Cold-start fetch'i geç biterse ve kullanıcı bu arada filtre değiştirdiyse
+  // "all" sonuçları filtreli listeyi ezmesin diye güncel filtreyi ref'te tut.
+  const filterStateRef = useRef({ filter, sort });
+  filterStateRef.current = { filter, sort };
+
   // ── 1. Cold start: cache + ilk fetch ─────────────────────────────────────
   useEffect(() => {
     if (!startupReady) return undefined;
@@ -99,6 +104,14 @@ export function PostsProvider({ children }) {
           filter: "all",
         });
         if (cancelled) return;
+        if (
+          filterStateRef.current.filter !== "all" ||
+          filterStateRef.current.sort !== "recent"
+        ) {
+          // Kullanıcı startup penceresinde filtre değiştirmiş; effect 3 hallediyor.
+          setLoading(false);
+          return;
+        }
         setPosts((prev) => (sameIds(prev, fresh) ? prev : fresh));
         lastDocRef.current = lastDoc;
         setHasMore(fresh.length > 0);
@@ -126,8 +139,16 @@ export function PostsProvider({ children }) {
       unsubRef.current = null;
       return;
     }
+    // İlk snapshot'ta listeyi olduğu gibi değiştir: başka bir filtreden
+    // dönülüyorsa prev o filtrenin gönderilerini içerir; slice(15) merge'ü
+    // yabancı gönderileri feed'e karıştırır (yinelenen key'ler dahil).
+    let isFirstSnapshot = true;
     unsubRef.current = PostsApi.subscribeToFreshFeed((live) => {
       setPosts((prev) => {
+        if (isFirstSnapshot) {
+          isFirstSnapshot = false;
+          return live;
+        }
         // Eğer paginate edilmişse (ilk 15'ten fazla varsa), realtime'dan gelen
         // ilk 15'i prev'in geri kalanıyla birleştir; aksi halde direkt değiştir.
         if (prev.length <= 15) return live;
@@ -147,8 +168,16 @@ export function PostsProvider({ children }) {
   }, [startupReady, filter, sort]);
 
   // ── 3. Filter değişimi ────────────────────────────────────────────────────
+  // İlk mount'ta cold-start effect'i (1) fetch'i yapıyor; burada atla.
+  // Sonraki değişimlerde "all/recent" dahil her filtre için fetch gerekir:
+  // aksi halde lastDocRef başka filtrenin cursor'ında kalır ve "all" feed'inde
+  // pagination ya yanlış yerden devam eder ya da hiç çalışmaz.
+  const filterEffectFirstRun = useRef(true);
   useEffect(() => {
-    if (filter === "all" && sort === "recent") return; // realtime hallediyor
+    if (filterEffectFirstRun.current) {
+      filterEffectFirstRun.current = false;
+      return;
+    }
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -458,6 +487,40 @@ export function PostsProvider({ children }) {
     [user, filter, sort],
   );
 
+  // ── Anket oyu (optimistic toggle) ────────────────────────────────────────
+  const votePoll = useCallback(
+    async (postId, optionId) => {
+      if (!user?.uid) {
+        Toast.show({ type: "warning", text1: i18nText("autoI18n.oy_vermek_icin_giris_yap", "Oy vermek için giriş yap") });
+        return;
+      }
+      const uid = user.uid;
+      const post = posts.find((p) => p.id === postId);
+      const currentVote = post?.poll?.votes?.[uid] ?? null;
+      const nextVote = currentVote === optionId ? null : optionId;
+
+      const applyVote = (voteVal) =>
+        setPosts((prev) =>
+          prev.map((p) => {
+            if (p.id !== postId || !p.poll) return p;
+            const votes = { ...(p.poll.votes || {}) };
+            if (voteVal == null) delete votes[uid];
+            else votes[uid] = voteVal;
+            return { ...p, poll: { ...p.poll, votes } };
+          }),
+        );
+
+      applyVote(nextVote); // optimistic
+      try {
+        await PostsApi.votePoll(postId, uid, optionId, currentVote);
+      } catch (e) {
+        applyVote(currentVote); // rollback
+        Toast.show({ type: "error", text1: i18nText("autoI18n.oy_kaydedilemedi", "Oy kaydedilemedi") });
+      }
+    },
+    [user?.uid, posts],
+  );
+
   const value = useMemo(
     () => ({
       // state
@@ -480,6 +543,7 @@ export function PostsProvider({ children }) {
       submitPost,
       deletePost,
       editPost,
+      votePoll,
       // constants
       FILTERS,
       SORTS,
@@ -501,6 +565,7 @@ export function PostsProvider({ children }) {
       submitPost,
       deletePost,
       editPost,
+      votePoll,
     ],
   );
 

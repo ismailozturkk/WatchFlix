@@ -56,6 +56,12 @@ export default function NotesCard({ navigation }) {
 
   return (
     <View style={styles.wrapper}>
+      <Text
+        allowFontScaling={false}
+        style={[styles.sectionTitle, { color: theme.text.muted }]}
+      >
+        {title}
+      </Text>
       <TouchableOpacity
         onPress={goToNotes}
         activeOpacity={0.85}
@@ -193,6 +199,12 @@ export default function NotesCard({ navigation }) {
 
 const styles = StyleSheet.create({
   wrapper: { width: "100%", alignItems: "center", marginBottom: 14 },
+  sectionTitle: {
+    width: "92%",
+    fontSize: 14,
+    marginBottom: 10,
+    textTransform: "uppercase",
+  },
   card: {
     width: "92%",
     borderRadius: 20,

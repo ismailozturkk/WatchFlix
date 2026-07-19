@@ -11,7 +11,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 
 
-function StoryActionBarComponent({ busy, onShare, onOpenSettings, onSaveImage }) {
+function StoryActionBarComponent({ busy, onShare, onShareSticker, onOpenSettings, onSaveImage }) {
   const { theme } = useTheme();
   return (
     <View style={styles.row}>
@@ -36,6 +36,21 @@ function StoryActionBarComponent({ busy, onShare, onOpenSettings, onSaveImage })
           <Text allowFontScaling={false} style={styles.sub}>{i18nText("autoI18n.png_olarak_disa_aktar", "PNG olarak dışa aktar")}</Text>
         </View>
       </TouchableOpacity>
+
+      {/* İçerikleri saydam zeminli PNG (çıkartma) olarak paylaş */}
+      {onShareSticker && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={onShareSticker}
+          disabled={busy}
+          style={[styles.iconBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+        >
+          <Ionicons name="cut-outline" size={22} color={theme.text.secondary} />
+          <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>
+            Sticker
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity
         activeOpacity={0.85}

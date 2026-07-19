@@ -26,14 +26,15 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { LinearGradient } from "expo-linear-gradient";
 import Toast from "react-native-toast-message";
 import { useTheme } from "@context/ThemeContext";
 
 const TYPE_META = {
-  success: { icon: "checkmark-circle", color: "#22C55E" },
-  error: { icon: "alert-circle", color: "#EF4444" },
-  warning: { icon: "warning", color: "#F59E0B" },
-  info: { icon: "information-circle", color: "#3B82F6" },
+  success: { icon: "checkmark", color: "#22C55E", softColor: "#86EFAC" },
+  error: { icon: "close", color: "#EF4444", softColor: "#FDA4AF" },
+  warning: { icon: "alert", color: "#F59E0B", softColor: "#FCD34D" },
+  info: { icon: "information", color: "#3B82F6", softColor: "#7DD3FC" },
 };
 
 const ToastCard = React.memo(function ToastCard({ type, text1, text2 }) {
@@ -43,38 +44,66 @@ const ToastCard = React.memo(function ToastCard({ type, text1, text2 }) {
   return (
     <Pressable
       onPress={() => Toast.hide()}
+      accessibilityRole="button"
+      accessibilityLabel={[text1, text2].filter(Boolean).join(". ")}
       style={[
         styles.card,
         {
           backgroundColor: theme.secondary,
-          borderColor: theme.border,
-          borderLeftColor: meta.color,
+          borderColor: `${meta.color}38`,
           shadowColor: "#000",
         },
       ]}
     >
-      <View style={[styles.iconWrap, { backgroundColor: meta.color + "22" }]}>
-        <Ionicons name={meta.icon} size={20} color={meta.color} />
-      </View>
-      <View style={styles.textWrap}>
-        {text1 ? (
-          <Text
-            allowFontScaling={false}
-            numberOfLines={2}
-            style={[styles.title, { color: theme.text.primary }]}
-          >
-            {text1}
-          </Text>
-        ) : null}
-        {text2 ? (
-          <Text
-            allowFontScaling={false}
-            numberOfLines={3}
-            style={[styles.message, { color: theme.text.secondary }]}
-          >
-            {text2}
-          </Text>
-        ) : null}
+      <View style={styles.cardClip}>
+        <LinearGradient
+          pointerEvents="none"
+          colors={[`${meta.color}1F`, `${meta.color}08`, "transparent"]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <LinearGradient
+          pointerEvents="none"
+          colors={[meta.softColor, meta.color, `${meta.color}00`]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.accentLine}
+        />
+
+        <LinearGradient
+          colors={[meta.softColor, meta.color]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.iconWrap, { shadowColor: meta.color }]}
+        >
+          <Ionicons name={meta.icon} size={19} color="#FFFFFF" />
+        </LinearGradient>
+
+        <View style={styles.textWrap}>
+          {text1 ? (
+            <Text
+              allowFontScaling={false}
+              numberOfLines={2}
+              style={[styles.title, { color: theme.text.primary }]}
+            >
+              {text1}
+            </Text>
+          ) : null}
+          {text2 ? (
+            <Text
+              allowFontScaling={false}
+              numberOfLines={3}
+              style={[styles.message, { color: theme.text.secondary }]}
+            >
+              {text2}
+            </Text>
+          ) : null}
+        </View>
+
+        <View style={[styles.closeButton, { backgroundColor: `${meta.color}12` }]}>
+          <Ionicons name="close" size={16} color={theme.text.secondary} />
+        </View>
       </View>
     </Pressable>
   );
@@ -102,31 +131,55 @@ export const toast = {
 
 const styles = StyleSheet.create({
   card: {
+    width: "92%",
+    maxWidth: 520,
+    alignSelf: "center",
+    borderRadius: 20,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 18,
+    elevation: 10,
+  },
+  cardClip: {
+    minHeight: 68,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    width: "92%",
-    alignSelf: "center",
     paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderLeftWidth: 4,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-    elevation: 6,
+    paddingLeft: 13,
+    paddingRight: 11,
+    borderRadius: 19,
+    overflow: "hidden",
+  },
+  accentLine: {
+    position: "absolute",
+    top: 0,
+    left: 20,
+    right: 20,
+    height: 2,
   },
   iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 7,
+    elevation: 4,
+  },
+  textWrap: { flex: 1, gap: 3, paddingVertical: 1 },
+  title: { fontSize: 14.5, fontWeight: "800", letterSpacing: -0.15, lineHeight: 19 },
+  message: { fontSize: 12.5, fontWeight: "500", lineHeight: 17.5 },
+  closeButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
   },
-  textWrap: { flex: 1, gap: 2 },
-  title: { fontSize: 14.5, fontWeight: "800", letterSpacing: -0.2 },
-  message: { fontSize: 12.5, fontWeight: "500", lineHeight: 17 },
 });
 
 export default toast;

@@ -40,6 +40,8 @@ import PostCommentSheetModal from "@components/modals/PostCommentSheetModal";
 import StaggerItem from "@components/StaggerItem";
 import BackButton from "@components/BackButton";
 import RatingStars from "../../components/RatingStars";
+import PollMessage from "@components/chat/PollMessage";
+import { FeedSkeleton } from "@components/Skeleton";
 import { getAvatarSource } from "../../utils/avatars";
 import { i18nText } from "../../utils/i18nText";
 import { appAlert } from "@components/AppAlert";
@@ -278,6 +280,8 @@ const PostCard = memo(function PostCard({
   onPressAuthor,
   onShare,
   onReport,
+  onVote,
+  getTmdbUrl,
 }) {
   const [spoilerRevealed, setSpoilerRevealed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -288,7 +292,17 @@ const PostCard = memo(function PostCard({
   const accentColor =
     post.type === "list"
       ? theme.colors?.green || "#3ddc84"
-      : theme.colors?.blue || "#4a7cf6";
+      : post.type === "poll"
+        ? theme.colors?.purple || "#a855f7"
+        : theme.colors?.blue || "#4a7cf6";
+  const typeBadgeLabel =
+    post.type === "list"
+      ? t.badges.list
+      : post.type === "poll"
+        ? i18nText("autoI18n.anket", "Anket")
+        : post.type === "text"
+          ? i18nText("autoI18n.sohbet", "Sohbet")
+          : t.badges.review;
 
   const timeText = formatTimeAgo(post._createdAtMs || 0, t.timeAgo);
 
@@ -355,7 +369,7 @@ const PostCard = memo(function PostCard({
               ]}
             >
               <Text style={[postStyles.badgeText, { color: accentColor }]}>
-                {post.type === "list" ? t.badges.list : t.badges.review}
+                {typeBadgeLabel}
               </Text>
             </View>
             {post.hasSpoiler && (
@@ -482,7 +496,7 @@ const PostCard = memo(function PostCard({
                   ]}
                 >
                   <Text style={[menuStyles.previewBadgeText, { color: accentColor }]}>
-                    {post.type === "list" ? t.badges.list : t.badges.review}
+                    {typeBadgeLabel}
                   </Text>
                 </View>
                 <Text
@@ -680,7 +694,22 @@ const PostCard = memo(function PostCard({
       )}
 
       {/* Body */}
-      {post.type === "review" && post.mediaList?.length > 0 ? (
+      {post.type === "poll" && post.poll ? (
+        <>
+          <Text style={[postStyles.title, { color: theme.text.primary }]}>
+            {post.title}
+          </Text>
+          <View style={postStyles.pollWrap}>
+            <PollMessage
+              poll={post.poll}
+              currentUid={currentUid}
+              accent={accentColor}
+              getTmdbUrl={getTmdbUrl}
+              onVote={(optId) => onVote?.(post.id, optId)}
+            />
+          </View>
+        </>
+      ) : post.type === "review" && post.mediaList?.length > 0 ? (
         <View style={{ flexDirection: "row", gap: 12 }}>
           <View style={{ alignItems: "center" }}>
             <View
@@ -842,7 +871,7 @@ const PostCard = memo(function PostCard({
                     paddingVertical: 6,
                     paddingRight: 12,
                   }}
-                  renderItem={({ item }) => (
+                  renderItem={({ item, index }) => (
                     <View
                       style={[postStyles.mediaCard, { borderColor: theme.border }]}
                     >
@@ -851,6 +880,11 @@ const PostCard = memo(function PostCard({
                         style={postStyles.mediaPoster}
                         contentFit="cover"
                       />
+                      {post.ranked && (
+                        <View style={[postStyles.rankNum, { backgroundColor: accentColor }]}>
+                          <Text style={postStyles.rankNumText}>{index + 1}</Text>
+                        </View>
+                      )}
                       {item.year ? (
                         <View style={postStyles.mediaYear}>
                           <Text style={postStyles.mediaYearText}>{item.year}</Text>
@@ -951,7 +985,7 @@ const EmptyState = memo(function EmptyState({ theme, t }) {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
-export default function ShareContentScreen() {
+export default function ShareContentScreen({ route }) {
   const { theme } = useTheme();
   const { t, language } = useLanguage();
   const ts = t.shareScreen;
@@ -1030,11 +1064,26 @@ export default function ShareContentScreen() {
     submitPost,
     deletePost,
     editPost,
+    votePoll,
   } = usePosts();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingPost, setEditingPost] = useState(null); // null = create, obj = edit
+  const [initialPost, setInitialPost] = useState(null);
   const [commentPost, setCommentPost] = useState(null); // yorum modalı açık post
+  const consumedComposeKey = useRef(null);
+
+  useEffect(() => {
+    const composePost = route?.params?.composePost;
+    if (!composePost) return;
+    const composeKey = composePost.composeKey || `${composePost.postType || "review"}-${Date.now()}`;
+    if (consumedComposeKey.current === composeKey) return;
+    consumedComposeKey.current = composeKey;
+    setEditingPost(null);
+    setInitialPost(composePost);
+    setModalVisible(true);
+    navigation.setParams?.({ composePost: undefined });
+  }, [route?.params?.composePost, navigation]);
 
   // Her post'a "ben beğendim/kaydettim mi?" bayrağını burada bind et.
   const enrichedPosts = useMemo(
@@ -1062,6 +1111,7 @@ export default function ShareContentScreen() {
   );
 
   const handleEditRequest = useCallback((post) => {
+    setInitialPost(null);
     setEditingPost(post);
     setModalVisible(true);
   }, []);
@@ -1069,6 +1119,7 @@ export default function ShareContentScreen() {
   const handleCloseModal = useCallback(() => {
     setModalVisible(false);
     setEditingPost(null);
+    setInitialPost(null);
   }, []);
 
   const handleOpenComments = useCallback((post) => {
@@ -1185,7 +1236,10 @@ export default function ShareContentScreen() {
         {/* Create post composer */}
         <TouchableOpacity
           activeOpacity={0.85}
-          onPress={() => setModalVisible(true)}
+          onPress={() => {
+            setInitialPost(null);
+            setModalVisible(true);
+          }}
           style={mainStyles.composerWrap}
         >
           <LinearGradient
@@ -1290,10 +1344,12 @@ export default function ShareContentScreen() {
           onPressAuthor={handleOpenProfile}
           onShare={handleSharePost}
           onReport={handleReportPost}
+          onVote={votePoll}
+          getTmdbUrl={getTmdbUrl}
         />
       </StaggerItem>
     ),
-    [theme, ts, user?.uid, toggleLike, toggleBookmark, handleOpenComments, handleOpenProfile, handleEditRequest, deletePost, handleSharePost, handleReportPost],
+    [theme, ts, user?.uid, toggleLike, toggleBookmark, handleOpenComments, handleOpenProfile, handleEditRequest, deletePost, handleSharePost, handleReportPost, votePoll, getTmdbUrl],
   );
 
   const listFooter = useMemo(() => {
@@ -1311,13 +1367,9 @@ export default function ShareContentScreen() {
   }, [loadingMore, hasMore, enrichedPosts.length, theme.text.muted]);
 
   const listEmpty = useMemo(() => {
-    // İlk yüklemede skeleton/loading göster, sonra empty state.
+    // İlk yüklemede feed kartı skeleton'ı, sonra empty state.
     if (loading) {
-      return (
-        <View style={{ paddingVertical: 60, alignItems: "center" }}>
-          <ActivityIndicator color={theme.text.muted} />
-        </View>
-      );
+      return <FeedSkeleton count={4} />;
     }
     return <EmptyState theme={theme} t={ts} />;
   }, [loading, theme, ts]);
@@ -1356,6 +1408,7 @@ export default function ShareContentScreen() {
         onClose={handleCloseModal}
         onSubmit={handleSubmitPost}
         editingPost={editingPost}
+        initialPost={initialPost}
       />
 
       <Modal
@@ -1657,6 +1710,11 @@ const postStyles = StyleSheet.create({
     gap: 5,
   },
   actionText: { fontSize: 12, fontWeight: "600" },
+  // Anket gövdesi — PollMessage koyu bubble varsayar; temadan bağımsız koyu kap.
+  pollWrap: { backgroundColor: "#171727", borderRadius: 14, padding: 12, marginTop: 2, marginBottom: 4 },
+  // Sıralı liste poster numarası (#1, #2...)
+  rankNum: { position: "absolute", top: 5, left: 5, minWidth: 20, height: 20, paddingHorizontal: 4, borderRadius: 7, alignItems: "center", justifyContent: "center" },
+  rankNumText: { color: "#fff", fontSize: 11, fontWeight: "900" },
 });
 
 const menuStyles = StyleSheet.create({

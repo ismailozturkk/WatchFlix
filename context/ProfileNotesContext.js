@@ -69,7 +69,13 @@ export const ProfileNotesProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    if (!uid) return;
+    if (!uid) {
+      // Logout: önceki hesabın notları yeni oturuma sızmasın (bildirim
+      // zamanlayıcı da bu listeden besleniyor).
+      setNotes([]);
+      setLoadingNotes(false);
+      return;
+    }
     // Offline-first: önce cache'ten seed.
     const cached = cacheStore.getJSON(...cacheKeys.notes(uid));
     if (Array.isArray(cached)) {

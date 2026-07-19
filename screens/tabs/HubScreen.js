@@ -17,7 +17,6 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
-  ActivityIndicator,
 } from "react-native";
 import Animated, {
   useSharedValue,
@@ -28,6 +27,9 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
+import Skeleton from "@components/Skeleton";
+import IconBacground from "@components/IconBacground";
+import ScreenSnow from "@components/ScreenSnow";
 import ProfileGamesModule from "@components/profile/ProfileGamesModule";
 import TournamentWidget from "@components/hub/TournamentWidget";
 import { useTheme } from "@context/ThemeContext";
@@ -134,8 +136,29 @@ function FeedWidget({ navigation, theme, posts, loading }) {
         <View style={styles.widgetDivider} />
 
         {loading && !latestPost ? (
-          <View style={styles.feedLoading}>
-            <ActivityIndicator color="#fff" size="small" />
+          <View style={[styles.latestPostCard, { backgroundColor: "rgba(255,255,255,0.08)" }]}>
+            <Skeleton
+              width={48}
+              height={68}
+              style={{ borderRadius: 10, backgroundColor: "rgba(255,255,255,0.18)" }}
+            />
+            <View style={{ flex: 1, marginLeft: 11, marginRight: 8, gap: 8 }}>
+              <Skeleton
+                width={"55%"}
+                height={11}
+                style={{ borderRadius: 4, backgroundColor: "rgba(255,255,255,0.18)" }}
+              />
+              <Skeleton
+                width={"88%"}
+                height={13}
+                style={{ borderRadius: 4, backgroundColor: "rgba(255,255,255,0.18)" }}
+              />
+              <Skeleton
+                width={"40%"}
+                height={10}
+                style={{ borderRadius: 4, backgroundColor: "rgba(255,255,255,0.18)" }}
+              />
+            </View>
           </View>
         ) : latestPost ? (
           <Pressable
@@ -210,25 +233,78 @@ function FeedWidget({ navigation, theme, posts, loading }) {
   );
 }
 
+// ─── Hızlı paylaşım çubuğu (Hub'dan doğrudan compose aç) ────────────────────
+// ShareContentScreen'in mevcut route.params.composePost mekanizmasını kullanır:
+// feed'e gider ve seçili tiple CreatePostModal'ı açar.
+function QuickComposeBar({ navigation, theme, avatar }) {
+  const go = (postType) =>
+    navigation.navigate("ShareContentScreen", {
+      composePost: { postType, composeKey: `${postType}-${Date.now()}` },
+    });
+  const chips = [
+    { key: "review", icon: "create", label: i18nText("autoI18n.inceleme", "İnceleme") },
+    { key: "list", icon: "list", label: i18nText("autoI18n.liste_2", "Liste") },
+    { key: "text", icon: "chatbubble-ellipses", label: i18nText("autoI18n.sohbet", "Sohbet") },
+    { key: "poll", icon: "stats-chart", label: i18nText("autoI18n.anket", "Anket") },
+  ];
+  return (
+    <View style={[styles.qcWrap, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+      <Pressable style={styles.qcPrompt} onPress={() => go("review")}>
+        {avatar ? (
+          <Image source={avatar} style={styles.qcAvatar} />
+        ) : (
+          <View style={[styles.qcAvatar, { backgroundColor: theme.primary, alignItems: "center", justifyContent: "center" }]}>
+            <AppIcon family="Ionicons" name="person" size={16} color={theme.text.muted} />
+          </View>
+        )}
+        <Text style={[styles.qcPromptText, { color: theme.text.muted }]} numberOfLines={1}>
+          {i18nText("autoI18n.ne_paylasmak_istersin", "Ne paylaşmak istersin?")}
+        </Text>
+        <View style={[styles.qcPlus, { backgroundColor: theme.accent }]}>
+          <AppIcon family="Ionicons" name="add" size={18} color="#fff" />
+        </View>
+      </Pressable>
+      <View style={styles.qcChips}>
+        {chips.map((c) => (
+          <Pressable
+            key={c.key}
+            style={[styles.qcChip, { borderColor: theme.border, backgroundColor: theme.primary }]}
+            onPress={() => go(c.key)}
+          >
+            <AppIcon family="Ionicons" name={c.icon} size={14} color={theme.text.secondary} />
+            <Text style={[styles.qcChipText, { color: theme.text.secondary }]} numberOfLines={1}>
+              {c.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function HubScreen({ navigation }) {
   const { theme } = useTheme();
-  useLanguage();
+  const { language } = useLanguage();
   const { user } = useAuth();
   const { avatar } = useProfileUi();
   const { posts, loading: postsLoading } = usePosts();
 
+  // language dependency'de olmalı; yoksa dil değişince selamlama eski dilde kalır.
   const greeting = useMemo(() => {
     const name = user?.displayName?.split(" ")[0] || "";
     const hi = i18nText("autoI18n.merhaba", "Merhaba");
     return name ? `${hi}, ${name}` : hi;
-  }, [user?.displayName]);
+  }, [user?.displayName, language]);
 
   return (
-    <SafeAreaView edges={["top"]} style={[styles.container, { backgroundColor: theme.primary }]}>
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
+    <View style={[styles.container, { backgroundColor: theme.primary }]}>
+      {/* Arka plan ikonları — içeriğin ARKASINDA, tüm ekranı kaplar */}
+      <IconBacground opacity={0.15} />
+      <SafeAreaView edges={["top"]} style={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+        >
         {/* Başlık */}
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
@@ -267,6 +343,7 @@ export default function HubScreen({ navigation }) {
           posts={posts}
           loading={postsLoading}
         />
+        <QuickComposeBar navigation={navigation} theme={theme} avatar={avatar} />
 
         {/* Turnuva */}
         <Text style={[styles.sectionTitle, { color: theme.text.muted, marginTop: 18 }]}>
@@ -276,8 +353,11 @@ export default function HubScreen({ navigation }) {
 
         {/* Oyunlar (profilden taşındı) */}
         <ProfileGamesModule navigation={navigation} />
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+      {/* Kar efekti — içeriğin ÜSTÜnde katman (optimize, sabit overlay) */}
+      <ScreenSnow />
+    </View>
   );
 }
 
@@ -479,4 +559,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
   },
+
+  // Hızlı paylaşım çubuğu
+  qcWrap: { width: "90%", borderRadius: 18, borderWidth: 1, padding: 12, marginTop: 12 },
+  qcPrompt: { flexDirection: "row", alignItems: "center", gap: 10 },
+  qcAvatar: { width: 34, height: 34, borderRadius: 17 },
+  qcPromptText: { flex: 1, fontSize: 14, fontWeight: "600" },
+  qcPlus: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  qcChips: { flexDirection: "row", gap: 8, marginTop: 12 },
+  qcChip: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
+  qcChipText: { fontSize: 11, fontWeight: "700" },
 });

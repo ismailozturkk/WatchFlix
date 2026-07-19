@@ -6,8 +6,10 @@
 // olduğundan her yakalamada tam kompozisyon elde edilir.
 //
 // Dışa açılan sözleşme (WrappedScreen bunlara bağımlı — KORUNMALI):
-//   WRAPPED_CARD_THEMES, DEFAULT_WRAPPED_CARD_OPTIONS, getWrappedCardPalette
-//   props: { recap, str, theme, language, getTmdbUrl, width, height, customization }
+//   WRAPPED_CARD_THEMES, DEFAULT_WRAPPED_CARD_OPTIONS, getWrappedCardPalette,
+//   foregroundForPalette
+//   props: { recap, str, theme, language, getTmdbUrl, width, height,
+//            userName, customization }
 
 import React, { memo } from "react";
 import { View, Text, StyleSheet } from "react-native";
@@ -42,6 +44,20 @@ export const WRAPPED_CARD_THEMES = [
     colors: ["#0891B2", "#164E63", "#082F49", "#030712"],
   },
   {
+    id: "forest",
+    labelKey: "themeForest",
+    accent: "#34D399",
+    secondary: "#A3E635",
+    colors: ["#059669", "#065F46", "#0A2E24", "#04120C"],
+  },
+  {
+    id: "gold",
+    labelKey: "themeGold",
+    accent: "#FBBF24",
+    secondary: "#FB923C",
+    colors: ["#D97706", "#92400E", "#2E1A08", "#120A04"],
+  },
+  {
     id: "noir",
     labelKey: "themeNoir",
     accent: "#F4F4F5",
@@ -53,8 +69,12 @@ export const WRAPPED_CARD_THEMES = [
 export const DEFAULT_WRAPPED_CARD_OPTIONS = {
   themeId: "signature",
   variant: "glow",
+  posterContent: "shows", // "shows" | "movies"
+  showPersonality: true,
+  showStats: true,
   showGenres: true,
   showPosters: true,
+  showName: true,
 };
 
 export function getWrappedCardPalette(themeId, fallbackAccent) {
@@ -79,8 +99,12 @@ const withAlpha = (color, alpha = 1) => {
   return color;
 };
 
-// accent açık (ocean/noir) ise üstüne gelen yazı koyu olmalı.
-const fgOn = (paletteId) => (["ocean", "noir"].includes(paletteId) ? "#0A0F14" : "#fff");
+// accent açık (ocean/noir/forest/gold) ise üstüne gelen yazı koyu olmalı.
+const LIGHT_ACCENT_THEMES = ["ocean", "noir", "forest", "gold"];
+const fgOn = (paletteId) => (LIGHT_ACCENT_THEMES.includes(paletteId) ? "#0A0F14" : "#fff");
+
+// Ekran tarafı (buton/ikon renkleri) da aynı kararı kullanır.
+export const foregroundForPalette = (palette) => fgOn(palette?.id);
 
 const WrappedShareCard = memo(function WrappedShareCard({
   recap,
@@ -90,6 +114,7 @@ const WrappedShareCard = memo(function WrappedShareCard({
   getTmdbUrl,
   width,
   height,
+  userName,
   customization = DEFAULT_WRAPPED_CARD_OPTIONS,
 }) {
   if (!recap) return null;
@@ -106,9 +131,31 @@ const WrappedShareCard = memo(function WrappedShareCard({
   const secondary = palette.secondary || accent;
   const onAccent = fgOn(palette.id);
   const isClean = customization.variant === "clean";
+  // Eski (kaydedilmiş) seçeneklerde yeni anahtarlar olmayabilir → undefined
+  // "açık" sayılır, yalnızca açık false gizler.
+  const showPersonality = customization.showPersonality !== false;
+  const showStats = customization.showStats !== false;
   const showGenres = customization.showGenres !== false;
   const showPosterSection = customization.showPosters !== false;
-  const posters = (recap.topShows || []).slice(0, 3);
+  const displayName =
+    customization.showName !== false ? (userName || "").trim() : "";
+
+  // Poster kaynağı: seçilen içerikte veri yoksa diğerine düşülür; ikisi de
+  // boşsa bölüm zaten gizlenir.
+  const showItems = (recap.topShows || [])
+    .slice(0, 3)
+    .map((p) => ({ key: `show-${p.showId}`, name: p.showName, image: p.showImage }));
+  const movieItems = (recap.moviePosters || [])
+    .slice(0, 3)
+    .map((p) => ({ key: `movie-${p.id}`, name: p.name, image: p.imagePath }));
+  const wantMovies = customization.posterContent === "movies";
+  const primaryItems = wantMovies ? movieItems : showItems;
+  const posters = primaryItems.length
+    ? primaryItems
+    : wantMovies
+      ? showItems
+      : movieItems;
+  const postersAreMovies = posters.length > 0 && posters === movieItems;
   const genres = (recap.topGenres || []).slice(0, 3);
 
   const pad = u(22);
@@ -204,39 +251,41 @@ const WrappedShareCard = memo(function WrappedShareCard({
         </View>
 
         {/* ── İzleyici kimliği ── */}
-        <View
-          style={[
-            styles.identityCard,
-            {
-              marginTop: u(16),
-              padding: u(10),
-              borderRadius: u(18),
-              borderColor: withAlpha(accent, 0.28),
-            },
-          ]}
-        >
-          <LinearGradient
-            colors={[withAlpha(accent, 0.32), withAlpha(secondary, 0.18)]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.emojiCircle, { width: u(46), height: u(46), borderRadius: u(15) }]}
+        {showPersonality && (
+          <View
+            style={[
+              styles.identityCard,
+              {
+                marginTop: u(16),
+                padding: u(10),
+                borderRadius: u(18),
+                borderColor: withAlpha(accent, 0.28),
+              },
+            ]}
           >
-            <Text style={{ fontSize: u(26) }} allowFontScaling={false}>
-              {recap.personality?.emoji}
-            </Text>
-          </LinearGradient>
-          <View style={styles.identityCopy}>
-            <Text style={[styles.eyebrow, { fontSize: u(8), color: withAlpha(accent, 0.95) }]} allowFontScaling={false}>
-              {str.personalityTitle?.toUpperCase()}
-            </Text>
-            <Text style={[styles.identityTitle, { fontSize: u(17), marginTop: u(2) }]} allowFontScaling={false} numberOfLines={1}>
-              {recap.personality?.title}
-            </Text>
+            <LinearGradient
+              colors={[withAlpha(accent, 0.32), withAlpha(secondary, 0.18)]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.emojiCircle, { width: u(46), height: u(46), borderRadius: u(15) }]}
+            >
+              <Text style={{ fontSize: u(26) }} allowFontScaling={false}>
+                {recap.personality?.emoji}
+              </Text>
+            </LinearGradient>
+            <View style={styles.identityCopy}>
+              <Text style={[styles.eyebrow, { fontSize: u(8), color: withAlpha(accent, 0.95) }]} allowFontScaling={false}>
+                {str.personalityTitle?.toUpperCase()}
+              </Text>
+              <Text style={[styles.identityTitle, { fontSize: u(17), marginTop: u(2) }]} allowFontScaling={false} numberOfLines={1}>
+                {recap.personality?.title}
+              </Text>
+            </View>
+            <View style={[styles.identityArrow, { width: u(24), height: u(24), borderRadius: u(8), backgroundColor: withAlpha(accent, 0.14) }]}>
+              <MaterialCommunityIcons name="star-four-points" size={u(13)} color={withAlpha(accent, 0.92)} />
+            </View>
           </View>
-          <View style={[styles.identityArrow, { width: u(24), height: u(24), borderRadius: u(8), backgroundColor: withAlpha("#FFFFFF", 0.08) }]}>
-            <MaterialCommunityIcons name="arrow-top-right" size={u(15)} color="rgba(255,255,255,0.6)" />
-          </View>
-        </View>
+        )}
 
         {/* ── Hero: toplam süre ── */}
         <View style={{ marginTop: u(16) }}>
@@ -277,11 +326,13 @@ const WrappedShareCard = memo(function WrappedShareCard({
         </View>
 
         {/* ── Bento istatistikleri ── */}
-        <View style={[styles.statGrid, { marginTop: u(16), gap: u(8) }]}>
-          <StatCell value={formatNumber(recap.totalMovies, language)} label={str.summaryMovies} icon="movie-open-outline" accent={accent} u={u} />
-          <StatCell value={formatNumber(recap.totalEpisodes, language)} label={str.summaryEpisodes} icon="play-box-multiple-outline" accent={accent} u={u} />
-          <StatCell value={formatNumber(recap.totalShows, language)} label={str.summaryShows} icon="television-classic" accent={accent} u={u} />
-        </View>
+        {showStats && (
+          <View style={[styles.statGrid, { marginTop: u(16), gap: u(8) }]}>
+            <StatCell value={formatNumber(recap.totalMovies, language)} label={str.summaryMovies} icon="movie-open-outline" accent={accent} u={u} />
+            <StatCell value={formatNumber(recap.totalEpisodes, language)} label={str.summaryEpisodes} icon="play-box-multiple-outline" accent={accent} u={u} />
+            <StatCell value={formatNumber(recap.totalShows, language)} label={str.summaryShows} icon="television-classic" accent={accent} u={u} />
+          </View>
+        )}
 
         {/* ── Türler ── */}
         {showGenres && genres.length > 0 && (
@@ -297,15 +348,20 @@ const WrappedShareCard = memo(function WrappedShareCard({
 
         <View style={{ flex: 1, minHeight: u(8) }} />
 
-        {/* ── En çok izlenen diziler ── */}
+        {/* ── En çok izlenenler (dizi veya film) ── */}
         {showPosterSection && posters.length > 0 && (
           <View>
-            <SectionHeader title={str.topShowsTitle} count={posters.length} accent={accent} u={u} />
+            <SectionHeader
+              title={postersAreMovies ? str.topMoviesTitle : str.topShowsTitle}
+              count={posters.length}
+              accent={accent}
+              u={u}
+            />
             <View style={[styles.posterRow, { gap: u(10), marginTop: u(8) }]}>
               {posters.map((p, i) => (
                 <PosterCard
-                  key={`${p.showId}-${i}`}
-                  show={p}
+                  key={p.key}
+                  item={p}
                   rank={i + 1}
                   top={i === 0}
                   accent={accent}
@@ -328,10 +384,23 @@ const WrappedShareCard = memo(function WrappedShareCard({
               Watchify
             </Text>
           </View>
-          <View style={[styles.footerMetaPill, { borderColor: withAlpha(accent, 0.4), paddingHorizontal: u(9), paddingVertical: u(4), borderRadius: u(999) }]}>
-            <Text style={[styles.footerMeta, { fontSize: u(8), color: withAlpha("#FFFFFF", 0.78) }]} allowFontScaling={false}>
-              {recap.year} · WRAPPED
-            </Text>
+          <View style={[styles.footerMetaPill, { gap: u(4), borderColor: withAlpha(accent, 0.4), paddingHorizontal: u(9), paddingVertical: u(4), borderRadius: u(999) }]}>
+            {displayName ? (
+              <>
+                <MaterialCommunityIcons name="account" size={u(10)} color={withAlpha(accent, 0.9)} />
+                <Text
+                  style={[styles.footerMeta, { fontSize: u(8), maxWidth: u(150), color: withAlpha("#FFFFFF", 0.85) }]}
+                  allowFontScaling={false}
+                  numberOfLines={1}
+                >
+                  {displayName}
+                </Text>
+              </>
+            ) : (
+              <Text style={[styles.footerMeta, { fontSize: u(8), color: withAlpha("#FFFFFF", 0.78) }]} allowFontScaling={false}>
+                {recap.year} · WRAPPED
+              </Text>
+            )}
           </View>
         </View>
       </View>
@@ -374,7 +443,8 @@ const GenreChip = ({ label, top, accent, secondary, onAccent, u }) =>
     </View>
   );
 
-const PosterCard = ({ show, rank, top, accent, onAccent, posterW, posterH, getTmdbUrl, u }) => (
+// item: { name, image } — dizi (showImage) ya da film (imagePath) normalize edilmiş.
+const PosterCard = ({ item, rank, top, accent, onAccent, posterW, posterH, getTmdbUrl, u }) => (
   <View style={{ alignItems: "center", width: posterW }}>
     <View
       style={[
@@ -383,9 +453,9 @@ const PosterCard = ({ show, rank, top, accent, onAccent, posterW, posterH, getTm
         top && { borderWidth: u(2), borderColor: accent, shadowColor: accent, shadowOpacity: 0.55, shadowRadius: u(10), shadowOffset: { width: 0, height: 0 }, elevation: 8 },
       ]}
     >
-      {show.showImage ? (
+      {item.image ? (
         <Image
-          source={{ uri: getTmdbUrl ? getTmdbUrl(show.showImage, "poster", 300) : null }}
+          source={{ uri: getTmdbUrl ? getTmdbUrl(item.image, "poster", 300) : null }}
           style={styles.poster}
           contentFit="cover"
           transition={120}
@@ -406,7 +476,7 @@ const PosterCard = ({ show, rank, top, accent, onAccent, posterW, posterH, getTm
       </View>
     </View>
     <Text style={[styles.posterName, { fontSize: u(9), marginTop: u(6), width: posterW }]} allowFontScaling={false} numberOfLines={1}>
-      {show.showName}
+      {item.name}
     </Text>
   </View>
 );
@@ -529,6 +599,11 @@ const styles = StyleSheet.create({
   },
   footerBrand: { flexDirection: "row", alignItems: "center", gap: 6 },
   footerBrandText: { color: "#fff", fontWeight: "900", letterSpacing: 0.3 },
-  footerMetaPill: { borderWidth: 1, backgroundColor: "rgba(255,255,255,0.04)" },
+  footerMetaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
   footerMeta: { fontWeight: "800", letterSpacing: 0.7 },
 });

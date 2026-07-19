@@ -17,21 +17,30 @@
 //   KENDİ:
 //     Users/{uid} + alt koleksiyonlar (friends, friendRequests, sentRequests,
 //                  blocked, notifications, following, followers,
-//                  likedPosts, bookmarks)
+//                  likedPosts, bookmarks, myComments, conversations,
+//                  gameProfile, gameStats, gameSessions)
 //     Usernames/{usernameLower}
-//     Lists/{uid} (+ watchedTv/{showId}/seasons alt koleksiyonu)
+//     Lists/{uid} (+ watchedTv/{showId}/seasons, wrapped alt koleksiyonları)
 //     Notes/{uid}/items
 //     Reminders/{uid} (movies, tvShows/{showId}/episodes)
 //     UserStats/{uid}
-//     Presence/{uid}
+//     Presence/{uid} (Firestore kalıntı) + RTDB /presence/{uid}
+//     SceneGame/{uid}, SceneGameHistory/{uid},
+//     GameLeaderboards/{boardId}/entries/{uid} (tüm mod×zorluk board'ları)
+//     Ratings/{mediaKey}/userRatings/{uid} + agregat düşümü (myRatings üzerinden)
 //     Posts (authorId == uid) + her postun likes/comments alt koleksiyonu
-//     chats (participants array-contains uid) + messages
+//     chats (participants array-contains uid ∪ conversations index'i) + messages
 //   KARŞILIKLI (başka kullanıcıların dokümanlarındaki izler):
 //     - Arkadaşların friends/{uid} kaydı + friendsCount--
 //     - Bana istek atanların sentRequests kaydı + pendingRequestsOutCount--
 //     - İstek attıklarımın friendRequests kaydı + pendingRequestsInCount--
 //     - Takipçilerin following/{uid} kaydı + followingCount--
 //     - Takip ettiklerimin followers/{uid} kaydı + followersCount--
+//     - Konuştuklarımın conversations/{uid} kaydı
+//   BİLİNÇLİ KAPSAM DIŞI:
+//     - tournaments/*/votes/{uid}: kural gereği silinemez (oy değiştirme
+//       exploit'ini önlemek için delete kapalı); temizlik ileride admin/CF ile.
+//     - SharedLists üyelikleri: liste sahibi/üye yönetimi ayrı akış.
 
 import {
   EmailAuthProvider,
@@ -49,7 +58,9 @@ import {
   writeBatch,
   increment,
 } from "firebase/firestore";
-import { auth, db } from "../firebase";
+import { ref as rtdbRef, remove as rtdbRemove } from "firebase/database";
+import { auth, db, rtdb } from "../firebase";
+import { removeMyRating } from "./ratingsService";
 
 const CHUNK = 450; // Firestore batch limiti 500 — güvenli pay bıraktık.
 
@@ -203,6 +214,44 @@ export async function purgeUserData(uid) {
     }
   });
 
+  // ── PUANLAR (Ratings agregatlarıyla tutarlı silme) ────────────────────────
+  // myRatings mirror'ı üzerinden her oy removeMyRating transaction'ı ile
+  // kaldırılır: Ratings/{key}/userRatings/{uid} silinir + agregat count/sum
+  // düşer + mirror silinir. Doğrudan koleksiyon silseydik silinen kullanıcının
+  // oyları site geneli ortalamalarda sonsuza dek sayılmaya devam ederdi.
+  await safe("ratings", async () => {
+    const snap = await getDocs(collection(db, "Users", uid, "myRatings"));
+    for (const d of snap.docs) {
+      const data = d.data() || {};
+      const mediaType = data.mediaType;
+      const mediaId = data.mediaId;
+      if (!mediaType || mediaId == null) {
+        // Meta eksikse en azından mirror'ı bırakma.
+        await safe(`rating-mirror ${d.id}`, () => deleteDoc(d.ref));
+        continue;
+      }
+      await safe(`rating ${d.id}`, () =>
+        removeMyRating({ mediaType, mediaId, uid }),
+      );
+    }
+  });
+
+  // ── KONUŞMALAR INDEX'İ (karşılıklı) + chatId türetimi ─────────────────────
+  // conversations hem karşı tarafın gelen kutusundaki kaydımı silmek hem de
+  // participants alanı olmayan eski chat dokümanlarını yakalamak için
+  // chats temizliğinden ÖNCE okunur.
+  const conversationChatIds = new Set();
+  await safe("conversations-reciprocal", async () => {
+    const snap = await getDocs(collection(db, "Users", uid, "conversations"));
+    for (const d of snap.docs) {
+      const otherUid = d.id;
+      conversationChatIds.add([uid, otherUid].sort().join("_"));
+      await safe(`conversation ${otherUid}`, () =>
+        deleteDoc(doc(db, "Users", otherUid, "conversations", uid)),
+      );
+    }
+  });
+
   // ── KENDİ Users ALT KOLEKSİYONLARI ────────────────────────────────────────
   const userSubcols = [
     "friends",
@@ -214,12 +263,37 @@ export async function purgeUserData(uid) {
     "followers",
     "likedPosts",
     "bookmarks",
+    "myComments",
+    "conversations",
+    "gameProfile",
+    "gameStats",
+    "gameSessions",
   ];
   for (const sub of userSubcols) {
     await safe(`users-sub ${sub}`, () =>
       deleteCollection(collection(db, "Users", uid, sub)),
     );
   }
+
+  // ── OYUN VERİLERİ (kök koleksiyonlar + leaderboard girdileri) ─────────────
+  await safe("scene-game", () => deleteDoc(doc(db, "SceneGame", uid)));
+  await safe("scene-game-history", () =>
+    deleteDoc(doc(db, "SceneGameHistory", uid)),
+  );
+  // Board id'leri deterministik: scene_{mode}_{difficulty}
+  // (services/sceneGameService.js#leaderboardBoardId). deleteDoc idempotent —
+  // hiç oynanmamış kombinasyonlarda sessiz no-op.
+  await safe("game-leaderboards", async () => {
+    const modes = ["classic", "time_attack", "survival"];
+    const difficulties = ["easy", "normal", "hard"];
+    for (const m of modes) {
+      for (const dLevel of difficulties) {
+        await safe(`leaderboard scene_${m}_${dLevel}`, () =>
+          deleteDoc(doc(db, "GameLeaderboards", `scene_${m}_${dLevel}`, "entries", uid)),
+        );
+      }
+    }
+  });
 
   // ── Lists (+ watchedTv/{showId}/seasons) ──────────────────────────────────
   await safe("lists", async () => {
@@ -233,7 +307,9 @@ export async function purgeUserData(uid) {
     }
     await deleteCollection(collection(db, "Lists", uid, "watchedTv"));
     // Yeni model: film/öntanımlı listeler + özel liste öğeleri ayrı koleksiyonlarda.
-    for (const sub of ["favorites", "watchList", "watchedMovies", "customItems"]) {
+    // wrapped: yıllık özet dokümanları (wrappedService) — parent silinince
+    // orphan kalmasın.
+    for (const sub of ["favorites", "watchList", "watchedMovies", "customItems", "wrapped"]) {
       await safe(`lists-sub ${sub}`, () =>
         deleteCollection(collection(db, "Lists", uid, sub)),
       );
@@ -264,20 +340,41 @@ export async function purgeUserData(uid) {
 
   // ── UserStats / Presence ──────────────────────────────────────────────────
   await safe("userstats", () => deleteDoc(doc(db, "UserStats", uid)));
+  // Firestore Presence: eski model kalıntısı; asıl presence RTDB'de.
   await safe("presence", () => deleteDoc(doc(db, "Presence", uid)));
+  await safe("presence-rtdb", async () => {
+    if (rtdb) await rtdbRemove(rtdbRef(rtdb, `presence/${uid}`));
+  });
 
-  // ── Sohbetler (participants array-contains uid) + messages ─────────────────
+  // ── Sohbetler + messages ──────────────────────────────────────────────────
+  // İki kaynaktan chatId topla: participants sorgusu (yeni dokümanlar) +
+  // conversations index'inden türetilen id'ler (participants alanı olmayan
+  // eski dokümanlar). Sorgu, rules'taki participants tabanlı read izniyle
+  // çalışır; başarısız olsa bile türetilmiş id'lerle silme devam eder.
   await safe("chats", async () => {
-    const snap = await getDocs(
-      query(
-        collection(db, "chats"),
-        where("participants", "array-contains", uid),
-      ),
-    );
-    for (const d of snap.docs) {
-      await safe(`chat ${d.id}`, async () => {
-        await deleteCollection(collection(db, "chats", d.id, "messages"));
-        await deleteDoc(d.ref);
+    const chatIds = new Set(conversationChatIds);
+    await safe("chats-query", async () => {
+      const snap = await getDocs(
+        query(
+          collection(db, "chats"),
+          where("participants", "array-contains", uid),
+        ),
+      );
+      snap.docs.forEach((d) => chatIds.add(d.id));
+    });
+    for (const chatId of chatIds) {
+      await safe(`chat ${chatId}`, async () => {
+        await deleteCollection(collection(db, "chats", chatId, "messages"));
+        await safe(`chat-pins ${chatId}`, () =>
+          deleteCollection(collection(db, "chats", chatId, "pins")),
+        );
+        await deleteDoc(doc(db, "chats", chatId));
+        // RTDB typing/presence metası (varsa).
+        if (rtdb) {
+          await safe(`chatMeta ${chatId}`, () =>
+            rtdbRemove(rtdbRef(rtdb, `chatMeta/${chatId}`)),
+          );
+        }
       });
     }
   });

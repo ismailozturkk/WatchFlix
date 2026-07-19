@@ -16,7 +16,11 @@ import {
   ScrollView,
   FlatList,
   SectionList,
+  Modal,
+  Dimensions,
 } from "react-native";
+
+const { height: SCREEN_H } = Dimensions.get("window");
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -521,12 +525,16 @@ export const StatsFilterBar = memo(function StatsFilterBar({
   searchValue,
   onSearchChange,
   searchPlaceholder,
-  dates = [],
   selectedDate,
-  onSelectDate,
+  selectedGenre,
   formatDate,
+  onOpenFilters,
   allDatesLabel = i18nText("autoI18n.tum_tarihler", "Tüm Tarihler"),
+  allGenresLabel = i18nText("autoI18n.tum_turler", "Tüm Türler"),
 }) {
+  const dateText = selectedDate ? formatDate?.(selectedDate) || selectedDate : allDatesLabel;
+  const genreText = selectedGenre || allGenresLabel;
+
   return (
     <View style={filterStyles.wrap}>
       {/* Search row */}
@@ -568,18 +576,63 @@ export const StatsFilterBar = memo(function StatsFilterBar({
             ) : null}
           </View>
         ) : (
-          // Date chips (sadece search kapalıyken görünür)
-          <FilterDateChips
-            theme={theme}
-            dates={dates}
-            selectedDate={selectedDate}
-            onSelectDate={onSelectDate}
-            formatDate={formatDate}
-            allDatesLabel={allDatesLabel}
-          />
+          // Tarih + tür filtre pill'leri (search kapalıyken). Dokununca modal açılır.
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={filterStyles.chipsScroll}
+            contentContainerStyle={filterStyles.chipsContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <FilterPill
+              theme={theme}
+              icon="calendar-outline"
+              text={dateText}
+              active={selectedDate != null}
+              onPress={onOpenFilters}
+            />
+            <FilterPill
+              theme={theme}
+              icon="pricetag-outline"
+              text={genreText}
+              active={selectedGenre != null}
+              onPress={onOpenFilters}
+            />
+          </ScrollView>
         )}
       </View>
     </View>
+  );
+});
+
+// Filtre tetikleyici pill (tarih / tür). Seçim varsa vurgulanır.
+const FilterPill = memo(function FilterPill({ theme, icon, text, active, onPress }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        filterStyles.pill,
+        {
+          backgroundColor: active ? theme.accent : theme.secondary,
+          borderColor: active ? theme.accent : theme.border,
+        },
+      ]}
+    >
+      <Ionicons name={icon} size={14} color={active ? "#fff" : theme.text.secondary} />
+      <Text
+        style={[
+          filterStyles.pillText,
+          {
+            color: active ? "#fff" : theme.text.secondary,
+            fontWeight: active ? "700" : "600",
+          },
+        ]}
+        numberOfLines={1}
+      >
+        {text}
+      </Text>
+      <Ionicons name="chevron-down" size={13} color={active ? "#fff" : theme.text.muted} />
+    </Pressable>
   );
 });
 
@@ -601,48 +654,175 @@ const FilterSearchInput = memo(function FilterSearchInput({
   );
 });
 
-const FilterDateChips = memo(function FilterDateChips({
+// ─── FILTER MODAL ────────────────────────────────────────────────────────────
+//
+// Tarih + tür filtrelerini tek bottom-sheet'te toplar. Seçimler anında uygulanır
+// (parent state'i günceller); "Temizle" ikisini de sıfırlar. Tekil seçim: null = tümü.
+
+export const StatsFilterModal = memo(function StatsFilterModal({
+  visible,
+  onClose,
   theme,
-  dates,
+  dates = [],
   selectedDate,
   onSelectDate,
+  genres = [],
+  selectedGenre,
+  onSelectGenre,
   formatDate,
-  allDatesLabel,
+  title = i18nText("autoI18n.filtrele", "Filtrele"),
+  dateLabel = i18nText("autoI18n.filtre_tarih", "Tarih"),
+  genreLabel = i18nText("autoI18n.filtre_tur", "Tür"),
+  allDatesLabel = i18nText("autoI18n.tum_tarihler", "Tüm Tarihler"),
+  allGenresLabel = i18nText("autoI18n.tum_turler", "Tüm Türler"),
+  clearLabel = i18nText("autoI18n.temizle", "Temizle"),
+  doneLabel = i18nText("autoI18n.tamam", "Tamam"),
 }) {
-  // "Tümü" + dates listesi
-  const items = [{ key: "all", label: allDatesLabel, value: null }, ...dates.map((d) => ({
-    key: d,
-    label: formatDate?.(d) || d,
-    value: d,
-  }))];
+  const hasFilters = selectedDate != null || selectedGenre != null;
+
+  const dateOptions = [
+    { key: "__all__", label: allDatesLabel, value: null },
+    ...dates.map((d) => ({ key: d, label: formatDate?.(d) || d, value: d })),
+  ];
+  const genreOptions = [
+    { key: "__all__", label: allGenresLabel, value: null },
+    ...genres.map((g) => ({ key: g, label: g, value: g })),
+  ];
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={filterStyles.chipsScroll}
-      contentContainerStyle={filterStyles.chipsContent}
-      keyboardShouldPersistTaps="handled"
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
     >
-      {items.map((it) => {
+      <View style={modalStyles.root}>
+        <Pressable style={modalStyles.backdrop} onPress={onClose} />
+
+        <View
+          style={[
+            modalStyles.sheet,
+            { backgroundColor: theme.secondary, borderColor: theme.border },
+          ]}
+        >
+          <View style={[modalStyles.handle, { backgroundColor: theme.border }]} />
+
+          <View style={modalStyles.header}>
+            <Text style={[modalStyles.title, { color: theme.text.primary }]}>{title}</Text>
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              style={[modalStyles.closeBtn, { borderColor: theme.border }]}
+            >
+              <Ionicons name="close" size={18} color={theme.text.secondary} />
+            </Pressable>
+          </View>
+
+          <ScrollView
+            style={modalStyles.body}
+            contentContainerStyle={modalStyles.bodyContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <FilterGroup theme={theme} icon="calendar-outline" label={dateLabel}>
+              <FilterChipCloud
+                theme={theme}
+                options={dateOptions}
+                selectedValue={selectedDate}
+                onSelect={onSelectDate}
+              />
+            </FilterGroup>
+
+            {genres.length > 0 && (
+              <FilterGroup theme={theme} icon="pricetags-outline" label={genreLabel}>
+                <FilterChipCloud
+                  theme={theme}
+                  options={genreOptions}
+                  selectedValue={selectedGenre}
+                  onSelect={onSelectGenre}
+                />
+              </FilterGroup>
+            )}
+          </ScrollView>
+
+          <View style={[modalStyles.footer, { borderTopColor: theme.border }]}>
+            <Pressable
+              onPress={() => {
+                onSelectDate(null);
+                onSelectGenre(null);
+              }}
+              disabled={!hasFilters}
+              style={[
+                modalStyles.clearBtn,
+                { borderColor: theme.border, opacity: hasFilters ? 1 : 0.45 },
+              ]}
+            >
+              <Ionicons name="refresh-outline" size={15} color={theme.text.secondary} />
+              <Text style={[modalStyles.clearText, { color: theme.text.secondary }]}>
+                {clearLabel}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={onClose}
+              style={[modalStyles.doneBtn, { backgroundColor: theme.accent }]}
+            >
+              <Text style={modalStyles.doneText}>{doneLabel}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+});
+
+const FilterGroup = memo(function FilterGroup({ theme, icon, label, children }) {
+  return (
+    <View style={modalStyles.group}>
+      <View style={modalStyles.groupHeader}>
+        <Ionicons name={icon} size={15} color={theme.text.muted} />
+        <Text style={[modalStyles.groupLabel, { color: theme.text.muted }]}>{label}</Text>
+      </View>
+      {children}
+    </View>
+  );
+});
+
+const FilterChipCloud = memo(function FilterChipCloud({
+  theme,
+  options,
+  selectedValue,
+  onSelect,
+}) {
+  return (
+    <View style={modalStyles.cloud}>
+      {options.map((opt) => {
         const isActive =
-          (it.value === null && !selectedDate) ||
-          (it.value && selectedDate === it.value);
+          (opt.value == null && selectedValue == null) ||
+          (opt.value != null && selectedValue === opt.value);
         return (
           <Pressable
-            key={it.key}
-            onPress={() => onSelectDate(it.value)}
+            key={opt.key}
+            onPress={() => onSelect(opt.value)}
             style={[
-              filterStyles.chip,
+              modalStyles.cloudChip,
               {
-                backgroundColor: isActive ? theme.accent : theme.secondary,
+                backgroundColor: isActive ? theme.accent : theme.primary,
                 borderColor: isActive ? theme.accent : theme.border,
               },
             ]}
           >
+            {isActive && (
+              <Ionicons
+                name="checkmark"
+                size={13}
+                color="#fff"
+                style={{ marginRight: 3 }}
+              />
+            )}
             <Text
               style={[
-                filterStyles.chipText,
+                modalStyles.cloudChipText,
                 {
                   color: isActive ? "#fff" : theme.text.secondary,
                   fontWeight: isActive ? "700" : "600",
@@ -650,12 +830,12 @@ const FilterDateChips = memo(function FilterDateChips({
               ]}
               numberOfLines={1}
             >
-              {it.label}
+              {opt.label}
             </Text>
           </Pressable>
         );
       })}
-    </ScrollView>
+    </View>
   );
 });
 
@@ -691,17 +871,106 @@ const filterStyles = StyleSheet.create({
   chipsContent: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
     paddingRight: 8,
   },
-  chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  pill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    maxWidth: 200,
+  },
+  pillText: { fontSize: 12, flexShrink: 1 },
+});
+
+const modalStyles = StyleSheet.create({
+  root: { flex: 1, justifyContent: "flex-end" },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.55)" },
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    paddingBottom: 10,
+  },
+  handle: {
+    alignSelf: "center",
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    marginTop: 10,
+    marginBottom: 6,
+    opacity: 0.7,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingTop: 4,
+    paddingBottom: 12,
+  },
+  title: { fontSize: 17, fontWeight: "800", letterSpacing: -0.3 },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  body: { paddingHorizontal: 16, maxHeight: Math.round(SCREEN_H * 0.48) },
+  bodyContent: { paddingBottom: 12, gap: 20 },
+  group: { gap: 10 },
+  groupHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  groupLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
+  cloud: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  cloudChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 13,
+    paddingVertical: 9,
     borderRadius: 999,
     borderWidth: 1,
-    maxWidth: 110,
+    maxWidth: "100%",
   },
-  chipText: { fontSize: 11 },
+  cloudChipText: { fontSize: 13 },
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    marginTop: 2,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  clearBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  clearText: { fontSize: 13, fontWeight: "700" },
+  doneBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 13,
+    borderRadius: 14,
+  },
+  doneText: { color: "#fff", fontSize: 14, fontWeight: "800" },
 });
 
 // ─── SECTION HEADER (her tarih grubunun başlığı) ─────────────────────────────

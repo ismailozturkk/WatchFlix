@@ -13,7 +13,11 @@ import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { MovieSkeleton } from "../../components/Skeleton";
-import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import {
+  useImageQualitySettings,
+  useListLayoutSettings,
+  useStreamingProviderSettings,
+} from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import PaginatedRail from "../../components/PaginatedRail";
@@ -26,6 +30,7 @@ const { width } = Dimensions.get("window");
 // Stable, module-scope item component → no remount → no flicker.
 const MovieProvidersCard = memo(function MovieProvidersCard({ item, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
+  const { posterBadges } = useListLayoutSettings();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -54,11 +59,13 @@ const MovieProvidersCard = memo(function MovieProvidersCard({ item, navigation, 
           transition={120}
         />
 
-        <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
-          <Text allowFontScaling={false} style={styles.similarRatingText}>
-            {item.vote_average.toFixed(1)}
-          </Text>
-        </View>
+        {posterBadges?.tmdbRating !== false && (
+          <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
+            <Text allowFontScaling={false} style={styles.similarRatingText}>
+              {item.vote_average.toFixed(1)}
+            </Text>
+          </View>
+        )}
         <ListBadges
           mediaId={item.id}
           mediaType="movie"
@@ -74,6 +81,7 @@ export default function MovieProviders({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { streamingProviderIds } = useStreamingProviderSettings();
   // Sağlayıcıları çek
   const {
     selectedProvider,
@@ -88,6 +96,19 @@ export default function MovieProviders({ navigation }) {
     pageProvider,
     totalPagesProvider,
   } = useMovie();
+
+  const displayedProviders = useMemo(
+    () =>
+      [...providers].sort((a, b) => {
+        const aSubscribed = streamingProviderIds.includes(a.provider_id) ? 1 : 0;
+        const bSubscribed = streamingProviderIds.includes(b.provider_id) ? 1 : 0;
+        return (
+          bSubscribed - aSubscribed ||
+          Number(a.display_priority ?? 9999) - Number(b.display_priority ?? 9999)
+        );
+      }),
+    [providers, streamingProviderIds],
+  );
 
   useEffect(() => {
     activateMovieSection("providers");
@@ -105,7 +126,9 @@ export default function MovieProviders({ navigation }) {
         backgroundColor:
           selectedProvider === item.provider_id
             ? theme.accent
-            : theme.secondary,
+            : streamingProviderIds.includes(item.provider_id)
+              ? theme.between
+              : theme.secondary,
         borderRadius: 15,
       }}
       onPress={() => fetchMoviesByProvider(item.provider_id)}
@@ -125,6 +148,13 @@ export default function MovieProviders({ navigation }) {
           height: 40,
         }}
       >
+        {streamingProviderIds.includes(item.provider_id) && (
+          <Ionicons
+            name="checkmark-circle"
+            size={14}
+            color={selectedProvider === item.provider_id ? "#FFFFFF" : theme.accent}
+          />
+        )}
         <Text
           style={{
             color: theme.text.primary,
@@ -153,7 +183,7 @@ export default function MovieProviders({ navigation }) {
     return (
       <View style={{ flex: 1, paddingVertical: 10 }}>
         <FlatList
-          data={providers}
+          data={displayedProviders}
           horizontal
           showsHorizontalScrollIndicator={false}
           keyExtractor={(item) => item.provider_id.toString()}
@@ -189,7 +219,7 @@ export default function MovieProviders({ navigation }) {
       <View style={{ flexDirection: "row", alignItems: "center", paddingRight: 12 }}>
         <View style={{ flex: 1 }}>
           <FlatList
-            data={providers}
+            data={displayedProviders}
             horizontal
             showsHorizontalScrollIndicator={false}
             keyExtractor={(item) => item.provider_id.toString()}

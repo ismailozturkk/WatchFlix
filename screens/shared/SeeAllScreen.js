@@ -10,7 +10,8 @@
 //                 genreIds?: number[], providerId?: number }
 //   movie section: "trends" | "bests" | "nowPlaying" | "upcoming"
 //   tv    section: "trends" | "best"  | "airingToday" | "onTheAir"
-//   ortak: "genres" (genreIds ile) | "providers" (providerId ile) — bunlar
+//   ortak: "genres" (genreIds ile) | "providers" (providerId ile) |
+//          "subscriptions" | "recentFavorites" | "hiddenGems" — bunlar
 //          context yerine bağımsız discover isteğiyle yüklenir (bkz. DiscoverSeeAll).
 //
 // Not: MovieProvider yalnız Movies sekmesini sardığı için (uygulama kökünde
@@ -38,7 +39,11 @@ import IconBacground from "../../components/IconBacground";
 import { useTheme } from "@context/ThemeContext";
 import { MovieProvider, useMovie } from "@context/MovieContex";
 import { useTvShow } from "@context/TvShowContex";
-import { useListLayoutSettings, useApiSettings } from "@context/AppSettingsContext";
+import {
+  useListLayoutSettings,
+  useApiSettings,
+  useStreamingProviderSettings,
+} from "@context/AppSettingsContext";
 import { useLanguage } from "@context/LanguageContext";
 
 const { width } = Dimensions.get("window");
@@ -68,6 +73,7 @@ const PosterCard = React.memo(function PosterCard({
   itemH,
   navigation,
 }) {
+  const { posterBadges } = useListLayoutSettings();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.92, duration: 150, useNativeDriver: true }).start();
@@ -100,7 +106,7 @@ const PosterCard = React.memo(function PosterCard({
           recyclingKey={`seeall-${mediaType}-${item.id}`}
           transition={120}
         />
-        {typeof item.vote_average === "number" ? (
+        {posterBadges?.tmdbRating !== false && typeof item.vote_average === "number" ? (
           <View style={[styles.rating, { backgroundColor: theme.secondaryt }]}>
             <Text allowFontScaling={false} style={styles.ratingText}>
               {item.vote_average.toFixed(1)}
@@ -451,9 +457,10 @@ function TvSeeAll({ section, title, navigation }) {
 // filtreyi (genreIds / providerId) doğrudan TMDB discover'a vererek bağımsız
 // yükler. Böylece taze MovieProvider'ın ilk sağlayıcıyı otomatik seçmesi gibi
 // yan etkiler tamamen atlanır.
-function useDiscoverPagination({ mediaType, genreIds, providerId }) {
+function useDiscoverPagination({ mediaType, genreIds, providerId, preset }) {
   const { API_KEY } = useApiSettings();
   const { language } = useLanguage();
+  const { streamingProviderIds } = useStreamingProviderSettings();
   const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
   const tmdbRegion = language === "tr" ? "TR" : "US";
 
@@ -475,6 +482,37 @@ function useDiscoverPagination({ mediaType, genreIds, providerId }) {
   const buildUrl = useCallback(
     (pageNum) => {
       const base = mediaType === "movie" ? "movie" : "tv";
+      if (preset) {
+        const params = new URLSearchParams({
+          language: tmdbLanguage,
+          page: String(pageNum),
+          include_adult: "false",
+          sort_by: preset === "hiddenGems" ? "vote_average.desc" : "popularity.desc",
+          "vote_count.gte": preset === "hiddenGems" ? "120" : "300",
+        });
+
+        if (preset === "subscriptions") {
+          params.set("watch_region", tmdbRegion);
+          params.set("with_watch_providers", streamingProviderIds.join("|"));
+          params.set("with_watch_monetization_types", "flatrate");
+        }
+
+        if (preset === "recentFavorites") {
+          const date = new Date();
+          date.setFullYear(date.getFullYear() - 5);
+          params.set(
+            mediaType === "movie" ? "primary_release_date.gte" : "first_air_date.gte",
+            date.toISOString().slice(0, 10),
+          );
+          params.set("vote_average.gte", "7");
+        }
+
+        if (preset === "topGenres" && genresKey) {
+          params.set("with_genres", genresKey.replaceAll(",", "|"));
+        }
+
+        return `https://api.themoviedb.org/3/discover/${base}?${params.toString()}`;
+      }
       if (isProviders) {
         return `https://api.themoviedb.org/3/discover/${base}?language=${tmdbLanguage}&watch_region=${tmdbRegion}&with_watch_providers=${providerId}&sort_by=vote_count.desc&page=${pageNum}`;
       }
@@ -482,16 +520,32 @@ function useDiscoverPagination({ mediaType, genreIds, providerId }) {
       if (genresKey) url += `&with_genres=${genresKey}`;
       return url;
     },
-    [mediaType, isProviders, providerId, genresKey, tmdbLanguage, tmdbRegion],
+    [
+      mediaType,
+      preset,
+      isProviders,
+      providerId,
+      genresKey,
+      tmdbLanguage,
+      tmdbRegion,
+      streamingProviderIds,
+    ],
   );
 
   const fetchPage = useCallback(
     async (pageNum, append) => {
+      if (preset === "subscriptions" && streamingProviderIds.length === 0) {
+        if (mounted.current) {
+          setData([]);
+          setTotalPages(1);
+        }
+        return false;
+      }
       try {
         const res = await axios.get(buildUrl(pageNum), {
           headers: { Authorization: API_KEY },
         });
-        if (!mounted.current) return;
+        if (!mounted.current) return false;
         const results = res.data.results || [];
         setTotalPages(res.data.total_pages || 1);
         setData((prev) => {
@@ -499,11 +553,13 @@ function useDiscoverPagination({ mediaType, genreIds, providerId }) {
           const seen = new Set(prev.map((x) => x && x.id));
           return [...prev, ...results.filter((x) => x && !seen.has(x.id))];
         });
+        return true;
       } catch (e) {
         if (__DEV__) console.error("DiscoverSeeAll:", e?.message || e);
+        return false;
       }
     },
-    [buildUrl, API_KEY],
+    [buildUrl, API_KEY, preset, streamingProviderIds.length],
   );
 
   // İlk sayfa — filtre (buildUrl) değişince baştan yükle.
@@ -518,16 +574,27 @@ function useDiscoverPagination({ mediaType, genreIds, providerId }) {
     if (loadingMore || page >= totalPages) return;
     const next = page + 1;
     setLoadingMore(true);
-    setPage(next);
-    await fetchPage(next, true);
-    if (mounted.current) setLoadingMore(false);
+    // Sayaç yalnızca başarılı fetch'te ilerler; aksi halde geçici bir ağ
+    // hatası o sayfayı kalıcı olarak atlatır (bir sonraki scroll page+2 çeker).
+    const ok = await fetchPage(next, true);
+    if (mounted.current) {
+      if (ok) setPage(next);
+      setLoadingMore(false);
+    }
   }, [loadingMore, page, totalPages, fetchPage]);
 
   return { data, loadMore, loadingMore, hasMore: page < totalPages };
 }
 
-function DiscoverSeeAll({ mediaType, title, genreIds, providerId, navigation }) {
-  const feed = useDiscoverPagination({ mediaType, genreIds, providerId });
+function DiscoverSeeAll({
+  mediaType,
+  title,
+  genreIds,
+  providerId,
+  preset,
+  navigation,
+}) {
+  const feed = useDiscoverPagination({ mediaType, genreIds, providerId, preset });
   return (
     <SeeAllGrid
       title={title}
@@ -545,13 +612,28 @@ export default function SeeAllScreen({ route, navigation }) {
   const { mediaType, section, title, genreIds, providerId } = route.params || {};
 
   // Genres / Providers: taze context yerine bağımsız discover akışı.
-  if (section === "genres" || section === "providers") {
+  if (
+    section === "genres" ||
+    section === "providers" ||
+    section === "subscriptions" ||
+    section === "topGenres" ||
+    section === "recentFavorites" ||
+    section === "hiddenGems"
+  ) {
     return (
       <DiscoverSeeAll
         mediaType={mediaType}
         title={title}
         genreIds={genreIds}
         providerId={providerId}
+        preset={
+          section === "subscriptions" ||
+          section === "topGenres" ||
+          section === "recentFavorites" ||
+          section === "hiddenGems"
+            ? section
+            : undefined
+        }
         navigation={navigation}
       />
     );

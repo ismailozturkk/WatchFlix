@@ -30,6 +30,24 @@ export const CHANNELS = {
 
 let handlerConfigured = false;
 
+// Android kanal adları OS bildirim ayarlarında KULLANICIYA görünür. Uygulama dili
+// TR/EN olduğuna göre bunları da yerelleştiriyoruz. React katmanı (dile erişimi
+// olan) setChannelNames ile günceller; servis içi çağrılar (izin akışı) bu güncel
+// değerleri kullanır. Varsayılan TR — React katmanı açılışta doğru dile çeker.
+let channelNames = {
+  default: "Genel",
+  reminders: "Hatırlatıcılar",
+  social: "Sosyal",
+};
+
+/**
+ * Kanal adlarını (yerelleştirilmiş) ayarla. ensureAndroidChannels bir sonraki
+ * çağrıda bu adları uygular (Android var olan kanalın adını günceller).
+ */
+export function setChannelNames(names) {
+  channelNames = { ...channelNames, ...(names || {}) };
+}
+
 /**
  * Bildirim davranışını ayarla (uygulama açıkken de banner göster).
  * Bir kez yeterli — App başlangıcında çağrılır.
@@ -72,19 +90,19 @@ export async function ensureAndroidChannels() {
   if (Platform.OS !== "android") return;
   try {
     await Notifications.setNotificationChannelAsync(CHANNELS.default, {
-      name: "Genel",
+      name: channelNames.default,
       importance: Notifications.AndroidImportance.DEFAULT,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: "#1E1E1E",
     });
     await Notifications.setNotificationChannelAsync(CHANNELS.reminders, {
-      name: "Hatırlatıcılar",
+      name: channelNames.reminders,
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: "#FFA500",
     });
     await Notifications.setNotificationChannelAsync(CHANNELS.social, {
-      name: "Sosyal",
+      name: channelNames.social,
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 200, 150, 200],
       lightColor: "#3B82F6",

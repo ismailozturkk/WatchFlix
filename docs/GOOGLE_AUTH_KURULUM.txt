@@ -1,0 +1,117 @@
+GOOGLE ILE GIRIS — KURULUM (Firebase Console tarafi)
+=====================================================
+
+Bu dosya KOD ile cozulemeyen adimlari anlatir. Kod tarafi hazir; asagidaki
+adimlar yapilmadan Google girisi HICBIR sekilde calismaz.
+
+Firebase projesi : movieandtv-2832a
+Android paketi   : com.smlztrk.Watchify
+Web client ID    : 427087836931-in7lreg3vjgnvudn5h8gauradaeo58kc.apps.googleusercontent.com
+                   (google-services.json'daki client_type:3 ile ayni olmali)
+
+
+1) ANDROID — SHA-1 PARMAK IZI EKSIK  [girisi su anda engelleyen sey bu]
+-----------------------------------------------------------------------
+BELIRTI: Google butonuna basinca hesap secici acilir/kapanir, giris olmaz.
+         Native SDK DEVELOPER_ERROR (statusCode 10) doner. Uygulama artik
+         bunu "Google girisi bu uygulama surumunde kullanilamiyor" diye
+         gosterir (GoogleAuthCode.MISCONFIGURED).
+
+MEVCUT DURUM (19.07.2026): Yerel debug SHA-1 Firebase'e eklendi ve hem
+         ./google-services.json hem ./android/app/google-services.json icinde
+         client_type:1 Android istemcisi mevcut. Yerel development build yolu
+         hazir. EAS/Play imzalari kullanilacaksa onlar ayrica eklenmelidir.
+
+COZUM:
+  a) Gereken SHA-1'leri topla. Uygulamayi imzalayan HER keystore icin ayri:
+
+     - Yerel debug (expo run:android / dev client):
+         keytool -list -v -keystore android/app/debug.keystore \
+                 -alias androiddebugkey -storepass android -keypass android
+       Bu repodaki debug.keystore'un SHA-1'i (Firebase'e eklendi):
+         5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25
+
+     - EAS build (development / preview / production):
+         eas credentials -p android
+       -> Keystore > SHA-1 Fingerprint degerini kopyala.
+
+     - Google Play'e yuklediyseniz (Play App Signing):
+         Play Console > Test and release > Setup > App signing
+       -> "App signing key certificate" SHA-1'i de EKLENMELI. Bu atlanirsa
+          uygulama Store'dan indirildiginde calismaz, dahili build'de calisir.
+
+  b) Firebase Console > Project settings > Your apps > Android
+     (com.smlztrk.Watchify) > "Add fingerprint" ile her SHA-1'i ekle.
+
+  c) Guncellenmis google-services.json'u indir ve IKI yere birden koy:
+         ./google-services.json
+         ./android/app/google-services.json
+     (android/ dizini bu repoda commit'li oldugu icin build android/app
+      altindakini kullanir; app.json'daki googleServicesFile yalnizca
+      `expo prebuild` calistiginda koktekini oraya kopyalar.)
+
+  d) Dogrula — yeni dosyada su blok GORUNMELI:
+         { "client_type": 1,
+           "android_info": { "package_name": "com.smlztrk.Watchify",
+                             "certificate_hash": "..." } }
+     Gorunmuyorsa SHA-1 kaydedilmemistir, tekrar deneyin.
+
+  e) Native yapilandirma degistigi icin YENIDEN BUILD gerekir. Metro'yu
+     yeniden baslatmak yetmez (JS degil, native kaynak degisiyor).
+
+
+2) IOS — HIC YAPILANDIRILMAMIS
+------------------------------
+BELIRTI: iOS'ta Google girisi calismaz. Kod artik kriptik native cokme yerine
+         net bir hata firlatir (GoogleAuthCode.MISCONFIGURED).
+
+EKSIKLER: GoogleService-Info.plist yok, app.json'da ios.googleServicesFile yok,
+          google-signin plugin'i iosUrlScheme parametresi olmadan eklenmis.
+
+COZUM:
+  a) Firebase Console > Add app > iOS. Bundle ID: app.json'daki iOS bundle
+     identifier ile birebir ayni olmali.
+  b) GoogleService-Info.plist'i indirip repo kokune koy.
+  c) app.json:
+       "ios": { "googleServicesFile": "./GoogleService-Info.plist", ... }
+     ve plugin girdisini duz string yerine yapilandirilmis hale getir:
+       ["@react-native-google-signin/google-signin",
+        { "iosUrlScheme": "com.googleusercontent.apps.<REVERSED_CLIENT_ID>" }]
+     <REVERSED_CLIENT_ID> plist icindeki REVERSED_CLIENT_ID degeridir.
+  d) Alternatif/ek olarak .env'e:
+       EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=<plist icindeki CLIENT_ID>
+     Servis bunu configure()'a iosClientId olarak gecer. Plist varsa sart degil.
+  e) expo prebuild --clean && yeniden build.
+
+
+3) NOTLAR
+---------
+- webClientId (type 3) DOGRU ve servisteki fallback ile eslesiyor; sorun orada
+  degil. .env'de EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID tanimli degil, bu yuzden
+  googleAuthService.js'deki fallback kullaniliyor.
+- Expo Go ile Google girisi CALISMAZ (native modul gerekir). expo-dev-client
+  build'i sart.
+- eas.json > build.production > android.credentialsSource: "local" ayarli ama
+  repoda credentials.json YOK. Production build'i bu haliyle calismaz;
+  ya credentials.json ekleyin ya da bu satiri kaldirip EAS'in yonettigi
+  keystore'a donun (o durumda EAS keystore SHA-1'ini eklemeyi unutmayin).
+
+
+4) AYNI E-POSTA KORUMASI — CALLABLE YAYIN DURUMU
+------------------------------------------------
+Kodda checkGoogleSignInEligibility callable'i hazir. Bu islev gecerli Google
+idToken'ini sunucuda dogrular ve ayni e-posta yalniz email/sifre hesabina aitse
+Google girisini Firebase credential uygulanmadan once reddeder. Kullanici once
+email/sifreyle girip Ayarlar > Hesap baglantilari uzerinden Google'i baglar.
+
+19.07.2026 deploy denemesi proje billing'i kapali oldugu icin mevcut
+GEMINI_API_KEY Secret Manager taniminda HTTP 403 ile durdu. Billing acilip secret
+erisimi duzeldiginde su komut calistirilmali:
+
+  firebase deploy --only functions:checkGoogleSignInEligibility \
+           --project movieandtv-2832a
+
+Callable yayinlanana kadar istemci functions/not-found durumunda
+fetchSignInMethodsForEmail kontrolune geri duser. Eski projede email enumeration
+protection kapaliysa bu yol cakismayi engeller. Protection aciksa Firebase bu
+listeyi bos dondurebildigi icin mutlak garanti callable yayinlandiginda saglanir.

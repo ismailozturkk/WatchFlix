@@ -16,6 +16,8 @@ import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
 import LottieView from "lottie-react-native";
 import { useListStatusContext } from "../context/ListStatusContext";
+import { useSharedLists } from "../context/SharedListsContext";
+import SharedListsSection from "./SharedListsSection";
 import { useHapticsSettings } from "../context/AppSettingsContext";
 import { BlurView } from "expo-blur";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -134,10 +136,12 @@ const ListView = ({
   addReminder,
   listStates,
   isLoading,
+  sharedItem, // ortak listeler için medya payload'ı ({id,type,name,imagePath,...})
 }) => {
   const { t } = useLanguage();
   const { theme } = useTheme();
   const { otherListKeys, allListKeys } = useListStatusContext();
+  const { sharedLists } = useSharedLists();
   const { hapticsEnabled } = useHapticsSettings();
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -433,26 +437,35 @@ const ListView = ({
             {/* Separator */}
             <View style={[styles.separator, { backgroundColor: theme.border }]} />
 
-            {otherListKeys?.length > 0 ? (
+            {otherListKeys?.length > 0 ||
+            (sharedLists.length > 0 && sharedItem) ? (
               <>
-                <FlatList
-                  data={otherListKeys}
-                  keyExtractor={(item) => item}
-                  numColumns={3}
-                  contentContainerStyle={styles.gridContainer}
-                  showsVerticalScrollIndicator={false}
-                  style={{ maxHeight: 300 }}
-                  columnWrapperStyle={{ gap: 10 }}
-                  renderItem={({ item }) => (
-                    <GridCard
-                      item={item}
-                      isIn={!!getIsActive(item)}
-                      scale={scaleValuesRef.current[item]}
-                      opacity={opacityValuesRef.current[item]}
-                      theme={theme}
-                      onPress={() => handleOptimisticPress(item, () => updateList(item, type, formatDateSave(new Date())))}
-                    />
-                  )}
+                {otherListKeys?.length > 0 && (
+                  <FlatList
+                    data={otherListKeys}
+                    keyExtractor={(item) => item}
+                    numColumns={3}
+                    contentContainerStyle={styles.gridContainer}
+                    showsVerticalScrollIndicator={false}
+                    style={{ maxHeight: 300 }}
+                    columnWrapperStyle={{ gap: 10 }}
+                    renderItem={({ item }) => (
+                      <GridCard
+                        item={item}
+                        isIn={!!getIsActive(item)}
+                        scale={scaleValuesRef.current[item]}
+                        opacity={opacityValuesRef.current[item]}
+                        theme={theme}
+                        onPress={() => handleOptimisticPress(item, () => updateList(item, type, formatDateSave(new Date())))}
+                      />
+                    )}
+                  />
+                )}
+
+                {/* Ortak listeler */}
+                <SharedListsSection
+                  sharedItem={sharedItem}
+                  visible={modalVisible}
                 />
 
                 {/* Eylemler */}

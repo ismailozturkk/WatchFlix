@@ -19,7 +19,7 @@ import RatingStars from "../../components/RatingStars";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import ListBadges from "../../components/ListBadges";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 const { width, height } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.6;
 // Sarmalayıcı yüksekliği poster yüksekliğinden türetilir (ekran yüksekliğinden
@@ -106,6 +106,7 @@ const TvTrendCard = memo(function TvTrendCard({
       : scale;
 
   const pressScale = useRef(new Animated.Value(1)).current;
+  const { posterBadges } = useListLayoutSettings();
   const onPressIn = () =>
     Animated.timing(pressScale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
   const onPressOut = () =>
@@ -117,6 +118,9 @@ const TvTrendCard = memo(function TvTrendCard({
     () => ({ uri: getTmdbUrl(item.poster_path, "poster", 200) }),
     [item.poster_path, getTmdbUrl]
   );
+  const showRating = posterBadges?.tmdbRating !== false;
+  const showVotes = posterBadges?.voteCount !== false;
+  const showRatingPill = showRating || showVotes;
 
   return (
     <Animated.View
@@ -170,42 +174,54 @@ const TvTrendCard = memo(function TvTrendCard({
             },
           ]}
         >
-          <View
-            style={{
-              position: "absolute",
-              top: -45,
-              right: 0,
-              borderRadius: 25,
-              paddingHorizontal: 5,
-              paddingVertical: 2,
-              backgroundColor: "rgba(0,0,0,0.6)",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 5,
-            }}
-          >
-            <RatingStars rating={item.vote_average} />
-            <Text
-              allowFontScaling={false}
-              style={{ fontSize: 14, color: theme.colors.orange }}
+          {showRatingPill && (
+            <View
+              style={{
+                position: "absolute",
+                top: -45,
+                right: 0,
+                borderRadius: 25,
+                paddingHorizontal: 5,
+                paddingVertical: 2,
+                backgroundColor: "rgba(0,0,0,0.6)",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5,
+              }}
             >
-              {rating.toFixed(1)}
-            </Text>
-            <Text
-              allowFontScaling={false}
-              style={{ fontSize: 14, color: theme.text.secondary }}
-            >
-              •
-            </Text>
-            <FontAwesome name="user" size={14} color={theme.colors.blue} />
-            <Text
-              allowFontScaling={false}
-              style={{ fontSize: 14, color: theme.colors.blue }}
-            >
-              {item.vote_count}
-            </Text>
-          </View>
+              {showRating && (
+                <>
+                  <RatingStars rating={item.vote_average} count={1} />
+                  <Text
+                    allowFontScaling={false}
+                    style={{ fontSize: 14, color: theme.colors.orange }}
+                  >
+                    {rating.toFixed(1)}
+                  </Text>
+                </>
+              )}
+              {showRating && showVotes && (
+                <Text
+                  allowFontScaling={false}
+                  style={{ fontSize: 14, color: theme.text.secondary }}
+                >
+                  •
+                </Text>
+              )}
+              {showVotes && (
+                <>
+                  <FontAwesome name="user" size={14} color={theme.colors.blue} />
+                  <Text
+                    allowFontScaling={false}
+                    style={{ fontSize: 14, color: theme.colors.blue }}
+                  >
+                    {item.vote_count}
+                  </Text>
+                </>
+              )}
+            </View>
+          )}
           <ListBadges
             mediaId={item.id}
             mediaType="tv"

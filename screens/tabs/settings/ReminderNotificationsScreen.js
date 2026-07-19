@@ -142,6 +142,25 @@ export default function ReminderNotificationsScreen() {
             />
           }
         />
+        <SettingRow
+          colors={C}
+          iconBg={C.iconBlue}
+          iconColor={C.blue}
+          iconName="play-circle-outline"
+          title={t.streamingNotifications || "Yayına gelince bildir"}
+          subtitle={
+            t.streamingNotificationsSubtitle ||
+            "İzleme listendeki yapım, abone olduğun platforma eklenince haber ver"
+          }
+          right={
+            <SwitchToggle
+              value={notificationsEnabled && notificationSettings.streamingEnabled}
+              onValueChange={(v) => updateNotifications({ streamingEnabled: v })}
+              disabled={!notificationsEnabled}
+              size={36}
+            />
+          }
+        />
         <View style={ns.notificationTiming}>
           <View style={ns.notificationTimingHeader}>
             <View style={[ns.iconWrap, { backgroundColor: C.iconGreen }]}>

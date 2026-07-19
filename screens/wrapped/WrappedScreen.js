@@ -23,6 +23,7 @@ import {
   ActivityIndicator,
   AppState,
   Modal,
+  ScrollView,
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -47,6 +48,7 @@ import WrappedShareCard, {
   DEFAULT_WRAPPED_CARD_OPTIONS,
   WRAPPED_CARD_THEMES,
   getWrappedCardPalette,
+  foregroundForPalette,
 } from "../../components/wrapped/WrappedShareCard";
 import {
   WrappedProgress,
@@ -64,9 +66,7 @@ import {
 } from "../../components/wrapped/WrappedSlides";
 
 const SLIDE_DURATION = 5200; // ms (otomatik geçiş)
-
-const foregroundForPalette = (palette) =>
-  ["ocean", "noir"].includes(palette.id) ? "#071014" : "#fff";
+// foregroundForPalette artık karttan geliyor (açık paletler listesi tek yerde).
 
 export default function WrappedScreen({ route, navigation }) {
   const { theme } = useTheme();
@@ -395,6 +395,7 @@ export default function WrappedScreen({ route, navigation }) {
           theme={theme}
           language={language}
           getTmdbUrl={getTmdbUrl}
+          userName={user?.displayName || ""}
           topInset={insets.top}
           bottomInset={insets.bottom}
           cardWidth={shareCardSize.width}
@@ -467,6 +468,8 @@ export default function WrappedScreen({ route, navigation }) {
         options={cardOptions}
         str={str}
         theme={theme}
+        hasPosterChoice={Boolean(recap.topShows?.length && recap.moviePosters?.length)}
+        hasUserName={Boolean((user?.displayName || "").trim())}
         onChange={updateCardOption}
         onReset={resetCardOptions}
         onClose={() => setShowCustomizer(false)}
@@ -484,6 +487,7 @@ function SummarySlide({
   theme,
   language,
   getTmdbUrl,
+  userName,
   topInset,
   bottomInset,
   cardWidth,
@@ -522,6 +526,7 @@ function SummarySlide({
             theme={theme}
             language={language}
             getTmdbUrl={getTmdbUrl}
+            userName={userName}
             width={cardWidth}
             height={cardHeight}
             customization={cardOptions}
@@ -609,6 +614,8 @@ function ShareCustomizerSheet({
   options,
   str,
   theme,
+  hasPosterChoice,
+  hasUserName,
   onChange,
   onReset,
   onClose,
@@ -651,6 +658,12 @@ function ShareCustomizerSheet({
             </TouchableOpacity>
           </View>
 
+          {/* Seçenekler küçük ekranlarda taşabilir → başlık/Tamam sabit, orası kayar */}
+          <ScrollView
+            style={styles.customizerScroll}
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+          >
           <CustomizerLabel icon="color-palette-outline" label={str.colorTheme} />
           <View style={styles.themeOptions}>
             {WRAPPED_CARD_THEMES.map((item) => {
@@ -726,9 +739,62 @@ function ShareCustomizerSheet({
             })}
           </View>
 
+          {/* Poster bölümü dizi mi film mi göstersin (ikisi de varsa) */}
+          {hasPosterChoice && (
+            <>
+              <CustomizerLabel icon="images-outline" label={str.posterContentLabel} />
+              <View style={styles.variantControl}>
+                {[
+                  { value: "shows", label: str.postersShows, icon: "tv-outline" },
+                  { value: "movies", label: str.postersMovies, icon: "film-outline" },
+                ].map((item) => {
+                  const active = (options.posterContent || "shows") === item.value;
+                  return (
+                    <TouchableOpacity
+                      key={item.value}
+                      style={[
+                        styles.variantBtn,
+                        active && { backgroundColor: palette.accent },
+                      ]}
+                      onPress={() => onChange("posterContent", item.value)}
+                      activeOpacity={0.8}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: active }}
+                    >
+                      <Ionicons
+                        name={item.icon}
+                        size={15}
+                        color={active ? accentForeground : "rgba(255,255,255,0.58)"}
+                      />
+                      <Text
+                        style={[
+                          styles.variantText,
+                          active && { color: accentForeground },
+                        ]}
+                        allowFontScaling={false}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
           <CustomizerLabel icon="eye-outline" label={str.visibleSections} />
           <View style={styles.visibilityRow}>
             {[
+              {
+                key: "showPersonality",
+                label: str.personalityOption,
+                icon: "happy-outline",
+              },
+              {
+                key: "showStats",
+                label: str.statsOption,
+                icon: "grid-outline",
+              },
               {
                 key: "showGenres",
                 label: str.genresOption,
@@ -739,8 +805,18 @@ function ShareCustomizerSheet({
                 label: str.postersOption,
                 icon: "images-outline",
               },
+              ...(hasUserName
+                ? [
+                    {
+                      key: "showName",
+                      label: str.nameOption,
+                      icon: "person-outline",
+                    },
+                  ]
+                : []),
             ].map((item) => {
-              const active = options[item.key];
+              // Eski seçeneklerde anahtar yoksa "açık" say (kartla aynı kural).
+              const active = options[item.key] !== false;
               return (
                 <TouchableOpacity
                   key={item.key}
@@ -775,6 +851,7 @@ function ShareCustomizerSheet({
               );
             })}
           </View>
+          </ScrollView>
 
           <TouchableOpacity
             style={[styles.doneBtn, { backgroundColor: palette.accent }]}
@@ -991,6 +1068,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.66)",
   },
   customizerSheet: {
+    maxHeight: "86%",
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 24,
@@ -1000,6 +1078,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.12)",
     backgroundColor: "#111014",
   },
+  customizerScroll: { flexGrow: 0 },
   customizerHandle: {
     width: 42,
     height: 4,
@@ -1053,9 +1132,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.55,
     textTransform: "uppercase",
   },
-  themeOptions: { flexDirection: "row", gap: 7, marginBottom: 14 },
+  themeOptions: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 14 },
   themeOption: {
-    flex: 1,
+    // 6 palet → satır başına 3 kutu (sarma ile 2 satır)
+    flexBasis: "30%",
+    flexGrow: 1,
     minWidth: 0,
     alignItems: "center",
     padding: 5,
@@ -1094,9 +1175,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   variantText: { color: "rgba(255,255,255,0.58)", fontSize: 10, fontWeight: "800" },
-  visibilityRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
+  visibilityRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
   visibilityBtn: {
-    flex: 1,
+    // 4-5 anahtar → 2 sütunlu ızgara (tek kalan satırı doldurur)
+    flexBasis: "47%",
+    flexGrow: 1,
     height: 42,
     paddingHorizontal: 9,
     borderRadius: 12,

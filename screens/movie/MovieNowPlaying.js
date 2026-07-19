@@ -16,7 +16,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { MovieSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
-import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import PaginatedRail from "../../components/PaginatedRail";
@@ -28,6 +28,7 @@ const { width } = Dimensions.get("window");
 // Stable, module-scope item component → no remount → no flicker.
 const MovieNowPlayingCard = memo(function MovieNowPlayingCard({ item, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
+  const { posterBadges } = useListLayoutSettings();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -56,11 +57,13 @@ const MovieNowPlayingCard = memo(function MovieNowPlayingCard({ item, navigation
           transition={120}
         />
 
-        <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
-          <Text allowFontScaling={false} style={styles.similarRatingText}>
-            {item.vote_average.toFixed(1)}
-          </Text>
-        </View>
+        {posterBadges?.tmdbRating !== false && (
+          <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
+            <Text allowFontScaling={false} style={styles.similarRatingText}>
+              {item.vote_average.toFixed(1)}
+            </Text>
+          </View>
+        )}
         <ListBadges
           mediaId={item.id}
           mediaType="movie"

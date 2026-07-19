@@ -82,6 +82,19 @@ const getDynamicRankColor = (totalMinutes, type) => {
     : { borderColorTv: c1, borderColor2Tv: c2, shadowColorTv: c3, rankLevelTv: step, rankNameTv: `Rank ${step + 1}` };
 };
 
+const getTopGenreNames = (items, limit = 3) => {
+  const counts = {};
+  (items || []).forEach((item) =>
+    (item.genres || []).forEach((genre) => {
+      if (genre) counts[genre] = (counts[genre] || 0) + 1;
+    }),
+  );
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([genre]) => genre);
+};
+
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export const ProfileStatsProvider = ({ children }) => {
@@ -121,6 +134,17 @@ export const ProfileStatsProvider = ({ children }) => {
   const [selectedDateTv, setSelectedDateTv] = useState(null);
   const [timeDisplayMode, setTimeDisplayMode] = useState("minutes");
   const [scaleValues,     setScaleValues]     = useState({});
+
+  // ── Logout/hesap değişimi: önceki hesabın verisi yeni hesaba sızmasın ───
+  // Listener effect'leri `!uid` iken sadece return ediyor; state'i burada
+  // sıfırlamazsak A çıkış yapıp B girince B'nin snapshot'ları gelene dek
+  // (legacy kayıtlar içinse kalıcı olarak) A'nın izleme verisi görünür.
+  useEffect(() => {
+    if (uid) return;
+    setListItems([]);
+    setListItemsTv([]);
+    setLists([]);
+  }, [uid]);
 
   // ── Root doc listener — özel listeler + eski format veri ────────────────
   useEffect(() => {
@@ -288,12 +312,10 @@ export const ProfileStatsProvider = ({ children }) => {
     return "";
   }))].filter(Boolean), [sortedListItems]);
 
-  const { mostWatchedGenre, secondWatchedGenre, threeWatchedGenre } = useMemo(() => {
-    const gc = {};
-    listItems.forEach((film) => (film.genres || []).forEach((g) => { if (g) gc[g] = (gc[g] || 0) + 1; }));
-    const s = Object.entries(gc).sort((a, b) => b[1] - a[1]);
-    return { mostWatchedGenre: s[0]?.[0] || null, secondWatchedGenre: s[1]?.[0] || "-", threeWatchedGenre: s[2]?.[0] || "-" };
-  }, [listItems]);
+  const topMovieGenres = useMemo(() => getTopGenreNames(listItems), [listItems]);
+  const mostWatchedGenre = topMovieGenres[0] || null;
+  const secondWatchedGenre = topMovieGenres[1] || "-";
+  const threeWatchedGenre = topMovieGenres[2] || "-";
 
   // ── Derived TV stats ─────────────────────────────────────────────────────
   const flatEpisodesTv = useMemo(() =>
@@ -331,12 +353,10 @@ export const ProfileStatsProvider = ({ children }) => {
     [sortedFlatEpisodesTv],
   );
 
-  const { mostWatchedGenreTv, secondWatchedGenreTv, thirdWatchedGenreTv } = useMemo(() => {
-    const gc = {};
-    flatEpisodesTv.forEach((ep) => (ep.genres || []).forEach((g) => { if (g) gc[g] = (gc[g] || 0) + 1; }));
-    const s = Object.entries(gc).sort((a, b) => b[1] - a[1]);
-    return { mostWatchedGenreTv: s[0]?.[0] || "-", secondWatchedGenreTv: s[1]?.[0] || "-", thirdWatchedGenreTv: s[2]?.[0] || "-" };
-  }, [flatEpisodesTv]);
+  const topTvGenres = useMemo(() => getTopGenreNames(flatEpisodesTv), [flatEpisodesTv]);
+  const mostWatchedGenreTv = topTvGenres[0] || "-";
+  const secondWatchedGenreTv = topTvGenres[1] || "-";
+  const thirdWatchedGenreTv = topTvGenres[2] || "-";
 
   // ── Rank colors ──────────────────────────────────────────────────────────
   const rankInfo = useMemo(() => ({
@@ -383,11 +403,11 @@ export const ProfileStatsProvider = ({ children }) => {
     // Movie stats
     watchedMovieCount, totalWatchedTime, totalMinutesTime, listItems, setListItems,
     isloadingMovieInfo, groupedData, uniqueDates, selectedDate, setSelectedDate,
-    mostWatchedGenre, secondWatchedGenre, threeWatchedGenre, scaleValues,
+    mostWatchedGenre, secondWatchedGenre, threeWatchedGenre, topMovieGenres, scaleValues,
     // TV stats
     watchedTvCount, totalSeasonsCount, totalEpisodesCount, totalWatchedTimeTv, totalMinutesTimeTv,
     listItemsTv, loadingTv, isloadingShowInfo, flatEpisodesTv, groupedDataTv, uniqueDatesTv,
-    selectedDateTv, setSelectedDateTv, mostWatchedGenreTv, secondWatchedGenreTv, thirdWatchedGenreTv,
+    selectedDateTv, setSelectedDateTv, mostWatchedGenreTv, secondWatchedGenreTv, thirdWatchedGenreTv, topTvGenres,
     // Shared helpers
     timeDisplayMode, handleTimeClick, formatTotalDurationTime, formatDate, onPressIn, onPressOut,
     t,
@@ -397,10 +417,10 @@ export const ProfileStatsProvider = ({ children }) => {
     displayLists, selectedList, modalDeleteVisible, isLoading,
     watchedMovieCount, totalWatchedTime, totalMinutesTime, listItems,
     isloadingMovieInfo, groupedData, uniqueDates, selectedDate,
-    mostWatchedGenre, secondWatchedGenre, threeWatchedGenre, scaleValues,
+    mostWatchedGenre, secondWatchedGenre, threeWatchedGenre, topMovieGenres, scaleValues,
     watchedTvCount, totalSeasonsCount, totalEpisodesCount, totalWatchedTimeTv, totalMinutesTimeTv,
     listItemsTv, loadingTv, isloadingShowInfo, flatEpisodesTv, groupedDataTv, uniqueDatesTv,
-    selectedDateTv, mostWatchedGenreTv, secondWatchedGenreTv, thirdWatchedGenreTv,
+    selectedDateTv, mostWatchedGenreTv, secondWatchedGenreTv, thirdWatchedGenreTv, topTvGenres,
     timeDisplayMode, rankInfo, t,
   ]);
 

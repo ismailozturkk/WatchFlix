@@ -14,9 +14,11 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons, FontAwesome } from "@expo/vector-icons";
+import Toast from "react-native-toast-message";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { i18nText } from "@utils/i18nText";
+import { isUnreleased } from "@utils/watchState";
 import RatingStars from "@components/RatingStars";
 import {
   mediaKey,
@@ -25,6 +27,22 @@ import {
   computeHybrid,
 } from "@services/ratingsService";
 
+// Yayın tarihini kullanıcının cihaz diline göre okunur biçime çevirir.
+const formatReleaseDate = (str) => {
+  if (!str) return "";
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return "";
+  try {
+    return d.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  } catch (e) {
+    return str;
+  }
+};
+
 export default function RatingSummary({
   mediaType,
   mediaId,
@@ -32,6 +50,7 @@ export default function RatingSummary({
   tmdbCount = 0,
   onPressRate,
   starSize = 16,
+  releaseDate,
 }) {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -56,12 +75,37 @@ export default function RatingSummary({
 
   const hybrid = computeHybrid({ tmdbAvg, tmdbCount, count: agg.count, sum: agg.sum });
   const hasMine = myRating != null && myRating > 0;
+  // İçerik henüz yayınlanmadıysa puanlama kilitli. (Kendi oyu olan kullanıcıyı
+  // kilitlemeyiz; tarihler geriye gitmese de mevcut oyunu yönetebilsin.)
+  const locked = isUnreleased(releaseDate) && !hasMine;
+
+  const handlePress = () => {
+    if (locked) {
+      const relText = formatReleaseDate(releaseDate);
+      Toast.show({
+        type: "info",
+        text1: i18nText("autoI18n.henuz_yayinlanmadi", "Henüz yayınlanmadı"),
+        text2: relText
+          ? i18nText(
+              "autoI18n.puanlama_su_tarihte_acilir",
+              "Puanlama {{date}} tarihinde açılır",
+              { date: relText },
+            )
+          : i18nText(
+              "autoI18n.yayinlandiginda_puan_verebilirsin",
+              "Yayınlandığında puan verebilirsin",
+            ),
+      });
+      return;
+    }
+    onPressRate?.();
+  };
 
   return (
     <TouchableOpacity
       style={styles.row}
       activeOpacity={0.7}
-      onPress={onPressRate}
+      onPress={handlePress}
     >
       <RatingStars rating={hybrid} max={10} size={starSize} color={theme.colors.orange} />
       <Text allowFontScaling={false} style={[styles.score, { color: theme.colors.orange }]}>
@@ -86,8 +130,16 @@ export default function RatingSummary({
         </View>
       )}
 
-      {/* Kullanıcının kendi oyu: VERDİYSE belli et (dolu yıldız + puan), aksi halde "Puan ver" */}
-      {hasMine ? (
+      {/* Yayın tarihi gelecekteyse puanlama kilitli */}
+      {locked ? (
+        <View style={[styles.rateBtn, { borderColor: theme.text.muted + "55", backgroundColor: theme.text.muted + "1A" }]}>
+          <Ionicons name="lock-closed" size={12} color={theme.text.muted} />
+          <Text allowFontScaling={false} style={[styles.rateBtnText, { color: theme.text.muted }]}>
+            {i18nText("autoI18n.yayinlanmadi", "Yayınlanmadı")}
+          </Text>
+        </View>
+      ) : /* Kullanıcının kendi oyu: VERDİYSE belli et (dolu yıldız + puan), aksi halde "Puan ver" */
+      hasMine ? (
         <View style={[styles.rateBtn, { borderColor: theme.accent, backgroundColor: theme.accent }]}>
           <Ionicons name="checkmark-circle" size={13} color="#fff" />
           <RatingStars rating={myRating} max={10} count={5} size={11} color="#fff" spacing={0.5} />

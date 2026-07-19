@@ -639,7 +639,150 @@ export const OnGoingSeriesSkeleton = () => {
   );
 };
 
+// ── Sosyal feed kartı (ShareContentScreen / PostDetail): avatar başlık + başlık
+// + poster rayı + aksiyon satırı. Gerçek PostCard (postStyles.card) ile aynı ölçü.
+export const PostCardSkeleton = () => {
+  const { theme } = useTheme();
+  return (
+    <View
+      style={{
+        marginHorizontal: 14,
+        marginBottom: 10,
+        borderRadius: 16,
+        padding: 13,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderLeftWidth: 2,
+        backgroundColor: theme.secondary,
+        borderColor: theme.border,
+        borderLeftColor: theme.border,
+      }}
+    >
+      {/* Başlık: avatar + isim/zaman + menü noktası */}
+      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+        <Skeleton width={34} height={34} style={{ borderRadius: 17 }} />
+        <View style={{ flex: 1, marginLeft: 10, gap: 6 }}>
+          <Skeleton width={"42%"} height={12} style={{ borderRadius: 4 }} />
+          <Skeleton width={"26%"} height={9} style={{ borderRadius: 4 }} />
+        </View>
+        <Skeleton width={4} height={16} style={{ borderRadius: 2 }} />
+      </View>
+      {/* Başlık satırı */}
+      <Skeleton width={"70%"} height={15} style={{ borderRadius: 5, marginBottom: 12 }} />
+      {/* Poster rayı */}
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} width={78} height={117} style={{ borderRadius: 10 }} />
+        ))}
+      </View>
+      {/* Aksiyon satırı (beğen / yorum / paylaş) */}
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 14,
+          paddingTop: 10,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: theme.border,
+        }}
+      >
+        {[46, 46, 40].map((w, i) => (
+          <Skeleton key={i} width={w} height={14} style={{ borderRadius: 6 }} />
+        ))}
+      </View>
+    </View>
+  );
+};
+
+// Feed ilk yüklemesi için N adet PostCardSkeleton (FlatList ListEmptyComponent).
+export const FeedSkeleton = ({ count = 4 }) => (
+  <View style={{ paddingTop: 6 }}>
+    {Array.from({ length: count }).map((_, i) => (
+      <PostCardSkeleton key={i} />
+    ))}
+  </View>
+);
+
+// ── "Postlarım" yatay kompakt kart (MyPostsScreen MyPostCard ile aynı ölçü):
+// sol poster yığını + rozet/zaman + başlık + içerik + istatistik satırı.
+export const MyPostsSkeleton = ({ count = 5 }) => {
+  const { theme } = useTheme();
+  return (
+    <View style={{ padding: 16 }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <View
+          key={i}
+          style={{
+            flexDirection: "row",
+            gap: 14,
+            padding: 14,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderLeftWidth: 3,
+            marginBottom: 12,
+            backgroundColor: theme.secondary,
+            borderColor: theme.border,
+            borderLeftColor: theme.border,
+          }}
+        >
+          <Skeleton width={64} height={96} style={{ borderRadius: 10 }} />
+          <View style={{ flex: 1, gap: 8 }}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Skeleton width={54} height={16} style={{ borderRadius: 6 }} />
+              <Skeleton width={40} height={10} style={{ borderRadius: 4, marginLeft: "auto" }} />
+            </View>
+            <Skeleton width={"75%"} height={15} style={{ borderRadius: 5 }} />
+            <Skeleton width={"100%"} height={11} style={{ borderRadius: 4 }} />
+            <Skeleton width={"55%"} height={11} style={{ borderRadius: 4 }} />
+            <View style={{ flexDirection: "row", gap: 16, marginTop: 2 }}>
+              <Skeleton width={44} height={12} style={{ borderRadius: 4 }} />
+              <Skeleton width={44} height={12} style={{ borderRadius: 4 }} />
+            </View>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+};
+
+// ── Etkinlik listesi satırı (MyActivityScreen row ile aynı ölçü):
+// sol poster 48×70 + meta/başlık/tarih satırları.
+export const ActivityListSkeleton = ({ count = 7 }) => {
+  const { theme } = useTheme();
+  return (
+    <View style={{ padding: 16, paddingTop: 6 }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <View
+          key={i}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            paddingVertical: 11,
+            paddingRight: 14,
+            paddingLeft: 16,
+            borderRadius: 18,
+            borderWidth: 1,
+            marginBottom: 12,
+            backgroundColor: theme.secondary,
+            borderColor: theme.border,
+          }}
+        >
+          <Skeleton width={48} height={70} style={{ borderRadius: 10 }} />
+          <View style={{ flex: 1, gap: 7 }}>
+            <Skeleton width={70} height={12} style={{ borderRadius: 4 }} />
+            <Skeleton width={"72%"} height={14} style={{ borderRadius: 5 }} />
+            <Skeleton width={"40%"} height={11} style={{ borderRadius: 4 }} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
+  // Temel Skeleton kutusu (boyut/renk inline gelir; köşe buradan)
+  skeleton: {
+    borderRadius: 4,
+  },
   cardContainer: {
     alignItems: "center",
     width: width * 0.6,
@@ -768,10 +911,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginVertical: 5,
   },
-  episodeRating: {
+  episodeDate: {
     borderRadius: 4,
   },
-  episodeDate: {
+  episodeRuntime: {
+    borderRadius: 4,
+  },
+  voteCount: {
+    borderRadius: 4,
+  },
+  sectionTitle: {
     borderRadius: 4,
   },
   episodeOverview: {

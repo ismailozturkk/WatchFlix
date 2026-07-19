@@ -21,38 +21,29 @@ import * as Haptics from "expo-haptics";
 import { useSnow } from "../../context/SnowContext";
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
   getAuth,
   sendEmailVerification,
+  signOut,
   updateProfile,
-  GoogleAuthProvider,
-  signInWithCredential,
 } from "firebase/auth";
 import Toast from "react-native-toast-message";
 import { useLanguage } from "../../context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../../firebase";
 import {
   createUserProfile,
   isUsernameAvailable,
+  UserProfileErrorCode,
 } from "../../services/userService";
 import IconBacground from "../../components/IconBacground";
 import EmailSuffixRow from "../../components/auth/EmailSuffixRow";
 import { alpha } from "../../theme/colors";
 import {
-  useAuthRequest,
-  makeRedirectUri,
-  ResponseType,
-} from "expo-auth-session";
-import * as WebBrowser from "expo-web-browser";
+  describeGoogleAuthError,
+  GoogleAuthCode,
+  signInWithGoogle as authenticateWithGoogle,
+} from "../../services/googleAuthService";
 import { i18nText } from "../../utils/i18nText";
-
-WebBrowser.maybeCompleteAuthSession();
-
-const GOOGLE_DISCOVERY = {
-  authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
-  tokenEndpoint: "https://oauth2.googleapis.com/token",
-};
 
 const SUCCESS = "rgb(37, 211, 102)";
 const ERROR = "rgb(189, 8, 28)";
@@ -78,7 +69,7 @@ export default function RegisterScreen({ navigation }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordAgain, setShowPasswordAgain] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   const [passwordCorrect, setPasswordCorrect] = useState(null);
   const [passwordCorrectAgain, setPasswordCorrectAgain] = useState(null);
@@ -102,12 +93,23 @@ export default function RegisterScreen({ navigation }) {
     passwordCorrect === true &&
     passwordCorrectAgain === true;
 
-  let usernameTimeout;
+  // ref: düz değişken her render'da sıfırlanıyordu → debounce hiç iptal
+  // edilmiyor, her tuş vuruşu ayrı Firestore sorgusu atıyor ve en son DÖNEN
+  // (en son YAZILAN değil) yanıt kazanıyordu. reqId eski yanıtı düşürür.
+  const usernameTimeoutRef = useRef(null);
+  const usernameReqRef = useRef(0);
 
   const checkUsername = async (name) => {
-    // Atomic check via Usernames/{lower} doc presence
-    const available = await isUsernameAvailable(name);
-    setUsernameAvailable(available);
+    const reqId = ++usernameReqRef.current;
+    try {
+      // Atomic check via Usernames/{lower} doc presence
+      const available = await isUsernameAvailable(name);
+      if (reqId === usernameReqRef.current) setUsernameAvailable(available);
+    } catch (e) {
+      // Offline vs. — spinner'da (null) takılı bırakma; kayıt anında
+      // createUserProfile zaten atomik kontrol yapıyor.
+      if (reqId === usernameReqRef.current) setUsernameAvailable(true);
+    }
   };
 
   const validateUsername = (text) => {
@@ -126,8 +128,8 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
     setUsernameAvailable(null);
-    if (usernameTimeout) clearTimeout(usernameTimeout);
-    usernameTimeout = setTimeout(() => {
+    if (usernameTimeoutRef.current) clearTimeout(usernameTimeoutRef.current);
+    usernameTimeoutRef.current = setTimeout(() => {
       checkUsername(text.toLowerCase());
     }, 500);
   };
@@ -170,6 +172,8 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
     setIsloading(true);
+    let createdUser = null;
+    let profileCreated = false;
     try {
       const auth = getAuth();
       const userCredential = await createUserWithEmailAndPassword(
@@ -178,11 +182,11 @@ export default function RegisterScreen({ navigation }) {
         password,
       );
       const user = userCredential.user;
+      createdUser = user;
+      const displayName = `${name.trim()} ${lastname.trim()}`;
       await updateProfile(user, {
-        displayName: name + " " + lastname,
-        username,
+        displayName,
       });
-      await sendEmailVerification(user);
 
       // Atomic profile + username reservation (transaction).
       // Çakışırsa createUserProfile throw eder → catch'e düşer, user'a hata.
@@ -190,22 +194,68 @@ export default function RegisterScreen({ navigation }) {
         uid: user.uid,
         username,
         email,
-        displayName: user.displayName,
+        displayName,
         avatarIndex: 0,
       });
+      profileCreated = true;
+
+      // Profil olusmadan once verification gondermiyoruz. Profil transaction'i
+      // duserse Auth kullanicisini silebilir ve e-postayi kilitlemeyiz.
+      let verificationSent = true;
+      try {
+        await sendEmailVerification(user);
+      } catch {
+        verificationSent = false;
+      }
+
+      // Kayit ekrani Firebase'de otomatik oturum acar. Kullanici emailini
+      // dogrulamadan uygulamaya sizmasin; basarili kayittan sonra giris ekranina
+      // temiz bir oturumla don.
+      await signOut(auth);
 
       Toast.show({
-        type: "success",
-        text1: i18nText("autoI18n.registration_success_verify_email", "{{username}} olarak kayıt başarılı! Email doğrulaması gönderildi: {{email}}", {
-          username,
-          email,
-        }),
+        type: verificationSent ? "success" : "info",
+        text1: verificationSent
+          ? i18nText("autoI18n.registration_success_verify_email", "{{username}} olarak kayıt başarılı! Email doğrulaması gönderildi: {{email}}", {
+              username,
+              email,
+            })
+          : language === "tr"
+          ? "Hesabın oluşturuldu. Doğrulama e-postasını giriş ekranından yeniden gönderebilirsin."
+          : "Your account was created. You can resend verification from the sign-in screen.",
       });
-      navigation.navigate("LoginScreen");
+      navigation.reset({ index: 0, routes: [{ name: "LoginScreen" }] });
     } catch (error) {
+      // Auth olustu ama profil transaction'i tamamlanmadiysa yetim hesabi sil.
+      // Aksi halde ayni e-posta sonraki denemelerde kalici olarak "kullanimda"
+      // gorunur. deleteUser yeni giris oldugu icin recent-login kosulunu saglar.
+      if (createdUser && !profileCreated) {
+        await deleteUser(createdUser).catch(() => signOut(getAuth()).catch(() => {}));
+      }
+      const message =
+        error?.code === "auth/email-already-in-use"
+          ? language === "tr"
+            ? "Bu e-posta ile zaten bir hesap var. Mevcut giriş yöntemini kullan; Google hesabıysan Google ile giriş yap."
+            : "An account already uses this email. Use its existing sign-in method; if it is a Google account, sign in with Google."
+          : error?.code === UserProfileErrorCode.USERNAME_TAKEN
+          ? language === "tr"
+            ? "Bu kullanıcı adı az önce alındı. Başka bir kullanıcı adı dene."
+            : "That username was just taken. Try another username."
+          : error?.code === "auth/invalid-email"
+          ? language === "tr"
+            ? "Geçerli bir e-posta adresi gir."
+            : "Enter a valid email address."
+          : error?.code === "auth/weak-password"
+          ? language === "tr"
+            ? "Daha güçlü bir şifre belirle."
+            : "Choose a stronger password."
+          : language === "tr"
+          ? "Kayıt tamamlanamadı. Bağlantını kontrol edip tekrar dene."
+          : "Registration could not be completed. Check your connection and try again.";
       Toast.show({
         type: "error",
-        text1: i18nText("autoI18n.kayit_sirasinda_hata_olustu", "Kayıt sırasında hata oluştu: ") + error.message,
+        text1: i18nText("autoI18n.kayit_sirasinda_hata_olustu", "Kayıt sırasında hata oluştu"),
+        text2: message,
       });
     } finally {
       setIsloading(false);
@@ -214,74 +264,34 @@ export default function RegisterScreen({ navigation }) {
 
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-  const [request, response, promptAsync] = useAuthRequest(
-    {
-      clientId:
-        "427087836931-in7lreg3vjgnvudn5h8gauradaeo58kc.apps.googleusercontent.com",
-      scopes: ["openid", "profile", "email"],
-      responseType: ResponseType.Token,
-      redirectUri: makeRedirectUri({ scheme: "watchify" }),
-    },
-    GOOGLE_DISCOVERY,
-  );
-
-  useEffect(() => {
-    if (response?.type === "success") {
-      const { access_token } = response.params;
-      handleGoogleCredential(access_token);
-    }
-  }, [response]);
-
-  const handleGoogleCredential = async (accessToken) => {
+  const signInWithGoogle = async () => {
+    if (isGoogleLoading) return;
     setIsGoogleLoading(true);
     try {
-      const credential = GoogleAuthProvider.credential(null, accessToken);
-      const auth = getAuth();
-      const userCredential = await signInWithCredential(auth, credential);
-      const user = userCredential.user;
+      const result = await authenticateWithGoogle();
+      if (result.cancelled) return;
+      const { user, needsProfileCompletion } = result;
 
-      const userRef = doc(db, "Users", user.uid);
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) {
-        // Google'dan gelen email prefix'i username olarak dene; çakışırsa
-        // _XXXX random ekle (basit retry).
-        const base = (user.email?.split("@")[0] || "user").replace(/[^a-zA-Z0-9_]/g, "");
-        let attemptUsername = base;
-        for (let i = 0; i < 5; i++) {
-          try {
-            await createUserProfile({
-              uid: user.uid,
-              username: attemptUsername,
-              email: user.email,
-              displayName: user.displayName,
-              avatarIndex: 0,
-            });
-            break;
-          } catch (e) {
-            if (/alınmış/.test(e.message)) {
-              attemptUsername = `${base}_${Math.floor(Math.random() * 9999)}`;
-            } else {
-              throw e;
-            }
-          }
-        }
+      if (needsProfileCompletion) {
+        navigation.reset({ index: 0, routes: [{ name: "GoogleProfileCompletionScreen" }] });
+      } else {
+        Toast.show({
+          type: "success",
+          text1: i18nText("autoI18n.hos_geldin", "Hoş geldin, ") + (user.displayName || user.email),
+        });
+        navigation.reset({ index: 0, routes: [{ name: "TabScreen" }] });
       }
-
-      Toast.show({
-        type: "success",
-        text1: i18nText("autoI18n.hos_geldin", "Hoş geldin, ") + (user.displayName || user.email),
-      });
-      navigation.reset({ index: 0, routes: [{ name: "TabScreen" }] });
     } catch (error) {
-      Toast.show({ type: "error", text1: i18nText("autoI18n.google_ile_giris_basarisiz", "Google ile giriş başarısız.") });
+      // İptal bir hata değil — sessizce geç.
+      if (error?.code === GoogleAuthCode.CANCELLED) return;
+      Toast.show({
+        type: "error",
+        text1: i18nText("autoI18n.google_ile_giris_basarisiz", "Google ile giriş başarısız."),
+        text2: describeGoogleAuthError(error, language === "tr"),
+      });
     } finally {
       setIsGoogleLoading(false);
     }
-  };
-
-  const signInWithGoogle = () => {
-    buzz();
-    promptAsync();
   };
 
   const getBorderColor = (field, validState) => {
@@ -730,9 +740,12 @@ export default function RegisterScreen({ navigation }) {
                 styles.googleButton,
                 { backgroundColor: fieldSurface, borderColor: hairline },
               ]}
-              onPress={signInWithGoogle}
+              onPress={() => {
+                buzz();
+                signInWithGoogle();
+              }}
               activeOpacity={0.8}
-              disabled={!request || isGoogleLoading}
+              disabled={isGoogleLoading}
             >
               {isGoogleLoading ? (
                 <LottieView

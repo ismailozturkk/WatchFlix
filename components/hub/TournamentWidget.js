@@ -3,9 +3,10 @@
 // Hub ekranındaki interaktif turnuva widget'ı. Bu ayın türünü, fazını ve geri
 // sayımını gösterir; faza göre KİŞİSEL durum satırı ekler:
 //   • selection → hype hakkın duruyor mu ("1 hype hakkın var" / "Hype'ın kayıtlı")
-//                 + en çok hype alan 3 posterin canlı önizlemesi
 //   • voting    → aktif turda kaç maça oy verdiğin (ör. "3/16 maç")
 //   • results   → şampiyon posteri
+// Tüm fazlarda sayacın altında, kartın tam genişliğini kullanan kompakt bracket
+// önizlemesi gösterilir.
 // Basınca TournamentScreen'e gider.
 //
 // Hafiftir: aday listesini OLUŞTURMAZ (getTournamentDoc — yoksa null); sayımlar
@@ -36,6 +37,93 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const SPRING = { mass: 0.4, damping: 12, stiffness: 180 };
 const PHASE_COLOR = { selection: "#3B82F6", voting: "#F59E0B", results: "#F5C518", upcoming: "#6B7280" };
 
+function MiniPoster({ contestant, getTmdbUrl, accent = false }) {
+  const uri = contestant?.posterPath
+    ? getTmdbUrl(contestant.posterPath, "poster", 45)
+    : null;
+
+  return (
+    <View style={[styles.treePoster, accent && styles.treePosterAccent]}>
+      {uri ? (
+        <Image source={{ uri }} style={styles.treePosterImage} contentFit="cover" />
+      ) : (
+        <AppIcon family="Ionicons" name="help" size={8} color="rgba(255,255,255,0.58)" />
+      )}
+    </View>
+  );
+}
+
+function MiniMatch({ match, getTmdbUrl, final = false }) {
+  const winnerId = match?.winner?.id;
+  return (
+    <View style={[styles.treeMatch, final && styles.treeFinalMatch]}>
+      <MiniPoster
+        contestant={match?.a}
+        getTmdbUrl={getTmdbUrl}
+        accent={!!winnerId && winnerId === match?.a?.id}
+      />
+      <MiniPoster
+        contestant={match?.b}
+        getTmdbUrl={getTmdbUrl}
+        accent={!!winnerId && winnerId === match?.b?.id}
+      />
+    </View>
+  );
+}
+
+// Büyük bracket ağacının Hub kartına sığan, iki taraflı yatay özeti. Dıştaki
+// ilk tur eşleşmeleri merkeze doğru birleşir; ilerleyen turlar açıldıkça aynı
+// düğümler gerçek adaylarla dolar.
+function TournamentTreePreview({ bracket, getTmdbUrl }) {
+  const rounds = bracket?.rounds || [];
+  const first = rounds[0]?.matches || [];
+  const second = rounds[1]?.matches || [];
+  const finalMatch = rounds[4]?.matches?.[0] || null;
+
+  return (
+    <View style={styles.treePreview} pointerEvents="none">
+      <View style={[styles.treeLine, styles.treeLineLeftTop]} />
+      <View style={[styles.treeLine, styles.treeLineLeftBottom]} />
+      <View style={[styles.treeLine, styles.treeLineLeftStem]} />
+      <View style={[styles.treeLine, styles.treeLineLeftCenter]} />
+      <View style={[styles.treeLine, styles.treeLineLeftFinal]} />
+
+      <View style={[styles.treeLine, styles.treeLineRightTop]} />
+      <View style={[styles.treeLine, styles.treeLineRightBottom]} />
+      <View style={[styles.treeLine, styles.treeLineRightStem]} />
+      <View style={[styles.treeLine, styles.treeLineRightCenter]} />
+      <View style={[styles.treeLine, styles.treeLineRightFinal]} />
+
+      <View style={[styles.treeNode, styles.treeNodeLeftTop]}>
+        <MiniMatch match={first[0]} getTmdbUrl={getTmdbUrl} />
+      </View>
+      <View style={[styles.treeNode, styles.treeNodeLeftBottom]}>
+        <MiniMatch match={first[1]} getTmdbUrl={getTmdbUrl} />
+      </View>
+      <View style={[styles.treeNode, styles.treeNodeLeftMiddle]}>
+        <MiniMatch match={second[0]} getTmdbUrl={getTmdbUrl} />
+      </View>
+
+      <View style={[styles.treeNode, styles.treeNodeCenter]}>
+        <View style={styles.treeTrophy}>
+          <AppIcon family="Ionicons" name="trophy" size={11} color="#F5C518" />
+        </View>
+        <MiniMatch match={finalMatch} getTmdbUrl={getTmdbUrl} final />
+      </View>
+
+      <View style={[styles.treeNode, styles.treeNodeRightMiddle]}>
+        <MiniMatch match={second[4]} getTmdbUrl={getTmdbUrl} />
+      </View>
+      <View style={[styles.treeNode, styles.treeNodeRightTop]}>
+        <MiniMatch match={first[8]} getTmdbUrl={getTmdbUrl} />
+      </View>
+      <View style={[styles.treeNode, styles.treeNodeRightBottom]}>
+        <MiniMatch match={first[9]} getTmdbUrl={getTmdbUrl} />
+      </View>
+    </View>
+  );
+}
+
 export default function TournamentWidget({ navigation }) {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -48,8 +136,7 @@ export default function TournamentWidget({ navigation }) {
   const entry = useMemo(() => getScheduleEntry(monthIndex), [monthIndex]);
 
   const [nowMs, setNowMs] = useState(now());
-  const [doc, setDoc] = useState(null);
-  const [champion, setChampion] = useState(null);
+  const [bracketPreview, setBracketPreview] = useState(null);
   const [agg, setAgg] = useState(null);       // { noms, picks, voters } | null
   const [myVote, setMyVote] = useState(null); // kendi oy dokümanım | null
 
@@ -74,16 +161,12 @@ export default function TournamentWidget({ navigation }) {
         uid ? fetchMyVoteOnce(periodId, uid) : Promise.resolve(null),
       ]);
       if (!active) return;
-      setDoc(d);
       setAgg(a);
       setMyVote(mine);
-      if (d?.nominees?.length && phaseInfo.phase === "results") {
-        let nomTally;
-        let tallies;
-        if (a) {
-          nomTally = a.noms;
-          tallies = a.picks;
-        } else {
+      if (d?.nominees?.length) {
+        let nomTally = a?.noms || {};
+        let tallies = a?.picks || {};
+        if (!a && phaseInfo.phase === "results") {
           const votes = await fetchVotesOnce(periodId);
           if (!active) return;
           nomTally = tallyNominations(votes);
@@ -92,7 +175,9 @@ export default function TournamentWidget({ navigation }) {
         // Havuz > 32 ise finalistler hype oylarından türer (ekranla aynı kural).
         const finalists = selectFinalists(d.nominees, nomTally);
         const b = buildBracket({ nominees: finalists, tallies, periodId, ms: nowMs });
-        setChampion(b.champion || null);
+        setBracketPreview(b);
+      } else {
+        setBracketPreview(null);
       }
     })();
     return () => { active = false; };
@@ -134,24 +219,6 @@ export default function TournamentWidget({ navigation }) {
       ? `${agg.voters} ${i18nText("autoI18n.tournament_widget_voters", "katılımcı")}`
       : null;
 
-  // Önizleme posterleri: şampiyon (results) → en çok HYPE alan 3 (selection,
-  // agg varsa) → en üst 3 seed (fallback).
-  const previewPosters = useMemo(() => {
-    if (champion?.posterPath) return [champion];
-    const nominees = doc?.nominees || [];
-    if (phaseInfo.phase === "selection" && agg && Object.keys(agg.noms).length > 0) {
-      const hyped = [...nominees]
-        .sort(
-          (a, b) =>
-            (agg.noms[String(b.id)] || 0) - (agg.noms[String(a.id)] || 0) ||
-            (a.seed || 0) - (b.seed || 0),
-        )
-        .slice(0, 3);
-      if (hyped.length) return hyped;
-    }
-    return [...nominees].sort((a, b) => a.seed - b.seed).slice(0, 3);
-  }, [champion, doc, agg, phaseInfo.phase]);
-
   return (
     <AnimatedPressable
       accessibilityRole="button"
@@ -170,58 +237,34 @@ export default function TournamentWidget({ navigation }) {
         <View pointerEvents="none" style={styles.glowOne} />
         <View pointerEvents="none" style={styles.glowTwo} />
 
-        <View style={styles.left}>
-          <View style={styles.titleRow}>
-            <AppIcon family="Ionicons" name="trophy" size={16} color="#fff" />
-            <Text style={styles.kicker}>{i18nText("autoI18n.tournament_monthly", "AYLIK TURNUVA")}</Text>
+        <View style={styles.topRow}>
+          <View style={styles.left}>
+            <View style={styles.titleRow}>
+              <AppIcon family="Ionicons" name="trophy" size={16} color="#fff" />
+              <Text style={styles.kicker}>{i18nText("autoI18n.tournament_monthly", "AYLIK TURNUVA")}</Text>
+            </View>
+            <Text style={styles.theme} numberOfLines={1}>
+              {theTheme} {mediaLabel(entry.mediaType, lang)}
+            </Text>
+            <Text style={styles.phaseLabel} numberOfLines={1}>{phaseLabel}</Text>
           </View>
-          <Text style={styles.theme} numberOfLines={1}>
-            {theTheme} {mediaLabel(entry.mediaType, lang)}
-          </Text>
-          <Text style={styles.phaseLabel} numberOfLines={1}>{phaseLabel}</Text>
-          <View style={styles.countdownRow}>
-            <CountdownTimer deadlineMs={phaseInfo.nextDeadlineMs} lang={lang} size="sm" />
-            {votersLine && (
-              <View style={styles.votersPill}>
-                <AppIcon family="Ionicons" name="people" size={10} color="#fff" />
-                <Text style={styles.votersText}>{votersLine}</Text>
-              </View>
-            )}
+
+          <View style={styles.openIcon}>
+            <AppIcon family="Ionicons" name="arrow-forward" size={17} color="#fff" />
           </View>
         </View>
 
-        {/* Poster önizleme */}
-        <View style={styles.posters}>
-          {previewPosters.length > 0 ? (
-            previewPosters.map((p, i) => {
-              const uri = p.posterPath ? getTmdbUrl(p.posterPath, "poster", 92) : null;
-              return (
-                <View
-                  key={p.id || i}
-                  style={[
-                    styles.posterWrap,
-                    { right: i * 24, zIndex: previewPosters.length - i, transform: [{ rotate: `${(i - 1) * 5}deg` }] },
-                  ]}
-                >
-                  {uri ? (
-                    <Image source={{ uri }} style={styles.poster} contentFit="cover" />
-                  ) : (
-                    <View style={[styles.poster, styles.posterEmpty]} />
-                  )}
-                  {champion && i === 0 && (
-                    <View style={styles.champBadge}>
-                      <AppIcon family="Ionicons" name="trophy" size={11} color="#F5C518" />
-                    </View>
-                  )}
-                </View>
-              );
-            })
-          ) : (
-            <View style={styles.cta}>
-              <AppIcon family="Ionicons" name="arrow-forward" size={20} color="#fff" />
+        <View style={styles.countdownRow}>
+          <CountdownTimer deadlineMs={phaseInfo.nextDeadlineMs} lang={lang} size="sm" />
+          {votersLine && (
+            <View style={styles.votersPill}>
+              <AppIcon family="Ionicons" name="people" size={10} color="#fff" />
+              <Text style={styles.votersText}>{votersLine}</Text>
             </View>
           )}
         </View>
+
+        <TournamentTreePreview bracket={bracketPreview} getTmdbUrl={getTmdbUrl} />
       </LinearGradient>
     </AnimatedPressable>
   );
@@ -238,11 +281,9 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   card: {
-    minHeight: 116,
+    minHeight: 206,
     borderRadius: 24,
     padding: 18,
-    flexDirection: "row",
-    alignItems: "center",
     overflow: "hidden",
   },
   glowOne: {
@@ -253,12 +294,13 @@ const styles = StyleSheet.create({
     position: "absolute", width: 100, height: 100, borderRadius: 50,
     left: -30, bottom: -50, backgroundColor: "rgba(255,255,255,0.07)",
   },
-  left: { flex: 1, paddingRight: 8 },
+  topRow: { flexDirection: "row", alignItems: "flex-start" },
+  left: { flex: 1, paddingRight: 10 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   kicker: { color: "rgba(255,255,255,0.9)", fontSize: 11, fontWeight: "900", letterSpacing: 1 },
   theme: { color: "#fff", fontSize: 20, fontWeight: "900", marginTop: 6 },
   phaseLabel: { color: "rgba(255,255,255,0.92)", fontSize: 11.5, fontWeight: "800", marginTop: 6, marginBottom: 5 },
-  countdownRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  countdownRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 3 },
   votersPill: {
     flexDirection: "row", alignItems: "center", gap: 4,
     backgroundColor: "rgba(255,255,255,0.18)",
@@ -266,16 +308,55 @@ const styles = StyleSheet.create({
   },
   votersText: { color: "#fff", fontSize: 10, fontWeight: "800" },
 
-  posters: { width: 92, height: 84, alignItems: "flex-end", justifyContent: "center" },
-  posterWrap: { position: "absolute" },
-  poster: { width: 52, height: 78, borderRadius: 8, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.6)" },
-  posterEmpty: { backgroundColor: "rgba(255,255,255,0.18)" },
-  champBadge: {
-    position: "absolute", top: -6, alignSelf: "center", right: 18,
-    backgroundColor: "rgba(0,0,0,0.6)", borderRadius: 10, padding: 3,
-  },
-  cta: {
-    width: 38, height: 38, borderRadius: 13,
+  openIcon: {
+    width: 34, height: 34, borderRadius: 12,
     backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center",
   },
+
+  treePreview: {
+    width: "100%", height: 82, marginTop: 10, borderRadius: 15,
+    backgroundColor: "rgba(7,12,28,0.22)", overflow: "hidden",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.16)",
+  },
+  treeNode: { position: "absolute", zIndex: 2 },
+  treeNodeLeftTop: { left: 6, top: 5 },
+  treeNodeLeftBottom: { left: 6, bottom: 5 },
+  treeNodeLeftMiddle: { left: "26%", top: 24 },
+  treeNodeCenter: { left: "50%", top: 19, marginLeft: -22, alignItems: "center" },
+  treeNodeRightMiddle: { right: "26%", top: 24 },
+  treeNodeRightTop: { right: 6, top: 5 },
+  treeNodeRightBottom: { right: 6, bottom: 5 },
+  treeMatch: {
+    width: 40, height: 29, borderRadius: 6, padding: 2, gap: 2,
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.14)", borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.30)",
+  },
+  treeFinalMatch: { borderColor: "rgba(245,197,24,0.85)", backgroundColor: "rgba(245,197,24,0.16)" },
+  treePoster: {
+    width: 16, height: 23, borderRadius: 3, overflow: "hidden",
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.10)", borderWidth: 0.75,
+    borderColor: "rgba(255,255,255,0.28)",
+  },
+  treePosterAccent: { borderColor: "#F5C518", borderWidth: 1.25 },
+  treePosterImage: { width: "100%", height: "100%" },
+  treeTrophy: {
+    position: "absolute", zIndex: 3, top: -12,
+    width: 20, height: 20, borderRadius: 10,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(8,12,25,0.78)", borderWidth: 1,
+    borderColor: "rgba(245,197,24,0.72)",
+  },
+  treeLine: { position: "absolute", zIndex: 1, backgroundColor: "rgba(255,255,255,0.42)" },
+  treeLineLeftTop: { left: 46, top: 19, width: "13%", height: 1 },
+  treeLineLeftBottom: { left: 46, bottom: 19, width: "13%", height: 1 },
+  treeLineLeftStem: { left: "25%", top: 19, width: 1, height: 44 },
+  treeLineLeftCenter: { left: "25%", top: 40, width: "5%", height: 1 },
+  treeLineLeftFinal: { left: "37%", top: 40, width: "9%", height: 1.5 },
+  treeLineRightTop: { right: 46, top: 19, width: "13%", height: 1 },
+  treeLineRightBottom: { right: 46, bottom: 19, width: "13%", height: 1 },
+  treeLineRightStem: { right: "25%", top: 19, width: 1, height: 44 },
+  treeLineRightCenter: { right: "25%", top: 40, width: "5%", height: 1 },
+  treeLineRightFinal: { right: "37%", top: 40, width: "9%", height: 1.5 },
 });

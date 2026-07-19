@@ -1,5 +1,8 @@
-import { createContext, useContext, useCallback, useEffect, useState, useMemo } from "react";
-import { useApiSettings } from "./AppSettingsContext";
+import { createContext, useContext, useCallback, useEffect, useState, useMemo, useRef } from "react";
+import {
+  useApiSettings,
+  useStreamingProviderSettings,
+} from "./AppSettingsContext";
 import Toast from "react-native-toast-message";
 import { useLanguage } from "./LanguageContext";
 import axios from "axios";
@@ -35,6 +38,8 @@ const mergeTrendItems = (prev, next) => {
 // Sayfalı bölümlerin ortak yükleyicisi: cache okuma, loading bayrakları,
 // append/replace + dedup mantığını tek yerde toplar. Her bölüm yalnızca
 // kendi cacheKey'ini ve `request`'ini verir.
+// `isStale`: kategori/dil değişince eski (in-flight) isteğin sonucu yeni
+// listeye karışmasın diye sonuç uygulanmadan önce kontrol edilir.
 const loadPage = async ({
   cacheKey,
   ttl,
@@ -44,8 +49,10 @@ const loadPage = async ({
   setTotal,
   setLoading,
   setLoadingMore,
+  isStale,
 }) => {
   const apply = (results, totalPages) => {
+    if (isStale?.()) return;
     if (setTotal) setTotal(totalPages || 1);
     if (append) setData((prev) => mergeUniqueById(prev, results));
     else setIfChanged(setData, results);
@@ -70,10 +77,21 @@ const loadPage = async ({
 
 export const MovieProvider = ({ children }) => {
   const { API_KEY } = useApiSettings();
+  const { streamingProviderIds } = useStreamingProviderSettings();
   const { language, t } = useLanguage();
   const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
   const tmdbRegion = language === "tr" ? "TR" : "US";
   const [activeSections, setActiveSections] = useState({});
+
+  // Bölüm başına istek jenerasyonu: fresh (sayfa 1) fetch jenerasyonu artırır,
+  // append aynı jenerasyonda kalır. Kategori/dil değişince eski in-flight
+  // isteklerin sonuçları stale sayılır ve state'e uygulanmaz.
+  const requestGenRef = useRef({});
+  const beginFreshRequest = (key) => {
+    requestGenRef.current[key] = (requestGenRef.current[key] || 0) + 1;
+    return requestGenRef.current[key];
+  };
+  const currentGen = (key) => requestGenRef.current[key] || 0;
 
   const activateMovieSection = useCallback((section) => {
     setActiveSections((current) => {
@@ -104,10 +122,12 @@ export const MovieProvider = ({ children }) => {
 
   const fetchMoviesBests = (page = 1, append = false) => {
     const lang = language === "tr" ? "tr-TR" : "en-US";
+    const gen = append ? currentGen("bests") : beginFreshRequest("bests");
     return loadPage({
       cacheKey: `movie_bests_${lang}_${selectedCategoryBests}_page_${page}`,
       ttl: TTL.TREND,
       append,
+      isStale: () => currentGen("bests") !== gen,
       setData: setMoviesBests,
       setTotal: setTotalPagesBest,
       setLoading: setLoadingBests,
@@ -170,11 +190,14 @@ export const MovieProvider = ({ children }) => {
 
   const fetchSeriesTrends = async (page = 1, append = false) => {
     const lang = language === "tr" ? "tr-TR" : "en-US";
+    const gen = append ? currentGen("trends") : beginFreshRequest("trends");
+    const isStale = () => currentGen("trends") !== gen;
     const baseKey = `movie_trends_${lang}_${selectedCategoryTrends}_${selectedCategoryTrendsMovie}`;
     const cacheKey = page === 1 ? baseKey : `${baseKey}_p${page}`;
 
     const cached = await getCachedValue(cacheKey, TTL.TREND);
     if (cached) {
+      if (isStale()) return;
       if (append) {
         setMovieTrends((prev) => mergeTrendItems(prev, cached.results ?? cached));
         setLoadingMoreTrends(false);
@@ -202,13 +225,14 @@ export const MovieProvider = ({ children }) => {
         headers: { accept: "application/json", Authorization: API_KEY },
       });
       const results = response.data.results || [];
+      // Cache doğru anahtara yazılabilir; yalnızca state güncellemesi stale'de atlanır.
+      setCachedValue(append ? cacheKey : baseKey, results);
+      if (isStale()) return;
       setTotalPagesTrends(response.data.total_pages || 1);
       if (append) {
         setMovieTrends((prev) => mergeTrendItems(prev, results));
-        setCachedValue(cacheKey, results);
       } else {
         setIfChanged(setMovieTrends, results);
-        setCachedValue(baseKey, results);
       }
     } catch (error) {
       if (__DEV__) console.error("fetchSeriesTrends:", error?.message || error);
@@ -399,7 +423,7 @@ export const MovieProvider = ({ children }) => {
   useEffect(() => {
     if (!activeSections.providers) return;
     fetchProviders();
-  }, [activeSections.providers, language]);
+  }, [activeSections.providers, language, streamingProviderIds]);
 
   const fetchProviders = async () => {
     const cacheKey = `movie_providers_${tmdbLanguage}_${tmdbRegion}`;
@@ -407,8 +431,12 @@ export const MovieProvider = ({ children }) => {
     if (cached) {
       setIfChanged(setProviders, cached);
       if (cached.length > 0) {
-        setSelectedProvider(cached[0].provider_id);
-        fetchMoviesByProvider(cached[0].provider_id);
+        const preferred =
+          cached.find((provider) =>
+            streamingProviderIds.includes(provider.provider_id),
+          ) || cached[0];
+        setSelectedProvider(preferred.provider_id);
+        fetchMoviesByProvider(preferred.provider_id);
       }
       setLoadingProvider(false);
       return;
@@ -422,8 +450,12 @@ export const MovieProvider = ({ children }) => {
       setIfChanged(setProviders, results);
       setCachedValue(cacheKey, results);
       if (results.length > 0) {
-        setSelectedProvider(results[0].provider_id);
-        fetchMoviesByProvider(results[0].provider_id);
+        const preferred =
+          results.find((provider) =>
+            streamingProviderIds.includes(provider.provider_id),
+          ) || results[0];
+        setSelectedProvider(preferred.provider_id);
+        fetchMoviesByProvider(preferred.provider_id);
       }
     } catch (err) {
       if (__DEV__) console.error(i18nText("autoI18n.saglayicilari_cekerken_hata", "Sağlayıcıları çekerken hata:"), err.message);
@@ -438,10 +470,12 @@ export const MovieProvider = ({ children }) => {
       setSelectedProvider(providerId);
       setPageProvider(1);
     }
+    const gen = append ? currentGen("provider") : beginFreshRequest("provider");
     return loadPage({
       cacheKey: `movie_provider_${tmdbLanguage}_${tmdbRegion}_${providerId}_p${page}`,
       ttl: TTL.PROVIDERS,
       append,
+      isStale: () => currentGen("provider") !== gen,
       setData: setMoviesProvider,
       setTotal: setTotalPagesProvider,
       setLoading: setLoadingMovieProvider,
@@ -483,10 +517,12 @@ export const MovieProvider = ({ children }) => {
   }, [activeSections.nowPlaying, language]);
 
   const fetchMoviNowPlaying = (page = 1, append = false) => {
+    const gen = append ? currentGen("nowPlaying") : beginFreshRequest("nowPlaying");
     return loadPage({
       cacheKey: `movie_now_playing_${tmdbLanguage}_${tmdbRegion}_p${page}`,
       ttl: TTL.NOW_PLAYING,
       append,
+      isStale: () => currentGen("nowPlaying") !== gen,
       setData: setMoviesNowPlaying,
       setTotal: setTotalPagesNowPlaying,
       setLoading: setLoadingNowPlaying,
@@ -539,10 +575,12 @@ export const MovieProvider = ({ children }) => {
   };
   const fetchMoviesByGenres = (page = 1, append = false) => {
     const genresKey = [...selectedGenres].sort().join(",");
+    const gen = append ? currentGen("genres") : beginFreshRequest("genres");
     return loadPage({
       cacheKey: `movie_genres_content_${tmdbLanguage}_p${page}_g${genresKey}`,
       ttl: TTL.TREND,
       append,
+      isStale: () => currentGen("genres") !== gen,
       setData: setMoviesGenres,
       setTotal: setTotalPagesGenres,
       setLoading: setLoadingGenres,
@@ -649,10 +687,12 @@ export const MovieProvider = ({ children }) => {
   // Film türlerini API'den almak
   const fetchMovieUpcoming = (page = 1, append = false) => {
     if (!calculatedDate) return;
+    const gen = append ? currentGen("upcoming") : beginFreshRequest("upcoming");
     return loadPage({
       cacheKey: `movie_upcoming_${tmdbLanguage}_${tmdbRegion}_${calculatedDate}_p${page}`,
       ttl: TTL.NOW_PLAYING,
       append,
+      isStale: () => currentGen("upcoming") !== gen,
       setData: setMoviesUpcoming,
       setTotal: setTotalPagesUpcoming,
       setLoading: setLoadingUpcoming,

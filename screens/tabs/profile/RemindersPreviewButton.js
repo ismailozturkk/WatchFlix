@@ -21,7 +21,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useProfileReminders } from "../../../context/ProfileRemindersContext";
-import { useImageQualitySettings } from "../../../context/AppSettingsContext";
+import { useImageQualitySettings, useListLayoutSettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
 
 
@@ -82,7 +82,13 @@ function buildItems(reminders) {
   const past = all
     .filter((x) => new Date(x.date).getTime() < now)
     .sort((a, b) => new Date(b.date) - new Date(a.date));
-  return { items: [...upcoming, ...past].slice(0, 5), total: all.length };
+  return {
+    items: [...upcoming, ...past].slice(0, 5),
+    total: all.length,
+    // Başlık rozetleri — ProfileReminders ile aynı sayım (tarih filtresi yok)
+    movieCount: movies.length,
+    tvCount: eps.length,
+  };
 }
 
 /**
@@ -220,10 +226,14 @@ export default function RemindersPreviewButton({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
   const { getTmdbUrl } = useImageQualitySettings();
+  const { posterBadges } = useListLayoutSettings();
   const { reminders, calculateDateDifference, formatDate } =
     useProfileReminders();
 
-  const { items, total } = useMemo(() => buildItems(reminders), [reminders]);
+  const { items, movieCount, tvCount } = useMemo(
+    () => buildItems(reminders),
+    [reminders],
+  );
   const n = items.length;
   const [top, setTop] = useState(0);
 
@@ -237,6 +247,11 @@ export default function RemindersPreviewButton({ navigation }) {
   }, []);
   const goAll = useCallback(
     () => navigation.navigate("RemindersScreen"),
+    [navigation],
+  );
+  // Gizlenen CalendarWidget'ın yerine takvime giriş buradan yapılır.
+  const goCalendar = useCallback(
+    () => navigation.navigate("CalendarScreen"),
     [navigation],
   );
   const cardColors = useMemo(
@@ -357,61 +372,65 @@ export default function RemindersPreviewButton({ navigation }) {
             </Text>
           ) : null}
 
-          <View style={styles.dateRow}>
-            <Ionicons
-              name="calendar-outline"
-              size={10}
-              color={theme.text.muted}
-            />
-            <Text
-              allowFontScaling={false}
-              style={[styles.dateText, { color: theme.text.muted }]}
-              numberOfLines={1}
-            >
-              {formatDate(item.date)}
-            </Text>
-          </View>
+          {posterBadges?.releaseDate !== false && (
+            <View style={styles.dateRow}>
+              <Ionicons
+                name="calendar-outline"
+                size={10}
+                color={theme.text.muted}
+              />
+              <Text
+                allowFontScaling={false}
+                style={[styles.dateText, { color: theme.text.muted }]}
+                numberOfLines={1}
+              >
+                {formatDate(item.date)}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Kalan gün */}
-        <View
-          style={[styles.daysBox, { backgroundColor: cs.bg, borderColor: cs.color }]}
-        >
-          <Ionicons name={cs.icon} size={14} color={cs.color} />
-          {!diff || !diff.isRemaining ? (
-            <Text
-              allowFontScaling={false}
-              style={[styles.daysLabel, { color: cs.color }]}
-              numberOfLines={1}
-            >{i18nText("autoI18n.yayinda", "Yayında")}</Text>
-          ) : diff.days === 0 ? (
-            <Text
-              allowFontScaling={false}
-              style={[styles.daysNum, { color: cs.color }]}
-            >{i18nText("autoI18n.bugun", "Bugün")}</Text>
-          ) : diff.days <= 99 ? (
-            <>
-              <Text
-                allowFontScaling={false}
-                style={[styles.daysNum, { color: cs.color }]}
-              >
-                {diff.days}
-              </Text>
+        {posterBadges?.countdown !== false && (
+          <View
+            style={[styles.daysBox, { backgroundColor: cs.bg, borderColor: cs.color }]}
+          >
+            <Ionicons name={cs.icon} size={14} color={cs.color} />
+            {!diff || !diff.isRemaining ? (
               <Text
                 allowFontScaling={false}
                 style={[styles.daysLabel, { color: cs.color }]}
-              >{i18nText("autoI18n.gun", "gün")}</Text>
-            </>
-          ) : (
-            <Text
-              allowFontScaling={false}
-              style={[styles.daysLabel, { color: cs.color }]}
-              numberOfLines={1}
-            >
-              {diff.text}
-            </Text>
-          )}
-        </View>
+                numberOfLines={1}
+              >{i18nText("autoI18n.yayinda", "Yayında")}</Text>
+            ) : diff.days === 0 ? (
+              <Text
+                allowFontScaling={false}
+                style={[styles.daysNum, { color: cs.color }]}
+              >{i18nText("autoI18n.bugun", "Bugün")}</Text>
+            ) : diff.days <= 99 ? (
+              <>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.daysNum, { color: cs.color }]}
+                >
+                  {diff.days}
+                </Text>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.daysLabel, { color: cs.color }]}
+                >{i18nText("autoI18n.gun", "gün")}</Text>
+              </>
+            ) : (
+              <Text
+                allowFontScaling={false}
+                style={[styles.daysLabel, { color: cs.color }]}
+                numberOfLines={1}
+              >
+                {diff.text}
+              </Text>
+            )}
+          </View>
+        )}
       </>
     );
   };
@@ -445,18 +464,68 @@ export default function RemindersPreviewButton({ navigation }) {
         >
           {label}
         </Text>
-        <TouchableOpacity
-          style={styles.allBtn}
-          onPress={() => navigation.navigate("RemindersScreen")}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.allText, { color: theme.accent }]}
+        <View style={styles.headerRight}>
+          {/* Film/dizi sayıları — ProfileReminders başlığındaki rozetlerle aynı */}
+          {movieCount > 0 && (
+            <View
+              style={[
+                styles.countBadge,
+                {
+                  backgroundColor: theme.notesColor.blueBackground,
+                  borderColor: theme.notesColor.blue,
+                },
+              ]}
+            >
+              <Ionicons
+                name="film-outline"
+                size={10}
+                color={theme.notesColor.blue}
+              />
+              <Text
+                allowFontScaling={false}
+                style={[styles.countBadgeText, { color: theme.notesColor.blue }]}
+              >
+                {movieCount}
+              </Text>
+            </View>
+          )}
+          {tvCount > 0 && (
+            <View
+              style={[
+                styles.countBadge,
+                {
+                  backgroundColor: theme.notesColor.purpleBackground,
+                  borderColor: theme.notesColor.purple,
+                },
+              ]}
+            >
+              <Ionicons
+                name="tv-outline"
+                size={10}
+                color={theme.notesColor.purple}
+              />
+              <Text
+                allowFontScaling={false}
+                style={[
+                  styles.countBadgeText,
+                  { color: theme.notesColor.purple },
+                ]}
+              >
+                {tvCount}
+              </Text>
+            </View>
+          )}
+
+          {/* Takvim butonu — "Tümü" bağlantısının yerinde; hatırlatmaların
+              tümü ön karta dokununca açılır. */}
+          <TouchableOpacity
+            style={[styles.calendarBtn, { backgroundColor: theme.accent + "22" }]}
+            onPress={goCalendar}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            {total}{i18nText("autoI18n.tumu_2", "· Tümü")}</Text>
-          <Ionicons name="chevron-forward" size={14} color={theme.accent} />
-        </TouchableOpacity>
+            <Ionicons name="calendar" size={15} color={theme.accent} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Kaydırılabilir kart yığını (arkadan öne render) */}
@@ -497,8 +566,25 @@ const styles = StyleSheet.create({
   // Boş durumda başlık dolu durumdaki headerRow ile aynı hizada dursun
   // (yoksa liste boşaldığında "Hatırlatmalar" yazısı sola kayıyor).
   emptyTitle: { paddingHorizontal: 20, marginBottom: 10 },
-  allBtn: { flexDirection: "row", alignItems: "center", gap: 2 },
-  allText: { fontSize: 12, fontWeight: "700" },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 6 },
+  // ProfileReminders başlığındaki countBadge ile aynı görünüm
+  countBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  countBadgeText: { fontSize: 11, fontWeight: "700" },
+  calendarBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
   stack: {
     width: CARD_W,

@@ -11,19 +11,18 @@ import {
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { SafeAreaView } from "react-native-safe-area-context";
-//import {} from "react-native-safe-area-context";
-import { useSnow } from "../../context/SnowContext";
 import LottieView from "lottie-react-native";
 import { useLanguage } from "../../context/LanguageContext";
 import AppIcon from "../../components/AppIcon";
 import { getAuth } from "firebase/auth";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "../../firebase";
 import ProfileLists from "./profile/ProfileLists";
 import { useAuth } from "../../context/AuthContext";
 import { useFriends } from "../../context/FriendsContext";
 import { AvatarSkeleton, WatchedInfoSkeleton } from "../../components/Skeleton";
 import { useProfileStats } from "../../context/ProfileStatsContext";
 import { useProfileUi } from "../../context/ProfileUiContext";
-import * as Progress from "react-native-progress";
 import NotesCard from "./profile/NotesCard";
 import RemindersPreviewButton from "./profile/RemindersPreviewButton";
 import MyActivityButton from "./profile/MyActivityButton";
@@ -31,11 +30,11 @@ import { useSnowSettings } from "../../context/AppSettingsContext";
 import CircularProgress, {
   CircularProgressBase,
 } from "react-native-circular-progress-indicator";
-import UserAvatar from "./profile/UserAvatar";
-import Avatar from "./profile/Avatar";
 import { BlurView } from "expo-blur";
 import IconBacground from "../../components/IconBacground";
-import BackButton from "../../components/BackButton";
+// BackButton bilinçli olarak yok: profil sekme kökü olarak render edilir
+// (TabScreenNavigator), stack'e push edilmez — buton yalnızca üstteki ekrandan
+// dönerken "hayalet" olarak belirip kalıyordu.
 import CalendarWidget from "../../components/profile/CalendarWidget";
 import StatisticsSection from "./profile/StatisticsSection";
 import { useUserProfile } from "../../context/UserProfileContext";
@@ -47,7 +46,6 @@ const ProfileScreen = ({ navigation }) => {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const { showSnow } = useSnowSettings();
-  const [isloading, setIsLoading] = useState(false);
   const [modalVisibleLogout, setModalVisibleLogout] = useState(false);
   const { user } = useAuth();
   const { profile } = useUserProfile();
@@ -85,15 +83,12 @@ const ProfileScreen = ({ navigation }) => {
     rankLevelMovie,
   } = useProfileStats();
   const SingOut = async () => {
-    setIsLoading(true);
-
     const auth = getAuth();
     try {
       await auth.signOut();
       handleLogout();
     } catch (error) {
       alert(error.message);
-      setIsLoading(false);
     }
   };
   const handleLogout = () => {
@@ -152,6 +147,25 @@ const ProfileScreen = ({ navigation }) => {
     friendsState?.incomingRequests?.length ?? profile?.pendingRequestsInCount ?? 0;
   const sendCount =
     friendsState?.outgoingRequests?.length ?? profile?.pendingRequestsOutCount ?? 0;
+
+  // Mesajlar butonundaki okunmamış rozeti — gelen kutusu index'indeki
+  // unreadCount alanlarının toplamı (ChatScreen sohbet açılınca sıfırlar).
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  useEffect(() => {
+    if (!user?.uid) return undefined;
+    const unsub = onSnapshot(
+      collection(db, "Users", user.uid, "conversations"),
+      (snap) => {
+        let total = 0;
+        snap.forEach((d) => {
+          total += d.data()?.unreadCount || 0;
+        });
+        setUnreadMessages(total);
+      },
+      () => setUnreadMessages(0),
+    );
+    return () => unsub();
+  }, [user?.uid]);
 
   const handleAvatarSelect = useCallback(
     async (index) => {
@@ -287,7 +301,8 @@ const ProfileScreen = ({ navigation }) => {
                   }
                 />
               </View>
-              {!user.emailVerified && (
+              {/* user, çıkış anındaki render'da null olabilir — doğrudan erişim çökertir */}
+              {!!user && !user.emailVerified && (
                 <Text
                   style={[styles.textVerified, { color: "rgb(229, 20, 0)" }]}
                 >
@@ -433,6 +448,20 @@ const ProfileScreen = ({ navigation }) => {
                 numberOfLines={1}
                 style={[styles.friendBarLabel, { color: theme.text.secondary }]}
               >{i18nText("autoI18n.mesajlar", "Mesajlar")}</Text>
+              {unreadMessages > 0 && (
+                <View style={styles.friendBarPillRow}>
+                  <View
+                    style={[styles.friendBarPill, { backgroundColor: "#6C63FF" }]}
+                  >
+                    <Text
+                      allowFontScaling={false}
+                      style={styles.friendBarPillText}
+                    >
+                      {unreadMessages > 99 ? "99+" : unreadMessages}
+                    </Text>
+                  </View>
+                </View>
+              )}
             </TouchableOpacity>
 
             {/* Dikey ayraç */}
@@ -526,7 +555,9 @@ const ProfileScreen = ({ navigation }) => {
           />
           <ProfileLists navigation={navigation} />
           <MyActivityButton navigation={navigation} />
-          <CalendarWidget navigation={navigation} />
+          {/* Takvim widget'ı şimdilik gizli — takvime giriş RemindersPreviewButton
+              başlığındaki takvim butonundan. Geri açmak için yorumu kaldır. */}
+          {/* <CalendarWidget navigation={navigation} /> */}
           <RemindersPreviewButton navigation={navigation} />
           <NotesCard navigation={navigation} />
           <View style={styles.section}>
@@ -633,8 +664,6 @@ const ProfileScreen = ({ navigation }) => {
           />
         </View>
       )}
-
-      <BackButton />
     </View>
   );
 };

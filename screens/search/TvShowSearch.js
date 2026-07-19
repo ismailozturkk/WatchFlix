@@ -24,13 +24,14 @@ import Toast from "react-native-toast-message";
 import { useAuth } from "../../context/AuthContext";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
-import { useAppSettings, useImageQualitySettings } from "../../context/AppSettingsContext";
+import { useAppSettings, useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 import ListBadges from "../../components/ListBadges";
 import { useFocusEffect } from "@react-navigation/native";
 import IconBacground from "../../components/IconBacground";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { i18nText } from "../../utils/i18nText";
+import { searchMediaWithFuzzyFallback } from "../../services/fuzzyMediaSearch";
 
 
 const { width } = Dimensions.get("window");
@@ -110,6 +111,7 @@ const useEnterAnim = (index) => {
 // ─── ROW KART ─────────────────────────────────────────────────────────────────
 const TvRowItem = memo(({ item, navigation, imageQuality, theme, index }) => {
   const { getTmdbUrl } = useImageQualitySettings();
+  const { posterBadges } = useListLayoutSettings();
   const { scale, onIn, onOut } = usePressAnim();
   const { opacity, translateY } = useEnterAnim(index);
   const rating = item.vote_average ?? 0;
@@ -185,32 +187,36 @@ const TvRowItem = memo(({ item, navigation, imageQuality, theme, index }) => {
             >
               {item.name || i18nText("autoI18n.isimsiz", "İsimsiz")}
             </Text>
-            <Text
-              style={[
-                styles.rowYear,
-                { color: theme.text?.secondary ?? "#aaa" },
-              ]}
-            >
-              {item.first_air_date
-                ? new Date(item.first_air_date).getFullYear()
-                : "—"}
-            </Text>
-            {rating > 0 && (
+            {posterBadges?.releaseDate !== false && (
+              <Text
+                style={[
+                  styles.rowYear,
+                  { color: theme.text?.secondary ?? "#aaa" },
+                ]}
+              >
+                {item.first_air_date
+                  ? new Date(item.first_air_date).getFullYear()
+                  : "—"}
+              </Text>
+            )}
+            {(posterBadges?.tmdbRating !== false || posterBadges?.voteCount !== false) && rating > 0 && (
               <View style={styles.rowRatingRow}>
-                <View
-                  style={[
-                    styles.ratingPill,
-                    {
-                      backgroundColor: ratingColor + "22",
-                      borderColor: ratingColor + "55",
-                    },
-                  ]}
-                >
-                  <Text style={[styles.ratingText, { color: ratingColor }]}>
-                    ★ {rating.toFixed(1)}
-                  </Text>
-                </View>
-                {item.vote_count > 0 && (
+                {posterBadges?.tmdbRating !== false && (
+                  <View
+                    style={[
+                      styles.ratingPill,
+                      {
+                        backgroundColor: ratingColor + "22",
+                        borderColor: ratingColor + "55",
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.ratingText, { color: ratingColor }]}>
+                      ★ {rating.toFixed(1)}
+                    </Text>
+                  </View>
+                )}
+                {posterBadges?.voteCount !== false && item.vote_count > 0 && (
                   <Text
                     style={[
                       styles.voteCount,
@@ -242,6 +248,7 @@ const TvRowItem = memo(({ item, navigation, imageQuality, theme, index }) => {
 // ─── GRID POSTER KART ─────────────────────────────────────────────────────────
 const TvGridItem = memo(({ item, navigation, imageQuality, theme, index }) => {
   const { getTmdbUrl } = useImageQualitySettings();
+  const { posterBadges } = useListLayoutSettings();
   const { scale, onIn, onOut } = usePressAnim();
   const { opacity, translateY } = useEnterAnim(index);
   const rating = item.vote_average ?? 0;
@@ -288,7 +295,7 @@ const TvGridItem = memo(({ item, navigation, imageQuality, theme, index }) => {
             style={styles.gridGradient}
           />
           {/* Puan rozeti – sağ üst */}
-          {rating > 0 && (
+          {posterBadges?.tmdbRating !== false && rating > 0 && (
             <View
               style={[
                 styles.gridRatingBadge,
@@ -311,7 +318,7 @@ const TvGridItem = memo(({ item, navigation, imageQuality, theme, index }) => {
             <Text style={styles.gridTitle} numberOfLines={2}>
               {item.name || "—"}
             </Text>
-            {item.first_air_date && (
+            {posterBadges?.releaseDate !== false && item.first_air_date && (
               <Text style={styles.gridYear}>
                 {new Date(item.first_air_date).getFullYear()}
               </Text>
@@ -566,6 +573,7 @@ export default function TvShowSearch({ navigation, route, isUnified, unifiedQuer
   const { theme } = useTheme();
   const { API_KEY, adultContent, imageQuality, showSnow } = useAppSettings();
   const searchTimeout = useRef(null);
+  const searchRequestRef = useRef(0);
   const inputRef = useRef(null);
 
   const searchBarAnim = useRef(new Animated.Value(0)).current;
@@ -608,14 +616,20 @@ export default function TvShowSearch({ navigation, route, isUnified, unifiedQuer
   }, [routeName]);
 
   const handleSearch = useCallback((text) => {
+    searchRequestRef.current += 1;
     setSearch(text);
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    if (text.trim() === "") {
-      setResults([]);
-      setLoading(false);
-    } else if (text.trim().length >= 2) {
+    if (text.trim().length >= 2) {
+      setError(null);
       setLoading(true);
       searchTimeout.current = setTimeout(() => fetchResults(text), 500);
+    } else {
+      // Boş veya 1 karakter: bekleyen istek iptal edildi. loading/error'ı
+      // burada sıfırlamazsak ekran skeleton'da ya da eski hatada takılı kalır
+      // (2+ karakterden geri silme senaryosu).
+      setResults([]);
+      setLoading(false);
+      setError(null);
     }
   }, []);
 
@@ -626,22 +640,20 @@ export default function TvShowSearch({ navigation, route, isUnified, unifiedQuer
         setLoading(false);
         return;
       }
+      const requestId = ++searchRequestRef.current;
       try {
-        const response = await axios.get(
-          "https://api.themoviedb.org/3/search/tv",
-          {
-            params: {
-              query: searchText,
-              include_adult: adultContent,
-              language: language === "tr" ? "tr-TR" : "en-US",
-              page: "1",
-            },
-            headers: { Authorization: API_KEY },
-          },
-        );
-        const sorted = [...response.data.results].sort(
-          (a, b) => b.vote_count - a.vote_count,
-        );
+        const { results: foundResults, usedFuzzyFallback } =
+          await searchMediaWithFuzzyFallback({
+            mediaType: "tv",
+            query: searchText,
+            adultContent,
+            language: language === "tr" ? "tr-TR" : "en-US",
+            API_KEY,
+          });
+        if (requestId !== searchRequestRef.current) return;
+        const sorted = usedFuzzyFallback
+          ? foundResults
+          : [...foundResults].sort((a, b) => b.vote_count - a.vote_count);
         setResults(sorted);
         setError(null);
         setLastSearch((prev) => {
@@ -657,10 +669,11 @@ export default function TvShowSearch({ navigation, route, isUnified, unifiedQuer
           return filtered.slice(0, 5);
         });
       } catch (err) {
+        if (requestId !== searchRequestRef.current) return;
         setError(err.message);
         Toast.show({ type: "error", text1: i18nText("autoI18n.hata_2", "Hata: ") + err.message });
       } finally {
-        setLoading(false);
+        if (requestId === searchRequestRef.current) setLoading(false);
       }
     },
     [language, adultContent, API_KEY],

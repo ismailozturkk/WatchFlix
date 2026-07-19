@@ -69,13 +69,22 @@ export default function SearchFriendsScreen({ navigation }) {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
+  // Hızlı yazımda eski sorgunun yanıtı yenisini ezmesin diye istek kimliği.
+  const searchReqRef = useRef(0);
   const handleSearch = useCallback(
     async (searchTerm) => {
       if (!searchTerm || !currentUser) return;
-      const users = await searchUsersByUsername(searchTerm, {
-        excludeUid: currentUser.uid,
-      });
-      setResults(users);
+      const reqId = ++searchReqRef.current;
+      try {
+        const users = await searchUsersByUsername(searchTerm, {
+          excludeUid: currentUser.uid,
+        });
+        if (reqId === searchReqRef.current) setResults(users);
+      } catch (e) {
+        // Ağ/Firestore hatası: sessizce yut — aksi halde setTimeout içinden
+        // çağrıldığı için unhandled promise rejection olur.
+        if (__DEV__) console.warn("searchUsersByUsername failed:", e?.message);
+      }
     },
     [currentUser],
   );

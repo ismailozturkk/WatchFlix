@@ -492,7 +492,9 @@ export default function CalendarScreen({ navigation }) {
   );
 
   const handleNotePress = useCallback(() => {
-    navigation.navigate("TabScreen", { screen: "Profile" });
+    // TabScreen gerçek bir navigator değil; sekme seçimi initialTab param'ıyla
+    // yapılır ("screen" param'ı sessizce yok sayılıyordu → hep dizi sekmesi açılırdı).
+    navigation.navigate("TabScreen", { initialTab: "profile" });
   }, [navigation]);
 
   const handleMoviePress = useCallback(

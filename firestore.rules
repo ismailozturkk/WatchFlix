@@ -84,10 +84,81 @@ service cloud.firestore {
       allow write: if isOwner(uid);
     }
 
+    // ─── Ortak Listeler ─────────────────────────────────────────────────
+    // SharedLists/{listId}: birden çok kullanıcının paylaştığı özel liste.
+    // Yetki modeli (services/sharedListsService.js ile birebir):
+    //   • Üyelik: memberIds array'i (kurucu dahil). Okuma yalnız üyelere.
+    //   • Kurucu (ownerId) tam yetkili: üye/yetki yönetimi, silme, adlandırma.
+    //   • Üye yalnız KENDİNİ çıkarabilir (ayrıl) — başka alan değiştiremez.
+    //   • items: canAdd üyesi ekler; ekleyen kendi öğesini, canRemove üyesi
+    //     ve kurucu her öğeyi silebilir.
+    function sharedList(listId) {
+      return get(/databases/$(database)/documents/SharedLists/$(listId)).data;
+    }
+    match /SharedLists/{listId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.memberIds;
+
+      allow create: if isSignedIn()
+                    && request.resource.data.ownerId == request.auth.uid
+                    && request.auth.uid in request.resource.data.memberIds;
+
+      allow update: if isSignedIn()
+                    && (
+                      // Kurucu: her şeyi yönetir; ownerId devredilemez ve
+                      // kurucu üyelikten çıkarılamaz.
+                      (request.auth.uid == resource.data.ownerId
+                       && request.resource.data.ownerId == resource.data.ownerId
+                       && request.resource.data.ownerId in request.resource.data.memberIds)
+                      ||
+                      // Üye: yalnız kendini çıkarır (ayrıl). memberIds eski
+                      // kümenin alt kümesi + tam 1 eksik + çıkan kendisi;
+                      // members map'inden de yalnız kendi anahtarı silinir.
+                      (request.auth.uid in resource.data.memberIds
+                       && request.auth.uid != resource.data.ownerId
+                       && !(request.auth.uid in request.resource.data.memberIds)
+                       && resource.data.memberIds.hasAll(request.resource.data.memberIds)
+                       && request.resource.data.memberIds.size() == resource.data.memberIds.size() - 1
+                       && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['memberIds', 'members', 'updatedAt'])
+                       && request.resource.data.members.diff(resource.data.members)
+                            .removedKeys().hasOnly([request.auth.uid])
+                       && request.resource.data.members.diff(resource.data.members)
+                            .addedKeys().size() == 0
+                       && request.resource.data.members.diff(resource.data.members)
+                            .changedKeys().size() == 0)
+                    );
+
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.ownerId;
+
+      match /items/{itemKey} {
+        allow read: if isSignedIn()
+                    && request.auth.uid in sharedList(listId).memberIds;
+        allow create: if isSignedIn()
+                      && request.auth.uid in sharedList(listId).memberIds
+                      && request.resource.data.addedBy == request.auth.uid
+                      && (request.auth.uid == sharedList(listId).ownerId
+                          || sharedList(listId).members[request.auth.uid].canAdd == true);
+        allow delete: if isSignedIn()
+                      && request.auth.uid in sharedList(listId).memberIds
+                      && (request.auth.uid == sharedList(listId).ownerId
+                          || resource.data.addedBy == request.auth.uid
+                          || sharedList(listId).members[request.auth.uid].canRemove == true);
+        allow update: if false; // öğeler değişmez — sil + yeniden ekle
+      }
+    }
+
     // ─── AI kota sayacı (callGemini Cloud Function yazar) ───────────────
     // Sahibi kalan hakkını görebilsin diye okuma açık; yazım YALNIZ admin
     // SDK (Cloud Function) — istemci kendi kotasını manipüle edemez.
     match /AiUsage/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+
+    // ─── Streaming uygunluk snapshot'ı (dailyStreamingAvailability yazar) ──
+    // Sahibi okuyabilir; yazım YALNIZ admin SDK (Cloud Function) → istemci
+    // snapshot'ı bozamaz (AiUsage ile aynı güven modeli).
+    match /ProviderWatch/{uid} {
       allow read: if isOwner(uid);
       allow write: if false;
     }
@@ -177,12 +248,19 @@ service cloud.firestore {
     // ─── Following / Followers / Liked / Bookmarks (Posts için) ─────────
     match /Users/{uid}/following/{targetUid} {
       allow read: if isSignedIn();
-      allow create, delete: if isOwner(uid);
+      allow create: if isOwner(uid);
+      // Silme: liste sahibi VEYA takip edilen kişi. İkincisi hesap silme
+      // purge'unda "beni takip edenlerin following kaydını temizle" adımı
+      // için gerekli — aksi halde silinen hesap sonsuza dek takipte görünür.
+      allow delete: if isOwner(uid) || isOwner(targetUid);
     }
     match /Users/{uid}/followers/{followerUid} {
       allow read: if isSignedIn();
       // followers dokümanını "followerUid" sahibi yazar (cross-write).
-      allow create, delete: if isOwner(followerUid);
+      allow create: if isOwner(followerUid);
+      // Silme: takipçinin kendisi VEYA liste sahibi (hesap silme purge'unda
+      // kendi followers koleksiyonunu temizleyebilmesi için).
+      allow delete: if isOwner(followerUid) || isOwner(uid);
     }
     match /Users/{uid}/likedPosts/{postId} {
       allow read, create, delete: if isOwner(uid);
@@ -203,8 +281,11 @@ service cloud.firestore {
     // ÖNEMLI: kodda alan adı `fromUid` (eskiden `fromUserId` yazılmıştı).
     match /Users/{uid}/notifications/{notifId} {
       allow read: if isOwner(uid);
+      // notBlocked: engellediğim kullanıcı bana bildirim yazamaz (push spam /
+      // spoof kapısı — friendRequests'teki kontrolün aynısı).
       allow create: if isSignedIn()
-                    && request.resource.data.fromUid == request.auth.uid;
+                    && request.resource.data.fromUid == request.auth.uid
+                    && notBlocked(uid);
       // Sahibi sadece 'read' alanını değiştirebilir veya silebilir.
       allow update: if isOwner(uid) && onlyUpdating(['read']);
       allow delete: if isOwner(uid);
@@ -303,15 +384,35 @@ service cloud.firestore {
                     && request.resource.data.likesCount == 0
                     && request.resource.data.commentsCount == 0;
 
+      // counterOk: sahibi olmayan kullanıcı sayaçları en fazla ±1 oynatabilir
+      // (istemci increment(±1) kullanır) — keyfî likesCount yazıp "top" feed'i
+      // manipüle etmek kural düzeyinde engellenir.
       allow update: if isOwner(resource.data.authorId)
                     || (isSignedIn() &&
-                        onlyUpdating(['likesCount', 'commentsCount', 'updatedAt']));
+                        onlyUpdating(['likesCount', 'commentsCount', 'updatedAt'])
+                        && counterOk('likesCount')
+                        && counterOk('commentsCount'))
+                    // Anket oyu: sahibi olmayan kullanıcı YALNIZ poll.votes'u ve
+                    // yalnız KENDİ oy anahtarını değiştirebilir (grup poll deseni).
+                    || (isSignedIn()
+                        && onlyUpdating(['poll'])
+                        && resource.data.poll is map
+                        && request.resource.data.poll.diff(resource.data.poll).affectedKeys().hasOnly(['votes'])
+                        && request.resource.data.poll.votes.diff(resource.data.poll.votes).affectedKeys().hasOnly([request.auth.uid]));
 
       allow delete: if isOwner(resource.data.authorId);
 
       match /likes/{userId} {
         allow read: if true;
-        allow create, delete: if isOwner(userId);
+        allow create: if isOwner(userId);
+        // Silme: beğeni sahibi VEYA post sahibi. Post sahibi izni hesap silme
+        // purge'u için şart: postu silmeden önce alt koleksiyon temizlenirken
+        // başkalarının beğeni dokümanları da silinebilmeli (aksi halde batch
+        // permission-denied ile düşer ve post asla silinemezdi).
+        allow delete: if isOwner(userId)
+                      || (isSignedIn()
+                          && request.auth.uid
+                             == get(/databases/$(database)/documents/Posts/$(postId)).data.authorId);
       }
 
       match /comments/{commentId} {
@@ -319,12 +420,27 @@ service cloud.firestore {
         allow create: if isSignedIn()
                       && request.resource.data.authorId == request.auth.uid;
         // Sahibi her şeyi güncelleyebilir/silebilir; sahibi olmayan kullanıcı
-        // SADECE beğeni alanlarını (likesCount / likedBy) güncelleyebilir.
+        // SADECE beğeni alanlarını (likesCount / likedBy) güncelleyebilir —
+        // likesCount ±1 ve likedBy'da YALNIZ kendi anahtarı (poll.votes deseni):
+        // başkalarının beğenilerini silmek/haritayı ezmek engellenir.
         allow update: if isSignedIn()
                       && (request.auth.uid == resource.data.authorId
-                          || onlyUpdating(['likesCount', 'likedBy']));
+                          || (onlyUpdating(['likesCount', 'likedBy'])
+                              && counterOk('likesCount')
+                              && request.resource.data.get('likedBy', {})
+                                   .diff(resource.data.get('likedBy', {}))
+                                   .affectedKeys().hasOnly([request.auth.uid])));
+        // Silme: yorum sahibi VEYA post sahibi (kendi postundaki yorumları
+        // yönetebilir; hesap silme purge'u da buna dayanır) VEYA üst yorumu
+        // aynı batch'te silinen yanıt (kaskatlı temizlik: existsAfter batch
+        // SONRASI durumu görür — üst yorumu silme yetkisi olmayan biri bu
+        // yoldan yanıt silemez).
         allow delete: if isSignedIn()
-                      && request.auth.uid == resource.data.authorId;
+                      && (request.auth.uid == resource.data.authorId
+                          || request.auth.uid
+                             == get(/databases/$(database)/documents/Posts/$(postId)).data.authorId
+                          || (resource.data.parentId is string
+                              && !existsAfter(/databases/$(database)/documents/Posts/$(postId)/comments/$(resource.data.parentId))));
       }
     }
 
@@ -358,8 +474,14 @@ service cloud.firestore {
     // ─── Sohbetler ──────────────────────────────────────────────────────
     // chatId = "uid1_uid2" (sıralı, ChatScreen kurar). Üyelik kontrolü
     // substring yerine TAM segment eşleşmesiyle (isChatMember) yapılır.
+    // read'e participants tabanlı ikinci yol eklendi: doc-ID'den türetilen
+    // kural collection query'lerde kanıtlanamadığı için
+    // where("participants","array-contains",uid) sorgusu (hesap silme
+    // purge'u) aksi halde her zaman permission-denied alırdı.
     match /chats/{chatId} {
-      allow read, write: if isChatMember(chatId);
+      allow read: if isChatMember(chatId)
+                  || (isSignedIn() && request.auth.uid in resource.data.participants);
+      allow write: if isChatMember(chatId);
     }
     match /chats/{chatId}/messages/{msgId} {
       allow read, write: if isChatMember(chatId);

@@ -17,6 +17,7 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import {
   deleteField,
   doc,
+  FieldPath,
   getDoc,
   onSnapshot,
   setDoc,
@@ -35,6 +36,9 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { useListStatusContext } from "../../context/ListStatusContext";
 import { PREDEFINED_MOVIE_LISTS } from "../../services/listItemsService";
+import { useSharedLists } from "../../context/SharedListsContext";
+import CreateSharedListModal from "../../components/modals/CreateSharedListModal";
+import { collection, getDocs, limit, query } from "firebase/firestore";
 import { BlurView } from "expo-blur";
 import { i18nText } from "@utils/i18nText";
 
@@ -296,6 +300,92 @@ const ListCard = ({
   );
 };
 
+// ── Ortak liste kartı ────────────────────────────────────────────────────────
+// ListCard ile aynı çerçeve; isim yerine üye sayısı çipi ve "people" ikonu.
+const SHARED_ACCENT = "#38bdf8";
+
+const SharedListCard = ({ list, previewItems, onPress, imageQuality, getTmdbUrl, theme, index }) => {
+  const enterAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(enterAnim, {
+      toValue: 1,
+      delay: index * 70,
+      speed: 12,
+      bounciness: 6,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: enterAnim,
+        transform: [
+          {
+            scale: enterAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.85, 1],
+            }),
+          },
+        ],
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={onPress}
+        style={styles.cardWrapper}
+      >
+        <View
+          style={[
+            styles.cardGlow,
+            {
+              backgroundColor: SHARED_ACCENT + "18",
+              borderColor: SHARED_ACCENT + "25",
+            },
+          ]}
+        />
+        <View style={styles.card}>
+          <PosterStack
+            items={previewItems}
+            accent={SHARED_ACCENT}
+            imageQuality={imageQuality}
+            getTmdbUrl={getTmdbUrl}
+            theme={theme}
+          />
+          <View
+            style={[styles.divider, { backgroundColor: SHARED_ACCENT + "30" }]}
+          />
+          <View style={styles.cardFooter}>
+            <View style={styles.cardFooterLeft}>
+              <View
+                style={[
+                  styles.iconDot,
+                  { backgroundColor: SHARED_ACCENT + "20" },
+                ]}
+              >
+                <Ionicons name="people" size={12} color={SHARED_ACCENT} />
+              </View>
+              <Text style={styles.cardName} numberOfLines={1}>
+                {list.name}
+              </Text>
+            </View>
+            <View style={styles.cardFooterRight}>
+              <Ionicons
+                name="person"
+                size={11}
+                color="rgba(255,255,255,0.4)"
+              />
+              <Text style={[styles.countBadge, { color: SHARED_ACCENT }]}>
+                {list.memberIds?.length ?? 1}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 // ── Ana Bileşen ──────────────────────────────────────────────────────────────
 export default function ListsViewScreen({ navigation }) {
   const { t } = useLanguage();
@@ -339,6 +429,38 @@ export default function ListsViewScreen({ navigation }) {
   const [newListName, setNewListName] = useState("");
   const [inputFocused, setInputFocused] = useState(false);
 
+  // ── Ortak listeler ─────────────────────────────────────────────────────────
+  const { sharedLists } = useSharedLists();
+  const [createSharedVisible, setCreateSharedVisible] = useState(false);
+  // listId → ilk 3 öğe (kart destesi önizlemesi). updatedAt değişince tazelenir.
+  const [sharedPreviews, setSharedPreviews] = useState({});
+  const sharedPreviewKey = sharedLists
+    .map((l) => `${l.id}:${l.updatedAt?.toMillis?.() ?? 0}`)
+    .join("|");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const previews = {};
+      await Promise.all(
+        sharedLists.map(async (l) => {
+          try {
+            const snap = await getDocs(
+              query(collection(db, "SharedLists", l.id, "items"), limit(3)),
+            );
+            previews[l.id] = snap.docs.map((d) => d.data());
+          } catch {
+            previews[l.id] = [];
+          }
+        }),
+      );
+      if (!cancelled) setSharedPreviews(previews);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharedPreviewKey]);
+
   const headerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -353,18 +475,23 @@ export default function ListsViewScreen({ navigation }) {
   useEffect(() => {
     const fetchListVisible = async () => {
       if (!user) return;
-      const userRef = doc(db, "Users", user.uid);
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) return;
-      const raw = userSnap.data().listVisible;
-      if (Array.isArray(raw)) {
-        // Eski format: [{listName: true}, ...] → map'e çevir ve kaydet
-        const map = {};
-        raw.forEach((item) => Object.assign(map, item));
-        setListVisible(map);
-        setDoc(userRef, { listVisible: map }, { merge: true });
-      } else {
-        setListVisible(raw || {});
+      try {
+        const userRef = doc(db, "Users", user.uid);
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) return;
+        const raw = userSnap.data().listVisible;
+        if (Array.isArray(raw)) {
+          // Eski format: [{listName: true}, ...] → map'e çevir ve kaydet
+          const map = {};
+          raw.forEach((item) => Object.assign(map, item));
+          setListVisible(map);
+          setDoc(userRef, { listVisible: map }, { merge: true }).catch(() => {});
+        } else {
+          setListVisible(raw || {});
+        }
+      } catch (e) {
+        // Offline ilk açılış: getDoc cache'siz reddeder — unhandled olmasın.
+        if (__DEV__) console.warn("fetchListVisible:", e?.message);
       }
     };
     fetchListVisible();
@@ -374,8 +501,12 @@ export default function ListsViewScreen({ navigation }) {
     if (!user) return;
     const userRef = doc(db, "Users", user.uid);
     const updated = { ...listVisible, [listName]: !listVisible[listName] };
-    await setDoc(userRef, { listVisible: updated }, { merge: true });
-    setListVisible(updated);
+    try {
+      await setDoc(userRef, { listVisible: updated }, { merge: true });
+      setListVisible(updated);
+    } catch (e) {
+      Toast.show({ type: "error", text1: i18nText("autoI18n.islem_basarisiz", "İşlem başarısız") });
+    }
   };
 
   // Firestore listeleri dinle
@@ -392,33 +523,60 @@ export default function ListsViewScreen({ navigation }) {
     return () => unsubscribe();
   }, [user?.uid]);
 
+  // Öntanımlı liste alanlarıyla çakışan adlar: aynı ada izin verilirse liste
+  // kök dokümanda oluşur ama UI filtresi onu "öntanımlı" sayıp gizler.
+  const RESERVED_LIST_NAMES = [
+    "watchedTv",
+    "favorites",
+    "watchList",
+    "watchedMovies",
+    "customLists",
+    "listOrder",
+  ];
+
   const addNewList = async () => {
-    if (!newListName.trim()) return;
-    setIsLoading(true);
-    const docRef = doc(db, "Lists", user.uid);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      if (data[newListName]) {
-        Toast.show({ type: "warning", text1: i18nText("autoI18n.bu_isimde_bir_liste_zaten_var", "Bu isimde bir liste zaten var") });
-        setIsLoading(false);
-        return;
-      }
-      await updateDoc(docRef, { [newListName]: [] });
-      setNewListName("");
-      Keyboard.dismiss();
-      Toast.show({ type: "success", text1: i18nText("autoI18n.liste_olusturuldu", "Liste oluşturuldu") });
-    } else {
-      Toast.show({ type: "error", text1: i18nText("autoI18n.hata_olustu", "Hata oluştu") });
+    const name = newListName.trim();
+    if (!name) return;
+    if (RESERVED_LIST_NAMES.includes(name)) {
+      Toast.show({ type: "warning", text1: i18nText("autoI18n.bu_isimde_bir_liste_zaten_var", "Bu isimde bir liste zaten var") });
+      return;
     }
-    setIsLoading(false);
+    setIsLoading(true);
+    try {
+      const docRef = doc(db, "Lists", user.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data[name]) {
+          Toast.show({ type: "warning", text1: i18nText("autoI18n.bu_isimde_bir_liste_zaten_var", "Bu isimde bir liste zaten var") });
+          return;
+        }
+        // setDoc+merge: updateDoc string anahtardaki noktaları field-path
+        // ayracı sayar ("S.W.A.T." → iç içe map, liste asla görünmez);
+        // setDoc data anahtarlarını literal işler.
+        await setDoc(docRef, { [name]: [] }, { merge: true });
+        setNewListName("");
+        Keyboard.dismiss();
+        Toast.show({ type: "success", text1: i18nText("autoI18n.liste_olusturuldu", "Liste oluşturuldu") });
+      } else {
+        Toast.show({ type: "error", text1: i18nText("autoI18n.hata_olustu", "Hata oluştu") });
+      }
+    } catch (e) {
+      // try/finally olmadan hata isLoading'i true'da bırakıp ekle butonunu
+      // kalıcı spinner'da kilitliyordu.
+      Toast.show({ type: "error", text1: i18nText("autoI18n.hata_olustu", "Hata oluştu") });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const deleteList = async () => {
     if (!selectedList) return;
     const docRef = doc(db, "Lists", user.uid);
     try {
-      await updateDoc(docRef, { [selectedList]: deleteField() });
+      // FieldPath: liste adında nokta varsa updateDoc'un string anahtarı
+      // nested path'e çözmesini engeller (ad literal tek segment kalır).
+      await updateDoc(docRef, new FieldPath(selectedList), deleteField());
       setModalVisible(false);
       Toast.show({ type: "success", text1: i18nText("autoI18n.liste_silindi", "Liste silindi") });
     } catch (error) {
@@ -584,6 +742,13 @@ export default function ListsViewScreen({ navigation }) {
             />
           )}
         </TouchableOpacity>
+        {/* Ortak liste oluştur */}
+        <TouchableOpacity
+          style={[styles.addBtn, { backgroundColor: SHARED_ACCENT }]}
+          onPress={() => setCreateSharedVisible(true)}
+        >
+          <Ionicons name="people" size={18} color="#000" />
+        </TouchableOpacity>
       </Animated.View>
 
       {/* ── Liste ────────────────────────────────────────────────────────── */}
@@ -617,6 +782,53 @@ export default function ListsViewScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
           columnWrapperStyle={styles.columnWrapper}
+          ListHeaderComponent={
+            sharedLists.length > 0 ? (
+              <View style={styles.sharedSection}>
+                <View style={styles.sharedSectionHeader}>
+                  <Ionicons name="people" size={13} color={SHARED_ACCENT} />
+                  <Text
+                    style={[
+                      styles.sharedSectionTitle,
+                      { color: theme.text?.muted ?? "#888" },
+                    ]}
+                  >
+                    {i18nText("autoI18n.ortak_listeler", "ORTAK LİSTELER")}
+                  </Text>
+                </View>
+                <View style={styles.sharedGrid}>
+                  {sharedLists.map((l, i) => (
+                    <SharedListCard
+                      key={l.id}
+                      list={l}
+                      index={i}
+                      previewItems={sharedPreviews[l.id] || []}
+                      imageQuality={imageQuality}
+                      getTmdbUrl={getTmdbUrl}
+                      theme={theme}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        navigation.navigate("SharedListScreen", {
+                          listId: l.id,
+                        });
+                      }}
+                    />
+                  ))}
+                </View>
+                <View style={styles.sharedSectionHeader}>
+                  <Ionicons name="albums" size={13} color="#fbbf24" />
+                  <Text
+                    style={[
+                      styles.sharedSectionTitle,
+                      { color: theme.text?.muted ?? "#888" },
+                    ]}
+                  >
+                    {i18nText("autoI18n.listelerim_upper", "LİSTELERİM")}
+                  </Text>
+                </View>
+              </View>
+            ) : null
+          }
           renderItem={renderItem}
         />
       )}
@@ -692,6 +904,15 @@ export default function ListsViewScreen({ navigation }) {
           </Animated.View>
         </View>
       </Modal>
+
+      {/* ── Ortak liste oluşturma ── */}
+      <CreateSharedListModal
+        visible={createSharedVisible}
+        onClose={() => setCreateSharedVisible(false)}
+        onCreated={(listId) =>
+          navigation.navigate("SharedListScreen", { listId })
+        }
+      />
       <BackButton />
     </SafeAreaView>
   );
@@ -758,6 +979,29 @@ const styles = StyleSheet.create({
   // ── FlatList ──────────────────────────────────────────────────────────────
   listContent: { paddingHorizontal: 12, paddingBottom: 30 },
   columnWrapper: { justifyContent: "space-between", marginBottom: 12 },
+
+  // ── Ortak listeler bölümü ──────────────────────────────────────────────────
+  sharedSection: { marginBottom: 4 },
+  sharedSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 4,
+    marginBottom: 10,
+    marginTop: 2,
+  },
+  sharedSectionTitle: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+  },
+  sharedGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 12,
+    marginBottom: 14,
+  },
 
   // ── Kart ──────────────────────────────────────────────────────────────────
   cardWrapper: { width: CARD_W },

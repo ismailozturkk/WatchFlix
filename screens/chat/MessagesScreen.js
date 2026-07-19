@@ -73,6 +73,8 @@ export default function MessagesScreen({ navigation }) {
   }, [user]);
 
   // ── 1-1 satırı ──
+  // Okunmamış mesaj varsa kart border'ı accent'e döner (sohbet açılınca
+  // ChatScreen sayacı sıfırlar, border normale döner).
   const renderConv = ({ item }) => (
     <TouchableOpacity
       activeOpacity={0.8}
@@ -83,7 +85,13 @@ export default function MessagesScreen({ navigation }) {
           friendAvatarIndex: item.withAvatarIndex,
         })
       }
-      style={[styles.row, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+      style={[
+        styles.row,
+        {
+          backgroundColor: theme.secondary,
+          borderColor: (item.unreadCount || 0) > 0 ? theme.accent : theme.border,
+        },
+      ]}
     >
       <View style={[styles.avatarWrap, { borderColor: theme.accent + "55" }]}>
         {avatars?.[item.withAvatarIndex] ? (

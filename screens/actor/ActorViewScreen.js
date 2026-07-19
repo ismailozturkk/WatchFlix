@@ -263,6 +263,12 @@ const ActorViewScreen = ({ route, navigation }) => {
   const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Aynı ekran örneği yeni personId ile yeniden kullanılabilir (oyuncu →
+    // film → başka oyuncu). loading'i resetlemezsek eski oyuncunun profili
+    // yeni id altında görünür; cancelled bayrağı da geç gelen eski yanıtın
+    // yenisini ezmesini önler.
+    let cancelled = false;
+    setLoading(true);
     const fetchActor = async () => {
       try {
         const { data } = await axios.get(
@@ -275,15 +281,18 @@ const ActorViewScreen = ({ route, navigation }) => {
             headers: { Authorization: API_KEY },
           },
         );
-        setActor(data);
+        if (!cancelled) setActor(data);
       } catch (err) {
         console.error("Actor fetch error:", err.message);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchActor();
-  }, [personId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [personId, language]);
 
   const headerOpacity = scrollY.interpolate({
     inputRange: [HERO_HEIGHT - 100, HERO_HEIGHT - 40],

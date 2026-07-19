@@ -23,7 +23,7 @@ import { memo, useEffect, useMemo, useRef } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import ListBadges from "../../components/ListBadges";
-import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 //import { API_KEY } from "@env";
 
 // Stable, module-scope item component. Hoisted out of the parent so its
@@ -31,6 +31,7 @@ import { useImageQualitySettings } from "../../context/AppSettingsContext";
 // instead of unmounting/remounting them → no poster flicker.
 const TvBestCard = memo(function TvBestCard({ item, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
+  const { posterBadges } = useListLayoutSettings();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -58,18 +59,22 @@ const TvBestCard = memo(function TvBestCard({ item, navigation, theme, getTmdbUr
           recyclingKey={`tvbest-${item.id}`}
           transition={120}
         />
-        <View
-          style={[styles.relaseDateCount, { backgroundColor: theme.secondaryt }]}
-        >
-          <Text style={[styles.similarRatingText, { color: theme.text.secondary }]}>
-            {item.first_air_date}
-          </Text>
-        </View>
-        <View style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}>
-          <Text style={[styles.similarRatingText, { color: theme.colors.orange }]}>
-            {item.vote_average.toFixed(1)}
-          </Text>
-        </View>
+        {posterBadges?.releaseDate !== false && (
+          <View
+            style={[styles.relaseDateCount, { backgroundColor: theme.secondaryt }]}
+          >
+            <Text style={[styles.similarRatingText, { color: theme.text.secondary }]}>
+              {item.first_air_date}
+            </Text>
+          </View>
+        )}
+        {posterBadges?.tmdbRating !== false && (
+          <View style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}>
+            <Text style={[styles.similarRatingText, { color: theme.colors.orange }]}>
+              {item.vote_average.toFixed(1)}
+            </Text>
+          </View>
+        )}
         <ListBadges
           mediaId={item.id}
           mediaType="tv"

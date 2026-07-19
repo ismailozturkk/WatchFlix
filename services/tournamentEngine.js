@@ -227,8 +227,13 @@ export function getMyPicks(voteDocs = [], uid) {
 // Çok oy kazanır; eşitlikte DÜŞÜK seed (daha iyi) kazanır. Oy yoksa ve tur
 // bitmediyse henüz kazanan yok (null). Tur bittiyse (decided) oy 0 olsa bile
 // düşük seed default kazanır ki bracket ilerleyebilsin.
+// Bye: rakip slotu boşsa (havuz < 32 — ör. ilk istemcinin nominee çekimi ağ
+// hatasıyla kısa kalmış) mevcut taraf otomatik ilerler; aksi halde null
+// final'e kadar kaskatlanır ve o ay şampiyon asla çıkamazdı.
 function winnerSide(a, b, av, bv, decided) {
-  if (!a || !b) return null;
+  if (!a && !b) return null;
+  if (a && !b) return "a";
+  if (!a && b) return "b";
   if (av > bv) return "a";
   if (bv > av) return "b";
   if (av + bv > 0 || decided) return (a.seed <= b.seed ? "a" : "b");

@@ -42,6 +42,7 @@ import TvShowSearch from "./screens/search/TvShowSearch";
 import LoginScreen from "./screens/auth/LoginScreen";
 import RegisterScreen from "./screens/auth/RegisterScreen";
 import ForgotPasswordScreen from "./screens/auth/ForgotPasswordScreen";
+import GoogleProfileCompletionScreen from "./screens/auth/GoogleProfileCompletionScreen";
 import OnboardingScreen from "./screens/onboarding/OnboardingScreen";
 import LottieView from "lottie-react-native";
 import { useTheme } from "./context/ThemeContext";
@@ -50,6 +51,9 @@ import { AppSettingsProvider } from "./context/AppSettingsContext";
 import { ConnectivityProvider } from "./context/ConnectivityContext";
 import { PetProvider } from "./context/PetContext";
 import { ListStatusProvider } from "./context/ListStatusContext";
+import { MediaActivityProvider } from "./context/MediaActivityContext";
+import { SharedListsProvider } from "./context/SharedListsContext";
+import SharedListScreen from "@screens/lists/SharedListScreen";
 import { auth, db } from "./firebase";
 import ProfileScreen from "./screens/tabs/ProfileScreen";
 import Toast from "react-native-toast-message";
@@ -94,6 +98,7 @@ import SocialNotificationsScreen from "./screens/tabs/settings/SocialNotificatio
 import PersonalizationScreen from "./screens/tabs/settings/PersonalizationScreen";
 import PosterSettingsScreen from "./screens/tabs/settings/PosterSettingsScreen";
 import PermissionsDataScreen from "./screens/tabs/settings/PermissionsDataScreen";
+import AccountConnectionsScreen from "./screens/tabs/settings/AccountConnectionsScreen";
 import ChatScreen from "@screens/chat/ChatScreen";
 import CreateGroupScreen from "@screens/chat/CreateGroupScreen";
 import GroupsListScreen from "@screens/chat/GroupsListScreen";
@@ -203,11 +208,14 @@ function AppContent() {
   const Stack = createNativeStackNavigator();
   const [showChatModal, setShowChatModal] = useState(false); // State for modal visibility
   const [swipeViewReady, setSwipeViewReady] = useState(false);
-  const [showBackButton, setShowBackButton] = useState(false);
-  const { user, initialRoute, loading } = useAuth();
+  const { user, initialRoute, loading, needsProfileCompletion } = useAuth();
 
   useEffect(() => {
-    if (user) {
+    // Profil tamamlanmadan Lists/{uid} YAZMA. Google kullanıcısı tamamlama
+    // ekranındayken oturumu açıktır; burada yazarsak ve kullanıcı "Başka hesap
+    // kullan" derse hesap silinir, doküman sahipsiz kalır — kural isOwner(uid)
+    // bir daha doğru olamayacağı için kalıcı olarak erişilemez çöp olur.
+    if (user && !needsProfileCompletion) {
       const createList = async () => {
         const docRef = doc(db, "Lists", user.uid);
         try {
@@ -222,14 +230,16 @@ function AppContent() {
           }
         } catch (e) {
           Toast.show({
-            type: "success",
-            text1: `Error fetching or creating document:, ${e}`,
+            type: "error",
+            text1: `Error fetching or creating document: ${e?.message || e}`,
           });
         }
       };
       createList();
     }
-  }, [user]);
+    // needsProfileCompletion bağımlılıkta: profil tamamlanınca kapı açılır ve
+    // liste o an oluşturulur (yeni bir açılış beklemeden).
+  }, [user, needsProfileCompletion]);
   useEffect(() => {
     if (user) {
       setShowChatModal(true);
@@ -267,30 +277,25 @@ function AppContent() {
       ref={navigationRef}
       linking={linking}
       onStateChange={(state) => {
-        // Get the current route name
-        const routeName = state.routes[state.index].name;
+        // state resmi tipte undefined olabilir — guard olmadan crash riski.
+        const routeName = state?.routes?.[state.index]?.name;
+        if (!routeName) return;
         // Control modal visibility based on the current screen
         if (
           routeName === "OnboardingScreen" ||
           routeName === "ForgotPasswordScreen" || // Examples - Add other screens where you want to show the chat modal
           routeName === "RegisterScreen" ||
-          routeName === "LoginScreen"
+          routeName === "LoginScreen" ||
+          routeName === "GoogleProfileCompletionScreen"
         ) {
           setShowChatModal(false);
         } else {
           setShowChatModal(true);
         }
-        if (
-          routeName === "OnboardingScreen" ||
-          routeName === "ForgotPasswordScreen" || // Examples - Add other screens where you want to show the chat modal
-          routeName === "RegisterScreen" ||
-          routeName === "LoginScreen" ||
-          routeName === "TabScreenNavigator"
-        ) {
-          setShowBackButton(false);
-        } else {
-          setShowBackButton(true);
-        }
+        // Not: showBackButton state'i kaldırıldı — hiçbir yerde tüketilmiyordu
+        // ve karşılaştırdığı "TabScreenNavigator" adı kayıtlı rota adı
+        // ("TabScreen") ile hiç eşleşmiyordu; her rota değişiminde gereksiz
+        // render tetikliyordu.
       }}
     >
       <Stack.Navigator
@@ -320,6 +325,11 @@ function AppContent() {
             headerTitle: "",
             headerShadowVisible: false,
           }}
+        />
+        <Stack.Screen
+          name="GoogleProfileCompletionScreen"
+          component={GoogleProfileCompletionScreen}
+          options={{ headerShown: false, gestureEnabled: false }}
         />
         <Stack.Screen
           name="TabScreen"
@@ -456,6 +466,13 @@ function AppContent() {
           }}
         />
         <Stack.Screen
+          name="SharedListScreen"
+          component={SharedListScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
           name="MovieStatisticsScreen"
           component={MovieStatisticsScreen}
           options={{
@@ -581,6 +598,11 @@ function AppContent() {
         <Stack.Screen
           name="PermissionsDataScreen"
           component={PermissionsDataScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="AccountConnectionsScreen"
+          component={AccountConnectionsScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
@@ -746,14 +768,17 @@ export default function App() {
     });
 
     // Fallback: forcefully hide after 10 seconds just in case
-    setTimeout(() => {
+    const fallbackTimer = setTimeout(() => {
       if (!timeoutFinished) {
         timeoutFinished = true;
         hideSplash();
       }
     }, 10000);
 
-    return () => sub.remove();
+    return () => {
+      sub.remove();
+      clearTimeout(fallbackTimer);
+    };
   }, []);
 
   // Presence (RTDB onDisconnect + AppState) — presenceService halleder.
@@ -784,6 +809,8 @@ export default function App() {
                   <FriendsProvider>
                   <NotificationsProvider>
                   <ListStatusProvider>
+                  <MediaActivityProvider>
+                  <SharedListsProvider>
                     <ProfileStatsProvider>
                       <ProfileNotesProvider>
                         <ProfileRemindersProvider>
@@ -812,6 +839,8 @@ export default function App() {
                         </ProfileRemindersProvider>
                       </ProfileNotesProvider>
                     </ProfileStatsProvider>
+                  </SharedListsProvider>
+                  </MediaActivityProvider>
                   </ListStatusProvider>
                   </NotificationsProvider>
                   </FriendsProvider>

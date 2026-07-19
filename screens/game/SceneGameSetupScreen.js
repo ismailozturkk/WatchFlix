@@ -37,7 +37,11 @@ function getModeMetaLine(mode, language) {
 export default function SceneGameSetupScreen({ navigation, route }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const { allLists } = useListStatusContext();
+  // combinedLists: legacy kök array'ler + yeni subcollection birleşimi.
+  // allLists yalnız kök array'leri görür; migration onları deleteField ile
+  // sildiği için migre kullanıcıda tüm "Sana Özel" kaynaklar 0/4 görünüp
+  // kalıcı kilitleniyordu (oyun içi kaynak seçimi zaten combinedLists kullanır).
+  const { combinedLists } = useListStatusContext();
   const { user } = useAuth();
 
   const gameId = route.params?.gameId || SCENE_GAME_ID;
@@ -66,10 +70,10 @@ export default function SceneGameSetupScreen({ navigation, route }) {
     () => Object.fromEntries(
       SCENE_GAME_SOURCES.filter((item) => item.personal).map((item) => [
         item.id,
-        buildWatchlistPool(allLists?.[item.listKey] || []).length,
+        buildWatchlistPool(combinedLists?.[item.listKey] || []).length,
       ]),
     ),
-    [allLists],
+    [combinedLists],
   );
 
   /* ── Derived state ──────────────────────────────────────────────────── */

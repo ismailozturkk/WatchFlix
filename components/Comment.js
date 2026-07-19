@@ -30,11 +30,16 @@ import {
 } from "firebase/firestore";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
+import { useUserProfile } from "../context/UserProfileContext";
+import { getUserProfile } from "../services/userService";
+import { clampAvatarIndex, getAvatarSource } from "../utils/avatars";
 import { alpha } from "../theme/colors";
 import { BlurView } from "expo-blur";
 import { MaterialCommunityIcons, Ionicons, Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import LottieView from "lottie-react-native";
+import appAlert from "./AppAlert";
+import Toast from "react-native-toast-message";
 import { i18nText } from "../utils/i18nText";
 
 
@@ -55,6 +60,22 @@ const getFeedTimestamp = (item) => {
   return (item.timestamp?.seconds || 0) * 1000;
 };
 
+// Kısa göreli zaman: 4d (dakika), 2s (saat), 3g (gün), 1h (hafta), 1y (yıl).
+// Sosyal medya deseni — kullanıcı adının yanında gösterilir.
+const shortTimeAgo = (ms) => {
+  if (!ms) return i18nText("autoI18n.simdi", "şimdi");
+  const mins = Math.floor((Date.now() - ms) / 60000);
+  if (mins < 1) return i18nText("autoI18n.simdi", "şimdi");
+  if (mins < 60) return `${mins}d`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}s`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}g`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 52) return `${weeks}h`;
+  return `${Math.floor(days / 365)}y`;
+};
+
 const TmdbReviewItem = memo(({ item, theme }) => {
   const styles = getStyles(theme);
   const [expanded, setExpanded] = useState(false);
@@ -66,14 +87,11 @@ const TmdbReviewItem = memo(({ item, theme }) => {
     i18nText("autoI18n.tmdb_kullanicisi", "TMDB kullanıcısı");
   const rating = Number(item.author_details?.rating);
   const canExpand = (item.content || "").length > 220;
-  const reviewDate = item.created_at
-    ? new Date(item.created_at).toLocaleDateString()
-    : "";
 
   return (
-    <View style={[styles.itemContainer, styles.tmdbReviewContainer]}>
-      <View style={styles.itemHeader}>
-        <View style={styles.userInfo}>
+    <View style={styles.threadItemContainer}>
+      <View style={styles.threadAvatarColumn}>
+        <View style={styles.avatarFrame}>
           {avatarUri ? (
             <Image source={{ uri: avatarUri }} style={[styles.avatar, styles.roundAvatar]} />
           ) : (
@@ -81,54 +99,57 @@ const TmdbReviewItem = memo(({ item, theme }) => {
               <Ionicons name="person" size={17} color={theme.accent} />
             </View>
           )}
-          <View style={styles.userTextGroup}>
-            <View style={styles.usernameRow}>
-              <Text allowFontScaling={false} style={styles.username} numberOfLines={1}>
-                {author}
-              </Text>
-              <View style={[styles.sourceBadge, styles.tmdbSourceBadge]}>
-                <Text allowFontScaling={false} style={[styles.sourceBadgeText, styles.tmdbSourceBadgeText]}>
-                  TMDB
-                </Text>
-              </View>
-            </View>
-            <Text allowFontScaling={false} style={styles.timestamp}>
-              {reviewDate}
-            </Text>
-          </View>
         </View>
-        {Number.isFinite(rating) && rating > 0 && (
-          <View style={styles.tmdbRatingBadge}>
-            <Ionicons name="star" size={12} color="#FFD54F" />
-            <Text allowFontScaling={false} style={styles.tmdbRatingText}>
-              {rating.toFixed(1)}
-            </Text>
-          </View>
-        )}
       </View>
 
-      <Text
-        allowFontScaling={false}
-        style={styles.commentText}
-        numberOfLines={expanded ? undefined : 5}
-      >
-        {item.content}
-      </Text>
+      <View style={styles.threadBody}>
+        <View style={styles.threadHeader}>
+          <View style={styles.usernameRow}>
+            <Text allowFontScaling={false} style={styles.username} numberOfLines={1}>
+              {author}
+            </Text>
+            <View style={[styles.sourceBadge, styles.tmdbSourceBadge]}>
+              <Text allowFontScaling={false} style={[styles.sourceBadgeText, styles.tmdbSourceBadgeText]}>
+                TMDB
+              </Text>
+            </View>
+            <Text allowFontScaling={false} style={styles.timestamp}>
+              {shortTimeAgo(getFeedTimestamp(item))}
+            </Text>
+          </View>
+          {Number.isFinite(rating) && rating > 0 && (
+            <View style={styles.tmdbRatingBadge}>
+              <Ionicons name="star" size={12} color="#FFD54F" />
+              <Text allowFontScaling={false} style={styles.tmdbRatingText}>
+                {rating.toFixed(1)}
+              </Text>
+            </View>
+          )}
+        </View>
 
-      {canExpand && (
-        <TouchableOpacity style={styles.readMoreButton} onPress={() => setExpanded((value) => !value)}>
-          <Text allowFontScaling={false} style={styles.readMoreText}>
-            {expanded
-              ? i18nText("autoI18n.daha_az", "Daha az")
-              : i18nText("autoI18n.devamini_oku", "Devamını oku")}
-          </Text>
-          <Ionicons
-            name={expanded ? "chevron-up" : "chevron-down"}
-            size={14}
-            color={theme.accent}
-          />
-        </TouchableOpacity>
-      )}
+        <Text
+          allowFontScaling={false}
+          style={styles.commentText}
+          numberOfLines={expanded ? undefined : 5}
+        >
+          {item.content}
+        </Text>
+
+        {canExpand && (
+          <TouchableOpacity style={styles.readMoreButton} onPress={() => setExpanded((value) => !value)}>
+            <Text allowFontScaling={false} style={styles.readMoreText}>
+              {expanded
+                ? i18nText("autoI18n.daha_az", "Daha az")
+                : i18nText("autoI18n.devamini_oku", "Devamını oku")}
+            </Text>
+            <Ionicons
+              name={expanded ? "chevron-up" : "chevron-down"}
+              size={14}
+              color={theme.accent}
+            />
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 });
@@ -143,18 +164,24 @@ const CommentItem = memo(
     toggleReplyVisibility,
     handleLikeToggle,
     isReply = false,
+    isLastReply = false,
     setCommentInputState,
     handleDeleteComment,
     handleDeleteReply,
     isVisible,
     theme,
+    avatarIndex, // yazarın güncel avatarı (uid → Users doc'tan); null ise legacy fallback
   }) => {
     const styles = getStyles(theme);
     const [showSpoiler, setShowSpoiler] = useState(false);
     const scaleAnim = useRef(new Animated.Value(1)).current;
 
-    // Yeni likedBy map formatı, eski likes array'ine fallback
-    const isLiked = item.likedBy?.[currentUser.uid] ?? item.likes?.includes(currentUser.uid) ?? false;
+    // Yeni likedBy map formatı, eski likes array'ine fallback.
+    // currentUser oturum düşüşünde null olabilir — render crash'lemesin.
+    const isLiked =
+      item.likedBy?.[currentUser?.uid] ??
+      item.likes?.includes(currentUser?.uid) ??
+      false;
     const likeCount = item.likeCount ?? item.likes?.length ?? 0;
 
     const onLikePress = () => {
@@ -179,165 +206,217 @@ const CommentItem = memo(
     // Show the reply count: prefer server-tracked field, fall back to loaded list length
     const totalReplies = Math.max(0, item.replyCount ?? 0) || replies.length;
 
-    return (
-      <View
-        style={[
-          styles.itemContainer,
-          isReply && styles.replyMargin,
-          item.userId === currentUser.uid && styles.ownComment,
-        ]}
-      >
-        <View style={styles.itemHeader}>
-          <View style={styles.userInfo}>
-            {(item.avatar && (
-              <Image
-                source={
-                  item.avatar
-                    ? { uri: item.avatar }
-                    : require("../assets/avatar/0.png")
-                }
-                style={styles.avatar}
-              />
-            )) || <Feather name="user" size={32} color="#fff" />}
-            <View style={styles.userTextGroup}>
-              <View style={styles.usernameRow}>
-                <Text allowFontScaling={false} style={styles.username} numberOfLines={1}>
-                  {item.username}
-                </Text>
-                {!isReply && (
-                  <View style={styles.sourceBadge}>
-                    <Text allowFontScaling={false} style={styles.sourceBadgeText}>
-                      {i18nText("autoI18n.topluluk", "Topluluk")}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <Text allowFontScaling={false} style={styles.timestamp}>
-                {item.timestamp?.toDate
-                  ? item.timestamp.toDate().toLocaleString()
-                  : i18nText("autoI18n.az_once", "Az önce")}
-              </Text>
-            </View>
-          </View>
+    const isOwn = item.userId === currentUser?.uid;
 
-          {/* Düzenle / Sil Aksiyonları */}
-          {item.userId === currentUser.uid && (
-            <View style={styles.ownerActions}>
-              <TouchableOpacity
-                onPress={() =>
-                  setCommentInputState({
-                    text: item.text,
-                    isSpoiler: item.isSpoiler,
-                    parentId: isReply ? item.parentId : null,
-                    editId: item.id,
-                    isReply: isReply,
-                    replieName: item.username,
-                    replieText: item.text,
-                  })
-                }
+    // Kendi yorumu: "..." menüsü → Düzenle / Sil (satır içi ikonlar yerine)
+    const openOwnMenu = () => {
+      appAlert(
+        i18nText("autoI18n.yorum_secenekleri", "Yorum seçenekleri"),
+        undefined,
+        [
+          {
+            text: i18nText("autoI18n.duzenle", "Düzenle"),
+            onPress: () =>
+              setCommentInputState({
+                text: item.text,
+                isSpoiler: item.isSpoiler,
+                parentId: isReply ? item.parentId : null,
+                editId: item.id,
+                isReply: isReply,
+                replieName: item.username,
+                replieText: item.text,
+              }),
+          },
+          {
+            text: i18nText("autoI18n.sil", "Sil"),
+            style: "destructive",
+            onPress: () =>
+              isReply
+                ? handleDeleteReply(item.parentId, item.id)
+                : handleDeleteComment(item.id),
+          },
+          { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
+        ],
+      );
+    };
+
+    const startReply = () =>
+      setCommentInputState((p) => ({
+        ...p,
+        parentId: item.id,
+        isReply: true,
+        replieName: item.username,
+        replieText: item.text,
+        editId: null,
+      }));
+
+    return (
+      <View style={[styles.threadItemContainer, isReply && styles.threadReplyItem]}>
+        {/* Yanıt bağlantısı: üst satırdan avatara kıvrılan çizgi (+ ara yanıtlar
+            için düz devam çizgisi) — ekran görüntüsündeki iplik görünümü */}
+        {isReply && <View pointerEvents="none" style={styles.replyElbow} />}
+        {isReply && !isLastReply && (
+          <View pointerEvents="none" style={styles.replyTrunk} />
+        )}
+
+        <View style={styles.threadAvatarColumn}>
+          <View style={[styles.avatarFrame, isReply && styles.replyAvatarFrame]}>
+            {avatarIndex != null ? (
+              // Güncel avatar sistemi: avatarIndex → local asset
+              <Image
+                source={getAvatarSource(avatarIndex)}
+                style={[
+                  styles.avatar,
+                  styles.roundAvatar,
+                  isReply && styles.replyAvatar,
+                ]}
+              />
+            ) : item.avatar ? (
+              // Legacy: yorumda saklanan photoURL (profil henüz yüklenmediyse)
+              <Image
+                source={{ uri: item.avatar }}
+                style={[
+                  styles.avatar,
+                  styles.roundAvatar,
+                  isReply && styles.replyAvatar,
+                ]}
+              />
+            ) : (
+              <View
+                style={[
+                  styles.avatar,
+                  styles.avatarFallback,
+                  isReply && styles.replyAvatar,
+                ]}
               >
                 <Feather
-                  name="edit-2"
-                  size={14}
-                  color={theme.colors.green}
-                  style={{ marginRight: 10 }}
+                  name="user"
+                  size={isReply ? 14 : 18}
+                  color={theme.text.secondary}
                 />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() =>
-                  isReply
-                    ? handleDeleteReply(item.parentId, item.id)
-                    : handleDeleteComment(item.id)
-                }
-              >
-                <Feather name="trash-2" size={14} color={theme.colors.red} />
-              </TouchableOpacity>
-            </View>
+              </View>
+            )}
+          </View>
+          {/* Yanıtlar açıkken ilk yanıta inen gövde çizgisi */}
+          {!isReply && totalReplies > 0 && isVisible && (
+            <View style={styles.threadLine} />
           )}
         </View>
 
-        <View style={styles.contentBody}>
-          {item.isSpoiler && !showSpoiler ? (
-            <TouchableOpacity
-              onPress={() => setShowSpoiler(true)}
-              style={styles.spoilerCover}
-            >
-              <BlurView intensity={25} tint="dark" style={styles.spoilerBlur}>
-                <Ionicons
-                  name="eye-off"
-                  size={16}
-                  color={theme.text.secondary}
-                />
-                <Text allowFontScaling={false} style={styles.spoilerText}>{i18nText("autoI18n.spoiler_icerigi_gor", "Spoiler içeriği gör")}</Text>
-              </BlurView>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.commentContentWrapper}>
-              <Text allowFontScaling={false} style={styles.commentText}>
-                {item.text}
+        <View style={[styles.threadBody, isReply && styles.replyBody]}>
+          {/* Başlık: kullanıcı adı + kısa zaman aynı satırda, sağda "..." */}
+          <View style={styles.threadHeader}>
+            <View style={styles.usernameRow}>
+              <Text allowFontScaling={false} style={styles.username} numberOfLines={1}>
+                {item.username}
               </Text>
-              {item.isSpoiler && (
-                <TouchableOpacity
-                  onPress={() => setShowSpoiler(false)}
-                  style={styles.eyeIconSmall}
-                >
-                  <Ionicons name="eye" size={14} color={theme.accent} />
-                </TouchableOpacity>
+              {!isReply && (
+                <View style={styles.sourceBadge}>
+                  <Text allowFontScaling={false} style={styles.sourceBadgeText}>
+                    {i18nText("autoI18n.topluluk", "Topluluk")}
+                  </Text>
+                </View>
               )}
-            </View>
-          )}
-        </View>
-
-        <View style={styles.actionsRow}>
-          <View style={styles.leftActions}>
-            <TouchableOpacity onPress={onLikePress} style={styles.actionButton}>
-              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                <MaterialCommunityIcons
-                  name={isLiked ? "heart" : "heart-outline"}
-                  size={18}
-                  color={isLiked ? theme.colors.red : theme.text.secondary}
-                />
-              </Animated.View>
-              <Text
-                allowFontScaling={false}
-                style={[styles.actionLabel, isLiked && { color: theme.colors.red }]}
-              >
-                {likeCount}
+              <Text allowFontScaling={false} style={styles.timestamp}>
+                {shortTimeAgo(getFeedTimestamp(item))}
               </Text>
-            </TouchableOpacity>
+            </View>
 
-            {!isReply && (
+            {isOwn && (
               <TouchableOpacity
-                onPress={() =>
-                  setCommentInputState((p) => ({
-                    ...p,
-                    parentId: item.id,
-                    isReply: true,
-                    replieName: item.username,
-                    replieText: item.text,
-                    editId: null,
-                  }))
-                }
-                style={styles.actionButton}
+                onPress={openOwnMenu}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <MaterialCommunityIcons
-                  name="reply-outline"
-                  size={18}
-                  color={theme.text.secondary}
+                <Feather
+                  name="more-horizontal"
+                  size={16}
+                  color={theme.text.muted}
                 />
-                <Text allowFontScaling={false} style={styles.actionLabel}>{i18nText("autoI18n.yanitla", "Yanıtla")}</Text>
               </TouchableOpacity>
             )}
           </View>
 
-          {/* Only show toggle when there are (or were) replies */}
+          <View style={styles.threadContentBody}>
+            {item.isSpoiler && !showSpoiler ? (
+              <TouchableOpacity
+                onPress={() => setShowSpoiler(true)}
+                style={styles.spoilerCover}
+              >
+                <BlurView intensity={25} tint="dark" style={styles.spoilerBlur}>
+                  <Ionicons
+                    name="eye-off"
+                    size={16}
+                    color={theme.text.secondary}
+                  />
+                  <Text allowFontScaling={false} style={styles.spoilerText}>{i18nText("autoI18n.spoiler_icerigi_gor", "Spoiler içeriği gör")}</Text>
+                </BlurView>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.commentContentWrapper}>
+                <Text allowFontScaling={false} style={styles.commentText}>
+                  {item.text}
+                </Text>
+                {item.isSpoiler && (
+                  <TouchableOpacity
+                    onPress={() => setShowSpoiler(false)}
+                    style={styles.eyeIconSmall}
+                  >
+                    <Ionicons name="eye" size={14} color={theme.accent} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
+
+          {/* Eylem satırı: kalp + sayı, yanıt balonu + sayı (ikon ağırlıklı) */}
+          <View style={styles.threadActionsRow}>
+            <TouchableOpacity onPress={onLikePress} style={styles.actionButton}>
+              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                <MaterialCommunityIcons
+                  name={isLiked ? "heart" : "heart-outline"}
+                  size={20}
+                  color={isLiked ? theme.colors.red : theme.text.secondary}
+                />
+              </Animated.View>
+              {likeCount > 0 && (
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.actionLabel, isLiked && { color: theme.colors.red }]}
+                >
+                  {likeCount}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            {!isReply && (
+              <TouchableOpacity onPress={startReply} style={styles.actionButton}>
+                <Ionicons
+                  name="chatbubble-outline"
+                  size={18}
+                  color={theme.text.secondary}
+                />
+                {totalReplies > 0 && (
+                  <Text allowFontScaling={false} style={styles.actionLabel}>
+                    {totalReplies}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Yanıtları gör/gizle bağlantısı (IG deseni: "— Yanıtları gör (N)") */}
           {!isReply && totalReplies > 0 && (
             <TouchableOpacity
               onPress={() => toggleReplyVisibility(item.id)}
               style={styles.repliesToggle}
             >
+              <View style={styles.repliesToggleLine} />
               <Text allowFontScaling={false} style={styles.repliesToggleText}>
-                {totalReplies}{i18nText("autoI18n.yanit", "Yanıt")}{isVisible ? "Gizle" : i18nText("autoI18n.gor", "Gör")}
+                {isVisible
+                  ? i18nText("autoI18n.yanitlari_gizle", "Yanıtları gizle")
+                  : i18nText("autoI18n.yanitlari_gor", "Yanıtları gör ({{count}})", {
+                      count: totalReplies,
+                    })}
               </Text>
             </TouchableOpacity>
           )}
@@ -359,6 +438,7 @@ const Comment = ({
   const { theme } = useTheme();
   const styles = getStyles(theme);
   const { user: currentUser } = useAuth();
+  const { avatarIndex: myAvatarIndex } = useUserProfile();
   const [comments, setComments] = useState([]);
   const [isSending, setIsSending] = useState(false);
   const [sourceFilter, setSourceFilter] = useState("all");
@@ -376,6 +456,49 @@ const Comment = ({
 
   // One ref per comment — stores its active onSnapshot unsubscribe fn
   const replyUnsubsRef = useRef({});
+
+  // ── Yazarların GÜNCEL avatarları (uid → avatarIndex) ─────────────────────
+  // Yorumlar eskiden photoURL saklıyordu; artık profil avatar sistemi
+  // (avatarIndex → local asset) kullanılır. Yazar başına tek getDoc,
+  // bileşen açık kaldığı sürece cache'lenir — avatar değiştiren kullanıcı
+  // eski yorumlarında da güncel avatarıyla görünür.
+  const [authorAvatars, setAuthorAvatars] = useState({});
+  const avatarFetchRef = useRef(new Set());
+  useEffect(() => {
+    const uids = new Set();
+    comments.forEach((c) => c.userId && uids.add(c.userId));
+    Object.values(repliesMap).forEach((reps) =>
+      (reps || []).forEach((r) => r.userId && uids.add(r.userId)),
+    );
+    const missing = [...uids].filter((uid) => !avatarFetchRef.current.has(uid));
+    if (missing.length === 0) return;
+    missing.forEach((uid) => avatarFetchRef.current.add(uid));
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        missing.map(async (uid) => {
+          try {
+            const profile = await getUserProfile(uid);
+            return [uid, clampAvatarIndex(profile?.avatarIndex)];
+          } catch {
+            avatarFetchRef.current.delete(uid); // sonraki snapshot'ta tekrar dene
+            return null;
+          }
+        }),
+      );
+      if (cancelled) return;
+      setAuthorAvatars((prev) => {
+        const next = { ...prev };
+        entries.forEach((entry) => {
+          if (entry) next[entry[0]] = entry[1];
+        });
+        return next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [comments, repliesMap]);
 
   const normalizedTmdbReviews = useMemo(
     () =>
@@ -494,15 +617,16 @@ const Comment = ({
         newRef = await addDoc(
           collection(db, collectionName, cid, "comments", parentId, "replies"),
           {
-            userId:    currentUser.uid,
-            username:  currentUser.displayName || "Anonim",
-            avatar:    currentUser.photoURL,
-            text:      text.trim(),
+            userId:      currentUser.uid,
+            username:    currentUser.displayName || "Anonim",
+            avatar:      currentUser.photoURL,
+            avatarIndex: clampAvatarIndex(myAvatarIndex),
+            text:        text.trim(),
             isSpoiler,
             parentId,
-            likeCount: 0,
-            likedBy:   {},
-            timestamp: serverTimestamp(),
+            likeCount:   0,
+            likedBy:     {},
+            timestamp:   serverTimestamp(),
           },
         );
         // Increment replyCount on parent comment
@@ -513,16 +637,17 @@ const Comment = ({
         newRef = await addDoc(
           collection(db, collectionName, cid, "comments"),
           {
-            userId:     currentUser.uid,
-            username:   currentUser.displayName || "Anonim",
-            avatar:     currentUser.photoURL,
-            text:       text.trim(),
+            userId:      currentUser.uid,
+            username:    currentUser.displayName || "Anonim",
+            avatar:      currentUser.photoURL,
+            avatarIndex: clampAvatarIndex(myAvatarIndex),
+            text:        text.trim(),
             isSpoiler,
-            parentId:   null,
-            likeCount:  0,
-            likedBy:    {},
-            replyCount: 0,
-            timestamp:  serverTimestamp(),
+            parentId:    null,
+            likeCount:   0,
+            likedBy:     {},
+            replyCount:  0,
+            timestamp:   serverTimestamp(),
           },
         );
       }
@@ -548,6 +673,14 @@ const Comment = ({
         text: "", isSpoiler: false, parentId: null,
         editId: null, isReply: false, replieName: null, replieText: null,
       });
+    } catch (e) {
+      // Örn. yanıt yazarken üst yorum silinmişse updateDoc "No document to
+      // update" ile reddeder — catch olmadan unhandled rejection olur ve
+      // kullanıcı hiçbir geri bildirim almazdı.
+      Toast.show({
+        type: "error",
+        text1: i18nText("autoI18n.yorum_kaydedilemedi", "Yorum kaydedilemedi"),
+      });
     } finally {
       setIsSending(false);
     }
@@ -556,21 +689,30 @@ const Comment = ({
   // ── Delete ───────────────────────────────────────────────
   const handleDelete = async (id, pid = null) => {
     const cid = contextId.toString();
-    if (pid) {
-      await deleteDoc(
-        doc(db, collectionName, cid, "comments", pid, "replies", id),
-      );
-      // Decrement replyCount (guard against going below 0)
-      await updateDoc(doc(db, collectionName, cid, "comments", pid), {
-        replyCount: increment(-1),
-      });
-    } else {
-      // Close any open reply subscription before deleting the comment
-      if (replyUnsubsRef.current[id]) {
-        replyUnsubsRef.current[id]();
-        delete replyUnsubsRef.current[id];
+    try {
+      if (pid) {
+        await deleteDoc(
+          doc(db, collectionName, cid, "comments", pid, "replies", id),
+        );
+        // Decrement replyCount (guard against going below 0). Üst yorum bu
+        // arada silinmiş olabilir — sayaç düşümü best-effort.
+        await updateDoc(doc(db, collectionName, cid, "comments", pid), {
+          replyCount: increment(-1),
+        }).catch(() => {});
+      } else {
+        // Close any open reply subscription before deleting the comment
+        if (replyUnsubsRef.current[id]) {
+          replyUnsubsRef.current[id]();
+          delete replyUnsubsRef.current[id];
+        }
+        await deleteDoc(doc(db, collectionName, cid, "comments", id));
       }
-      await deleteDoc(doc(db, collectionName, cid, "comments", id));
+    } catch (e) {
+      Toast.show({
+        type: "error",
+        text1: i18nText("autoI18n.islem_basarisiz", "İşlem başarısız"),
+      });
+      return;
     }
     // Kullanıcının yorum sayacını azalt + denormalize kopyayı kaldır (best-effort).
     updateDoc(doc(db, "Users", currentUser.uid), {
@@ -620,6 +762,7 @@ const Comment = ({
         keyExtractor={(item) => item.feedId}
         contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
+        ItemSeparatorComponent={() => <View style={styles.feedSeparator} />}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <MaterialCommunityIcons
@@ -647,21 +790,25 @@ const Comment = ({
               currentUser={currentUser}
               contextId={contextId}
               theme={theme}
+              avatarIndex={authorAvatars[item.userId] ?? item.avatarIndex ?? null}
               replies={repliesMap[item.id] || []}
               isVisible={replyVisibility[item.id]}
               toggleReplyVisibility={toggleReplyVisibility}
               handleLikeToggle={(id, liked) => {
+                if (!currentUser?.uid) return;
                 const ref = doc(db, collectionName, contextId.toString(), "comments", id);
+                // Yorum bu arada silinmiş olabilir — reddi yut (unhandled
+                // rejection olmasın), snapshot listesi zaten güncellenir.
                 if (liked) {
                   updateDoc(ref, {
                     likeCount: increment(-1),
                     [`likedBy.${currentUser.uid}`]: deleteField(),
-                  });
+                  }).catch(() => {});
                 } else {
                   updateDoc(ref, {
                     likeCount: increment(1),
                     [`likedBy.${currentUser.uid}`]: true,
-                  });
+                  }).catch(() => {});
                 }
               }}
               setCommentInputState={setCommentInputState}
@@ -669,16 +816,19 @@ const Comment = ({
               handleDeleteReply={(pid, id) => handleDelete(id, pid)}
             />
             {replyVisibility[item.id] &&
-              repliesMap[item.id]?.map((rep) => (
+              repliesMap[item.id]?.map((rep, repIndex, repArr) => (
                 <CommentItem
                   key={rep.id}
                   item={rep}
                   currentUser={currentUser}
                   isReply
+                  isLastReply={repIndex === repArr.length - 1}
                   theme={theme}
+                  avatarIndex={authorAvatars[rep.userId] ?? rep.avatarIndex ?? null}
                   setCommentInputState={setCommentInputState}
                   handleDeleteReply={(pid, id) => handleDelete(id, pid)}
                   handleLikeToggle={(id, liked) => {
+                    if (!currentUser?.uid) return;
                     const ref = doc(
                       db, collectionName, contextId.toString(),
                       "comments", item.id, "replies", id,
@@ -687,12 +837,12 @@ const Comment = ({
                       updateDoc(ref, {
                         likeCount: increment(-1),
                         [`likedBy.${currentUser.uid}`]: deleteField(),
-                      });
+                      }).catch(() => {});
                     } else {
                       updateDoc(ref, {
                         likeCount: increment(1),
                         [`likedBy.${currentUser.uid}`]: true,
-                      });
+                      }).catch(() => {});
                     }
                   }}
                 />
@@ -802,7 +952,16 @@ const getStyles = (theme) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.primary },
     commentList: { flex: 1 },
-    listContent: { padding: 15, paddingBottom: 160, flexGrow: 1 },
+    // gap: üst seviye öğeler (yorum blokları / TMDB incelemeleri) arası boşluk;
+    // araya feedSeparator çizgisi girer (gap ayraç öncesi/sonrasına da uygulanır).
+    listContent: { padding: 15, paddingBottom: 160, flexGrow: 1, gap: 10 },
+    // Üst seviye yorumlar arasındaki ince ayraç çizgisi — ekran kenarından
+    // kenarına uzanır (negatif margin, listContent padding'ini sıfırlar).
+    feedSeparator: {
+      height: StyleSheet.hairlineWidth,
+      marginHorizontal: -15,
+      backgroundColor: alpha(theme.border, 0.9),
+    },
 
     sourceFilterRow: {
       flexDirection: "row",
@@ -859,6 +1018,94 @@ const getStyles = (theme) =>
       borderLeftWidth: 3,
       borderLeftColor: theme.accent,
     },
+    // ── Düz (flat) sosyal yorum düzeni — avatar solda, gövde sağda, kart yok ──
+    // Dikey dolgu satırda değil GÖVDEDE tutulur; böylece avatar kolonu satırın
+    // tam yüksekliğine uzanır ve iplik çizgisi (threadLine) satır sınırına
+    // kadar iner → yanıtın kavis çizgisi (replyElbow, top:0) ile boşluksuz
+    // birleşir.
+    threadItemContainer: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    threadReplyItem: {
+      paddingLeft: 48,
+    },
+    threadAvatarColumn: {
+      width: 38,
+      alignItems: "center",
+    },
+    avatarFrame: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      marginTop: 10,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: alpha(theme.border, 0.9),
+      backgroundColor: theme.secondary,
+    },
+    replyAvatarFrame: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      marginTop: 8,
+    },
+    replyAvatar: { width: 26, height: 26, borderRadius: 13 },
+    avatarFallback: {
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.primary,
+    },
+    // Ana yorumun altındaki dikey iplik — yanıtlar açıkken görünür
+    threadLine: {
+      flex: 1,
+      width: 1.5,
+      marginTop: 6,
+      borderRadius: 1,
+      backgroundColor: alpha(theme.border, 0.95),
+    },
+    // Yanıt satırı: ipten avatara kıvrılan "L" çizgisi
+    replyElbow: {
+      position: "absolute",
+      left: 19,
+      top: 0,
+      width: 33,
+      height: 23,
+      borderLeftWidth: 1.5,
+      borderBottomWidth: 1.5,
+      borderBottomLeftRadius: 14,
+      borderColor: alpha(theme.border, 0.95),
+    },
+    // Ara yanıtlarda ip alttaki yanıta doğru düz devam eder
+    replyTrunk: {
+      position: "absolute",
+      left: 19,
+      top: 0,
+      bottom: 0,
+      width: 1.5,
+      backgroundColor: alpha(theme.border, 0.95),
+    },
+    threadBody: {
+      flex: 1,
+      minWidth: 0,
+      paddingVertical: 10,
+    },
+    replyBody: { paddingVertical: 8 },
+    threadHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 3,
+      gap: 8,
+    },
+    threadContentBody: { marginTop: 1, marginBottom: 2 },
+    threadActionsRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 22,
+      marginTop: 8,
+    },
     replyMargin: {
       marginLeft: 35,
       borderLeftWidth: 2,
@@ -872,12 +1119,17 @@ const getStyles = (theme) =>
     },
     userInfo: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
     userTextGroup: { flex: 1, minWidth: 0 },
-    usernameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-    ownerActions: { flexDirection: "row", alignItems: "center" },
+    usernameRow: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
     avatar: { width: 34, height: 34 },
     roundAvatar: { borderRadius: 17 },
-    username: { color: theme.text.primary, fontSize: 13, fontWeight: "700", flexShrink: 1 },
-    timestamp: { color: theme.text.muted, fontSize: 10 },
+    username: { color: theme.text.primary, fontSize: 14, fontWeight: "700", flexShrink: 1 },
+    timestamp: { color: theme.text.muted, fontSize: 12, fontWeight: "500" },
     sourceBadge: {
       paddingHorizontal: 6,
       paddingVertical: 2,
@@ -937,17 +1189,28 @@ const getStyles = (theme) =>
     },
     spoilerText: { color: theme.text.secondary, fontSize: 12, fontWeight: "600" },
 
-    actionsRow: {
+    actionButton: {
       flexDirection: "row",
-      justifyContent: "space-between",
       alignItems: "center",
-      marginTop: 10,
+      gap: 5,
+      paddingVertical: 2,
     },
-    leftActions: { flexDirection: "row", gap: 18 },
-    actionButton: { flexDirection: "row", alignItems: "center", gap: 5 },
-    actionLabel: { color: theme.text.secondary, fontSize: 12, fontWeight: "600" },
-    repliesToggle: { paddingVertical: 4 },
-    repliesToggleText: { color: theme.text.secondary, fontSize: 12, fontWeight: "700" },
+    actionLabel: { color: theme.text.secondary, fontSize: 12.5, fontWeight: "600" },
+    // "— Yanıtları gör (N)" bağlantısı (IG deseni: kısa çizgi + metin)
+    repliesToggle: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 10,
+      paddingVertical: 2,
+    },
+    repliesToggleLine: {
+      width: 26,
+      height: 1,
+      backgroundColor: theme.text.muted,
+      opacity: 0.5,
+    },
+    repliesToggleText: { color: theme.text.muted, fontSize: 12, fontWeight: "700" },
 
     inputWrapper: {
       position: "absolute",

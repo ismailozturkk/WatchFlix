@@ -11,6 +11,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import PosterImage from "../PosterImage";
 import ListBadges from "../ListBadges";
 import { useTheme } from "../../context/ThemeContext";
+import { useListLayoutSettings } from "../../context/AppSettingsContext";
 
 const { width } = Dimensions.get("window");
 
@@ -22,6 +23,7 @@ const SimilarMediaItem = memo(function SimilarMediaItem({
   navigation,
 }) {
   const { theme } = useTheme();
+  const { posterBadges } = useListLayoutSettings();
   const scale = useRef(new Animated.Value(1)).current;
 
   const onPressIn = () =>
@@ -59,14 +61,16 @@ const SimilarMediaItem = memo(function SimilarMediaItem({
           style={[styles.similarPoster, { borderColor: theme.border + "55" }]}
         />
         {/* Rating pill */}
-        <View
-          style={[styles.ratingPill, { backgroundColor: "rgba(0,0,0,0.72)" }]}
-        >
-          <Ionicons name="star" size={9} color="#FFD700" />
-          <Text allowFontScaling={false} style={styles.ratingPillText}>
-            {item.vote_average.toFixed(1)}
-          </Text>
-        </View>
+        {posterBadges?.tmdbRating !== false && (
+          <View
+            style={[styles.ratingPill, { backgroundColor: "rgba(0,0,0,0.72)" }]}
+          >
+            <Ionicons name="star" size={9} color="#FFD700" />
+            <Text allowFontScaling={false} style={styles.ratingPillText}>
+              {item.vote_average.toFixed(1)}
+            </Text>
+          </View>
+        )}
         {/* List indicators */}
         <View style={styles.stats}>
           <ListBadges

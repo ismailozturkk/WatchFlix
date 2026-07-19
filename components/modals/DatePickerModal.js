@@ -32,6 +32,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@context/ThemeContext";
+import { useLanguage } from "@context/LanguageContext";
 import { alpha } from "@theme/colors";
 import { i18nText } from "@utils/i18nText";
 
@@ -49,8 +50,8 @@ export const DAYS_LIST = Array.from({ length: 31 }, (_, i) =>
 );
 
 export const MONTHS_TR = [
-  "Ocak", i18nText("autoI18n.subat", "Şubat"), "Mart", "Nisan", i18nText("autoI18n.mayis", "Mayıs"), "Haziran",
-  "Temmuz", i18nText("autoI18n.agustos", "Ağustos"), i18nText("autoI18n.eylul", "Eylül"), "Ekim", i18nText("autoI18n.kasim", "Kasım"), i18nText("autoI18n.aralik", "Aralık"),
+  "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
 ];
 
 export const MONTHS_EN = [
@@ -59,7 +60,7 @@ export const MONTHS_EN = [
 ];
 
 const currentYear = new Date().getFullYear();
-export const YEARS_LIST = Array.from({ length: 100 }, (_, i) =>
+export const YEARS_LIST = Array.from({ length: 150 }, (_, i) =>
   String(currentYear - i),
 );
 
@@ -97,8 +98,21 @@ export function indicesToIso(day, month, year) {
 
 export function normalizeDate(d) {
   if (!d) return null;
-  if (typeof d === "string") return d.split("T")[0];
+  if (typeof d === "string") {
+    const iso = d.split("T")[0];
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    if (!match) return null;
+    const [, year, month, day] = match;
+    const parsed = new Date(Number(year), Number(month) - 1, Number(day));
+    if (
+      parsed.getFullYear() !== Number(year) ||
+      parsed.getMonth() !== Number(month) - 1 ||
+      parsed.getDate() !== Number(day)
+    ) return null;
+    return iso;
+  }
   // Date objesi ise lokal tarihi ISO'ya çevir (timezone kaymasını önlemek için)
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return null;
   const offset = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - offset).toISOString().split("T")[0];
 }
@@ -274,6 +288,7 @@ export default function DatePickerModal({
   maxDateErrorMsg = i18nText("autoI18n.gelecek_bir_tarih_secilemez", "Gelecek bir tarih seçilemez"),
 }) {
   const { theme } = useTheme();
+  const { language } = useLanguage();
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
   const init = isoToIndices(value);
@@ -355,7 +370,7 @@ export default function DatePickerModal({
   );
 
   const previewDay = dynamicDays[dayIdx] || dynamicDays[dynamicDays.length - 1];
-  const previewMonth = MONTHS_TR[monthIdx];
+  const previewMonth = (language === "tr" ? MONTHS_TR : MONTHS_EN)[monthIdx];
   const previewYear = YEARS_LIST[yearIdx];
 
   const handleConfirm = () => {

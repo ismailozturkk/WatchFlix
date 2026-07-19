@@ -26,6 +26,9 @@ import { useLanguage } from "../../context/LanguageContext";
 import AppIcon from "../../components/AppIcon";
 import IconBacground from "../../components/IconBacground";
 import usePullToSearch from "../../hooks/usePullToSearch";
+import DiscoveryMediaRail from "../../components/DiscoveryMediaRail";
+import { useStreamingProviderSettings } from "../../context/AppSettingsContext";
+import { useProfileStats } from "../../context/ProfileStatsContext";
 
 const INITIAL_SECTION_COUNT = 2;
 
@@ -33,6 +36,8 @@ export default function TvShowScreen({ navigation }) {
   const { theme } = useTheme();
   const { showSnow } = useSnowSettings();
   const { showOngoingTvShows } = useOngoingTvShowsSettings();
+  const { streamingProviderIds } = useStreamingProviderSettings();
+  const { topTvGenres } = useProfileStats();
   const { t } = useLanguage();
   const { loadingTrend } = useTvShow();
   const searchInputRef = useRef(null);
@@ -70,6 +75,14 @@ export default function TvShowScreen({ navigation }) {
         ? { key: "ongoing", Component: TvOngoingSection }
         : null,
       { key: "best", Component: TvShowBests },
+      ...(streamingProviderIds.length > 0
+        ? [{ key: "subscriptions", Component: DiscoveryMediaRail, preset: "subscriptions" }]
+        : []),
+      ...(topTvGenres?.length === 3
+        ? [{ key: "topGenres", Component: DiscoveryMediaRail, preset: "topGenres", genreNames: topTvGenres }]
+        : []),
+      { key: "recentFavorites", Component: DiscoveryMediaRail, preset: "recentFavorites" },
+      { key: "hiddenGems", Component: DiscoveryMediaRail, preset: "hiddenGems" },
       { key: "providers", Component: TvShowsProvders },
       { key: "genres", Component: TvShowsGenres },
       { key: "onTheAir", Component: TvShowsOnTheAir },
@@ -77,7 +90,7 @@ export default function TvShowScreen({ navigation }) {
     ];
 
     return items.filter(Boolean);
-  }, [showOngoingTvShows]);
+  }, [showOngoingTvShows, streamingProviderIds, topTvGenres]);
 
   const [visibleSectionCount, setVisibleSectionCount] = useState(INITIAL_SECTION_COUNT);
 
@@ -89,7 +102,14 @@ export default function TvShowScreen({ navigation }) {
   const renderSection = useCallback(
     ({ item }) => {
       const SectionComponent = item.Component;
-      return <SectionComponent navigation={navigation} />;
+      return (
+        <SectionComponent
+          navigation={navigation}
+          mediaType="tv"
+          preset={item.preset}
+          genreNames={item.genreNames}
+        />
+      );
     },
     [navigation],
   );

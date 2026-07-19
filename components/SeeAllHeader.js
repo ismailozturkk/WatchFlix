@@ -1,8 +1,8 @@
 // Bölüm başlığı + sağda "Tümünü Gör" bağlantısı. TV & Film ana ekranlarındaki
 // yatay rail'lerin üstünde kullanılır; onPress verilince SeeAllScreen'e gider.
 //
-// "Tümünü Gör" artık metin yerine yalnızca bir genişletme ikonu; arka planı
-// soldan şeffaf başlayıp sağa doğru koyulaşan yatay bir degrade.
+// "Tümünü Gör" metin yerine soldan şeffaflaşan bir fade alanı ve sağda
+// cam hissi veren kompakt genişletme ikonu olarak gösterilir.
 
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
@@ -11,8 +11,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../context/ThemeContext";
 import { alpha } from "../theme/colors";
 
-// Soldan şeffaf → sağa koyulaşan degrade zeminli, yalnızca ikonlu genişletme
-// düğmesi. Hem başlık içinde hem tek başına (Bests/Trends sekmelerinde) kullanılır.
 function ExpandPill({ onPress, style }) {
   const { theme } = useTheme();
   return (
@@ -24,12 +22,27 @@ function ExpandPill({ onPress, style }) {
       accessibilityRole="button"
     >
       <LinearGradient
-        colors={[alpha(theme.primary, 0), theme.primary]}
+        colors={[
+          alpha(theme.primary, 0),
+          alpha(theme.primary, 0.68),
+          alpha(theme.primary, 0.96),
+        ]}
+        locations={[0, 0.48, 1]}
         start={{ x: 0, y: 0.5 }}
         end={{ x: 1, y: 0.5 }}
-        style={StyleSheet.absoluteFill}
+        style={styles.pillFade}
       />
-      <Ionicons name="expand-outline" size={18} color={theme.accent} />
+      <View
+        style={[
+          styles.iconBubble,
+          {
+            backgroundColor: alpha(theme.secondary, 0.92),
+            borderColor: alpha(theme.accent, 0.34),
+          },
+        ]}
+      >
+        <Ionicons name="expand-outline" size={18} color={theme.accent} />
+      </View>
     </TouchableOpacity>
   );
 }
@@ -70,14 +83,32 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   pill: {
-    width: 58,
-    height: 32,
-    borderRadius: 10,
-    marginLeft: 10,
+    width: 46,
+    height: 38,
+    borderRadius: 16,
+    marginLeft: 4,
+    alignSelf: "center",
     overflow: "hidden",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
-    paddingRight: 10,
+    paddingRight: 2,
+  },
+  pillFade: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 16,
+  },
+  iconBubble: {
+    width: 34,
+    height: 34,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 3,
   },
 });

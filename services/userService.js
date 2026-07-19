@@ -38,6 +38,22 @@ import { clampAvatarIndex, DEFAULT_AVATAR_INDEX } from "../utils/avatars";
 
 export const SCHEMA_VERSION = 2;
 
+// Profil hataları koda bağlanır: UI, metne regex atmak yerine koda bakar ve
+// kendi dilinde mesaj basar. (Mesajlar geriye dönük uyumluluk için aynı.)
+export const UserProfileErrorCode = {
+  USERNAME_TAKEN: "profile/username-taken",
+  INVALID_USERNAME: "profile/invalid-username",
+  MISSING_UID: "profile/missing-uid",
+};
+
+export class UserProfileError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.name = "UserProfileError";
+    this.code = code;
+  }
+}
+
 export const DEFAULT_PRIVACY = {
   profile: "public",
   lists: "public",
@@ -91,11 +107,15 @@ export async function searchUsersByUsername(searchTerm, { excludeUid, max = 20 }
 /**
  * Username serbest mi? Usernames/{lower} dokümanı yoksa serbest.
  */
-export async function isUsernameAvailable(username) {
+export async function isUsernameAvailable(username, { excludeUid } = {}) {
   const lower = normalizeUsername(username);
   if (!isValidUsername(username)) return false;
   const snap = await getDoc(doc(db, "Usernames", lower));
-  return !snap.exists();
+  if (!snap.exists()) return true;
+  // Kendi rezervasyonun senin için "dolu" değildir. excludeUid verilmezse eski
+  // davranış korunur; profil tamamlama/retry akışları uid'yi geçer, aksi halde
+  // kullanıcı kendi username'ini "alınmış" görüp ilerleyemez.
+  return !!excludeUid && snap.data()?.uid === excludeUid;
 }
 
 // ── Profile CRUD ────────────────────────────────────────────────────────────
@@ -118,33 +138,81 @@ export async function createUserProfile({
   displayName,
   avatarIndex = DEFAULT_AVATAR_INDEX,
 }) {
-  if (!uid) throw new Error("createUserProfile: uid yok");
+  if (!uid)
+    throw new UserProfileError(
+      UserProfileErrorCode.MISSING_UID,
+      "createUserProfile: uid yok",
+    );
   if (!isValidUsername(username))
-    throw new Error("Geçersiz kullanıcı adı (3-20 char, a-z 0-9 _)");
+    throw new UserProfileError(
+      UserProfileErrorCode.INVALID_USERNAME,
+      "Geçersiz kullanıcı adı (3-20 char, a-z 0-9 _)",
+    );
 
   const usernameLower = normalizeUsername(username);
 
   await runTransaction(db, async (tx) => {
     const usernameRef = doc(db, "Usernames", usernameLower);
-    const usernameSnap = await tx.get(usernameRef);
-
-    if (usernameSnap.exists() && usernameSnap.data().uid !== uid) {
-      throw new Error("Bu kullanıcı adı zaten alınmış");
-    }
-
     const userRef = doc(db, "Users", uid);
 
-    tx.set(usernameRef, {
-      uid,
-      reservedAt: serverTimestamp(),
-    });
+    // Firestore kuralı: bir transaction'daki TÜM okumalar yazımlardan önce.
+    const [usernameSnap, userSnap] = await Promise.all([
+      tx.get(usernameRef),
+      tx.get(userRef),
+    ]);
 
-    tx.set(userRef, {
+    if (usernameSnap.exists() && usernameSnap.data().uid !== uid) {
+      throw new UserProfileError(
+        UserProfileErrorCode.USERNAME_TAKEN,
+        "Bu kullanıcı adı zaten alınmış",
+      );
+    }
+
+    const existing = userSnap.exists() ? userSnap.data() : null;
+    const previousLower = existing?.usernameLower;
+
+    // Username değiştiyse eski rezervasyonu bırakmayacağız; yoksa o username
+    // herkes için kalıcı olarak yanar. Ama önce OKU: var olmayan bir dokümana
+    // tx.delete atmak kuralda `resource.data.uid` null üzerinden değerlendiği
+    // için reddedilir ve tüm transaction'ı düşürür.
+    // (Tüm okumalar yazımlardan önce bitmeli — bu yüzden burada.)
+    let staleRef = null;
+    if (existing && previousLower && previousLower !== usernameLower) {
+      const ref = doc(db, "Usernames", previousLower);
+      const snap = await tx.get(ref);
+      if (snap.exists() && snap.data()?.uid === uid) staleRef = ref;
+    }
+
+    // ── Buradan sonrası yazım ──────────────────────────────────────────────
+
+    // Rezervasyon zaten bizimse DOKUNMA. /Usernames'te `allow update` kuralı
+    // yok; var olan bir dokümana tx.set atmak PERMISSION_DENIED ile tüm
+    // transaction'ı düşürür — kendi username'iyle tekrar deneyen kullanıcı
+    // (tam da desteklemek istediğimiz yol) buraya çarpıyordu.
+    if (!usernameSnap.exists()) {
+      tx.set(usernameRef, { uid, reservedAt: serverTimestamp() });
+    }
+
+    const identity = {
       uid,
       username: username.trim(),
       usernameLower,
       email,
       displayName: displayName || username,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (existing) {
+      // Profil zaten var: yalnızca kimlik alanlarını tazele. Sayaçlar, bio,
+      // avatar, privacy ve createdAt EZİLMEZ — bu yoldan geçen mevcut bir
+      // hesabın (ör. Google bağlayan eski kullanıcı) tüm verisi sıfırlanıyordu.
+      tx.set(userRef, identity, { merge: true });
+      if (staleRef) tx.delete(staleRef);
+      return;
+    }
+
+    tx.set(userRef, {
+      ...identity,
       bio: "",
       avatarIndex: clampAvatarIndex(avatarIndex),
 
@@ -163,7 +231,6 @@ export async function createUserProfile({
       listVisible: DEFAULT_LIST_VISIBLE,
 
       createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
       _schemaVersion: SCHEMA_VERSION,
     });
   });
@@ -221,7 +288,13 @@ export async function changeUsername(uid, newUsername) {
 
     const oldLower = userSnap.data().usernameLower;
 
-    tx.set(newUsernameRef, { uid, reservedAt: serverTimestamp() });
+    // Rules yalnız create/delete'e izin veriyor ("Update yok") — doküman
+    // zaten kendi uid'imizle varsa tx.set bir update sayılır ve
+    // PERMISSION_DENIED tüm transaction'ı düşürür. createUserProfile'daki
+    // guard'ın aynısı.
+    if (!newUsernameSnap.exists()) {
+      tx.set(newUsernameRef, { uid, reservedAt: serverTimestamp() });
+    }
     if (oldLower && oldLower !== newLower) {
       tx.delete(doc(db, "Usernames", oldLower));
     }

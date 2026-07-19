@@ -19,10 +19,12 @@ import React, {
 } from "react";
 import Skeleton from "../../components/SkeletonGraph";
 import axios from "axios";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLanguage } from "../../context/LanguageContext";
 import LottieView from "lottie-react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
+import { getRatingColors } from "../../utils/ratingColors";
 
 import {
   useApiSettings,
@@ -31,21 +33,31 @@ import {
 } from "../../context/AppSettingsContext";
 
 // ─── Rating Renk Sistemi ──────────────────────────────────────────────────────
-const RATING_TIERS = [
-  { min: 9, bg: "rgb(0, 88, 74)", text: "#fff" },
-  { min: 8, bg: "rgb(41, 184, 100)", text: "#000" },
-  { min: 7, bg: "rgba(119, 255, 171, 1)", text: "#000" },
-  { min: 6, bg: "rgb(255, 255, 0)", text: "#000" },
-  { min: 5, bg: "rgb(255, 100, 0)", text: "#000" },
-  { min: 4, bg: "rgb(255, 0, 0)", text: "#fff" },
-  { min: -Infinity, bg: "rgb(99, 0, 204)", text: "#fff" },
-];
+// Ortak katmanlar utils/ratingColors.js'te — story "Bölüm Graph" bloğu da kullanır.
 
-const getRatingColors = (rating) => {
-  const tier =
-    RATING_TIERS.find((t) => rating >= t.min) ??
-    RATING_TIERS[RATING_TIERS.length - 1];
-  return { bg: tier.bg, text: tier.text };
+// ─── Izgara Boyutları ─────────────────────────────────────────────────────────
+// default: mevcut boyutlar; compact: panel sağ üstündeki düğmeyle açılan
+// küçük görünüm. Hücre, yazı ve etiket konumları birlikte ölçeklenir —
+// yapı bozulmadan küçülür. Sütun genişliği = cell + 2×2 yatay margin.
+const GRID_SIZES = {
+  default: {
+    cell: 50,
+    radius: 8,
+    rating: 14,
+    label: 8,
+    labelOffset: 3,
+    headerFont: 10,
+    dot: 24,
+  },
+  compact: {
+    cell: 36,
+    radius: 6,
+    rating: 11,
+    label: 6.5,
+    labelOffset: 2,
+    headerFont: 9,
+    dot: 18,
+  },
 };
 
 // ─── Bölüm Hücresi (Memoize) ──────────────────────────────────────────────────
@@ -57,6 +69,7 @@ const EpisodeCell = React.memo(
     isSelected,
     onPress,
     borderColor,
+    grid, // GRID_SIZES.default | GRID_SIZES.compact (modül sabiti → memo bozulmaz)
   }) => {
     const { bg, text } = getRatingColors(episode.vote_average);
     const rating = episode.vote_average
@@ -70,6 +83,9 @@ const EpisodeCell = React.memo(
         style={[
           styles.cell,
           {
+            width: grid.cell,
+            height: grid.cell,
+            borderRadius: grid.radius,
             backgroundColor: bg,
             borderWidth: 1.5,
             borderColor: isSelected ? "#fff" : borderColor,
@@ -77,11 +93,35 @@ const EpisodeCell = React.memo(
           },
         ]}
       >
-        <Text style={[styles.cellSeasonLabel, { color: text, opacity: 0.55 }]}>
+        <Text
+          style={[
+            styles.cellSeasonLabel,
+            {
+              color: text,
+              opacity: 0.55,
+              fontSize: grid.label,
+              top: grid.labelOffset,
+              left: grid.labelOffset + 1,
+            },
+          ]}
+        >
           S{seasonNumber}
         </Text>
-        <Text style={[styles.cellRating, { color: text }]}>{rating}</Text>
-        <Text style={[styles.cellEpisodeLabel, { color: text, opacity: 0.55 }]}>
+        <Text style={[styles.cellRating, { color: text, fontSize: grid.rating }]}>
+          {rating}
+        </Text>
+        <Text
+          style={[
+            styles.cellEpisodeLabel,
+            {
+              color: text,
+              opacity: 0.55,
+              fontSize: grid.label,
+              bottom: grid.labelOffset,
+              right: grid.labelOffset + 1,
+            },
+          ]}
+        >
           E{episodeIndex + 1}
         </Text>
       </TouchableOpacity>
@@ -155,6 +195,10 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
   const [error, setError] = useState(null);
   const [selectedEpisode, setSelectedEpisode] = useState(null);
   // { season: number, index: number } | null
+  // Kompakt ızgara — varsayılan mevcut boyutlar; düğmeyle küçük görünüme geçilir.
+  const [compactGrid, setCompactGrid] = useState(false);
+  const grid = compactGrid ? GRID_SIZES.compact : GRID_SIZES.default;
+  const colWidth = grid.cell + 4; // hücre + 2×2 yatay margin
 
   const { t, language } = useLanguage();
   const { theme } = useTheme();
@@ -450,13 +494,27 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                   )}
                   <TouchableOpacity
                     style={styles.detailBtn}
-                    onPress={() =>
+                    onPress={() => {
+                      // EpisodeDetails bu meta'yı WatchedAdd → markEpisodes'a
+                      // iletir; eksik gönderilirse ilk işaretlemede watchedTv
+                      // dokümanı boş adla/0 bölüm sayısıyla oluşur ve sonraki
+                      // işaretlemeler bu meta'yı bir daha onarmaz.
+                      const seasonMeta = showDetail?.seasons?.find(
+                        (s) => s.season_number === selectedEpisode.season,
+                      );
                       navigation.navigate("EpisodeDetails", {
                         showId: id,
                         seasonNumber: selectedEpisode.season,
                         episodeNumber: selectedEpisodeData.episode_number,
-                      })
-                    }
+                        showName: showDetail?.name || "",
+                        showEpisodeCount: showDetail?.number_of_episodes || 0,
+                        showSeasonCount: showDetail?.number_of_seasons || 0,
+                        seasonEpisodes: seasonMeta?.episode_count || 0,
+                        showPosterPath: showDetail?.poster_path || null,
+                        seasonPosterPath: seasonMeta?.poster_path || null,
+                        genres: showDetail?.genres?.map((g) => g.name) || [],
+                      });
+                    }}
                   >
                     <Text style={styles.detailBtnText}>{t.detail} →</Text>
                   </TouchableOpacity>
@@ -489,6 +547,19 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
               </>
             )}
           </View>
+
+          {/* Izgara boyutu: varsayılan ↔ kompakt (bölüm seçiliyken ✕'in soluna kayar) */}
+          <TouchableOpacity
+            style={[styles.gridSizeBtn, selectedEpisode && { right: 44 }]}
+            onPress={() => setCompactGrid((v) => !v)}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Ionicons
+              name={compactGrid ? "expand-outline" : "contract-outline"}
+              size={14}
+              color="#fff"
+            />
+          </TouchableOpacity>
 
           {/* Seçili bölümü kapat */}
           {selectedEpisode && (
@@ -526,12 +597,20 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
           contentContainerStyle={{ paddingHorizontal: 12 }}
           showsHorizontalScrollIndicator={false}
         >
-          <View style={{ minWidth: tvShows.length * 54 }}>
+          <View style={{ minWidth: tvShows.length * colWidth }}>
             {/* Sezon Başlık Satırı */}
             <View style={[styles.row, { marginBottom: 4 }]}>
               {tvShows.map((season) => (
-                <View key={season.season_number} style={styles.seasonHeader}>
-                  <Text style={styles.seasonHeaderText}>
+                <View
+                  key={season.season_number}
+                  style={[styles.seasonHeader, { width: colWidth }]}
+                >
+                  <Text
+                    style={[
+                      styles.seasonHeaderText,
+                      { fontSize: grid.headerFont },
+                    ]}
+                  >
                     S{season.season_number}
                   </Text>
                 </View>
@@ -548,6 +627,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                       episode={season.episodes[epIndex]}
                       seasonNumber={season.season_number}
                       episodeIndex={epIndex}
+                      grid={grid}
                       isSelected={
                         selectedEpisode?.season === season.season_number &&
                         selectedEpisode?.index === epIndex
@@ -558,8 +638,18 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                       borderColor={theme.primary}
                     />
                   ) : (
-                    <View key={season.season_number} style={styles.emptyCell}>
-                      <Text style={styles.emptyCellDot}>·</Text>
+                    <View
+                      key={season.season_number}
+                      style={[
+                        styles.emptyCell,
+                        { width: grid.cell, height: grid.cell },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.emptyCellDot, { fontSize: grid.dot }]}
+                      >
+                        ·
+                      </Text>
                     </View>
                   ),
                 )}
@@ -706,6 +796,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   closeBtn: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  // Izgara boyut düğmesi — closeBtn ile aynı görünüm, panel sağ üstünde
+  gridSizeBtn: {
     position: "absolute",
     top: 10,
     right: 10,

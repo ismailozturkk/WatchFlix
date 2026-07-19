@@ -20,12 +20,13 @@ import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SeeAllButton } from "../../components/SeeAllHeader";
 import { i18nText } from "../../utils/i18nText";
-import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 const { width, height } = Dimensions.get("window");
 
 // Stable, module-scope item component → no remount → no flicker.
 const MovieGenresCard = memo(function MovieGenresCard({ item, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
+  const { posterBadges } = useListLayoutSettings();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -54,11 +55,13 @@ const MovieGenresCard = memo(function MovieGenresCard({ item, navigation, theme,
           transition={120}
         />
 
-        <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
-          <Text allowFontScaling={false} style={styles.similarRatingText}>
-            {item.vote_average.toFixed(1)}
-          </Text>
-        </View>
+        {posterBadges?.tmdbRating !== false && (
+          <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
+            <Text allowFontScaling={false} style={styles.similarRatingText}>
+              {item.vote_average.toFixed(1)}
+            </Text>
+          </View>
+        )}
         <ListBadges
           mediaId={item.id}
           mediaType="movie"
@@ -151,13 +154,13 @@ export default function MovieGenres({ navigation }) {
     : i18nText("autoI18n.turler", "Türler");
   return (
     <View style={styles.container}>
-      <View style={{ flexDirection: "row", alignItems: "center", paddingRight: 12 }}>
-        <View style={{ flex: 1 }}>
+      <View style={styles.genreHeaderRow}>
+        <View style={styles.genreListWrap}>
           <FlatList
             data={genres}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 15 }}
+            contentContainerStyle={styles.genreListContent}
             keyExtractor={(item) => item.id.toString()}
             renderItem={({ item }) => (
               <TouchableOpacity
@@ -182,6 +185,7 @@ export default function MovieGenres({ navigation }) {
           />
         </View>
         <SeeAllButton
+          style={styles.genreSeeAllButton}
           onPress={() =>
             navigation.navigate("SeeAllScreen", {
               mediaType: "movie",
@@ -214,8 +218,25 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
   },
-  genreButton: {
+  genreHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingRight: 12,
     marginBottom: 20,
+  },
+  genreListWrap: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  genreListContent: {
+    paddingHorizontal: 15,
+    alignItems: "center",
+  },
+  genreSeeAllButton: {
+    marginTop: 0,
+    marginBottom: 0,
+  },
+  genreButton: {
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 20,
