@@ -123,6 +123,8 @@ import Reanimated, {
   useAnimatedReaction,
   useAnimatedKeyboard,
   useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import TrailerModal from "@components/video/TrailerModal";
 
@@ -613,12 +615,29 @@ export default function ChatScreen({ route, navigation }) {
   const [composerTransitioning, setComposerTransitioning] = useState(false);
   const { theme } = useTheme();
 
-  // React Native Modal ayrı bir native katmanda açıldığı için ana ekranın
-  // inputAreaStyle padding'i modal sheet'lerine taşınmaz. Aynı klavye shared
-  // value'sunu modal köklerine de uygula; böylece edge-to-edge Android ve
-  // iOS'ta sheet'in alt kenarı klavyenin üstünde kalır.
+  // React Native Modal ayrı bir native PENCEREDE açılır; useAnimatedKeyboard
+  // ana pencerenin insets animasyonuna bağlı olduğundan modal açıkken değeri
+  // 0'da kalıyor ve arama/anket sheet'leri klavyenin altında kalıyordu.
+  // Modal padding'i bu yüzden pencereden bağımsız Keyboard event'leriyle
+  // beslenen AYRI bir shared value'dan sürülür (iOS'ta willShow ile animasyona
+  // eşlik eder, Android'de didShow anında yumuşak geçiş uygulanır).
+  const modalKb = useSharedValue(0);
+  useEffect(() => {
+    const showEvt = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const show = Keyboard.addListener(showEvt, (e) => {
+      modalKb.value = withTiming(e?.endCoordinates?.height || 0, { duration: 220 });
+    });
+    const hide = Keyboard.addListener(hideEvt, () => {
+      modalKb.value = withTiming(0, { duration: 180 });
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [modalKb]);
   const modalKeyboardStyle = useAnimatedStyle(() => ({
-    paddingBottom: keyboard.height.value,
+    paddingBottom: modalKb.value,
   }));
 
   // Ana mesaj inputu odaktayken modalı aynı karede açmak iki farklı native

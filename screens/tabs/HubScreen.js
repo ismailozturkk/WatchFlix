@@ -7,7 +7,8 @@
 //
 // İçerik:
 //   • Selamlama başlığı + avatar
-//   • Sosyal: Feed'e yönlendiren büyük, interaktif gradyan widget
+//   • Sosyal: Feed'e yönlendiren büyük, interaktif gradyan widget; içinde
+//     hızlı paylaşım (compose) satırı + tip çipleri (İnceleme/Liste/Sohbet/Anket)
 //   • Oyunlar: taşınan ProfileGamesModule (öne çıkan oyun + istatistik)
 
 import React, { useMemo } from "react";
@@ -27,7 +28,6 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
-import Skeleton from "@components/Skeleton";
 import IconBacground from "@components/IconBacground";
 import ScreenSnow from "@components/ScreenSnow";
 import ProfileGamesModule from "@components/profile/ProfileGamesModule";
@@ -52,12 +52,23 @@ const getPostAvatar = (post) => {
   return post?.authorAvatar || getAvatarSource(0);
 };
 
-function FeedWidget({ navigation, theme, posts, loading }) {
+function FeedWidget({ navigation, theme, posts, avatar }) {
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
-  const latestPost = posts?.[0] || null;
-  const latestPoster = latestPost?.mediaList?.find((item) => item?.poster)?.poster;
+  // Hızlı paylaşım: ShareContentScreen'in composePost mekanizması — feed'e
+  // gidip seçili tiple CreatePostModal'ı açar (eski QuickComposeBar davranışı).
+  const goCompose = (postType) =>
+    navigation.navigate("ShareContentScreen", {
+      composePost: { postType, composeKey: `${postType}-${Date.now()}` },
+    });
+  const composeChips = [
+    { key: "review", icon: "create", label: i18nText("autoI18n.inceleme", "İnceleme") },
+    { key: "list", icon: "list", label: i18nText("autoI18n.liste_2", "Liste") },
+    { key: "text", icon: "chatbubble-ellipses", label: i18nText("autoI18n.sohbet", "Sohbet") },
+    { key: "poll", icon: "stats-chart", label: i18nText("autoI18n.anket", "Anket") },
+  ];
+
   const recentAuthors = (posts || [])
     .filter((post, index, all) =>
       post?.authorId && all.findIndex((item) => item?.authorId === post.authorId) === index,
@@ -135,150 +146,55 @@ function FeedWidget({ navigation, theme, posts, loading }) {
 
         <View style={styles.widgetDivider} />
 
-        {loading && !latestPost ? (
-          <View style={[styles.latestPostCard, { backgroundColor: "rgba(255,255,255,0.08)" }]}>
-            <Skeleton
-              width={48}
-              height={68}
-              style={{ borderRadius: 10, backgroundColor: "rgba(255,255,255,0.18)" }}
-            />
-            <View style={{ flex: 1, marginLeft: 11, marginRight: 8, gap: 8 }}>
-              <Skeleton
-                width={"55%"}
-                height={11}
-                style={{ borderRadius: 4, backgroundColor: "rgba(255,255,255,0.18)" }}
-              />
-              <Skeleton
-                width={"88%"}
-                height={13}
-                style={{ borderRadius: 4, backgroundColor: "rgba(255,255,255,0.18)" }}
-              />
-              <Skeleton
-                width={"40%"}
-                height={10}
-                style={{ borderRadius: 4, backgroundColor: "rgba(255,255,255,0.18)" }}
-              />
-            </View>
-          </View>
-        ) : latestPost ? (
+        {/* Hızlı paylaşım — eskiden widget'ın altındaki ayrı çubuktaydı,
+            son gönderi kartının yerine widget'ın içine taşındı. */}
+        <View style={styles.composeArea}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={latestPost.title}
+            accessibilityLabel={i18nText("autoI18n.ne_paylasmak_istersin", "Ne paylaşmak istersin?")}
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
-            onPress={() => navigation.navigate("PostDetailScreen", { postId: latestPost.id })}
+            onPress={() => goCompose("review")}
             style={({ pressed }) => [
-              styles.latestPostCard,
+              styles.composePrompt,
               { backgroundColor: pressed ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.11)" },
             ]}
           >
-            {latestPoster ? (
-              <Image source={{ uri: latestPoster }} style={styles.latestPoster} contentFit="cover" />
+            {avatar ? (
+              <Image source={avatar} style={styles.composeAvatar} />
             ) : (
-              <View style={styles.latestPosterFallback}>
-                <AppIcon
-                  family="Ionicons"
-                  name={latestPost.type === "list" ? "list" : "star"}
-                  size={22}
-                  color="rgba(255,255,255,0.75)"
-                />
+              <View style={[styles.composeAvatar, styles.composeAvatarFallback]}>
+                <AppIcon family="Ionicons" name="person" size={16} color="rgba(255,255,255,0.8)" />
               </View>
             )}
-
-            <View style={styles.latestPostCopy}>
-              <View style={styles.latestPostKicker}>
-                <Image source={getPostAvatar(latestPost)} style={styles.latestAuthorAvatar} />
-                <Text style={styles.latestAuthor} numberOfLines={1}>
-                  {latestPost.authorName || i18nText("autoI18n.kullanici", "Kullanıcı")}
-                </Text>
-                <View style={styles.latestTypeBadge}>
-                  <Text style={styles.latestTypeText}>
-                    {latestPost.type === "list"
-                      ? i18nText("autoI18n.liste_upper", "LİSTE")
-                      : i18nText("autoI18n.inceleme_upper", "İNCELEME")}
-                  </Text>
-                </View>
-              </View>
-
-              <Text style={styles.latestPostTitle} numberOfLines={2}>
-                {latestPost.title}
-              </Text>
-
-              <View style={styles.latestPostStats}>
-                <AppIcon family="Ionicons" name="heart" size={13} color="rgba(255,255,255,0.76)" />
-                <Text style={styles.latestPostStatText}>{latestPost.likesCount || 0}</Text>
-                <AppIcon family="Ionicons" name="chatbubble" size={12} color="rgba(255,255,255,0.76)" />
-                <Text style={styles.latestPostStatText}>{latestPost.commentsCount || 0}</Text>
-              </View>
-            </View>
-
-            <AppIcon family="Ionicons" name="chevron-forward" size={20} color="rgba(255,255,255,0.82)" />
-          </Pressable>
-        ) : (
-          <Pressable
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            onPress={() => navigation.navigate("ShareContentScreen")}
-            style={styles.emptyFeedCard}
-          >
-            <AppIcon family="Ionicons" name="sparkles" size={20} color="#fff" />
-            <Text style={styles.emptyFeedText}>
-              {i18nText("autoI18n.henuz_paylasim_yok", "Henüz paylaşım yok")}
+            <Text style={styles.composePromptText} numberOfLines={1}>
+              {i18nText("autoI18n.ne_paylasmak_istersin", "Ne paylaşmak istersin?")}
             </Text>
-            <AppIcon family="Ionicons" name="arrow-forward" size={17} color="#fff" />
+            <View style={styles.composePlus}>
+              <AppIcon family="Ionicons" name="add" size={18} color="#fff" />
+            </View>
           </Pressable>
-        )}
+
+          <View style={styles.composeChips}>
+            {composeChips.map((c) => (
+              <Pressable
+                key={c.key}
+                style={({ pressed }) => [
+                  styles.composeChip,
+                  pressed && { backgroundColor: "rgba(255,255,255,0.2)" },
+                ]}
+                onPress={() => goCompose(c.key)}
+              >
+                <AppIcon family="Ionicons" name={c.icon} size={14} color="rgba(255,255,255,0.92)" />
+                <Text style={styles.composeChipText} numberOfLines={1}>
+                  {c.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
       </LinearGradient>
     </Animated.View>
-  );
-}
-
-// ─── Hızlı paylaşım çubuğu (Hub'dan doğrudan compose aç) ────────────────────
-// ShareContentScreen'in mevcut route.params.composePost mekanizmasını kullanır:
-// feed'e gider ve seçili tiple CreatePostModal'ı açar.
-function QuickComposeBar({ navigation, theme, avatar }) {
-  const go = (postType) =>
-    navigation.navigate("ShareContentScreen", {
-      composePost: { postType, composeKey: `${postType}-${Date.now()}` },
-    });
-  const chips = [
-    { key: "review", icon: "create", label: i18nText("autoI18n.inceleme", "İnceleme") },
-    { key: "list", icon: "list", label: i18nText("autoI18n.liste_2", "Liste") },
-    { key: "text", icon: "chatbubble-ellipses", label: i18nText("autoI18n.sohbet", "Sohbet") },
-    { key: "poll", icon: "stats-chart", label: i18nText("autoI18n.anket", "Anket") },
-  ];
-  return (
-    <View style={[styles.qcWrap, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      <Pressable style={styles.qcPrompt} onPress={() => go("review")}>
-        {avatar ? (
-          <Image source={avatar} style={styles.qcAvatar} />
-        ) : (
-          <View style={[styles.qcAvatar, { backgroundColor: theme.primary, alignItems: "center", justifyContent: "center" }]}>
-            <AppIcon family="Ionicons" name="person" size={16} color={theme.text.muted} />
-          </View>
-        )}
-        <Text style={[styles.qcPromptText, { color: theme.text.muted }]} numberOfLines={1}>
-          {i18nText("autoI18n.ne_paylasmak_istersin", "Ne paylaşmak istersin?")}
-        </Text>
-        <View style={[styles.qcPlus, { backgroundColor: theme.accent }]}>
-          <AppIcon family="Ionicons" name="add" size={18} color="#fff" />
-        </View>
-      </Pressable>
-      <View style={styles.qcChips}>
-        {chips.map((c) => (
-          <Pressable
-            key={c.key}
-            style={[styles.qcChip, { borderColor: theme.border, backgroundColor: theme.primary }]}
-            onPress={() => go(c.key)}
-          >
-            <AppIcon family="Ionicons" name={c.icon} size={14} color={theme.text.secondary} />
-            <Text style={[styles.qcChipText, { color: theme.text.secondary }]} numberOfLines={1}>
-              {c.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-    </View>
   );
 }
 
@@ -287,7 +203,7 @@ export default function HubScreen({ navigation }) {
   const { language } = useLanguage();
   const { user } = useAuth();
   const { avatar } = useProfileUi();
-  const { posts, loading: postsLoading } = usePosts();
+  const { posts } = usePosts();
 
   // language dependency'de olmalı; yoksa dil değişince selamlama eski dilde kalır.
   const greeting = useMemo(() => {
@@ -341,9 +257,8 @@ export default function HubScreen({ navigation }) {
           navigation={navigation}
           theme={theme}
           posts={posts}
-          loading={postsLoading}
+          avatar={avatar}
         />
-        <QuickComposeBar navigation={navigation} theme={theme} avatar={avatar} />
 
         {/* Turnuva */}
         <Text style={[styles.sectionTitle, { color: theme.text.muted, marginTop: 18 }]}>
@@ -475,98 +390,50 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.18)",
     marginHorizontal: 16,
   },
-  latestPostCard: {
-    minHeight: 88,
-    margin: 12,
-    marginTop: 10,
-    borderRadius: 17,
-    padding: 9,
+  // Hızlı paylaşım (widget içi — gradient üstünde beyaz-saydam yüzeyler)
+  composeArea: { margin: 12, marginTop: 10 },
+  composePrompt: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 10,
+    borderRadius: 14,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.16)",
   },
-  latestPoster: {
-    width: 48,
-    height: 68,
-    borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.1)",
-  },
-  latestPosterFallback: {
-    width: 48,
-    height: 68,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.12)",
-  },
-  latestPostCopy: { flex: 1, marginLeft: 11, marginRight: 8 },
-  latestPostKicker: { flexDirection: "row", alignItems: "center", gap: 5 },
-  latestAuthorAvatar: { width: 18, height: 18, borderRadius: 9 },
-  latestAuthor: {
-    maxWidth: "48%",
-    color: "rgba(255,255,255,0.82)",
-    fontSize: 10.5,
-    fontWeight: "700",
-  },
-  latestTypeBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: "rgba(255,255,255,0.13)",
-  },
-  latestTypeText: { color: "rgba(255,255,255,0.82)", fontSize: 7.5, fontWeight: "900" },
-  latestPostTitle: {
-    color: "#fff",
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: "800",
-    marginTop: 5,
-  },
-  latestPostStats: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 5,
-  },
-  latestPostStatText: {
-    color: "rgba(255,255,255,0.74)",
-    fontSize: 10,
-    fontWeight: "700",
-    marginRight: 5,
-  },
-  feedLoading: {
-    minHeight: 94,
+  composeAvatar: { width: 32, height: 32, borderRadius: 16 },
+  composeAvatarFallback: {
+    backgroundColor: "rgba(255,255,255,0.14)",
     alignItems: "center",
     justifyContent: "center",
   },
-  emptyFeedCard: {
-    minHeight: 66,
-    margin: 12,
-    marginTop: 10,
-    paddingHorizontal: 16,
-    borderRadius: 17,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
-    backgroundColor: "rgba(255,255,255,0.11)",
-  },
-  emptyFeedText: {
+  composePromptText: {
     flex: 1,
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 13.5,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.85)",
   },
-
-  // Hızlı paylaşım çubuğu
-  qcWrap: { width: "90%", borderRadius: 18, borderWidth: 1, padding: 12, marginTop: 12 },
-  qcPrompt: { flexDirection: "row", alignItems: "center", gap: 10 },
-  qcAvatar: { width: 34, height: 34, borderRadius: 17 },
-  qcPromptText: { flex: 1, fontSize: 14, fontWeight: "600" },
-  qcPlus: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
-  qcChips: { flexDirection: "row", gap: 8, marginTop: 12 },
-  qcChip: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
-  qcChipText: { fontSize: 11, fontWeight: "700" },
+  composePlus: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.22)",
+  },
+  composeChips: { flexDirection: "row", gap: 8, marginTop: 10 },
+  composeChip: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(255,255,255,0.10)",
+  },
+  composeChipText: { fontSize: 11, fontWeight: "700", color: "rgba(255,255,255,0.92)" },
 });

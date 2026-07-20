@@ -38,8 +38,9 @@ import LottieView from "lottie-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Reanimated, {
   FadeInUp,
-  useAnimatedKeyboard,
   useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { useNavigation } from "@react-navigation/native";
 
@@ -155,16 +156,14 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
   const anim = useRef(new Animated.Value(0)).current;
   const [rendered, setRendered] = useState(false);
 
-  // Modal ayrı native katmanda ve edge-to-edge çalıştığı için Keyboard event
-  // ölçümü bazı Android sürümlerinde klavyenin kapladığı alanı eksik veriyor.
-  // UI thread'deki gerçek yükseklikle sohbet gövdesini daralt; SafeAreaView
-  // zaten alt inset'i eklediğinden burada yalnızca kalan klavye payını uygula.
+  // RN Modal ayrı bir native penceredir. useAnimatedKeyboard ana pencerenin
+  // inset animasyonunu izlediği için Android'de bu modal açıkken 0'da kalabilir.
+  // Modal penceresine gelen gerçek Keyboard event yüksekliğini shared value'ya
+  // taşı; böylece input her cihazda klavyenin üstünde kalır.
   const insets = useSafeAreaInsets();
-  const keyboard = useAnimatedKeyboard({
-    isNavigationBarTranslucentAndroid: true,
-  });
-  const keyboardAvoidanceStyle = useAnimatedStyle(() => ({
-    paddingBottom: Math.max(0, keyboard.height.value - insets.bottom),
+  const modalKeyboardHeight = useSharedValue(0);
+  const composerKeyboardStyle = useAnimatedStyle(() => ({
+    marginBottom: Math.max(0, modalKeyboardHeight.value - insets.bottom),
   }));
 
   useEffect(() => {
@@ -199,6 +198,32 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
   const scrollToEndSoon = useCallback(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 60);
   }, []);
+
+  useEffect(() => {
+    if (!rendered) {
+      modalKeyboardHeight.value = 0;
+      return undefined;
+    }
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const show = Keyboard.addListener(showEvent, (event) => {
+      modalKeyboardHeight.value = withTiming(
+        event?.endCoordinates?.height || 0,
+        { duration: Platform.OS === "ios" ? event?.duration || 250 : 200 },
+      );
+      scrollToEndSoon();
+    });
+    const hide = Keyboard.addListener(hideEvent, (event) => {
+      modalKeyboardHeight.value = withTiming(0, {
+        duration: Platform.OS === "ios" ? event?.duration || 220 : 170,
+      });
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+      modalKeyboardHeight.value = 0;
+    };
+  }, [modalKeyboardHeight, rendered, scrollToEndSoon]);
 
   // Kayıtlı sohbetleri yükle (bir kez)
   useEffect(() => {
@@ -581,7 +606,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
             </View>
           ) : (
             // ── Sohbet ──
-            <Reanimated.View style={[styles.chatBody, keyboardAvoidanceStyle]}>
+            <Reanimated.View style={styles.chatBody}>
               {settingsVisible && (
                 <View style={[styles.settings, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
                   <View style={styles.settingRow}>
@@ -704,7 +729,13 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
               </ScrollView>
 
               {/* Giriş çubuğu */}
-              <View style={[styles.inputWrap, { backgroundColor: theme.primary, borderTopColor: theme.border }]}>
+              <Reanimated.View
+                style={[
+                  styles.inputWrap,
+                  { backgroundColor: theme.primary, borderTopColor: theme.border },
+                  composerKeyboardStyle,
+                ]}
+              >
                 <View style={[styles.inputBar, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
                   <Ionicons name="sparkles" size={16} color={theme.bold} style={{ marginLeft: 2 }} />
                   <TextInput
@@ -746,7 +777,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
                     </View>
                   )}
                 </TouchableOpacity>
-              </View>
+              </Reanimated.View>
             </Reanimated.View>
           )}
         </SafeAreaView>

@@ -19,7 +19,6 @@ import {
   ScrollView,
   FlatList,
   StyleSheet,
-  KeyboardAvoidingView,
   Platform,
   Keyboard,
   ActivityIndicator,
@@ -31,14 +30,19 @@ import {
   Dimensions,
 } from "react-native";
 import { appAlert } from "@components/AppAlert";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import LottieView from "lottie-react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import Reanimated, { FadeInUp } from "react-native-reanimated";
+import Reanimated, {
+  FadeInUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useNavigation } from "@react-navigation/native";
 
 import { useLanguage } from "../context/LanguageContext";
@@ -150,6 +154,11 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
   // ── Aç/kapa animasyonu (FAB'dan büyür / FAB'a küçülür) ──────────────────────
   const anim = useRef(new Animated.Value(0)).current;
   const [rendered, setRendered] = useState(false);
+  const insets = useSafeAreaInsets();
+  const modalKeyboardHeight = useSharedValue(0);
+  const composerKeyboardStyle = useAnimatedStyle(() => ({
+    marginBottom: Math.max(0, modalKeyboardHeight.value - insets.bottom),
+  }));
 
   useEffect(() => {
     if (visible) {
@@ -184,6 +193,35 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
   const scrollToEndSoon = useCallback(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 60);
   }, []);
+
+  // Bu ekran da RN Modal içinde çalışır. Android'de KeyboardAvoidingView
+  // pencere resize edilmediğinde etkisiz kaldığından gerçek klavye yüksekliğini
+  // modal event'lerinden alıp sohbet gövdesine uygularız.
+  useEffect(() => {
+    if (!rendered) {
+      modalKeyboardHeight.value = 0;
+      return undefined;
+    }
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const show = Keyboard.addListener(showEvent, (event) => {
+      modalKeyboardHeight.value = withTiming(
+        event?.endCoordinates?.height || 0,
+        { duration: Platform.OS === "ios" ? event?.duration || 250 : 200 },
+      );
+      scrollToEndSoon();
+    });
+    const hide = Keyboard.addListener(hideEvent, (event) => {
+      modalKeyboardHeight.value = withTiming(0, {
+        duration: Platform.OS === "ios" ? event?.duration || 220 : 170,
+      });
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+      modalKeyboardHeight.value = 0;
+    };
+  }, [modalKeyboardHeight, rendered, scrollToEndSoon]);
 
   // Kayıtlı sohbetleri yükle (bir kez)
   useEffect(() => {
@@ -582,11 +620,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
             </View>
           ) : (
             // ── Sohbet ──
-            <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : "height"}
-              style={{ flex: 1 }}
-              keyboardVerticalOffset={0}
-            >
+            <Reanimated.View style={{ flex: 1 }}>
               {settingsVisible && (
                 <View style={[styles.settings, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
                   <View style={styles.settingRow}>
@@ -709,7 +743,13 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
               </ScrollView>
 
               {/* Giriş çubuğu */}
-              <View style={[styles.inputWrap, { backgroundColor: theme.primary, borderTopColor: theme.border }]}>
+              <Reanimated.View
+                style={[
+                  styles.inputWrap,
+                  { backgroundColor: theme.primary, borderTopColor: theme.border },
+                  composerKeyboardStyle,
+                ]}
+              >
                 <View style={[styles.inputBar, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
                   <Ionicons name="sparkles" size={16} color={theme.bold} style={{ marginLeft: 2 }} />
                   <TextInput
@@ -751,8 +791,8 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
                     </View>
                   )}
                 </TouchableOpacity>
-              </View>
-            </KeyboardAvoidingView>
+              </Reanimated.View>
+            </Reanimated.View>
           )}
         </SafeAreaView>
       </Animated.View>

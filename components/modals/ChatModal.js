@@ -494,6 +494,11 @@ export const ChatModal = () => {
   const [view, setView] = useState("chat"); // "chat" | "history"
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  // Android'de RN Modal içindeki KeyboardAvoidingView (behavior:"height")
+  // edge-to-edge altında pencere yeniden boyutlanmadığı için hiç tepki
+  // vermiyor; input klavyenin altında kalıyordu. Yüksekliği event'ten alıp
+  // içeriği elle yukarı iteriz (iOS'ta KAV "padding" çalışmaya devam eder).
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -536,11 +541,17 @@ export const ChatModal = () => {
 
   // ── Klavye dinleyicileri ────────────────────────────────────────────────────
   useEffect(() => {
-    const show = Keyboard.addListener("keyboardDidShow", () => {
+    const show = Keyboard.addListener("keyboardDidShow", (e) => {
       setKeyboardVisible(true);
+      const h = e?.endCoordinates?.height || 0;
+      setKeyboardHeight(h);
+      if (__DEV__) console.log("[ChatModal] keyboardDidShow height=", h);
       scrollToEndSoon();
     });
-    const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false));
+    const hide = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardVisible(false);
+      setKeyboardHeight(0);
+    });
     return () => {
       show.remove();
       hide.remove();
@@ -851,7 +862,10 @@ export const ChatModal = () => {
           style={{ position: "absolute", top: 0, right: 0, left: 0, bottom: 0, zIndex: 4 }}
         />
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          // Android: behavior "height" modal penceresinde işlevsiz — kaydırma
+          // aşağıdaki marginBottom (keyboardHeight) ile yapılır; KAV'ı devre
+          // dışı bırakmak çifte kaymayı önler. iOS: "padding" çalışır.
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.modalContainer}
           keyboardVerticalOffset={0}
         >
@@ -1180,6 +1194,14 @@ export const ChatModal = () => {
               </View>
             )}
           </Reanimated.View>
+
+          {/* Android klavye ayracı: modal penceresi "resize" olmadığından ve
+              LinearTransition'lı view'a verilen inline margin layout
+              animasyonu tarafından yutulabildiğinden, flex-end düzeninde
+              içeriği klavye kadar yukarı iten AYRI bir boşluk kullanılır. */}
+          {Platform.OS === "android" && keyboardHeight > 0 && (
+            <View style={{ height: keyboardHeight, width: "100%" }} />
+          )}
         </KeyboardAvoidingView>
       </Modal>
     </View>

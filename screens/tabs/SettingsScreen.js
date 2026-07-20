@@ -493,14 +493,8 @@ export default function SettingsScreen() {
 
         <SectionLabel color={C.muted}>{t.theme.toUpperCase()}</SectionLabel>
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
-          <View style={[s.themeHeader, { borderBottomColor: C.borderMuted }]}>
-            <View style={[s.iconWrap, { backgroundColor: C.iconAmber }]}>
-              <AppIcon name="sunny-outline" size={15} color={C.amber} />
-            </View>
-            <Text allowFontScaling={false} style={[s.rowTitle, { color: C.text }]}>
-              {t.appearance}
-            </Text>
-          </View>
+          {/* Ayrı "Görünüm" başlık satırı kaldırıldı — SettingsTheme'in kendi
+              "Aktif tema" özet satırı bu görevi üstleniyor. */}
           <SettingsTheme />
         </View>
 
@@ -668,8 +662,8 @@ export default function SettingsScreen() {
             title={language === "tr" ? "Hesap bağlantıları" : "Account connections"}
             subtitle={
               language === "tr"
-                ? "Google ve diğer giriş yöntemleri"
-                : "Google and other sign-in methods"
+                ? "Google, Apple ve parola yöntemleri"
+                : "Google, Apple and password methods"
             }
             onPress={() => navigation.navigate("AccountConnectionsScreen")}
             right={<Chevron color={C.muted} />}
@@ -1299,14 +1293,6 @@ const s = StyleSheet.create({
     borderRadius: 6,
     overflow: "hidden",
     borderWidth: 1,
-  },
-  themeHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 13,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
   },
   qualityHeader: {
     flexDirection: "row",

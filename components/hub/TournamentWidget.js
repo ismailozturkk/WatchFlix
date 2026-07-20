@@ -18,6 +18,7 @@ import { View, Text, StyleSheet, Pressable } from "react-native";
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import Svg, { Circle, Path } from "react-native-svg";
 import AppIcon from "@components/AppIcon";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
@@ -53,10 +54,14 @@ function MiniPoster({ contestant, getTmdbUrl, accent = false }) {
   );
 }
 
-function MiniMatch({ match, getTmdbUrl, final = false }) {
+function MiniMatch({ match, getTmdbUrl, final = false, compact = false }) {
   const winnerId = match?.winner?.id;
   return (
-    <View style={[styles.treeMatch, final && styles.treeFinalMatch]}>
+    <View style={[
+      styles.treeMatch,
+      compact && styles.treeMatchCompact,
+      final && styles.treeFinalMatch,
+    ]}>
       <MiniPoster
         contestant={match?.a}
         getTmdbUrl={getTmdbUrl}
@@ -74,51 +79,108 @@ function MiniMatch({ match, getTmdbUrl, final = false }) {
 // Büyük bracket ağacının Hub kartına sığan, iki taraflı yatay özeti. Dıştaki
 // ilk tur eşleşmeleri merkeze doğru birleşir; ilerleyen turlar açıldıkça aynı
 // düğümler gerçek adaylarla dolar.
-function TournamentTreePreview({ bracket, getTmdbUrl }) {
+function TournamentTreePreview({ bracket, getTmdbUrl, accent, lang }) {
+  const [canvasWidth, setCanvasWidth] = useState(320);
   const rounds = bracket?.rounds || [];
   const first = rounds[0]?.matches || [];
   const second = rounds[1]?.matches || [];
   const finalMatch = rounds[4]?.matches?.[0] || null;
+  const isDecided = (match) => !!(match?.decided && match?.winnerSide);
+
+  const outerLeft = 8;
+  const outerRight = canvasWidth - outerLeft - 40;
+  const middleLeft = canvasWidth * 0.25625;
+  const middleRight = canvasWidth - middleLeft - 40;
+  const centerLeft = canvasWidth / 2 - 22;
+  const leftJunction = canvasWidth * 0.190625;
+  const rightJunction = canvasWidth - leftJunction;
+  const paths = [
+    { d: `M${outerLeft + 40} 18.5 H${leftJunction} V38.5 H${middleLeft}`, active: isDecided(first[0]) },
+    { d: `M${outerLeft + 40} 57.5 H${leftJunction} V38.5 H${middleLeft}`, active: isDecided(first[1]) },
+    { d: `M${middleLeft + 40} 38.5 H${centerLeft}`, active: isDecided(second[0]) },
+    { d: `M${outerRight} 18.5 H${rightJunction} V38.5 H${middleRight + 40}`, active: isDecided(first[8]) },
+    { d: `M${outerRight} 57.5 H${rightJunction} V38.5 H${middleRight + 40}`, active: isDecided(first[9]) },
+    { d: `M${middleRight} 38.5 H${centerLeft + 44}`, active: isDecided(second[4]) },
+  ];
 
   return (
     <View style={styles.treePreview} pointerEvents="none">
-      <View style={[styles.treeLine, styles.treeLineLeftTop]} />
-      <View style={[styles.treeLine, styles.treeLineLeftBottom]} />
-      <View style={[styles.treeLine, styles.treeLineLeftStem]} />
-      <View style={[styles.treeLine, styles.treeLineLeftCenter]} />
-      <View style={[styles.treeLine, styles.treeLineLeftFinal]} />
-
-      <View style={[styles.treeLine, styles.treeLineRightTop]} />
-      <View style={[styles.treeLine, styles.treeLineRightBottom]} />
-      <View style={[styles.treeLine, styles.treeLineRightStem]} />
-      <View style={[styles.treeLine, styles.treeLineRightCenter]} />
-      <View style={[styles.treeLine, styles.treeLineRightFinal]} />
-
-      <View style={[styles.treeNode, styles.treeNodeLeftTop]}>
-        <MiniMatch match={first[0]} getTmdbUrl={getTmdbUrl} />
-      </View>
-      <View style={[styles.treeNode, styles.treeNodeLeftBottom]}>
-        <MiniMatch match={first[1]} getTmdbUrl={getTmdbUrl} />
-      </View>
-      <View style={[styles.treeNode, styles.treeNodeLeftMiddle]}>
-        <MiniMatch match={second[0]} getTmdbUrl={getTmdbUrl} />
-      </View>
-
-      <View style={[styles.treeNode, styles.treeNodeCenter]}>
-        <View style={styles.treeTrophy}>
-          <AppIcon family="Ionicons" name="trophy" size={11} color="#F5C518" />
+      <View style={styles.treeHeader}>
+        <View style={styles.treeHeaderTitle}>
+          <AppIcon family="Ionicons" name="git-network-outline" size={11} color="rgba(255,255,255,0.84)" />
+          <Text style={styles.treeHeaderText}>
+            {lang === "tr" ? "ELEME AĞACI" : "BRACKET"}
+          </Text>
         </View>
-        <MiniMatch match={finalMatch} getTmdbUrl={getTmdbUrl} final />
+        <Text style={styles.treeRoundText}>{lang === "tr" ? "SON 32" : "TOP 32"}</Text>
+        <View style={styles.treeFinalPill}>
+          <View style={[styles.treeLiveDot, { backgroundColor: accent }]} />
+          <Text style={styles.treeFinalText}>{lang === "tr" ? "FİNAL" : "FINAL"}</Text>
+        </View>
+        <Text style={styles.treeRoundText}>{lang === "tr" ? "SON 32" : "TOP 32"}</Text>
       </View>
 
-      <View style={[styles.treeNode, styles.treeNodeRightMiddle]}>
-        <MiniMatch match={second[4]} getTmdbUrl={getTmdbUrl} />
-      </View>
-      <View style={[styles.treeNode, styles.treeNodeRightTop]}>
-        <MiniMatch match={first[8]} getTmdbUrl={getTmdbUrl} />
-      </View>
-      <View style={[styles.treeNode, styles.treeNodeRightBottom]}>
-        <MiniMatch match={first[9]} getTmdbUrl={getTmdbUrl} />
+      <View
+        style={styles.treeCanvas}
+        onLayout={(event) => {
+          const nextWidth = Math.round(event.nativeEvent.layout.width);
+          if (nextWidth > 0 && nextWidth !== canvasWidth) setCanvasWidth(nextWidth);
+        }}
+      >
+        <View style={styles.treeCenterGlow} />
+        <Svg style={StyleSheet.absoluteFill} viewBox={`0 0 ${canvasWidth} 76`} preserveAspectRatio="none">
+          {paths.map((path, index) => (
+            <Path
+              key={`base-${index}`}
+              d={path.d}
+              fill="none"
+              stroke="rgba(255,255,255,0.24)"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ))}
+          {paths.filter((path) => path.active).map((path, index) => (
+            <Path
+              key={`active-${index}`}
+              d={path.d}
+              fill="none"
+              stroke={accent}
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ))}
+          <Circle cx={leftJunction} cy="38.5" r="2.2" fill="rgba(255,255,255,0.72)" />
+          <Circle cx={rightJunction} cy="38.5" r="2.2" fill="rgba(255,255,255,0.72)" />
+        </Svg>
+
+        <View style={[styles.treeNode, { left: outerLeft, top: 4 }]}>
+          <MiniMatch match={first[0]} getTmdbUrl={getTmdbUrl} compact />
+        </View>
+        <View style={[styles.treeNode, { left: outerLeft, top: 43 }]}>
+          <MiniMatch match={first[1]} getTmdbUrl={getTmdbUrl} compact />
+        </View>
+        <View style={[styles.treeNode, { left: middleLeft, top: 24 }]}>
+          <MiniMatch match={second[0]} getTmdbUrl={getTmdbUrl} />
+        </View>
+
+        <View style={[styles.treeNode, styles.treeNodeCenter, { left: centerLeft }]}>
+          <View style={styles.treeTrophy}>
+            <AppIcon family="Ionicons" name="trophy" size={11} color="#F5C518" />
+          </View>
+          <MiniMatch match={finalMatch} getTmdbUrl={getTmdbUrl} final />
+        </View>
+
+        <View style={[styles.treeNode, { left: middleRight, top: 24 }]}>
+          <MiniMatch match={second[4]} getTmdbUrl={getTmdbUrl} />
+        </View>
+        <View style={[styles.treeNode, { left: outerRight, top: 4 }]}>
+          <MiniMatch match={first[8]} getTmdbUrl={getTmdbUrl} compact />
+        </View>
+        <View style={[styles.treeNode, { left: outerRight, top: 43 }]}>
+          <MiniMatch match={first[9]} getTmdbUrl={getTmdbUrl} compact />
+        </View>
       </View>
     </View>
   );
@@ -264,7 +326,12 @@ export default function TournamentWidget({ navigation }) {
           )}
         </View>
 
-        <TournamentTreePreview bracket={bracketPreview} getTmdbUrl={getTmdbUrl} />
+        <TournamentTreePreview
+          bracket={bracketPreview}
+          getTmdbUrl={getTmdbUrl}
+          accent={phaseColor}
+          lang={lang}
+        />
       </LinearGradient>
     </AnimatedPressable>
   );
@@ -281,7 +348,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   card: {
-    minHeight: 206,
+    minHeight: 226,
     borderRadius: 24,
     padding: 18,
     overflow: "hidden",
@@ -314,25 +381,46 @@ const styles = StyleSheet.create({
   },
 
   treePreview: {
-    width: "100%", height: 82, marginTop: 10, borderRadius: 15,
-    backgroundColor: "rgba(7,12,28,0.22)", overflow: "hidden",
-    borderWidth: 1, borderColor: "rgba(255,255,255,0.16)",
+    width: "100%", height: 105, marginTop: 10, borderRadius: 16,
+    backgroundColor: "rgba(5,10,24,0.30)", overflow: "hidden",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.18)",
+  },
+  treeHeader: {
+    height: 28, paddingHorizontal: 9, flexDirection: "row",
+    alignItems: "center", justifyContent: "space-between",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255,255,255,0.14)",
+  },
+  treeHeaderTitle: { flexDirection: "row", alignItems: "center", gap: 4 },
+  treeHeaderText: { color: "rgba(255,255,255,0.84)", fontSize: 8.5, fontWeight: "900", letterSpacing: 0.7 },
+  treeRoundText: { color: "rgba(255,255,255,0.54)", fontSize: 7.5, fontWeight: "800", letterSpacing: 0.5 },
+  treeFinalPill: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.10)",
+  },
+  treeLiveDot: { width: 4, height: 4, borderRadius: 2 },
+  treeFinalText: { color: "#fff", fontSize: 7.5, fontWeight: "900", letterSpacing: 0.6 },
+  treeCanvas: { flex: 1, position: "relative" },
+  treeCenterGlow: {
+    position: "absolute", left: "50%", top: 9, marginLeft: -30,
+    width: 60, height: 60, borderRadius: 30,
+    backgroundColor: "rgba(245,197,24,0.08)",
   },
   treeNode: { position: "absolute", zIndex: 2 },
-  treeNodeLeftTop: { left: 6, top: 5 },
-  treeNodeLeftBottom: { left: 6, bottom: 5 },
-  treeNodeLeftMiddle: { left: "26%", top: 24 },
-  treeNodeCenter: { left: "50%", top: 19, marginLeft: -22, alignItems: "center" },
-  treeNodeRightMiddle: { right: "26%", top: 24 },
-  treeNodeRightTop: { right: 6, top: 5 },
-  treeNodeRightBottom: { right: 6, bottom: 5 },
+  treeNodeCenter: { top: 21, alignItems: "center" },
   treeMatch: {
     width: 40, height: 29, borderRadius: 6, padding: 2, gap: 2,
     flexDirection: "row", alignItems: "center", justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.14)", borderWidth: 1,
     borderColor: "rgba(255,255,255,0.30)",
   },
-  treeFinalMatch: { borderColor: "rgba(245,197,24,0.85)", backgroundColor: "rgba(245,197,24,0.16)" },
+  treeMatchCompact: { width: 40, height: 29, backgroundColor: "rgba(255,255,255,0.10)" },
+  treeFinalMatch: {
+    width: 44, height: 34, padding: 3,
+    borderColor: "rgba(245,197,24,0.92)", borderWidth: 1.5,
+    backgroundColor: "rgba(245,197,24,0.18)",
+  },
   treePoster: {
     width: 16, height: 23, borderRadius: 3, overflow: "hidden",
     alignItems: "center", justifyContent: "center",
@@ -342,21 +430,10 @@ const styles = StyleSheet.create({
   treePosterAccent: { borderColor: "#F5C518", borderWidth: 1.25 },
   treePosterImage: { width: "100%", height: "100%" },
   treeTrophy: {
-    position: "absolute", zIndex: 3, top: -12,
+    position: "absolute", zIndex: 3, top: -13,
     width: 20, height: 20, borderRadius: 10,
     alignItems: "center", justifyContent: "center",
     backgroundColor: "rgba(8,12,25,0.78)", borderWidth: 1,
     borderColor: "rgba(245,197,24,0.72)",
   },
-  treeLine: { position: "absolute", zIndex: 1, backgroundColor: "rgba(255,255,255,0.42)" },
-  treeLineLeftTop: { left: 46, top: 19, width: "13%", height: 1 },
-  treeLineLeftBottom: { left: 46, bottom: 19, width: "13%", height: 1 },
-  treeLineLeftStem: { left: "25%", top: 19, width: 1, height: 44 },
-  treeLineLeftCenter: { left: "25%", top: 40, width: "5%", height: 1 },
-  treeLineLeftFinal: { left: "37%", top: 40, width: "9%", height: 1.5 },
-  treeLineRightTop: { right: 46, top: 19, width: "13%", height: 1 },
-  treeLineRightBottom: { right: 46, bottom: 19, width: "13%", height: 1 },
-  treeLineRightStem: { right: "25%", top: 19, width: 1, height: 44 },
-  treeLineRightCenter: { right: "25%", top: 40, width: "5%", height: 1 },
-  treeLineRightFinal: { right: "37%", top: 40, width: "9%", height: 1.5 },
 });

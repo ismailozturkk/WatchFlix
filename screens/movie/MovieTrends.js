@@ -18,6 +18,7 @@ import RatingStars from "../../components/RatingStars";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import ListBadges from "../../components/ListBadges";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { SeeAllButton } from "../../components/SeeAllHeader";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 const { width, height } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.6;
@@ -324,20 +325,36 @@ export default function MovieTrends({ navigation }) {
       />
     );
   };
+
+  const trendHeader = (
+    <View style={styles.header}>
+      <View style={styles.categoryRail}>
+        <FlatList
+          data={categoriesTrends}
+          renderItem={renderCategory}
+          keyExtractor={(item) => item}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesList}
+        />
+      </View>
+      <SeeAllButton
+        onPress={() =>
+          navigation.navigate("SeeAllScreen", {
+            mediaType: "movie",
+            section: "trends",
+            title: t.movieScreens.title,
+          })
+        }
+      />
+    </View>
+  );
+
   if (loadingTrends) {
     return (
       <View style={{ flex: 1, marginTop: 10 }}>
         <StatusBar barStyle="light-content" />
-        <View style={styles.header}>
-          <FlatList
-            data={categoriesTrends}
-            renderItem={renderCategory}
-            keyExtractor={(item) => item}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
-          />
-        </View>
+        {trendHeader}
         <View style={styles.skeletonRow}>
           {[0, 1, 2].map((index) => (
             <MovieCardSkeleton key={index} index={{ index }} />
@@ -349,16 +366,7 @@ export default function MovieTrends({ navigation }) {
   return (
     <View style={{ flex: 1, marginTop: 10 }}>
       <StatusBar barStyle="light-content" />
-      <View style={styles.header}>
-        <FlatList
-          data={categoriesTrends}
-          renderItem={renderCategory}
-          keyExtractor={(item) => item}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesList}
-        />
-      </View>
+      {trendHeader}
       <Animated.FlatList
         data={movieTrends}
         renderItem={renderItem}
@@ -417,7 +425,11 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 8,
+    paddingRight: 12,
+    flexDirection: "row",
+    alignItems: "center",
   },
+  categoryRail: { flex: 1, justifyContent: "center" },
   headerTitle: {
     fontSize: 24,
     fontWeight: "bold",
@@ -425,7 +437,8 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   categoriesList: {
-    paddingHorizontal: 15,
+    paddingLeft: 15,
+    paddingRight: 4,
   },
   skeletonRow: {
     flexDirection: "row",

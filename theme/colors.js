@@ -99,7 +99,7 @@ const PALETTE = {
 
   blueAlt: "#2196F3",
 
-  blueDark: "#0551A3", // dark tema accent
+  blueDark: "#0551A3", // (eski dark tema accent'i — artık kullanılmıyor)
 
   blueMid: "#2275B9", // gray tema bold
 
@@ -321,119 +321,139 @@ function makeTheme({
 export const themes = {
   /* ── Koyu Gri ─────────────────────────────────────────────────── */
 
+  // Varsayılan tema — kimliği (nötr koyu gri + mavi accent) korunarak inceltildi:
+  // yüzeylere çok hafif soğuk alt ton, soluk metne daha okunur kademe
+  // (#666 ≈ 4.0:1 → #7C838F ≈ 4.9:1), accent dark temayla aynı modern maviye.
   gray: {
-    primary: PALETTE.gray900,
+    primary: "#1D1F23",
 
-    secondary: PALETTE.gray800,
+    secondary: "#2A2D33",
 
-    secondaryt: alpha(PALETTE.gray800, 0.5),
+    secondaryt: alpha("#2A2D33", 0.5),
 
-    between: PALETTE.gray850,
+    between: "#24262B",
 
-    border: alpha(PALETTE.gray700, 0.8),
+    border: alpha("#4A4F58", 0.8),
 
-    tab: alpha(PALETTE.gray800, 0.95),
+    tab: alpha("#2A2D33", 0.95),
 
-    ai: alpha(PALETTE.gray800, 0.4),
+    ai: alpha("#2A2D33", 0.4),
 
     text: {
-      primary: PALETTE.white,
+      primary: "#F6F7F9",
 
-      secondary: "#DDDDDD",
+      secondary: "#D6D9DE",
 
-      between: "#BBBBBB",
+      between: "#B4B9C1",
 
-      muted: PALETTE.gray600,
+      muted: "#7C838F",
     },
 
-    accent: PALETTE.blueAlt,
+    accent: "#3B82F6",
 
-    bold: PALETTE.blueMid,
+    bold: "#2563EB",
 
-    shadow: alpha(PALETTE.black, 0.7),
+    shadow: alpha(PALETTE.black, 0.6),
 
     colors: SHARED_COLORS,
 
     notesColor: SHARED_NOTES_COLORS,
   },
 
-  /* ── Siyah (AMOLED) ──────────────────────────────────────────── */
+  /* ── Siyah (AMOLED) ──────────────────────────────────────────────
+     Zemin saf siyah (OLED kimliği); yüzeyler hafif mavi alt tonlu koyu
+     griler (Material dark rehberi: saf siyah kart yerine yükseltilmiş
+     yüzey). Eski accent (#0551A3) siyah üstünde ~2.4:1 ile ölüydü —
+     yeni accent #3B82F6 siyahta ~6.2:1 kontrast verir. */
 
   dark: {
     primary: PALETTE.black,
 
-    secondary: "#141414",
+    secondary: "#15171C",
 
-    secondaryt: alpha("#141414", 0.5),
+    secondaryt: alpha("#15171C", 0.5),
 
-    between: "#1F1F1F",
+    between: "#1D2026",
 
-    border: "#232323",
+    border: "#262A31",
 
-    tab: "#141414",
+    tab: "#121418",
 
-    ai: alpha("#141414", 0.4),
+    ai: alpha("#121418", 0.4),
 
     text: {
-      primary: PALETTE.white,
+      primary: "#F5F6F8",
 
-      secondary: "#D3D3D3",
+      secondary: "#C9CDD4",
 
-      between: "#B1B1B1",
+      between: "#9AA1AB",
 
-      muted: PALETTE.gray600,
+      muted: "#757C87",
     },
 
-    accent: PALETTE.blueDark,
+    accent: "#3B82F6",
 
-    bold: "#2275B9",
+    bold: "#2563EB",
 
-    shadow: alpha(PALETTE.gray500, 0.4),
+    shadow: alpha(PALETTE.black, 0.55),
 
     colors: SHARED_COLORS,
 
     notesColor: SHARED_NOTES_COLORS,
   },
 
-  /* ── Açık (Light) ────────────────────────────────────────────── */
+  /* ── Açık (Light) ────────────────────────────────────────────────
+     Eski palet baştan sona orta-gri (zemin #E8E8E8, kart #D6D6D6) olduğu
+     için yıkanmış görünüyordu. Modern açık tema deseni: hafif soğuk kırık
+     beyaz zemin + BEYAZ kartlar + ince ayrım çizgileri. Metin koyu lacivert-
+     grafit ölçeği; accent beyaz üstünde ~5.2:1 kontrastlı (#2563EB) —
+     eski #38A6F0 (~2.5:1) buton üzerindeki beyaz yazıyı okunmaz kılıyordu.
+     Gölge %70 siyah yerine yumuşak, mavi alt tonlu %16. */
 
   light: {
-    primary: PALETTE.gray100,
+    // Saf beyaz kart + çok açık zemin fazla parlak geldi — tüm yüzeyler bir
+    // kademe koyulaştırıldı (slate alt tonlu): kart kırık beyaz, zemin gri.
+    primary: "#EDF0F5",
 
-    secondary: PALETTE.gray200,
+    secondary: "#F7F9FC",
 
-    secondaryt: alpha(PALETTE.gray200, 0.5),
+    secondaryt: alpha("#F7F9FC", 0.5),
 
-    between: PALETTE.gray300,
+    between: "#E2E7EE",
 
-    border: PALETTE.gray400,
+    border: "#D3DAE3",
 
-    tab: "#C6C6C6",
+    tab: "#F7F9FC",
 
-    ai: alpha("#C6C6C6", 0.4),
+    ai: alpha("#F7F9FC", 0.4),
 
     text: {
-      primary: PALETTE.gray700,
+      primary: "#1A202C",
 
-      secondary: PALETTE.gray600,
+      secondary: "#3E4756",
 
-      between: PALETTE.gray500,
+      between: "#667081",
 
-      muted: "#818181",
+      muted: "#7C8594",
     },
 
-    accent: "#38A6F0",
+    accent: "#2563EB",
 
-    bold: PALETTE.blue,
+    bold: "#1D4ED8",
 
-    shadow: alpha(PALETTE.black, 0.7),
+    shadow: alpha("#0F172A", 0.16),
 
     colors: SHARED_COLORS,
 
     notesColor: SHARED_NOTES_COLORS,
   },
 
-  /* ── Lacivert ─────────────────────────────────────────────────── */
+  /* ── Lacivert ─────────────────────────────────────────────────────
+     Eski accent (#2B4C84) lacivert zeminde ~1.8:1 ile görünmezdi ve bold
+     zeminle AYNI renkti (fiilen bozuk). Yeni accent parlak azur (~6:1);
+     between artık zemin-kart arasında (eskiden karttan açık bir orta mavi
+     olduğu için chip'ler metin gibi parlıyordu); muted, secondary metinden
+     ayrıştırıldı. */
 
   blue: {
     primary: PALETTE.navy500,
@@ -442,67 +462,157 @@ export const themes = {
 
     secondaryt: alpha(PALETTE.navy400, 0.5),
 
-    between: PALETTE.navy200,
+    between: "#1B2440",
 
-    border: PALETTE.navy300,
+    border: "#2A3E63",
 
-    tab: "#25395B",
+    tab: "#20304F",
 
-    ai: alpha("#25395B", 0.4),
+    ai: alpha("#20304F", 0.4),
 
     text: {
       primary: PALETTE.navy050,
 
       secondary: PALETTE.navy100,
 
-      between: PALETTE.navy200,
+      between: "#6E87A8",
 
-      muted: PALETTE.navy100,
+      muted: "#5F7694",
     },
 
-    accent: PALETTE.navy300,
+    accent: "#4C8DFF",
 
-    bold: PALETTE.navy500,
+    bold: "#2D6BDF",
 
-    shadow: alpha(PALETTE.black, 0.7),
+    shadow: alpha(PALETTE.black, 0.6),
 
     colors: SHARED_COLORS,
 
     notesColor: SHARED_NOTES_COLORS,
   },
 
-  /* ── Açık Yeşil (Teal) ───────────────────────────────────────── */
+  /* ── Açık Yeşil (Teal) ────────────────────────────────────────────
+     Eski palette kartlar zeminden KOYUYDU (ters hiyerarşi → çamurlu his)
+     ve accent (#62BEB4) açık zeminde ~2:1 ile kayboluyordu. Yeni düzen:
+     ferah adaçayı zemin + açık nane kartlar + koyu teal accent (Tailwind
+     teal-700, açık yüzeylerde ~4.8:1). Kimlik (yeşil/teal) korunur. */
 
   green: {
-    primary: PALETTE.teal050,
+    // İlk düzenleme fazla açık kaçıp beyaz temaya benzedi — yeşil kimliği
+    // hissedilir kılmak için tüm yüzeyler bir kademe koyulaştırıldı: doygun
+    // adaçayı zemin + nane kartlar. Kart > zemin hiyerarşisi korunur; accent
+    // koyu teal, orta tonlu zeminde de ~4.6:1 kontrast verir.
+    primary: "#B9CEC7",
 
-    secondary: PALETTE.teal100,
+    secondary: "#D8E7E1",
 
-    secondaryt: alpha(PALETTE.teal500, 0.5),
+    secondaryt: alpha("#D8E7E1", 0.5),
 
-    between: PALETTE.teal150,
+    between: "#A9C0B8",
 
-    border: PALETTE.teal200,
+    border: "#93AFA6",
 
-    tab: PALETTE.teal300,
+    tab: "#D8E7E1",
 
-    ai: alpha(PALETTE.teal300, 0.4),
+    ai: alpha("#D8E7E1", 0.4),
 
     text: {
-      primary: PALETTE.teal600,
+      primary: "#122E2B",
 
-      secondary: PALETTE.teal500,
+      secondary: "#24504B",
 
-      between: PALETTE.teal400,
+      between: "#3E6862",
 
-      muted: PALETTE.teal600,
+      muted: "#527570",
     },
 
-    accent: "#62BEB4",
+    accent: "#0B5F57",
 
-    bold: PALETTE.teal700,
+    bold: "#0A4A44",
 
-    shadow: alpha(PALETTE.black, 0.7),
+    shadow: alpha("#0B221F", 0.22),
+
+    colors: SHARED_COLORS,
+
+    notesColor: SHARED_NOTES_COLORS,
+  },
+
+  /* ── Gece Moru ────────────────────────────────────────────────────
+     Medya uygulamalarının klasiği: mor alt tonlu koyu yüzeyler + canlı
+     violet accent. Uygulamanın mevcut mor kimliğiyle (sohbet accent'i
+     #6C63FF, Wrapped gradyanı) akraba. Accent koyu zeminde ~5.3:1. */
+
+  purple: {
+    primary: "#16131E",
+
+    secondary: "#211C2E",
+
+    secondaryt: alpha("#211C2E", 0.5),
+
+    between: "#1B1726",
+
+    border: "#332C46",
+
+    tab: "#1D1929",
+
+    ai: alpha("#1D1929", 0.4),
+
+    text: {
+      primary: "#F4F2F9",
+
+      secondary: "#CFC9DE",
+
+      between: "#A79FBE",
+
+      muted: "#7E7694",
+    },
+
+    accent: "#8B5CF6",
+
+    bold: "#7C3AED",
+
+    shadow: alpha(PALETTE.black, 0.6),
+
+    colors: SHARED_COLORS,
+
+    notesColor: SHARED_NOTES_COLORS,
+  },
+
+  /* ── Kehribar (Sinema) ────────────────────────────────────────────
+     Sıcak projektör ışığı hissi: kahve alt tonlu koyu yüzeyler + altın
+     accent — film uygulaması kimliğine birebir. Amber accent koyu
+     zeminde ~9:1 kontrast verir; metin ölçeği sıcak kırık beyazlar. */
+
+  amber: {
+    primary: "#1A1512",
+
+    secondary: "#282017",
+
+    secondaryt: alpha("#282017", 0.5),
+
+    between: "#211A14",
+
+    border: "#3E3226",
+
+    tab: "#241D15",
+
+    ai: alpha("#241D15", 0.4),
+
+    text: {
+      primary: "#F8F4EE",
+
+      secondary: "#DCD2C4",
+
+      between: "#B3A794",
+
+      muted: "#847A69",
+    },
+
+    accent: "#F59E0B",
+
+    bold: "#D97706",
+
+    shadow: alpha(PALETTE.black, 0.6),
 
     colors: SHARED_COLORS,
 
