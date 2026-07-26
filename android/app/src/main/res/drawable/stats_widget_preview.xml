@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget seçici için görsel önizleme (android:previewImage).
+     previewLayout API 31+; daha eski launcher'lar bu drawable'ı gösterir.
+     Ölçüler 252×250dp'lik nominal bir karta göre. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Kart zemini -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="315"
+                android:endColor="#070A14"
+                android:startColor="#171331" />
+            <corners android:radius="20dp" />
+            <stroke
+                android:width="1.5dp"
+                android:color="#406C63FF" />
+        </shape>
+    </item>
+
+    <!-- Başlıktaki logo rozeti -->
+    <item
+        android:width="24dp"
+        android:height="24dp"
+        android:left="14dp"
+        android:top="14dp">
+        <shape android:shape="rectangle">
+            <gradient android:angle="315" android:endColor="#554BD8" android:startColor="#7F77FF" />
+            <corners android:radius="8dp" />
+        </shape>
+    </item>
+
+    <!-- Film kartı -->
+    <item
+        android:height="66dp"
+        android:left="12dp"
+        android:right="12dp"
+        android:top="48dp">
+        <shape android:shape="rectangle">
+            <gradient android:angle="315" android:endColor="#141726" android:startColor="#2E6C63FF" />
+            <corners android:radius="16dp" />
+            <stroke android:width="1dp" android:color="#1FFFFFFF" />
+        </shape>
+    </item>
+    <!-- Film kartı: sol panel (sayı) -->
+    <item
+        android:height="54dp"
+        android:left="18dp"
+        android:right="150dp"
+        android:top="54dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#D90E1120" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <!-- Film kartı: sağ panel (süre dökümü) -->
+    <item
+        android:height="54dp"
+        android:left="108dp"
+        android:right="18dp"
+        android:top="54dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#D90E1120" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+
+    <!-- Toplam süre şeridi -->
+    <item
+        android:height="34dp"
+        android:left="12dp"
+        android:right="12dp"
+        android:top="122dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#12FFFFFF" />
+            <corners android:radius="12dp" />
+            <stroke android:width="1dp" android:color="#1AFFFFFF" />
+        </shape>
+    </item>
+
+    <!-- Dizi kartı -->
+    <item
+        android:height="66dp"
+        android:left="12dp"
+        android:right="12dp"
+        android:top="164dp">
+        <shape android:shape="rectangle">
+            <gradient android:angle="315" android:endColor="#141726" android:startColor="#2E6C63FF" />
+            <corners android:radius="16dp" />
+            <stroke android:width="1dp" android:color="#1FFFFFFF" />
+        </shape>
+    </item>
+    <item
+        android:height="54dp"
+        android:left="18dp"
+        android:right="150dp"
+        android:top="170dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#D90E1120" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <item
+        android:height="54dp"
+        android:left="108dp"
+        android:right="18dp"
+        android:top="170dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#D90E1120" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+
+</layer-list>

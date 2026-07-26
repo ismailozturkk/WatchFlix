@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Izgaranın tek hücresi: 2:3 poster. Bitmap'i provider yerleştirir; indirme
+     başarısızsa aksan renginde yer tutucu ikon gösterilir.
+
+     YÜKSEKLİK NEDEN SABİT: GridView hücre genişliğini stretchMode ile kendi
+     hesaplar ama yüksekliği içerikten alır. wrap_content bırakılırsa poster
+     bitmap'i gelene kadar hücreler 0 yükseklikte çizilip ızgara zıplar.
+     112dp, profildeki liste kartının poster bloğuyla aynı yükseklik.
+
+     fitCenter (centerCrop DEĞİL): bitmap 2:3 olarak kırpılıp köşeleri
+     yuvarlatılmış geliyor. centerCrop hücreyi doldurur ama o yuvarlak köşeleri
+     kesip kare gösterir; fitCenter en kötü ihtimalle birkaç dp boşluk bırakır. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/lists_widget_item_root"
+    android:layout_width="match_parent"
+    android:layout_height="112dp"
+    android:background="@drawable/lists_widget_poster_bg">
+
+    <ImageView
+        android:id="@+id/lists_widget_item_poster"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:scaleType="fitCenter" />
+
+    <ImageView
+        android:id="@+id/lists_widget_item_placeholder"
+        android:layout_width="26dp"
+        android:layout_height="26dp"
+        android:layout_gravity="center"
+        android:importantForAccessibility="no"
+        android:scaleType="fitCenter"
+        android:src="@drawable/reminder_widget_ic_movie"
+        android:visibility="gone" />
+</FrameLayout>

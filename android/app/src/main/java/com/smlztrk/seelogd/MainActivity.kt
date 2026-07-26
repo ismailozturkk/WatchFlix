@@ -1,4 +1,4 @@
-package com.smlztrk.Watchify
+package com.smlztrk.seelogd
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

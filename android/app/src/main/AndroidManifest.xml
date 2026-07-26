@@ -4,19 +4,15 @@
   <uses-permission android:name="android.permission.INTERNET"/>
   <uses-permission android:name="android.permission.READ_CALENDAR"/>
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+  <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" tools:node="remove"/>
   <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+  <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove"/>
   <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED"/>
+  <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove"/>
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.WRITE_CALENDAR"/>
-  <!-- Play izin temizliği (YAYIN_VE_GELIR_YOL_HARITASI §1.5/3): story kaydetme
-       için READ_MEDIA_IMAGES + VISUAL_USER_SELECTED yeterli. Aşağıdaki
-       tools:node="remove" girdileri, kütüphane manifest'lerinin (expo-media-library,
-       expo-image-picker vb.) bu izinleri merge ile GERİ EKLEMESİNİ de engeller. -->
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove"/>
-  <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" tools:node="remove"/>
-  <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove"/>
-  <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove"/>
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW"/>
@@ -38,17 +34,8 @@
         <action android:name="androidx.media3.session.MediaSessionService"/>
       </intent-filter>
     </service>
-    <receiver
-      android:name=".widget.ReminderWidgetProvider"
-      android:exported="false"
-      android:label="@string/reminder_widget_name">
-      <intent-filter>
-        <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
-      </intent-filter>
-      <meta-data
-        android:name="android.appwidget.provider"
-        android:resource="@xml/reminder_widget_info"/>
-    </receiver>
+    <service android:name=".widget.ReminderWidgetRemoteViewsService" android:exported="false" android:permission="android.permission.BIND_REMOTEVIEWS"/>
+    <service android:name=".widget.ListsWidgetRemoteViewsService" android:exported="false" android:permission="android.permission.BIND_REMOTEVIEWS"/>
     <activity android:name=".MainActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.App.SplashScreen" android:exported="true" android:screenOrientation="portrait" android:supportsPictureInPicture="true">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
@@ -58,9 +45,28 @@
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="watchify"/>
-        <data android:scheme="exp+watchflix"/>
+        <data android:scheme="seelogd"/>
+        <data android:scheme="exp+seelogd"/>
       </intent-filter>
     </activity>
+    <receiver android:name=".widget.ReminderWidgetProvider" android:exported="false" android:label="@string/reminder_widget_name">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/reminder_widget_info"/>
+    </receiver>
+    <receiver android:name=".widget.ListsWidgetProvider" android:exported="false" android:label="@string/lists_widget_name">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+        <action android:name="com.smlztrk.seelogd.widget.LISTS_CYCLE"/>
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/lists_widget_info"/>
+    </receiver>
+    <receiver android:name=".widget.StatsWidgetProvider" android:exported="false" android:label="@string/stats_widget_name">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/stats_widget_info"/>
+    </receiver>
   </application>
 </manifest>

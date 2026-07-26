@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- İki kart + süre şeridi dikeyde yer ister; targetCellHeight 4.
+     minResizeHeight tek kart + şerit sığacak kadar (kartlar weight'li, kısalır). -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/stats_widget_description"
+    android:initialLayout="@layout/stats_widget"
+    android:minWidth="250dp"
+    android:minHeight="220dp"
+    android:minResizeWidth="250dp"
+    android:minResizeHeight="180dp"
+    android:previewImage="@drawable/stats_widget_preview"
+    android:previewLayout="@layout/stats_widget_preview"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="4"
+    android:targetCellHeight="4"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen" />

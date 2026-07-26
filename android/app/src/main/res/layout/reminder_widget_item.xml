@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Koleksiyon widget'ının tek satırı. Kaydırılabilir ListView bunu her öğe
+     için şişirir. Sol: poster (bitmap; yoksa tip ikonlu gradyan yer tutucu),
+     orta: başlık + alt bilgi, sağ: geri sayım + kısa tarih. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/reminder_widget_item_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="6dp"
+    android:background="@drawable/reminder_widget_row_bg"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="8dp"
+    android:paddingVertical="7dp">
+
+    <!-- Poster (bitmap provider tarafından yerleştirilir) -->
+    <ImageView
+        android:id="@+id/reminder_widget_item_poster"
+        android:layout_width="34dp"
+        android:layout_height="50dp"
+        android:background="@drawable/reminder_widget_poster_bg"
+        android:clipToOutline="true"
+        android:importantForAccessibility="no"
+        android:scaleType="centerCrop" />
+
+    <!-- Poster yoksa: tip ikonlu gradyan rozet (provider görünürlüğü ayarlar) -->
+    <ImageView
+        android:id="@+id/reminder_widget_item_badge"
+        android:layout_width="34dp"
+        android:layout_height="50dp"
+        android:background="@drawable/reminder_widget_movie_badge"
+        android:importantForAccessibility="no"
+        android:padding="9dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/reminder_widget_ic_movie"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="8dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/reminder_widget_item_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#F7F7FC"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/reminder_widget_item_meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#9AA3B8"
+            android:textSize="9sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/reminder_widget_item_when"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#C9C7FF"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/reminder_widget_item_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:textColor="#7E879B"
+            android:textSize="8sp" />
+    </LinearLayout>
+</LinearLayout>

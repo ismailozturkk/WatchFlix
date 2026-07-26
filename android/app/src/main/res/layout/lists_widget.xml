@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Listelerim" widget'ı. Üst: liste seçici (ikon + ad + sayı + ‹ konum ›),
+     alt: 3 sütunlu kaydırılabilir poster ızgarası (koleksiyon widget). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/lists_widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/reminder_widget_background"
+    android:orientation="vertical"
+    android:paddingHorizontal="12dp"
+    android:paddingTop="11dp"
+    android:paddingBottom="10dp">
+
+    <!-- ── Liste seçici ────────────────────────────────────────────────── -->
+    <LinearLayout
+        android:id="@+id/lists_widget_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/lists_widget_header_bg"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="7dp">
+
+        <!-- Listeye özgü ikon; rengi provider tarafından aksana boyanır -->
+        <ImageView
+            android:id="@+id/lists_widget_icon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:background="@drawable/lists_widget_icon_dot"
+            android:importantForAccessibility="no"
+            android:padding="4dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/lists_widget_ic_list" />
+
+        <TextView
+            android:id="@+id/lists_widget_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/lists_widget_preview_title"
+            android:textColor="#F7F7FC"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <!-- Listedeki toplam öğe sayısı (aksan renginde) -->
+        <TextView
+            android:id="@+id/lists_widget_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:text="0"
+            android:textColor="#FBBF24"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/lists_widget_prev"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:background="@drawable/lists_widget_nav_btn"
+            android:contentDescription="@string/lists_widget_prev"
+            android:padding="6dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/lists_widget_ic_prev"
+            android:tint="#C9C7FF" />
+
+        <TextView
+            android:id="@+id/lists_widget_position"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="5dp"
+            android:minWidth="24dp"
+            android:gravity="center"
+            android:text="@string/lists_widget_preview_position"
+            android:textColor="#7E879B"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/lists_widget_next"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:background="@drawable/lists_widget_nav_btn"
+            android:contentDescription="@string/lists_widget_next"
+            android:padding="6dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/lists_widget_ic_next"
+            android:tint="#C9C7FF" />
+    </LinearLayout>
+
+    <!-- ── 3 sütunlu kaydırılabilir poster ızgarası ─────────────────────── -->
+    <GridView
+        android:id="@+id/lists_widget_grid"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="8dp"
+        android:horizontalSpacing="6dp"
+        android:layout_weight="1"
+        android:numColumns="3"
+        android:overScrollMode="never"
+        android:scrollbars="none"
+        android:stretchMode="columnWidth"
+        android:verticalSpacing="6dp" />
+
+    <!-- Boş durum: ızgara boşken GridView yerine bu gösterilir -->
+    <LinearLayout
+        android:id="@+id/lists_widget_empty"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <ImageView
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/lists_widget_ic_list"
+            android:tint="#4A5266" />
+
+        <TextView
+            android:id="@+id/lists_widget_empty_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="7dp"
+            android:gravity="center"
+            android:text="@string/lists_widget_empty"
+            android:textColor="#94A0B8"
+            android:textSize="12sp" />
+    </LinearLayout>
+</LinearLayout>

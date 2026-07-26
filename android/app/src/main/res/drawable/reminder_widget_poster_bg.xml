@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Poster arka planı + yuvarlatma. clipToOutline poster bitmap'ini köşelerden
+     kırpar; bitmap yüklenene kadar bu koyu yer tutucu görünür. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+  <solid android:color="#1F2233" />
+  <corners android:radius="7dp" />
+</shape>

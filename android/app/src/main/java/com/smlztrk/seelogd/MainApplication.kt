@@ -1,4 +1,4 @@
-package com.smlztrk.Watchify
+package com.smlztrk.seelogd
 
 import android.app.Application
 import android.content.res.Configuration
@@ -15,7 +15,7 @@ import com.facebook.react.defaults.DefaultReactNativeHost
 
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
-import com.smlztrk.Watchify.widget.ReminderWidgetPackage
+import com.smlztrk.seelogd.widget.SeelogdWidgetPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -25,7 +25,8 @@ class MainApplication : Application(), ReactApplication {
         override fun getPackages(): List<ReactPackage> =
             PackageList(this).packages.apply {
               // Packages that cannot be autolinked yet can be added manually here, for example:
-              add(ReminderWidgetPackage())
+              // Yaklaşanlar + Listelerim + İstatistikler widget köprüleri.
+              add(SeelogdWidgetPackage())
             }
 
           override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"

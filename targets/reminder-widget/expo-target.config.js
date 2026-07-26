@@ -1,5 +1,5 @@
 /**
- * Watchify — iOS "Yaklaşanlar" widget hedefi (@bacons/apple-targets).
+ * Seelogd — iOS "Yaklaşanlar" widget hedefi (@bacons/apple-targets).
  *
  * `npx expo prebuild -p ios` çalıştığında bu dizindeki tüm .swift dosyaları
  * bir WidgetKit uzantısı hedefi olarak Xcode projesine eklenir. Widget, App
@@ -13,6 +13,6 @@ module.exports = {
   deploymentTarget: "15.1",
   frameworks: ["SwiftUI", "WidgetKit"],
   entitlements: {
-    "com.apple.security.application-groups": ["group.com.smlztrk.Watchify"],
+    "com.apple.security.application-groups": ["group.com.smlztrk.seelogd"],
   },
 };

@@ -88,9 +88,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.smlztrk.Watchify'
+    namespace 'com.smlztrk.seelogd'
     defaultConfig {
-        applicationId 'com.smlztrk.Watchify'
+        applicationId 'com.smlztrk.seelogd'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

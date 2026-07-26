@@ -5,35 +5,38 @@
     android:layout_height="match_parent"
     android:background="@drawable/reminder_widget_background"
     android:orientation="vertical"
-    android:padding="14dp">
+    android:paddingHorizontal="13dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="11dp">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="36dp"
+        android:layout_height="32dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <TextView
+        <!-- Uygulama logosu: monochrome ikon, accent gradyan rozet üstünde beyaz -->
+        <ImageView
             android:layout_width="28dp"
             android:layout_height="28dp"
             android:background="@drawable/reminder_widget_logo_badge"
-            android:gravity="center"
-            android:text="W"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:importantForAccessibility="no"
+            android:padding="4dp"
+            android:scaleType="fitCenter"
+            android:src="@mipmap/ic_launcher_monochrome"
+            android:tint="#FFFFFF" />
 
         <TextView
             android:id="@+id/reminder_widget_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="9dp"
             android:layout_weight="1"
             android:ellipsize="end"
             android:maxLines="1"
             android:text="@string/reminder_widget_preview_title"
             android:textColor="#FFFFFF"
-            android:textSize="16sp"
+            android:textSize="15sp"
             android:textStyle="bold" />
 
         <TextView
@@ -49,108 +52,41 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <View
+    <!-- Kaydırılabilir liste (koleksiyon widget) -->
+    <ListView
+        android:id="@+id/reminder_widget_list"
         android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginTop="7dp"
-        android:layout_marginBottom="5dp"
-        android:background="#1FFFFFFF" />
+        android:layout_height="0dp"
+        android:layout_marginTop="3dp"
+        android:layout_weight="1"
+        android:divider="@null"
+        android:dividerHeight="0dp"
+        android:overScrollMode="never"
+        android:scrollbars="none" />
 
-    <TextView
+    <!-- Boş durum: liste boşken ListView yerine bu gösterilir -->
+    <LinearLayout
         android:id="@+id/reminder_widget_empty"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:gravity="center"
-        android:text="@string/reminder_widget_empty"
-        android:textColor="#94A0B8"
-        android:textSize="12sp" />
+        android:orientation="vertical">
 
-    <LinearLayout
-        android:id="@+id/reminder_widget_row_1"
-        style="@style/ReminderWidgetRow"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/reminder_widget_badge_1"
-            style="@style/ReminderWidgetTypeBadge" />
-
-        <LinearLayout style="@style/ReminderWidgetTextColumn">
-            <TextView
-                android:id="@+id/reminder_widget_name_1"
-                style="@style/ReminderWidgetTitle" />
-            <TextView
-                android:id="@+id/reminder_widget_meta_1"
-                style="@style/ReminderWidgetMeta" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/reminder_widget_row_2"
-        style="@style/ReminderWidgetRow"
-        android:visibility="gone">
+        <ImageView
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/reminder_widget_ic_empty" />
 
         <TextView
-            android:id="@+id/reminder_widget_badge_2"
-            style="@style/ReminderWidgetTypeBadge" />
-
-        <LinearLayout style="@style/ReminderWidgetTextColumn">
-            <TextView
-                android:id="@+id/reminder_widget_name_2"
-                style="@style/ReminderWidgetTitle" />
-            <TextView
-                android:id="@+id/reminder_widget_meta_2"
-                style="@style/ReminderWidgetMeta" />
-        </LinearLayout>
+            android:id="@+id/reminder_widget_empty_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="7dp"
+            android:gravity="center"
+            android:text="@string/reminder_widget_empty"
+            android:textColor="#94A0B8"
+            android:textSize="12sp" />
     </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/reminder_widget_row_3"
-        style="@style/ReminderWidgetRow"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/reminder_widget_badge_3"
-            style="@style/ReminderWidgetTypeBadge" />
-
-        <LinearLayout style="@style/ReminderWidgetTextColumn">
-            <TextView
-                android:id="@+id/reminder_widget_name_3"
-                style="@style/ReminderWidgetTitle" />
-            <TextView
-                android:id="@+id/reminder_widget_meta_3"
-                style="@style/ReminderWidgetMeta" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/reminder_widget_row_4"
-        style="@style/ReminderWidgetRow"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/reminder_widget_badge_4"
-            style="@style/ReminderWidgetTypeBadge" />
-
-        <LinearLayout style="@style/ReminderWidgetTextColumn">
-            <TextView
-                android:id="@+id/reminder_widget_name_4"
-                style="@style/ReminderWidgetTitle" />
-            <TextView
-                android:id="@+id/reminder_widget_meta_4"
-                style="@style/ReminderWidgetMeta" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/reminder_widget_more"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:gravity="center"
-        android:text="@string/reminder_widget_more"
-        android:textColor="#C9C7FF"
-        android:textSize="10sp"
-        android:textStyle="bold"
-        android:visibility="gone" />
 </LinearLayout>

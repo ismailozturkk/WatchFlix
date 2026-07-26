@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget seçicide (android:previewLayout) gösterilen statik önizleme.
+     Canlı düzenin birebir aynısı; tek fark GridView yerine elle dizilmiş
+     sahte posterler — koleksiyon adaptörü önizlemede çalışmaz. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/reminder_widget_background"
+    android:orientation="vertical"
+    android:paddingHorizontal="12dp"
+    android:paddingTop="11dp"
+    android:paddingBottom="10dp">
+
+    <!-- Liste seçici -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/lists_widget_header_bg"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="7dp">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:background="@drawable/lists_widget_icon_dot"
+            android:importantForAccessibility="no"
+            android:padding="4dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/lists_widget_ic_heart"
+            android:tint="#F87171" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/lists_widget_preview_title"
+            android:textColor="#F7F7FC"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:text="24"
+            android:textColor="#F87171"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:background="@drawable/lists_widget_nav_btn"
+            android:importantForAccessibility="no"
+            android:padding="6dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/lists_widget_ic_prev"
+            android:tint="#C9C7FF" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="5dp"
+            android:gravity="center"
+            android:minWidth="24dp"
+            android:text="@string/lists_widget_preview_position"
+            android:textColor="#7E879B"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:background="@drawable/lists_widget_nav_btn"
+            android:importantForAccessibility="no"
+            android:padding="6dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/lists_widget_ic_next"
+            android:tint="#C9C7FF" />
+    </LinearLayout>
+
+    <!-- Sahte 3 sütunlu poster ızgarası -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="86dp"
+            android:layout_weight="1"
+            android:background="@drawable/lists_widget_poster_preview_a" />
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="86dp"
+            android:layout_marginHorizontal="6dp"
+            android:layout_weight="1"
+            android:background="@drawable/lists_widget_poster_preview_b" />
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="86dp"
+            android:layout_weight="1"
+            android:background="@drawable/lists_widget_poster_preview_c" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="86dp"
+            android:layout_weight="1"
+            android:background="@drawable/lists_widget_poster_preview_c" />
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="86dp"
+            android:layout_marginHorizontal="6dp"
+            android:layout_weight="1"
+            android:background="@drawable/lists_widget_poster_preview_a" />
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="86dp"
+            android:layout_weight="1"
+            android:background="@drawable/lists_widget_poster_preview_b" />
+    </LinearLayout>
+</LinearLayout>

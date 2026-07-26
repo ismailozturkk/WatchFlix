@@ -1,4 +1,4 @@
-package com.smlztrk.Watchify.widget
+package com.smlztrk.seelogd.widget
 
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext

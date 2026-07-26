@@ -1,4 +1,4 @@
-// Watchify — iOS "Yaklaşanlar" (Coming Up) home-screen widget.
+// Seelogd — iOS "Yaklaşanlar" (Coming Up) home-screen widget.
 //
 // Android'deki ReminderWidgetProvider.kt ile aynı davranış: paylaşılan App
 // Group UserDefaults'tan hatırlatıcı JSON'unu okur, yaklaşan film/bölümleri
@@ -10,9 +10,9 @@ import SwiftUI
 
 // MARK: - Paylaşılan veri
 
-private let appGroupId = "group.com.smlztrk.Watchify"
+// appGroupId / languageKey / loadLanguage() ve marka renkleri shared.swift'te
+// (üç widget da aynı uzantı hedefinde yaşıyor).
 private let itemsKey = "items"
-private let languageKey = "language"
 
 private struct ReminderItem: Identifiable {
   let id: String
@@ -20,10 +20,6 @@ private struct ReminderItem: Identifiable {
   let title: String
   let subtitle: String
   let date: Date
-}
-
-private func loadLanguage() -> String {
-  UserDefaults(suiteName: appGroupId)?.string(forKey: languageKey) ?? "tr"
 }
 
 private func loadItems() -> [ReminderItem] {
@@ -63,6 +59,30 @@ private func countdownText(_ date: Date, isTurkish: Bool) -> String {
   return isTurkish ? "\(days) gün" : "\(days) days"
 }
 
+private let sampleItems: [ReminderItem] = [
+  ReminderItem(
+    id: "sample-1",
+    type: "movie",
+    title: "Dune: Part Two",
+    subtitle: "",
+    date: Date().addingTimeInterval(86400)
+  ),
+  ReminderItem(
+    id: "sample-2",
+    type: "tv",
+    title: "The Last of Us",
+    subtitle: "S2 • E1",
+    date: Date().addingTimeInterval(86400 * 3)
+  ),
+  ReminderItem(
+    id: "sample-3",
+    type: "movie",
+    title: "Interstellar",
+    subtitle: "",
+    date: Date().addingTimeInterval(86400 * 5)
+  )
+]
+
 // MARK: - Timeline
 
 private struct ReminderEntry: TimelineEntry {
@@ -73,12 +93,14 @@ private struct ReminderEntry: TimelineEntry {
 
 private struct ReminderProvider: TimelineProvider {
   func placeholder(in context: Context) -> ReminderEntry {
-    ReminderEntry(date: Date(), items: [], isTurkish: true)
+    ReminderEntry(date: Date(), items: sampleItems, isTurkish: loadLanguage().hasPrefix("tr"))
   }
 
   func getSnapshot(in context: Context, completion: @escaping (ReminderEntry) -> Void) {
+    let items = loadItems()
+    let displayItems = (items.isEmpty || context.isPreview) ? sampleItems : items
     completion(
-      ReminderEntry(date: Date(), items: loadItems(), isTurkish: loadLanguage().hasPrefix("tr"))
+      ReminderEntry(date: Date(), items: displayItems, isTurkish: loadLanguage().hasPrefix("tr"))
     )
   }
 
@@ -96,16 +118,6 @@ private struct ReminderProvider: TimelineProvider {
     ) ?? Date().addingTimeInterval(60 * 60)
     completion(Timeline(entries: [entry], policy: .after(nextRefresh)))
   }
-}
-
-// MARK: - Renkler (marka)
-
-private extension Color {
-  static let wxBackground = Color(red: 0.043, green: 0.055, blue: 0.086) // #0B0E16
-  static let wxAccent = Color(red: 0.424, green: 0.388, blue: 1.0)       // #6C63FF
-  static let wxMovie = Color(red: 0.898, green: 0.357, blue: 0.133)      // #E55B22
-  static let wxTitle = Color(red: 0.969, green: 0.969, blue: 0.988)      // #F7F7FC
-  static let wxMeta = Color(red: 0.604, green: 0.639, blue: 0.722)       // #9AA3B8
 }
 
 // MARK: - Görünüm
@@ -209,18 +221,6 @@ private struct ReminderWidgetEntryView: View {
   }
 }
 
-// iOS 17+ containerBackground ister; daha eskiler düz background kullanır.
-private extension View {
-  @ViewBuilder
-  func widgetBackgroundCompat(_ color: Color) -> some View {
-    if #available(iOS 17.0, *) {
-      containerBackground(for: .widget) { color }
-    } else {
-      background(color)
-    }
-  }
-}
-
 // MARK: - Widget
 
 struct ReminderWidget: Widget {
@@ -230,15 +230,19 @@ struct ReminderWidget: Widget {
     StaticConfiguration(kind: kind, provider: ReminderProvider()) { entry in
       ReminderWidgetEntryView(entry: entry)
     }
-    .configurationDisplayName("Watchify Yaklaşanlar")
+    .configurationDisplayName("Seelogd Yaklaşanlar")
     .description("Yaklaşan film ve dizi bölümlerini gösterir.")
     .supportedFamilies([.systemMedium, .systemLarge])
   }
 }
 
+// Tek uzantı hedefi, üç widget: Yaklaşanlar (bu dosya), Listelerim
+// (lists-widget.swift), İstatistikler (stats-widget.swift).
 @main
 struct ReminderWidgetBundle: WidgetBundle {
   var body: some Widget {
     ReminderWidget()
+    ListsWidget()
+    StatsWidget()
   }
 }

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android Widget Picker (android:previewImage) için görsel önizleme drawable'ı -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Ana widget kartı arkaplanı -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="315"
+                android:endColor="#070A14"
+                android:startColor="#171331" />
+            <corners android:radius="20dp" />
+            <stroke
+                android:width="1.5dp"
+                android:color="#406C63FF" />
+        </shape>
+    </item>
+
+    <!-- Header simgesi (sol üst logo rozeti) -->
+    <item
+        android:width="26dp"
+        android:height="26dp"
+        android:left="14dp"
+        android:top="14dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="315"
+                android:endColor="#554BD8"
+                android:startColor="#7F77FF" />
+            <corners android:radius="8dp" />
+        </shape>
+    </item>
+
+    <!-- 1. Satır Arkaplanı -->
+    <item
+        android:height="44dp"
+        android:left="14dp"
+        android:right="14dp"
+        android:top="52dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#1AFFFFFF" />
+            <corners android:radius="10dp" />
+            <stroke
+                android:width="1dp"
+                android:color="#15FFFFFF" />
+        </shape>
+    </item>
+
+    <!-- 1. Satır İkon Rozeti (Film - Turuncu) -->
+    <item
+        android:width="26dp"
+        android:height="32dp"
+        android:left="20dp"
+        android:top="58dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="315"
+                android:endColor="#E55B22"
+                android:startColor="#FF9A4A" />
+            <corners android:radius="7dp" />
+        </shape>
+    </item>
+
+    <!-- 2. Satır Arkaplanı -->
+    <item
+        android:height="44dp"
+        android:left="14dp"
+        android:right="14dp"
+        android:top="102dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#1AFFFFFF" />
+            <corners android:radius="10dp" />
+            <stroke
+                android:width="1dp"
+                android:color="#15FFFFFF" />
+        </shape>
+    </item>
+
+    <!-- 2. Satır İkon Rozeti (Dizi - Mor) -->
+    <item
+        android:width="26dp"
+        android:height="32dp"
+        android:left="20dp"
+        android:top="108dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="315"
+                android:endColor="#7137C8"
+                android:startColor="#B56DFF" />
+            <corners android:radius="7dp" />
+        </shape>
+    </item>
+
+</layer-list>
