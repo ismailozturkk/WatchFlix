@@ -713,6 +713,7 @@ export default function ActorSearch({ navigation, route, isUnified, unifiedQuery
             placeholderTextColor={theme.text?.muted ?? "#666"}
             value={search}
             onChangeText={handleSearch}
+            maxLength={80}
             returnKeyType="search"
             onSubmitEditing={() =>
               search.trim().length >= 2 && fetchResults(search)

@@ -14,7 +14,7 @@ import { getAuth } from "firebase/auth";
 import { useTheme } from "../../context/ThemeContext";
 import { appAlert } from "@components/AppAlert";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import IconBacground from "../../components/IconBacground";
+import ScreenDecor from "../../components/ScreenDecor";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../components/BackButton";
 import LottieView from "lottie-react-native";
@@ -240,7 +240,7 @@ export default function SearchFriendsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-      <IconBacground opacity={0.3} />
+      <ScreenDecor iconOpacity={0.3} />
 
       {/* Başlık */}
       <Animated.Text
@@ -261,6 +261,7 @@ export default function SearchFriendsScreen({ navigation }) {
             placeholderTextColor={theme.text?.muted ?? "#666"}
             value={searchTerm}
             onChangeText={setSearchTerm}
+            maxLength={80}
             autoCapitalize="none"
             style={[styles.searchInput, { color: theme.text?.primary ?? "#fff" }]}
             returnKeyType="search"

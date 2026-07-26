@@ -1,3 +1,5 @@
+import { resolveRarity } from "@theme/badgeTokens";
+
 export const GAME_REGISTRY = [
   {
     id: "scene_guess",
@@ -62,25 +64,94 @@ const survivalBestOf = (stats) => {
 // boylece kilitliyken bile kullaniciya ne kadar kaldigi gosterilebilir.
 // Film/dizi ayrimi, kusursuz tur ve hizli cevap gibi ayri sayac gerektiren
 // basarimlar oturum bazli alanlar Firestore'a tasininca (Faz E) eklenecek.
+// `iconSolid` NEDEN ELLE YAZILIYOR: eskiden acik hal `icon.replace("-outline","")`
+// ile turetiliyordu. Ionicons'ta her outline ikonun dolu ikizi YOK ve AppIcon
+// taninmayan isimde kirmizi bir uyari ucgeni basiyor (components/AppIcon.js) —
+// yani hatali secim sessizce kullaniciya kirmizi ucgen olarak gidiyordu.
+// Katalogda acikca tutmak bunu imkansiz kilar.
+// `rarity` yazilmazsa target'tan turetilir (theme/badgeTokens.js resolveRarity).
 const defineAchievement = (def) => ({
   ...def,
+  iconSolid: def.iconSolid || def.icon,
+  rarity: def.rarity || resolveRarity(def.target),
   isUnlocked: (stats) => def.getProgress(stats) >= def.target,
 });
 
+// SIRALAMA = SAYAÇ AİLESİ. Aynı sayacı ölçen başarımlar bitişik ve eşiğe göre
+// artan durur; böylece hem listede bir merdiven olarak okunur hem de yeni bir
+// kademe eklerken hangi ailenin neresine gireceği belli olur.
+//
+// Eskiden burada `gorev_*` çeviri anahtarlı 3 girdi vardı: başlıkları emir
+// cümlesiydi ("Beş oyun oyna") ve `_aciklama` anahtarları hiç yoktu, yani
+// kartın alt satırı boş çiziliyordu. Diğer 9 başarımın "isim + açıklama"
+// kalıbına çevrildiler. "5 doğru" kademesi tamamen kaldırıldı: İlk Oyun ile
+// pratikte aynı anda açılıyordu (bir oyun bitiren zaten 5 doğru yapıyor).
 export const SCENE_ACHIEVEMENTS = [
+  // ── Oynanan oyun sayısı (totalPlayed): 1 → 5 → 25 ──────────────────────
   defineAchievement({
     id: "first_game",
     titleKey: "autoI18n.basari_ilk_oyun",
     descriptionKey: "autoI18n.basari_ilk_oyun_aciklama",
     icon: "flag-outline",
+    iconSolid: "flag",
     target: 1,
     getProgress: (stats) => Number(stats?.totalPlayed) || 0,
   }),
+  defineAchievement({
+    id: "game_explorer",
+    titleKey: "autoI18n.basari_oyun_kasifi",
+    descriptionKey: "autoI18n.basari_oyun_kasifi_aciklama",
+    icon: "game-controller-outline",
+    iconSolid: "game-controller",
+    target: 5,
+    getProgress: (stats) => Number(stats?.totalPlayed) || 0,
+  }),
+  defineAchievement({
+    id: "marathon",
+    titleKey: "autoI18n.basari_maraton",
+    descriptionKey: "autoI18n.basari_maraton_aciklama",
+    icon: "walk-outline",
+    iconSolid: "walk",
+    target: 25,
+    getProgress: (stats) => Number(stats?.totalPlayed) || 0,
+  }),
+
+  // ── Toplam doğru cevap (totalCorrect): 50 → 100 → 500 ──────────────────
+  defineAchievement({
+    id: "fifty_correct",
+    titleKey: "autoI18n.basari_yarim_yuzyil",
+    descriptionKey: "autoI18n.basari_yarim_yuzyil_aciklama",
+    icon: "checkmark-done-circle-outline",
+    iconSolid: "checkmark-done-circle",
+    target: 50,
+    getProgress: (stats) => Number(stats?.totalCorrect) || 0,
+  }),
+  defineAchievement({
+    id: "movie_buff",
+    titleKey: "autoI18n.basari_film_kurdu",
+    descriptionKey: "autoI18n.basari_film_kurdu_aciklama",
+    icon: "film-outline",
+    iconSolid: "film",
+    target: 100,
+    getProgress: (stats) => Number(stats?.totalCorrect) || 0,
+  }),
+  defineAchievement({
+    id: "sniper",
+    titleKey: "autoI18n.basari_keskin_nisanci",
+    descriptionKey: "autoI18n.basari_keskin_nisanci_aciklama",
+    icon: "locate-outline",
+    iconSolid: "locate",
+    target: 500,
+    getProgress: (stats) => Number(stats?.totalCorrect) || 0,
+  }),
+
+  // ── En iyi seri (bestStreak): 10 → 20 ──────────────────────────────────
   defineAchievement({
     id: "sharp_eye",
     titleKey: "autoI18n.basari_keskin_goz",
     descriptionKey: "autoI18n.basari_keskin_goz_aciklama",
     icon: "eye-outline",
+    iconSolid: "eye",
     target: 10,
     getProgress: (stats) => Number(stats?.bestStreak) || 0,
   }),
@@ -89,38 +160,29 @@ export const SCENE_ACHIEVEMENTS = [
     titleKey: "autoI18n.basari_seri_ustasi",
     descriptionKey: "autoI18n.basari_seri_ustasi_aciklama",
     icon: "flame-outline",
+    iconSolid: "flame",
     target: 20,
     getProgress: (stats) => Number(stats?.bestStreak) || 0,
   }),
-  defineAchievement({
-    id: "movie_buff",
-    titleKey: "autoI18n.basari_film_kurdu",
-    descriptionKey: "autoI18n.basari_film_kurdu_aciklama",
-    icon: "film-outline",
-    target: 100,
-    getProgress: (stats) => Number(stats?.totalCorrect) || 0,
-  }),
+
+  // ── Tek oyun skoru (bestScore) ─────────────────────────────────────────
   defineAchievement({
     id: "score_hunter",
     titleKey: "autoI18n.basari_skor_avcisi",
     descriptionKey: "autoI18n.basari_skor_avcisi_aciklama",
     icon: "trophy-outline",
+    iconSolid: "trophy",
     target: 1000,
     getProgress: (stats) => Number(stats?.bestScore) || 0,
   }),
-  defineAchievement({
-    id: "marathon",
-    titleKey: "autoI18n.basari_maraton",
-    descriptionKey: "autoI18n.basari_maraton_aciklama",
-    icon: "walk-outline",
-    target: 25,
-    getProgress: (stats) => Number(stats?.totalPlayed) || 0,
-  }),
+
+  // ── Tekil kilometre taşları (mod / seviye) ─────────────────────────────
   defineAchievement({
     id: "survivor",
     titleKey: "autoI18n.basari_hayatta_kalan",
     descriptionKey: "autoI18n.basari_hayatta_kalan_aciklama",
     icon: "heart-outline",
+    iconSolid: "heart",
     target: 1,
     getProgress: (stats) => (survivalBestOf(stats) > 0 ? 1 : 0),
   }),
@@ -129,50 +191,8 @@ export const SCENE_ACHIEVEMENTS = [
     titleKey: "autoI18n.basari_veteran",
     descriptionKey: "autoI18n.basari_veteran_aciklama",
     icon: "ribbon-outline",
+    iconSolid: "ribbon",
     target: 5,
     getProgress: (stats) => Number(stats?.level) || 1,
   }),
-  defineAchievement({
-    id: "sniper",
-    titleKey: "autoI18n.basari_keskin_nisanci",
-    descriptionKey: "autoI18n.basari_keskin_nisanci_aciklama",
-    icon: "locate-outline",
-    target: 500,
-    getProgress: (stats) => Number(stats?.totalCorrect) || 0,
-  }),
-];
-
-// Baslangic gorevleri (Part 15.3). Gercek gunluk/haftalik sifirlama tarih takibi
-// ve backend gerektirdiginden bu surumde kalici/birikimli hedefler kullanilir.
-export const SCENE_STARTER_TASKS = [
-  {
-    id: "complete_game",
-    titleKey: "autoI18n.gorev_bir_oyun_tamamla",
-    target: 1,
-    getProgress: (stats) => Number(stats?.totalPlayed) || 0,
-  },
-  {
-    id: "five_correct",
-    titleKey: "autoI18n.gorev_bes_dogru",
-    target: 5,
-    getProgress: (stats) => Number(stats?.totalCorrect) || 0,
-  },
-  {
-    id: "play_five_games",
-    titleKey: "autoI18n.gorev_bes_oyun",
-    target: 5,
-    getProgress: (stats) => Number(stats?.totalPlayed) || 0,
-  },
-  {
-    id: "fifty_correct",
-    titleKey: "autoI18n.gorev_elli_dogru",
-    target: 50,
-    getProgress: (stats) => Number(stats?.totalCorrect) || 0,
-  },
-  {
-    id: "reach_streak_ten",
-    titleKey: "autoI18n.gorev_on_seri",
-    target: 10,
-    getProgress: (stats) => Number(stats?.bestStreak) || 0,
-  },
 ];

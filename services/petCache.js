@@ -11,7 +11,7 @@
 // exists/size/delete/create senkron; sadece downloadFileAsync async.
 
 import { File, Directory, Paths } from "expo-file-system";
-import { petUrl } from "../utils/r2";
+import { petUrls } from "../utils/r2";
 
 // İndirilen petlerin tutulduğu klasör: <cache>/pets/
 export const PETS_DIRNAME = "pets";
@@ -58,9 +58,10 @@ export function getPetSize(id) {
 }
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const DOWNLOAD_TIMEOUT_MS = 20_000;
 
 // Ayrıntılı tanı logu. Pet indirme sorunlarında (özellikle R2/.r2.dev erişim
-// engeli) gerçek sebebi görünür kılar: URL, deneme, HTTP durum, content-type,
+// engeli) gerçek sebebi görünür kılar: kaynak, deneme, HTTP durum, content-type,
 // byte, magic ve hata cause kodu (ör. ECONNRESET).
 const PET_LOG = "[petCache]";
 function plog(...args) {
@@ -102,43 +103,58 @@ function isWebp(b) {
 export async function downloadPet(id) {
   ensureDir();
   const file = petFile(id);
-  const url = petUrl(id);
+  const urls = petUrls(id);
+  // Önce doğrudan R2, erişilemiyorsa HTTPS görsel CDN'i. İki kaynak da geçici ağ
+  // hatası verirse aynı sıra bir kez daha denenir.
+  const attempts = [...urls, ...urls];
   let lastErr;
 
-  plog(`indirme başladı id=${id} url=${url}`);
+  plog(`indirme başladı id=${id} kaynak=${urls.length}`);
   const t0 = Date.now();
 
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (let attempt = 0; attempt < attempts.length; attempt++) {
+    const url = attempts[attempt];
+    const sourceName = url.includes("images.weserv.nl") ? "cdn" : "r2";
     try { if (file.exists) file.delete(); } catch { /* yarım dosyayı temizle */ }
 
     let bytes;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: { Accept: "image/webp,image/*;q=0.8" },
+      });
       plog(
-        `deneme ${attempt} → HTTP ${res.status} ${res.statusText || ""} | ` +
+        `deneme ${attempt + 1}/${attempts.length} (${sourceName}) → ` +
+        `HTTP ${res.status} ${res.statusText || ""} | ` +
         `type=${res.headers?.get?.("content-type") || "?"} | ` +
         `len=${res.headers?.get?.("content-length") || "?"} | ` +
         `cf-ray=${res.headers?.get?.("cf-ray") || "yok"} | ${Date.now() - t0}ms`,
       );
       if (!res.ok) {
-        // 403/429 → R2 .r2.dev erişim/hız sınırı. Tekrar denemek hızlı çözmez.
-        throw new Error(`Sunucu hatası HTTP ${res.status} — R2 erişim/hız sınırı olabilir`);
+        throw new Error(`Sunucu hatası HTTP ${res.status} (${sourceName})`);
       }
       bytes = new Uint8Array(await res.arrayBuffer());
     } catch (e) {
-      // Ağ/TLS hatası (ör. ECONNRESET = ISP/DNS engeli, .r2.dev sinkhole) burada görünür.
-      plog(`deneme ${attempt} HATA (fetch): ${errDetail(e)} | url=${url}`);
-      lastErr = new Error(`İndirme başarısız: ${e?.message || e}`);
-      // HTTP durum hatası içerikseldir → tekrar deneme; salt ağ hatası → bir kez dene.
-      if (String(e?.message || "").includes("HTTP")) throw lastErr;
-      await wait(700);
+      const message =
+        e?.name === "AbortError"
+          ? `İndirme zaman aşımına uğradı (${sourceName})`
+          : `İndirme başarısız (${sourceName}): ${e?.message || e}`;
+      plog(
+        `deneme ${attempt + 1}/${attempts.length} HATA (fetch): ` +
+        `${errDetail(e)} | kaynak=${sourceName}`,
+      );
+      lastErr = new Error(message);
+      if (attempt === urls.length - 1) await wait(700);
       continue;
+    } finally {
+      clearTimeout(timeout);
     }
 
     if (!bytes || bytes.length <= 0) {
-      plog(`deneme ${attempt} HATA: boş yanıt (0B)`);
-      lastErr = new Error("Sunucudan boş yanıt geldi");
-      await wait(700);
+      plog(`deneme ${attempt + 1} HATA: boş yanıt (0B)`);
+      lastErr = new Error(`Sunucudan boş yanıt geldi (${sourceName})`);
       continue;
     }
 
@@ -148,36 +164,44 @@ export async function downloadPet(id) {
       const head = Array.from(bytes.slice(0, 16))
         .map((b) => b.toString(16).padStart(2, "0"))
         .join(" ");
-      plog(`deneme ${attempt} HATA: geçersiz içerik ${bytes.length}B | ilk16bayt=${head}`);
-      throw new Error(`Geçersiz içerik (${bytes.length}B) — R2 erişim/hız sınırı olabilir`);
+      plog(
+        `deneme ${attempt + 1} HATA: geçersiz içerik ` +
+        `${bytes.length}B | kaynak=${sourceName} | ilk16bayt=${head}`,
+      );
+      lastErr = new Error(`Geçersiz pet içeriği (${sourceName}, ${bytes.length}B)`);
+      continue;
     }
 
     try {
       file.create({ overwrite: true });
       file.write(bytes);
     } catch (e) {
-      plog(`deneme ${attempt} HATA (disk): ${errDetail(e)}`);
+      plog(`deneme ${attempt + 1} HATA (disk): ${errDetail(e)}`);
       lastErr = new Error(`Diske yazılamadı: ${e?.message || e}`);
       // create başarılı + write başarısız → 0B/yarım dosya kalabilir;
       // isPetCached yalnız exists'e baktığı için "indirilmiş" sanılırdı.
       try {
         if (file.exists) file.delete();
       } catch {}
-      await wait(700);
       continue;
     }
 
     if (!file.exists || (file.size ?? 0) <= 0) {
-      plog(`deneme ${attempt} HATA: dosya diske yazılamadı (size=${file.size ?? 0})`);
+      plog(
+        `deneme ${attempt + 1} HATA: dosya diske yazılamadı ` +
+        `(size=${file.size ?? 0})`,
+      );
       lastErr = new Error("Dosya diske yazılamadı");
       try {
         if (file.exists) file.delete();
       } catch {}
-      await wait(700);
       continue;
     }
 
-    plog(`BAŞARILI id=${id} | ${bytes.length}B | ${Date.now() - t0}ms`);
+    plog(
+      `BAŞARILI id=${id} | kaynak=${sourceName} | ` +
+      `${bytes.length}B | ${Date.now() - t0}ms`,
+    );
     return file.uri; // başarı
   }
   plog(`BAŞARISIZ id=${id} | son hata: ${lastErr?.message || "?"} | ${Date.now() - t0}ms`);

@@ -44,12 +44,13 @@ import {
   MaterialCommunityIcons,
   Feather,
 } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "@services/hapticsService";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import { getAvatarSource } from "@utils/avatars";
 import { i18nText } from "@utils/i18nText";
+import appAlert from "@components/AppAlert";
 import { alpha } from "../../theme/colors";
 import {
   subscribeToPostComments,
@@ -59,7 +60,7 @@ import {
   toggleCommentLike,
 } from "@services/postsService";
 
-const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get("window");
+const { height: SCREEN_H } = Dimensions.get("window");
 
 const EMPTY_INPUT = {
   text: "",
@@ -69,11 +70,28 @@ const EMPTY_INPUT = {
   replieName: null,
 };
 
+const shortTimeAgo = (timestamp) => {
+  const date = timestamp?.toDate?.() || (timestamp instanceof Date ? timestamp : null);
+  const ms = date?.getTime?.() || 0;
+  if (!ms) return i18nText("autoI18n.simdi", "şimdi");
+  const minutes = Math.floor((Date.now() - ms) / 60000);
+  if (minutes < 1) return i18nText("autoI18n.simdi", "şimdi");
+  if (minutes < 60) return `${minutes}d`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}s`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}g`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 52) return `${weeks}h`;
+  return `${Math.floor(days / 365)}y`;
+};
+
 // ── Tek yorum satırı ───────────────────────────────────────
 const CommentItem = memo(function CommentItem({
   item,
   currentUid,
   isReply,
+  isLastReply,
   replyCount,
   isRepliesVisible,
   onToggleReplies,
@@ -94,9 +112,26 @@ const CommentItem = memo(function CommentItem({
       ? getAvatarSource(item.authorAvatarIndex)
       : getAvatarSource(0);
 
-  const timeText = item.createdAt?.toDate
-    ? item.createdAt.toDate().toLocaleString()
-    : i18nText("autoI18n.az_once", "Az önce");
+  const timeText = shortTimeAgo(item.createdAt);
+
+  const openOwnerMenu = () => {
+    appAlert(
+      i18nText("autoI18n.yorum_secenekleri", "Yorum seçenekleri"),
+      undefined,
+      [
+        {
+          text: i18nText("autoI18n.duzenle", "Düzenle"),
+          onPress: () => onEdit(item, isReply),
+        },
+        {
+          text: i18nText("autoI18n.sil", "Sil"),
+          style: "destructive",
+          onPress: () => onDelete(item),
+        },
+        { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
+      ],
+    );
+  };
 
   const onLikePress = () => {
     try {
@@ -118,51 +153,53 @@ const CommentItem = memo(function CommentItem({
   };
 
   return (
-    <View
-      style={[
-        styles.itemContainer,
-        isReply && styles.replyMargin,
-        isOwner && styles.ownComment,
-      ]}
-    >
-      <View style={styles.itemHeader}>
-        <View style={styles.userInfo}>
-          <Image source={avatarSrc} style={styles.avatar} />
-          <View style={{ flex: 1 }}>
-            <Text allowFontScaling={false} style={styles.username} numberOfLines={1}>
-              {item.authorName || i18nText("autoI18n.kullanici", "Kullanıcı")}
-            </Text>
-            <Text allowFontScaling={false} style={styles.timestamp}>
-              {timeText}
-            </Text>
-          </View>
-        </View>
+    <View style={[styles.threadItemContainer, isReply && styles.threadReplyItem]}>
+      {isReply && <View pointerEvents="none" style={styles.replyElbow} />}
+      {isReply && !isLastReply && (
+        <View pointerEvents="none" style={styles.replyTrunk} />
+      )}
 
-        {isOwner && (
-          <View style={styles.ownerActions}>
-            <TouchableOpacity onPress={() => onEdit(item, isReply)} hitSlop={8}>
-              <Feather
-                name="edit-2"
-                size={14}
-                color={theme.colors.green}
-                style={{ marginRight: 12 }}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => onDelete(item)} hitSlop={8}>
-              <Feather name="trash-2" size={14} color={theme.colors.red} />
-            </TouchableOpacity>
-          </View>
+      <View style={styles.threadAvatarColumn}>
+        <View style={[styles.avatarFrame, isReply && styles.replyAvatarFrame]}>
+          <Image
+            source={avatarSrc}
+            style={[styles.avatar, isReply && styles.replyAvatar]}
+          />
+        </View>
+        {!isReply && replyCount > 0 && isRepliesVisible && (
+          <View style={styles.threadLine} />
         )}
       </View>
 
-      <View style={styles.contentBody}>
+      <View style={[styles.threadBody, isReply && styles.replyBody]}>
+        <View style={styles.threadHeader}>
+          <View style={styles.usernameRow}>
+            <Text allowFontScaling={false} style={styles.username} numberOfLines={1}>
+              {item.authorName || i18nText("autoI18n.kullanici", "Kullanıcı")}
+            </Text>
+            {!isReply && (
+              <View style={styles.sourceBadge}>
+                <Text allowFontScaling={false} style={styles.sourceBadgeText}>
+                  {i18nText("autoI18n.topluluk", "Topluluk")}
+                </Text>
+              </View>
+            )}
+            <Text allowFontScaling={false} style={styles.timestamp}>{timeText}</Text>
+          </View>
+          {isOwner && (
+            <TouchableOpacity onPress={openOwnerMenu} hitSlop={8}>
+              <Feather name="more-horizontal" size={16} color={theme.text.muted} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.threadContentBody}>
         <Text allowFontScaling={false} style={styles.commentText}>
           {item.text}
         </Text>
-      </View>
+        </View>
 
-      <View style={styles.actionsRow}>
-        <View style={styles.leftActions}>
+        <View style={styles.threadActionsRow}>
           <TouchableOpacity onPress={onLikePress} style={styles.actionButton}>
             <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
               <MaterialCommunityIcons
@@ -171,24 +208,26 @@ const CommentItem = memo(function CommentItem({
                 color={isLiked ? theme.colors.red : theme.text.secondary}
               />
             </Animated.View>
-            <Text
-              allowFontScaling={false}
-              style={[styles.actionLabel, isLiked && { color: theme.colors.red }]}
-            >
-              {likeCount}
-            </Text>
+            {likeCount > 0 && (
+              <Text
+                allowFontScaling={false}
+                style={[styles.actionLabel, isLiked && { color: theme.colors.red }]}
+              >
+                {likeCount}
+              </Text>
+            )}
           </TouchableOpacity>
 
           {!isReply && (
             <TouchableOpacity onPress={() => onReply(item)} style={styles.actionButton}>
-              <MaterialCommunityIcons
-                name="reply-outline"
+              <Ionicons
+                name="chatbubble-outline"
                 size={18}
                 color={theme.text.secondary}
               />
-              <Text allowFontScaling={false} style={styles.actionLabel}>
-                {i18nText("autoI18n.yanitla", "Yanıtla")}
-              </Text>
+              {replyCount > 0 && (
+                <Text allowFontScaling={false} style={styles.actionLabel}>{replyCount}</Text>
+              )}
             </TouchableOpacity>
           )}
         </View>
@@ -198,12 +237,13 @@ const CommentItem = memo(function CommentItem({
             onPress={() => onToggleReplies(item.id)}
             style={styles.repliesToggle}
           >
+            <View style={styles.repliesToggleLine} />
             <Text allowFontScaling={false} style={styles.repliesToggleText}>
-              {replyCount}{" "}
-              {i18nText("autoI18n.yanit", "Yanıt")}{" "}
               {isRepliesVisible
-                ? i18nText("autoI18n.gizle", "Gizle")
-                : i18nText("autoI18n.gor", "Gör")}
+                ? i18nText("autoI18n.yanitlari_gizle", "Yanıtları gizle")
+                : i18nText("autoI18n.yanitlari_gor", "Yanıtları gör ({{count}})", {
+                    count: replyCount,
+                  })}
             </Text>
           </TouchableOpacity>
         )}
@@ -421,12 +461,13 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
             styles={styles}
           />
           {visible &&
-            replies.map((rep) => (
+            replies.map((rep, index) => (
               <CommentItem
                 key={rep.id}
                 item={rep}
                 currentUid={user?.uid}
                 isReply
+                isLastReply={index === replies.length - 1}
                 onLike={handleLike}
                 onEdit={startEdit}
                 onDelete={handleDelete}
@@ -484,26 +525,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
 
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.postPill}>
-            {postPoster ? (
-              <Image source={{ uri: postPoster }} style={styles.postPillPoster} contentFit="cover" />
-            ) : (
-              <View style={styles.postPillPosterPlaceholder}>
-                <MaterialCommunityIcons
-                  name={post?.type === "list" ? "format-list-bulleted" : "movie-open-outline"}
-                  size={15}
-                  color={theme.text.secondary}
-                />
-              </View>
-            )}
-
-            <Image source={postAuthorAvatar} style={styles.postAuthorAvatar} />
-            <Text allowFontScaling={false} style={styles.postAuthorName} numberOfLines={1}>
-              {post?.authorName || i18nText("autoI18n.kullanici", "Kullanıcı")}
-            </Text>
-          </View>
-
-          <View style={styles.headerRight}>
+          <View style={styles.headerTitleRow}>
             <View style={styles.headerTitleGroup}>
               <MaterialCommunityIcons
                 name="comment-text-multiple-outline"
@@ -521,6 +543,58 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
             >
               <Ionicons name="close" size={18} color={theme.text.secondary} />
             </TouchableOpacity>
+          </View>
+
+          <View style={styles.miniPost}>
+            <Image source={postAuthorAvatar} style={styles.miniPostAvatar} />
+
+            <View style={styles.miniPostCopy}>
+              <View style={styles.miniPostAuthorRow}>
+                <Text allowFontScaling={false} style={styles.miniPostAuthor} numberOfLines={1}>
+                  {post?.authorName || i18nText("autoI18n.kullanici", "Kullanıcı")}
+                </Text>
+                <View style={styles.miniPostTypeDot} />
+                <Text allowFontScaling={false} style={styles.miniPostType} numberOfLines={1}>
+                  {post?.type === "list"
+                    ? i18nText("autoI18n.liste", "Liste")
+                    : post?.type === "poll"
+                      ? i18nText("autoI18n.anket", "Anket")
+                      : post?.type === "text"
+                        ? i18nText("autoI18n.sohbet", "Sohbet")
+                        : i18nText("autoI18n.inceleme", "İnceleme")}
+                </Text>
+              </View>
+
+              <Text allowFontScaling={false} style={styles.miniPostTitle} numberOfLines={1}>
+                {post?.title || i18nText("autoI18n.gonderi", "Gönderi")}
+              </Text>
+              {!!post?.content && (
+                <Text allowFontScaling={false} style={styles.miniPostContent} numberOfLines={1}>
+                  {post.content}
+                </Text>
+              )}
+            </View>
+
+            {postPoster ? (
+              <View style={styles.miniPostPosterWrap}>
+                <Image source={{ uri: postPoster }} style={styles.miniPostPoster} contentFit="cover" />
+                {post?.mediaList?.length > 1 && (
+                  <View style={styles.miniPostMediaCount}>
+                    <Text allowFontScaling={false} style={styles.miniPostMediaCountText}>
+                      +{post.mediaList.length - 1}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View style={styles.miniPostPosterPlaceholder}>
+                <MaterialCommunityIcons
+                  name={post?.type === "list" ? "format-list-bulleted" : "movie-open-outline"}
+                  size={18}
+                  color={theme.text.secondary}
+                />
+              </View>
+            )}
           </View>
         </View>
 
@@ -548,6 +622,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
               data={topLevelSorted}
               keyExtractor={(c) => c.id}
               renderItem={renderItem}
+              ItemSeparatorComponent={() => <View style={styles.feedSeparator} />}
               contentContainerStyle={styles.listContent}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
@@ -580,6 +655,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
                 placeholderTextColor={theme.text.muted}
                 value={input.text}
                 onChangeText={(t) => setInput((p) => ({ ...p, text: t }))}
+                maxLength={500}
                 multiline
               />
               <TouchableOpacity
@@ -644,57 +720,101 @@ const getStyles = (theme) =>
     },
 
     header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
       paddingHorizontal: 18,
       paddingBottom: 12,
       gap: 10,
     },
-    postPill: {
+    headerTitleRow: {
       flexDirection: "row",
       alignItems: "center",
-      backgroundColor: alpha(theme.text.primary, 0.06),
-      borderRadius: 14,
+      justifyContent: "space-between",
+    },
+    miniPost: {
+      minHeight: 76,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      padding: 9,
+      backgroundColor: alpha(theme.text.primary, 0.055),
+      borderRadius: 16,
       borderWidth: 1,
       borderColor: theme.border,
-      paddingVertical: 5,
-      paddingLeft: 5,
-      paddingRight: 9,
-      gap: 7,
-      flex: 1,
-      maxWidth: SCREEN_W * 0.54,
     },
-    postPillPoster: {
-      width: 28,
-      height: 40,
-      borderRadius: 8,
+    miniPostAvatar: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      borderWidth: 1,
+      borderColor: alpha(theme.text.primary, 0.16),
+      alignSelf: "flex-start",
+      marginTop: 1,
+    },
+    miniPostCopy: { flex: 1, minWidth: 0, gap: 2 },
+    miniPostAuthorRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      minWidth: 0,
+      marginBottom: 1,
+    },
+    miniPostAuthor: {
+      maxWidth: "56%",
+      color: theme.text.primary,
+      fontSize: 12,
+      fontWeight: "800",
+    },
+    miniPostTypeDot: {
+      width: 3,
+      height: 3,
+      borderRadius: 1.5,
+      marginHorizontal: 6,
+      backgroundColor: theme.text.muted,
+    },
+    miniPostType: {
+      color: theme.accent,
+      fontSize: 9.5,
+      fontWeight: "800",
+    },
+    miniPostTitle: {
+      color: theme.text.primary,
+      fontSize: 12.5,
+      lineHeight: 17,
+      fontWeight: "700",
+    },
+    miniPostContent: {
+      color: theme.text.secondary,
+      fontSize: 11,
+      lineHeight: 15,
+    },
+    miniPostPosterWrap: {
+      width: 42,
+      height: 60,
+      borderRadius: 9,
+      overflow: "hidden",
       backgroundColor: theme.primary,
     },
-    postPillPosterPlaceholder: {
-      width: 28,
-      height: 40,
-      borderRadius: 8,
+    miniPostPoster: { width: "100%", height: "100%" },
+    miniPostPosterPlaceholder: {
+      width: 42,
+      height: 60,
+      borderRadius: 9,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: theme.primary,
     },
-    postAuthorAvatar: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: alpha(theme.text.primary, 0.16),
+    miniPostMediaCount: {
+      position: "absolute",
+      right: 3,
+      bottom: 3,
+      minWidth: 20,
+      height: 18,
+      paddingHorizontal: 4,
+      borderRadius: 9,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(0,0,0,0.7)",
     },
-    postAuthorName: {
-      flex: 1,
-      fontSize: 12,
-      fontWeight: "700",
-      color: theme.text.primary,
-      letterSpacing: 0.1,
-    },
+    miniPostMediaCountText: { color: "#fff", fontSize: 9, fontWeight: "800" },
 
-    headerRight: { flexDirection: "row", alignItems: "center", gap: 10 },
     headerTitleGroup: { flexDirection: "row", alignItems: "center", gap: 6 },
     headerTitle: {
       fontSize: 16,
@@ -718,8 +838,13 @@ const getStyles = (theme) =>
       backgroundColor: theme.border,
     },
 
-    commentArea: { flex: 1 },
-    listContent: { padding: 15, paddingBottom: 140 },
+    commentArea: { flex: 1, backgroundColor: theme.primary },
+    listContent: { padding: 15, paddingBottom: 140, gap: 10 },
+    feedSeparator: {
+      height: StyleSheet.hairlineWidth,
+      marginHorizontal: -15,
+      backgroundColor: alpha(theme.border, 0.9),
+    },
 
     center: {
       flex: 1,
@@ -730,52 +855,133 @@ const getStyles = (theme) =>
     },
     emptyText: { color: theme.text.muted, fontSize: 13, fontWeight: "600" },
 
-    itemContainer: {
-      marginBottom: 14,
-      backgroundColor: theme.primary,
-      borderRadius: 18,
-      padding: 14,
+    threadItemContainer: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    threadReplyItem: { paddingLeft: 48 },
+    threadAvatarColumn: {
+      width: 38,
+      alignItems: "center",
+    },
+    avatarFrame: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      marginTop: 10,
+      alignItems: "center",
+      justifyContent: "center",
       borderWidth: 1,
-      borderColor: theme.border,
+      borderColor: alpha(theme.border, 0.9),
+      backgroundColor: theme.primary,
+      overflow: "hidden",
     },
-    ownComment: {
-      borderColor: alpha(theme.accent, 0.4),
-      borderLeftWidth: 3,
-      borderLeftColor: theme.accent,
-    },
-    replyMargin: {
-      marginLeft: 32,
-      borderLeftWidth: 2,
-      borderLeftColor: theme.accent,
-    },
-
-    itemHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 8,
-    },
-    userInfo: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
-    ownerActions: { flexDirection: "row", alignItems: "center" },
-    avatar: { width: 34, height: 34, borderRadius: 17 },
-    username: { color: theme.text.primary, fontSize: 13, fontWeight: "700" },
-    timestamp: { color: theme.text.muted, fontSize: 10, marginTop: 1 },
-
-    contentBody: { marginVertical: 6 },
-    commentText: { color: theme.text.primary, fontSize: 14, lineHeight: 20 },
-
-    actionsRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
+    replyAvatarFrame: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
       marginTop: 8,
     },
-    leftActions: { flexDirection: "row", gap: 18 },
-    actionButton: { flexDirection: "row", alignItems: "center", gap: 5 },
-    actionLabel: { color: theme.text.secondary, fontSize: 12, fontWeight: "600" },
-    repliesToggle: { paddingVertical: 4 },
-    repliesToggleText: {
+    avatar: { width: 34, height: 34, borderRadius: 17 },
+    replyAvatar: { width: 26, height: 26, borderRadius: 13 },
+    threadLine: {
+      flex: 1,
+      width: 1.5,
+      marginTop: 6,
+      borderRadius: 1,
+      backgroundColor: alpha(theme.border, 0.95),
+    },
+    replyElbow: {
+      position: "absolute",
+      left: 19,
+      top: 0,
+      width: 33,
+      height: 23,
+      borderLeftWidth: 1.5,
+      borderBottomWidth: 1.5,
+      borderBottomLeftRadius: 14,
+      borderColor: alpha(theme.border, 0.95),
+    },
+    replyTrunk: {
+      position: "absolute",
+      left: 19,
+      top: 0,
+      bottom: 0,
+      width: 1.5,
+      backgroundColor: alpha(theme.border, 0.95),
+    },
+    threadBody: {
+      flex: 1,
+      minWidth: 0,
+      paddingVertical: 10,
+    },
+    replyBody: { paddingVertical: 8 },
+    threadHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 3,
+      gap: 8,
+    },
+    usernameRow: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    sourceBadge: {
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 7,
+      backgroundColor: alpha(theme.accent, 0.16),
+    },
+    sourceBadgeText: {
+      color: theme.accent,
+      fontSize: 8,
+      fontWeight: "800",
+    },
+    username: {
+      color: theme.text.primary,
+      fontSize: 14,
+      fontWeight: "700",
+      flexShrink: 1,
+    },
+    timestamp: { color: theme.text.muted, fontSize: 12, fontWeight: "500" },
+    threadContentBody: { marginTop: 1, marginBottom: 2 },
+    commentText: { color: theme.text.primary, fontSize: 14, lineHeight: 20 },
+    threadActionsRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 22,
+      marginTop: 8,
+    },
+    actionButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      paddingVertical: 2,
+    },
+    actionLabel: {
       color: theme.text.secondary,
+      fontSize: 12.5,
+      fontWeight: "600",
+    },
+    repliesToggle: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 10,
+      paddingVertical: 2,
+    },
+    repliesToggleLine: {
+      width: 26,
+      height: 1,
+      backgroundColor: theme.text.muted,
+      opacity: 0.5,
+    },
+    repliesToggleText: {
+      color: theme.text.muted,
       fontSize: 12,
       fontWeight: "700",
     },
@@ -789,14 +995,14 @@ const getStyles = (theme) =>
       paddingBottom: Platform.OS === "ios" ? 28 : 15,
       borderTopWidth: 1,
       borderColor: theme.border,
-      backgroundColor: theme.secondary,
+      backgroundColor: theme.primary,
     },
     inputRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
     input: {
       flex: 1,
       minHeight: 45,
       maxHeight: 100,
-      backgroundColor: theme.primary,
+      backgroundColor: theme.secondary,
       borderRadius: 22,
       paddingHorizontal: 16,
       paddingTop: 12,

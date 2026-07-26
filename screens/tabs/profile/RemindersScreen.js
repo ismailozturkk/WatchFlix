@@ -11,7 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
-import IconBacground from "../../../components/IconBacground";
+import ScreenDecor from "../../../components/ScreenDecor";
 import ProfileReminders from "./ProfileReminders";
 import { i18nText } from "../../../utils/i18nText";
 
@@ -29,7 +29,7 @@ export default function RemindersScreen({ navigation }) {
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
       <StatusBar barStyle="light-content" />
-      <IconBacground opacity={0.25} />
+      <ScreenDecor iconOpacity={0.25} />
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         {/* Başlık */}
         <View style={styles.header}>

@@ -30,7 +30,7 @@ export default class ErrorBoundary extends React.Component {
             style={styles.button}
             onPress={() => this.setState({ hasError: false, error: null })}
           >
-            <Text style={styles.buttonText}>Tekrar Dene</Text>
+            <Text style={styles.buttonText}>{i18nText("autoI18n.tekrar_dene", "Tekrar Dene")}</Text>
           </TouchableOpacity>
         </View>
       );

@@ -21,7 +21,7 @@ import { useSharedLists } from "../context/SharedListsContext";
 import SharedListsSection from "./SharedListsSection";
 import { useHapticsSettings } from "../context/AppSettingsContext";
 import { BlurView } from "expo-blur";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "@services/hapticsService";
 import { i18nText } from "../utils/i18nText";
 import {
   WATCH_STATE,
@@ -481,7 +481,7 @@ const ListViewTv = ({
                   >
                     <Ionicons name="close-circle-outline" size={15} color={theme.text.muted} />
                     <Text allowFontScaling={false} style={[styles.actionBtnText, { color: theme.text.muted }]}>
-                      Kapat
+                      {i18nText("autoI18n.kapat", "Kapat")}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity

@@ -2,7 +2,7 @@
 //
 // Sahne Tahmin sonuc paylasim karti (Part 13.4). captureRef hedefi.
 // Spoiler olusturacak sahne gorselleri YOK; yalniz skor, mod, zorluk, dogruluk,
-// seri ve Watchify marka alani gosterilir. Saf/statik bilesendir (animasyon/buton
+// seri ve Seelogd marka alani gosterilir. Saf/statik bilesendir (animasyon/buton
 // icermez) — her yakalamada tam kompozisyon elde edilir.
 
 import React, { memo } from "react";
@@ -110,7 +110,7 @@ const SceneResultShareCard = memo(function SceneResultShareCard({
       {/* Filigran */}
       <View style={[styles.watermark, { bottom: u(14), right: u(16), paddingRight: u(11), borderRadius: u(999) }]}>
         <Image source={APP_LOGO} style={{ width: u(30), height: u(30) }} contentFit="contain" />
-        <Text style={[styles.wmText, { fontSize: u(12) }]} allowFontScaling={false}>Watchify</Text>
+        <Text style={[styles.wmText, { fontSize: u(12) }]} allowFontScaling={false}>Seelogd</Text>
       </View>
     </View>
   );

@@ -23,6 +23,7 @@ import { useLanguage } from "../../../context/LanguageContext";
 import { useProfileReminders } from "../../../context/ProfileRemindersContext";
 import { useImageQualitySettings, useListLayoutSettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
+import { parseAirDate, startOfDay } from "../../../utils/airDate";
 
 
 const { width } = Dimensions.get("window");
@@ -72,16 +73,21 @@ function buildItems(reminders) {
       })),
     ),
   );
-  const all = [...movies, ...eps].filter(
-    (x) => x.date && !isNaN(new Date(x.date)),
-  );
-  const now = Date.now();
+  const all = [...movies, ...eps].filter((x) => startOfDay(x.date) !== null);
+  // Sınır "şu an" değil "bugünün başlangıcı": bugün yayınlanan bir bölüm gün
+  // boyu yaklaşanlarda kalmalı, saat geçti diye geçmişe düşmemeli. Widget'ın
+  // filtresiyle de aynı sınır (bkz. reminderWidgetService).
+  const todayStart = startOfDay(new Date()).getTime();
+  const dayOf = (x) => startOfDay(x.date).getTime();
+  // Eleme gün bazında, sıralama tam zaman bazında: aynı güne düşen iki kayıt
+  // saatine göre sıralı kalsın.
+  const timeOf = (x) => parseAirDate(x.date).getTime();
   const upcoming = all
-    .filter((x) => new Date(x.date).getTime() >= now)
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
+    .filter((x) => dayOf(x) >= todayStart)
+    .sort((a, b) => timeOf(a) - timeOf(b));
   const past = all
-    .filter((x) => new Date(x.date).getTime() < now)
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
+    .filter((x) => dayOf(x) < todayStart)
+    .sort((a, b) => timeOf(b) - timeOf(a));
   return {
     items: [...upcoming, ...past].slice(0, 5),
     total: all.length,

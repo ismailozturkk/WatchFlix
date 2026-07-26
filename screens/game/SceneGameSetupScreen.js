@@ -29,18 +29,14 @@ function getModeMetaLine(mode, language) {
   if (mode.totalSeconds) parts.push(`${mode.totalSeconds} ${i18nText("autoI18n.saniye", language === "en" ? "sec" : "sn")}`);
   if (mode.lives) parts.push(`${mode.lives} ${i18nText("autoI18n.can", language === "en" ? "lives" : "can")}`);
   if (mode.estimatedMinutes) parts.push(`~${mode.estimatedMinutes} ${i18nText("autoI18n.dakika", language === "en" ? "min" : "dk")}`);
-  if (mode.leaderboardEligible) parts.push(i18nText("autoI18n.liderlik_uygun", language === "en" ? "Leaderboard" : "Liderlik"));
-  return parts.join("  ·  ");
+  if (mode.leaderboardEligible) parts.push(i18nText("autoI18n.liderlik_uygun", language === "en" ? "Liderlik" : "Liderlik"));
+  return parts.join(" · ");
 }
 
 /* ══════════════════════════════════════════════════════════════════════════ */
 export default function SceneGameSetupScreen({ navigation, route }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  // combinedLists: legacy kök array'ler + yeni subcollection birleşimi.
-  // allLists yalnız kök array'leri görür; migration onları deleteField ile
-  // sildiği için migre kullanıcıda tüm "Sana Özel" kaynaklar 0/4 görünüp
-  // kalıcı kilitleniyordu (oyun içi kaynak seçimi zaten combinedLists kullanır).
   const { combinedLists } = useListStatusContext();
   const { user } = useAuth();
 
@@ -160,21 +156,14 @@ export default function SceneGameSetupScreen({ navigation, route }) {
 
       {/* ── 4. Summary ────────────────────────────────────────────────── */}
       <View style={[styles.summaryCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-        <View style={[styles.summaryIcon, { backgroundColor: `${theme.accent}15` }]}>
-          <AppIcon family="Ionicons" name="clipboard-outline" size={22} color={theme.accent} />
+        <View style={[styles.summaryIcon, { backgroundColor: `${theme.accent}1C` }]}>
+          <AppIcon family="Ionicons" name="checkmark-done-circle" size={20} color={theme.accent} />
         </View>
         <View style={styles.summaryCopy}>
-          <Text style={[styles.summaryTitle, { color: theme.text.primary }]}>
-            {i18nText("autoI18n.ozet", "Özet")}
+          <Text style={[styles.summaryTitle, { color: theme.text.primary }]} allowFontScaling={false}>
+            {getLocalizedGameLabel(selectedMode, language)} · {getLocalizedGameLabel(selectedDifficulty, language)} · {getLocalizedGameLabel(selectedSource, language)}
           </Text>
-          <Text style={[styles.summaryMeta, { color: theme.text.muted }]}>
-            {getLocalizedGameLabel(selectedMode, language)}
-            {"  ·  "}
-            {getLocalizedGameLabel(selectedDifficulty, language)}
-            {"  ·  "}
-            {getLocalizedGameLabel(selectedSource, language)}
-          </Text>
-          <Text style={[styles.summaryDetails, { color: theme.text.secondary }]}>
+          <Text style={[styles.summaryDetails, { color: theme.accent }]} allowFontScaling={false}>
             {getModeMetaLine(selectedMode, language)}
           </Text>
         </View>
@@ -184,11 +173,11 @@ export default function SceneGameSetupScreen({ navigation, route }) {
       <TouchableOpacity
         accessibilityRole="button"
         accessibilityLabel={i18nText("autoI18n.oyunu_baslat", "Oyunu Başlat")}
-        style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent, marginTop: 6 }]}
+        style={[gameSharedStyles.primaryButton, styles.startButton, { backgroundColor: theme.accent }]}
         onPress={handleStartGame}
       >
-        <AppIcon family="Ionicons" name="play" size={20} color="#fff" />
-        <Text style={gameSharedStyles.primaryButtonText}>
+        <AppIcon family="Ionicons" name="play" size={17} color="#fff" />
+        <Text style={gameSharedStyles.primaryButtonText} allowFontScaling={false}>
           {i18nText("autoI18n.oyunu_baslat", "Oyunu Başlat")}
         </Text>
       </TouchableOpacity>
@@ -197,19 +186,21 @@ export default function SceneGameSetupScreen({ navigation, route }) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   Sub-components
+   Sub-components (Compact UI)
    ══════════════════════════════════════════════════════════════════════════ */
 
 function SectionHeader({ icon, title, theme }) {
   return (
     <View style={styles.sectionRow}>
-      <AppIcon family="Ionicons" name={icon} size={16} color={theme.text.muted} />
-      <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>{title}</Text>
+      <AppIcon family="Ionicons" name={icon} size={14} color={theme.text.muted} />
+      <Text style={[styles.sectionTitle, { color: theme.text.muted }]} allowFontScaling={false}>
+        {title}
+      </Text>
     </View>
   );
 }
 
-/* ── Mode Card ──────────────────────────────────────────────────────────── */
+/* ── Mode Card (Compact) ─────────────────────────────────────────────────── */
 function ModeCard({ mode, selected, language, theme, onPress }) {
   const borderColor = !mode.available ? theme.border : selected ? theme.accent : theme.border;
   return (
@@ -217,182 +208,187 @@ function ModeCard({ mode, selected, language, theme, onPress }) {
       accessibilityRole="button"
       accessibilityState={{ selected, disabled: !mode.available }}
       disabled={!mode.available}
-      activeOpacity={0.8}
+      activeOpacity={0.85}
       onPress={onPress}
       style={[
         styles.modeCard,
         {
-          backgroundColor: theme.secondary,
+          backgroundColor: selected ? `${theme.accent}14` : theme.secondary,
           borderColor,
-          opacity: mode.available ? 1 : 0.52,
+          opacity: mode.available ? 1 : 0.5,
         },
       ]}
     >
-      <View style={[styles.modeIcon, { backgroundColor: selected ? `${theme.accent}20` : theme.primary }]}>
-        <AppIcon family="Ionicons" name={mode.icon} size={24} color={selected ? theme.accent : theme.text.muted} />
+      <View style={[styles.modeIcon, { backgroundColor: selected ? theme.accent : theme.primary }]}>
+        <AppIcon family="Ionicons" name={mode.icon} size={18} color={selected ? "#FFFFFF" : theme.text.muted} />
       </View>
       <View style={styles.modeCopy}>
         <View style={styles.modeTitleRow}>
-          <Text style={[styles.modeTitle, { color: theme.text.primary }]}>
+          <Text style={[styles.modeTitle, { color: theme.text.primary }]} allowFontScaling={false}>
             {i18nText(mode.titleKey, getLocalizedGameLabel(mode, language))}
           </Text>
-          {!mode.available && (
-            <View style={[styles.soonBadge, { borderColor: theme.border }]}>
-              <Text style={[styles.soonText, { color: theme.text.muted }]}>
-                {i18nText("autoI18n.yakinda", "Yakında")}
-              </Text>
-            </View>
-          )}
-          {selected && mode.available && (
-            <AppIcon family="Ionicons" name="checkmark-circle" size={18} color={theme.accent} />
-          )}
+          <Text style={[styles.modeMetaPill, { color: selected ? theme.accent : theme.text.muted }]} allowFontScaling={false}>
+            {getModeMetaLine(mode, language)}
+          </Text>
         </View>
-        <Text style={[styles.modeRule, { color: theme.text.muted }]} numberOfLines={2}>
+        <Text style={[styles.modeRule, { color: theme.text.muted }]} numberOfLines={1} allowFontScaling={false}>
           {i18nText(mode.ruleKey, "")}
         </Text>
-        <Text style={[styles.modeMeta, { color: selected ? theme.accent : theme.text.muted }]}>
-          {getModeMetaLine(mode, language)}
-        </Text>
       </View>
+      {selected && mode.available && (
+        <AppIcon family="Ionicons" name="checkmark-circle" size={18} color={theme.accent} />
+      )}
     </TouchableOpacity>
   );
 }
 
-/* ── Difficulty Chip ────────────────────────────────────────────────────── */
+/* ── Difficulty Chip (Compact) ────────────────────────────────────────────── */
 function DifficultyChip({ diff, selected, language, theme, onPress }) {
   return (
     <TouchableOpacity
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      activeOpacity={0.8}
+      activeOpacity={0.85}
       onPress={onPress}
       style={[
         styles.diffChip,
         {
-          backgroundColor: selected ? `${diff.color}18` : theme.secondary,
+          backgroundColor: selected ? `${diff.color}20` : theme.secondary,
           borderColor: selected ? diff.color : theme.border,
         },
       ]}
     >
-      <AppIcon family="Ionicons" name={diff.icon} size={20} color={selected ? diff.color : theme.text.muted} />
-      <Text style={[styles.diffTitle, { color: selected ? diff.color : theme.text.primary }]}>
-        {i18nText(diff.titleKey, getLocalizedGameLabel(diff, language))}
-      </Text>
-      <Text style={[styles.diffDesc, { color: selected ? diff.color : theme.text.muted }]}>
-        {diff.timeSeconds}{i18nText("autoI18n.saniye_kisa", "sn")} · {diff.optionCount} {i18nText("autoI18n.secenek", language === "en" ? "options" : "şık")}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+        <AppIcon family="Ionicons" name={diff.icon} size={15} color={selected ? diff.color : theme.text.muted} />
+        <Text style={[styles.diffTitle, { color: selected ? diff.color : theme.text.primary }]} allowFontScaling={false}>
+          {i18nText(diff.titleKey, getLocalizedGameLabel(diff, language))}
+        </Text>
+      </View>
+      <Text style={[styles.diffDesc, { color: selected ? diff.color : theme.text.muted }]} allowFontScaling={false}>
+        {diff.timeSeconds}{i18nText("autoI18n.saniye_kisa", "sn")} · {diff.optionCount} {i18nText("autoI18n.secenek", language === "en" ? "opts" : "şık")}
       </Text>
     </TouchableOpacity>
   );
 }
 
-/* ── Source Card ─────────────────────────────────────────────────────────── */
+/* ── Source Card (Compact) ────────────────────────────────────────────────── */
 function SourceCard({ item, count, disabled, selected, language, theme, onPress }) {
   return (
     <TouchableOpacity
       accessibilityRole="button"
       accessibilityState={{ selected, disabled: !!disabled }}
       disabled={disabled}
-      activeOpacity={0.8}
+      activeOpacity={0.85}
       onPress={onPress}
       style={[
         styles.sourceCard,
         {
-          backgroundColor: theme.secondary,
+          backgroundColor: selected ? `${theme.accent}14` : theme.secondary,
           borderColor: selected ? theme.accent : theme.border,
           opacity: disabled ? 0.45 : 1,
         },
       ]}
     >
-      <View style={[styles.sourceIcon, { backgroundColor: selected ? `${theme.accent}25` : theme.primary }]}>
-        <AppIcon family="Ionicons" name={item.icon} size={21} color={selected ? theme.accent : theme.text.secondary} />
+      <View style={[styles.sourceIcon, { backgroundColor: selected ? theme.accent : theme.primary }]}>
+        <AppIcon family="Ionicons" name={item.icon} size={17} color={selected ? "#FFFFFF" : theme.text.secondary} />
       </View>
-      <Text style={[styles.sourceTitle, { color: theme.text.primary }]} numberOfLines={2}>
-        {getLocalizedGameLabel(item, language)}
-      </Text>
-      {item.personal && count !== undefined ? (
-        <Text style={[styles.sourceMeta, { color: disabled ? "#FF6B6B" : theme.text.muted }]}>
-          {disabled
-            ? i18nText("autoI18n.oyun_en_az_dort_icerik", `${count}/4`, { count })
-            : i18nText("autoI18n.oyun_uygun_icerik", `${count} içerik`, { count })}
+      <View style={styles.sourceTextWrap}>
+        <Text style={[styles.sourceTitle, { color: theme.text.primary }]} numberOfLines={1} allowFontScaling={false}>
+          {getLocalizedGameLabel(item, language)}
         </Text>
-      ) : null}
+        {item.personal && count !== undefined ? (
+          <Text style={[styles.sourceMeta, { color: disabled ? "#FF6B6B" : theme.text.muted }]} allowFontScaling={false}>
+            {disabled ? `${count}/4` : `${count} içerik`}
+          </Text>
+        ) : null}
+      </View>
       {selected && !disabled ? (
-        <AppIcon family="Ionicons" name="checkmark-circle" size={19} color={theme.accent} style={styles.sourceCheck} />
+        <AppIcon family="Ionicons" name="checkmark-circle" size={16} color={theme.accent} />
       ) : null}
     </TouchableOpacity>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   Styles
+   Compact Styles
    ══════════════════════════════════════════════════════════════════════════ */
 const styles = StyleSheet.create({
-  /* Section header */
-  sectionRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
-  sectionTitle: { fontSize: 12, fontWeight: "900", letterSpacing: 0.8, textTransform: "uppercase" },
+  sectionRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 10, marginBottom: 6, paddingHorizontal: 2 },
+  sectionTitle: { fontSize: 11.5, fontWeight: "900", letterSpacing: 0.8, textTransform: "uppercase" },
 
-  /* Mode cards */
-  modeList: { gap: 9 },
+  /* Mode cards (Compact) */
+  modeList: { gap: 8 },
   modeCard: {
-    minHeight: 100,
-    borderRadius: 19,
+    minHeight: 58,
+    borderRadius: 16,
     borderWidth: 1.5,
-    padding: 13,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
   },
-  modeIcon: { width: 50, height: 50, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  modeIcon: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   modeCopy: { flex: 1 },
-  modeTitleRow: { flexDirection: "row", alignItems: "center", gap: 7 },
-  modeTitle: { fontSize: 14, fontWeight: "900" },
-  modeRule: { fontSize: 10, lineHeight: 14, fontWeight: "650", marginTop: 4 },
-  modeMeta: { fontSize: 9, fontWeight: "800", marginTop: 5 },
-  soonBadge: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 },
-  soonText: { fontSize: 7, fontWeight: "800" },
+  modeTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  modeTitle: { fontSize: 13.5, fontWeight: "900" },
+  modeMetaPill: { fontSize: 9.5, fontWeight: "750" },
+  modeRule: { fontSize: 10, fontWeight: "600", marginTop: 1 },
 
-  /* Difficulty chips */
-  difficultyRow: { flexDirection: "row", gap: 9 },
+  /* Difficulty chips (Compact) */
+  difficultyRow: { flexDirection: "row", gap: 8 },
   diffChip: {
     flex: 1,
-    minHeight: 86,
-    borderRadius: 17,
+    minHeight: 58,
+    borderRadius: 15,
     borderWidth: 1.5,
-    padding: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    gap: 2,
   },
-  diffTitle: { fontSize: 13, fontWeight: "900", marginTop: 2 },
-  diffDesc: { fontSize: 9, fontWeight: "700", textAlign: "center" },
+  diffTitle: { fontSize: 12.5, fontWeight: "900" },
+  diffDesc: { fontSize: 9, fontWeight: "750" },
 
-  /* Source grid */
-  sourceGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  /* Source grid (Compact) */
+  sourceGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   sourceCard: {
-    width: "48%",
-    minHeight: 110,
-    borderRadius: 17,
+    width: "48.5%",
+    minHeight: 54,
+    borderRadius: 15,
     borderWidth: 1.5,
-    padding: 13,
-  },
-  sourceIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  sourceTitle: { fontSize: 13, fontWeight: "800", lineHeight: 17, marginTop: 9, paddingRight: 10 },
-  sourceMeta: { fontSize: 10, fontWeight: "700", marginTop: 4 },
-  sourceCheck: { position: "absolute", top: 11, right: 11 },
-
-  /* Summary card */
-  summaryCard: {
-    borderRadius: 19,
-    borderWidth: 1,
-    padding: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    marginTop: 2,
+    gap: 8,
   },
-  summaryIcon: { width: 48, height: 48, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  sourceIcon: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  sourceTextWrap: { flex: 1 },
+  sourceTitle: { fontSize: 12, fontWeight: "800" },
+  sourceMeta: { fontSize: 9, fontWeight: "700", marginTop: 1 },
+
+  /* Summary card (Compact) */
+  summaryCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 10,
+  },
+  summaryIcon: { width: 34, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   summaryCopy: { flex: 1 },
-  summaryTitle: { fontSize: 13, fontWeight: "900" },
-  summaryMeta: { fontSize: 10, fontWeight: "700", marginTop: 3 },
-  summaryDetails: { fontSize: 9, fontWeight: "650", marginTop: 3 },
+  summaryTitle: { fontSize: 12, fontWeight: "900" },
+  summaryDetails: { fontSize: 9.5, fontWeight: "750", marginTop: 2 },
+
+  startButton: {
+    minHeight: 48,
+    marginTop: 10,
+    marginBottom: 20,
+    borderRadius: 16,
+  },
 });

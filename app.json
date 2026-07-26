@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Watchify",
-    "slug": "WatchFlix",
+    "name": "Seelogd",
+    "slug": "seelogd",
     "version": "1.4.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,11 +12,14 @@
       "resizeMode": "contain",
       "backgroundColor": "#1E1E1E"
     },
-    "scheme": "watchify",
+    "scheme": "seelogd",
     "ios": {
+      "bundleIdentifier": "com.smlztrk.seelogd",
       "supportsTablet": true,
       "entitlements": {
-        "com.apple.security.application-groups": ["group.com.smlztrk.Watchify"]
+        "com.apple.security.application-groups": [
+          "group.com.smlztrk.seelogd"
+        ]
       }
     },
     "android": {
@@ -31,13 +34,14 @@
         "resizeMode": "contain",
         "backgroundColor": "#1E1E1E"
       },
-      "package": "com.smlztrk.Watchify",
+      "package": "com.smlztrk.seelogd",
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
-        "android.permission.READ_MEDIA_IMAGES"
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "blockedPermissions": [
         "android.permission.WRITE_EXTERNAL_STORAGE",
@@ -48,11 +52,6 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "3bbd3b81-8382-4788-bfc9-dbde13043eaf"
-      }
     },
     "plugins": [
       "@bacons/apple-targets",
@@ -67,7 +66,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/android-icon-monochrome.png",
+          "icon": "./assets/notification-icon.png",
           "color": "#1E1E1E",
           "defaultChannel": "default"
         }
@@ -79,10 +78,34 @@
           "photosPermission": "Uygulamanın oluşturduğun story görselini galerine kaydetmesine izin ver.",
           "savePhotosPermission": "Uygulamanın oluşturduğun story görselini galerine kaydetmesine izin ver.",
           "isAccessMediaLocationEnabled": false,
-          "granularPermissions": ["photo"]
+          "granularPermissions": [
+            "photo"
+          ]
         }
       ]
     ],
-    "owner": "smlztrk"
+    "owner": "smlztrk",
+    "extra": {
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.smlztrk.seelogd.widget",
+                  "targetName": "ReminderWidget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.smlztrk.seelogd"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "9c17fe1c-ca63-4de3-af7a-76d131e3db7a"
+      }
+    }
   }
 }

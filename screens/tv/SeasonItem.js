@@ -13,8 +13,10 @@ import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
+import Toast from "react-native-toast-message";
 import Reminder from "../../components/Reminder";
-import { markSeason, unmarkSeason } from "../../services/watchedTvService";
+import { markSeason, removeTvWatchEvent } from "../../services/watchedTvService";
+import WatchHistorySheet from "@components/modals/WatchHistorySheet";
 import {
   getWatchState,
   isAired,
@@ -35,7 +37,6 @@ import DrumDatePickerModal from "@components/modals/DatePickerModal";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import Entypo from "@expo/vector-icons/Entypo";
 import { i18nText } from "../../utils/i18nText";
-
 
 const { width } = Dimensions.get("window");
 
@@ -91,14 +92,16 @@ const DatePickerModal = memo(
 
         <Text
           style={[styles.sheetTitle, { color: theme.text?.primary ?? "#fff" }]}
-        >{i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}</Text>
+        >
+          {i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}
+        </Text>
         <Text
           style={[
             styles.sheetSubtitle,
             { color: theme.text?.secondary ?? "#aaa" },
           ]}
         >
-          Bu sezonu ne zaman izlediniz?
+          {i18nText("autoI18n.bu_sezonu_ne_zaman_izlediniz", "Bu sezonu ne zaman izlediniz?")}
         </Text>
 
         <View style={styles.optionsRow}>
@@ -121,14 +124,18 @@ const DatePickerModal = memo(
                 styles.optionLabel,
                 { color: theme.text?.primary ?? "#fff" },
               ]}
-            >{i18nText("autoI18n.tarih_sec", "Tarih Seç")}</Text>
+            >
+              {i18nText("autoI18n.tarih_sec", "Tarih Seç")}
+            </Text>
             <Text
               style={[
                 styles.optionDate,
                 { color: theme.text?.secondary ?? "#aaa" },
               ]}
             >
-              {selectedDate ? formatDate(selectedDate) : i18nText("autoI18n.gun_seciniz", "Gün seçiniz")}
+              {selectedDate
+                ? formatDate(selectedDate)
+                : i18nText("autoI18n.gun_seciniz", "Gün seçiniz")}
             </Text>
           </TouchableOpacity>
 
@@ -151,7 +158,9 @@ const DatePickerModal = memo(
                 styles.optionLabel,
                 { color: theme.text?.primary ?? "#fff" },
               ]}
-            >{i18nText("autoI18n.simdi", "Şimdi")}</Text>
+            >
+              {i18nText("autoI18n.simdi", "Şimdi")}
+            </Text>
             <Text
               style={[
                 styles.optionDate,
@@ -185,7 +194,9 @@ const DatePickerModal = memo(
                 styles.optionLabel,
                 { color: theme.text?.primary ?? "#fff" },
               ]}
-            >{i18nText("autoI18n.yayin_tarihi", "Yayın Tarihi")}</Text>
+            >
+              {i18nText("autoI18n.yayin_tarihi", "Yayın Tarihi")}
+            </Text>
             <Text
               style={[
                 styles.optionDate,
@@ -210,12 +221,16 @@ const DatePickerModal = memo(
               styles.cancelBtnText,
               { color: theme.text?.secondary ?? "#aaa" },
             ]}
-          >{i18nText("autoI18n.iptal", "İptal")}</Text>
+          >
+            {i18nText("autoI18n.iptal", "İptal")}
+          </Text>
         </TouchableOpacity>
 
         <DrumDatePickerModal
           visible={isDatePickerVisible}
-          value={selectedDate || (formatDateSave ? formatDateSave(new Date()) : "")}
+          value={
+            selectedDate || (formatDateSave ? formatDateSave(new Date()) : "")
+          }
           onConfirm={(iso) => onConfirm(iso)}
           onClose={onCancelPicker}
           title={i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}
@@ -226,11 +241,17 @@ const DatePickerModal = memo(
         />
       </View>
     </Modal>
-  ),
+  )
 );
 
 // ─── Ana Bileşen ──────────────────────────────────────────────────────────────
-const SeasonItem = ({ season, details, navigation, watchedCount = 0 }) => {
+const SeasonItem = ({
+  season,
+  details,
+  navigation,
+  watchedCount = 0,
+  watchEvents = [],
+}) => {
   const { theme } = useTheme();
   const { t, language } = useLanguage();
   const { user } = useAuth();
@@ -240,6 +261,7 @@ const SeasonItem = ({ season, details, navigation, watchedCount = 0 }) => {
   const [play, setPlay] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [watchHistoryVisible, setWatchHistoryVisible] = useState(false);
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
 
@@ -293,7 +315,7 @@ const SeasonItem = ({ season, details, navigation, watchedCount = 0 }) => {
       addSeasonToFirestore(false, isoDate);
       hideDatePicker();
     },
-    [hideDatePicker, formatDateSave],
+    [hideDatePicker, formatDateSave]
   );
 
   // ── Tarih yardımcıları ────────────────────────────────────────────────────
@@ -304,27 +326,25 @@ const SeasonItem = ({ season, details, navigation, watchedCount = 0 }) => {
         month: "long",
         year: "numeric",
       }).format(new Date(timestamp)),
-    [language],
+    [language]
   );
 
   const formatDateSave = useCallback((timestamp) => {
     const date = new Date(timestamp);
     if (isNaN(date.getTime())) return "";
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(date.getDate()).padStart(2, "0")}`;
   }, []);
 
   // ── Firestore: sezon ekle / sil — kanonik servis (race-free) ─────────────
   const addSeasonToFirestore = useCallback(
-    async (isDelete = false, date = null) => {
+    async (_isDelete = false, date = null) => {
       if (!user?.uid) return;
       try {
         setIsLoading(true);
         setModalVisible(false);
-
-        if (isDelete) {
-          await unmarkSeason(user.uid, details.id, season.season_number);
-          return;
-        }
 
         if (!date) return;
         const response = await axios.get(
@@ -332,7 +352,7 @@ const SeasonItem = ({ season, details, navigation, watchedCount = 0 }) => {
           {
             params: { language: language === "tr" ? "tr-TR" : "en-US" },
             headers: { accept: "application/json", Authorization: API_KEY },
-          },
+          }
         );
         const episodeDate = formatDateSave(date);
         const episodesData = response.data.episodes.map((ep) => ({
@@ -358,21 +378,30 @@ const SeasonItem = ({ season, details, navigation, watchedCount = 0 }) => {
             seasonEpisodes: season.episode_count,
           },
           episodesData,
-          episodeDate,
+          episodeDate
         );
       } catch (e) {
-        if (__DEV__) console.error(i18nText("autoI18n.sezon_eklenirken_hata", "Sezon eklenirken hata:"), e);
+        if (__DEV__)
+          console.error(
+            i18nText(
+              "autoI18n.sezon_eklenirken_hata",
+              "Sezon eklenirken hata:"
+            ),
+            e
+          );
       } finally {
         setIsLoading(false);
       }
     },
-    [user, details, season, language, API_KEY, formatDateSave],
+    [user, details, season, language, API_KEY, formatDateSave]
   );
 
   // ── İzlenme buton rengi & ilerleme ────────────────────────────────────────
   const watchBtnColor = watchStateColor(watchState, theme);
   const progressColor =
-    watchState === WATCH_STATE.FULL ? theme.colors?.green : theme.colors?.orange;
+    watchState === WATCH_STATE.FULL
+      ? theme.colors?.green
+      : theme.colors?.orange;
   const progressWidth = `${Math.round(seasonEpisodeWatch * 100)}%`;
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -430,7 +459,7 @@ const SeasonItem = ({ season, details, navigation, watchedCount = 0 }) => {
                 <View style={styles.posterWrapper}>
                   <Image
                     source={{
-                      uri: getTmdbUrl(season.poster_path, 'poster', 200),
+                      uri: getTmdbUrl(season.poster_path, "poster", 200),
                     }}
                     style={styles.seasonPoster}
                   />
@@ -512,7 +541,7 @@ const SeasonItem = ({ season, details, navigation, watchedCount = 0 }) => {
                     ) : (
                       <TouchableOpacity
                         onPress={() =>
-                          isWatched ? addSeasonToFirestore(true) : openModal()
+                          isWatched ? setWatchHistoryVisible(true) : openModal()
                         }
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
@@ -584,13 +613,18 @@ const SeasonItem = ({ season, details, navigation, watchedCount = 0 }) => {
 
               {/* ── İlerleme çubuğu – kart alt kenarı ─────────────────── */}
               {seasonEpisodeWatch > 0 && (
-                <View style={styles.progressTrack}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { width: progressWidth, backgroundColor: progressColor },
-                    ]}
-                  />
+                <View pointerEvents="none" style={styles.progressClipLayer}>
+                  <View style={styles.progressTrack}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        {
+                          width: progressWidth,
+                          backgroundColor: progressColor,
+                        },
+                      ]}
+                    />
+                  </View>
                 </View>
               )}
             </>
@@ -603,7 +637,7 @@ const SeasonItem = ({ season, details, navigation, watchedCount = 0 }) => {
                   { color: theme.text?.secondary ?? "#aaa" },
                 ]}
               >
-                Yeni Sezon Geliyor
+                {i18nText("autoI18n.yeni_sezon_geliyor", "Yeni Sezon Geliyor")}
               </Text>
               <Text
                 style={[
@@ -611,7 +645,7 @@ const SeasonItem = ({ season, details, navigation, watchedCount = 0 }) => {
                   { color: theme.text?.muted ?? "#555" },
                 ]}
               >
-                Tarih Belirsiz
+                {i18nText("autoI18n.tarih_belirsiz", "Tarih Belirsiz")}
               </Text>
             </View>
           )}
@@ -619,6 +653,34 @@ const SeasonItem = ({ season, details, navigation, watchedCount = 0 }) => {
       </TouchableOpacity>
 
       {/* ── Tarih Modal ──────────────────────────────────────────────────── */}
+      <WatchHistorySheet
+        visible={watchHistoryVisible}
+        onClose={() => setWatchHistoryVisible(false)}
+        title={`${details?.name || ""} · ${season.season_number}. ${i18nText("autoI18n.sezon", "Sezon")}`}
+        events={watchEvents}
+        busy={isLoading}
+        onAddAgain={() => {
+          setWatchHistoryVisible(false);
+          setTimeout(openModal, 180);
+        }}
+        onDeleteEvent={async (event) => {
+          if (!user?.uid || !event?.id) return;
+          try {
+            setIsLoading(true);
+            await removeTvWatchEvent(user.uid, details.id, event.id);
+            Toast.show({
+              type: "success",
+              text1: i18nText("autoI18n.izleme_kaydi_silindi", "Seçilen izleme kaydı silindi."),
+            });
+            if (watchEvents.length <= 1) setWatchHistoryVisible(false);
+          } catch (error) {
+            Toast.show({ type: "error", text1: i18nText("autoI18n.hata_2", "Hata: ") + error.message });
+          } finally {
+            setIsLoading(false);
+          }
+        }}
+      />
+
       <DatePickerModal
         visible={modalVisible}
         onClose={closeModal}
@@ -753,12 +815,20 @@ const styles = StyleSheet.create({
   },
 
   // ── İlerleme çubuğu ───────────────────────────────────────────────────────
+  progressClipLayer: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 16,
+    overflow: "hidden",
+    zIndex: 4,
+  },
   progressTrack: {
     position: "absolute",
     bottom: 0,
     left: 92, // posterWrapper genişliği + marginLeft
     right: 0,
     height: 3,
+    borderRadius: 2,
+    overflow: "hidden",
     backgroundColor: "rgba(255,255,255,0.06)",
   },
   progressFill: {

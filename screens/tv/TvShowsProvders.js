@@ -16,6 +16,7 @@ import { MovieSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
 import { useTvShow } from "../../context/TvShowContex";
 import ListBadges from "../../components/ListBadges";
+import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import PaginatedRail from "../../components/PaginatedRail";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -61,11 +62,7 @@ const TvProvidersCard = memo(function TvProvidersCard({ item, navigation, theme,
         />
 
         {posterBadges?.tmdbRating !== false && (
-          <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
-            <Text allowFontScaling={false} style={styles.similarRatingText}>
-              {item.vote_average.toFixed(1)}
-            </Text>
-          </View>
+          <RatingBadge value={item.vote_average} votes={item.vote_count} style={POSTER_BADGE_POS.bottomRight} />
         )}
         <ListBadges
           mediaId={item.id}

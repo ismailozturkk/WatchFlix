@@ -21,7 +21,6 @@ import Skeleton from "../../components/SkeletonGraph";
 import axios from "axios";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLanguage } from "../../context/LanguageContext";
-import LottieView from "lottie-react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import { getRatingColors } from "../../utils/ratingColors";
@@ -29,8 +28,8 @@ import { getRatingColors } from "../../utils/ratingColors";
 import {
   useApiSettings,
   useImageQualitySettings,
-  useSnowSettings,
 } from "../../context/AppSettingsContext";
+import ScreenSnow from "../../components/ScreenSnow";
 
 // ─── Rating Renk Sistemi ──────────────────────────────────────────────────────
 // Ortak katmanlar utils/ratingColors.js'te — story "Bölüm Graph" bloğu da kullanır.
@@ -202,7 +201,6 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
 
   const { t, language } = useLanguage();
   const { theme } = useTheme();
-  const { showSnow } = useSnowSettings();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const { API_KEY } = useApiSettings();
 
@@ -385,15 +383,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.primary }]}
     >
-      {/* Kar Efekti */}
-      {showSnow && (
-        <LottieView
-          style={styles.lottie}
-          source={require("@lottie/snow.json")}
-          autoPlay
-          loop
-        />
-      )}
+      <ScreenSnow />
 
       {/* ── Üst Bilgi Paneli ─────────────────────────────────────────────── */}
       <View style={styles.infoPanelWrapper}>
@@ -540,7 +530,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                     </Text>
                   </View>
                   <Text style={styles.voteCount}>
-                    {showDetail.imdb_votes} oy
+                    {showDetail.imdb_votes} {i18nText("votes", "oy")}
                   </Text>
                 </View>
                 <Text style={styles.hintText}>{i18nText("autoI18n.bolume_dokun_bolum_bilgisi", "Bölüme dokun → bölüm bilgisi")}</Text>
@@ -667,14 +657,6 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  lottie: {
-    position: "absolute",
-    top: 0,
-    left: -60,
-    right: -60,
-    bottom: -200,
-    zIndex: 0,
-  },
 
   // ── Bilgi Paneli ────────────────────────────────────────────────────────
   infoPanelWrapper: {

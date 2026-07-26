@@ -3,8 +3,10 @@ import { View, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useProfileStats } from "../../../context/ProfileStatsContext";
 import { useTheme } from "../../../context/ThemeContext";
+import { useLanguage } from "../../../context/LanguageContext";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
+import { buildWatchChartData } from "../../../utils/watchHistory";
 import BackButton from "../../../components/BackButton";
 import {
   StatsHeroCard,
@@ -21,7 +23,6 @@ const sectionKeyExtractor = (_item, index) => `m-${index}`;
 const MovieStatisticsScreen = ({ navigation }) => {
   const {
     watchedMovieCount,
-    totalWatchedTime,
     formatDate,
     groupedData,
     uniqueDates,
@@ -39,9 +40,11 @@ const MovieStatisticsScreen = ({ navigation }) => {
     borderColorMovie,
     rankLevelMovie,
     rankNameMovie,
+    mostRewatchedMovies,
   } = useProfileStats();
 
   const { theme } = useTheme();
+  const { language } = useLanguage();
   const { getTmdbUrl } = useImageQualitySettings();
   const insets = useSafeAreaInsets();
 
@@ -51,15 +54,17 @@ const MovieStatisticsScreen = ({ navigation }) => {
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [filterVisible, setFilterVisible] = useState(false);
 
-  const timeLabels = useMemo(
-    () => ({
-      years: t.profileScreen.years,
-      months: t.profileScreen.months,
-      days: t.profileScreen.days,
-      hours: t.profileScreen.hours,
-      minutes: t.profileScreen.minutes,
-    }),
-    [t],
+  const chartDataByPeriod = useMemo(
+    () => Object.fromEntries(["daily", "monthly", "yearly"].map((period) => [
+      period,
+      buildWatchChartData(
+        groupedData,
+        (item) => item.minutes,
+        language === "en" ? "en-US" : "tr-TR",
+        period,
+      ),
+    ])),
+    [groupedData, language],
   );
 
   const heroGenres = useMemo(
@@ -104,7 +109,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
         genres: [...new Set(s.items.flatMap((m) => m.genres || []).filter(Boolean))],
         totalMinutes: s.items.reduce((acc, item) => acc + (item.minutes || 0), 0),
         posters: s.items.map((item) => ({
-          key: String(item.id),
+          key: String(item.historyId || item.watchEventId || item.id),
           imageUri: item.imagePath ? getTmdbUrl(item.imagePath, "poster", 200) : null,
           title: item.name,
           minutes: item.minutes,
@@ -163,8 +168,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
         theme={theme}
         primaryCount={watchedMovieCount}
         primaryLabel={t.profileScreen.movieWatched}
-        time={totalWatchedTime || {}}
-        timeLabels={timeLabels}
+        chartDataByPeriod={chartDataByPeriod}
         expanded={expanded}
         onToggleExpand={onToggleExpand}
         rankColor={borderColorMovie}
@@ -175,6 +179,10 @@ const MovieStatisticsScreen = ({ navigation }) => {
         onTimePress={handleTimeClick}
         formatDuration={formatTotalDurationTime}
         genres={heroGenres}
+        rewatchItems={(mostRewatchedMovies || []).map(({ item, count }) => ({
+          title: item.name,
+          count,
+        }))}
       />
     </>
   );

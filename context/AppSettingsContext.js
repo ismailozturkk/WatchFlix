@@ -13,8 +13,13 @@ import { buildTmdbUrl } from "../utils/tmdbImageUtils";
 import { i18nText } from "../utils/i18nText";
 import {
   AUTO_DATA_CACHE_KEY,
+  DATA_TYPES_KEY,
+  DEFAULT_DATA_TYPES,
+  normalizeDataTypes,
   setAutoDataCacheEnabled,
+  setDataTypes,
 } from "../utils/dataCacheSettings";
+import { setHapticsEnabled as setGlobalHapticsEnabled } from "../services/hapticsService";
 
 
 const AppSettingsContext = createContext();
@@ -152,19 +157,22 @@ const normalizePosterBadges = (settings) => {
 export const AppSettingsProvider = ({ children }) => {
   const [showSnow, setShowSnow] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState("tr");
-  const [selectedTheme, setSelectedTheme] = useState("dark");
+  const [selectedTheme, setSelectedTheme] = useState("blue");
   const [customThemes, setCustomThemes] = useState([]);
   const [adultContent, setAdultContent] = useState(false);
   const [showOngoingTvShows, setShowOngoingTvShows] = useState(true);
-  const [showIconBackground, setShowIconBackground] = useState(true);
+  const [showIconBackground, setShowIconBackground] = useState(false);
   // İkon arka plan düzeni: "shared" (sabit, her ekranda aynı, performanslı) | "random" (her ekran farklı)
   const [iconBackgroundMode, setIconBackgroundMode] = useState("shared");
   // İkon saydamlık çarpanı (0.1–1). Ekranların kendi opaklık değerini ölçekler; 1 = değişiklik yok.
   const [iconBackgroundOpacity, setIconBackgroundOpacity] = useState(1);
   const [imageQualityLevel, setImageQualityLevel] = useState("good");
   const [selectedAvatar, setSelectedAvatar] = useState(null);
-  const [hapticsEnabled, setHapticsEnabled] = useState(true);
+  const [hapticsEnabled, setHapticsEnabled] = useState(false);
   const [autoDataCacheEnabled, setAutoDataCacheEnabledState] = useState(false);
+  // "Verileri indir" açıkken hangi türlerin indirileceği (hepsi varsayılan açık).
+  // Kapalı tür ne otomatik cache'lenir ne de manuel indirmeye dahil edilir.
+  const [dataCacheTypes, setDataCacheTypesState] = useState(DEFAULT_DATA_TYPES);
   const [notificationSettings, setNotificationSettings] =
     useState(DEFAULT_NOTIFICATION_SETTINGS);
   // Liste görünümü: sütun sayısı (3 varsayılan | 4) ve afiş köşe yuvarlaklığı (2 | 10 varsayılan | 20)
@@ -176,6 +184,8 @@ export const AppSettingsProvider = ({ children }) => {
   // TV/Film ana ekran yatay rail posterleri: boyut ("normal" | "small") ve köşe (4 | 15 varsayılan | 24)
   const [railPosterSize, setRailPosterSize] = useState("normal");
   const [railPosterRadius, setRailPosterRadius] = useState(15);
+  // Paylaşım akışındaki liste postları: "spaced" (varsayılan aralıklı) | "joined" (bitişik şerit)
+  const [postListPosterLayout, setPostListPosterLayout] = useState("spaced");
   // Poster üzerindeki rozetlerin (ListBadges) TÜR BAZINDA görünürlüğü —
   // her rozet ayrı açılıp kapatılabilir; kapalı olan posterde çizilmez.
   const [posterBadges, setPosterBadges] = useState(DEFAULT_POSTER_BADGES);
@@ -201,6 +211,7 @@ export const AppSettingsProvider = ({ children }) => {
           [, savedNotificationSettings],
           [, savedReminderNotificationSettings],
           [, savedAutoDataCache],
+          [, savedDataCacheTypes],
           [, savedCustomTheme],
           [, savedCustomThemes],
           [, savedListsGridColumns],
@@ -209,6 +220,7 @@ export const AppSettingsProvider = ({ children }) => {
           [, savedSeeAllPosterRadius],
           [, savedRailPosterSize],
           [, savedRailPosterRadius],
+          [, savedPostListPosterLayout],
           [, savedShowPosterBadges],
           [, savedStreamingProviderIds],
         ] = await AsyncStorage.multiGet([
@@ -227,6 +239,7 @@ export const AppSettingsProvider = ({ children }) => {
           "notificationSettings",
           "reminderNotificationSettings",
           AUTO_DATA_CACHE_KEY,
+          DATA_TYPES_KEY,
           "customThemeTokens", // legacy tek özel tema — çoklu yapıya migrate edilir
           "customThemes",
           "listsGridColumns",
@@ -235,6 +248,7 @@ export const AppSettingsProvider = ({ children }) => {
           "seeAllPosterRadius",
           "railPosterSize",
           "railPosterRadius",
+          "postListPosterLayout",
           "showPosterBadges",
           "streamingProviderIds",
         ]);
@@ -322,6 +336,9 @@ export const AppSettingsProvider = ({ children }) => {
           const n = parseInt(savedRailPosterRadius, 10);
           if (n === 4 || n === 15 || n === 24) setRailPosterRadius(n);
         }
+        if (savedPostListPosterLayout === "spaced" || savedPostListPosterLayout === "joined") {
+          setPostListPosterLayout(savedPostListPosterLayout);
+        }
         if (savedShowPosterBadges !== null) {
           const parsed = JSON.parse(savedShowPosterBadges);
           setPosterBadges(normalizePosterBadges(parsed));
@@ -336,10 +353,29 @@ export const AppSettingsProvider = ({ children }) => {
             );
           }
         }
-        if (savedHapticsEnabled !== null) setHapticsEnabled(JSON.parse(savedHapticsEnabled));
+        if (savedHapticsEnabled !== null) {
+          const nextHapticsEnabled = JSON.parse(savedHapticsEnabled) !== false;
+          setHapticsEnabled(nextHapticsEnabled);
+          setGlobalHapticsEnabled(nextHapticsEnabled);
+        } else {
+          // Varsayılan: titreşim kapalı (kullanıcı ayarlardan açabilir).
+          setGlobalHapticsEnabled(false);
+        }
         const autoCache = savedAutoDataCache === "true";
         setAutoDataCacheEnabledState(autoCache);
         setAutoDataCacheEnabled(autoCache);
+
+        // Tür seçimi — bozuk/eksik kayıt normalize edilir (eksikler açık sayılır).
+        let types = DEFAULT_DATA_TYPES;
+        if (savedDataCacheTypes !== null) {
+          try {
+            types = normalizeDataTypes(JSON.parse(savedDataCacheTypes));
+          } catch {
+            types = DEFAULT_DATA_TYPES;
+          }
+        }
+        setDataCacheTypesState(types);
+        setDataTypes(types);
         if (savedNotificationSettings !== null || savedReminderNotificationSettings !== null) {
           const loadedSettings = JSON.parse(
             savedNotificationSettings ?? savedReminderNotificationSettings,
@@ -480,8 +516,10 @@ export const AppSettingsProvider = ({ children }) => {
   }, []);
 
   const changeHapticsEnabled = useCallback((newVal) => {
-    setHapticsEnabled(newVal);
-    AsyncStorage.setItem("hapticsEnabled", JSON.stringify(newVal)).catch((e) =>
+    const nextValue = !!newVal;
+    setHapticsEnabled(nextValue);
+    setGlobalHapticsEnabled(nextValue);
+    AsyncStorage.setItem("hapticsEnabled", JSON.stringify(nextValue)).catch((e) =>
       Toast.show({ type: "error", text1: i18nText("autoI18n.titresim_ayari_kaydedilemedi", "Titreşim ayarı kaydedilemedi: ") + e }),
     );
   }, []);
@@ -551,6 +589,17 @@ export const AppSettingsProvider = ({ children }) => {
     );
   }, []);
 
+  const changePostListPosterLayout = useCallback((layout) => {
+    if (layout !== "spaced" && layout !== "joined") return;
+    setPostListPosterLayout(layout);
+    AsyncStorage.setItem("postListPosterLayout", layout).catch(() =>
+      Toast.show({
+        type: "error",
+        text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi"),
+      }),
+    );
+  }, []);
+
   const showPosterBadges = useMemo(
     () => POSTER_BADGE_KEYS.some((key) => posterBadges[key]),
     [posterBadges],
@@ -592,6 +641,37 @@ export const AppSettingsProvider = ({ children }) => {
     );
   }, []);
 
+  // Tür seçimi — React state + senkron ayna (cache katmanları) + kalıcı kayıt.
+  const persistDataCacheTypes = useCallback((next) => {
+    const normalized = normalizeDataTypes(next);
+    setDataCacheTypesState(normalized);
+    setDataTypes(normalized);
+    AsyncStorage.setItem(DATA_TYPES_KEY, JSON.stringify(normalized)).catch((e) =>
+      Toast.show({
+        type: "error",
+        text1:
+          i18nText(
+            "autoI18n.veri_turleri_kaydedilemedi",
+            "Veri türleri kaydedilemedi: ",
+          ) + e,
+      }),
+    );
+  }, []);
+
+  const changeDataCacheType = useCallback(
+    (key, val) => {
+      persistDataCacheTypes({ ...dataCacheTypes, [key]: !!val });
+    },
+    [dataCacheTypes, persistDataCacheTypes],
+  );
+
+  const changeDataCacheTypes = useCallback(
+    (patch) => {
+      persistDataCacheTypes({ ...dataCacheTypes, ...(patch || {}) });
+    },
+    [dataCacheTypes, persistDataCacheTypes],
+  );
+
   const changeStreamingProviderIds = useCallback((providerIds) => {
     const next = [...new Set((providerIds || []).map(Number))].filter(
       (id) => Number.isInteger(id) && id > 0,
@@ -632,6 +712,9 @@ export const AppSettingsProvider = ({ children }) => {
       changeNotificationSettings,
       autoDataCacheEnabled,
       changeAutoDataCacheEnabled,
+      dataCacheTypes,
+      changeDataCacheType,
+      changeDataCacheTypes,
     }),
     [
       showSnow,
@@ -657,6 +740,9 @@ export const AppSettingsProvider = ({ children }) => {
       changeNotificationSettings,
       autoDataCacheEnabled,
       changeAutoDataCacheEnabled,
+      dataCacheTypes,
+      changeDataCacheType,
+      changeDataCacheTypes,
     ],
   );
 
@@ -767,8 +853,17 @@ export const AppSettingsProvider = ({ children }) => {
     () => ({
       autoDataCacheEnabled,
       changeAutoDataCacheEnabled,
+      dataCacheTypes,
+      changeDataCacheType,
+      changeDataCacheTypes,
     }),
-    [autoDataCacheEnabled, changeAutoDataCacheEnabled],
+    [
+      autoDataCacheEnabled,
+      changeAutoDataCacheEnabled,
+      dataCacheTypes,
+      changeDataCacheType,
+      changeDataCacheTypes,
+    ],
   );
 
   const apiValue = useMemo(() => ({ API_KEY }), []);
@@ -792,6 +887,8 @@ export const AppSettingsProvider = ({ children }) => {
       changeRailPosterSize,
       railPosterRadius,
       changeRailPosterRadius,
+      postListPosterLayout,
+      changePostListPosterLayout,
       showPosterBadges,
       changeShowPosterBadges,
       posterBadges,
@@ -811,6 +908,8 @@ export const AppSettingsProvider = ({ children }) => {
       changeRailPosterSize,
       railPosterRadius,
       changeRailPosterRadius,
+      postListPosterLayout,
+      changePostListPosterLayout,
       showPosterBadges,
       changeShowPosterBadges,
       posterBadges,

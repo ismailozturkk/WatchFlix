@@ -34,6 +34,7 @@ import { usePosts } from "../../context/PostsContext";
 import {
   useApiSettings,
   useImageQualitySettings,
+  useListLayoutSettings,
 } from "../../context/AppSettingsContext";
 import CreatePostModal from "@components/modals/CreatePostModal";
 import PostCommentSheetModal from "@components/modals/PostCommentSheetModal";
@@ -53,7 +54,16 @@ const { width } = Dimensions.get("window");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const POST_TYPES = { ALL: "all", REVIEW: "review", LIST: "list", FOLLOWING: "following" };
+// Feed filtre anahtarları — tip olanlar (review/list/text/poll) composer'ın
+// ürettiği `post.type` değerleriyle birebir aynı olmalı; all/following sanal.
+const POST_TYPES = {
+  ALL: "all",
+  REVIEW: "review",
+  LIST: "list",
+  TEXT: "text",
+  POLL: "poll",
+  FOLLOWING: "following",
+};
 
 const formatTimeAgo = (timestamp, ago) => {
   if (!timestamp) return "";
@@ -130,6 +140,16 @@ const FilterChips = memo(function FilterChips({ theme, t, active, onChange }) {
     { key: POST_TYPES.ALL, label: t.filters.all, icon: "apps-outline" },
     { key: POST_TYPES.REVIEW, label: t.filters.reviews, icon: "star-outline" },
     { key: POST_TYPES.LIST, label: t.filters.lists, icon: "list-outline" },
+    {
+      key: POST_TYPES.TEXT,
+      label: t.filters.texts,
+      icon: "chatbubble-ellipses-outline",
+    },
+    {
+      key: POST_TYPES.POLL,
+      label: t.filters.polls,
+      icon: "stats-chart-outline",
+    },
     {
       key: POST_TYPES.FOLLOWING,
       label: t.filters.following,
@@ -267,8 +287,14 @@ const LikeButton = memo(function LikeButton({ liked, count, onPress, theme }) {
   );
 });
 
+// Spoiler'lı postlarda posterler bulanıklaştırılır; "Spoiler'ı göster/gizle"
+// ile blur açılıp kapanır. Küçük ve geniş posterler için ayrı yarıçap.
+const SPOILER_BLUR = 16;
+const SPOILER_BLUR_WIDE = 22;
+
 const PostCard = memo(function PostCard({
   post,
+  showTopDivider,
   theme,
   t,
   currentUid,
@@ -282,6 +308,7 @@ const PostCard = memo(function PostCard({
   onReport,
   onVote,
   getTmdbUrl,
+  postListPosterLayout,
 }) {
   const [spoilerRevealed, setSpoilerRevealed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -316,33 +343,94 @@ const PostCard = memo(function PostCard({
       : typeof post.authorAvatar === "string"
         ? { uri: post.authorAvatar }
         : post.authorAvatar || getAvatarSource(0);
+  const joinedListPosters =
+    post.type === "list" && postListPosterLayout === "joined";
+
+  const mediaPreview =
+    !post.mediaList || post.mediaList.length === 0 ? null : post.mediaList.length === 1 ? (
+      <View style={[postStyles.mediaCardWide, { borderColor: theme.border }]}>
+        <Image
+          source={{ uri: post.mediaList[0].poster }}
+          style={postStyles.mediaPosterWide}
+          contentFit="cover"
+          blurRadius={showSpoiler ? SPOILER_BLUR_WIDE : 0}
+        />
+      </View>
+    ) : (
+      <FlatList
+        horizontal
+        data={post.mediaList}
+        keyExtractor={(m) => String(m.id)}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{
+          gap: joinedListPosters ? 0 : 10,
+          paddingVertical: 6,
+          paddingRight: 12,
+        }}
+        renderItem={({ item, index }) => (
+          <View
+            style={[
+              postStyles.mediaCard,
+              { borderColor: theme.border },
+              joinedListPosters && {
+                borderWidth: 0,
+                borderTopLeftRadius: index === 0 ? 13 : 0,
+                borderBottomLeftRadius: index === 0 ? 13 : 0,
+                borderTopRightRadius: index === post.mediaList.length - 1 ? 13 : 0,
+                borderBottomRightRadius: index === post.mediaList.length - 1 ? 13 : 0,
+              },
+            ]}
+          >
+            <Image
+              source={{ uri: item.poster }}
+              style={postStyles.mediaPoster}
+              contentFit="cover"
+              blurRadius={showSpoiler ? SPOILER_BLUR : 0}
+            />
+            {post.ranked && (
+              <View style={[postStyles.rankNum, { backgroundColor: accentColor }]}>
+                <Text style={postStyles.rankNumText}>{index + 1}</Text>
+              </View>
+            )}
+            {item.year ? (
+              <View style={postStyles.mediaYear}>
+                <Text style={postStyles.mediaYearText}>{item.year}</Text>
+              </View>
+            ) : null}
+          </View>
+        )}
+      />
+    );
 
   return (
     <View
       style={[
         postStyles.card,
         {
-          backgroundColor: theme.secondary,
+          backgroundColor: theme.primary,
           borderColor: theme.border,
-          borderLeftColor: accentColor,
+          borderTopWidth: showTopDivider ? StyleSheet.hairlineWidth : 0,
         },
       ]}
     >
-      {/* Header */}
-      <View style={postStyles.header}>
+      <View style={postStyles.postLayout}>
         <TouchableOpacity
-          style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
+          style={postStyles.avatarColumn}
           activeOpacity={0.7}
           onPress={() => onPressAuthor?.(post)}
         >
           {avatarSrc ? (
-            <Image source={avatarSrc} style={postStyles.avatar} />
+            <Image
+              source={avatarSrc}
+              style={[postStyles.avatar, { borderColor: accentColor + "66" }]}
+            />
           ) : (
             <View
               style={[
                 postStyles.avatar,
                 {
                   backgroundColor: theme.border,
+                  borderColor: accentColor + "66",
                   justifyContent: "center",
                   alignItems: "center",
                 },
@@ -351,58 +439,67 @@ const PostCard = memo(function PostCard({
               <AppIcon family="Ionicons" name="person" size={17} color={theme.text.muted} />
             </View>
           )}
-          <View style={{ flex: 1, marginLeft: 10 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
+        </TouchableOpacity>
+
+        <View style={postStyles.mainColumn}>
+          {/* Kullanıcı + zaman + menü */}
+          <View style={postStyles.header}>
+            <View style={postStyles.identityRow}>
               <Text
                 style={[postStyles.userName, { color: theme.text.primary }]}
                 numberOfLines={1}
               >
                 {post.authorName || i18nText("autoI18n.kullanici", "Kullanıcı")}
               </Text>
-            <View
-              style={[
-                postStyles.badge,
-                {
-                  backgroundColor: accentColor + "22",
-                  borderColor: accentColor + "55",
-                },
-              ]}
-            >
-              <Text style={[postStyles.badgeText, { color: accentColor }]}>
-                {typeBadgeLabel}
+              <Text style={[postStyles.time, { color: theme.text.muted }]}>
+                · {timeText}
               </Text>
             </View>
-            {post.hasSpoiler && (
+
+            <View style={postStyles.headerBadges}>
               <View
                 style={[
                   postStyles.badge,
                   {
-                    backgroundColor: "rgba(240,79,79,0.12)",
-                    borderColor: "rgba(240,79,79,0.4)",
-                    marginLeft: 6,
+                    backgroundColor: accentColor + "1A",
+                    borderColor: accentColor + "44",
                   },
                 ]}
               >
-                <Text style={[postStyles.badgeText, { color: "#f04f4f" }]}>
-                  {t.badges.spoiler}
+                <Text style={[postStyles.badgeText, { color: accentColor }]}>
+                  {typeBadgeLabel}
                 </Text>
               </View>
-            )}
+              {post.hasSpoiler && (
+                <View
+                  style={[
+                    postStyles.badge,
+                    {
+                      backgroundColor: "rgba(240,79,79,0.12)",
+                      borderColor: "rgba(240,79,79,0.4)",
+                    },
+                  ]}
+                >
+                  <Text style={[postStyles.badgeText, { color: "#f04f4f" }]}>
+                    {t.badges.spoiler}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={postStyles.menuButton}
+              hitSlop={8}
+              onPress={() => setMenuOpen(true)}
+            >
+              <AppIcon
+                family="Feather"
+                name="more-horizontal"
+                size={19}
+                color={theme.text.muted}
+              />
+            </TouchableOpacity>
           </View>
-          <Text style={[postStyles.time, { color: theme.text.muted }]}>
-            {timeText}
-          </Text>
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity hitSlop={8} onPress={() => setMenuOpen(true)}>
-          <AppIcon
-            family="MaterialCommunityIcons"
-            name="dots-vertical"
-            size={18}
-            color={theme.text.muted}
-          />
-        </TouchableOpacity>
-      </View>
 
       {/* Action menu sheet */}
       <Modal
@@ -699,13 +796,20 @@ const PostCard = memo(function PostCard({
           <Text style={[postStyles.title, { color: theme.text.primary }]}>
             {post.title}
           </Text>
-          <View style={postStyles.pollWrap}>
+          <View
+            style={[
+              postStyles.pollWrap,
+              { backgroundColor: theme.secondary, borderColor: theme.border },
+            ]}
+          >
             <PollMessage
               poll={post.poll}
               currentUid={currentUid}
               accent={accentColor}
               getTmdbUrl={getTmdbUrl}
               onVote={(optId) => onVote?.(post.id, optId)}
+              variant="feed"
+              theme={theme}
             />
           </View>
         </>
@@ -722,6 +826,7 @@ const PostCard = memo(function PostCard({
                 source={{ uri: post.mediaList[0].poster }}
                 style={postStyles.mediaPoster}
                 contentFit="cover"
+                blurRadius={showSpoiler ? SPOILER_BLUR : 0}
               />
             </View>
             {post.userRating > 0 && (
@@ -729,7 +834,7 @@ const PostCard = memo(function PostCard({
                 style={[
                   postStyles.ratingPill,
                   {
-                    backgroundColor: theme.primary,
+                    backgroundColor: theme.secondary,
                     borderColor: theme.border,
                   },
                 ]}
@@ -761,7 +866,7 @@ const PostCard = memo(function PostCard({
                 style={[
                   postStyles.spoilerCard,
                   {
-                    backgroundColor: theme.primary,
+                    backgroundColor: theme.secondary,
                     borderColor: "rgba(240,79,79,0.4)",
                   },
                 ]}
@@ -798,37 +903,41 @@ const PostCard = memo(function PostCard({
         </View>
       ) : (
         <>
-          <Text style={[postStyles.title, { color: theme.text.primary }]}>
-            {post.title}
-          </Text>
+          {(!showSpoiler || post.type !== "list") && (
+            <Text style={[postStyles.title, { color: theme.text.primary }]}>
+              {post.title}
+            </Text>
+          )}
           {showSpoiler ? (
-            // Liste için spoiler — içerik ve posterler gizlenir
-            <Pressable
-              onPress={() => setSpoilerRevealed(true)}
-              style={[
-                postStyles.spoilerCard,
-                {
-                  backgroundColor: theme.primary,
-                  borderColor: "rgba(240,79,79,0.4)",
-                },
-              ]}
-            >
-              <AppIcon family="Ionicons" name="eye-off" size={20} color="#f04f4f" />
-              <Text
-                style={[postStyles.spoilerCardText, { color: theme.text.primary }]}
-                numberOfLines={2}
-              >
-                {t.spoiler.hidden}
-              </Text>
-              <View
+            <>
+              <Pressable
+                onPress={() => setSpoilerRevealed(true)}
                 style={[
-                  postStyles.spoilerCardBtn,
-                  { backgroundColor: "rgba(240,79,79,0.18)" },
+                  postStyles.spoilerCard,
+                  {
+                    backgroundColor: theme.secondary,
+                    borderColor: "rgba(240,79,79,0.4)",
+                  },
                 ]}
               >
-                <Text style={postStyles.spoilerCardBtnText}>{t.spoiler.reveal}</Text>
-              </View>
-            </Pressable>
+                <AppIcon family="Ionicons" name="eye-off" size={20} color="#f04f4f" />
+                <Text
+                  style={[postStyles.spoilerCardText, { color: theme.text.primary }]}
+                  numberOfLines={2}
+                >
+                  {t.spoiler.hidden}
+                </Text>
+                <View
+                  style={[
+                    postStyles.spoilerCardBtn,
+                    { backgroundColor: "rgba(240,79,79,0.18)" },
+                  ]}
+                >
+                  <Text style={postStyles.spoilerCardBtnText}>{t.spoiler.reveal}</Text>
+                </View>
+              </Pressable>
+              {post.type === "list" && mediaPreview}
+            </>
           ) : (
             <>
               <Text style={[postStyles.content, { color: theme.text.secondary }]}>
@@ -838,7 +947,7 @@ const PostCard = memo(function PostCard({
                 <View
                   style={[
                     postStyles.listRatingPill,
-                    { backgroundColor: theme.primary, borderColor: theme.border },
+                    { backgroundColor: theme.secondary, borderColor: theme.border },
                   ]}
                 >
                   <RatingStars rating={post.userRating} max={5} size={12} />
@@ -849,51 +958,7 @@ const PostCard = memo(function PostCard({
                   </Text>
                 </View>
               )}
-              {!post.mediaList || post.mediaList.length === 0 ? null : post
-                  .mediaList.length === 1 ? (
-                <View
-                  style={[postStyles.mediaCardWide, { borderColor: theme.border }]}
-                >
-                  <Image
-                    source={{ uri: post.mediaList[0].poster }}
-                    style={postStyles.mediaPosterWide}
-                    contentFit="cover"
-                  />
-                </View>
-              ) : (
-                <FlatList
-                  horizontal
-                  data={post.mediaList}
-                  keyExtractor={(m) => String(m.id)}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{
-                    gap: 10,
-                    paddingVertical: 6,
-                    paddingRight: 12,
-                  }}
-                  renderItem={({ item, index }) => (
-                    <View
-                      style={[postStyles.mediaCard, { borderColor: theme.border }]}
-                    >
-                      <Image
-                        source={{ uri: item.poster }}
-                        style={postStyles.mediaPoster}
-                        contentFit="cover"
-                      />
-                      {post.ranked && (
-                        <View style={[postStyles.rankNum, { backgroundColor: accentColor }]}>
-                          <Text style={postStyles.rankNumText}>{index + 1}</Text>
-                        </View>
-                      )}
-                      {item.year ? (
-                        <View style={postStyles.mediaYear}>
-                          <Text style={postStyles.mediaYearText}>{item.year}</Text>
-                        </View>
-                      ) : null}
-                    </View>
-                  )}
-                />
-              )}
+              {mediaPreview}
             </>
           )}
         </>
@@ -924,7 +989,6 @@ const PostCard = memo(function PostCard({
             {post.commentsCount || 0}
           </Text>
         </TouchableOpacity>
-        <View style={{ flex: 1 }} />
         <TouchableOpacity
           style={postStyles.actionBtn}
           activeOpacity={0.7}
@@ -949,6 +1013,8 @@ const PostCard = memo(function PostCard({
             color={theme.text.secondary}
           />
         </TouchableOpacity>
+      </View>
+        </View>
       </View>
     </View>
   );
@@ -993,6 +1059,7 @@ export default function ShareContentScreen({ route }) {
   const { avatar } = useProfileUi();
   const { API_KEY } = useApiSettings();
   const { getTmdbUrl } = useImageQualitySettings();
+  const { postListPosterLayout } = useListLayoutSettings();
   const navigation = useNavigation();
 
   // Gerçek trend içerikler (film + dizi)
@@ -1333,6 +1400,7 @@ export default function ShareContentScreen({ route }) {
       <StaggerItem index={index}>
         <PostCard
           post={item}
+          showTopDivider={index === 0}
           theme={theme}
           t={ts}
           currentUid={user?.uid}
@@ -1346,10 +1414,11 @@ export default function ShareContentScreen({ route }) {
           onReport={handleReportPost}
           onVote={votePoll}
           getTmdbUrl={getTmdbUrl}
+          postListPosterLayout={postListPosterLayout}
         />
       </StaggerItem>
     ),
-    [theme, ts, user?.uid, toggleLike, toggleBookmark, handleOpenComments, handleOpenProfile, handleEditRequest, deletePost, handleSharePost, handleReportPost, votePoll, getTmdbUrl],
+    [theme, ts, user?.uid, toggleLike, toggleBookmark, handleOpenComments, handleOpenProfile, handleEditRequest, deletePost, handleSharePost, handleReportPost, votePoll, getTmdbUrl, postListPosterLayout],
   );
 
   const listFooter = useMemo(() => {
@@ -1585,41 +1654,83 @@ const chipStyles = StyleSheet.create({
 
 const postStyles = StyleSheet.create({
   card: {
-    marginHorizontal: 14,
-    marginBottom: 10,
-    borderRadius: 16,
-    padding: 13,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderLeftWidth: 2,
+    width: "100%",
+    paddingHorizontal: 16,
+    paddingTop: 15,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  header: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-  avatar: { width: 34, height: 34, borderRadius: 17 },
-  userName: { fontSize: 13.5, fontWeight: "700", maxWidth: width * 0.4 },
+  postLayout: { flexDirection: "row", alignItems: "flex-start", gap: 11 },
+  avatarColumn: { width: 42, alignItems: "center", paddingTop: 1 },
+  mainColumn: { flex: 1, minWidth: 0 },
+  header: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    marginBottom: 6,
+  },
+  identityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 0,
+    flexShrink: 1,
+  },
+  headerBadges: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    flexShrink: 0,
+  },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1.5,
+  },
+  userName: { fontSize: 14.5, fontWeight: "800", flexShrink: 1 },
+  menuButton: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: "auto",
+    marginTop: -3,
+  },
   badge: {
-    marginLeft: 7,
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 7,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  badgeText: { fontSize: 8.5, fontWeight: "800", letterSpacing: 0.4 },
-  time: { fontSize: 10.5, marginTop: 2 },
-  title: { fontSize: 14.5, fontWeight: "700", marginBottom: 4 },
-  content: { fontSize: 13, lineHeight: 18.5, marginBottom: 10 },
+  badgeText: { fontSize: 9, fontWeight: "900", letterSpacing: 0.45 },
+  time: { fontSize: 12.5, fontWeight: "500", marginLeft: 4 },
+  title: { fontSize: 16, lineHeight: 21, fontWeight: "800", marginBottom: 6 },
+  content: { fontSize: 14, lineHeight: 21, marginBottom: 12 },
   mediaCard: {
-    width: 78,
-    height: 117,
-    borderRadius: 10,
+    width: 86,
+    height: 129,
+    borderRadius: 13,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 7,
+    elevation: 3,
   },
   mediaPoster: { width: "100%", height: "100%" },
   mediaCardWide: {
-    height: 150,
-    borderRadius: 12,
+    height: 188,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
-    marginBottom: 10,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.16,
+    shadowRadius: 9,
+    elevation: 3,
   },
   mediaPosterWide: { width: "100%", height: "100%" },
   mediaYear: {
@@ -1638,8 +1749,8 @@ const postStyles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
     borderRadius: 999,
     borderWidth: 1,
   },
@@ -1699,19 +1810,26 @@ const postStyles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 9,
-    marginTop: 2,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    gap: 14,
+    justifyContent: "flex-start",
+    gap: 22,
+    paddingTop: 8,
+    marginTop: 4,
   },
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 6,
+    minHeight: 36,
+    paddingVertical: 7,
   },
-  actionText: { fontSize: 12, fontWeight: "600" },
-  // Anket gövdesi — PollMessage koyu bubble varsayar; temadan bağımsız koyu kap.
-  pollWrap: { backgroundColor: "#171727", borderRadius: 14, padding: 12, marginTop: 2, marginBottom: 4 },
+  actionText: { fontSize: 12, fontWeight: "700" },
+  pollWrap: {
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 10,
+    marginTop: 3,
+    marginBottom: 5,
+  },
   // Sıralı liste poster numarası (#1, #2...)
   rankNum: { position: "absolute", top: 5, left: 5, minWidth: 20, height: 20, paddingHorizontal: 4, borderRadius: 7, alignItems: "center", justifyContent: "center" },
   rankNumText: { color: "#fff", fontSize: 11, fontWeight: "900" },

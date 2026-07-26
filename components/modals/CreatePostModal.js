@@ -1224,6 +1224,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                     placeholderTextColor={theme.text.muted}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
+                    maxLength={60}
                     autoFocus
                   />
                   {searchQuery.length > 0 && (

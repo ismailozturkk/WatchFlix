@@ -15,9 +15,8 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 //import { API_KEY } from "@env";
 import { useTvShow } from "../../context/TvShowContex";
-import RatingStars from "../../components/RatingStars";
-import FontAwesome from "@expo/vector-icons/FontAwesome";
 import ListBadges from "../../components/ListBadges";
+import { RatingBadge } from "../../components/PosterInfoBadges";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SeeAllButton } from "../../components/SeeAllHeader";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
@@ -113,15 +112,10 @@ const TvTrendCard = memo(function TvTrendCard({
   const onPressOut = () =>
     Animated.timing(pressScale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
 
-  const rating = item.vote_average;
-
   const source = useMemo(
     () => ({ uri: getTmdbUrl(item.poster_path, "poster", 200) }),
     [item.poster_path, getTmdbUrl]
   );
-  const showRating = posterBadges?.tmdbRating !== false;
-  const showVotes = posterBadges?.voteCount !== false;
-  const showRatingPill = showRating || showVotes;
 
   return (
     <Animated.View
@@ -175,53 +169,13 @@ const TvTrendCard = memo(function TvTrendCard({
             },
           ]}
         >
-          {showRatingPill && (
-            <View
-              style={{
-                position: "absolute",
-                top: -45,
-                right: 0,
-                borderRadius: 25,
-                paddingHorizontal: 5,
-                paddingVertical: 2,
-                backgroundColor: "rgba(0,0,0,0.6)",
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 5,
-              }}
-            >
-              {showRating && (
-                <>
-                  <RatingStars rating={item.vote_average} count={1} />
-                  <Text
-                    allowFontScaling={false}
-                    style={{ fontSize: 14, color: theme.colors.orange }}
-                  >
-                    {rating.toFixed(1)}
-                  </Text>
-                </>
-              )}
-              {showRating && showVotes && (
-                <Text
-                  allowFontScaling={false}
-                  style={{ fontSize: 14, color: theme.text.secondary }}
-                >
-                  •
-                </Text>
-              )}
-              {showVotes && (
-                <>
-                  <FontAwesome name="user" size={14} color={theme.colors.blue} />
-                  <Text
-                    allowFontScaling={false}
-                    style={{ fontSize: 14, color: theme.colors.blue }}
-                  >
-                    {item.vote_count}
-                  </Text>
-                </>
-              )}
-            </View>
+          {posterBadges?.tmdbRating !== false && (
+            <RatingBadge
+              value={item.vote_average}
+              votes={item.vote_count}
+              scale={1}
+              style={styles.trendRating}
+            />
           )}
           <ListBadges
             mediaId={item.id}
@@ -477,6 +431,11 @@ const styles = StyleSheet.create({
   infoContainer: {
     justifyContent: "center",
     alignItems: "center",
+  },
+  trendRating: {
+    position: "absolute",
+    top: -42,
+    right: 6,
   },
   title: {
     textAlign: "center",

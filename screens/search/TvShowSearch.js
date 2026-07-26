@@ -19,7 +19,6 @@ import { useTheme } from "../../context/ThemeContext";
 import { SearchSkeleton } from "../../components/Skeleton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import LottieView from "lottie-react-native";
-import { useSnow } from "../../context/SnowContext";
 import Toast from "react-native-toast-message";
 import { useAuth } from "../../context/AuthContext";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
@@ -32,6 +31,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { i18nText } from "../../utils/i18nText";
 import { searchMediaWithFuzzyFallback } from "../../services/fuzzyMediaSearch";
+import ScreenSnow from "../../components/ScreenSnow";
 
 
 const { width } = Dimensions.get("window");
@@ -571,7 +571,7 @@ export default function TvShowSearch({ navigation, route, isUnified, unifiedQuer
 
   const { language, t } = useLanguage();
   const { theme } = useTheme();
-  const { API_KEY, adultContent, imageQuality, showSnow } = useAppSettings();
+  const { API_KEY, adultContent, imageQuality } = useAppSettings();
   const searchTimeout = useRef(null);
   const searchRequestRef = useRef(0);
   const inputRef = useRef(null);
@@ -754,14 +754,7 @@ export default function TvShowSearch({ navigation, route, isUnified, unifiedQuer
       style={[styles.container, !isUnified && { backgroundColor: theme.primary }]}
     >
       {!isUnified && <IconBacground opacity={0.3} />}
-      {showSnow && (
-        <LottieView
-          style={styles.lottie}
-          source={require("@lottie/snow.json")}
-          autoPlay
-          loop
-        />
-      )}
+      <ScreenSnow />
 
       {/* ── Başlık ─────────────────────────────────────────────────────── */}
       {!isUnified && <Animated.Text
@@ -798,6 +791,7 @@ export default function TvShowSearch({ navigation, route, isUnified, unifiedQuer
             placeholderTextColor={theme.text?.muted ?? "#666"}
             value={search}
             onChangeText={handleSearch}
+            maxLength={80}
             returnKeyType="search"
             onSubmitEditing={() =>
               search.trim().length >= 2 && fetchResults(search)
@@ -912,14 +906,6 @@ export default function TvShowSearch({ navigation, route, isUnified, unifiedQuer
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1,paddingTop:10 },
-  lottie: {
-    position: "absolute",
-    top: 0,
-    left: -60,
-    right: -60,
-    bottom: -200,
-    zIndex: 0,
-  },
 
   pageTitle: {
     fontSize: 26,

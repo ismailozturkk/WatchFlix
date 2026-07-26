@@ -35,7 +35,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../components/BackButton";
 import PosterImage from "@components/PosterImage";
 import ListBadges from "../../components/ListBadges";
-import IconBacground from "../../components/IconBacground";
+import ScreenDecor from "../../components/ScreenDecor";
 import { useTheme } from "@context/ThemeContext";
 import { MovieProvider, useMovie } from "@context/MovieContex";
 import { useTvShow } from "@context/TvShowContex";
@@ -294,7 +294,7 @@ function SeeAllGrid({
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.primary }]}>
-      <IconBacground opacity={0.3} />
+      <ScreenDecor iconOpacity={0.3} />
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         <View style={styles.header}>
           <BackButton absolute={false} />

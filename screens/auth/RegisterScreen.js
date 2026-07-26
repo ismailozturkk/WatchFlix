@@ -17,8 +17,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import LottieView from "lottie-react-native";
-import * as Haptics from "expo-haptics";
-import { useSnow } from "../../context/SnowContext";
+import * as Haptics from "@services/hapticsService";
 import {
   createUserWithEmailAndPassword,
   deleteUser,
@@ -35,7 +34,7 @@ import {
   isUsernameAvailable,
   UserProfileErrorCode,
 } from "../../services/userService";
-import IconBacground from "../../components/IconBacground";
+import ScreenDecor from "../../components/ScreenDecor";
 import EmailSuffixRow from "../../components/auth/EmailSuffixRow";
 import { alpha } from "../../theme/colors";
 import {
@@ -53,7 +52,6 @@ const buzz = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
 
 export default function RegisterScreen({ navigation }) {
   const { theme, selectedTheme } = useTheme();
-  const { showSnow } = useSnow();
   const insets = useSafeAreaInsets();
   const accent = theme.accent;
   const hairline = theme.border;
@@ -329,17 +327,8 @@ export default function RegisterScreen({ navigation }) {
         translucent
         backgroundColor="transparent"
       />
-      <IconBacground opacity={isLightTheme ? 0.05 : 0.08} />
+      <ScreenDecor iconOpacity={isLightTheme ? 0.05 : 0.08} />
 
-      {showSnow && (
-        <LottieView
-          style={styles.lottie}
-          source={require("@lottie/snow.json")}
-          autoPlay
-          loop
-          pointerEvents="none"
-        />
-      )}
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -417,6 +406,7 @@ export default function RegisterScreen({ navigation }) {
                   blurOnSubmit={false}
                   onSubmitEditing={() => lastnameRef.current?.focus()}
                   onChangeText={setName}
+                  maxLength={30}
                   onFocus={() => setFocusedField("name")}
                   onBlur={() => setFocusedField(null)}
                 />
@@ -448,6 +438,7 @@ export default function RegisterScreen({ navigation }) {
                   blurOnSubmit={false}
                   onSubmitEditing={() => usernameRef.current?.focus()}
                   onChangeText={setLastname}
+                  maxLength={30}
                   onFocus={() => setFocusedField("lastname")}
                   onBlur={() => setFocusedField(null)}
                 />
@@ -492,6 +483,7 @@ export default function RegisterScreen({ navigation }) {
                 placeholderTextColor={theme.text.muted}
                 placeholder={i18nText("autoI18n.kullanici_adi", "Kullanıcı Adı")}
                 onChangeText={handleUsernameChange}
+                maxLength={20}
                 autoCapitalize="none"
                 autoCorrect={false}
                 autoComplete="username-new"
@@ -548,6 +540,7 @@ export default function RegisterScreen({ navigation }) {
                 blurOnSubmit={false}
                 onSubmitEditing={() => passwordRef.current?.focus()}
                 onChangeText={setEmail}
+                maxLength={254}
                 onFocus={() => setFocusedField("email")}
                 onBlur={() => setFocusedField(null)}
               />
@@ -590,6 +583,7 @@ export default function RegisterScreen({ navigation }) {
                 blurOnSubmit={false}
                 onSubmitEditing={() => passwordAgainRef.current?.focus()}
                 onChangeText={inputPassword}
+                maxLength={128}
                 onFocus={() => setFocusedField("password")}
                 onBlur={() => setFocusedField(null)}
               />
@@ -638,6 +632,7 @@ export default function RegisterScreen({ navigation }) {
                   if (canSubmit) createAccount();
                 }}
                 onChangeText={inputPasswordAgain}
+                maxLength={128}
                 onFocus={() => setFocusedField("passwordAgain")}
                 onBlur={() => setFocusedField(null)}
               />
@@ -811,14 +806,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 22,
     gap: 18,
-  },
-  lottie: {
-    position: "absolute",
-    height: 1000,
-    top: 0,
-    left: -60,
-    right: -60,
-    zIndex: 0,
   },
   backButton: {
     position: "absolute",

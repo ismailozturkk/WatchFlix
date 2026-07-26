@@ -218,7 +218,7 @@ export default function CommentSheetModal({
                 color={theme.text.secondary}
               />
               <Text allowFontScaling={false} style={styles.headerTitle}>
-                Yorumlar
+                {i18nText("comments", "Yorumlar")}
               </Text>
             </View>
             <TouchableOpacity

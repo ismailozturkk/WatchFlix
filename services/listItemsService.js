@@ -7,7 +7,8 @@
 //     Lists/{uid}/favorites/{type_id}
 //     Lists/{uid}/watchList/{type_id}
 //     Lists/{uid}/watchedMovies/{type_id}        (yalnız film)
-//       { id, type, name, imagePath, dateAdded, minutes, genres, listOrder }
+//       { id, type, name, imagePath, dateAdded, minutes, genres, listOrder,
+//         watchEvents:[{ id, watchedAt, scope:"movie", recordedAt }] }
 //
 //   Özel (kullanıcının oluşturduğu) listeler — TÜMÜ tek koleksiyonda, listId ile ayrışır:
 //     Lists/{uid}/customItems/{listId__type_id}
@@ -32,8 +33,14 @@ import {
   writeBatch,
   deleteField,
   arrayUnion,
+  runTransaction,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import {
+  createWatchEventId,
+  materializeMovieWatchEvents,
+  normalizeWatchDate,
+} from "../utils/watchHistory";
 
 export const PREDEFINED_MOVIE_LISTS = ["favorites", "watchList", "watchedMovies"];
 const CUSTOM_ITEMS = "customItems";
@@ -70,6 +77,66 @@ export async function addToList(uid, listKey, item) {
 export async function removeFromList(uid, listKey, type, id) {
   if (!uid || !listKey || id == null || !type) return;
   await deleteDoc(doc(db, "Lists", uid, listKey, itemKey(type, id)));
+}
+
+/**
+ * Filmin her izlenmesini aynı kanonik belge içinde ayrı olay olarak saklar.
+ * İlk yazmada eski liste alanları korunur; sonraki yazmalar üyeliği silmeden
+ * geçmişe yeni bir occurrence ekler.
+ */
+export async function markMovieWatch(uid, item, watchDate) {
+  if (!uid || item?.id == null) return null;
+  const watchedAt = normalizeWatchDate(watchDate);
+  if (!watchedAt) return null;
+  const ref = doc(db, "Lists", uid, "watchedMovies", itemKey("movie", item.id));
+  const event = {
+    id: createWatchEventId(`movie_${item.id}`),
+    watchedAt,
+    scope: "movie",
+    recordedAt: new Date().toISOString(),
+  };
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const existing = snap.exists() ? snap.data() : {};
+    const watchEvents = [...materializeMovieWatchEvents(existing), event];
+    tx.set(
+      ref,
+      {
+        ...normalizeItem({ ...existing, ...item, type: "movie", dateAdded: watchedAt }),
+        watchEvents,
+        watchCount: watchEvents.length,
+      },
+      { merge: true },
+    );
+  });
+  return event;
+}
+
+/** Seçilen film izleme olayını siler; son olay silinirse liste belgesi de silinir. */
+export async function removeMovieWatchEvent(uid, movieId, eventId) {
+  if (!uid || movieId == null || !eventId) return;
+  const ref = doc(db, "Lists", uid, "watchedMovies", itemKey("movie", movieId));
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) return;
+    const current = snap.data() || {};
+    const remaining = materializeMovieWatchEvents(current).filter(
+      (event) => event.id !== eventId,
+    );
+    if (!remaining.length) {
+      tx.delete(ref);
+      return;
+    }
+    const latest = remaining
+      .slice()
+      .sort((a, b) => String(b.watchedAt).localeCompare(String(a.watchedAt)))[0];
+    tx.update(ref, {
+      watchEvents: remaining,
+      watchCount: remaining.length,
+      dateAdded: latest.watchedAt,
+    });
+  });
 }
 
 /**

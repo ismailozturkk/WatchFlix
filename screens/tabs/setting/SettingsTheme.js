@@ -16,7 +16,7 @@ import { useLanguage } from "../../../context/LanguageContext";
 import { useTheme } from "../../../context/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "@services/hapticsService";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,

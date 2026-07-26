@@ -18,9 +18,12 @@ export default function PollMessage({
   accent = "#6C63FF",
   getTmdbUrl,
   onVote,
+  variant = "chat",
+  theme,
 }) {
   const { question, type, options = [], votes = {} } = poll || {};
   const userVote = votes?.[currentUid] || null;
+  const isFeed = variant === "feed" && theme;
 
   const { counts, total } = useMemo(() => {
     const c = {};
@@ -36,7 +39,7 @@ export default function PollMessage({
   const pct = (optId) => (total > 0 ? Math.round(((counts[optId] || 0) / total) * 100) : 0);
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, isFeed && styles.feedWrap]}>
       {/* Başlık */}
       <View style={styles.head}>
         <View style={[styles.badge, { backgroundColor: accent + "22", borderColor: accent + "55" }]}>
@@ -45,12 +48,12 @@ export default function PollMessage({
             {i18nText("autoI18n.anket", "Anket")}
           </Text>
         </View>
-        <Text style={styles.totalText}>
+        <Text style={[styles.totalText, isFeed && { color: theme.text.muted }]}>
           {i18nText("autoI18n.n_oy", "{{n}} oy", { n: total })}
         </Text>
       </View>
 
-      <Text style={styles.question}>{question}</Text>
+      <Text style={[styles.question, isFeed && { color: theme.text.primary }]}>{question}</Text>
 
       {/* ── METİN ANKETİ ── */}
       {type === "text" && (
@@ -63,25 +66,46 @@ export default function PollMessage({
                 key={opt.id}
                 activeOpacity={0.85}
                 onPress={() => onVote(opt.id)}
-                style={[styles.textOpt, voted && { borderColor: accent }]}
+                style={[
+                  styles.textOpt,
+                  isFeed && {
+                    borderColor: theme.border,
+                    backgroundColor: theme.primary,
+                  },
+                  voted && { borderColor: accent },
+                ]}
               >
                 {/* Sonuç barı (zemin) */}
                 <View
                   style={[
                     styles.bar,
-                    { width: `${p}%`, backgroundColor: voted ? accent + "44" : "rgba(255,255,255,0.08)" },
+                    {
+                      width: `${p}%`,
+                      backgroundColor: voted
+                        ? accent + "44"
+                        : isFeed
+                          ? theme.border
+                          : "rgba(255,255,255,0.08)",
+                    },
                   ]}
                 />
                 <View style={styles.textOptRow}>
                   <Ionicons
                     name={voted ? "checkmark-circle" : "ellipse-outline"}
                     size={17}
-                    color={voted ? accent : "rgba(255,255,255,0.4)"}
+                    color={voted ? accent : isFeed ? theme.text.muted : "rgba(255,255,255,0.4)"}
                   />
-                  <Text style={styles.optLabel} numberOfLines={2}>
+                  <Text
+                    style={[styles.optLabel, isFeed && { color: theme.text.primary }]}
+                    numberOfLines={2}
+                  >
                     {opt.label}
                   </Text>
-                  {total > 0 && <Text style={styles.optPct}>{p}%</Text>}
+                  {total > 0 && (
+                    <Text style={[styles.optPct, isFeed && { color: theme.text.secondary }]}>
+                      {p}%
+                    </Text>
+                  )}
                 </View>
               </TouchableOpacity>
             );
@@ -91,7 +115,7 @@ export default function PollMessage({
 
       {/* ── MEDYA ANKETİ ── */}
       {type === "media" && (
-        <View style={styles.mediaGrid}>
+        <View style={[styles.mediaGrid, isFeed && styles.feedMediaGrid]}>
           {options.map((opt) => {
             const voted = userVote === opt.id;
             const p = pct(opt.id);
@@ -101,9 +125,15 @@ export default function PollMessage({
                 key={opt.id}
                 activeOpacity={0.85}
                 onPress={() => onVote(opt.id)}
-                style={styles.mediaOpt}
+                style={[styles.mediaOpt, isFeed && styles.feedMediaOpt]}
               >
-                <View style={[styles.posterBox, voted && { borderColor: accent }]}>
+                <View
+                  style={[
+                    styles.posterBox,
+                    isFeed && { width: "100%", height: undefined, aspectRatio: 2 / 3, borderColor: theme.border },
+                    voted && { borderColor: accent },
+                  ]}
+                >
                   {poster ? (
                     <Image
                       source={{ uri: getTmdbUrl(poster, "poster", 200) }}
@@ -112,8 +142,18 @@ export default function PollMessage({
                       transition={120}
                     />
                   ) : (
-                    <View style={[styles.poster, styles.posterPh]}>
-                      <Ionicons name="film-outline" size={18} color="rgba(255,255,255,0.35)" />
+                    <View
+                      style={[
+                        styles.poster,
+                        styles.posterPh,
+                        isFeed && { backgroundColor: theme.primary },
+                      ]}
+                    >
+                      <Ionicons
+                        name="film-outline"
+                        size={isFeed ? 15 : 18}
+                        color={isFeed ? theme.text.muted : "rgba(255,255,255,0.35)"}
+                      />
                     </View>
                   )}
                   {voted && (
@@ -127,7 +167,14 @@ export default function PollMessage({
                     </View>
                   )}
                 </View>
-                <Text style={styles.mediaLabel} numberOfLines={2}>
+                <Text
+                  style={[
+                    styles.mediaLabel,
+                    isFeed && styles.feedMediaLabel,
+                    isFeed && { color: theme.text.primary },
+                  ]}
+                  numberOfLines={2}
+                >
                   {opt.label}
                 </Text>
               </TouchableOpacity>
@@ -136,7 +183,7 @@ export default function PollMessage({
         </View>
       )}
 
-      <Text style={styles.hint}>
+      <Text style={[styles.hint, isFeed && { color: theme.text.muted }]}>
         {userVote
           ? i18nText("autoI18n.oyunu_degistirmek_icin_dokun", "Oyunu değiştirmek için dokun")
           : i18nText("autoI18n.oy_vermek_icin_dokun", "Oy vermek için dokun")}
@@ -147,6 +194,7 @@ export default function PollMessage({
 
 const styles = StyleSheet.create({
   wrap: { width: "100%", minWidth: 230, marginBottom: 8 },
+  feedWrap: { minWidth: 0, marginBottom: 4 },
   head: {
     flexDirection: "row",
     alignItems: "center",
@@ -190,6 +238,8 @@ const styles = StyleSheet.create({
   // media
   mediaGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   mediaOpt: { width: 82 },
+  feedMediaGrid: { flexWrap: "nowrap", gap: 5 },
+  feedMediaOpt: { width: "23.5%", minWidth: 0 },
   posterBox: {
     width: 82,
     height: 123,
@@ -224,6 +274,7 @@ const styles = StyleSheet.create({
   },
   pctTagText: { color: "#fff", fontSize: 10, fontWeight: "800" },
   mediaLabel: { color: "rgba(255,255,255,0.9)", fontSize: 10.5, fontWeight: "600", marginTop: 4, lineHeight: 13 },
+  feedMediaLabel: { fontSize: 9, lineHeight: 11.5, marginTop: 4 },
 
   hint: {
     color: "rgba(255,255,255,0.35)",

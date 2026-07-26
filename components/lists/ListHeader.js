@@ -15,6 +15,7 @@ export default function ListHeader({ title, search, setSearch, theme }) {
       <TextInput
         value={search}
         onChangeText={setSearch}
+        maxLength={80}
         placeholder={i18nText("autoI18n.ara", "Ara...")}
         placeholderTextColor={theme.text.muted}
         style={{

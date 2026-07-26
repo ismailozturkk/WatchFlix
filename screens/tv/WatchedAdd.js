@@ -2,7 +2,9 @@ import { Modal, StyleSheet, TouchableOpacity, View, Text } from "react-native";
 import React, { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAuth } from "../../context/AuthContext";
-import { markEpisodes, unmarkEpisode } from "../../services/watchedTvService";
+import { markEpisodes, removeTvWatchEvent } from "../../services/watchedTvService";
+import WatchHistorySheet from "@components/modals/WatchHistorySheet";
+import Toast from "react-native-toast-message";
 import { useTheme } from "../../context/ThemeContext";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import LottieView from "lottie-react-native";
@@ -33,6 +35,7 @@ export default function WatchedAdd({
   size = 48,
   // İzlenme durumu üstteki tek abonelikten (useWatchedShow) controlled gelir.
   isWatched = false,
+  watchEvents = [],
 }) {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -40,6 +43,7 @@ export default function WatchedAdd({
   const [isLoading, setIsLoading] = useState(false);
   const showReleaseDateTime = new Date(showReleaseDate);
   const [modalVisible, setModalVisible] = useState(false);
+  const [watchHistoryVisible, setWatchHistoryVisible] = useState(false);
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
 
@@ -85,11 +89,6 @@ export default function WatchedAdd({
       setIsLoading(true);
       closeModal();
 
-      if (isWatched) {
-        await unmarkEpisode(user.uid, showId, seasonNumber, episodeNumber);
-        return;
-      }
-
       if (!date) return;
       const episodeDate = formatDateSave(date);
       await markEpisodes(
@@ -131,7 +130,7 @@ export default function WatchedAdd({
       <TouchableOpacity
         onPress={() => {
           if (isWatched) {
-            markEpisodeAsWatched();
+            setWatchHistoryVisible(true);
           } else {
             openModal();
           }
@@ -330,6 +329,34 @@ export default function WatchedAdd({
           />
         </View>
       </Modal>
+
+      <WatchHistorySheet
+        visible={watchHistoryVisible}
+        onClose={() => setWatchHistoryVisible(false)}
+        title={`${showName || ""} · S${seasonNumber} B${episodeNumber}`}
+        events={watchEvents}
+        busy={isLoading}
+        onAddAgain={() => {
+          setWatchHistoryVisible(false);
+          setTimeout(openModal, 180);
+        }}
+        onDeleteEvent={async (event) => {
+          if (!user?.uid || !event?.id) return;
+          try {
+            setIsLoading(true);
+            await removeTvWatchEvent(user.uid, showId, event.id);
+            Toast.show({
+              type: "success",
+              text1: i18nText("autoI18n.izleme_kaydi_silindi", "Seçilen izleme kaydı silindi."),
+            });
+            if (watchEvents.length <= 1) setWatchHistoryVisible(false);
+          } catch (error) {
+            Toast.show({ type: "error", text1: i18nText("autoI18n.hata_2", "Hata: ") + error.message });
+          } finally {
+            setIsLoading(false);
+          }
+        }}
+      />
     </View>
   );
 }

@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+  memo,
+} from "react";
 import {
   StyleSheet,
   View,
@@ -23,20 +30,22 @@ import RatingStars from "../../components/RatingStars";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import TVShowItem from "../../components/TVShowItem";
 import { LinearGradient } from "expo-linear-gradient";
-import LottieView from "lottie-react-native";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { useSnow } from "../../context/SnowContext";
 import { getDoc, doc, updateDoc, setDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
 import Toast from "react-native-toast-message";
 import SeasonItem from "./SeasonItem";
 import SeasonDeck from "./SeasonDeck";
-import * as Progress from "react-native-progress";
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { useAppSettings, useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
+import {
+  useAppSettings,
+  useImageQualitySettings,
+  useListLayoutSettings,
+} from "../../context/AppSettingsContext";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
+import WatchHistorySheet from "@components/modals/WatchHistorySheet";
 import ListViewTv from "../../components/ListViewTv";
 import PosterImage from "../../components/PosterImage";
 import { BlurView } from "expo-blur";
@@ -48,7 +57,7 @@ import {
   removeFromList,
   PREDEFINED_MOVIE_LISTS,
 } from "../../services/listItemsService";
-import IconBacground from "../../components/IconBacground";
+import ScreenDecor from "../../components/ScreenDecor";
 import ImageGalleryModal from "@components/modals/ImageGalleryModal";
 import TrailerSection from "@components/video/TrailerSection";
 import PaginatedRail from "../../components/PaginatedRail";
@@ -57,7 +66,7 @@ import RatingSheetModal from "@components/modals/RatingSheetModal";
 import RatingSummary from "@components/RatingSummary";
 import { i18nText } from "../../utils/i18nText";
 import { useWatchedShow } from "../../hooks/useWatchedShow";
-import { markShow, unmarkShow } from "../../services/watchedTvService";
+import { markShow, removeTvWatchEvent } from "../../services/watchedTvService";
 import AIChatScreen from "../AIChatScreen";
 import {
   getWatchState,
@@ -67,13 +76,14 @@ import {
 } from "../../utils/watchState";
 import Reminder from "../../components/Reminder";
 
-
 const { height, width } = Dimensions.get("window");
 const BACKDROP_HEIGHT = width * (9 / 16);
 // Fragman oynatıcısı: 16:9 oranını koruyarak cihaza göre boyutlanır
 // (tablette aşırı genişlememesi için üst sınır var).
 const VIDEO_WIDTH = Math.min(width - 24, 720);
 const VIDEO_HEIGHT = Math.round((VIDEO_WIDTH * 9) / 16);
+// Fotoğrafı olmayan oyuncu kartındaki ikon: kart genişliğinin (width * 0.2) ~%45'i.
+const CAST_PLACEHOLDER_ICON = Math.round(width * 0.09);
 
 /* ─── Section header (aynı MovieDetails stili) ── */
 const SectionHeader = ({ title, right, theme }) => (
@@ -166,7 +176,7 @@ export default function TvShowsDetails({ route, navigation }) {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { API_KEY, showSnow } = useAppSettings();
+  const { API_KEY } = useAppSettings();
   const { getTmdbUrl } = useImageQualitySettings();
   const { allLists, statusIndex } = useListStatusContext();
   // İzleme sağlayıcıları bölgesi — MovieDetail ile aynı seçim.
@@ -203,6 +213,7 @@ export default function TvShowsDetails({ route, navigation }) {
   const [PosterModalVisible, setPosterModalVisible] = useState(false);
   const [backdropModalVisible, setBacdropModalVisible] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [watchHistoryVisible, setWatchHistoryVisible] = useState(false);
   const [aiVisible, setAiVisible] = useState(false);
 
   /* ── Format helpers ── */
@@ -220,7 +231,10 @@ export default function TvShowsDetails({ route, navigation }) {
     }
     const d = new Date(ts);
     if (isNaN(d.getTime())) return "";
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(d.getDate()).padStart(2, "0")}`;
   };
 
   /* ── listStates — useMemo: snapshot başına bir kez, ekstra render yok ── */
@@ -325,7 +339,10 @@ export default function TvShowsDetails({ route, navigation }) {
           return {
             ...cur,
             [kind]: {
-              items: [...current.items, ...fresh.filter((it) => !seen.has(it.id))],
+              items: [
+                ...current.items,
+                ...fresh.filter((it) => !seen.has(it.id)),
+              ],
               page: res.data?.page || rail.page + 1,
               totalPages: res.data?.total_pages || current.totalPages,
               loading: false,
@@ -341,7 +358,7 @@ export default function TvShowsDetails({ route, navigation }) {
         railBusyRef.current[kind] = false;
       }
     },
-    [railState, id, language, API_KEY],
+    [railState, id, language, API_KEY]
   );
 
   /* ── İzlenme durumu — useWatchedShow'dan TÜRETİLİR (subcollection) ── */
@@ -357,6 +374,7 @@ export default function TvShowsDetails({ route, navigation }) {
     showTotalEpisodes > 0
       ? Math.min(1, watchedEpisodeCount / showTotalEpisodes)
       : 0;
+  const showProgressPercent = Math.round(isSeasonWatched * 100);
 
   /* ── updateTvSeriesList ── */
   const updateTvSeriesList = async (listType, type) => {
@@ -366,18 +384,26 @@ export default function TvShowsDetails({ route, navigation }) {
       ({
         favorites: t.tvShowsDetails?.favorites,
         watchList: t.tvShowsDetails?.watchList,
-        watchedMovies: t.tvShowsDetails?.watched,
+        watchedMovies: t.tvShowsDetails?.watchedMovies,
         watchedTv: t.tvShowsDetails?.watchedTv,
-      })[l] || l;
+      }[l] || l);
     const toastRemove = () =>
       Toast.show({
         type: "warning",
-        text1: i18nText("autoI18n.tv_removed_from_list", "Dizi {{list}} listesinden kaldırıldı!", { list: getName(listType) }),
+        text1: i18nText(
+          "autoI18n.tv_removed_from_list",
+          "Dizi {{list}} listesinden kaldırıldı!",
+          { list: getName(listType) }
+        ),
       });
     const toastAdd = () =>
       Toast.show({
         type: "success",
-        text1: i18nText("autoI18n.tv_added_to_list", "Dizi {{list}} listesine eklendi!", { list: getName(listType) }),
+        text1: i18nText(
+          "autoI18n.tv_added_to_list",
+          "Dizi {{list}} listesine eklendi!",
+          { list: getName(listType) }
+        ),
       });
 
     try {
@@ -424,7 +450,10 @@ export default function TvShowsDetails({ route, navigation }) {
       }
       await updateDoc(ref, { [listType]: list });
     } catch (e) {
-      Toast.show({ type: "error", text1: i18nText("autoI18n.hata_2", "Hata: ") + e.message });
+      Toast.show({
+        type: "error",
+        text1: i18nText("autoI18n.hata_2", "Hata: ") + e.message,
+      });
     }
   };
 
@@ -469,7 +498,7 @@ export default function TvShowsDetails({ route, navigation }) {
           {
             params: { language: language === "tr" ? "tr-TR" : "en-US" },
             headers: { accept: "application/json", Authorization: API_KEY },
-          },
+          }
         );
         seasonsWithEpisodes.push({
           seasonNumber: seasonObj.season_number,
@@ -495,11 +524,14 @@ export default function TvShowsDetails({ route, navigation }) {
           genres: details.genres?.map((g) => g.name) || [],
         },
         seasonsWithEpisodes,
-        eDate,
+        eDate
       );
       Toast.show({
         type: "success",
-        text1: i18nText("autoI18n.dizi_bolumleri_izlendi_olarak_isaretlendi", "Dizi bölümleri izlendi olarak işaretlendi"),
+        text1: i18nText(
+          "autoI18n.dizi_bolumleri_izlendi_olarak_isaretlendi",
+          "Dizi bölümleri izlendi olarak işaretlendi"
+        ),
       });
     } catch (e) {
       console.error(e);
@@ -508,16 +540,19 @@ export default function TvShowsDetails({ route, navigation }) {
     }
   };
 
-  /* ── Dizinin tüm izlenme kaydını kaldır ── */
-  const removeShowFromFirestore = async () => {
-    if (!user?.uid || !details) return;
+  const removeShowWatchEvent = async (event) => {
+    if (!user?.uid || !details || !event?.id) return;
     try {
       setIsLoading(true);
-      await unmarkShow(user.uid, details.id);
+      await removeTvWatchEvent(user.uid, details.id, event.id);
       Toast.show({
-        type: "warning",
-        text1: i18nText("autoI18n.dizi_izleme_listesinden_silindi", "Dizi izleme listesinden silindi"),
+        type: "success",
+        text1: i18nText(
+          "autoI18n.izleme_kaydi_silindi",
+          "Seçilen izleme kaydı silindi."
+        ),
       });
+      if (watched.watchEvents.length <= 1) setWatchHistoryVisible(false);
     } catch (e) {
       console.error(e);
     } finally {
@@ -531,7 +566,7 @@ export default function TvShowsDetails({ route, navigation }) {
     ({ item }) => (
       <SimilarTvShow item={item} navigation={navigation} theme={theme} />
     ),
-    [navigation, theme],
+    [navigation, theme]
   );
 
   const openReviewComposer = useCallback(() => {
@@ -541,7 +576,9 @@ export default function TvShowsDetails({ route, navigation }) {
       composePost: {
         composeKey: `tv-${id}-${Date.now()}`,
         postType: "review",
-        title: title ? `${title} incelemesi` : i18nText("autoI18n.yeni_inceleme", "Yeni inceleme"),
+        title: title
+          ? `${title} incelemesi`
+          : i18nText("autoI18n.yeni_inceleme", "Yeni inceleme"),
         content: "",
         selectedMedia: [
           {
@@ -555,7 +592,9 @@ export default function TvShowsDetails({ route, navigation }) {
               ? getTmdbUrl(details.poster_path, "poster", 500)
               : null,
             first_air_date: details.first_air_date,
-            year: details.first_air_date ? String(details.first_air_date).slice(0, 4) : "",
+            year: details.first_air_date
+              ? String(details.first_air_date).slice(0, 4)
+              : "",
             genre_ids: details.genres?.map((g) => g.id).filter(Boolean) || [],
           },
         ],
@@ -565,8 +604,14 @@ export default function TvShowsDetails({ route, navigation }) {
 
   const aiPrompt = useMemo(() => {
     if (!details?.name) return "";
-    const year = details.first_air_date ? ` (${String(details.first_air_date).slice(0, 4)})` : "";
-    return `${details.name}${year} dizisi hakkında spoiler vermeden bilgi ver. Konusu, türü, sezon yapısı, öne çıkan oyuncuları, atmosferi, kimlere uygun olduğu ve neden izlenebileceğini kısa başlıklarla anlat.`;
+    const year = details.first_air_date
+      ? ` (${String(details.first_air_date).slice(0, 4)})`
+      : "";
+    return i18nText(
+      "autoI18n.dizi_ai_prompt",
+      "{{title}} dizisi hakkında spoiler vermeden bilgi ver. Konusu, türü, sezon yapısı, öne çıkan oyuncuları, atmosferi, kimlere uygun olduğu ve neden izlenebileceğini kısa başlıklarla anlat.",
+      { title: `${details.name}${year}` },
+    );
   }, [details]);
 
   // Oyuncu kartı — MovieDetail.renderCastMember ile birebir aynı yapı.
@@ -579,14 +624,26 @@ export default function TvShowsDetails({ route, navigation }) {
         activeOpacity={0.8}
       >
         <View style={styles.castItem}>
-          <Image
-            source={
-              item.profile_path
-                ? { uri: getTmdbUrl(item.profile_path, 'poster', 200) }
-                : require("../../assets/image/user.png")
-            }
-            style={[styles.castImage, { borderColor: theme.border }]}
-          />
+          {item.profile_path ? (
+            <Image
+              source={{ uri: getTmdbUrl(item.profile_path, "poster", 200) }}
+              style={[styles.castImage, { borderColor: theme.border }]}
+            />
+          ) : (
+            <View
+              style={[
+                styles.castImage,
+                styles.castImagePlaceholder,
+                { borderColor: theme.border, backgroundColor: theme.secondary },
+              ]}
+            >
+              <FontAwesome
+                name="user"
+                size={CAST_PLACEHOLDER_ICON}
+                color={theme.text.muted}
+              />
+            </View>
+          )}
           <Text
             allowFontScaling={false}
             style={[styles.castName, { color: theme.text.primary }]}
@@ -604,7 +661,7 @@ export default function TvShowsDetails({ route, navigation }) {
         </View>
       </TouchableOpacity>
     ),
-    [navigation, theme, getTmdbUrl],
+    [navigation, theme, getTmdbUrl]
   );
 
   if (loading) return <DetailsSkeleton />;
@@ -634,15 +691,15 @@ export default function TvShowsDetails({ route, navigation }) {
   const regionProviders = details["watch/providers"]?.results?.[providerRegion];
   const flatrateProviders = regionProviders?.flatrate ?? [];
   const providerNames = new Set(
-    flatrateProviders.map((p) => (p.provider_name || "").toLowerCase()),
+    flatrateProviders.map((p) => (p.provider_name || "").toLowerCase())
   );
   const rowNetworks = (details.networks || []).filter(
-    (nw) => !providerNames.has((nw.name || "").toLowerCase()),
+    (nw) => !providerNames.has((nw.name || "").toLowerCase())
   );
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
-      <IconBacground opacity={0.25} />
+      <ScreenDecor iconOpacity={0.25} />
       <StatusBar
         barStyle="light-content"
         translucent
@@ -663,7 +720,7 @@ export default function TvShowsDetails({ route, navigation }) {
             >
               <Image
                 source={{
-                  uri: getTmdbUrl(details.backdrop_path, 'backdrop', 1000),
+                  uri: getTmdbUrl(details.backdrop_path, "backdrop", 1000),
                 }}
                 style={styles.backdrop}
               />
@@ -681,7 +738,6 @@ export default function TvShowsDetails({ route, navigation }) {
             style={styles.heroGradient}
             pointerEvents="none"
           />
-
         </View>
 
         {/* ── POSTER + INFO HEADER ── */}
@@ -694,7 +750,7 @@ export default function TvShowsDetails({ route, navigation }) {
             {details.poster_path ? (
               <Image
                 source={{
-                  uri: getTmdbUrl(details.poster_path, 'poster', 200),
+                  uri: getTmdbUrl(details.poster_path, "poster", 200),
                 }}
                 style={[styles.poster, { borderColor: theme.border + "80" }]}
               />
@@ -764,13 +820,13 @@ export default function TvShowsDetails({ route, navigation }) {
 
         {/* ── BODY ── */}
         <View style={styles.body}>
-          {/* ListViewTv + progress bar */}
-          <View style={{ marginBottom: 8 }}>
+          {/* Liste işlemleri + genel dizi ilerlemesi */}
+          <View style={styles.listActionsBlock}>
             <ListViewTv
               isSeasonWatched={isSeasonWatched}
               showWatchState={showWatchState}
               onMarkWatched={openModal}
-              onUnmarkWatched={removeShowFromFirestore}
+              onUnmarkWatched={() => setWatchHistoryVisible(true)}
               watchedOverride={
                 showWatchState === WATCH_STATE.UNAIRED ? (
                   <Reminder
@@ -801,20 +857,94 @@ export default function TvShowsDetails({ route, navigation }) {
                 genres: details.genres?.map((g) => g.name) || [],
               }}
             />
-            <View
-              style={{ marginTop: -12, marginHorizontal: 4, marginBottom: 8 }}
-            >
-              <Progress.Bar
-                progress={isSeasonWatched || 0}
-                width={width - 30}
-                height={3}
-                borderWidth={0}
-                borderRadius={2}
-                animationConfig={{ bounciness: 10 }}
-                color={watchedColor}
-                unfilledColor={theme.border}
-              />
-            </View>
+            {showTotalEpisodes > 0 && (
+              <View
+                style={[
+                  styles.showProgressCard,
+                  {
+                    backgroundColor: theme.secondary,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <View style={styles.showProgressHeader}>
+                  <View
+                    style={[
+                      styles.showProgressIcon,
+                      { backgroundColor: watchedColor + "20" },
+                    ]}
+                  >
+                    <Ionicons
+                      name={
+                        showWatchState === WATCH_STATE.FULL
+                          ? "checkmark-circle"
+                          : "analytics-outline"
+                      }
+                      size={17}
+                      color={watchedColor}
+                    />
+                  </View>
+                  <View style={styles.showProgressCopy}>
+                    <Text
+                      allowFontScaling={false}
+                      style={[
+                        styles.showProgressTitle,
+                        { color: theme.text.primary },
+                      ]}
+                    >
+                      {i18nText("autoI18n.dizi_ilerlemesi", "Dizi ilerlemesi")}
+                    </Text>
+                    <Text
+                      allowFontScaling={false}
+                      style={[
+                        styles.showProgressSubtitle,
+                        { color: theme.text.muted },
+                      ]}
+                    >
+                      {watchedEpisodeCount}/{showTotalEpisodes}{" "}
+                      {i18nText("autoI18n.bolum_izlendi", "bölüm izlendi")}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.showProgressPercent,
+                      { backgroundColor: watchedColor + "18" },
+                    ]}
+                  >
+                    <Text
+                      allowFontScaling={false}
+                      style={[
+                        styles.showProgressPercentText,
+                        { color: watchedColor },
+                      ]}
+                    >
+                      {showProgressPercent}%
+                    </Text>
+                  </View>
+                </View>
+
+                <View
+                  style={[
+                    styles.showProgressTrack,
+                    { backgroundColor: theme.border },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.showProgressFill,
+                      { width: `${showProgressPercent}%` },
+                    ]}
+                  >
+                    <LinearGradient
+                      colors={[watchedColor, theme.accent]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={StyleSheet.absoluteFill}
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
 
           <View style={styles.detailActionRow}>
@@ -829,7 +959,10 @@ export default function TvShowsDetails({ route, navigation }) {
               <View
                 style={[
                   styles.detailActionIcon,
-                  { backgroundColor: (theme.colors?.blue || theme.accent) + "20" },
+                  {
+                    backgroundColor:
+                      (theme.colors?.blue || theme.accent) + "20",
+                  },
                 ]}
               >
                 <Ionicons
@@ -841,7 +974,10 @@ export default function TvShowsDetails({ route, navigation }) {
               <View style={styles.detailActionCopy}>
                 <Text
                   allowFontScaling={false}
-                  style={[styles.detailActionTitle, { color: theme.text.primary }]}
+                  style={[
+                    styles.detailActionTitle,
+                    { color: theme.text.primary },
+                  ]}
                 >
                   {i18nText("autoI18n.inceleme", "İnceleme")}
                 </Text>
@@ -866,7 +1002,10 @@ export default function TvShowsDetails({ route, navigation }) {
               <View
                 style={[
                   styles.detailActionIcon,
-                  { backgroundColor: (theme.colors?.purple || theme.accent) + "20" },
+                  {
+                    backgroundColor:
+                      (theme.colors?.purple || theme.accent) + "20",
+                  },
                 ]}
               >
                 <Ionicons
@@ -878,7 +1017,10 @@ export default function TvShowsDetails({ route, navigation }) {
               <View style={styles.detailActionCopy}>
                 <Text
                   allowFontScaling={false}
-                  style={[styles.detailActionTitle, { color: theme.text.primary }]}
+                  style={[
+                    styles.detailActionTitle,
+                    { color: theme.text.primary },
+                  ]}
                 >
                   {i18nText("autoI18n.yapay_zeka", "Yapay Zeka")}
                 </Text>
@@ -1036,7 +1178,11 @@ export default function TvShowsDetails({ route, navigation }) {
             >
               {t.comments || i18nText("autoI18n.yorumlar", "Yorumlar")}
             </Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.text.muted} />
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={theme.text.muted}
+            />
           </TouchableOpacity>
 
           {/* ── TV SHOW ITEM ── */}
@@ -1058,7 +1204,7 @@ export default function TvShowsDetails({ route, navigation }) {
                 {details.backdrop_path && (
                   <Image
                     source={{
-                      uri: getTmdbUrl(details.backdrop_path, 'backdrop', 1000),
+                      uri: getTmdbUrl(details.backdrop_path, "backdrop", 1000),
                     }}
                     style={styles.graphBackdrop}
                     blurRadius={2}
@@ -1072,7 +1218,7 @@ export default function TvShowsDetails({ route, navigation }) {
                   {details.poster_path && (
                     <Image
                       source={{
-                        uri: getTmdbUrl(details.poster_path, 'poster', 200),
+                        uri: getTmdbUrl(details.poster_path, "poster", 200),
                       }}
                       style={styles.graphPoster}
                     />
@@ -1132,7 +1278,12 @@ export default function TvShowsDetails({ route, navigation }) {
                       <Text
                         allowFontScaling={false}
                         style={styles.graphChevronText}
-                      >{i18nText("autoI18n.detayli_istatistikler", "Detaylı İstatistikler")}</Text>
+                      >
+                        {i18nText(
+                          "autoI18n.detayli_istatistikler",
+                          "Detaylı İstatistikler"
+                        )}
+                      </Text>
                       <Ionicons
                         name="chevron-forward"
                         size={14}
@@ -1203,14 +1354,17 @@ export default function TvShowsDetails({ route, navigation }) {
                   ]}
                   numberOfLines={expandedCard === "overview" ? null : 2}
                 >
-                  {details.overview || i18nText("autoI18n.ozet_bulunmuyor", "Özet bulunmuyor.")}
+                  {details.overview ||
+                    i18nText("autoI18n.ozet_bulunmuyor", "Özet bulunmuyor.")}
                 </Text>
               </Animated.View>
               {expandedCard !== "overview" && (
                 <Text
                   allowFontScaling={false}
                   style={[styles.accordionMore, { color: theme.accent }]}
-                >{i18nText("autoI18n.devami", "devamı...")}</Text>
+                >
+                  {i18nText("autoI18n.devami", "devamı...")}
+                </Text>
               )}
             </TouchableOpacity>
           </View>
@@ -1241,7 +1395,7 @@ export default function TvShowsDetails({ route, navigation }) {
                     >
                       <Image
                         source={{
-                          uri: getTmdbUrl(p.logo_path, 'poster', 200),
+                          uri: getTmdbUrl(p.logo_path, "poster", 200),
                         }}
                         style={styles.providerLogo}
                       />
@@ -1275,7 +1429,7 @@ export default function TvShowsDetails({ route, navigation }) {
                         {n.logo_path ? (
                           <Image
                             source={{
-                              uri: getTmdbUrl(n.logo_path, 'poster', 200),
+                              uri: getTmdbUrl(n.logo_path, "poster", 200),
                             }}
                             style={styles.networkLogo}
                             resizeMode="contain"
@@ -1395,7 +1549,12 @@ export default function TvShowsDetails({ route, navigation }) {
                       season={season}
                       details={details}
                       navigation={navigation}
-                      watchedCount={watched.seasonWatchedCount(season.season_number)}
+                      watchedCount={watched.seasonWatchedCount(
+                        season.season_number
+                      )}
+                      watchEvents={watched.seasonWatchEvents(
+                        season.season_number
+                      )}
                     />
                   ))}
                   {seasonList.length > 5 && (
@@ -1499,17 +1658,6 @@ export default function TvShowsDetails({ route, navigation }) {
         </View>
       </ScrollView>
 
-      {/* Kar: scroll boyunca N adet yerine tek sabit overlay (MovieScreen paterni) */}
-      {showSnow && (
-        <View style={styles.snowOverlay} pointerEvents="none">
-          <LottieView
-            style={{ flex: 1 }}
-            source={require("@lottie/snow.json")}
-            autoPlay
-            loop
-          />
-        </View>
-      )}
 
       {/* ─── ÜST OVERLAY BUTONLARI (her zaman tıklanabilir) ─── */}
       <TouchableOpacity
@@ -1549,16 +1697,29 @@ export default function TvShowsDetails({ route, navigation }) {
       {/* ═══ MODALS ═══ */}
 
       {/* İzleme tarihi */}
+      <WatchHistorySheet
+        visible={watchHistoryVisible}
+        onClose={() => setWatchHistoryVisible(false)}
+        title={details?.name}
+        events={watched.watchEvents}
+        busy={isLoading}
+        onAddAgain={() => {
+          setWatchHistoryVisible(false);
+          setTimeout(openModal, 180);
+        }}
+        onDeleteEvent={removeShowWatchEvent}
+      />
+
       <WatchedDateSheet
         visible={modalVisible}
         onClose={closeModal}
         subtitle={i18nText(
           "autoI18n.bu_diziyi_ne_zaman_izlediniz",
-          "Bu diziyi ne zaman izlediniz?",
+          "Bu diziyi ne zaman izlediniz?"
         )}
         pickerSubtitle={i18nText(
           "autoI18n.bu_diziyi_ne_zaman_izlemeye_basladiniz",
-          "Bu diziyi ne zaman izlemeye başladınız?",
+          "Bu diziyi ne zaman izlemeye başladınız?"
         )}
         releaseDate={details?.first_air_date}
         minDate={details?.first_air_date}
@@ -1607,7 +1768,7 @@ export default function TvShowsDetails({ route, navigation }) {
         onRequestClose={() => setRatingModalVisible(false)}
         statusBarTranslucent
       >
-      <RatingSheetModal
+        <RatingSheetModal
           visible={ratingModalVisible}
           onClose={() => setRatingModalVisible(false)}
           mediaType="tv"
@@ -1690,14 +1851,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
-  snowOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1,
-  },
 
   /* Info header */
   infoHeader: {
@@ -1751,6 +1904,50 @@ const styles = StyleSheet.create({
 
   /* Body */
   body: { paddingHorizontal: 15 },
+
+  listActionsBlock: { marginBottom: 10 },
+  showProgressCard: {
+    marginTop: -10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 15,
+    borderWidth: 1,
+  },
+  showProgressHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+  showProgressIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  showProgressCopy: { flex: 1, minWidth: 0 },
+  showProgressTitle: { fontSize: 12.5, fontWeight: "800" },
+  showProgressSubtitle: { fontSize: 10.5, fontWeight: "600", marginTop: 2 },
+  showProgressPercent: {
+    minWidth: 43,
+    height: 25,
+    borderRadius: 9,
+    paddingHorizontal: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  showProgressPercentText: { fontSize: 11, fontWeight: "900" },
+  showProgressTrack: {
+    height: 6,
+    borderRadius: 3,
+    overflow: "hidden",
+    marginTop: 9,
+  },
+  showProgressFill: {
+    height: "100%",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
 
   /* Stat row */
   statRow: {
@@ -1837,6 +2034,7 @@ const styles = StyleSheet.create({
     marginBottom: 7,
     borderWidth: 1.5,
   },
+  castImagePlaceholder: { justifyContent: "center", alignItems: "center" },
   castName: {
     fontSize: 11.5,
     textAlign: "center",
@@ -1993,7 +2191,12 @@ const styles = StyleSheet.create({
 
   /* Video modal */
   videoModal: { flex: 1, justifyContent: "center", alignItems: "center" },
-  videoModalContent: { backgroundColor: "#000", position: "relative", width: VIDEO_WIDTH, alignSelf: "center" },
+  videoModalContent: {
+    backgroundColor: "#000",
+    position: "relative",
+    width: VIDEO_WIDTH,
+    alignSelf: "center",
+  },
   videoCloseBtn: { position: "absolute", top: -52, right: 12, zIndex: 10 },
   videoCloseBtnBlur: {
     width: 38,
@@ -2003,5 +2206,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
-
 });

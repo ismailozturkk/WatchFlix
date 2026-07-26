@@ -450,7 +450,7 @@ export const ListStatusProvider = ({ children }) => {
   useEffect(() => {
     if (!user?.uid || !hasFirestoreIndex) return undefined;
 
-    if (!shouldPersistInternetData()) return undefined;
+    if (!shouldPersistInternetData({ category: "lists" })) return undefined;
 
     const uid = user.uid;
     const timer = setTimeout(() => {

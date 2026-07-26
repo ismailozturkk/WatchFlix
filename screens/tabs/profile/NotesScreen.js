@@ -3,7 +3,7 @@
  *
  * Dikey tam-genişlik kart listesi + sekme çubuğu (Notlar / Yapılacaklar) +
  * FAB + alt-sheet ekle/düzenle modalı + silme onay modalı. Veri katmanı
- * Watchify'in mevcut `useProfileNotes()` (Firestore) context'idir; kalıcılık
+ * Seelogd'in mevcut `useProfileNotes()` (Firestore) context'idir; kalıcılık
  * tek noktadan `saveNote` (upsert) ve `handleDeleteNote` ile yapılır.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -26,7 +26,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useProfileNotes } from "../../../context/ProfileNotesContext";
-import IconBacground from "../../../components/IconBacground";
+import ScreenDecor from "../../../components/ScreenDecor";
 import DatePickerModal from "@components/modals/DatePickerModal";
 import { i18nText } from "../../../utils/i18nText";
 
@@ -400,6 +400,7 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
               multiline
               value={content}
               onChangeText={setContent}
+              maxLength={2000}
               textAlignVertical="top"
             />
           ) : (
@@ -473,6 +474,7 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
                   placeholderTextColor={theme.text.muted}
                   value={newTodoText}
                   onChangeText={setNewTodoText}
+                  maxLength={60}
                   onSubmitEditing={addTodo}
                   returnKeyType="done"
                   blurOnSubmit={false}
@@ -562,7 +564,7 @@ export default function NotesScreen({ navigation }) {
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
       <StatusBar barStyle="light-content" />
-      <IconBacground opacity={0.25} />
+      <ScreenDecor iconOpacity={0.25} />
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         {/* Header */}
         <View style={styles.header}>

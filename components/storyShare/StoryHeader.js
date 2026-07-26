@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../context/ThemeContext";
+import { i18nText } from "../../utils/i18nText";
 
 function StoryHeaderComponent({ busy, onBack, onOpenDrafts, onSaveDraft }) {
   const { theme } = useTheme();
@@ -22,7 +23,7 @@ function StoryHeaderComponent({ busy, onBack, onOpenDrafts, onSaveDraft }) {
         style={[styles.title, { color: theme.text.primary }]}
         numberOfLines={1}
       >
-        Story Tasarla
+        {i18nText("autoI18n.story_tasarla", "Story Tasarla")}
       </Text>
       <View style={styles.right}>
         <TouchableOpacity activeOpacity={0.8} onPress={onOpenDrafts} disabled={busy} style={btn}>

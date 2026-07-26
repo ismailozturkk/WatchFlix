@@ -529,7 +529,7 @@ export default function ProfileNotes() {
                 { color: activeTab === "todo" ? "#fff" : theme.text.muted },
               ]}
             >
-              Todo
+              {i18nText("autoI18n.todo", "Todo")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -707,7 +707,7 @@ export default function ProfileNotes() {
                         },
                       ]}
                     >
-                      Todo
+                      {i18nText("autoI18n.todo", "Todo")}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -785,6 +785,7 @@ export default function ProfileNotes() {
                   placeholderTextColor={theme.text.muted}
                   value={message}
                   onChangeText={setMessage}
+                  maxLength={2000}
                 />
               ) : (
                 <View>
@@ -829,6 +830,7 @@ export default function ProfileNotes() {
                           onChangeText={(txt) =>
                             updateTodoItemText(item.id, txt)
                           }
+                          maxLength={60}
                           returnKeyType="next"
                           onSubmitEditing={addTodoItem}
                         />
@@ -1101,6 +1103,7 @@ export default function ProfileNotes() {
                             ]}
                             value={localNewItemText}
                             onChangeText={setLocalNewItemText}
+                            maxLength={60}
                             placeholder="Yeni madde..."
                             placeholderTextColor={theme.text.muted}
                             returnKeyType="done"
@@ -1144,6 +1147,7 @@ export default function ProfileNotes() {
                         placeholderTextColor={theme.text.muted}
                         value={noteContent}
                         onChangeText={setNoteContent}
+                        maxLength={2000}
                       />
                       <View style={styles.toolRow}>
                         <TouchableOpacity

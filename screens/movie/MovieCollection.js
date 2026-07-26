@@ -14,6 +14,7 @@ import { MovieCollectionSkeleton } from "../../components/Skeleton";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
+import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useListLayoutSettings } from "../../context/AppSettingsContext";
 
@@ -163,13 +164,11 @@ export default function MovieCollection({ navigation }) {
           recyclingKey={`collectionpart-${item.id}`}
           transition={120}
         />
-        {posterBadges?.tmdbRating !== false && typeof item.vote_average === "number" && item.vote_average > 0 ? (
-          <View style={[styles.ratingBadge, { backgroundColor: theme.secondaryt }]}>
-            <Text allowFontScaling={false} style={styles.ratingText}>
-              {item.vote_average.toFixed(1)}
-            </Text>
-          </View>
-        ) : null}
+        <RatingBadge
+          value={item.vote_average}
+          votes={item.vote_count}
+          style={POSTER_BADGE_POS.bottomRight}
+        />
         <ListBadges
           mediaId={item.id}
           mediaType="movie"

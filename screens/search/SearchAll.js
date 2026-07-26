@@ -237,6 +237,7 @@ const SearchAll = ({ navigation }) => {
           }}
           value={query}
           onChangeText={handleSearch}
+          maxLength={80}
         />
         {query.length > 0 && (
           <TouchableOpacity onPress={() => handleSearch("")}>

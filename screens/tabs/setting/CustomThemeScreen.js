@@ -17,7 +17,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "@services/hapticsService";
 import AppIcon from "@components/AppIcon";
 import { toast } from "@components/AppToast";
 import { appAlert } from "@components/AppAlert";

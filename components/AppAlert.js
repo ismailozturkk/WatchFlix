@@ -27,7 +27,7 @@ import {
 } from "react-native";
 import { BlurView } from "expo-blur";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "@services/hapticsService";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
 

@@ -189,6 +189,7 @@ function HexColorInput({ theme, color, onChange }) {
         onChangeText={(v) =>
           setText(v.replace(/[^0-9a-fA-F]/g, "").slice(0, 6))
         }
+        maxLength={6}
         onSubmitEditing={commit}
         onBlur={commit}
         placeholder="FF5E7E"
@@ -1071,7 +1072,7 @@ export default function StoryShareScreen({ route, navigation }) {
               pointerEvents="none"
             >
               <Image source={APP_LOGO} style={styles.wmLogo} resizeMode="contain" />
-              <Text style={styles.wmText}>Watchify</Text>
+              <Text style={styles.wmText}>Seelogd</Text>
             </View>
           </ViewShot>
         </Animated.View>
@@ -1134,7 +1135,10 @@ export default function StoryShareScreen({ route, navigation }) {
           {activeTab === "background" && (
             <View>
               <Label theme={theme}>
-                Arka Plan ({backgrounds.length}/{MAX_BACKGROUNDS} — alt alta dizilir)
+                {i18nText("autoI18n.arka_plan_stack", "Arka Plan ({{count}}/{{max}} — alt alta dizilir)", {
+                  count: backgrounds.length,
+                  max: MAX_BACKGROUNDS,
+                })}
               </Label>
               <FlatList
                 data={backdropChoices}
@@ -1556,6 +1560,7 @@ export default function StoryShareScreen({ route, navigation }) {
                     ref={editRef}
                     value={selected.text}
                     onChangeText={(txt) => updateSelected({ text: txt })}
+                    maxLength={200}
                     placeholder={i18nText("autoI18n.yazini_gir", "Yazını gir...")}
                     placeholderTextColor={theme.text.muted}
                     multiline
@@ -1571,7 +1576,7 @@ export default function StoryShareScreen({ route, navigation }) {
                   />
                   <View style={[styles.ctrlHead, { marginTop: 14 }]}>
                     <Text allowFontScaling={false} style={[styles.ctrlLabel, { color: theme.text.muted }]}>
-                      Renk
+                      {i18nText("autoI18n.renk", "Renk")}
                     </Text>
                     <ResetBtn theme={theme} onPress={() => updateSelected({ color: DEFAULTS.textColor })} />
                   </View>
@@ -1688,7 +1693,7 @@ export default function StoryShareScreen({ route, navigation }) {
                     <>
                       <View style={[styles.ctrlHead, { marginTop: 12 }]}>
                         <Text allowFontScaling={false} style={[styles.ctrlLabel, { color: theme.text.muted }]}>
-                          Arka Plan Rengi
+                          {i18nText("autoI18n.arka_plan_rengi", "Arka Plan Rengi")}
                         </Text>
                         <ResetBtn theme={theme} onPress={() => updateSelected({ bgColor: DEFAULTS.textBgColor })} />
                       </View>
@@ -1757,7 +1762,7 @@ export default function StoryShareScreen({ route, navigation }) {
               )}
 
               {/* Filigran konumu */}
-              <Label theme={theme}>Filigran Konumu (zorunlu)</Label>
+              <Label theme={theme}>{i18nText("autoI18n.filigran_konumu_zorunlu", "Filigran Konumu (zorunlu)")}</Label>
               <View style={styles.toolRow}>
                 {WM_POSITIONS.map((p) => (
                   <TouchableOpacity

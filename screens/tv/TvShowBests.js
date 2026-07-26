@@ -23,6 +23,7 @@ import { memo, useEffect, useMemo, useRef } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import ListBadges from "../../components/ListBadges";
+import { RatingBadge, ReleaseDateBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 //import { API_KEY } from "@env";
 
@@ -60,20 +61,10 @@ const TvBestCard = memo(function TvBestCard({ item, navigation, theme, getTmdbUr
           transition={120}
         />
         {posterBadges?.releaseDate !== false && (
-          <View
-            style={[styles.relaseDateCount, { backgroundColor: theme.secondaryt }]}
-          >
-            <Text style={[styles.similarRatingText, { color: theme.text.secondary }]}>
-              {item.first_air_date}
-            </Text>
-          </View>
+          <ReleaseDateBadge date={item.first_air_date} variant="year" style={POSTER_BADGE_POS.topRight} />
         )}
         {posterBadges?.tmdbRating !== false && (
-          <View style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}>
-            <Text style={[styles.similarRatingText, { color: theme.colors.orange }]}>
-              {item.vote_average.toFixed(1)}
-            </Text>
-          </View>
+          <RatingBadge value={item.vote_average} votes={item.vote_count} style={POSTER_BADGE_POS.bottomRight} />
         )}
         <ListBadges
           mediaId={item.id}

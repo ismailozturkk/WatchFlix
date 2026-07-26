@@ -7,7 +7,6 @@ import {
 } from "react-native";
 import Animated from "react-native-reanimated";
 import { useTheme } from "../../context/ThemeContext";
-import LottieView from "lottie-react-native";
 import TvShowsOnTheAir from "../tv/TvShowsOnTheAir";
 import TvShowsAiringToday from "../tv/TvShowsAiringToday";
 import TvShowsGenres from "../tv/TvShowsGenres";
@@ -20,11 +19,10 @@ import { useTvShow } from "../../context/TvShowContex";
 import { DeviceEventEmitter } from "react-native";
 import {
   useOngoingTvShowsSettings,
-  useSnowSettings,
 } from "../../context/AppSettingsContext";
 import { useLanguage } from "../../context/LanguageContext";
 import AppIcon from "../../components/AppIcon";
-import IconBacground from "../../components/IconBacground";
+import ScreenDecor from "../../components/ScreenDecor";
 import usePullToSearch from "../../hooks/usePullToSearch";
 import DiscoveryMediaRail from "../../components/DiscoveryMediaRail";
 import { useStreamingProviderSettings } from "../../context/AppSettingsContext";
@@ -34,7 +32,6 @@ const INITIAL_SECTION_COUNT = 2;
 
 export default function TvShowScreen({ navigation }) {
   const { theme } = useTheme();
-  const { showSnow } = useSnowSettings();
   const { showOngoingTvShows } = useOngoingTvShowsSettings();
   const { streamingProviderIds } = useStreamingProviderSettings();
   const { topTvGenres } = useProfileStats();
@@ -151,7 +148,7 @@ export default function TvShowScreen({ navigation }) {
 
   return (
     <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
-      <IconBacground opacity={0.3} />
+      <ScreenDecor iconOpacity={0.3} />
       <Animated.FlatList
         data={visibleSections}
         keyExtractor={(item) => item.key}
@@ -175,16 +172,6 @@ export default function TvShowScreen({ navigation }) {
         }
       />
 
-      {showSnow && (
-        <View style={styles.snowOverlay} pointerEvents="none">
-          <LottieView
-            style={{ flex: 1 }}
-            source={require("@lottie/snow.json")}
-            autoPlay
-            loop
-          />
-        </View>
-      )}
     </View>
   );
 }
@@ -192,14 +179,6 @@ export default function TvShowScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     paddingBottom: 75,
-  },
-  snowOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1,
   },
   fakeSearchContainer: {
     paddingTop: 50,

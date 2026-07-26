@@ -66,6 +66,7 @@ import ListsViewScreen from "@screens/lists/ListsViewScreen";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import SwipeView from "@screens/chat/SwipeView";
 import { ProfileStatsProvider }     from "./context/ProfileStatsContext";
+import { WatchProgressProvider }    from "./context/WatchProgressContext";
 import { ProfileNotesProvider }     from "./context/ProfileNotesContext";
 import { ProfileRemindersProvider } from "./context/ProfileRemindersContext";
 import { ProfileUiProvider }        from "./context/ProfileUiContext";
@@ -98,7 +99,11 @@ import SocialNotificationsScreen from "./screens/tabs/settings/SocialNotificatio
 import PersonalizationScreen from "./screens/tabs/settings/PersonalizationScreen";
 import PosterSettingsScreen from "./screens/tabs/settings/PosterSettingsScreen";
 import PermissionsDataScreen from "./screens/tabs/settings/PermissionsDataScreen";
+import OpenSourceLicensesScreen from "./screens/tabs/settings/OpenSourceLicensesScreen";
 import AccountConnectionsScreen from "./screens/tabs/settings/AccountConnectionsScreen";
+import AboutAppScreen from "./screens/tabs/settings/AboutAppScreen";
+import PremiumScreen from "./screens/premium/PremiumScreen";
+import { PremiumProvider } from "./context/PremiumContext";
 import ChatScreen from "@screens/chat/ChatScreen";
 import CreateGroupScreen from "@screens/chat/CreateGroupScreen";
 import GroupsListScreen from "@screens/chat/GroupsListScreen";
@@ -108,7 +113,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { enableFreeze } from "react-native-screens";
 import Comment from "./components/Comment";
 import MovieSearchScreen from "./screens/search/MovieSearchScreen";
-import IconBacground from "./components/IconBacground";
+import SplashPosterWave from "./components/SplashPosterWave";
 import CalendarScreen from "@screens/calendar/CalendarScreen";
 import { CalendarProvider } from "./context/CalendarContext";
 import OnGoingSeries from "./screens/tv/OnGoingSeries";
@@ -123,6 +128,7 @@ import SceneGameResultScreen from "./screens/game/SceneGameResultScreen";
 import GameLeaderboardScreen from "./screens/game/GameLeaderboardScreen";
 import GameStatsScreen from "./screens/game/GameStatsScreen";
 import GameAchievementsScreen from "./screens/game/GameAchievementsScreen";
+import WatchBadgesScreen from "./screens/tabs/profile/WatchBadgesScreen";
 import CustomThemeScreen from "./screens/tabs/setting/CustomThemeScreen";
 import { preloadAllCache } from "./utils/apiCache";
 import { installAxiosDataCache } from "./utils/axiosDataCache";
@@ -142,11 +148,19 @@ ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Bildirime dokunulduğunda yönlendirme için global navigation ref.
 const navigationRef = createNavigationContainerRef();
+// Ana ekran widget'larının dokunma hedefleri. Android tarafındaki karşılıkları:
+// ReminderWidgetProvider (reminders), ListsWidgetProvider (lists/…),
+// StatsWidgetProvider (stats/…). Yol adları değişirse widget'lar sessizce
+// açılış ekranına düşer — iki tarafı birlikte güncelle.
 const linking = {
-  prefixes: ["watchify://"],
+  prefixes: ["seelogd://"],
   config: {
     screens: {
       RemindersScreen: "reminders",
+      ListsViewScreen: "lists",
+      ListsScreen: "lists/:listName",
+      MovieStatisticsScreen: "stats/movies",
+      TvStatisticsScreen: "stats/tv",
     },
   },
 };
@@ -174,13 +188,34 @@ const startupPreloadPromise = Promise.allSettled([
 
 // Daha sonra stack/tab navigator'larında otomatik etkili olur
 
+// Splash arka planı (theme.primary) koyuysa status bar ikonları açık renk
+// basılmalı. expo-status-bar "barStyle" değil "style" prop'u tanır; cihaz
+// temasına düşen "auto" yerine gerçek arka plan parlaklığından türetiyoruz.
+const isDarkHexColor = (hex) => {
+  if (typeof hex !== "string") return true;
+  const raw = hex.replace("#", "");
+  const full =
+    raw.length === 3
+      ? raw
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : raw;
+  const n = parseInt(full.slice(0, 6), 16);
+  if (Number.isNaN(n)) return true;
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return 0.299 * r + 0.587 * g + 0.114 * b < 140;
+};
+
 const SplashScreen = () => {
   const { theme } = useTheme();
   const { showSnow } = useSnow();
 
   return (
     <View style={[styles.splashContainer, { backgroundColor: theme.primary }]}>
-      <IconBacground opacity={0.5} />
+      <SplashPosterWave />
 
       {showSnow && (
         <LottieView
@@ -190,16 +225,7 @@ const SplashScreen = () => {
           loop
         />
       )}
-      <LottieView
-        style={{ width: 350, height: 350 }}
-        source={require("@lottie/splash.json")} // Lottie dosyanızın yolu
-        autoPlay
-        loop
-      />
-      <StatusBar
-        //backgroundColor={theme.primary} // Arka plan rengini RGB olarak ayarlayın
-        barStyle="dark-content" // Metin ve simgelerin rengini ayarlayın (light-content veya dark-content)
-      />
+      <StatusBar style={isDarkHexColor(theme.primary) ? "light" : "dark"} />
     </View>
   );
 };
@@ -606,6 +632,21 @@ function AppContent() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="OpenSourceLicensesScreen"
+          component={OpenSourceLicensesScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="AboutAppScreen"
+          component={AboutAppScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PremiumScreen"
+          component={PremiumScreen}
+          options={{ headerShown: false, animation: "slide_from_bottom" }}
+        />
+        <Stack.Screen
           name="Comment"
           component={Comment}
           options={{
@@ -700,6 +741,11 @@ function AppContent() {
         <Stack.Screen
           name="GameAchievementsScreen"
           component={GameAchievementsScreen}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="WatchBadgesScreen"
+          component={WatchBadgesScreen}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
@@ -805,6 +851,7 @@ export default function App() {
             <ThemeProvider>
               <SnowProvider>
                 <AuthProvider>
+                  <PremiumProvider>
                   <UserProfileProvider>
                   <FriendsProvider>
                   <NotificationsProvider>
@@ -812,6 +859,11 @@ export default function App() {
                   <MediaActivityProvider>
                   <SharedListsProvider>
                     <ProfileStatsProvider>
+                      {/* ProfileStatsProvider'ın İÇİNDE olmalı: izleme puanı
+                          onun verisinden türüyor ve yeni listener açmıyor.
+                          Sağlayıcı, hook'un iki ekranda birden çalışıp defter
+                          mutabakatını ikiye katlamasını engelliyor. */}
+                      <WatchProgressProvider>
                       <ProfileNotesProvider>
                         <ProfileRemindersProvider>
                           <ProfileUiProvider>
@@ -838,6 +890,7 @@ export default function App() {
                           </ProfileUiProvider>
                         </ProfileRemindersProvider>
                       </ProfileNotesProvider>
+                      </WatchProgressProvider>
                     </ProfileStatsProvider>
                   </SharedListsProvider>
                   </MediaActivityProvider>
@@ -845,6 +898,7 @@ export default function App() {
                   </NotificationsProvider>
                   </FriendsProvider>
                   </UserProfileProvider>
+                  </PremiumProvider>
                 </AuthProvider>
               </SnowProvider>
             </ThemeProvider>

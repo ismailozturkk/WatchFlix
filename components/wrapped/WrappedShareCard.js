@@ -1,6 +1,6 @@
 // components/wrapped/WrappedShareCard.js
 //
-// Watchify Wrapped — premium paylaşılabilir özet kartı (captureRef hedefi).
+// Seelogd Wrapped — premium paylaşılabilir özet kartı (captureRef hedefi).
 // TAM 9:16 oran. İçerik, kartın yüksekliğine göre orantılı ölçeklenir (s = h/REF_H)
 // → poster/bölüm vb. her boyutta taşmadan sığar. Saf/statik (animasyon/buton yok)
 // olduğundan her yakalamada tam kompozisyon elde edilir.
@@ -224,7 +224,7 @@ const WrappedShareCard = memo(function WrappedShareCard({
             </LinearGradient>
             <View>
               <Text style={[styles.brand, { fontSize: u(13) }]} allowFontScaling={false}>
-                WATCHIFY
+                SEELOGD
               </Text>
               <Text style={[styles.brandSub, { fontSize: u(8), color: withAlpha(accent, 0.85) }]} allowFontScaling={false}>
                 WRAPPED · {recap.year}
@@ -381,7 +381,7 @@ const WrappedShareCard = memo(function WrappedShareCard({
           <View style={styles.footerBrand}>
             <Image source={APP_LOGO} style={{ width: u(22), height: u(22) }} contentFit="contain" />
             <Text style={[styles.footerBrandText, { fontSize: u(10) }]} allowFontScaling={false}>
-              Watchify
+              Seelogd
             </Text>
           </View>
           <View style={[styles.footerMetaPill, { gap: u(4), borderColor: withAlpha(accent, 0.4), paddingHorizontal: u(9), paddingVertical: u(4), borderRadius: u(999) }]}>

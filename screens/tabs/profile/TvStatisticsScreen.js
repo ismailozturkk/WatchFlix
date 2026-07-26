@@ -3,8 +3,10 @@ import { View, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useProfileStats } from "../../../context/ProfileStatsContext";
 import { useTheme } from "../../../context/ThemeContext";
+import { useLanguage } from "../../../context/LanguageContext";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
+import { buildWatchChartData } from "../../../utils/watchHistory";
 import BackButton from "../../../components/BackButton";
 import {
   StatsHeroCard,
@@ -27,7 +29,6 @@ const TvStatisticsScreen = ({ navigation }) => {
     formatTotalDurationTime,
     timeDisplayMode,
     handleTimeClick,
-    totalWatchedTimeTv,
     watchedTvCount,
     totalMinutesTimeTv,
     mostWatchedGenreTv,
@@ -41,9 +42,11 @@ const TvStatisticsScreen = ({ navigation }) => {
     borderColorTv,
     rankLevelTv,
     rankNameTv,
+    mostRewatchedTv,
   } = useProfileStats();
 
   const { theme } = useTheme();
+  const { language } = useLanguage();
   const { getTmdbUrl } = useImageQualitySettings();
   const insets = useSafeAreaInsets();
 
@@ -53,15 +56,17 @@ const TvStatisticsScreen = ({ navigation }) => {
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [filterVisible, setFilterVisible] = useState(false);
 
-  const timeLabels = useMemo(
-    () => ({
-      years: t.profileScreen.years,
-      months: t.profileScreen.months,
-      days: t.profileScreen.days,
-      hours: t.profileScreen.hours,
-      minutes: t.profileScreen.minutes,
-    }),
-    [t],
+  const chartDataByPeriod = useMemo(
+    () => Object.fromEntries(["daily", "monthly", "yearly"].map((period) => [
+      period,
+      buildWatchChartData(
+        groupedDataTv,
+        (item) => item.episodeMinutes,
+        language === "en" ? "en-US" : "tr-TR",
+        period,
+      ),
+    ])),
+    [groupedDataTv, language],
   );
 
   const heroGenres = useMemo(
@@ -176,8 +181,7 @@ const TvStatisticsScreen = ({ navigation }) => {
         secondaryLabel={t.profileScreen.tvShowEpisodetotalCount}
         tertiaryCount={totalSeasonsCount}
         tertiaryLabel={t.profileScreen.tvShowSeasonCount}
-        time={totalWatchedTimeTv || {}}
-        timeLabels={timeLabels}
+        chartDataByPeriod={chartDataByPeriod}
         expanded={expanded}
         onToggleExpand={onToggleExpand}
         rankColor={borderColorTv}
@@ -188,6 +192,10 @@ const TvStatisticsScreen = ({ navigation }) => {
         onTimePress={handleTimeClick}
         formatDuration={formatTotalDurationTime}
         genres={heroGenres}
+        rewatchItems={(mostRewatchedTv || []).map(({ item, count }) => ({
+          title: item.name,
+          count,
+        }))}
       />
     </>
   );

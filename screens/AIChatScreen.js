@@ -37,13 +37,10 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import LottieView from "lottie-react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import Reanimated, {
-  FadeInUp,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import Reanimated, { FadeInUp } from "react-native-reanimated";
 import { useNavigation } from "@react-navigation/native";
+
+import useModalKeyboardLift from "@hooks/useModalKeyboardLift";
 
 import { useLanguage } from "../context/LanguageContext";
 import { useTheme } from "../context/ThemeContext";
@@ -77,7 +74,7 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const FAB_ORIGIN = [SCREEN_W - 49, SCREEN_H - 109, 0];
 
 const TABS = ["explore", "plan", "lists"];
-const PREFS_KEY = "@whatchflix/ai_cine_prefs";
+const PREFS_KEY = "@seelogd/ai_cine_prefs";
 const DEFAULT_PREFS = { enabled: false, watchList: true, favorites: true, custom: true, watched: true };
 const LIST_TOGGLES = [
   ["watchList", "listWatchList"],
@@ -155,10 +152,6 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
   const anim = useRef(new Animated.Value(0)).current;
   const [rendered, setRendered] = useState(false);
   const insets = useSafeAreaInsets();
-  const modalKeyboardHeight = useSharedValue(0);
-  const composerKeyboardStyle = useAnimatedStyle(() => ({
-    marginBottom: Math.max(0, modalKeyboardHeight.value - insets.bottom),
-  }));
 
   useEffect(() => {
     if (visible) {
@@ -194,34 +187,15 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 60);
   }, []);
 
-  // Bu ekran da RN Modal içinde çalışır. Android'de KeyboardAvoidingView
-  // pencere resize edilmediğinde etkisiz kaldığından gerçek klavye yüksekliğini
-  // modal event'lerinden alıp sohbet gövdesine uygularız.
-  useEffect(() => {
-    if (!rendered) {
-      modalKeyboardHeight.value = 0;
-      return undefined;
-    }
-    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const show = Keyboard.addListener(showEvent, (event) => {
-      modalKeyboardHeight.value = withTiming(
-        event?.endCoordinates?.height || 0,
-        { duration: Platform.OS === "ios" ? event?.duration || 250 : 200 },
-      );
-      scrollToEndSoon();
-    });
-    const hide = Keyboard.addListener(hideEvent, (event) => {
-      modalKeyboardHeight.value = withTiming(0, {
-        duration: Platform.OS === "ios" ? event?.duration || 220 : 170,
-      });
-    });
-    return () => {
-      show.remove();
-      hide.remove();
-      modalKeyboardHeight.value = 0;
-    };
-  }, [modalKeyboardHeight, rendered, scrollToEndSoon]);
+  // ── Klavye kaldırma ─────────────────────────────────────────────────────────
+  // Ölçüm ve platform farkları hooks/useModalKeyboardLift.js içinde; oradaki
+  // açıklama Android'de insets.bottom'ın neden ÇIKARILMAMASI gerektiğini anlatır.
+  // Modal'ın statusBarTranslucent + navigationBarTranslucent olması şarttır.
+  const composerKeyboardStyle = useModalKeyboardLift({
+    active: rendered,
+    bottomInset: insets.bottom,
+    onChange: scrollToEndSoon,
+  });
 
   // Kayıtlı sohbetleri yükle (bir kez)
   useEffect(() => {
@@ -266,9 +240,12 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
     const list = Array.isArray(base) ? [...base] : [];
     if (activeTab === "explore" && mostWatchedGenre) {
       const tpl = t?.AICineChat?.personalizedChip || "Sana özel: {genre}";
+      const promptTpl =
+        t?.AICineChat?.personalizedPrompt ||
+        "{{genre}} türünde bana birkaç film/dizi öner";
       list.unshift({
         label: `🎯 ${tpl.replace("{genre}", mostWatchedGenre)}`,
-        prompt: `${mostWatchedGenre} türünde bana birkaç film/dizi öner`,
+        prompt: promptTpl.replace("{{genre}}", mostWatchedGenre),
       });
     }
     if (
@@ -516,6 +493,12 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
       visible={rendered}
       animationType="none"
       statusBarTranslucent
+      // navigationBarTranslucent, dialog penceresini HER API seviyesinde
+      // edge-to-edge yapar: pencere IME için yeniden boyutlanmaz ve alt system
+      // inset'i decor tarafından padding'lenmez. Böylece klavye kaldırma
+      // formülü Android 12/13/14/15/16'da aynı kalır. (statusBarTranslucent
+      // olmadan verilmemeli — RN DEV uyarısı.)
+      navigationBarTranslucent
       onRequestClose={handleClose}
     >
       {/* Karartma — animasyonla belirir */}
@@ -758,6 +741,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
                     placeholderTextColor={theme.text.muted}
                     value={message}
                     onChangeText={setMessage}
+                    maxLength={1000}
                     multiline
                     onSubmitEditing={() => handleSend()}
                   />

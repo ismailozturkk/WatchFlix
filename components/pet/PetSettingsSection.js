@@ -173,8 +173,8 @@ function PetSettingsSection({ colors: C, showLabel = true }) {
       if (cachedPets[pet.id]) {
         selectPet(pet.id);
       } else {
-        await downloadPet(pet.id);
-        selectPet(pet.id);
+        const downloaded = await downloadPet(pet.id);
+        if (downloaded) selectPet(pet.id);
       }
     },
     [cachedPets, downloadPet, selectPet],
@@ -338,7 +338,7 @@ function PetSettingsSection({ colors: C, showLabel = true }) {
                           },
                         ]}
                       >
-                        {sz.label}
+                        {i18nText(sz.labelKey, sz.label)}
                       </Text>
                     </TouchableOpacity>
                   );

@@ -11,7 +11,10 @@
 import axios from "axios";
 import * as cacheStore from "./cacheStore";
 import { getIsOnline } from "../context/ConnectivityContext";
-import { shouldPersistInternetData } from "./dataCacheSettings";
+import {
+  categoryForNamespace,
+  shouldPersistInternetData,
+} from "./dataCacheSettings";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -23,6 +26,8 @@ const DAY = 24 * 60 * 60 * 1000;
  * @param {number} [opts.maxAge] - online iken cache bu kadar tazeyse fetch atlanır
  * @param {boolean} [opts.forceRefresh=false] - cache taze olsa bile fetch et
  * @param {boolean} [opts.fallbackToCache=true] - fetch hata verirse cache'e düş
+ * @param {string} [opts.category] - veri türü ("Verileri indir" seçimi); yoksa
+ *   namespace'ten türetilir, o da eşleşmezse yalnız ana anahtar geçerlidir
  * @returns {Promise<{data:any, fromCache:boolean, stale:boolean, error?:any}>}
  */
 export async function cachedRead(ns, key, fetchFn, opts = {}) {
@@ -46,7 +51,12 @@ export async function cachedRead(ns, key, fetchFn, opts = {}) {
 
   try {
     const data = await fetchFn();
-    if (shouldPersistInternetData({ force: forceCache })) {
+    if (
+      shouldPersistInternetData({
+        force: forceCache,
+        category: opts.category ?? categoryForNamespace(ns),
+      })
+    ) {
       cacheStore.setJSON(ns, key, data);
     }
     return { data, fromCache: false, stale: false };
@@ -83,6 +93,12 @@ export function readCache(ns, key, opts = {}) {
 
 /** Veriyi cache'e yaz (onSnapshot dinleyicilerinden son durumu saklamak için). */
 export function writeCache(ns, key, data, opts = {}) {
-  if (!shouldPersistInternetData({ force: opts.forceCache })) return false;
+  if (
+    !shouldPersistInternetData({
+      force: opts.forceCache,
+      category: opts.category ?? categoryForNamespace(ns),
+    })
+  )
+    return false;
   return cacheStore.setJSON(ns, key, data);
 }

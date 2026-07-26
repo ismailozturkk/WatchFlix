@@ -20,9 +20,11 @@ import { useMediaActivity } from "@hooks/useMediaActivity";
  *  - theme              : opsiyonel; verilmezse ThemeContext'ten alınır
  *  - variant            : "pill" (varsayılan, poster üstü dikey rozet) | "chip" (arama ekranları, tint'li yuvarlak çip)
  *  - vertical           : chip varyantında dikey (true) / yatay (false) dizilim
- *  - iconSize           : ikon boyutu (pill varsayılan 12, chip varsayılan vertical?10:9)
+ *  - iconSize           : ikon boyutu (pill varsayılan 11, chip varsayılan vertical?10:9)
  *  - watchedIcon        : "izlendi" ikonu (bazı ekranlar "eye-off" kullanır, varsayılan "eye")
- *  - style              : konumlandırma / görünüm override'ı (pill'de bg, padding, radius vs. ezilebilir)
+ *  - style              : konumlandırma / görünüm override'ı
+ *  - scale              : ölçek katsayısı (varsayılan: poster ayarından türetilir)
+ *  - posterWidth        : poster genişliği (verilirse rozetler poster boyutuna tam orantılanır)
  */
 
 // theme.colors yoksa kullanılacak güvenli varsayılan renkler
@@ -45,15 +47,25 @@ const ListBadges = memo(function ListBadges({
   iconSize,
   watchedIcon = "eye",
   style,
+  scale: scaleProp,
+  posterWidth,
 }) {
   const ctx = useTheme();
   const theme = themeProp ?? ctx?.theme;
 
-  // Ayarlar > Poster görünümü: rozet görünürlüğü + poster boyutu.
-  // Rozetler poster boyutu ayarına göre ölçeklenir — varsayılan poster
-  // boyutunda mevcut (12px) boyut korunur, küçük posterde orantılı küçülür.
-  const { posterBadges, railPosterSize } = useListLayoutSettings();
-  const badgeScale = railPosterSize === "small" ? 0.85 : 1;
+  // Ayarlar > Poster görünümü: rozet görünürlüğü + poster boyutu / sütun sayısı.
+  const { posterBadges, railPosterSize, listsGridColumns } = useListLayoutSettings();
+
+  // Poster boyutuna göre taban ölçek hesabı (110px standart 3'lü poster kabul edilir)
+  let baseScale = scaleProp != null ? scaleProp : 1;
+  if (scaleProp == null) {
+    if (posterWidth != null) {
+      baseScale = Math.min(1.1, Math.max(0.6, posterWidth / 110));
+    } else {
+      if (railPosterSize === "small") baseScale *= 0.82;
+      if (listsGridColumns === 4) baseScale *= 0.82;
+    }
+  }
 
   const { inWatchList, isWatched, inFavorites, isInOtherLists } = useListStatus(
     mediaId,
@@ -93,19 +105,22 @@ const ListBadges = memo(function ListBadges({
   }
 
   // ── Varsayılan: poster üstü dikey pill ──
-  // İkon ve pill dolgusu poster boyutu + rozet sayısıyla birlikte ölçeklenir.
-  const densityScale = items.length >= 6 ? 0.82 : items.length >= 5 ? 0.9 : 1;
-  const effectiveScale = badgeScale * densityScale;
-  const size = Math.max(8, Math.round((iconSize ?? 12) * effectiveScale));
-  const gap = Math.max(1, Math.round(3 * effectiveScale));
-  const paddingVertical = Math.max(2, Math.round(3 * effectiveScale));
-  const radius = Math.max(6, Math.round(7 * effectiveScale));
+  // İkon ve pill dolgusu poster boyutu + aktif rozet sayısıyla birlikte oranlanır.
+  // Çok sayıda rozet (4+) olduğunda rozetlerin posterden taşmasını önlemek için yoğunluk ölçeği uygulanır.
+  const densityScale = items.length >= 6 ? 0.72 : items.length >= 5 ? 0.78 : items.length >= 4 ? 0.85 : 1.0;
+  const effectiveScale = baseScale * densityScale;
+  const size = Math.max(7, Math.round((iconSize ?? 11) * effectiveScale));
+  const gap = Math.max(1, Math.round(2 * effectiveScale));
+  const paddingVertical = Math.max(1.5, Math.round(2.5 * effectiveScale));
+  const paddingHorizontal = Math.max(1, Math.round(1.5 * effectiveScale));
+  const radius = Math.max(4, Math.round(6 * effectiveScale));
+
   return (
     <View
       style={[
         styles.pill,
-        { backgroundColor: theme?.secondaryt },
-        { gap, paddingVertical, borderRadius: radius },
+        { backgroundColor: theme?.secondaryt ?? "rgba(0,0,0,0.62)" },
+        { gap, paddingVertical, paddingHorizontal, borderRadius: radius, maxHeight: "90%" },
         style,
       ]}
     >
@@ -121,11 +136,12 @@ export default ListBadges;
 const styles = StyleSheet.create({
   // pill (section / detay / profil arama kartları)
   pill: {
-    gap: 3,
-    paddingVertical: 3,
+    gap: 2,
+    paddingVertical: 2,
     paddingHorizontal: 1,
-    borderRadius: 7,
+    borderRadius: 6,
     alignItems: "center",
+    justifyContent: "center",
   },
   // chip — dikey kolon (arama satır kartı)
   chipColumn: {

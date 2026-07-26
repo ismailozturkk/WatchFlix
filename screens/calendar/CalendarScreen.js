@@ -535,7 +535,7 @@ export default function CalendarScreen({ navigation }) {
             allowFontScaling={false}
             style={[styles.headerTitle, { color: theme.text.primary }]}
           >
-            Takvim
+            {i18nText("autoI18n.takvim", "Takvim")}
           </Text>
           <Text
             allowFontScaling={false}

@@ -1,6 +1,6 @@
 // screens/wrapped/WrappedScreen.js
 //
-// Watchify Wrapped — yıllık izleme özeti (Spotify Wrapped tarzı tam ekran hikâye).
+// Seelogd Wrapped — yıllık izleme özeti (Spotify Wrapped tarzı tam ekran hikâye).
 // Veri tamamen cihazda hesaplanır (utils/wrapped.js, ProfileStatsContext'ten);
 // son slayt paylaşılabilir özet kartıdır (galeriye kaydet / paylaş). Geçmiş
 // yıllar Lists/{uid}/wrapped/{year} altına arşivlenir (services/wrappedService).
@@ -8,6 +8,7 @@
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -30,7 +31,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import * as MediaLibrary from "expo-media-library";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "@services/hapticsService";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import Toast from "react-native-toast-message";
@@ -86,7 +87,7 @@ export default function WrappedScreen({ route, navigation }) {
     const maxWidth = Math.max(180, screenWidth - 32);
     const maxHeight = Math.max(
       320,
-      screenHeight - insets.top - insets.bottom - 150,
+      screenHeight - insets.top - insets.bottom - 234
     );
     const width = Math.min(maxWidth, (maxHeight * 9) / 16);
     return { width, height: (width * 16) / 9 };
@@ -95,13 +96,13 @@ export default function WrappedScreen({ route, navigation }) {
   // ── Kaynak veri ──
   const movies = useMemo(
     () => (listItems || []).filter((m) => m?.type === "movie"),
-    [listItems],
+    [listItems]
   );
   const episodes = flatEpisodesTv || [];
 
   const availableYears = useMemo(
     () => getAvailableYears(movies, episodes),
-    [movies, episodes],
+    [movies, episodes]
   );
 
   // ── Seçili yıl ──
@@ -111,7 +112,7 @@ export default function WrappedScreen({ route, navigation }) {
 
   const recap = useMemo(
     () => buildYearlyRecap({ movies, episodes, year, language }),
-    [movies, episodes, year, language],
+    [movies, episodes, year, language]
   );
 
   const hasData =
@@ -121,14 +122,19 @@ export default function WrappedScreen({ route, navigation }) {
   const slides = useMemo(() => {
     if (!hasData) return [];
     const list = [{ key: "intro", Comp: IntroSlide }];
-    if (recap.totalMinutes > 0) list.push({ key: "total", Comp: TotalTimeSlide });
+    if (recap.totalMinutes > 0)
+      list.push({ key: "total", Comp: TotalTimeSlide });
     if (recap.totalMovies > 0) list.push({ key: "movies", Comp: MoviesSlide });
     if (recap.totalEpisodes > 0) list.push({ key: "tv", Comp: TvSlide });
     // Tür/dizi slaytları tüm listeyi gösterir → kaydırmalı + otomatik geçmez (manual).
-    if (recap.allGenres.length > 0) list.push({ key: "genres", Comp: TopGenresSlide, manual: true });
-    if (recap.allShows.length > 0) list.push({ key: "shows", Comp: TopShowsSlide, manual: true });
-    if (recap.busiestMonth || recap.busiestDay) list.push({ key: "busy", Comp: BusiestSlide });
-    if (recap.busiestMonth) list.push({ key: "busyMonth", Comp: BusiestMonthSlide });
+    if (recap.allGenres.length > 0)
+      list.push({ key: "genres", Comp: TopGenresSlide, manual: true });
+    if (recap.allShows.length > 0)
+      list.push({ key: "shows", Comp: TopShowsSlide, manual: true });
+    if (recap.busiestMonth || recap.busiestDay)
+      list.push({ key: "busy", Comp: BusiestSlide });
+    if (recap.busiestMonth)
+      list.push({ key: "busyMonth", Comp: BusiestMonthSlide });
     list.push({ key: "personality", Comp: PersonalitySlide });
     list.push({ key: "summary", Comp: null }); // özel: özet kartı
     return list;
@@ -140,6 +146,7 @@ export default function WrappedScreen({ route, navigation }) {
 
   // ── İlerleme animasyonu (segmentli progress + otomatik geçiş) ──
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const slideTransition = useRef(new Animated.Value(0)).current;
   const animRef = useRef(null);
   const pausedValRef = useRef(0); // duraklatıldığında aktif slaytta kalınan ilerleme (0-1)
 
@@ -151,6 +158,15 @@ export default function WrappedScreen({ route, navigation }) {
   const [held, setHeld] = useState(false);
   const [blurred, setBlurred] = useState(false);
   const paused = userPaused || held || blurred;
+
+  useLayoutEffect(() => {
+    slideTransition.setValue(0);
+    Animated.timing(slideTransition, {
+      toValue: 1,
+      duration: 420,
+      useNativeDriver: true,
+    }).start();
+  }, [index, slideTransition, year]);
 
   const goNext = useCallback(() => {
     setIndex((i) => (i < lastIndex ? i + 1 : i));
@@ -253,7 +269,9 @@ export default function WrappedScreen({ route, navigation }) {
   // Özet (final) slaytına ulaşınca premium başarı dokunsalı.
   useEffect(() => {
     if (isSummary) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        () => {}
+      );
     }
   }, [isSummary]);
 
@@ -275,9 +293,7 @@ export default function WrappedScreen({ route, navigation }) {
   const cardRef = useRef(null);
   const [busyAction, setBusyAction] = useState(null);
   const [showCustomizer, setShowCustomizer] = useState(false);
-  const [cardOptions, setCardOptions] = useState(
-    DEFAULT_WRAPPED_CARD_OPTIONS,
-  );
+  const [cardOptions, setCardOptions] = useState(DEFAULT_WRAPPED_CARD_OPTIONS);
   const busy = busyAction !== null;
 
   const updateCardOption = useCallback((key, value) => {
@@ -291,24 +307,44 @@ export default function WrappedScreen({ route, navigation }) {
   }, []);
 
   const capture = useCallback(async () => {
-    // Kart zaten chrome içermiyor; doğrudan yakala.
+    const node = cardRef.current;
+    if (!node) throw new Error("card-not-ready");
+    // Kart zaten chrome içermiyor; doğrudan yakala. İki kare + kısa gecikme
+    // bekle → gradient ve expo-image katmanları boyansın (ilk yakalama boş
+    // çıkmasın). Yakalama ara sıra ilk denemede başarısız olabildiğinden bir
+    // kez daha dener.
     await new Promise((r) => requestAnimationFrame(() => r()));
-    await new Promise((r) => setTimeout(r, 80));
-    return captureRef(cardRef, { format: "png", quality: 1, result: "tmpfile" });
+    await new Promise((r) => requestAnimationFrame(() => r()));
+    await new Promise((r) => setTimeout(r, 90));
+    const opts = { format: "png", quality: 1, result: "tmpfile" };
+    try {
+      return await captureRef(node, opts);
+    } catch (first) {
+      await new Promise((r) => setTimeout(r, 140));
+      return captureRef(node, opts);
+    }
   }, []);
 
   const handleShare = useCallback(async () => {
     if (busy) return;
     try {
       setBusyAction("share");
-      const uri = await capture();
+      // Önce paylaşım desteğini doğrula (yoksa boşuna yakalama yapma).
       if (!(await Sharing.isAvailableAsync())) {
         Toast.show({ type: "error", text1: str.shareUnavailable });
         return;
       }
-      await Sharing.shareAsync(uri, { mimeType: "image/png", dialogTitle: str.brand });
+      const uri = await capture();
+      // view-shot bazı platformlarda şemasız yol döndürür; expo-sharing yerel
+      // dosya için file:// bekler → eksikse ekle (Android'de sessiz başarısızlık).
+      const shareUri = /^(file|content):\/\//.test(uri) ? uri : `file://${uri}`;
+      await Sharing.shareAsync(shareUri, {
+        mimeType: "image/png",
+        dialogTitle: str.brand,
+        UTI: "public.png",
+      });
     } catch (e) {
-      Toast.show({ type: "error", text1: str.errorPrefix + e.message });
+      Toast.show({ type: "error", text1: str.errorPrefix + (e?.message || e) });
     } finally {
       setBusyAction(null);
     }
@@ -344,7 +380,11 @@ export default function WrappedScreen({ route, navigation }) {
       <View style={styles.root}>
         <StatusBar barStyle="light-content" />
         <WrappedSlideFrame accent={SLIDE_COLORS[3]} topInset={insets.top}>
-          <Ionicons name="film-outline" size={56} color="rgba(255,255,255,0.85)" />
+          <Ionicons
+            name="film-outline"
+            size={56}
+            color="rgba(255,255,255,0.85)"
+          />
           <Text style={styles.emptyTitle} allowFontScaling={false}>
             {str.emptyTitle}
           </Text>
@@ -359,6 +399,19 @@ export default function WrappedScreen({ route, navigation }) {
 
   const accent = SLIDE_COLORS[index % SLIDE_COLORS.length];
   const ActiveComp = slides[index]?.Comp;
+  const slideLabel =
+    {
+      intro: str.brand,
+      total: str.totalTitle,
+      movies: str.moviesTitle,
+      tv: str.tvTitle,
+      genres: str.genresTitle,
+      shows: str.topShowsTitle,
+      busy: str.busiestTitle,
+      busyMonth: str.busiestMonthTitle,
+      personality: str.personalityTitle,
+      summary: str.summaryTitle,
+    }[slides[index]?.key] || str.brand;
 
   return (
     <View style={styles.root}>
@@ -387,41 +440,67 @@ export default function WrappedScreen({ route, navigation }) {
       </View>
 
       {/* ── Üst katman: aktif slayt (box-none → boş alan taps alt bölgeye geçer) ── */}
-      {isSummary ? (
-        <SummarySlide
-          cardRef={cardRef}
-          recap={recap}
-          str={str}
-          theme={theme}
-          language={language}
-          getTmdbUrl={getTmdbUrl}
-          userName={user?.displayName || ""}
-          topInset={insets.top}
-          bottomInset={insets.bottom}
-          cardWidth={shareCardSize.width}
-          cardHeight={shareCardSize.height}
-          busy={busy}
-          busyAction={busyAction}
-          cardOptions={cardOptions}
-          onCustomize={() => setShowCustomizer(true)}
-          onSave={handleSave}
-          onShare={handleShare}
-        />
-      ) : ActiveComp ? (
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <ActiveComp
+      <Animated.View
+        key={`${year}-${index}`}
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            opacity: slideTransition,
+            transform: [
+              {
+                translateY: slideTransition.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [18, 0],
+                }),
+              },
+              {
+                scale: slideTransition.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.975, 1],
+                }),
+              },
+            ],
+          },
+        ]}
+        pointerEvents="box-none"
+      >
+        {isSummary ? (
+          <SummarySlide
+            cardRef={cardRef}
             recap={recap}
             str={str}
             theme={theme}
             language={language}
             getTmdbUrl={getTmdbUrl}
+            userName={user?.displayName || ""}
             topInset={insets.top}
-            accent={accent}
-            years={availableYears}
-            onSelectYear={onSelectYear}
+            bottomInset={insets.bottom}
+            cardWidth={shareCardSize.width}
+            cardHeight={shareCardSize.height}
+            busy={busy}
+            busyAction={busyAction}
+            cardOptions={cardOptions}
+            onCustomize={() => setShowCustomizer(true)}
+            onThemeChange={(themeId) => updateCardOption("themeId", themeId)}
+            onSave={handleSave}
+            onShare={handleShare}
           />
-        </View>
-      ) : null}
+        ) : ActiveComp ? (
+          <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+            <ActiveComp
+              recap={recap}
+              str={str}
+              theme={theme}
+              language={language}
+              getTmdbUrl={getTmdbUrl}
+              topInset={insets.top}
+              accent={accent}
+              years={route?.params?.hideYearPicker ? [year] : availableYears}
+              onSelectYear={onSelectYear}
+            />
+          </View>
+        ) : null}
+      </Animated.View>
 
       {/* ── Chrome: progress + kapat (en üstte, dokunmaları yakalar) ── */}
       <View style={styles.chromeTop} pointerEvents="box-none">
@@ -435,16 +514,40 @@ export default function WrappedScreen({ route, navigation }) {
 
       {/* ── Alt navigasyon okları (kaydırmalı slaytlarda da güvenilir geçiş) ── */}
       {!isSummary && (
-        <View style={[styles.navRow, { bottom: insets.bottom + 22 }]} pointerEvents="box-none">
+        <View
+          style={[styles.navRow, { bottom: insets.bottom + 22 }]}
+          pointerEvents="box-none"
+        >
           {index > 0 ? (
-            <TouchableOpacity style={styles.navBtn} onPress={tapPrev} activeOpacity={0.85}>
+            <TouchableOpacity
+              style={styles.navBtn}
+              onPress={tapPrev}
+              activeOpacity={0.85}
+            >
               <Ionicons name="chevron-back" size={22} color="#fff" />
             </TouchableOpacity>
           ) : (
             <View style={styles.navBtn} />
           )}
+          <View style={styles.navMeta} pointerEvents="none">
+            <Text style={styles.navMetaCount} allowFontScaling={false}>
+              {String(index + 1).padStart(2, "0")} /{" "}
+              {String(slides.length).padStart(2, "0")}
+            </Text>
+            <Text
+              style={styles.navMetaLabel}
+              allowFontScaling={false}
+              numberOfLines={1}
+            >
+              {slideLabel}
+            </Text>
+          </View>
           {index < lastIndex ? (
-            <TouchableOpacity style={styles.navBtnPrimary} onPress={tapNext} activeOpacity={0.85}>
+            <TouchableOpacity
+              style={styles.navBtnPrimary}
+              onPress={tapNext}
+              activeOpacity={0.85}
+            >
               <Ionicons name="chevron-forward" size={22} color="#000" />
             </TouchableOpacity>
           ) : (
@@ -468,7 +571,9 @@ export default function WrappedScreen({ route, navigation }) {
         options={cardOptions}
         str={str}
         theme={theme}
-        hasPosterChoice={Boolean(recap.topShows?.length && recap.moviePosters?.length)}
+        hasPosterChoice={Boolean(
+          recap.topShows?.length && recap.moviePosters?.length
+        )}
         hasUserName={Boolean((user?.displayName || "").trim())}
         onChange={updateCardOption}
         onReset={resetCardOptions}
@@ -496,29 +601,71 @@ function SummarySlide({
   busyAction,
   cardOptions,
   onCustomize,
+  onThemeChange,
   onSave,
   onShare,
 }) {
   const palette = getWrappedCardPalette(cardOptions.themeId, theme.accent);
   const accentForeground = foregroundForPalette(palette);
+  const secondary = palette.secondary || palette.accent;
+
+  // Başlık + dock, karttan hemen sonra hafifçe süzülerek girer (yalnız mount).
+  const intro = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(intro, {
+      toValue: 1,
+      duration: 520,
+      delay: 140,
+      useNativeDriver: true,
+    }).start();
+  }, [intro]);
+  const introRise = intro.interpolate({
+    inputRange: [0, 1],
+    outputRange: [22, 0],
+  });
+
   return (
     <View style={StyleSheet.absoluteFill}>
       <LinearGradient
         colors={[palette.colors[2], "#08070B", "#000"]}
-        locations={[0, 0.48, 1]}
+        locations={[0, 0.5, 1]}
         style={StyleSheet.absoluteFill}
       />
       <View
         style={[
           styles.summaryGlow,
-          { backgroundColor: palette.accent, opacity: 0.16 },
+          { backgroundColor: palette.accent, opacity: 0.2 },
         ]}
       />
-      <View style={[styles.summaryWrap, { paddingTop: topInset + 50, paddingBottom: bottomInset + 12 }]}>
+      <View
+        style={[
+          styles.summaryGlowAlt,
+          { backgroundColor: secondary, opacity: 0.13 },
+        ]}
+      />
+
+      <View
+        style={[
+          styles.summaryWrap,
+          { paddingTop: topInset + 16, paddingBottom: bottomInset + 12 },
+        ]}
+      >
+        <Animated.View style={[styles.summaryHeader, { opacity: intro }]}>
+          <Ionicons name="sparkles" size={15} color={palette.accent} />
+          <Text style={styles.summaryHeadline} allowFontScaling={false}>
+            {str.shareCardReady}
+          </Text>
+        </Animated.View>
         <View
           ref={cardRef}
           collapsable={false}
-          style={[styles.cardShadow, { shadowColor: palette.accent, borderRadius: Math.round(cardHeight * 0.053) }]}
+          style={[
+            styles.cardShadow,
+            {
+              shadowColor: palette.accent,
+              borderRadius: Math.round(cardHeight * 0.053),
+            },
+          ]}
         >
           <WrappedShareCard
             recap={recap}
@@ -533,45 +680,83 @@ function SummarySlide({
           />
         </View>
 
-        <View style={styles.summaryFooter}>
-          <View style={styles.shareReadyCard}>
-            <View style={styles.shareReadyIcon}>
-              <Ionicons name="color-palette-outline" size={18} color={palette.accent} />
-            </View>
-            <View style={styles.shareReadyCopy}>
-              <Text style={styles.shareReadyTitle} allowFontScaling={false}>
-                {str.shareCardReady}
-              </Text>
-              <Text style={styles.shareReadyHint} allowFontScaling={false} numberOfLines={1}>
-                {str.shareCardHint}
-              </Text>
-            </View>
+        <Animated.View
+          style={[
+            styles.dock,
+            { opacity: intro, transform: [{ translateY: introRise }] },
+          ]}
+        >
+          <View style={styles.dockThemeRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.swatchRow}
+              style={styles.swatchScroll}
+            >
+              {WRAPPED_CARD_THEMES.map((item) => {
+                const active = cardOptions.themeId === item.id;
+                return (
+                  <Pressable
+                    key={item.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={str[item.labelKey]}
+                    accessibilityState={{ selected: active }}
+                    onPress={() => onThemeChange(item.id)}
+                    disabled={busy}
+                    style={styles.swatchTap}
+                  >
+                    <View
+                      style={[
+                        styles.swatchRing,
+                        active && { borderColor: palette.accent },
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={[item.accent, item.secondary]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.swatch}
+                      />
+                    </View>
+                    {active && (
+                      <View
+                        style={[
+                          styles.swatchCheck,
+                          { backgroundColor: palette.accent },
+                        ]}
+                      >
+                        <Ionicons
+                          name="checkmark"
+                          size={9}
+                          color={accentForeground}
+                        />
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
             <TouchableOpacity
-              style={[styles.customizeBtn, { backgroundColor: palette.accent }]}
+              style={styles.customizeChip}
               onPress={onCustomize}
               disabled={busy}
               activeOpacity={0.82}
+              accessibilityRole="button"
+              accessibilityLabel={str.customize}
             >
-              <Ionicons
-                name="options-outline"
-                size={14}
-                color={accentForeground}
-              />
-              <Text
-                style={[
-                  styles.customizeBtnText,
-                  { color: accentForeground },
-                ]}
-                allowFontScaling={false}
-              >
-                {str.customize}
-              </Text>
+              <Ionicons name="options-outline" size={18} color="#fff" />
             </TouchableOpacity>
           </View>
 
+          <View style={styles.dockDivider} />
+
           <View style={styles.summaryActions}>
             <TouchableOpacity
-              style={[styles.actionBtn, styles.saveBtn, busy && styles.actionDisabled]}
+              style={[
+                styles.actionBtn,
+                styles.saveBtn,
+                busy && styles.actionDisabled,
+              ]}
               onPress={onSave}
               disabled={busy}
               activeOpacity={0.85}
@@ -580,28 +765,50 @@ function SummarySlide({
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
-                  <Ionicons name="download-outline" size={18} color="#fff" />
-                  <Text style={styles.actionText}>{str.save}</Text>
+                  <Ionicons name="download-outline" size={19} color="#fff" />
+                  <Text style={styles.actionText} allowFontScaling={false}>
+                    {str.save}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.actionBtn, styles.shareBtn, busy && styles.actionDisabled]}
+              style={[
+                styles.actionBtn,
+                styles.shareBtn,
+                busy && styles.actionDisabled,
+              ]}
               onPress={onShare}
               disabled={busy}
               activeOpacity={0.85}
             >
-              {busyAction === "share" ? (
-                <ActivityIndicator size="small" color="#000" />
-              ) : (
-                <>
-                  <Ionicons name="share-social" size={18} color="#000" />
-                  <Text style={[styles.actionText, { color: "#000" }]}>{str.share}</Text>
-                </>
-              )}
+              <LinearGradient
+                colors={[palette.accent, palette.secondary || palette.accent]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.shareBtnFill}
+              >
+                {busyAction === "share" ? (
+                  <ActivityIndicator size="small" color={accentForeground} />
+                ) : (
+                  <>
+                    <Ionicons
+                      name="share-social"
+                      size={19}
+                      color={accentForeground}
+                    />
+                    <Text
+                      style={[styles.shareText, { color: accentForeground }]}
+                      allowFontScaling={false}
+                    >
+                      {str.share}
+                    </Text>
+                  </>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </View>
   );
@@ -635,12 +842,13 @@ function ShareCustomizerSheet({
         <View style={styles.customizerSheet}>
           <View style={styles.customizerHandle} />
           <View style={styles.customizerHeader}>
-            <View style={[styles.customizerHeaderIcon, { backgroundColor: palette.accent }]}>
-              <Ionicons
-                name="sparkles"
-                size={18}
-                color={accentForeground}
-              />
+            <View
+              style={[
+                styles.customizerHeaderIcon,
+                { backgroundColor: palette.accent },
+              ]}
+            >
+              <Ionicons name="sparkles" size={18} color={accentForeground} />
             </View>
             <View style={styles.customizerHeaderCopy}>
               <Text style={styles.customizerTitle} allowFontScaling={false}>
@@ -650,8 +858,16 @@ function ShareCustomizerSheet({
                 {str.customizeSubtitle}
               </Text>
             </View>
-            <TouchableOpacity style={styles.resetBtn} onPress={onReset} activeOpacity={0.78}>
-              <Ionicons name="refresh" size={13} color="rgba(255,255,255,0.72)" />
+            <TouchableOpacity
+              style={styles.resetBtn}
+              onPress={onReset}
+              activeOpacity={0.78}
+            >
+              <Ionicons
+                name="refresh"
+                size={13}
+                color="rgba(255,255,255,0.72)"
+              />
               <Text style={styles.resetText} allowFontScaling={false}>
                 {str.reset}
               </Text>
@@ -664,193 +880,238 @@ function ShareCustomizerSheet({
             bounces={false}
             showsVerticalScrollIndicator={false}
           >
-          <CustomizerLabel icon="color-palette-outline" label={str.colorTheme} />
-          <View style={styles.themeOptions}>
-            {WRAPPED_CARD_THEMES.map((item) => {
-              const active = options.themeId === item.id;
-              const itemPalette = getWrappedCardPalette(item.id, theme.accent);
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.themeOption,
-                    active && { borderColor: itemPalette.accent, backgroundColor: "rgba(255,255,255,0.1)" },
-                  ]}
-                  onPress={() => onChange("themeId", item.id)}
-                  activeOpacity={0.8}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: active }}
-                >
-                  <LinearGradient
-                    colors={[itemPalette.colors[0], itemPalette.colors[2]]}
-                    style={styles.themeSwatch}
-                  >
-                    {active && (
-                      <Ionicons name="checkmark" size={16} color="#fff" />
-                    )}
-                  </LinearGradient>
-                  <Text
-                    style={[styles.themeOptionText, active && { color: "#fff" }]}
-                    allowFontScaling={false}
-                    numberOfLines={1}
-                  >
-                    {str[item.labelKey]}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <CustomizerLabel icon="albums-outline" label={str.cardStyle} />
-          <View style={styles.variantControl}>
-            {[
-              { value: "glow", label: str.styleGlow, icon: "sparkles-outline" },
-              { value: "clean", label: str.styleClean, icon: "remove-outline" },
-            ].map((item) => {
-              const active = options.variant === item.value;
-              return (
-                <TouchableOpacity
-                  key={item.value}
-                  style={[
-                    styles.variantBtn,
-                    active && { backgroundColor: palette.accent },
-                  ]}
-                  onPress={() => onChange("variant", item.value)}
-                  activeOpacity={0.8}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: active }}
-                >
-                  <Ionicons
-                    name={item.icon}
-                    size={15}
-                    color={active ? accentForeground : "rgba(255,255,255,0.58)"}
-                  />
-                  <Text
+            <CustomizerLabel
+              icon="color-palette-outline"
+              label={str.colorTheme}
+            />
+            <View style={styles.themeOptions}>
+              {WRAPPED_CARD_THEMES.map((item) => {
+                const active = options.themeId === item.id;
+                const itemPalette = getWrappedCardPalette(
+                  item.id,
+                  theme.accent
+                );
+                return (
+                  <TouchableOpacity
+                    key={item.id}
                     style={[
-                      styles.variantText,
-                      active && { color: accentForeground },
+                      styles.themeOption,
+                      active && {
+                        borderColor: itemPalette.accent,
+                        backgroundColor: "rgba(255,255,255,0.1)",
+                      },
                     ]}
-                    allowFontScaling={false}
+                    onPress={() => onChange("themeId", item.id)}
+                    activeOpacity={0.8}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: active }}
                   >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Poster bölümü dizi mi film mi göstersin (ikisi de varsa) */}
-          {hasPosterChoice && (
-            <>
-              <CustomizerLabel icon="images-outline" label={str.posterContentLabel} />
-              <View style={styles.variantControl}>
-                {[
-                  { value: "shows", label: str.postersShows, icon: "tv-outline" },
-                  { value: "movies", label: str.postersMovies, icon: "film-outline" },
-                ].map((item) => {
-                  const active = (options.posterContent || "shows") === item.value;
-                  return (
-                    <TouchableOpacity
-                      key={item.value}
-                      style={[
-                        styles.variantBtn,
-                        active && { backgroundColor: palette.accent },
-                      ]}
-                      onPress={() => onChange("posterContent", item.value)}
-                      activeOpacity={0.8}
-                      accessibilityRole="radio"
-                      accessibilityState={{ checked: active }}
+                    <LinearGradient
+                      colors={[itemPalette.colors[0], itemPalette.colors[2]]}
+                      style={styles.themeSwatch}
                     >
-                      <Ionicons
-                        name={item.icon}
-                        size={15}
-                        color={active ? accentForeground : "rgba(255,255,255,0.58)"}
-                      />
-                      <Text
-                        style={[
-                          styles.variantText,
-                          active && { color: accentForeground },
-                        ]}
-                        allowFontScaling={false}
-                      >
-                        {item.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </>
-          )}
+                      {active && (
+                        <Ionicons name="checkmark" size={16} color="#fff" />
+                      )}
+                    </LinearGradient>
+                    <Text
+                      style={[
+                        styles.themeOptionText,
+                        active && { color: "#fff" },
+                      ]}
+                      allowFontScaling={false}
+                      numberOfLines={1}
+                    >
+                      {str[item.labelKey]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
-          <CustomizerLabel icon="eye-outline" label={str.visibleSections} />
-          <View style={styles.visibilityRow}>
-            {[
-              {
-                key: "showPersonality",
-                label: str.personalityOption,
-                icon: "happy-outline",
-              },
-              {
-                key: "showStats",
-                label: str.statsOption,
-                icon: "grid-outline",
-              },
-              {
-                key: "showGenres",
-                label: str.genresOption,
-                icon: "pricetags-outline",
-              },
-              {
-                key: "showPosters",
-                label: str.postersOption,
-                icon: "images-outline",
-              },
-              ...(hasUserName
-                ? [
-                    {
-                      key: "showName",
-                      label: str.nameOption,
-                      icon: "person-outline",
-                    },
-                  ]
-                : []),
-            ].map((item) => {
-              // Eski seçeneklerde anahtar yoksa "açık" say (kartla aynı kural).
-              const active = options[item.key] !== false;
-              return (
-                <TouchableOpacity
-                  key={item.key}
-                  style={[
-                    styles.visibilityBtn,
-                    active && { borderColor: palette.accent, backgroundColor: "rgba(255,255,255,0.1)" },
-                  ]}
-                  onPress={() => onChange(item.key, !active)}
-                  activeOpacity={0.8}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: active }}
-                >
-                  <View
+            <CustomizerLabel icon="albums-outline" label={str.cardStyle} />
+            <View style={styles.variantControl}>
+              {[
+                {
+                  value: "glow",
+                  label: str.styleGlow,
+                  icon: "sparkles-outline",
+                },
+                {
+                  value: "clean",
+                  label: str.styleClean,
+                  icon: "remove-outline",
+                },
+              ].map((item) => {
+                const active = options.variant === item.value;
+                return (
+                  <TouchableOpacity
+                    key={item.value}
                     style={[
-                      styles.visibilityCheck,
-                      active && { backgroundColor: palette.accent, borderColor: palette.accent },
+                      styles.variantBtn,
+                      active && { backgroundColor: palette.accent },
                     ]}
+                    onPress={() => onChange("variant", item.value)}
+                    activeOpacity={0.8}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: active }}
                   >
-                    {active && (
-                      <Ionicons
-                        name="checkmark"
-                        size={12}
-                        color={accentForeground}
-                      />
-                    )}
-                  </View>
-                  <Ionicons name={item.icon} size={16} color="#fff" />
-                  <Text style={styles.visibilityText} allowFontScaling={false}>
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+                    <Ionicons
+                      name={item.icon}
+                      size={15}
+                      color={
+                        active ? accentForeground : "rgba(255,255,255,0.58)"
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.variantText,
+                        active && { color: accentForeground },
+                      ]}
+                      allowFontScaling={false}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Poster bölümü dizi mi film mi göstersin (ikisi de varsa) */}
+            {hasPosterChoice && (
+              <>
+                <CustomizerLabel
+                  icon="images-outline"
+                  label={str.posterContentLabel}
+                />
+                <View style={styles.variantControl}>
+                  {[
+                    {
+                      value: "shows",
+                      label: str.postersShows,
+                      icon: "tv-outline",
+                    },
+                    {
+                      value: "movies",
+                      label: str.postersMovies,
+                      icon: "film-outline",
+                    },
+                  ].map((item) => {
+                    const active =
+                      (options.posterContent || "shows") === item.value;
+                    return (
+                      <TouchableOpacity
+                        key={item.value}
+                        style={[
+                          styles.variantBtn,
+                          active && { backgroundColor: palette.accent },
+                        ]}
+                        onPress={() => onChange("posterContent", item.value)}
+                        activeOpacity={0.8}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: active }}
+                      >
+                        <Ionicons
+                          name={item.icon}
+                          size={15}
+                          color={
+                            active ? accentForeground : "rgba(255,255,255,0.58)"
+                          }
+                        />
+                        <Text
+                          style={[
+                            styles.variantText,
+                            active && { color: accentForeground },
+                          ]}
+                          allowFontScaling={false}
+                        >
+                          {item.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+
+            <CustomizerLabel icon="eye-outline" label={str.visibleSections} />
+            <View style={styles.visibilityRow}>
+              {[
+                {
+                  key: "showPersonality",
+                  label: str.personalityOption,
+                  icon: "happy-outline",
+                },
+                {
+                  key: "showStats",
+                  label: str.statsOption,
+                  icon: "grid-outline",
+                },
+                {
+                  key: "showGenres",
+                  label: str.genresOption,
+                  icon: "pricetags-outline",
+                },
+                {
+                  key: "showPosters",
+                  label: str.postersOption,
+                  icon: "images-outline",
+                },
+                ...(hasUserName
+                  ? [
+                      {
+                        key: "showName",
+                        label: str.nameOption,
+                        icon: "person-outline",
+                      },
+                    ]
+                  : []),
+              ].map((item) => {
+                // Eski seçeneklerde anahtar yoksa "açık" say (kartla aynı kural).
+                const active = options[item.key] !== false;
+                return (
+                  <TouchableOpacity
+                    key={item.key}
+                    style={[
+                      styles.visibilityBtn,
+                      active && {
+                        borderColor: palette.accent,
+                        backgroundColor: "rgba(255,255,255,0.1)",
+                      },
+                    ]}
+                    onPress={() => onChange(item.key, !active)}
+                    activeOpacity={0.8}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: active }}
+                  >
+                    <View
+                      style={[
+                        styles.visibilityCheck,
+                        active && {
+                          backgroundColor: palette.accent,
+                          borderColor: palette.accent,
+                        },
+                      ]}
+                    >
+                      {active && (
+                        <Ionicons
+                          name="checkmark"
+                          size={12}
+                          color={accentForeground}
+                        />
+                      )}
+                    </View>
+                    <Ionicons name={item.icon} size={16} color="#fff" />
+                    <Text
+                      style={styles.visibilityText}
+                      allowFontScaling={false}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </ScrollView>
 
           <TouchableOpacity
@@ -859,10 +1120,7 @@ function ShareCustomizerSheet({
             activeOpacity={0.84}
           >
             <Text
-              style={[
-                styles.doneText,
-                { color: accentForeground },
-              ]}
+              style={[styles.doneText, { color: accentForeground }]}
               allowFontScaling={false}
             >
               {str.done}
@@ -960,6 +1218,29 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
+  navMeta: {
+    maxWidth: 170,
+    minHeight: 40,
+    paddingHorizontal: 13,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.26)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  navMetaCount: {
+    color: "rgba(255,255,255,0.58)",
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  navMetaLabel: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 2,
+  },
   closeBtn: {
     position: "absolute",
     left: 16,
@@ -983,84 +1264,153 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  emptyTitle: { color: "#fff", fontSize: 24, fontWeight: "900", marginTop: 18, letterSpacing: -0.5 },
-  emptySub: { color: "rgba(255,255,255,0.8)", fontSize: 15, fontWeight: "600", marginTop: 10, lineHeight: 21 },
+  emptyTitle: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "900",
+    marginTop: 18,
+    letterSpacing: -0.5,
+  },
+  emptySub: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 15,
+    fontWeight: "600",
+    marginTop: 10,
+    lineHeight: 21,
+  },
 
   summaryGlow: {
     position: "absolute",
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    top: -130,
-    right: -120,
+    width: 340,
+    height: 340,
+    borderRadius: 170,
+    top: -140,
+    right: -130,
   },
-  summaryWrap: { flex: 1, alignItems: "center", justifyContent: "space-between" },
+  summaryGlowAlt: {
+    position: "absolute",
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    bottom: -120,
+    left: -120,
+  },
+  summaryWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+  },
+  summaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  summaryHeadline: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
   cardShadow: {
     borderRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.42,
-    shadowRadius: 24,
-    elevation: 16,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.5,
+    shadowRadius: 28,
+    elevation: 18,
   },
-  summaryFooter: { width: "100%", gap: 9, marginTop: 12 },
-  shareReadyCard: {
-    minHeight: 55,
-    marginHorizontal: 20,
-    paddingHorizontal: 9,
-    paddingVertical: 8,
-    borderRadius: 17,
+  dock: {
+    width: "100%",
+    borderRadius: 26,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.13)",
-    backgroundColor: "rgba(255,255,255,0.075)",
-    flexDirection: "row",
-    alignItems: "center",
+    borderColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    paddingHorizontal: 12,
+    paddingTop: 11,
+    paddingBottom: 12,
+    gap: 11,
   },
-  shareReadyIcon: {
+  dockThemeRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  swatchScroll: { flex: 1 },
+  swatchRow: { gap: 13, paddingHorizontal: 2, alignItems: "center" },
+  swatchTap: {
     width: 34,
     height: 34,
-    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  swatchRing: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 2,
+    borderColor: "transparent",
+    padding: 2,
+  },
+  swatch: { flex: 1, borderRadius: 13 },
+  swatchCheck: {
+    position: "absolute",
+    bottom: -1,
+    right: -1,
+    width: 15,
+    height: 15,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: "#0b0a0f",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  customizeChip: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
     backgroundColor: "rgba(255,255,255,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 8,
   },
-  shareReadyCopy: { flex: 1, paddingRight: 8 },
-  shareReadyTitle: { color: "#fff", fontSize: 11, fontWeight: "800" },
-  shareReadyHint: {
-    color: "rgba(255,255,255,0.52)",
-    fontSize: 8,
-    fontWeight: "600",
-    marginTop: 2,
+  dockDivider: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    marginHorizontal: 2,
   },
-  customizeBtn: {
-    height: 32,
-    paddingHorizontal: 9,
-    borderRadius: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-  },
-  customizeBtnText: { fontSize: 9, fontWeight: "800" },
   summaryActions: {
     flexDirection: "row",
-    gap: 10,
+    gap: 11,
     width: "100%",
-    paddingHorizontal: 20,
   },
   actionBtn: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 7,
-    height: 48,
-    borderRadius: 15,
+    gap: 8,
+    height: 56,
+    borderRadius: 18,
   },
-  saveBtn: { backgroundColor: "rgba(255,255,255,0.15)", borderWidth: 1, borderColor: "rgba(255,255,255,0.3)" },
-  shareBtn: { backgroundColor: "#fff" },
+  saveBtn: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.28)",
+  },
+  shareBtn: { flex: 1.4, overflow: "hidden" },
+  shareBtnFill: {
+    flex: 1,
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+  },
+  shareText: { fontSize: 16, fontWeight: "900", letterSpacing: 0.3 },
   actionDisabled: { opacity: 0.58 },
-  actionText: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  actionText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+  },
 
   customizerRoot: {
     flex: 1,
@@ -1117,7 +1467,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
   },
-  resetText: { color: "rgba(255,255,255,0.68)", fontSize: 9, fontWeight: "700" },
+  resetText: {
+    color: "rgba(255,255,255,0.68)",
+    fontSize: 9,
+    fontWeight: "700",
+  },
   customizerLabelRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1132,7 +1486,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.55,
     textTransform: "uppercase",
   },
-  themeOptions: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 14 },
+  themeOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+    marginBottom: 14,
+  },
   themeOption: {
     // 6 palet → satır başına 3 kutu (sarma ile 2 satır)
     flexBasis: "30%",
@@ -1174,8 +1533,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
   },
-  variantText: { color: "rgba(255,255,255,0.58)", fontSize: 10, fontWeight: "800" },
-  visibilityRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
+  variantText: {
+    color: "rgba(255,255,255,0.58)",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  visibilityRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 16,
+  },
   visibilityBtn: {
     // 4-5 anahtar → 2 sütunlu ızgara (tek kalan satırı doldurur)
     flexBasis: "47%",

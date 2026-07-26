@@ -1,6 +1,6 @@
 // services/aiConversationsStore.js
 //
-// Watchify AI asistanı sohbet geçmişi — AsyncStorage kalıcılığı.
+// Seelogd AI asistanı sohbet geçmişi — AsyncStorage kalıcılığı.
 //
 // Veri modeli (tek JSON blob altında saklanır):
 //   Conversation = {
@@ -23,7 +23,7 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const STORAGE_KEY = "@whatchflix/ai_conversations";
+const STORAGE_KEY = "@seelogd/ai_conversations";
 const MAX_CONVERSATIONS = 50; // sınırsız büyümesini engelle
 
 /** Basit, çakışması düşük id üretici. */

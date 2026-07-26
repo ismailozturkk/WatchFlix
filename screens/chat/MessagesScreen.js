@@ -22,7 +22,7 @@ import { useTheme } from "@context/ThemeContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BackButton from "@components/BackButton";
-import IconBacground from "@components/IconBacground";
+import ScreenDecor from "@components/ScreenDecor";
 import GroupAvatar from "@components/chat/GroupAvatar";
 import { i18nText } from "@utils/i18nText";
 import { subscribeUserGroups } from "@services/groupsService";
@@ -169,7 +169,7 @@ export default function MessagesScreen({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-      <IconBacground opacity={0.3} />
+      <ScreenDecor iconOpacity={0.3} />
 
       <View style={styles.headerRow}>
         <Text style={[styles.title, { color: theme.text?.primary ?? "#fff" }]}>

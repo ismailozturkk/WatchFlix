@@ -21,7 +21,7 @@ import SharedListsSection from "./SharedListsSection";
 import { useHapticsSettings } from "../context/AppSettingsContext";
 import { BlurView } from "expo-blur";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "@services/hapticsService";
 import { i18nText } from "../utils/i18nText";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -131,6 +131,7 @@ const ListView = ({
   type,
   navigation,
   updateWatchedList,
+  openWatchedHistory,
   isRemaining,
   isReminderSet,
   addReminder,
@@ -290,7 +291,7 @@ const ListView = ({
                     ? () => handleOptimisticPress("reminder", addReminder)
                     : () =>
                         getIsActive("watchedMovies")
-                          ? handleOptimisticPress("watchedMovies", () => updateList("watchedMovies", type, formatDateSave(new Date())))
+                          ? handleOptimisticPress("watchedMovies", openWatchedHistory, false)
                           : handleOptimisticPress("watchedMovies", updateWatchedList, false)
                 }
               >
@@ -477,7 +478,7 @@ const ListView = ({
                   >
                     <Ionicons name="close-circle-outline" size={15} color={theme.text.muted} />
                     <Text allowFontScaling={false} style={[styles.actionBtnText, { color: theme.text.muted }]}>
-                      Kapat
+                      {i18nText("autoI18n.kapat", "Kapat")}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity

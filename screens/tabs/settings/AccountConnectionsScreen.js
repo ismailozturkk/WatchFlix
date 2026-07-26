@@ -153,8 +153,8 @@ export default function AccountConnectionsScreen() {
     appAlert(
       tr ? "Apple bağlantısı kaldırılsın mı?" : "Disconnect Apple?",
       tr
-        ? "Apple ile giriş artık bu Watchify hesabında kullanılamayacak."
-        : "Sign in with Apple will no longer work for this Watchify account.",
+        ? "Apple ile giriş artık bu Seelogd hesabında kullanılamayacak."
+        : "Sign in with Apple will no longer work for this Seelogd account.",
       [
         { text: tr ? "Vazgeç" : "Cancel", style: "cancel" },
         {
@@ -291,7 +291,7 @@ export default function AccountConnectionsScreen() {
         </View>
         <View style={styles.identityText}>
           <Text style={[styles.identityName, { color: C.text }]} numberOfLines={1}>
-            {user?.displayName || (tr ? "Watchify hesabı" : "Watchify account")}
+            {user?.displayName || (tr ? "Seelogd hesabı" : "Seelogd account")}
           </Text>
           <Text style={[styles.identityEmail, { color: C.muted }]} numberOfLines={1}>
             {user?.email || (tr ? "E-posta bilgisi yok" : "No email available")}
@@ -409,6 +409,7 @@ export default function AccountConnectionsScreen() {
               <TextInput
                 value={password}
                 onChangeText={setPassword}
+                maxLength={128}
                 placeholder={tr ? "Yeni parola" : "New password"}
                 placeholderTextColor={C.muted}
                 secureTextEntry={!showPassword}
@@ -432,6 +433,7 @@ export default function AccountConnectionsScreen() {
               <TextInput
                 value={passwordAgain}
                 onChangeText={setPasswordAgain}
+                maxLength={128}
                 placeholder={tr ? "Parolayı tekrar yaz" : "Repeat password"}
                 placeholderTextColor={C.muted}
                 secureTextEntry={!showPassword}
@@ -494,8 +496,8 @@ export default function AccountConnectionsScreen() {
 
       <Text style={[styles.note, { color: C.muted }]}>
         {tr
-          ? "Bağlı giriş yöntemlerinden herhangi biriyle aynı Watchify profiline erişebilirsin. Tek giriş yöntemi, hesaba erişimini kaybetmemen için kaldırılamaz."
-          : "Any connected method opens the same Watchify profile. Your only sign-in method cannot be removed to protect account access."}
+          ? "Bağlı giriş yöntemlerinden herhangi biriyle aynı Seelogd profiline erişebilirsin. Tek giriş yöntemi, hesaba erişimini kaybetmemen için kaldırılamaz."
+          : "Any connected method opens the same Seelogd profile. Your only sign-in method cannot be removed to protect account access."}
       </Text>
     </SettingsSubScreen>
   );

@@ -25,7 +25,7 @@ import Toast from "react-native-toast-message";
 import { appAlert } from "@components/AppAlert";
 import { useLanguage } from "../../../context/LanguageContext";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import IconBacground from "../../../components/IconBacground";
+import ScreenDecor from "../../../components/ScreenDecor";
 import BackButton from "../../../components/BackButton";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
@@ -193,7 +193,7 @@ export default function FriendsListScreen({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-      <IconBacground opacity={0.3} />
+      <ScreenDecor iconOpacity={0.3} />
 
       {/* Başlık + arkadaş sayısı */}
       <Animated.View

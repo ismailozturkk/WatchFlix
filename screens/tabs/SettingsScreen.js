@@ -12,6 +12,8 @@ import {
   Platform,
   PanResponder,
   ActivityIndicator,
+  Animated,
+  Easing,
 } from "react-native";
 import axios from "axios";
 import { useNavigation } from "@react-navigation/native";
@@ -37,15 +39,22 @@ import PetSettingsSection from "@components/pet/PetSettingsSection";
 import PermissionsSection from "@components/PermissionsSection";
 import BatteryOptimizationNotice from "@components/BatteryOptimizationNotice";
 import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import CountryFlag from "react-native-country-flag";
-import IconBacground from "../../components/IconBacground";
-import ScreenSnow from "../../components/ScreenSnow";
+import ScreenDecor from "../../components/ScreenDecor";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
 import { appAlert } from "@components/AppAlert";
 import { Image } from "expo-image";
 import TmdbLogo from "../../components/TmdbLogo";
 import { getCachedValue, setCachedValue, TTL } from "../../utils/apiCache";
+import { usePremium } from "../../context/PremiumContext";
+import {
+  DATA_TYPE_COUNT,
+  buildAllTypes,
+  countEnabledTypes,
+  getDataTypeOptions,
+} from "./settings/dataTypes";
 
 const LANGUAGES = [
   { code: "tr", name: "Türkçe", nativeName: "Türkçe", flag: "tr" },
@@ -261,6 +270,120 @@ function OpacitySlider({ value, onChange, colors }) {
   );
 }
 
+/**
+ * "Verileri indir" açıkken indirilecek veri türlerinin seçimi.
+ * Ana anahtar kapalıyken hiç render edilmez — kapalıyken zaten hiçbir şey
+ * indirilmediği için seçim de anlamsız olur.
+ */
+function DataTypePicker({ types, colors, onChange, onToggleAll }) {
+  const options = getDataTypeOptions();
+  const enabledCount = countEnabledTypes(types);
+  const allEnabled = enabledCount === DATA_TYPE_COUNT;
+
+  return (
+    <View style={s.dataTypes}>
+      <View style={s.dataTypesHeader}>
+        <View style={{ flex: 1 }}>
+          <Text allowFontScaling={false} style={[s.dataTypesTitle, { color: colors.text }]}>
+            {i18nText("autoI18n.indirilecek_veri_turleri", "İndirilecek veri türleri")}
+            {"  "}
+            <Text style={{ color: colors.accent }}>
+              {enabledCount}/{DATA_TYPE_COUNT}
+            </Text>
+          </Text>
+          <Text allowFontScaling={false} style={[s.dataTypesSub, { color: colors.muted }]}>
+            {i18nText(
+              "autoI18n.indirilecek_veri_turleri_alt",
+              "Kapalı tür ne otomatik indirilir ne de çevrimdışı saklanır",
+            )}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => onToggleAll(!allEnabled)}
+          activeOpacity={0.7}
+          style={[s.dataTypesAction, { backgroundColor: colors.accentDim }]}
+        >
+          <Text allowFontScaling={false} style={[s.dataTypesActionText, { color: colors.accent }]}>
+            {allEnabled
+              ? i18nText("autoI18n.tumunu_kapat", "Tümünü kapat")
+              : i18nText("autoI18n.tumunu_ac", "Tümünü aç")}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {enabledCount === 0 && (
+        <Text allowFontScaling={false} style={[s.dataTypesWarn, { color: colors.danger }]}>
+          {i18nText(
+            "autoI18n.hicbir_veri_turu_secili_degil",
+            "Hiçbir tür seçili değil — hiçbir veri çevrimdışı saklanmaz.",
+          )}
+        </Text>
+      )}
+
+      <View style={s.dataTypeGrid}>
+        {options.map((opt) => {
+          const enabled = types?.[opt.id] !== false;
+          const tint = colors[opt.colorKey] || colors.accent;
+          return (
+            <TouchableOpacity
+              key={opt.id}
+              style={[
+                s.dataTypeButton,
+                {
+                  backgroundColor: enabled ? alpha(tint, 0.14) : colors.cardAlt,
+                  borderColor: enabled ? alpha(tint, 0.55) : colors.borderMuted,
+                },
+              ]}
+              activeOpacity={0.72}
+              onPress={() => onChange(opt.id, !enabled)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: enabled }}
+              accessibilityLabel={opt.label}
+            >
+              <View
+                style={[
+                  s.dataTypeIcon,
+                  { backgroundColor: enabled ? tint : colors.closeBg },
+                ]}
+              >
+                <AppIcon
+                  family="Ionicons"
+                  name={opt.icon}
+                  size={15}
+                  color={enabled ? colors.white : colors.muted}
+                />
+              </View>
+              <Text
+                allowFontScaling={false}
+                numberOfLines={2}
+                style={[
+                  s.dataTypeLabel,
+                  { color: enabled ? colors.text : colors.muted },
+                ]}
+              >
+                {opt.label}
+              </Text>
+              <View
+                style={[
+                  s.dataTypeCheck,
+                  {
+                    backgroundColor: enabled ? tint : "transparent",
+                    borderColor: enabled ? tint : colors.border,
+                  },
+                ]}
+              >
+                {enabled ? (
+                  <AppIcon family="Ionicons" name="checkmark" size={9} color="#fff" />
+                ) : null}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function SettingsScreen() {
   const navigation = useNavigation();
   const [langModalVisible, setLangModalVisible] = useState(false);
@@ -293,10 +416,49 @@ export default function SettingsScreen() {
   const {
     autoDataCacheEnabled,
     changeAutoDataCacheEnabled,
+    dataCacheTypes,
+    changeDataCacheType,
+    changeDataCacheTypes,
   } = useAutoDataCacheSettings();
   const { permissionStatus, requestPermission } = useDeviceNotifications();
   const { streamingProviderIds, changeStreamingProviderIds } =
     useStreamingProviderSettings();
+  const { isPremium, isUnlimited, loading: premiumLoading } = usePremium();
+  const premiumMotion = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(premiumMotion, {
+          toValue: 1,
+          duration: 4200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(premiumMotion, {
+          toValue: 0,
+          duration: 4200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [premiumMotion]);
+
+  const premiumWashOpacity = premiumMotion.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.2, 0.72, 0.28],
+  });
+  const premiumShineX = premiumMotion.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-190, 260],
+  });
+  const premiumIconScale = premiumMotion.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [1, 1.08, 1],
+  });
 
   useEffect(() => {
     let active = true;
@@ -445,7 +607,8 @@ export default function SettingsScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: C.bg }]}>
-      <IconBacground opacity={0.15} />
+      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
+      <ScreenDecor iconOpacity={0.15} />
 
       <ScrollView
         style={s.scroll}
@@ -552,6 +715,149 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        <SectionLabel color={C.muted}>SEELOGD PREMIUM</SectionLabel>
+        <TouchableOpacity
+          activeOpacity={0.84}
+          onPress={() => navigation.navigate("PremiumScreen")}
+          accessibilityRole="button"
+          accessibilityLabel="Seelogd Premium"
+          style={[s.premiumCard, { borderColor: alpha(C.accent, 0.34) }]}
+        >
+          <LinearGradient
+            colors={[
+              alpha(C.purple, 0.24),
+              alpha(C.accent, 0.11),
+              C.card,
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={s.premiumGradient}
+          >
+            <View style={s.premiumGlow} />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                s.premiumAnimatedWash,
+                {
+                  opacity: premiumWashOpacity,
+                  transform: [
+                    {
+                      scale: premiumMotion.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 1.2],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <LinearGradient
+                colors={[
+                  alpha(C.purple, 0.58),
+                  alpha(C.accent, 0.44),
+                  alpha(C.blue, 0.24),
+                ]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </Animated.View>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                s.premiumShine,
+                { transform: [{ translateX: premiumShineX }, { rotate: "16deg" }] },
+              ]}
+            >
+              <LinearGradient
+                colors={["transparent", "rgba(255,255,255,0.15)", "transparent"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </Animated.View>
+            <View style={s.premiumHeader}>
+              <Animated.View
+                style={[
+                  s.premiumIcon,
+                  {
+                    backgroundColor: alpha(C.purple, 0.18),
+                    transform: [{ scale: premiumIconScale }],
+                  },
+                ]}
+              >
+                <AppIcon name={isUnlimited ? "infinite" : "diamond"} size={21} color={C.purple} />
+              </Animated.View>
+              <View style={s.premiumHeaderCopy}>
+                <Text style={[s.premiumEyebrow, { color: C.purple }]}>SEELOGD</Text>
+                <Text style={[s.premiumTitle, { color: C.text }]}>
+                  {isUnlimited ? "Premium Unlimited" : "Premium"}
+                </Text>
+              </View>
+              {premiumLoading ? (
+                <ActivityIndicator size="small" color={C.accent} />
+              ) : (
+                <View
+                  style={[
+                    s.premiumPlanBadge,
+                    { backgroundColor: isPremium ? C.iconGreen : C.cardAlt },
+                  ]}
+                >
+                  <View
+                    style={[
+                      s.premiumStatusDot,
+                      { backgroundColor: isPremium ? C.green : C.muted },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      s.premiumPlanBadgeText,
+                      { color: isPremium ? C.green : C.muted },
+                    ]}
+                  >
+                    {isUnlimited
+                      ? "UNLIMITED"
+                      : isPremium
+                        ? language === "tr" ? "AKTİF" : "ACTIVE"
+                        : "FREE"}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={[s.premiumDescription, { color: C.muted }]}>
+              {premiumLoading
+                ? language === "tr" ? "Üyelik durumun kontrol ediliyor…" : "Checking your membership…"
+                : isUnlimited
+                  ? language === "tr" ? "Sınırsız CineMatch AI ve tüm premium ayrıcalıklar açık." : "Unlimited CineMatch AI and every premium benefit are unlocked."
+                  : isPremium
+                    ? language === "tr" ? "Premium özelliklerin açık. Unlimited ile sınırları kaldır." : "Premium is active. Remove the limits with Unlimited."
+                    : language === "tr" ? "Daha fazla AI, gelişmiş istatistikler ve özel deneyim." : "More AI, advanced statistics, and a personalized experience."}
+            </Text>
+
+            <View style={s.premiumFooter}>
+              <View style={s.premiumBenefits}>
+                <View style={[s.premiumBenefitChip, { backgroundColor: alpha(C.accent, 0.1) }]}>
+                  <AppIcon name="sparkles" size={13} color={C.accent} />
+                  <Text style={[s.premiumBenefitText, { color: C.text }]}>CineMatch AI</Text>
+                </View>
+                <View style={[s.premiumBenefitChip, { backgroundColor: alpha(C.purple, 0.1) }]}>
+                  <AppIcon name="stats-chart" size={13} color={C.purple} />
+                  <Text style={[s.premiumBenefitText, { color: C.text }]}>Wrapped+</Text>
+                </View>
+              </View>
+              <View style={[s.premiumAction, { backgroundColor: C.accent }]}>
+                <Text style={s.premiumActionText}>
+                  {isPremium
+                    ? language === "tr" ? "Yönet" : "Manage"
+                    : language === "tr" ? "Planları Gör" : "View Plans"}
+                </Text>
+                <AppIcon name="chevron-forward" size={14} color="#FFFFFF" />
+              </View>
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+
         <SectionLabel color={C.muted}>
           {(language === "tr" ? "İZLEME PLATFORMLARIM" : "MY STREAMING SERVICES")}
         </SectionLabel>
@@ -591,7 +897,14 @@ export default function SettingsScreen() {
             iconColor={C.amber}
             iconName="cloud-download-outline"
             title={t.downloadData}
-            subtitle={t.downloadDataSubtitle}
+            subtitle={
+              autoDataCacheEnabled
+                ? `${t.downloadDataSubtitle} · ${countEnabledTypes(dataCacheTypes)}/${DATA_TYPE_COUNT} ${i18nText("autoI18n.tur_kucuk", "tür")}`
+                : i18nText(
+                    "autoI18n.veri_indirme_kapali_alt",
+                    "Kapalı — hiçbir veri veya poster indirilmez",
+                  )
+            }
             right={
               <SwitchToggle
                 value={autoDataCacheEnabled}
@@ -600,6 +913,14 @@ export default function SettingsScreen() {
               />
             }
           />
+          {autoDataCacheEnabled && (
+            <DataTypePicker
+              types={dataCacheTypes}
+              colors={C}
+              onChange={changeDataCacheType}
+              onToggleAll={(enabled) => changeDataCacheTypes(buildAllTypes(enabled))}
+            />
+          )}
           <SettingRow
             colors={C}
             iconBg={C.iconPurple}
@@ -727,15 +1048,35 @@ export default function SettingsScreen() {
               "autoI18n.izinler_veriler_aciklama",
               "Cihaz izinleri, çevrimdışı veri ve önbellek",
             )}
-            last
             onPress={() => navigation.navigate("PermissionsDataScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          {/* PrivacySettingsScreen App.js'te kayıtlıydı ama hiçbir yerden
+              açılmıyordu; gizlilik tercihleri (profil/liste/gönderi/çevrimiçi)
+              kullanıcıya ulaşılamaz durumdaydı. Gizlilik politikası bu
+              kontrolü vaat ettiği için giriş buraya eklendi. */}
+          <SettingRow
+            colors={C}
+            iconBg={C.iconBlue}
+            iconColor={C.blue}
+            iconName="lock-closed-outline"
+            title={i18nText("autoI18n.gizlilik", "Gizlilik")}
+            subtitle={i18nText(
+              "autoI18n.gizlilik_aciklama",
+              "Profil, listeler, gönderiler ve çevrimiçi durumu kimler görsün",
+            )}
+            last
+            onPress={() => navigation.navigate("PrivacySettingsScreen")}
             right={<Chevron color={C.muted} />}
           />
         </View>
 
         <SwipeCard>
           <SectionLabel color={C.muted}>{t.about.toUpperCase()}</SectionLabel>
-          <View
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate("AboutAppScreen")}
             style={[
               s.aboutCard,
               { backgroundColor: C.card, borderColor: C.border },
@@ -757,35 +1098,27 @@ export default function SettingsScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text allowFontScaling={false} style={[s.aboutName, { color: C.text }]}>
-                Watchify
+                Seelogd
               </Text>
               <Text allowFontScaling={false} style={[s.aboutMeta, { color: C.muted }]}>
                 created by ismail ozturk · © 2025
               </Text>
               {/* TMDB koşulları: zorunlu atıf cümlesi + resmi logo birlikte */}
               <TmdbLogo width={72} style={{ marginTop: 8 }} />
-              <Text
-                allowFontScaling={false}
-                style={[s.aboutMeta, { marginTop: 4, fontSize: 10, color: C.muted }]}
-              >
-                {t.tmdbAttribution}
-              </Text>
-              <Text
-                allowFontScaling={false}
-                style={[s.aboutMeta, { marginTop: 2, fontSize: 10, color: C.muted }]}
-              >
-                {t.justwatchAttribution}
-              </Text>
+
             </View>
-            <View style={[s.versionBadge, { backgroundColor: C.borderMuted }]}>
-              <Text
-                allowFontScaling={false}
-                style={[s.versionText, { color: C.text }]}
-              >
-                v1.21.1
-              </Text>
+            <View style={{ alignItems: "flex-end", gap: 6 }}>
+              <View style={[s.versionBadge, { backgroundColor: C.borderMuted }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[s.versionText, { color: C.text }]}
+                >
+                  v1.21.1
+                </Text>
+              </View>
+              <Chevron color={C.muted} />
             </View>
-          </View>
+          </TouchableOpacity>
         </SwipeCard>
 
         <Modal
@@ -858,6 +1191,7 @@ export default function SettingsScreen() {
                   placeholderTextColor={C.muted}
                   value={providerSearch}
                   onChangeText={setProviderSearch}
+                  maxLength={80}
                   autoCorrect={false}
                   autoCapitalize="none"
                 />
@@ -1038,6 +1372,7 @@ export default function SettingsScreen() {
                     placeholderTextColor={C.muted}
                     value={langSearch}
                     onChangeText={setLangSearch}
+                    maxLength={80}
                     autoCorrect={false}
                     autoCapitalize="none"
                   />
@@ -1116,13 +1451,63 @@ export default function SettingsScreen() {
           </KeyboardAvoidingView>
         </Modal>
       </ScrollView>
-      {/* Kar efekti — sabit overlay (scroll dışında), optimize ortak bileşen */}
-      <ScreenSnow />
     </View>
   );
 }
 
 const s = StyleSheet.create({
+  // ── "Verileri indir" tür seçici ───────────────────────────────────────────
+  // Üstteki SettingRow'un alt çizgisi ayırıcı görevi görür; burada tekrar
+  // kenarlık verilmez (yoksa 2px'lik çift çizgi oluşur).
+  dataTypes: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
+  },
+  dataTypesHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 9,
+  },
+  dataTypesTitle: { fontSize: 11.5, fontWeight: "800" },
+  dataTypesSub: { fontSize: 9, marginTop: 2, lineHeight: 12 },
+  dataTypesAction: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 },
+  dataTypesActionText: { fontSize: 8.5, fontWeight: "800" },
+  dataTypesWarn: { fontSize: 9.5, fontWeight: "700", marginBottom: 8 },
+  dataTypeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  dataTypeButton: {
+    width: "31.8%",
+    minHeight: 46,
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingLeft: 6,
+    paddingRight: 13,
+    paddingVertical: 6,
+  },
+  dataTypeIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  dataTypeLabel: { flex: 1, fontSize: 8.8, fontWeight: "700", lineHeight: 11 },
+  dataTypeCheck: {
+    position: "absolute",
+    top: 3,
+    right: 3,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   root: {
     flex: 1,
   },
@@ -1237,6 +1622,26 @@ const s = StyleSheet.create({
   providerCountWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
   providerCount: { minWidth: 24, height: 24, paddingHorizontal: 7, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   providerCountText: { fontSize: 11, fontWeight: "800" },
+  premiumCard: { borderRadius: 21, borderWidth: 1, overflow: "hidden" },
+  premiumGradient: { minHeight: 166, padding: 16, overflow: "hidden" },
+  premiumGlow: { position: "absolute", width: 150, height: 150, borderRadius: 75, right: -52, top: -76, backgroundColor: "rgba(255,255,255,0.055)" },
+  premiumAnimatedWash: { position: "absolute", width: 230, height: 230, borderRadius: 115, right: -75, top: -92, overflow: "hidden" },
+  premiumShine: { position: "absolute", top: -55, bottom: -55, width: 74 },
+  premiumHeader: { flexDirection: "row", alignItems: "center" },
+  premiumIcon: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  premiumHeaderCopy: { flex: 1, marginLeft: 11 },
+  premiumEyebrow: { fontSize: 8, fontWeight: "900", letterSpacing: 1.6 },
+  premiumTitle: { fontSize: 17, fontWeight: "800", letterSpacing: -0.35, marginTop: 1 },
+  premiumPlanBadge: { minHeight: 26, borderRadius: 9, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", gap: 5 },
+  premiumStatusDot: { width: 5, height: 5, borderRadius: 3 },
+  premiumPlanBadgeText: { fontSize: 8.5, fontWeight: "900", letterSpacing: 0.55 },
+  premiumDescription: { fontSize: 11.5, lineHeight: 17, marginTop: 13, maxWidth: "92%" },
+  premiumFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 15, gap: 10 },
+  premiumBenefits: { flexDirection: "row", alignItems: "center", gap: 7, flex: 1 },
+  premiumBenefitChip: { minHeight: 29, borderRadius: 9, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", gap: 5 },
+  premiumBenefitText: { fontSize: 9.5, fontWeight: "700" },
+  premiumAction: { minHeight: 34, borderRadius: 11, paddingHorizontal: 11, flexDirection: "row", alignItems: "center", gap: 3 },
+  premiumActionText: { color: "#FFFFFF", fontSize: 10.5, fontWeight: "800" },
   providerSheet: { maxHeight: "88%" },
   providerHelp: { fontSize: 12, lineHeight: 18, marginBottom: 12 },
   providerSearchBox: { height: 44, borderRadius: 13, borderWidth: 1, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 9 },

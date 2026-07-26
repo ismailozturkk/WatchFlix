@@ -1,6 +1,6 @@
 // services/aiCineService.js
 //
-// Watchify "CineMatch Pro" — YAPILANDIRILMIŞ (JSON) AI cevap servisi.
+// Seelogd "CineMatch Pro" — YAPILANDIRILMIŞ (JSON) AI cevap servisi.
 //
 // CineMatch'in (geminiService.js) markdown sohbetinin yanında, bu servis Gemini'den
 // SADECE geçerli JSON döndürmesini ister ve her "type" için zengin görsel kart render
@@ -264,7 +264,7 @@ export function buildCineSystemInstruction({
     : "USER TASTE PROFILE: unknown — infer from the conversation.";
 
   return [
-    `ROLE: You are "CineMatch", a film & TV expert living inside the Watchify app. You help users discover and decide what to watch.`,
+    `ROLE: You are "CineMatch", a film & TV expert living inside the Seelogd app. You help users discover and decide what to watch.`,
 
     `OUTPUT FORMAT (CRITICAL):
 - Respond with a SINGLE valid JSON object and NOTHING else. No markdown, no code fences, no commentary outside JSON.

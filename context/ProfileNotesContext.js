@@ -105,7 +105,7 @@ export const ProfileNotesProvider = ({ children }) => {
               console.warn("Error checking old notes:", err?.message);
           }
           setNotes([]);
-          if (shouldPersistInternetData()) {
+          if (shouldPersistInternetData({ category: "notes" })) {
             cacheStore.setJSON(...cacheKeys.notes(uid), []);
           }
           setLoadingNotes(false);
@@ -114,7 +114,7 @@ export const ProfileNotesProvider = ({ children }) => {
             .map((d) => ({ ...d.data(), id: d.id }))
             .sort((a, b) => b.createdAt - a.createdAt);
           setNotes(fetched);
-          if (shouldPersistInternetData()) {
+          if (shouldPersistInternetData({ category: "notes" })) {
             cacheStore.setJSON(...cacheKeys.notes(uid), fetched);
           }
           setLoadingNotes(false);

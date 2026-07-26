@@ -7,7 +7,7 @@
 //   authorId          : string
 //   authorName        : string                (denormalize)
 //   authorAvatarIndex : number 0-55           (utils/avatars.js -> getAvatarSource)
-//   type              : 'review' | 'list'
+//   type              : 'review' | 'list' | 'text' | 'poll'
 //   title, content    : string
 //   mediaList         : Array<{ id, type, title, poster, year }>
 //   userRating?       : 1-5
@@ -50,7 +50,10 @@ import {
   deleteField,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { i18nText } from "../utils/i18nText";
 import { clampAvatarIndex, DEFAULT_AVATAR_INDEX } from "../utils/avatars";
+// Paylaşım tipleri tek yerden gelir (composer + feed filtreleri aynı listeyi kullanır).
+import { POST_TYPES } from "../utils/postComposer";
 import {
   createSocialNotification,
   notifyOnComment,
@@ -96,7 +99,7 @@ const serializePost = (docSnap) => {
 
 export async function createPost(user, payload) {
   if (!user?.uid) throw new Error("createPost: user yok");
-  if (!payload?.type || !["review", "list", "text", "poll"].includes(payload.type))
+  if (!payload?.type || !POST_TYPES.includes(payload.type))
     throw new Error("createPost: geçersiz type");
   if (!payload?.title?.trim()) throw new Error("createPost: title boş olamaz");
 
@@ -107,7 +110,7 @@ export async function createPost(user, payload) {
 
   const base = {
     authorId: user.uid,
-    authorName: user.displayName || payload.authorName || "Kullanıcı",
+    authorName: user.displayName || payload.authorName || i18nText("autoI18n.kullanici", "Kullanıcı"),
     authorAvatarIndex,
     type: payload.type,
     title: payload.title.trim(),
@@ -186,7 +189,7 @@ export async function updatePost(postId, partial) {
 /**
  * Public feed sayfasını çek.
  * @param {Object} opts
- * @param {'all'|'review'|'list'} opts.filter
+ * @param {'all'|'review'|'list'|'text'|'poll'} opts.filter
  * @param {'recent'|'likes'|'comments'} opts.sort
  * @param {DocumentSnapshot|null} opts.lastDoc Pagination kursoru
  * @returns {Promise<{posts: Array, lastDoc: DocumentSnapshot|null}>}
@@ -198,10 +201,9 @@ export async function fetchFeed({ filter = "all", sort = "recent", lastDoc = nul
     orderBy(sortField, "desc"),
     ...(sortField === "createdAt" ? [] : [orderBy("createdAt", "desc")]),
   ];
-  const typeFilter =
-    filter === "review" || filter === "list"
-      ? [where("type", "==", filter)]
-      : [];
+  const typeFilter = POST_TYPES.includes(filter)
+    ? [where("type", "==", filter)]
+    : [];
 
   let q = query(collection(db, "Posts"), ...typeFilter, ...base, limit(PAGE));
   if (lastDoc) {
@@ -299,10 +301,9 @@ export async function fetchUserPosts(uid, lastDoc = null) {
  * @returns {Function} unsubscribe
  */
 export function subscribeToFreshFeed(callback, { filter = "all" } = {}) {
-  const typeFilter =
-    filter === "review" || filter === "list"
-      ? [where("type", "==", filter)]
-      : [];
+  const typeFilter = POST_TYPES.includes(filter)
+    ? [where("type", "==", filter)]
+    : [];
   const q = query(
     collection(db, "Posts"),
     ...typeFilter,
@@ -454,7 +455,7 @@ export async function addComment(
   const commRef = doc(collection(db, "Posts", postId, "comments"));
   batch.set(commRef, {
     authorId: user.uid,
-    authorName: user.displayName || "Kullanıcı",
+    authorName: user.displayName || i18nText("autoI18n.kullanici", "Kullanıcı"),
     authorAvatarIndex: clampAvatarIndex(authorAvatarIndex),
     text: text.trim(),
     parentId,

@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import PosterImage from "../PosterImage";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "@services/hapticsService";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,

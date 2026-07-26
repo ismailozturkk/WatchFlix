@@ -48,6 +48,7 @@ function SaveDraftModalComponent({
           <TextInput
             value={draftName}
             onChangeText={onChangeName}
+            maxLength={40}
             placeholder={i18nText("autoI18n.taslak_adi_orn_inception_story", "Taslak adı (örn: Inception story)")}
             placeholderTextColor={theme.text.muted}
             autoFocus

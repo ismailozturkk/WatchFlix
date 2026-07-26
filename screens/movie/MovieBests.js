@@ -22,6 +22,7 @@ import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { i18nText } from "../../utils/i18nText";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
+import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 
 // Stable, module-scope item component → no remount → no flicker.
 const MovieBestCard = memo(function MovieBestCard({ item, navigation, theme, getTmdbUrl }) {
@@ -56,11 +57,11 @@ const MovieBestCard = memo(function MovieBestCard({ item, navigation, theme, get
         />
 
         {posterBadges?.tmdbRating !== false && (
-          <View style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}>
-            <Text style={[styles.similarRatingText, { color: theme.colors.orange }]}>
-              {item.vote_average.toFixed(1)}
-            </Text>
-          </View>
+          <RatingBadge
+            value={item.vote_average}
+            votes={item.vote_count}
+            style={POSTER_BADGE_POS.bottomRight}
+          />
         )}
         <ListBadges
           mediaId={item.id}

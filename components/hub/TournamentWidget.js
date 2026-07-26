@@ -5,20 +5,24 @@
 //   • selection → hype hakkın duruyor mu ("1 hype hakkın var" / "Hype'ın kayıtlı")
 //   • voting    → aktif turda kaç maça oy verdiğin (ör. "3/16 maç")
 //   • results   → şampiyon posteri
-// Tüm fazlarda sayacın altında, kartın tam genişliğini kullanan kompakt bracket
-// önizlemesi gösterilir.
-// Basınca TournamentScreen'e gider.
+// Tüm fazlarda sayacın altında, kartın tam genişliğini kullanan bracket
+// önizlemesi gösterilir: 31 maçın TAMAMI (her yarıda 8+4+2+1 çentik, merkezde
+// final) tek bakışta okunan iki taraflı bir huni olarak çizilir. Basınca
+// TournamentScreen'e gider.
 //
 // Hafiftir: aday listesini OLUŞTURMAZ (getTournamentDoc — yoksa null); sayımlar
 // tek agregat dokümandan (fetchAggOnce), kişisel durum tek kendi-oy dokümanından
 // (fetchMyVoteOnce) okunur. Tür/faz/geri sayım motordan (ağ gerekmez) gelir.
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { memo, useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
+import Animated, {
+  useSharedValue, useAnimatedStyle, withSpring, withRepeat, withSequence, withTiming,
+  ReduceMotion,
+} from "react-native-reanimated";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import Svg, { Circle, Path } from "react-native-svg";
+import Svg, { Path } from "react-native-svg";
 import AppIcon from "@components/AppIcon";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
@@ -38,149 +42,339 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const SPRING = { mass: 0.4, damping: 12, stiffness: 180 };
 const PHASE_COLOR = { selection: "#3B82F6", voting: "#F59E0B", results: "#F5C518", upcoming: "#6B7280" };
 
-function MiniPoster({ contestant, getTmdbUrl, accent = false }) {
-  const uri = contestant?.posterPath
-    ? getTmdbUrl(contestant.posterPath, "poster", 45)
-    : null;
+// ─── Eleme ağacı önizlemesi ───────────────────────────────────────────────────
+// Ölçüler tek yerden türer (BracketTree'nin yaptığı gibi); tuval genişliği
+// onLayout ile ölçülür, YÜKSEKLİK sabittir → SVG 1:1 çizilir (viewBox yok),
+// böylece bağlantılar ile mutlak konumlu View'lar aynı koordinat sisteminde.
+const TREE_H = 102;          // tuval yüksekliği
+const TREE_PAD_Y = 5;
+const TREE_LABEL_H = 12;     // alttaki tur etiketi şeridi
+const SIDE_COLS = 4;         // her yarıda 8 / 4 / 2 / 1 maç
+const TICK_H = [5, 6.5, 8.5, 11];   // tur ilerledikçe kalınlaşan çentikler
+const TRACK = "rgba(255,255,255,0.15)";
+const TRACK_LINE = "rgba(255,255,255,0.22)";
+const DONE = "rgba(255,255,255,0.92)";
+const GOLD = "#F5C518";
+const TOTAL_MATCHES = ROUNDS.reduce((s, r) => s + r.matches, 0); // 31
 
+// BracketTree ile AYNI kural: maç ancak turu bittiyse ve kazananı varsa çözülmüş.
+const isDecided = (m) => !!(m && m.decided && m.winnerSide);
+
+// Türkçe-güvenli BÜYÜK harf: JS'in toUpperCase'i 'i' → 'I' yapar ("FINAL"),
+// Türkçede doğrusu 'İ'dir. Intl'e bağımlı olmadan önce i'leri İ'ye çeviririz.
+const upperLocale = (s, lang) => (lang === "tr" ? String(s).replace(/i/g, "İ") : s).toUpperCase();
+
+// StageTimeline'ın kısa tur etiketleri — aynı sözlük.
+const shortRound = (key, lang) =>
+  key === "r32" ? "32"
+  : key === "r16" ? "16"
+  : key === "qf" ? (lang === "tr" ? "ÇF" : "QF")
+  : key === "sf" ? (lang === "tr" ? "YF" : "SF")
+  : (lang === "tr" ? "FİNAL" : "FINAL");
+
+// Aktif turun nabzı — StageTimeline'daki onaylı desenin aynısı.
+const Pulse = memo(({ style }) => {
+  const p = useSharedValue(0);
+  useEffect(() => {
+    const cfg = { reduceMotion: ReduceMotion.System };
+    p.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1100, ...cfg }),
+        withTiming(0, { duration: 0, ...cfg }),
+      ),
+      -1,
+    );
+  }, [p]);
+  const a = useAnimatedStyle(() => ({ opacity: 0.30 * (1 - p.value) }));
+  return <Animated.View pointerEvents="none" style={[style, a]} />;
+});
+
+// Tüm ölçüler ölçülen genişlikten türer — sihirli sabit yok.
+function treeGeometry(width) {
+  if (!width) return null;
+  const finalW = Math.round(Math.min(124, Math.max(92, width * 0.3)));
+  const sideW = (width - finalW) / 2;
+  const colSpan = sideW / SIDE_COLS;
+  const tickW = Math.max(9, Math.min(22, colSpan * 0.58));
+  const top = TREE_PAD_Y;
+  const bottom = TREE_H - TREE_LABEL_H - TREE_PAD_Y;
+  const step = (bottom - top) / 8;
+
+  // Satır merkezleri BracketTree'deki gibi özyinelemeli: her üst tur, altındaki
+  // iki maçın tam ortasına oturur.
+  const centers = [Array.from({ length: 8 }, (_, i) => top + step * (i + 0.5))];
+  for (let r = 1; r < SIDE_COLS; r++) {
+    centers[r] = Array.from({ length: 8 >> r }, (_, j) =>
+      (centers[r - 1][2 * j] + centers[r - 1][2 * j + 1]) / 2);
+  }
+  const midY = centers[SIDE_COLS - 1][0];
+  // Final posterleri okunabilir olmalı — BracketTree'nin 34x50'sinden bile büyük.
+  const posterW = Math.min(44, Math.max(30, Math.floor((finalW - 14) / 2)));
+  const posterH = Math.round(posterW * 1.5);
+  return { width, finalW, sideW, colSpan, tickW, centers, midY, posterW, posterH };
+}
+
+// 30 bağlantı → sadece 2 <Path> (soluk ray + kazananın ilerlediği yol).
+// centerW: merkezdeki içeriğin (final çifti ya da şampiyon posteri) GERÇEK
+// genişliği — yarı final çizgileri tam posterin kenarında bitsin diye.
+function treePaths(geo, rounds, centerW) {
+  const { width, colSpan, tickW, centers, midY } = geo;
+  const edge = (width - centerW) / 2;
+  const muted = [];
+  const active = [];
+
+  for (let side = 0; side < 2; side++) {
+    const left = side === 0;
+    const X = (x) => (left ? x : width - x);
+    for (let r = 0; r < SIDE_COLS - 1; r++) {
+      const half = 8 >> r;
+      const childR = r * colSpan + tickW;
+      const parentL = (r + 1) * colSpan;
+      const mx = (childR + parentL) / 2;
+      for (let j = 0; j < half; j++) {
+        const m = rounds?.[r]?.matches?.[left ? j : half + j];
+        const d = `M${X(childR)} ${centers[r][j]}H${X(mx)}V${centers[r + 1][j >> 1]}H${X(parentL)}`;
+        (isDecided(m) ? active : muted).push(d);
+      }
+    }
+    // Yarı final → final
+    const sfM = rounds?.[SIDE_COLS - 1]?.matches?.[left ? 0 : 1];
+    const d = `M${X((SIDE_COLS - 1) * colSpan + tickW)} ${midY}H${X(edge)}`;
+    (isDecided(sfM) ? active : muted).push(d);
+  }
+  return { muted: muted.join(" "), active: active.join(" ") };
+}
+
+// Final/şampiyon posteri — gold YALNIZ burada (BracketTree'deki kural).
+// Rozet dilbilgisi de BracketTree'den: kazanana kupa (sağ üst), kendi oyuma
+// accent onay işareti (sağ alt); kaybeden RENK DEĞİŞTİRMEZ, yalnız solar.
+function TreePoster({ c, w, h, winner, loser, mine, accent, getTmdbUrl }) {
+  const uri = c?.posterPath ? getTmdbUrl(c.posterPath, "poster", w) : null;
   return (
-    <View style={[styles.treePoster, accent && styles.treePosterAccent]}>
+    <View
+      style={{
+        width: w, height: h, borderRadius: 6, overflow: "hidden",
+        borderWidth: winner ? 2 : 1,
+        borderColor: winner ? GOLD : "rgba(255,255,255,0.42)",
+        backgroundColor: "rgba(255,255,255,0.10)",
+        opacity: loser ? 0.42 : 1,
+        alignItems: "center", justifyContent: "center",
+      }}
+    >
       {uri ? (
-        <Image source={{ uri }} style={styles.treePosterImage} contentFit="cover" />
+        <Image source={{ uri }} style={styles.treePosterImage} contentFit="cover" transition={140} />
       ) : (
-        <AppIcon family="Ionicons" name="help" size={8} color="rgba(255,255,255,0.58)" />
+        <AppIcon family="Ionicons" name={c ? "image-outline" : "help"} size={14} color="rgba(255,255,255,0.55)" />
+      )}
+      {/* Sıra numarası poster üstünde okunabilsin diye alt karartma */}
+      {!!c?.seed && (
+        <LinearGradient
+          colors={["rgba(4,7,18,0)", "rgba(4,7,18,0.85)"]}
+          style={styles.treeScrim}
+          pointerEvents="none"
+        >
+          <Text allowFontScaling={false} style={styles.treeSeedText}>#{c.seed}</Text>
+        </LinearGradient>
+      )}
+      {winner && (
+        <View style={styles.treeWinBadge}>
+          <AppIcon family="Ionicons" name="trophy" size={9} color={GOLD} />
+        </View>
+      )}
+      {mine && (
+        <View style={[styles.treeMineBadge, { backgroundColor: accent }]}>
+          <AppIcon family="Ionicons" name="checkmark" size={8} color="#fff" />
+        </View>
       )}
     </View>
   );
 }
 
-function MiniMatch({ match, getTmdbUrl, final = false, compact = false }) {
-  const winnerId = match?.winner?.id;
-  return (
-    <View style={[
-      styles.treeMatch,
-      compact && styles.treeMatchCompact,
-      final && styles.treeFinalMatch,
-    ]}>
-      <MiniPoster
-        contestant={match?.a}
-        getTmdbUrl={getTmdbUrl}
-        accent={!!winnerId && winnerId === match?.a?.id}
-      />
-      <MiniPoster
-        contestant={match?.b}
-        getTmdbUrl={getTmdbUrl}
-        accent={!!winnerId && winnerId === match?.b?.id}
-      />
-    </View>
+// Büyük bracket'in Hub kartına sığan, iki taraflı GERÇEK özeti: 16 sol + 16 sağ
+// çentik ortadaki finale daralır. Çentiğin dolgusu maçın durumunu taşır
+// (dolu = oynandı, boş çerçeve = şu an oylanıyor, soluk = sırada), kazananın
+// yolu beyaz çizgiyle finale kadar izlenir. Posterler yalnız okunabildikleri
+// yerde — finalde — kullanılır; final bittiyse yerini şampiyon posteri alır.
+function TournamentTreePreview({ bracket, getTmdbUrl, accent, lang, phase, activeRound, myPicks }) {
+  const [canvasWidth, setCanvasWidth] = useState(0);
+  const rounds = bracket?.rounds;
+  const geo = useMemo(() => treeGeometry(canvasWidth), [canvasWidth]);
+
+  const finalRound = rounds?.[ROUNDS.length - 1];
+  const finalMatch = finalRound?.matches?.[0] || null;
+  const champion = bracket?.championDecided ? bracket.champion : null;
+  // Gold ancak final GERÇEKTEN kurulduğunda (yarı final bitip final açıldığında)
+  // gelir; yarı final sürerken görünen çift henüz değişebilir → projeksiyon.
+  const finalSet = !!champion || !!(finalRound && (finalRound.votable || finalRound.decided));
+  // Şampiyon posteri tek ve daha büyük; final ise iki posterlik bir sıra.
+  const champW = geo ? Math.min(48, geo.posterW + 8) : 0;
+  const centerW = champion ? champW : geo ? 2 * geo.posterW + 6 : 0;
+  const paths = useMemo(
+    () => (geo ? treePaths(geo, rounds, centerW) : null),
+    [geo, rounds, centerW],
   );
-}
+  const doneCount = useMemo(
+    () => (rounds ? rounds.reduce((n, r) => n + r.matches.filter(isDecided).length, 0) : 0),
+    [rounds],
+  );
 
-// Büyük bracket ağacının Hub kartına sığan, iki taraflı yatay özeti. Dıştaki
-// ilk tur eşleşmeleri merkeze doğru birleşir; ilerleyen turlar açıldıkça aynı
-// düğümler gerçek adaylarla dolar.
-function TournamentTreePreview({ bracket, getTmdbUrl, accent, lang }) {
-  const [canvasWidth, setCanvasWidth] = useState(320);
-  const rounds = bracket?.rounds || [];
-  const first = rounds[0]?.matches || [];
-  const second = rounds[1]?.matches || [];
-  const finalMatch = rounds[4]?.matches?.[0] || null;
-  const isDecided = (match) => !!(match?.decided && match?.winnerSide);
-
-  const outerLeft = 8;
-  const outerRight = canvasWidth - outerLeft - 40;
-  const middleLeft = canvasWidth * 0.25625;
-  const middleRight = canvasWidth - middleLeft - 40;
-  const centerLeft = canvasWidth / 2 - 22;
-  const leftJunction = canvasWidth * 0.190625;
-  const rightJunction = canvasWidth - leftJunction;
-  const paths = [
-    { d: `M${outerLeft + 40} 18.5 H${leftJunction} V38.5 H${middleLeft}`, active: isDecided(first[0]) },
-    { d: `M${outerLeft + 40} 57.5 H${leftJunction} V38.5 H${middleLeft}`, active: isDecided(first[1]) },
-    { d: `M${middleLeft + 40} 38.5 H${centerLeft}`, active: isDecided(second[0]) },
-    { d: `M${outerRight} 18.5 H${rightJunction} V38.5 H${middleRight + 40}`, active: isDecided(first[8]) },
-    { d: `M${outerRight} 57.5 H${rightJunction} V38.5 H${middleRight + 40}`, active: isDecided(first[9]) },
-    { d: `M${middleRight} 38.5 H${centerLeft + 44}`, active: isDecided(second[4]) },
-  ];
+  // Başlık rozeti — her fazda DOĞRUYU söyler (sabit "SON 32" yok).
+  const chip = !rounds
+    ? { text: lang === "tr" ? "HAZIRLANIYOR" : "PREPARING", dot: "rgba(255,255,255,0.55)", gold: false }
+    : champion
+      ? { text: lang === "tr" ? "ŞAMPİYON" : "CHAMPION", dot: GOLD, gold: true }
+      : phase === "voting" && ROUNDS[activeRound]
+        ? { text: upperLocale(roundLabel(ROUNDS[activeRound], lang), lang), dot: "#EF4444", gold: false, live: true }
+        : { text: lang === "tr" ? "PROJEKSİYON" : "PROJECTED", dot: "rgba(255,255,255,0.55)", gold: false };
 
   return (
+    // İlerleme bilgisi kartın KENDİ accessibilityLabel'ında duyurulur; burada
+    // iç içe accessible View açmak iOS'ta dış etiketi bastırırdı.
     <View style={styles.treePreview} pointerEvents="none">
       <View style={styles.treeHeader}>
-        <View style={styles.treeHeaderTitle}>
-          <AppIcon family="Ionicons" name="git-network-outline" size={11} color="rgba(255,255,255,0.84)" />
-          <Text style={styles.treeHeaderText}>
-            {lang === "tr" ? "ELEME AĞACI" : "BRACKET"}
+        <AppIcon family="Ionicons" name="git-network-outline" size={11} color="rgba(255,255,255,0.80)" />
+        <Text allowFontScaling={false} style={styles.treeHeaderText}>
+          {lang === "tr" ? "ELEME AĞACI" : "BRACKET"}
+        </Text>
+        <View style={styles.treeHeaderSpacer} />
+        {!!rounds && (
+          <Text allowFontScaling={false} style={styles.treeCountText}>
+            {doneCount}/{TOTAL_MATCHES}
+          </Text>
+        )}
+        <View style={[styles.treeChip, chip.gold && styles.treeChipGold]}>
+          {chip.live && <Pulse style={[styles.treeChipPulse, { backgroundColor: chip.dot }]} />}
+          <View style={[styles.treeDot, { backgroundColor: chip.dot }]} />
+          <Text
+            allowFontScaling={false}
+            numberOfLines={1}
+            style={[styles.treeChipText, chip.gold && styles.treeChipTextGold]}
+          >
+            {chip.text}
           </Text>
         </View>
-        <Text style={styles.treeRoundText}>{lang === "tr" ? "SON 32" : "TOP 32"}</Text>
-        <View style={styles.treeFinalPill}>
-          <View style={[styles.treeLiveDot, { backgroundColor: accent }]} />
-          <Text style={styles.treeFinalText}>{lang === "tr" ? "FİNAL" : "FINAL"}</Text>
-        </View>
-        <Text style={styles.treeRoundText}>{lang === "tr" ? "SON 32" : "TOP 32"}</Text>
       </View>
 
       <View
         style={styles.treeCanvas}
-        onLayout={(event) => {
-          const nextWidth = Math.round(event.nativeEvent.layout.width);
-          if (nextWidth > 0 && nextWidth !== canvasWidth) setCanvasWidth(nextWidth);
+        onLayout={(e) => {
+          const w = Math.round(e.nativeEvent.layout.width);
+          if (w > 0 && w !== canvasWidth) setCanvasWidth(w);
         }}
       >
-        <View style={styles.treeCenterGlow} />
-        <Svg style={StyleSheet.absoluteFill} viewBox={`0 0 ${canvasWidth} 76`} preserveAspectRatio="none">
-          {paths.map((path, index) => (
-            <Path
-              key={`base-${index}`}
-              d={path.d}
-              fill="none"
-              stroke="rgba(255,255,255,0.24)"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          ))}
-          {paths.filter((path) => path.active).map((path, index) => (
-            <Path
-              key={`active-${index}`}
-              d={path.d}
-              fill="none"
-              stroke={accent}
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          ))}
-          <Circle cx={leftJunction} cy="38.5" r="2.2" fill="rgba(255,255,255,0.72)" />
-          <Circle cx={rightJunction} cy="38.5" r="2.2" fill="rgba(255,255,255,0.72)" />
-        </Svg>
+        {!!geo && (
+          <>
+            {/* Bağlantılar: önce soluk ray, üstüne kazananın yolu */}
+            <Svg width={geo.width} height={TREE_H} style={StyleSheet.absoluteFill}>
+              {!!paths.muted && (
+                <Path d={paths.muted} fill="none" stroke={TRACK_LINE} strokeWidth={1.3}
+                  strokeLinecap="round" strokeLinejoin="round" />
+              )}
+              {!!paths.active && (
+                <Path d={paths.active} fill="none" stroke={DONE} strokeWidth={2.2}
+                  strokeLinecap="round" strokeLinejoin="round" />
+              )}
+            </Svg>
 
-        <View style={[styles.treeNode, { left: outerLeft, top: 4 }]}>
-          <MiniMatch match={first[0]} getTmdbUrl={getTmdbUrl} compact />
-        </View>
-        <View style={[styles.treeNode, { left: outerLeft, top: 43 }]}>
-          <MiniMatch match={first[1]} getTmdbUrl={getTmdbUrl} compact />
-        </View>
-        <View style={[styles.treeNode, { left: middleLeft, top: 24 }]}>
-          <MiniMatch match={second[0]} getTmdbUrl={getTmdbUrl} />
-        </View>
+            {/* Maç çentikleri — 30 eleme maçının tamamı */}
+            {[0, 1, 2, 3].map((r) => {
+              const half = 8 >> r;
+              const h = TICK_H[r];
+              return [0, 1].map((side) =>
+                Array.from({ length: half }, (_, j) => {
+                  const m = rounds?.[r]?.matches?.[side === 0 ? j : half + j];
+                  const done = isDecided(m);
+                  const live = !!(m && m.votable && !done);
+                  return (
+                    <View
+                      key={`t${r}_${side}_${j}`}
+                      style={[
+                        styles.treeTick,
+                        {
+                          left: side === 0 ? r * geo.colSpan : geo.width - r * geo.colSpan - geo.tickW,
+                          top: geo.centers[r][j] - h / 2,
+                          width: geo.tickW,
+                          height: h,
+                          borderRadius: h / 2,
+                          backgroundColor: done ? DONE : live ? "rgba(255,255,255,0.20)" : TRACK,
+                        },
+                        live && styles.treeTickLive,
+                      ]}
+                    />
+                  );
+                }),
+              );
+            })}
 
-        <View style={[styles.treeNode, styles.treeNodeCenter, { left: centerLeft }]}>
-          <View style={styles.treeTrophy}>
-            <AppIcon family="Ionicons" name="trophy" size={11} color="#F5C518" />
-          </View>
-          <MiniMatch match={finalMatch} getTmdbUrl={getTmdbUrl} final />
-        </View>
+            {/* Merkez: final eşleşmesi — veya final bittiyse şampiyon.
+                İçerik TAM midY'de merkezlenir (etiket akışta değil, alt şeritte)
+                ki yarı final çizgileri posterlerin dikey ortasında bitsin. */}
+            <View style={[styles.treeFinalWrap, { left: geo.sideW, width: geo.finalW }]}>
+              {champion ? (
+                <TreePoster
+                  c={champion} w={champW} h={Math.round(champW * 1.5)}
+                  winner accent={accent} getTmdbUrl={getTmdbUrl}
+                />
+              ) : (
+                <View style={styles.treeFinalRow}>
+                  <TreePoster
+                    c={finalMatch?.a} w={geo.posterW} h={geo.posterH}
+                    winner={isDecided(finalMatch) && finalMatch.winnerSide === "a"}
+                    loser={isDecided(finalMatch) && finalMatch.winnerSide === "b"}
+                    mine={myPicks?.[finalMatch?.matchId] === "a"}
+                    accent={accent}
+                    getTmdbUrl={getTmdbUrl}
+                  />
+                  <TreePoster
+                    c={finalMatch?.b} w={geo.posterW} h={geo.posterH}
+                    winner={isDecided(finalMatch) && finalMatch.winnerSide === "b"}
+                    loser={isDecided(finalMatch) && finalMatch.winnerSide === "a"}
+                    mine={myPicks?.[finalMatch?.matchId] === "b"}
+                    accent={accent}
+                    getTmdbUrl={getTmdbUrl}
+                  />
+                </View>
+              )}
+            </View>
 
-        <View style={[styles.treeNode, { left: middleRight, top: 24 }]}>
-          <MiniMatch match={second[4]} getTmdbUrl={getTmdbUrl} />
-        </View>
-        <View style={[styles.treeNode, { left: outerRight, top: 4 }]}>
-          <MiniMatch match={first[8]} getTmdbUrl={getTmdbUrl} compact />
-        </View>
-        <View style={[styles.treeNode, { left: outerRight, top: 43 }]}>
-          <MiniMatch match={first[9]} getTmdbUrl={getTmdbUrl} compact />
-        </View>
+            {/* Tur etiketleri — her sütunun tam altında, aktif tur parlar.
+                Merkezdekiler BracketTree'nin 9 sütunluk etiket şeridiyle aynı
+                dili konuşur: dıştan içe 32 · 16 · ÇF · YF · FİNAL · YF · … */}
+            {[0, 1, 2, 3].map((r) =>
+              [0, 1].map((side) => (
+                <Text
+                  key={`l${r}_${side}`}
+                  allowFontScaling={false}
+                  numberOfLines={1}
+                  style={[
+                    styles.treeColLabel,
+                    {
+                      left: (side === 0 ? r * geo.colSpan : geo.width - r * geo.colSpan - geo.tickW)
+                        + geo.tickW / 2 - 13,
+                      opacity: activeRound === r ? 1 : 0.42,
+                    },
+                  ]}
+                >
+                  {shortRound(ROUNDS[r].key, lang)}
+                </Text>
+              )),
+            )}
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[
+                styles.treeColLabel,
+                styles.treeCenterLabel,
+                { left: geo.sideW, width: geo.finalW },
+                finalSet && styles.treeCenterLabelGold,
+              ]}
+            >
+              {champion
+                ? (lang === "tr" ? "ŞAMPİYON" : "CHAMPION")
+                : shortRound("final", lang)}
+            </Text>
+          </>
+        )}
       </View>
     </View>
   );
@@ -198,7 +392,7 @@ export default function TournamentWidget({ navigation }) {
   const entry = useMemo(() => getScheduleEntry(monthIndex), [monthIndex]);
 
   const [nowMs, setNowMs] = useState(now());
-  const [bracketPreview, setBracketPreview] = useState(null);
+  const [seed, setSeed] = useState(null);     // { finalists, tallies } | null
   const [agg, setAgg] = useState(null);       // { noms, picks, voters } | null
   const [myVote, setMyVote] = useState(null); // kendi oy dokümanım | null
 
@@ -228,22 +422,35 @@ export default function TournamentWidget({ navigation }) {
       if (d?.nominees?.length) {
         let nomTally = a?.noms || {};
         let tallies = a?.picks || {};
-        if (!a && phaseInfo.phase === "results") {
+        // Agg dokümanı YOKSA (Cloud Function henüz kurulmadıysa) tüm oy
+        // koleksiyonundan say — TournamentScreen ile AYNI kural. Aksi halde
+        // tallies boş kalır ve ağaç, oylara değil seed sırasına göre kazanan
+        // gösterirdi; yani detay ekranından farklı bir şampiyon çıkardı.
+        if (!a) {
           const votes = await fetchVotesOnce(periodId);
           if (!active) return;
           nomTally = tallyNominations(votes);
           tallies = tallyVotes(votes);
         }
         // Havuz > 32 ise finalistler hype oylarından türer (ekranla aynı kural).
-        const finalists = selectFinalists(d.nominees, nomTally);
-        const b = buildBracket({ nominees: finalists, tallies, periodId, ms: nowMs });
-        setBracketPreview(b);
+        setSeed({ finalists: selectFinalists(d.nominees, nomTally), tallies });
       } else {
-        setBracketPreview(null);
+        setSeed(null);
       }
     })();
     return () => { active = false; };
   }, [periodId, phaseInfo.phase, uid]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Bracket AĞDAN değil, çekilen tohumdan türer: nowMs değiştikçe (30 sn'de bir)
+  // yeniden hesaplanır, böylece bir tur Hub açıkken KAPANDIĞINDA ağaç kendi
+  // kendine ilerler. (Oy sayımları tek seferlik okunur; tazelenmeleri için
+  // ekran yeniden odaklanmalı — Hub'ı hafif tutmak bilinçli bir ödün.)
+  const bracketPreview = useMemo(
+    () => (seed
+      ? buildBracket({ nominees: seed.finalists, tallies: seed.tallies, periodId, ms: nowMs })
+      : null),
+    [seed, periodId, nowMs],
+  );
 
   const phaseColor = PHASE_COLOR[phaseInfo.phase] || PHASE_COLOR.selection;
   const theTheme = lang === "tr" ? entry.tr : entry.en;
@@ -253,6 +460,8 @@ export default function TournamentWidget({ navigation }) {
     () => Object.keys(myVote?.noms || {}).filter((k) => myVote.noms[k]).length,
     [myVote],
   );
+  // Ağaç için sabit kimlik: myVote her tazelemede yeni nesne olur, picks değil.
+  const myPicks = useMemo(() => myVote?.picks || null, [myVote]);
   const activeRoundDef =
     phaseInfo.phase === "voting" ? ROUNDS[phaseInfo.activeRound] : null;
   const myRoundPicks = useMemo(() => {
@@ -275,6 +484,17 @@ export default function TournamentWidget({ navigation }) {
           }`
         : i18nText("autoI18n.tournament_next_in", "Yeni turnuvaya");
 
+  // Ekran okuyucu için ağacın ilerlemesi (ağaç paneli sessizdir).
+  const bracketProgress = useMemo(() => {
+    if (!bracketPreview) return null;
+    const done = bracketPreview.rounds.reduce(
+      (n, r) => n + r.matches.filter((m) => m.decided && m.winnerSide).length, 0,
+    );
+    return lang === "tr"
+      ? `${TOTAL_MATCHES} maçın ${done} tanesi tamamlandı`
+      : `${done} of ${TOTAL_MATCHES} matches complete`;
+  }, [bracketPreview, lang]);
+
   // Katılım satırı (agg varsa): "N katılımcı".
   const votersLine =
     agg?.voters > 0
@@ -284,7 +504,7 @@ export default function TournamentWidget({ navigation }) {
   return (
     <AnimatedPressable
       accessibilityRole="button"
-      accessibilityLabel={i18nText("autoI18n.tournament_open", "Aylık turnuvayı aç")}
+      accessibilityLabel={`${i18nText("autoI18n.tournament_open", "Aylık turnuvayı aç")} — ${theTheme}, ${phaseLabel}${bracketProgress ? `, ${bracketProgress}` : ""}`}
       onPressIn={() => { scale.value = withSpring(0.97, SPRING); }}
       onPressOut={() => { scale.value = withSpring(1, SPRING); }}
       onPress={() => navigation.navigate("TournamentScreen")}
@@ -329,8 +549,11 @@ export default function TournamentWidget({ navigation }) {
         <TournamentTreePreview
           bracket={bracketPreview}
           getTmdbUrl={getTmdbUrl}
-          accent={phaseColor}
+          accent={theme.accent}
           lang={lang}
+          phase={phaseInfo.phase}
+          activeRound={phaseInfo.activeRound}
+          myPicks={myPicks}
         />
       </LinearGradient>
     </AnimatedPressable>
@@ -380,60 +603,66 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center",
   },
 
+  // ── Eleme ağacı önizlemesi ──────────────────────────────────────────────────
+  // Panelin yüksekliği SABİT DEĞİL: başlık (26) + tuval (TREE_H) kadar büyür,
+  // böylece eski 105/28/76 uyuşmazlığı yapısal olarak imkânsız.
   treePreview: {
-    width: "100%", height: 105, marginTop: 10, borderRadius: 16,
-    backgroundColor: "rgba(5,10,24,0.30)", overflow: "hidden",
-    borderWidth: 1, borderColor: "rgba(255,255,255,0.18)",
+    width: "100%", marginTop: 10, borderRadius: 16,
+    backgroundColor: "rgba(5,10,24,0.40)", overflow: "hidden",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.16)",
   },
   treeHeader: {
-    height: 28, paddingHorizontal: 9, flexDirection: "row",
-    alignItems: "center", justifyContent: "space-between",
+    height: 26, paddingHorizontal: 10, flexDirection: "row",
+    alignItems: "center", gap: 5,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(255,255,255,0.14)",
+    borderBottomColor: "rgba(255,255,255,0.12)",
   },
-  treeHeaderTitle: { flexDirection: "row", alignItems: "center", gap: 4 },
-  treeHeaderText: { color: "rgba(255,255,255,0.84)", fontSize: 8.5, fontWeight: "900", letterSpacing: 0.7 },
-  treeRoundText: { color: "rgba(255,255,255,0.54)", fontSize: 7.5, fontWeight: "800", letterSpacing: 0.5 },
-  treeFinalPill: {
+  treeHeaderText: { color: "rgba(255,255,255,0.80)", fontSize: 8.5, fontWeight: "900", letterSpacing: 0.7 },
+  treeHeaderSpacer: { flex: 1 },
+  treeCountText: {
+    color: "rgba(255,255,255,0.52)", fontSize: 9, fontWeight: "800",
+    letterSpacing: 0.2, marginRight: 2,
+  },
+  treeChip: {
     flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.10)",
+    paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 7,
+    backgroundColor: "rgba(255,255,255,0.12)", maxWidth: "46%",
   },
-  treeLiveDot: { width: 4, height: 4, borderRadius: 2 },
-  treeFinalText: { color: "#fff", fontSize: 7.5, fontWeight: "900", letterSpacing: 0.6 },
-  treeCanvas: { flex: 1, position: "relative" },
-  treeCenterGlow: {
-    position: "absolute", left: "50%", top: 9, marginLeft: -30,
-    width: 60, height: 60, borderRadius: 30,
-    backgroundColor: "rgba(245,197,24,0.08)",
+  treeChipGold: { backgroundColor: "rgba(245,197,24,0.20)" },
+  treeChipPulse: { position: "absolute", left: 4, width: 12, height: 12, borderRadius: 6 },
+  treeDot: { width: 4.5, height: 4.5, borderRadius: 2.5 },
+  treeChipText: { color: "#fff", fontSize: 8.5, fontWeight: "900", letterSpacing: 0.5, flexShrink: 1 },
+  treeChipTextGold: { color: "#FDE68A" },
+
+  treeCanvas: { height: TREE_H, position: "relative" },
+  treeTick: { position: "absolute" },
+  treeTickLive: { borderWidth: 1.2, borderColor: "#fff" },
+
+  treeFinalWrap: {
+    position: "absolute", top: 0, height: TREE_H - TREE_LABEL_H,
+    alignItems: "center", justifyContent: "center", zIndex: 2,
   },
-  treeNode: { position: "absolute", zIndex: 2 },
-  treeNodeCenter: { top: 21, alignItems: "center" },
-  treeMatch: {
-    width: 40, height: 29, borderRadius: 6, padding: 2, gap: 2,
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.14)", borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.30)",
-  },
-  treeMatchCompact: { width: 40, height: 29, backgroundColor: "rgba(255,255,255,0.10)" },
-  treeFinalMatch: {
-    width: 44, height: 34, padding: 3,
-    borderColor: "rgba(245,197,24,0.92)", borderWidth: 1.5,
-    backgroundColor: "rgba(245,197,24,0.18)",
-  },
-  treePoster: {
-    width: 16, height: 23, borderRadius: 3, overflow: "hidden",
-    alignItems: "center", justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.10)", borderWidth: 0.75,
-    borderColor: "rgba(255,255,255,0.28)",
-  },
-  treePosterAccent: { borderColor: "#F5C518", borderWidth: 1.25 },
+  treeFinalRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   treePosterImage: { width: "100%", height: "100%" },
-  treeTrophy: {
-    position: "absolute", zIndex: 3, top: -13,
-    width: 20, height: 20, borderRadius: 10,
-    alignItems: "center", justifyContent: "center",
-    backgroundColor: "rgba(8,12,25,0.78)", borderWidth: 1,
-    borderColor: "rgba(245,197,24,0.72)",
+  treeScrim: {
+    position: "absolute", left: 0, right: 0, bottom: 0, height: "42%",
+    justifyContent: "flex-end", paddingBottom: 1.5, paddingHorizontal: 3,
   },
+  treeSeedText: { color: "rgba(255,255,255,0.92)", fontSize: 8.5, fontWeight: "900" },
+  treeWinBadge: {
+    position: "absolute", top: 2, right: 2,
+    backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 8, padding: 2,
+  },
+  // Sağ alt: BracketTree'deki mineBadge ile aynı köşe (sıra numarası solda).
+  treeMineBadge: {
+    position: "absolute", bottom: 2, right: 2,
+    width: 13, height: 13, borderRadius: 6.5,
+    alignItems: "center", justifyContent: "center",
+  },
+  treeColLabel: {
+    position: "absolute", bottom: 0, width: 26, textAlign: "center",
+    color: "#fff", fontSize: 8.5, fontWeight: "900", letterSpacing: 0.3,
+  },
+  treeCenterLabel: { opacity: 1, color: "rgba(255,255,255,0.62)" },
+  treeCenterLabelGold: { color: "#FDE68A" },
 });

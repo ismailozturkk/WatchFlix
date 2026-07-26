@@ -45,6 +45,7 @@ export default function MovieSearchScreen({ navigation }) {
           autoFocus
           placeholder={i18nText("autoI18n.film_veya_dizi_ara", "Film veya dizi ara...")}
           placeholderTextColor="#888"
+          maxLength={80}
           style={styles.input}
         />
       </Animated.View>

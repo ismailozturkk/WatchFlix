@@ -1121,6 +1121,7 @@ export const ChatModal = () => {
                       placeholderTextColor={theme.text.muted}
                       value={message}
                       onChangeText={setMessage}
+                      maxLength={1000}
                       multiline
                       onSubmitEditing={handleSend}
                     />

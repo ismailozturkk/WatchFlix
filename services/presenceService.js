@@ -24,6 +24,7 @@
 
 import { AppState } from "react-native";
 import { rtdb } from "../firebase";
+import { i18nText } from "../utils/i18nText";
 import {
   ref,
   onValue,
@@ -145,13 +146,13 @@ export function formatLastSeen(presence, t = {}) {
   if (!ms) return t.unknown || "";
   const diff = Date.now() - ms;
   const sec = Math.floor(diff / 1000);
-  if (sec < 60) return t.now || "az önce";
+  if (sec < 60) return t.now || i18nText("autoI18n.az_once", "az önce");
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} ${t.minute || "dk önce"}`;
+  if (min < 60) return `${min} ${t.minute || i18nText("autoI18n.dk_once", "dk önce")}`;
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} ${t.hour || "saat önce"}`;
+  if (hr < 24) return `${hr} ${t.hour || i18nText("autoI18n.saat_once", "saat önce")}`;
   const d = Math.floor(hr / 24);
-  return `${d} ${t.day || "gün önce"}`;
+  return `${d} ${t.day || i18nText("autoI18n.gun_once", "gün önce")}`;
 }
 
 // ─── Diğer kullanıcıların presence'ini sorgulama ─────────────────────────────

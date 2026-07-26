@@ -11,6 +11,7 @@
 //   /pets/...             (ileride)
 
 export const R2_BASE_URL = "https://pub-8da9947755d445ebb717219a6bd737b5.r2.dev";
+export const PET_FALLBACK_URL = "https://images.weserv.nl/";
 
 /**
  * R2'deki bir asset'in tam URL'ini üretir.
@@ -29,4 +30,17 @@ export function r2Url(category, fileName) {
  */
 export function petUrl(id) {
   return r2Url("pets", `${id}.webp`);
+}
+
+/**
+ * Pet indirmede sırayla denenecek kaynaklar.
+ * Bazı mobil operatörler `*.r2.dev` DNS/TLS erişimini engelleyebildiği için
+ * HTTPS görsel CDN'i yedek kaynaktır.
+ */
+export function petUrls(id) {
+  const directUrl = petUrl(id);
+  return [
+    directUrl,
+    `${PET_FALLBACK_URL}?url=${encodeURIComponent(directUrl)}&output=webp`,
+  ];
 }

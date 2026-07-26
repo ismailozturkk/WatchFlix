@@ -15,7 +15,7 @@ import { BlurView } from "expo-blur";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Feather from "@expo/vector-icons/Feather";
 import Toast from "react-native-toast-message";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "@services/hapticsService";
 import BackButton from "../../components/BackButton";
 import PosterImage from "@components/PosterImage";
 import SwitchToggle from "../../components/SwitchToggle";
@@ -127,7 +127,7 @@ export default function SharedListScreen({ route, navigation }) {
     appAlert(
       i18nText("autoI18n.uyeyi_cikar", "Üyeyi çıkar"),
       i18nText(
-        "autoI18n.uyeyi_cikar_onay",
+        "autoI18n.uyeyi_listeden_cikar_onay",
         "{{name}} listeden çıkarılsın mı?",
         { name: member.name || member.username },
       ),

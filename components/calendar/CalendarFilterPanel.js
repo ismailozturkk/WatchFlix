@@ -227,7 +227,7 @@ export function CalendarFilterPanel({
                   allowFontScaling={false}
                   style={[styles.rangeHint, { color: theme.text.muted }]}
                 >
-                  {i18nText("autoI18n.aralik", "Aralık")}
+                  {i18nText("autoI18n.aralik_filtre", "Aralık")}
                 </Text>
                 <Text
                   allowFontScaling={false}

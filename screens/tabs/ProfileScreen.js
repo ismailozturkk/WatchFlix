@@ -7,11 +7,10 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
-  Animated
+  Animated,
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { SafeAreaView } from "react-native-safe-area-context";
-import LottieView from "lottie-react-native";
 import { useLanguage } from "../../context/LanguageContext";
 import AppIcon from "../../components/AppIcon";
 import { getAuth } from "firebase/auth";
@@ -26,12 +25,11 @@ import { useProfileUi } from "../../context/ProfileUiContext";
 import NotesCard from "./profile/NotesCard";
 import RemindersPreviewButton from "./profile/RemindersPreviewButton";
 import MyActivityButton from "./profile/MyActivityButton";
-import { useSnowSettings } from "../../context/AppSettingsContext";
 import CircularProgress, {
   CircularProgressBase,
 } from "react-native-circular-progress-indicator";
 import { BlurView } from "expo-blur";
-import IconBacground from "../../components/IconBacground";
+import ScreenDecor from "../../components/ScreenDecor";
 // BackButton bilinçli olarak yok: profil sekme kökü olarak render edilir
 // (TabScreenNavigator), stack'e push edilmez — buton yalnızca üstteki ekrandan
 // dönerken "hayalet" olarak belirip kalıyordu.
@@ -41,14 +39,33 @@ import { useUserProfile } from "../../context/UserProfileContext";
 import { propagateProfileChange } from "../../services/profilePropagation";
 import { i18nText } from "../../utils/i18nText";
 import ProfileAvatarPickerModal from "../../components/profile/ProfileAvatarPickerModal";
+import AppBadge from "../../components/badges/AppBadge";
+import WatchBadgeStrip from "../../components/profile/WatchBadgeStrip";
+import { useWatchProgressContext } from "../../context/WatchProgressContext";
+import { odulAdi, odulBasligi } from "../../components/badges/badgeMeta";
+import { PERDE_ADLARI } from "../../utils/watchScoring";
+import { toast } from "../../components/AppToast";
+import {
+  badgeLabel,
+  getIdentityBadges,
+} from "../../components/badges/badgeCatalog";
+import { usePremium } from "../../context/PremiumContext";
 
 const ProfileScreen = ({ navigation }) => {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
-  const { showSnow } = useSnowSettings();
   const [modalVisibleLogout, setModalVisibleLogout] = useState(false);
   const { user } = useAuth();
   const { profile } = useUserProfile();
+  const { isPremium, isUnlimited } = usePremium();
+  const identityBadges = getIdentityBadges({
+    founder: Boolean(profile?.badges?.founder),
+    isPremium,
+    isUnlimited,
+  });
+  const profileUsername = String(profile?.username || "")
+    .trim()
+    .replace(/^@/, "");
   const {
     avatar,
     selectAvatarIndex,
@@ -82,6 +99,56 @@ const ProfileScreen = ({ navigation }) => {
     rankNameMovie,
     rankLevelMovie,
   } = useProfileStats();
+  // İzleme puanı (Kare) + Perde + 81 rozet. Yeni Firestore listener AÇMAZ —
+  // yukarıdaki useProfileStats verisinden türetilir (hooks/useWatchProgress.js).
+  // Context'ten okunur, hook DOĞRUDAN çağrılmaz: WatchBadgesScreen de aynı veriyi
+  // istiyor ve stack'te profil mount'ta kaldığı için iki çağrı iki defter
+  // mutabakatı effect'i demekti (context/WatchProgressContext.js).
+  const watchProgress = useWatchProgressContext() || { loading: true };
+  // Profil başlığındaki WatchBadgeStrip memo'lu; yönlendirme referansını sabit
+  // tutarak ilgisiz profil render'larında şeridi yeniden çizdirmiyoruz.
+  const acRozetler = useCallback(
+    () => navigation.navigate("WatchBadgesScreen"),
+    [navigation]
+  );
+
+  // Rozet/Perde kutlaması. Push bildirimi YOK (bir izleme rozeti telefonu
+  // titretmeyi hak etmez) ve ilk tohumlamada hiç tetiklenmez — mevcut kullanıcı
+  // 30 rozetlik bir bildirim yağmuruna tutulmaz (docs §6.1).
+  const { kutlama, kutlamayiKapat } = watchProgress;
+  useEffect(() => {
+    if (!kutlama) return;
+    // Ad çözümü KATALOG DIŞINI da kapsar: koleksiyon, dönem mührü ve prestij
+    // basamakları da defterde normal rozet gibi durur ama WATCH_BADGE_BY_ID'de
+    // yoktur — düz katalog aramasıyla bu üçünün kutlaması hiç oynamıyordu.
+    const lang = language === "en" ? "en" : "tr";
+    const ilkId = kutlama.rozetler?.[0] || null;
+    const ilkAd = ilkId ? odulAdi(ilkId, lang) : null;
+    if (ilkAd) {
+      const ek =
+        kutlama.rozetler.length > 1 ? ` +${kutlama.rozetler.length - 1}` : "";
+      toast.success(odulBasligi(ilkId, lang), ilkAd + ek);
+    } else if (kutlama.perdeAtladi) {
+      toast.success(
+        i18nText(
+          "autoI18n.perde_atlandi",
+          `Perde ${kutlama.yeniPerde}'e yükseldin`,
+          { n: kutlama.yeniPerde }
+        ),
+        PERDE_ADLARI[kutlama.yeniPerde - 1] || ""
+      );
+    } else if (kutlama.makaraAtladi) {
+      // Makara ayrı bildirilir: zirvedeki kullanıcının Perdesi değişmiyor,
+      // "Perde 20'e yükseldin" demek yanlış olurdu.
+      toast.success(
+        i18nText("autoI18n.makara_atlandi", `${kutlama.yeniMakara}. Makara`, {
+          n: kutlama.yeniMakara,
+        }),
+        PERDE_ADLARI[PERDE_ADLARI.length - 1]
+      );
+    }
+    kutlamayiKapat();
+  }, [kutlama, kutlamayiKapat, language]);
   const SingOut = async () => {
     const auth = getAuth();
     try {
@@ -135,18 +202,23 @@ const ProfileScreen = ({ navigation }) => {
   const rawProgressTv = (totalTimeTv % 10080) / 10080;
   const rawProgressMovie = (totalTime % 10080) / 10080;
   const safeProgressTv = parseInt(
-    Math.min(Math.max(rawProgressTv, 0), 1).toFixed(3) * 100,
+    Math.min(Math.max(rawProgressTv, 0), 1).toFixed(3) * 100
   );
   const safeProgressMovie = parseInt(
-    Math.min(Math.max(rawProgressMovie, 0), 1).toFixed(3) * 100,
+    Math.min(Math.max(rawProgressMovie, 0), 1).toFixed(3) * 100
   );
   //console.log("safeProgressTv:", safeProgressMovie);
   const friendsState = useFriends();
-  const friendCount = friendsState?.friends?.length ?? profile?.friendsCount ?? 0;
+  const friendCount =
+    friendsState?.friends?.length ?? profile?.friendsCount ?? 0;
   const receivedCount =
-    friendsState?.incomingRequests?.length ?? profile?.pendingRequestsInCount ?? 0;
+    friendsState?.incomingRequests?.length ??
+    profile?.pendingRequestsInCount ??
+    0;
   const sendCount =
-    friendsState?.outgoingRequests?.length ?? profile?.pendingRequestsOutCount ?? 0;
+    friendsState?.outgoingRequests?.length ??
+    profile?.pendingRequestsOutCount ??
+    0;
 
   // Mesajlar butonundaki okunmamış rozeti — gelen kutusu index'indeki
   // unreadCount alanlarının toplamı (ChatScreen sohbet açılınca sıfırlar).
@@ -162,7 +234,7 @@ const ProfileScreen = ({ navigation }) => {
         });
         setUnreadMessages(total);
       },
-      () => setUnreadMessages(0),
+      () => setUnreadMessages(0)
     );
     return () => unsub();
   }, [user?.uid]);
@@ -173,18 +245,20 @@ const ProfileScreen = ({ navigation }) => {
       try {
         const saved = await selectAvatar(index);
         if (saved && changed && user?.uid) {
-          propagateProfileChange(user.uid, { avatarIndex: index }).catch(() => {});
+          propagateProfileChange(user.uid, { avatarIndex: index }).catch(
+            () => {}
+          );
         }
       } catch {
         // Context seçimi geri alır ve kullanıcıya kalıcılık hatasını gösterir.
       }
     },
-    [selectAvatarIndex, selectAvatar, user?.uid],
+    [selectAvatarIndex, selectAvatar, user?.uid]
   );
 
   return (
     <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
-      <IconBacground opacity={0.3} />
+      <ScreenDecor iconOpacity={0.3} />
 
       <ScrollView
         keyboardShouldPersistTaps="handled"
@@ -269,22 +343,89 @@ const ProfileScreen = ({ navigation }) => {
                 </View>
               )}
             </TouchableOpacity>
-            <View style={{ flexDirection: "column", width: "50%" }}>
-              <Text
-                allowFontScaling={false}
-                style={[styles.textName, { color: theme.text.primary }]}
-              >
-                {profile?.displayName || user?.displayName}
-              </Text>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 5,
-                }}
-              >
+            <View style={styles.profileInfo}>
+              <View style={styles.profileNameRow}>
+                <View style={styles.profileNameBlock}>
+                  <Text
+                    allowFontScaling={false}
+                    numberOfLines={1}
+                    style={[styles.textName, { color: theme.text.primary }]}
+                  >
+                    {profile?.displayName || user?.displayName}
+                  </Text>
+                  {!!profileUsername && (
+                    <Text
+                      allowFontScaling={false}
+                      numberOfLines={1}
+                      style={[styles.textUsername, { color: theme.text.muted }]}
+                    >
+                      @{profileUsername}
+                    </Text>
+                  )}
+                </View>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate("EditProfileScreen")}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={i18nText(
+                    "autoI18n.profili_duzenle",
+                    "Profili Düzenle"
+                  )}
+                  style={[
+                    styles.editProfileButton,
+                    {
+                      backgroundColor: theme.accent + "18",
+                      borderColor: theme.accent + "66",
+                    },
+                  ]}
+                >
+                  <AppIcon
+                    family="Ionicons"
+                    name="create-outline"
+                    size={17}
+                    color={theme.accent}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {identityBadges.length > 0 && (
+                <View style={styles.identityBadgesRow}>
+                  {identityBadges.map((badge) => (
+                    <View
+                      key={badge.id}
+                      style={[
+                        styles.identityBadgeChip,
+                        {
+                          backgroundColor: theme.accent + "12",
+                          borderColor: theme.border,
+                        },
+                      ]}
+                    >
+                      <AppBadge
+                        glyph={badge.glyph}
+                        glyphSolid={badge.glyphSolid}
+                        rarity={badge.rarity}
+                        ornate={badge.ornate}
+                        size={25}
+                        accessibilityLabel={badgeLabel(badge, language)}
+                      />
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.identityBadgeLabel,
+                          { color: theme.text.primary },
+                        ]}
+                      >
+                        {badgeLabel(badge, language)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              <View style={styles.profileMetaRow}>
                 <Text
                   allowFontScaling={false}
+                  numberOfLines={1}
                   style={[styles.textEmail, { color: theme.text.primary }]}
                 >
                   {user?.email}
@@ -313,39 +454,19 @@ const ProfileScreen = ({ navigation }) => {
                 <Text
                   allowFontScaling={false}
                   style={[styles.textDate, { color: theme.text.primary }]}
-                >{i18nText("autoI18n.katilma_tarihi", "Katılma tarihi:")}{" "}
+                >
+                  {i18nText("autoI18n.katilma_tarihi", "Katılma tarihi:")}{" "}
                   {convertTimestampToDate(user.metadata.createdAt)}
                 </Text>
               )}
-              <TouchableOpacity
-                onPress={() => navigation.navigate("EditProfileScreen")}
-                activeOpacity={0.85}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 5,
-                  alignSelf: "flex-start",
-                  marginTop: 8,
-                  paddingVertical: 6,
-                  paddingHorizontal: 12,
-                  borderRadius: 20,
-                  borderWidth: 1,
-                  backgroundColor: theme.accent + "1f",
-                  borderColor: theme.accent,
-                }}
-              >
-                <AppIcon
-                  family="Ionicons"
-                  name="create-outline"
-                  size={13}
-                  color={theme.accent}
-                />
-                <Text
-                  allowFontScaling={false}
-                  style={{ color: theme.accent, fontSize: 12, fontWeight: "700" }}
-                >{i18nText("autoI18n.profili_duzenle", "Profili Düzenle")}</Text>
-              </TouchableOpacity>
             </View>
+          </View>
+          <View style={styles.profileBadgeStrip}>
+            <WatchBadgeStrip
+              progress={watchProgress}
+              onPress={acRozetler}
+              compact
+            />
           </View>
           {/* ── Arkadaş aksiyonları ── */}
           {/* ── Arkadaş aksiyonları ── */}
@@ -375,7 +496,9 @@ const ProfileScreen = ({ navigation }) => {
                 allowFontScaling={false}
                 numberOfLines={1}
                 style={[styles.friendBarLabel, { color: theme.text.secondary }]}
-              >{i18nText("autoI18n.ara_2", "Ara")}</Text>
+              >
+                {i18nText("autoI18n.ara_2", "Ara")}
+              </Text>
             </TouchableOpacity>
 
             {/* Dikey ayraç */}
@@ -398,17 +521,27 @@ const ProfileScreen = ({ navigation }) => {
                   { backgroundColor: "#64b4ff15" },
                 ]}
               >
-                <AppIcon family="Ionicons" name="people-outline" size={18} color="#64b4ff" />
+                <AppIcon
+                  family="Ionicons"
+                  name="people-outline"
+                  size={18}
+                  color="#64b4ff"
+                />
               </View>
               <Text
                 allowFontScaling={false}
                 numberOfLines={1}
                 style={[styles.friendBarLabel, { color: theme.text.secondary }]}
-              >{i18nText("autoI18n.arkadaslar", "Arkadaşlar")}</Text>
+              >
+                {i18nText("autoI18n.arkadaslar", "Arkadaşlar")}
+              </Text>
               {friendCount > 0 && (
                 <View style={styles.friendBarPillRow}>
                   <View
-                    style={[styles.friendBarPill, { backgroundColor: "#64b4ff" }]}
+                    style={[
+                      styles.friendBarPill,
+                      { backgroundColor: "#64b4ff" },
+                    ]}
                   >
                     <Text
                       allowFontScaling={false}
@@ -441,17 +574,27 @@ const ProfileScreen = ({ navigation }) => {
                   { backgroundColor: "#6C63FF15" },
                 ]}
               >
-                <AppIcon family="Ionicons" name="chatbubble-ellipses-outline" size={18} color="#6C63FF" />
+                <AppIcon
+                  family="Ionicons"
+                  name="chatbubble-ellipses-outline"
+                  size={18}
+                  color="#6C63FF"
+                />
               </View>
               <Text
                 allowFontScaling={false}
                 numberOfLines={1}
                 style={[styles.friendBarLabel, { color: theme.text.secondary }]}
-              >{i18nText("autoI18n.mesajlar", "Mesajlar")}</Text>
+              >
+                {i18nText("autoI18n.mesajlar", "Mesajlar")}
+              </Text>
               {unreadMessages > 0 && (
                 <View style={styles.friendBarPillRow}>
                   <View
-                    style={[styles.friendBarPill, { backgroundColor: "#6C63FF" }]}
+                    style={[
+                      styles.friendBarPill,
+                      { backgroundColor: "#6C63FF" },
+                    ]}
                   >
                     <Text
                       allowFontScaling={false}
@@ -484,13 +627,20 @@ const ProfileScreen = ({ navigation }) => {
                   { backgroundColor: "#29b86415" },
                 ]}
               >
-                <AppIcon family="Ionicons" name="mail-outline" size={18} color="#29b864" />
+                <AppIcon
+                  family="Ionicons"
+                  name="mail-outline"
+                  size={18}
+                  color="#29b864"
+                />
               </View>
               <Text
                 allowFontScaling={false}
                 numberOfLines={1}
                 style={[styles.friendBarLabel, { color: theme.text.secondary }]}
-              >{i18nText("autoI18n.istekler", "İstekler")}</Text>
+              >
+                {i18nText("autoI18n.istekler", "İstekler")}
+              </Text>
               {(receivedCount > 0 || sendCount > 0) && (
                 <View style={styles.friendBarPillRow}>
                   {receivedCount > 0 && (
@@ -653,17 +803,6 @@ const ProfileScreen = ({ navigation }) => {
         </SafeAreaView>
       </ScrollView>
 
-      {/* Kar: scroll içinde 2 dev Lottie yerine tek sabit overlay (MovieScreen paterni) */}
-      {showSnow && (
-        <View style={styles.snowOverlay} pointerEvents="none">
-          <LottieView
-            style={{ flex: 1 }}
-            source={require("@lottie/snow.json")}
-            autoPlay
-            loop
-          />
-        </View>
-      )}
     </View>
   );
 };
@@ -764,11 +903,62 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   textName: {
-    fontSize: 24,
+    flexShrink: 1,
+    fontSize: 22,
     fontWeight: "bold",
     color: "#000",
   },
+  profileInfo: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "column",
+  },
+  profileNameRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  profileNameBlock: { flex: 1, minWidth: 0 },
+  textUsername: {
+    marginTop: 1,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  editProfileButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  profileMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    minWidth: 0,
+  },
+  identityBadgesRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  identityBadgeChip: {
+    minHeight: 30,
+    maxWidth: "100%",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingLeft: 3,
+    paddingRight: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  identityBadgeLabel: { flexShrink: 1, fontSize: 9, fontWeight: "800" },
   textEmail: {
+    flexShrink: 1,
     fontSize: 14,
     gap: 10,
     color: "#000",
@@ -782,14 +972,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     gap: 10,
     color: "#000",
-  },
-  snowOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1,
   },
   profilImage: {
     width: 100,
@@ -810,10 +992,16 @@ const styles = StyleSheet.create({
   },
   images: {
     width: "100%",
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "flex-start",
     alignItems: "center",
+    gap: 14,
+  },
+  profileBadgeStrip: {
+    alignSelf: "stretch",
+    paddingHorizontal: 16,
   },
   section: {
     width: "90%",

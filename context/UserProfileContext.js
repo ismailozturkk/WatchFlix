@@ -85,7 +85,7 @@ export function UserProfileProvider({ children }) {
         if (snap.exists()) {
           const p = { uid: snap.id, ...snap.data() };
           setProfile(p);
-          if (shouldPersistInternetData()) {
+          if (shouldPersistInternetData({ category: "profile" })) {
             cacheStore.setJSON(...cacheKeys.profile(uid), p);
           }
         } else {

@@ -41,6 +41,12 @@ import CreateSharedListModal from "../../components/modals/CreateSharedListModal
 import { collection, getDocs, limit, query } from "firebase/firestore";
 import { BlurView } from "expo-blur";
 import { i18nText } from "@utils/i18nText";
+// İkon/vurgu eşlemesi profil rayı ve Android widget'ı ile ORTAK.
+import {
+  getListAccent,
+  getListIcon,
+  SHARED_LIST_ACCENT,
+} from "@utils/listAppearance";
 
 
 const { width } = Dimensions.get("window");
@@ -60,38 +66,6 @@ const getDisplayName = (listName) => {
       return i18nText("autoI18n.izlenecekler", "İzlenecekler");
     default:
       return listName;
-  }
-};
-
-// ── Listeye özgü ikon ────────────────────────────────────────────────────────
-const getListIcon = (listName) => {
-  switch (listName) {
-    case "watchedMovies":
-      return "film";
-    case "watchedTv":
-      return "tv";
-    case "favorites":
-      return "heart";
-    case "watchList":
-      return "bookmark";
-    default:
-      return "list";
-  }
-};
-
-// ── Listeye özgü vurgu rengi ─────────────────────────────────────────────────
-const getListAccent = (listName) => {
-  switch (listName) {
-    case "watchedMovies":
-      return "#4fc3f7";
-    case "watchedTv":
-      return "#a78bfa";
-    case "favorites":
-      return "#f87171";
-    case "watchList":
-      return "#34d399";
-    default:
-      return "#fbbf24";
   }
 };
 
@@ -302,7 +276,7 @@ const ListCard = ({
 
 // ── Ortak liste kartı ────────────────────────────────────────────────────────
 // ListCard ile aynı çerçeve; isim yerine üye sayısı çipi ve "people" ikonu.
-const SHARED_ACCENT = "#38bdf8";
+const SHARED_ACCENT = SHARED_LIST_ACCENT;
 
 const SharedListCard = ({ list, previewItems, onPress, imageQuality, getTmdbUrl, theme, index }) => {
   const enterAnim = useRef(new Animated.Value(0)).current;
@@ -660,7 +634,7 @@ export default function ListsViewScreen({ navigation }) {
               { color: theme.text?.primary ?? "#fff" },
             ]}
           >
-            Listelerim
+            {i18nText("autoI18n.listelerim", "Listelerim")}
           </Text>
         </View>
         <View style={[styles.countChip, { backgroundColor: theme.secondary }]}>
@@ -711,6 +685,7 @@ export default function ListsViewScreen({ navigation }) {
             placeholderTextColor={theme.text?.muted ?? "#555"}
             value={newListName}
             onChangeText={setNewListName}
+            maxLength={40}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
             returnKeyType="done"

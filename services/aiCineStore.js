@@ -18,7 +18,7 @@ import { makeId, summarizeTitle } from "./aiConversationsStore";
 
 export { makeId, summarizeTitle };
 
-const STORAGE_KEY = "@whatchflix/ai_cine_conversations";
+const STORAGE_KEY = "@seelogd/ai_cine_conversations";
 const MAX_CONVERSATIONS = 50;
 
 /** Tüm sohbetleri yükler (en yeni en üstte). */

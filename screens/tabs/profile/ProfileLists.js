@@ -22,25 +22,14 @@ import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 import { useSharedLists } from "../../../context/SharedListsContext";
 import SwitchToggle from "../../../components/SwitchToggle";
 import { i18nText } from "../../../utils/i18nText";
+import { sortItemsByListOrder } from "../../../utils/listOrder";
+import {
+  getListAccent,
+  getListIcon,
+  SHARED_LIST_ACCENT,
+} from "../../../utils/listAppearance";
 import { collection, getDocs, limit, query } from "firebase/firestore";
 import { db } from "../../../firebase";
-
-const sortItemsByListOrder = (items) =>
-  (Array.isArray(items) ? items : []).slice().sort((a, b) => {
-    const aHasOrder = Number.isFinite(a?.listOrder);
-    const bHasOrder = Number.isFinite(b?.listOrder);
-
-    if (aHasOrder && bHasOrder) {
-      const orderDiff = a.listOrder - b.listOrder;
-      if (orderDiff !== 0) return orderDiff;
-    } else if (aHasOrder !== bHasOrder) {
-      return aHasOrder ? -1 : 1;
-    }
-
-    const aDate = new Date(a?.dateAdded || 0).getTime() || 0;
-    const bDate = new Date(b?.dateAdded || 0).getTime() || 0;
-    return aDate - bDate || String(a?.id ?? "").localeCompare(String(b?.id ?? ""));
-  });
 
 // Kart yüksekliği tüm düzenlerde sabit (poster bloğu 112 + ayırıcı/alt bilgi).
 const CARD_H = 171;
@@ -60,40 +49,8 @@ const getCardWidth = (gridStyle) => {
   }
 };
 
-// Ortak liste kartlarının aksanı — ListsViewScreen.SHARED_ACCENT ile aynı.
-const SHARED_ACCENT = "#38bdf8";
+const SHARED_ACCENT = SHARED_LIST_ACCENT;
 const SHARED_KEY_PREFIX = "shared:";
-
-// ── Listeye özgü vurgu rengi/ikon — ListsViewScreen kartlarıyla birebir aynı ──
-const getListAccent = (listName) => {
-  switch (listName) {
-    case "watchedMovies":
-      return "#4fc3f7";
-    case "watchedTv":
-      return "#a78bfa";
-    case "favorites":
-      return "#f87171";
-    case "watchList":
-      return "#34d399";
-    default:
-      return "#fbbf24";
-  }
-};
-
-const getListIcon = (listName) => {
-  switch (listName) {
-    case "watchedMovies":
-      return "film";
-    case "watchedTv":
-      return "tv";
-    case "favorites":
-      return "heart";
-    case "watchList":
-      return "bookmark";
-    default:
-      return "list";
-  }
-};
 
 export default function ProfileLists({ navigation }) {
   const { t } = useLanguage();

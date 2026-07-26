@@ -15,14 +15,13 @@ import {
 import React, { useState } from "react";
 import { useTheme } from "../../context/ThemeContext";
 import LottieView from "lottie-react-native";
-import * as Haptics from "expo-haptics";
-import { useSnow } from "../../context/SnowContext";
+import * as Haptics from "@services/hapticsService";
 import { getAuth, sendPasswordResetEmail } from "firebase/auth";
 import Toast from "react-native-toast-message";
 import { useLanguage } from "../../context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import IconBacground from "../../components/IconBacground";
+import ScreenDecor from "../../components/ScreenDecor";
 import EmailSuffixRow from "../../components/auth/EmailSuffixRow";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
@@ -34,7 +33,6 @@ const buzz = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
 
 export default function ForgotPasswordScreen({ navigation }) {
   const { theme, selectedTheme } = useTheme();
-  const { showSnow } = useSnow();
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [isloading, setIsloading] = useState(false);
@@ -78,17 +76,8 @@ export default function ForgotPasswordScreen({ navigation }) {
         translucent
         backgroundColor="transparent"
       />
-      <IconBacground opacity={isLightTheme ? 0.05 : 0.08} />
+      <ScreenDecor iconOpacity={isLightTheme ? 0.05 : 0.08} />
 
-      {showSnow && (
-        <LottieView
-          style={styles.lottie}
-          source={require("@lottie/snow.json")}
-          autoPlay
-          loop
-          pointerEvents="none"
-        />
-      )}
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -169,6 +158,7 @@ export default function ForgotPasswordScreen({ navigation }) {
                     onSubmitEditing={resetPassword}
                     onChangeText={setEmail}
                     value={email}
+                    maxLength={254}
                     onFocus={() => setEmailFocused(true)}
                     onBlur={() => setEmailFocused(false)}
                   />
@@ -313,14 +303,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 22,
     gap: 18,
-  },
-  lottie: {
-    position: "absolute",
-    height: 1000,
-    top: 0,
-    left: -60,
-    right: -60,
-    zIndex: 0,
   },
   backButton: {
     position: "absolute",

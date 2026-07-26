@@ -1,38 +1,24 @@
-import { NativeModules, Platform } from "react-native";
+import { parseAirDate, startOfDay } from "../utils/airDate";
+import { callWidget, widgetPosterUrl } from "./widgetBridge";
 
 // Android: klasik köprü modülü (android/.../widget/ReminderWidgetModule.kt).
 // iOS: yerel Expo modülü (modules/reminder-widget) — paylaşılan App Group'a
-// yazıp WidgetKit zaman çizelgelerini yeniler.
-const androidWidget = NativeModules.ReminderWidgetModule;
+// yazıp WidgetKit zaman çizelgelerini yeniler. İkisinin seçimi widgetBridge'de.
+const ANDROID_MODULE = "ReminderWidgetModule";
 
-let iosWidgetResolved = false;
-let iosWidget = null;
-const getIosWidget = () => {
-  if (iosWidgetResolved) return iosWidget;
-  iosWidgetResolved = true;
-  try {
-    // Tembel yüklenir: non-iOS platformlar ve Jest (bkz. jest.config.js — saf
-    // JS testleri) asla expo-modules-core'u import etmez.
-    const { requireOptionalNativeModule } = require("expo-modules-core");
-    iosWidget = requireOptionalNativeModule("ReminderWidget");
-  } catch (error) {
-    iosWidget = null;
-  }
-  return iosWidget;
-};
-
-const getWidget = () => (Platform.OS === "ios" ? getIosWidget() : androidWidget);
-
+// parseAirDate: Date / Firestore Timestamp / ISO / "YYYY-MM-DD" hepsini çözer.
+// Tarih-only değerler YEREL gece yarısına oturur — aksi halde negatif UTC
+// ofsetli cihazlarda bugünkü bölüm "dün"e düşüp widget'tan eleniyordu.
 const toEpoch = (value) => {
-  if (!value) return null;
-  const date = typeof value?.toDate === "function" ? value.toDate() : new Date(value);
-  const epoch = date.getTime();
-  return Number.isFinite(epoch) ? epoch : null;
+  const date = parseAirDate(value);
+  return date ? date.getTime() : null;
 };
+
+// w185: satırdaki 34×50dp poster için küçük ve hızlı.
+const posterUrl = (path) => widgetPosterUrl(path, "w185");
 
 export const buildReminderWidgetItems = (reminders, language = "tr") => {
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
+  const startOfToday = startOfDay(new Date());
   const movieItems = (reminders?.movieReminders || []).map((movie) => ({
     id: `movie-${movie.movieId}`,
     type: "movie",
@@ -41,6 +27,7 @@ export const buildReminderWidgetItems = (reminders, language = "tr") => {
       Number(movie.movieMinutes) > 0
         ? `${movie.movieMinutes} ${language === "tr" ? "dk" : "min"}`
         : "",
+    poster: posterUrl(movie.posterPath),
     dateEpoch: toEpoch(movie.releaseDate),
   }));
 
@@ -54,6 +41,8 @@ export const buildReminderWidgetItems = (reminders, language = "tr") => {
           language === "tr"
             ? `S${season.seasonNumber} · ${episode.episodeNumber}. Bölüm`
             : `S${season.seasonNumber} · Episode ${episode.episodeNumber}`,
+        // Sezon posteri varsa onu, yoksa dizi posterini kullan.
+        poster: posterUrl(season.seasonPosterPath || show.showPosterPath),
         dateEpoch: toEpoch(episode.airDate),
       })),
     ),
@@ -68,23 +57,13 @@ export const buildReminderWidgetItems = (reminders, language = "tr") => {
     .slice(0, 20);
 };
 
-export const syncReminderWidget = async (reminders, language = "tr") => {
-  const widget = getWidget();
-  if (!widget?.updateReminders) return;
-  const items = buildReminderWidgetItems(reminders, language);
-  try {
-    await widget.updateReminders(JSON.stringify(items), language);
-  } catch (error) {
-    if (__DEV__) console.warn("[ReminderWidget] sync failed:", error?.message);
-  }
-};
+export const syncReminderWidget = (reminders, language = "tr") =>
+  callWidget(
+    ANDROID_MODULE,
+    "updateReminders",
+    JSON.stringify(buildReminderWidgetItems(reminders, language)),
+    language,
+  );
 
-export const clearReminderWidget = async () => {
-  const widget = getWidget();
-  if (!widget?.clearReminders) return;
-  try {
-    await widget.clearReminders();
-  } catch (error) {
-    if (__DEV__) console.warn("[ReminderWidget] clear failed:", error?.message);
-  }
-};
+export const clearReminderWidget = () =>
+  callWidget(ANDROID_MODULE, "clearReminders");

@@ -1,6 +1,6 @@
 // services/wrappedService.js
 //
-// Watchify Wrapped — Firestore arşivi.
+// Seelogd Wrapped — Firestore arşivi.
 // Yıllık özet anlık görüntüleri `Lists/{uid}/wrapped/{year}` altında saklanır.
 // Bu yol firestore.rules'taki `match /Lists/{uid}/{document=**}` ile zaten
 // sahibe-yaz / giriş-yapana-oku korumalıdır → ek kural gerekmez.

@@ -1,5 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { shouldPersistInternetData } from "./dataCacheSettings";
+import {
+  categoryForCacheKey,
+  shouldPersistInternetData,
+} from "./dataCacheSettings";
+import { getIsOnline } from "../context/ConnectivityContext";
 
 /** TTL constants (milliseconds) */
 export const TTL = {
@@ -22,14 +26,18 @@ const storageKey = (key) => `${PREFIX}${key}`;
 /**
  * Returns cached data if the entry exists and is within ttlMs.
  * Checks memory first, then AsyncStorage.
+ *
+ * ÇEVRİMDIŞI: TTL yok sayılır ve bayat kayıt silinmez — "Verileri indir" ile
+ * indirilen film/dizi içeriği internet yokken TTL dolmuş olsa da kullanılabilsin.
  * @returns {Promise<any|null>}
  */
 export const getCachedValue = async (key, ttlMs) => {
   const now = Date.now();
+  const offline = !getIsOnline();
 
   const hit = mem.get(key);
   if (hit) {
-    if (now - hit.ts < ttlMs) return hit.data;
+    if (offline || now - hit.ts < ttlMs) return hit.data;
     mem.delete(key);
   }
 
@@ -37,7 +45,7 @@ export const getCachedValue = async (key, ttlMs) => {
     const raw = await AsyncStorage.getItem(storageKey(key));
     if (!raw) return null;
     const entry = JSON.parse(raw);
-    if (now - entry.ts < ttlMs) {
+    if (offline || now - entry.ts < ttlMs) {
       mem.set(key, entry);
       return entry.data;
     }
@@ -53,7 +61,9 @@ export const getCachedValue = async (key, ttlMs) => {
  * Fire-and-forget — never throws.
  */
 export const setCachedValue = (key, data, { force = false } = {}) => {
-  if (!shouldPersistInternetData({ force })) return;
+  // Kategori anahtar önekinden türetilir (movie_* → film, tv_* → dizi içerikleri).
+  if (!shouldPersistInternetData({ force, category: categoryForCacheKey(key) }))
+    return;
   const entry = { data, ts: Date.now() };
   mem.set(key, entry);
   AsyncStorage.setItem(storageKey(key), JSON.stringify(entry)).catch(() => {});

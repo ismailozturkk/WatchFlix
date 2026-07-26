@@ -18,13 +18,13 @@ import BackButton from "../../components/BackButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import LottieView from "lottie-react-native";
-import { useSnow } from "../../context/SnowContext";
 import WatchedAdd from "./WatchedAdd";
+import { useWatchedShow } from "../../hooks/useWatchedShow";
 import {
   useApiSettings,
   useImageQualitySettings,
-  useSnowSettings,
 } from "../../context/AppSettingsContext";
+import ScreenSnow from "../../components/ScreenSnow";
 
 const { width } = Dimensions.get("window");
 
@@ -138,6 +138,7 @@ export default function EpisodeDetails({ route, navigation }) {
     seasonPosterPath,
     genres,
   } = route.params;
+  const watched = useWatchedShow(showId);
 
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -146,7 +147,6 @@ export default function EpisodeDetails({ route, navigation }) {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const { API_KEY } = useApiSettings();
-  const { showSnow } = useSnowSettings();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
 
   const formatDate = useCallback(
@@ -266,14 +266,7 @@ export default function EpisodeDetails({ route, navigation }) {
 
       {/* ── İçerik ───────────────────────────────────────────────────────── */}
       <View style={[styles.content, { backgroundColor: theme.primary }]}>
-        {showSnow && (
-          <LottieView
-            style={styles.lottie}
-            source={require("@lottie/snow.json")}
-            autoPlay
-            loop
-          />
-        )}
+        <ScreenSnow />
 
         {/* ── Başlık Bloğu ─────────────────────────────────────────────── */}
         <View style={styles.titleBlock}>
@@ -323,6 +316,8 @@ export default function EpisodeDetails({ route, navigation }) {
             seasonPosterPath={seasonPosterPath}
             episodePosterPath={details.still_path}
             genres={genres}
+            isWatched={watched.isEpisodeWatched(seasonNumber, episodeNumber)}
+            watchEvents={watched.episodeWatchEvents(seasonNumber, episodeNumber)}
           />
         </View>
 
@@ -522,14 +517,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 18,
     paddingTop: 4,
-  },
-  lottie: {
-    position: "absolute",
-    height: 1000,
-    top: 0,
-    left: -120,
-    right: -120,
-    zIndex: 0,
   },
 
   // ── Başlık Bloğu ──────────────────────────────────────────────────────────

@@ -8,17 +8,25 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:427087836931:android:d6f52beea8a0caefe91b36",
+        "mobilesdk_app_id": "1:427087836931:android:eaf678e13726a8f1e91b36",
         "android_client_info": {
-          "package_name": "com.smlztrk.Watchify"
+          "package_name": "com.smlztrk.seelogd"
         }
       },
       "oauth_client": [
         {
-          "client_id": "427087836931-6f3bui0ruo2arq47vu9b4br94e5c4g71.apps.googleusercontent.com",
+          "client_id": "427087836931-s1ouqq0kbg3uk8ptr2vsv6bvatfueof8.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.smlztrk.Watchify",
+            "package_name": "com.smlztrk.seelogd",
+            "certificate_hash": "8a76f7f5f0a577724fb7033da1203bf76613582e"
+          }
+        },
+        {
+          "client_id": "427087836931-vj75hjjnkeia62i7s349gu2mev10uu8d.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.smlztrk.seelogd",
             "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
           }
         },

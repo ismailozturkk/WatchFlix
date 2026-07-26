@@ -1,6 +1,6 @@
 /* ─────────────────────────────────────────────────────────────────────────────
 
- * Watchify — Merkezi Renk & Tema Sistemi
+ * Seelogd — Merkezi Renk & Tema Sistemi
 
  *
 

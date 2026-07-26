@@ -24,7 +24,7 @@ import { useTvShow } from "../../context/TvShowContex";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Progress from "react-native-progress";
-import IconBacground from "../../components/IconBacground";
+import ScreenDecor from "../../components/ScreenDecor";
 import { OnGoingSeriesSkeleton } from "../../components/Skeleton";
 import { i18nText } from "../../utils/i18nText";
 import {
@@ -193,7 +193,7 @@ function SeriesCard({ show, navigation, theme, language, API_KEY, imageQuality }
               allowFontScaling={false}
               style={[styles.epText, { color: theme.text.muted }]}
             >
-              {show.showSeasonCount || (show.seasons || []).length} sezon
+              {show.showSeasonCount || (show.seasons || []).length} {i18nText("autoI18n.sezon_lower", "sezon")}
             </Text>
           </View>
         </View>
@@ -253,7 +253,7 @@ export default function OnGoingSeries({ navigation }) {
     return (
       <View style={[styles.root, { backgroundColor: theme.primary }]}>
         <StatusBar barStyle="light-content" />
-        <IconBacground opacity={0.3} />
+        <ScreenDecor iconOpacity={0.3} />
         <SafeAreaView style={{ flex: 1 }}>
           <OnGoingSeriesSkeleton />
         </SafeAreaView>
@@ -264,7 +264,7 @@ export default function OnGoingSeries({ navigation }) {
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
       <StatusBar barStyle="light-content" />
-      <IconBacground opacity={0.3} />
+      <ScreenDecor iconOpacity={0.3} />
 
       <SafeAreaView style={{ flex: 1 }}>
         {/* ── Header ── */}
@@ -287,7 +287,7 @@ export default function OnGoingSeries({ navigation }) {
               allowFontScaling={false}
               style={[styles.headerTitle, { color: theme.text.primary }]}
             >
-              Devam Eden Diziler
+              {i18nText("autoI18n.devam_eden_diziler", "Devam Eden Diziler")}
             </Text>
             <Text
               allowFontScaling={false}
@@ -316,7 +316,7 @@ export default function OnGoingSeries({ navigation }) {
               allowFontScaling={false}
               style={[styles.statLabel, { color: theme.text.muted }]}
             >
-              Toplam
+              {i18nText("autoI18n.toplam", "Toplam")}
             </Text>
           </View>
           <View
@@ -340,7 +340,7 @@ export default function OnGoingSeries({ navigation }) {
               allowFontScaling={false}
               style={[styles.statLabel, { color: theme.text.muted }]}
             >
-              Devam Eden
+              {i18nText("autoI18n.devam_eden", "Devam Eden")}
             </Text>
           </View>
           <View
@@ -399,6 +399,7 @@ export default function OnGoingSeries({ navigation }) {
             placeholderTextColor={theme.text.muted}
             value={searchQuery}
             onChangeText={setSearchQuery}
+            maxLength={80}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery("")}>

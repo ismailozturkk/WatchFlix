@@ -23,6 +23,7 @@ import PaginatedRail from "../../components/PaginatedRail";
 import SeeAllHeader from "../../components/SeeAllHeader";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 const { width } = Dimensions.get("window");
 
 // Stable, module-scope item component → no remount → no flicker.
@@ -58,11 +59,11 @@ const MovieNowPlayingCard = memo(function MovieNowPlayingCard({ item, navigation
         />
 
         {posterBadges?.tmdbRating !== false && (
-          <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
-            <Text allowFontScaling={false} style={styles.similarRatingText}>
-              {item.vote_average.toFixed(1)}
-            </Text>
-          </View>
+          <RatingBadge
+            value={item.vote_average}
+            votes={item.vote_count}
+            style={POSTER_BADGE_POS.bottomRight}
+          />
         )}
         <ListBadges
           mediaId={item.id}

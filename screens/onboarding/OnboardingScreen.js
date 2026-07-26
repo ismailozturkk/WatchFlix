@@ -19,7 +19,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "@services/hapticsService";
 import IconBacground from "../../components/IconBacground";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -59,7 +59,7 @@ const COPY = {
     langEyebrow: "SANA GÖRE HAZIRLAYALIM",
     langTitle: "Hangi dilde keşfetmek istersin?",
     langHint: "İçerikleri, önerileri ve topluluğu seçtiğin dilde deneyimle.",
-    langContinue: "Watchify'ı Keşfet",
+    langContinue: "Seelogd'ı Keşfet",
     skip: "Atla",
     next: "Devam Et",
     start: "Son Adım",
@@ -84,7 +84,7 @@ const COPY = {
       {
         kind: "ai",
         icon: "sparkles-outline",
-        eyebrow: "WATCHIFY AI",
+        eyebrow: "SEELOGD AI",
         title: "“Ne izlesem?” sorusu bitti.",
         titleAccent: "“Ne izlesem?”",
         desc: "Tek soruya beş farklı cevap stili: öneri, karşılaştırma, izleme planı, liste ve künye — hepsi bir arada.",
@@ -119,7 +119,7 @@ const COPY = {
       },
     ],
     cta: {
-      eyebrow: "WATCHIFY'A HOŞ GELDİN",
+      eyebrow: "SEELOGD'A HOŞ GELDİN",
       title: "İzleme hikâyen şimdi başlıyor.",
       titleAccent: "şimdi",
       desc: "Ücretsiz hesabını oluştur; keşfetmeye, biriktirmeye ve paylaşmaya hemen başla.",
@@ -132,7 +132,7 @@ const COPY = {
     langEyebrow: "LET'S MAKE IT YOURS",
     langTitle: "Which language would you like to explore in?",
     langHint: "Experience titles, recommendations and the community in your language.",
-    langContinue: "Explore Watchify",
+    langContinue: "Explore Seelogd",
     skip: "Skip",
     next: "Continue",
     start: "Final Step",
@@ -157,7 +157,7 @@ const COPY = {
       {
         kind: "ai",
         icon: "sparkles-outline",
-        eyebrow: "WATCHIFY AI",
+        eyebrow: "SEELOGD AI",
         title: "Never wonder what to watch.",
         titleAccent: "what to watch",
         desc: "One question, five answer styles: picks, comparisons, watch plans, lists and spotlights — all at once.",
@@ -192,7 +192,7 @@ const COPY = {
       },
     ],
     cta: {
-      eyebrow: "WELCOME TO WATCHIFY",
+      eyebrow: "WELCOME TO SEELOGD",
       title: "Your watching story starts now.",
       titleAccent: "now",
       desc: "Create your free account and start discovering, collecting and sharing today.",
@@ -795,7 +795,7 @@ function PosterMarquee({ posters, paused }) {
   );
 }
 
-// ── Marka intro overlay'i: logo + "Watchify" adı animasyonlu belirir ─────────
+// ── Marka intro overlay'i: logo + "Seelogd" adı animasyonlu belirir ─────────
 function IntroOverlay({ theme, accent, isLightTheme, tagline, eyebrow, tapHint, onDone }) {
   const overlayOpacity = useRef(new Animated.Value(1)).current;
   const logoScale = useRef(new Animated.Value(0.55)).current;
@@ -1456,7 +1456,7 @@ function PosterFan({ posters, theme, accent }) {
       ))}
       <View style={[styles.posterFanBadge, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
         <Ionicons name="checkmark-circle" size={16} color={accent} />
-        <Text style={[styles.posterFanBadgeText, { color: theme.text.primary }]}>Watchify</Text>
+        <Text style={[styles.posterFanBadgeText, { color: theme.text.primary }]}>Seelogd</Text>
       </View>
     </View>
   );

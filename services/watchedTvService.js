@@ -5,9 +5,13 @@
 //     id, name, showEpisodeCount, showSeasonCount, imagePath, addedShowDate,
 //     genres[], type:"tv", listOrder, watchedSeasonCount, watchedEpisodeCount,
 //     totalMinutes,
+//     watchEvents:[{ id, watchedAt, scope, episodeKeys[], seasonNumbers[],
+//                    episodeCount, seasonCount, minutes, recordedAt }],
 //     seasons: [{ seasonNumber, seasonPosterPath, seasonEpisodes, addedSeasonDate,
 //                 episodes:[{ episodeNumber, episodePosterPath, episodeName,
 //                             episodeRatings, episodeMinutes, episodeWatchTime }] }]
+// watchEvents üst düzeyde TEK kez saklanır. Bölüm geçmişi episodeKeys üzerinden
+// türetilir; tam dizi tekrarında aynı olayı yüzlerce bölümün içine kopyalamayız.
 //
 // Sezonlar/bölümler doküman İÇİNE gömülüdür (ayrı alt-koleksiyon YOK): tek koleksiyon
 // listener'ı (ListStatusContext, ProfileStatsContext) tüm detayı verir → istatistik ve
@@ -28,6 +32,11 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import {
+  createWatchEventId,
+  materializeTvWatchState,
+  normalizeWatchDate,
+} from "../utils/watchHistory";
 
 // Doküman id şeması: `tv_${showId}` — TÜM liste öğesi koleksiyonlarıyla aynı
 // (`${type}_${id}`). favorites/watchList film+dizi karışık tuttuğu için type
@@ -50,6 +59,101 @@ function normalizeEpisode(ep, watchDate) {
   };
 }
 
+const episodeKey = (seasonNumber, episodeNumber) =>
+  `${Number(seasonNumber)}:${Number(episodeNumber)}`;
+
+function appendWatchEvent(data, showMeta, seasonTargets, watchDate, scope) {
+  const watchedAt = normalizeWatchDate(watchDate);
+  if (!watchedAt) return null;
+  const current = materializeTvWatchState({
+    ...(data || {}),
+    id: data?.id ?? showMeta?.id,
+  });
+  const event = {
+    id: createWatchEventId(`tv_${showMeta?.id}`),
+    watchedAt,
+    scope,
+    recordedAt: new Date().toISOString(),
+    episodeKeys: [],
+    seasonNumbers: [],
+  };
+  const seasons = current.seasons.map((season) => ({
+    ...season,
+    episodes: [...(season.episodes || [])],
+  }));
+
+  (seasonTargets || []).forEach(({ seasonMeta, episodes }) => {
+    const seasonNumber = Number(seasonMeta.seasonNumber);
+    let seasonIndex = seasons.findIndex(
+      (season) => Number(season.seasonNumber) === seasonNumber,
+    );
+    if (seasonIndex === -1) {
+      seasons.push({
+        seasonNumber,
+        seasonPosterPath: seasonMeta.seasonPosterPath || null,
+        seasonEpisodes: seasonMeta.seasonEpisodes || episodes.length,
+        addedSeasonDate: watchedAt,
+        episodes: [],
+      });
+      seasonIndex = seasons.length - 1;
+    }
+    const season = seasons[seasonIndex];
+    const byEpisode = new Map(
+      (season.episodes || []).map((episode) => [Number(episode.episodeNumber), episode]),
+    );
+    (episodes || []).forEach((rawEpisode) => {
+      if (rawEpisode?.episodeNumber == null) return;
+      const normalized = normalizeEpisode(rawEpisode, watchedAt);
+      const previous = byEpisode.get(Number(rawEpisode.episodeNumber));
+      const { watchEvents: _previousEvents, ...previousCompact } = previous || {};
+      byEpisode.set(Number(rawEpisode.episodeNumber), {
+        ...normalized,
+        ...previousCompact,
+        episodePosterPath:
+          previous?.episodePosterPath ?? normalized.episodePosterPath,
+        episodeName: previous?.episodeName || normalized.episodeName,
+        episodeRatings: previous?.episodeRatings || normalized.episodeRatings,
+        episodeMinutes: previous?.episodeMinutes || normalized.episodeMinutes,
+        episodeWatchTime: watchedAt,
+      });
+      event.episodeKeys.push(episodeKey(seasonNumber, rawEpisode.episodeNumber));
+    });
+    event.seasonNumbers.push(seasonNumber);
+    seasons[seasonIndex] = {
+      ...season,
+      seasonPosterPath: season.seasonPosterPath ?? seasonMeta.seasonPosterPath ?? null,
+      seasonEpisodes: season.seasonEpisodes || seasonMeta.seasonEpisodes || byEpisode.size,
+      addedSeasonDate: season.addedSeasonDate || watchedAt,
+      episodes: [...byEpisode.values()].sort(
+        (a, b) => Number(a.episodeNumber) - Number(b.episodeNumber),
+      ),
+    };
+  });
+
+  event.episodeKeys = [...new Set(event.episodeKeys)];
+  event.seasonNumbers = [...new Set(event.seasonNumbers)];
+  event.episodeCount = event.episodeKeys.length;
+  event.seasonCount = event.seasonNumbers.length;
+  event.minutes = seasons.reduce(
+    (total, season) => total + (season.episodes || []).reduce((sum, episode) =>
+      event.episodeKeys.includes(episodeKey(season.seasonNumber, episode.episodeNumber))
+        ? sum + (Number(episode.episodeMinutes) || 0)
+        : sum,
+    0),
+    0,
+  );
+  seasons.sort((a, b) => Number(a.seasonNumber) - Number(b.seasonNumber));
+  const compactSeasons = seasons.map((season) => ({
+    ...season,
+    episodes: (season.episodes || []).map(({ watchEvents: _events, ...episode }) => episode),
+  }));
+  return {
+    event,
+    seasons: compactSeasons,
+    watchEvents: [...current.watchEvents, event],
+  };
+}
+
 function recomputeAggregates(seasons) {
   let watchedEpisodeCount = 0;
   let totalMinutes = 0;
@@ -63,6 +167,21 @@ function recomputeAggregates(seasons) {
     watchedEpisodeCount,
     totalMinutes,
   };
+}
+
+function mergeWatchEvents(...groups) {
+  const byId = new Map();
+  groups.flat().filter(Boolean).forEach((event) => {
+    if (!event?.id) return;
+    const previous = byId.get(event.id) || {};
+    byId.set(event.id, {
+      ...previous,
+      ...event,
+      episodeKeys: [...new Set([...(previous.episodeKeys || []), ...(event.episodeKeys || [])])],
+      seasonNumbers: [...new Set([...(previous.seasonNumbers || []), ...(event.seasonNumbers || [])])],
+    });
+  });
+  return [...byId.values()];
 }
 
 // İki sezon dizisini BİRLEŞTİRİR (seasonNumber'a göre; bölümler episodeNumber
@@ -81,6 +200,19 @@ function mergeSeasons(a, b) {
       if (!epNums.has(e.episodeNumber)) {
         existing.episodes.push(e);
         epNums.add(e.episodeNumber);
+      } else {
+        const episodeIndex = existing.episodes.findIndex(
+          (episode) => episode.episodeNumber === e.episodeNumber,
+        );
+        const previousEpisode = existing.episodes[episodeIndex];
+        existing.episodes[episodeIndex] = {
+          ...e,
+          ...previousEpisode,
+          watchEvents: mergeWatchEvents(
+            previousEpisode?.watchEvents || [],
+            e?.watchEvents || [],
+          ),
+        };
       }
     });
     existing.seasonPosterPath =
@@ -121,11 +253,33 @@ export function dedupeWatchedTvEntries(entries) {
     }
     const epCount = (x) =>
       (x.seasons || []).reduce((a, s) => a + (s.episodes?.length || 0), 0);
-    if ((isTv && !prev._isTv) || (isTv === prev._isTv && epCount(cur) > epCount(prev))) {
-      byId.set(key, cur);
+    const kazanan = (isTv && !prev._isTv) || (isTv === prev._isTv && epCount(cur) > epCount(prev))
+      ? cur : prev;
+    const kaybeden = kazanan === cur ? prev : cur;
+    // Kazananı OLDUĞU GİBİ almak metadata kaybettiriyordu: göç sırasında
+    // üretilen `tv_` dokümanı yalnızca sezon/bölüm taşıyabiliyor (name, genres,
+    // imagePath, showEpisodeCount boş). Kazanan `tv_` olduğu için dizi adsız,
+    // türsüz ve "showEpisodeCount: 0" kalıyor — yani hem listede isimsiz
+    // görünüyor hem de tür puanına ve dizi bitirme bonusuna hiç giremiyor.
+    // Bölümler kazanandan gelir, EKSİK üst düzey alanlar diğerinden doldurulur.
+    const birlesik = { ...kazanan };
+    for (const alan of ["name", "imagePath", "genres", "showEpisodeCount", "showSeasonCount", "addedShowDate", "dateAdded", "listOrder"]) {
+      const bos = birlesik[alan] == null
+        || birlesik[alan] === ""
+        || birlesik[alan] === 0
+        || (Array.isArray(birlesik[alan]) && birlesik[alan].length === 0);
+      if (bos && kaybeden[alan] != null) birlesik[alan] = kaybeden[alan];
     }
+    birlesik.watchEvents = mergeWatchEvents(
+      kazanan.watchEvents || [],
+      kaybeden.watchEvents || [],
+    );
+    byId.set(key, birlesik);
   });
-  return [...byId.values()].map(({ _isTv, ...s }) => s);
+  // `id` her zaman BARE (öneksiz) ve STRING döner: tüketiciler bunu Set
+  // karşılaştırmasında ve keyExtractor'da kullanıyor, tip kayması iki kaydı
+  // yeniden ayrıştırırdı.
+  return [...byId.values()].map(({ _isTv, ...s }) => ({ ...s, id: String(s.id) }));
 }
 
 function buildShowMeta(showMeta, watchDate) {
@@ -146,54 +300,47 @@ function buildShowMeta(showMeta, watchDate) {
  * showMeta: { id, name, showEpisodeCount, showSeasonCount, imagePath, genres }
  * seasonMeta: { seasonNumber, seasonPosterPath, seasonEpisodes }
  */
-export async function markEpisodes(uid, showMeta, seasonMeta, episodes, watchDate) {
+export async function markEpisodes(
+  uid,
+  showMeta,
+  seasonMeta,
+  episodes,
+  watchDate,
+  options = {},
+) {
   if (!uid || showMeta?.id == null || seasonMeta?.seasonNumber == null) return;
   if (!Array.isArray(episodes) || episodes.length === 0) return;
   const ref = showRef(uid, showMeta.id);
-  const newEps = episodes.map((e) => normalizeEpisode(e, watchDate));
+  let createdEvent = null;
 
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     const data = snap.exists() ? snap.data() : null;
-    let seasons = data?.seasons ? [...data.seasons] : [];
-
-    const idx = seasons.findIndex((s) => s.seasonNumber === seasonMeta.seasonNumber);
-    const existing = idx !== -1 ? seasons[idx].episodes || [] : [];
-    const existingNums = new Set(existing.map((e) => e.episodeNumber));
-    const toAdd = newEps.filter((e) => !existingNums.has(e.episodeNumber));
-
-    if (toAdd.length === 0 && snap.exists()) return; // değişiklik yok
-
-    const mergedEps = [...existing, ...toAdd].sort(
-      (a, b) => a.episodeNumber - b.episodeNumber,
+    const result = appendWatchEvent(
+      data,
+      showMeta,
+      [{ seasonMeta, episodes }],
+      watchDate,
+      options.scope || "episode",
     );
-    const seasonObj = {
-      seasonNumber: seasonMeta.seasonNumber,
-      seasonPosterPath:
-        idx !== -1
-          ? seasons[idx].seasonPosterPath ?? seasonMeta.seasonPosterPath ?? null
-          : seasonMeta.seasonPosterPath || null,
-      seasonEpisodes: seasonMeta.seasonEpisodes || mergedEps.length,
-      addedSeasonDate:
-        idx !== -1 ? seasons[idx].addedSeasonDate || watchDate || null : watchDate || null,
-      episodes: mergedEps,
-    };
-
-    if (idx !== -1) seasons[idx] = seasonObj;
-    else seasons.push(seasonObj);
-    seasons.sort((a, b) => a.seasonNumber - b.seasonNumber);
+    if (!result) return;
+    createdEvent = result.event;
 
     tx.set(
       ref,
       {
         ...(snap.exists() ? {} : buildShowMeta(showMeta, watchDate)),
         ...(snap.exists() && !data.name ? { name: showMeta.name || "" } : {}),
-        seasons,
-        ...recomputeAggregates(seasons),
+        seasons: result.seasons,
+        watchEvents: result.watchEvents,
+        watchCount: result.watchEvents.length,
+        addedShowDate: data?.addedShowDate || normalizeWatchDate(watchDate),
+        ...recomputeAggregates(result.seasons),
       },
       { merge: true },
     );
   });
+  return createdEvent;
 }
 
 /** Tek bir bölümün işaretini kaldırır (boş sezon→çıkar, son bölüm→show'u sil). */
@@ -235,7 +382,9 @@ export async function unmarkEpisode(uid, showId, seasonNumber, episodeNumber) {
 
 /** Bir sezonun tüm bölümlerini işaretler (markEpisodes wrapper'ı). */
 export async function markSeason(uid, showMeta, seasonMeta, episodes, watchDate) {
-  return markEpisodes(uid, showMeta, seasonMeta, episodes, watchDate);
+  return markEpisodes(uid, showMeta, seasonMeta, episodes, watchDate, {
+    scope: "season",
+  });
 }
 
 /** Bir sezonun işaretini komple kaldırır. */
@@ -267,32 +416,74 @@ export async function unmarkSeason(uid, showId, seasonNumber) {
  */
 export async function markShow(uid, showMeta, seasonsWithEpisodes, watchDate) {
   if (!uid || showMeta?.id == null || !Array.isArray(seasonsWithEpisodes)) return;
-  const seasons = [];
-  for (const sea of seasonsWithEpisodes) {
-    if (sea?.seasonNumber == null) continue;
-    const eps = (sea.episodes || []).map((e) => normalizeEpisode(e, watchDate));
-    if (eps.length === 0) continue;
-    seasons.push({
-      seasonNumber: sea.seasonNumber,
-      seasonPosterPath: sea.seasonPosterPath || null,
-      seasonEpisodes: sea.seasonEpisodes || eps.length,
-      addedSeasonDate: watchDate || null,
-      episodes: eps.sort((a, b) => a.episodeNumber - b.episodeNumber),
-    });
-  }
-  if (seasons.length === 0) return;
-  seasons.sort((a, b) => a.seasonNumber - b.seasonNumber);
+  const targets = seasonsWithEpisodes
+    .filter((season) => season?.seasonNumber != null && (season.episodes || []).length)
+    .map((season) => ({ seasonMeta: season, episodes: season.episodes }));
+  if (!targets.length) return null;
+  const ref = showRef(uid, showMeta.id);
+  let createdEvent = null;
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.exists() ? snap.data() : null;
+    const result = appendWatchEvent(data, showMeta, targets, watchDate, "show");
+    if (!result) return;
+    createdEvent = result.event;
+    tx.set(ref, {
+      ...(snap.exists() ? {} : buildShowMeta(showMeta, watchDate)),
+      ...(snap.exists() && !data.name ? { name: showMeta.name || "" } : {}),
+      seasons: result.seasons,
+      watchEvents: result.watchEvents,
+      watchCount: result.watchEvents.length,
+      addedShowDate: data?.addedShowDate || normalizeWatchDate(watchDate),
+      ...recomputeAggregates(result.seasons),
+    }, { merge: true });
+  });
+  return createdEvent;
+}
 
-  await setDoc(
-    showRef(uid, showMeta.id),
-    {
-      ...buildShowMeta(showMeta, watchDate),
+/**
+ * Tek bir izleme olayını dizi, sezon ve bölüm geçmişinden birlikte kaldırır.
+ * Tam dizi olayı bölüm ekranından silinse dahi aynı occurrence'ın bütün
+ * bölümleri birlikte kaldırılır; böylece istatistiklerde yarım olay kalmaz.
+ */
+export async function removeTvWatchEvent(uid, showId, eventId) {
+  if (!uid || showId == null || !eventId) return;
+  const ref = showRef(uid, showId);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) return;
+    const data = snap.data() || {};
+    const current = materializeTvWatchState({ ...data, id: data.id ?? showId });
+    const seasons = current.seasons
+      .map((season) => ({
+        ...season,
+        episodes: (season.episodes || [])
+          .map((episode) => {
+            const watchEvents = (episode.watchEvents || []).filter(
+              (event) => event.id !== eventId,
+            );
+            if (!watchEvents.length) return null;
+            const latest = watchEvents
+              .slice()
+              .sort((a, b) => String(b.watchedAt).localeCompare(String(a.watchedAt)))[0];
+            const { watchEvents: _storedEvents, ...compactEpisode } = episode;
+            return { ...compactEpisode, episodeWatchTime: latest.watchedAt };
+          })
+          .filter(Boolean),
+      }))
+      .filter((season) => season.episodes.length);
+    const watchEvents = current.watchEvents.filter((event) => event.id !== eventId);
+    if (!seasons.length || !watchEvents.length) {
+      tx.delete(ref);
+      return;
+    }
+    tx.update(ref, {
       seasons,
+      watchEvents,
+      watchCount: watchEvents.length,
       ...recomputeAggregates(seasons),
-    },
-    // Manuel liste sırası gibi show metadata alanlarını tam işaretlemede koru.
-    { merge: true },
-  );
+    });
+  });
 }
 
 /** Dizinin tüm izlenme kaydını siler. */
@@ -364,6 +555,10 @@ export async function migrateWatchedTvDocIds(uid, pendingRekey) {
             ...data, // bare metadata (eksik alanlar için)
             ...existing, // tv_ metadata öncelikli (daha güncel)
             seasons,
+            watchEvents: mergeWatchEvents(
+              existing.watchEvents || [],
+              data?.watchEvents || [],
+            ),
             ...recomputeAggregates(seasons),
           },
           { merge: true },

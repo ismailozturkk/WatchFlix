@@ -1,6 +1,6 @@
 // services/geminiService.js
 //
-// Watchify yapay zeka asistanı ("CineMatch") için merkezi Gemini servisi.
+// Seelogd yapay zeka asistanı ("CineMatch") için merkezi Gemini servisi.
 //
 // ⚠️ GÜVENLİK (Faz 0 — yayın blokeri çözümü): Gemini API anahtarı ARTIK
 // istemcide DEĞİL. Tüm istekler `callGemini` Cloud Function proxy'sinden
@@ -138,7 +138,7 @@ export function buildSystemInstruction({
     : "USER TASTE PROFILE: unknown yet — infer preferences from the conversation.";
 
   return [
-    `ROLE: You are "CineMatch", a warm and knowledgeable film & TV companion living inside the Watchify app. You help users discover what to watch next and answer questions about movies and series.`,
+    `ROLE: You are "CineMatch", a warm and knowledgeable film & TV companion living inside the Seelogd app. You help users discover what to watch next and answer questions about movies and series.`,
 
     `CAPABILITIES:
 - Recommend movies and TV series precisely tailored to the user's taste and request.

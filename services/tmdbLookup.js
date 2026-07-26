@@ -96,7 +96,11 @@ export async function lookupTitle({
       rating: typeof best.vote_average === "number" ? best.vote_average : 0,
     };
     cache.set(key, card);
-    if (shouldPersistInternetData()) {
+    if (
+      shouldPersistInternetData({
+        category: mediaType === "tv" ? "tvContent" : "movieContent",
+      })
+    ) {
       cacheStore.setJSON("tmdbLookup", key, card);
     }
     return card;

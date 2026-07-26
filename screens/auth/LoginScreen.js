@@ -18,8 +18,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import LottieView from "lottie-react-native";
-import * as Haptics from "expo-haptics";
-import { useSnow } from "../../context/SnowContext";
+import * as Haptics from "@services/hapticsService";
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -29,7 +28,7 @@ import Toast from "react-native-toast-message";
 import { useLanguage } from "../../context/LanguageContext";
 import Checkbox from "expo-checkbox";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import IconBacground from "../../components/IconBacground";
+import ScreenDecor from "../../components/ScreenDecor";
 import EmailSuffixRow from "../../components/auth/EmailSuffixRow";
 import { alpha } from "../../theme/colors";
 import {
@@ -50,7 +49,6 @@ const CHIP_W = Math.min(SCREEN_W - 68, 400);
 
 export default function LoginScreen({ navigation }) {
   const { theme, selectedTheme } = useTheme();
-  const { showSnow } = useSnow();
   const { t, language, toggleLanguage } = useLanguage();
   const insets = useSafeAreaInsets();
   const accent = theme.accent;
@@ -211,18 +209,9 @@ export default function LoginScreen({ navigation }) {
         translucent
         backgroundColor="transparent"
       />
-      <IconBacground opacity={isLightTheme ? 0.05 : 0.08} />
+      <ScreenDecor iconOpacity={isLightTheme ? 0.05 : 0.08} />
 
       {/* Snow */}
-      {showSnow && (
-        <LottieView
-          style={styles.lottie}
-          source={require("@lottie/snow.json")}
-          autoPlay
-          loop
-          pointerEvents="none"
-        />
-      )}
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -379,6 +368,7 @@ export default function LoginScreen({ navigation }) {
                 onSubmitEditing={() => passwordRef.current?.focus()}
                 onChangeText={setEmail}
                 value={email}
+                maxLength={254}
                 onFocus={() => setEmailFocused(true)}
                 onBlur={() => setEmailFocused(false)}
               />
@@ -423,6 +413,7 @@ export default function LoginScreen({ navigation }) {
                 }}
                 onChangeText={setPassword}
                 value={password}
+                maxLength={128}
                 onFocus={() => setPasswordFocused(true)}
                 onBlur={() => setPasswordFocused(false)}
               />
@@ -588,14 +579,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 22,
     gap: 18,
-  },
-  lottie: {
-    position: "absolute",
-    height: 1000,
-    top: 0,
-    left: -60,
-    right: -60,
-    zIndex: 0,
   },
   languageButton: {
     position: "absolute",

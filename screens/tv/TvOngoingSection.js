@@ -120,7 +120,7 @@ const OngoingCard = ({
           <View style={styles.completedBadge}>
             <Ionicons name="checkmark-circle" size={10} color="#fff" />
             <Text allowFontScaling={false} style={styles.completedText}>
-              Bitti
+              {i18nText("tvStatusEnd", "Bitti")}
             </Text>
           </View>
         )}
@@ -202,7 +202,7 @@ export default function TvOngoingSection({ navigation }) {
           allowFontScaling={false}
           style={[styles.title, { color: theme.text.secondary }]}
         >
-          Devam Eden Dizilerim
+          {i18nText("autoI18n.devam_eden_dizilerim", "Devam Eden Dizilerim")}
         </Text>
         <TouchableOpacity
           style={[styles.seeAll, { backgroundColor: theme.secondary }]}

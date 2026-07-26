@@ -18,7 +18,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import LottieView from "lottie-react-native";
 import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "@services/hapticsService";
 import BackButton from "@components/BackButton";
 import AppIcon from "@components/AppIcon";
 import { toast } from "@components/AppToast";

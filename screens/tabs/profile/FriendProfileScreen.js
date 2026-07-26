@@ -45,7 +45,7 @@ import {
   isOnlineVisible,
   formatLastSeen,
 } from "../../../services/presenceService";
-import IconBacground from "../../../components/IconBacground";
+import ScreenDecor from "../../../components/ScreenDecor";
 import BackButton from "../../../components/BackButton";
 import { i18nText } from "../../../utils/i18nText";
 
@@ -558,7 +558,7 @@ export default function FriendProfileScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-      <IconBacground opacity={0.3} />
+      <ScreenDecor iconOpacity={0.3} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* ── Üst bilgi kartı ──────────────────────────────────────────────── */}
@@ -760,7 +760,7 @@ export default function FriendProfileScreen({ route, navigation }) {
                     </View>
                     <View style={[styles.watchMinuteBadge, { backgroundColor: theme.primary ?? "#111", borderColor: theme.border ?? "rgba(255,255,255,0.08)" }]}>
                       <Text allowFontScaling={false} numberOfLines={1} style={[styles.watchMinuteBadgeText, { color: theme.text?.secondary ?? "#aaa" }]}>
-                        {stats.totalMinutes.toLocaleString(language === "tr" ? "tr-TR" : "en-US")} dk
+                        {stats.totalMinutes.toLocaleString(language === "tr" ? "tr-TR" : "en-US")} {i18nText("autoI18n.dakika", "dk")}
                       </Text>
                     </View>
                   </View>

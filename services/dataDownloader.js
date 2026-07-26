@@ -5,8 +5,13 @@
 // expo-image disk cache'ine indirir. Böylece internet yokken/azken bu veriler
 // ve görseller hazır olur.
 //
-// Kapsam: profil + listeler + notlar + hatırlatıcılar + feed + ana TMDB
-// film/dizi bölümleri + posterler.
+// Kapsam (her biri ayrı bir veri türü — Ayarlar > Genel'den seçilir):
+//   profil · listeler · notlar · hatırlatıcılar · gönderiler · etkinlikler ·
+//   film içerikleri · dizi içerikleri · görseller (posterler)
+//
+// KAPI: Ana "Verileri indir" anahtarı kapalıysa bu fonksiyon hiçbir şey
+// indirmez (blocked: "disabled" döner). Açıkken yalnızca seçili türler işlenir;
+// "Görseller" kapalıysa poster prefetch hiç çalışmaz.
 //
 // NOT: Koleksiyon yolları mevcut context'lerden doğrulandı:
 //   Users/{uid}                       (UserProfileContext)
@@ -22,7 +27,13 @@ import * as cacheStore from "../utils/cacheStore";
 import { prefetchImages } from "./imagePrefetch";
 import { buildTmdbUrl } from "../utils/tmdbImageUtils";
 import { cacheKeys } from "../utils/cacheKeys";
+import { i18nText } from "../utils/i18nText";
 import { setCachedValue } from "../utils/apiCache";
+import {
+  getAutoDataCacheEnabled,
+  getDataTypes,
+  normalizeDataTypes,
+} from "../utils/dataCacheSettings";
 import * as PostsApi from "./postsService";
 
 // Cache anahtarları tek kaynaktan (context read-through ile AYNI).
@@ -149,27 +160,57 @@ async function cacheArrayTmdb(cacheKey, path, params, posterPaths, picker = (dat
 }
 
 /**
- * Tüm kişisel veriyi indir/cache'le.
+ * Seçili veri türlerini indir/cache'le.
+ *
+ * Ana anahtar ("Verileri indir" ayarı) kapalıysa HİÇBİR ŞEY indirilmez —
+ * poster prefetch dahil. Açıkken yalnız seçili türler işlenir.
+ *
  * @param {object} [opts]
+ * @param {string} [opts.language] 'tr' | 'en'
+ * @param {Record<string, boolean>} [opts.types] Tür seçimi; verilmezse kayıtlı ayar
  * @param {(percent:number, label:string)=>void} [opts.onProgress] percent: 0..1
- * @returns {Promise<{ok:boolean, cachedDocs:number, prefetchedImages:number, errors:string[]}>}
+ * @returns {Promise<{ok:boolean, blocked?:string, cachedDocs:number, prefetchedImages:number, skipped:string[], errors:string[]}>}
  */
-export async function downloadAllData({ language = "tr", onProgress } = {}) {
+export async function downloadAllData({ language = "tr", types, onProgress } = {}) {
   const uid = auth.currentUser?.uid;
   const errors = [];
+  const skipped = [];
   let cachedDocs = 0;
   const posterPaths = new Set();
   const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
   const tmdbRegion = language === "tr" ? "TR" : "US";
 
-  if (!uid) {
-    return { ok: false, cachedDocs: 0, prefetchedImages: 0, errors: ["no-user"] };
+  // Ana anahtar kapalıysa indirme yok (ekran da butonu kilitler; bu ikinci hat).
+  if (!getAutoDataCacheEnabled()) {
+    return {
+      ok: false,
+      blocked: "disabled",
+      cachedDocs: 0,
+      prefetchedImages: 0,
+      skipped: [],
+      errors: ["disabled"],
+    };
   }
 
-  // Ağırlıklı adımlar (son %25 görsel prefetch'e ayrılır).
+  const selected = normalizeDataTypes(types ?? getDataTypes());
+  const isOn = (category) => selected[category] !== false;
+
+  if (!uid) {
+    return {
+      ok: false,
+      blocked: "no-user",
+      cachedDocs: 0,
+      prefetchedImages: 0,
+      skipped: [],
+      errors: ["no-user"],
+    };
+  }
+
+  // Adımlar — `category` alanı Ayarlar'daki tür seçimiyle eşleşir.
   const steps = [
     {
-      label: "Profil",
+      category: "profile",
+      label: i18nText("profile", "Profil"),
       run: async () => {
         const snap = await getDoc(doc(db, "Users", uid));
         // Şekil UserProfileContext ile aynı: { uid, ...userDoc }
@@ -180,7 +221,8 @@ export async function downloadAllData({ language = "tr", onProgress } = {}) {
       },
     },
     {
-      label: "Listeler",
+      category: "lists",
+      label: i18nText("autoI18n.listeler", "Listeler"),
       run: async () => {
         // kök döküman
         const rootSnap = await getDoc(doc(db, "Lists", uid));
@@ -216,7 +258,8 @@ export async function downloadAllData({ language = "tr", onProgress } = {}) {
       },
     },
     {
-      label: "Notlar",
+      category: "notes",
+      label: i18nText("autoI18n.notlar", "Notlar"),
       run: async () => {
         const snap = await getDocs(collection(db, "Notes", uid, "items"));
         // Şekil ProfileNotesContext ile ayni: dizi, createdAt azalan.
@@ -228,7 +271,8 @@ export async function downloadAllData({ language = "tr", onProgress } = {}) {
       },
     },
     {
-      label: "Hatırlatıcılar",
+      category: "reminders",
+      label: i18nText("autoI18n.hatirlaticilar", "Hatırlatıcılar"),
       run: async () => {
         // movies → dizi (ProfileRemindersContext.movieReminders ile aynı)
         const moviesSnap = await getDocs(collection(db, "Reminders", uid, "movies"));
@@ -254,7 +298,8 @@ export async function downloadAllData({ language = "tr", onProgress } = {}) {
       },
     },
     {
-      label: "Gönderiler",
+      category: "posts",
+      label: i18nText("autoI18n.gonderiler", "Gönderiler"),
       run: async () => {
         const { posts } = await PostsApi.fetchFeed({ filter: "all" });
         await AsyncStorage.setItem(FEED_CACHE_KEY, JSON.stringify(posts));
@@ -263,7 +308,8 @@ export async function downloadAllData({ language = "tr", onProgress } = {}) {
       },
     },
     {
-      label: "Etkinlikler",
+      category: "activity",
+      label: i18nText("autoI18n.etkinlikler", "Etkinlikler"),
       run: async () => {
         // Etkinliklerim hub'ı (MyActivityScreen) bu cache'i okur.
         const toArr = (snap) =>
@@ -296,7 +342,8 @@ export async function downloadAllData({ language = "tr", onProgress } = {}) {
       },
     },
     {
-      label: "Film/Dizi içerikleri",
+      category: "movieContent",
+      label: i18nText("autoI18n.film_icerikleri", "Film içerikleri"),
       run: async () => {
         let count = 0;
         const shortLang = language === "tr" ? "tr-TR" : "en-US";
@@ -320,18 +367,6 @@ export async function downloadAllData({ language = "tr", onProgress } = {}) {
           count += await cacheArrayTmdb(
             `movie_trends_${shortLang}_${window}_trending`,
             `trending/movie/${window}`,
-            {
-              include_adult: "false",
-              include_null_first_air_dates: "false",
-              language: shortLang,
-              page: "1",
-            },
-            posterPaths,
-            (data) => [{ id: "left-spacer" }, ...(data.results || []), { id: "right-spacer" }],
-          );
-          count += await cacheArrayTmdb(
-            `tv_trends_${shortLang}_${window}_trending`,
-            `trending/tv/${window}`,
             {
               include_adult: "false",
               include_null_first_air_dates: "false",
@@ -370,12 +405,6 @@ export async function downloadAllData({ language = "tr", onProgress } = {}) {
           posterPaths,
         );
         count += await cacheArrayTmdb(
-          `tv_providers_${tmdbLanguage}_${tmdbRegion}`,
-          "watch/providers/tv",
-          { language: tmdbLanguage, watch_region: tmdbRegion },
-          posterPaths,
-        );
-        count += await cacheArrayTmdb(
           `movie_now_playing_${tmdbLanguage}_${tmdbRegion}`,
           "movie/now_playing",
           { language: tmdbLanguage, region: tmdbRegion },
@@ -395,6 +424,31 @@ export async function downloadAllData({ language = "tr", onProgress } = {}) {
           posterPaths,
         );
 
+        cachedDocs += count;
+      },
+    },
+    {
+      category: "tvContent",
+      label: i18nText("autoI18n.dizi_icerikleri", "Dizi içerikleri"),
+      run: async () => {
+        let count = 0;
+        const shortLang = language === "tr" ? "tr-TR" : "en-US";
+
+        for (const window of ["week", "day"]) {
+          count += await cacheArrayTmdb(
+            `tv_trends_${shortLang}_${window}_trending`,
+            `trending/tv/${window}`,
+            {
+              include_adult: "false",
+              include_null_first_air_dates: "false",
+              language: shortLang,
+              page: "1",
+            },
+            posterPaths,
+            (data) => [{ id: "left-spacer" }, ...(data.results || []), { id: "right-spacer" }],
+          );
+        }
+
         for (const sort of ["vote_count", "popularity"]) {
           count += await cachePagedTmdb(
             `tv_bests_${shortLang}_discover_${sort}_page_1`,
@@ -410,6 +464,12 @@ export async function downloadAllData({ language = "tr", onProgress } = {}) {
             posterPaths,
           );
         }
+        count += await cacheArrayTmdb(
+          `tv_providers_${tmdbLanguage}_${tmdbRegion}`,
+          "watch/providers/tv",
+          { language: tmdbLanguage, watch_region: tmdbRegion },
+          posterPaths,
+        );
         count += await cachePagedTmdb(
           `tv_airing_today_${tmdbLanguage}_${tmdbRegion}_page_1`,
           "tv/airing_today",
@@ -455,35 +515,63 @@ export async function downloadAllData({ language = "tr", onProgress } = {}) {
     },
   ];
 
-  const dataWeight = 0.85; // veri adımları toplamı
-  for (let i = 0; i < steps.length; i++) {
-    const step = steps[i];
-    onProgress?.((i / steps.length) * dataWeight, step.label);
+  // Kapalı türler hiç çalıştırılmaz; ilerleme yalnız açık adımlara bölünür ki
+  // yüzde atlamasın. Görseller kapalıysa veri adımları %100'ü paylaşır.
+  steps.filter((s) => !isOn(s.category)).forEach((s) => skipped.push(s.category));
+  const activeSteps = steps.filter((s) => isOn(s.category));
+  const withImages = isOn("images");
+  if (!withImages) skipped.push("images");
+
+  if (activeSteps.length === 0 && !withImages) {
+    return {
+      ok: false,
+      blocked: "no-types",
+      cachedDocs: 0,
+      prefetchedImages: 0,
+      skipped,
+      errors: ["no-types"],
+    };
+  }
+
+  const dataWeight = withImages ? 0.85 : 1; // veri adımları toplamı
+
+  for (let i = 0; i < activeSteps.length; i++) {
+    const step = activeSteps[i];
+    onProgress?.((i / activeSteps.length) * dataWeight, step.label);
     try {
       await step.run();
     } catch (e) {
-      errors.push(`${step.label}: ${e?.message || "hata"}`);
+      errors.push(`${step.label}: ${e?.message || i18nText("autoI18n.hata", "Hata")}`);
     }
   }
-  onProgress?.(dataWeight, "Görseller");
-
-  // Posterleri prefetch et (kalan %25).
-  const urls = [...posterPaths]
-    .map((p) => buildTmdbUrl(p, "poster", 342, "good"))
-    .filter(Boolean);
 
   let prefetchedImages = 0;
-  try {
-    prefetchedImages = await prefetchImages(urls, {
-      onProgress: (done, total) => {
-        const frac = total ? done / total : 1;
-        onProgress?.(dataWeight + frac * (1 - dataWeight), "Görseller");
-      },
-    });
-  } catch (e) {
-    errors.push(`Görseller: ${e?.message || "hata"}`);
+  if (withImages) {
+    onProgress?.(dataWeight, i18nText("autoI18n.gorseller", "Görseller"));
+
+    // Posterleri prefetch et (kalan %15).
+    const urls = [...posterPaths]
+      .map((p) => buildTmdbUrl(p, "poster", 342, "good"))
+      .filter(Boolean);
+
+    try {
+      prefetchedImages = await prefetchImages(urls, {
+        onProgress: (done, total) => {
+          const frac = total ? done / total : 1;
+          onProgress?.(dataWeight + frac * (1 - dataWeight), i18nText("autoI18n.gorseller", "Görseller"));
+        },
+      });
+    } catch (e) {
+      errors.push(`${i18nText("autoI18n.gorseller", "Görseller")}: ${e?.message || i18nText("autoI18n.hata", "Hata")}`);
+    }
   }
 
   onProgress?.(1, "Tamam");
-  return { ok: errors.length === 0, cachedDocs, prefetchedImages, errors };
+  return {
+    ok: errors.length === 0,
+    cachedDocs,
+    prefetchedImages,
+    skipped,
+    errors,
+  };
 }

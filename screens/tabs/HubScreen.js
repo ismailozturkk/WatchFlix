@@ -28,8 +28,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
-import IconBacground from "@components/IconBacground";
-import ScreenSnow from "@components/ScreenSnow";
+import ScreenDecor from "@components/ScreenDecor";
 import ProfileGamesModule from "@components/profile/ProfileGamesModule";
 import TournamentWidget from "@components/hub/TournamentWidget";
 import { useTheme } from "@context/ThemeContext";
@@ -214,8 +213,8 @@ export default function HubScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
-      {/* Arka plan ikonları — içeriğin ARKASINDA, tüm ekranı kaplar */}
-      <IconBacground opacity={0.15} />
+      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
+      <ScreenDecor iconOpacity={0.15} />
       <SafeAreaView edges={["top"]} style={styles.container}>
         <ScrollView
           contentContainerStyle={styles.scroll}
@@ -270,8 +269,6 @@ export default function HubScreen({ navigation }) {
         <ProfileGamesModule navigation={navigation} />
         </ScrollView>
       </SafeAreaView>
-      {/* Kar efekti — içeriğin ÜSTÜnde katman (optimize, sabit overlay) */}
-      <ScreenSnow />
     </View>
   );
 }

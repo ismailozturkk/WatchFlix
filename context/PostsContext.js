@@ -24,6 +24,7 @@ import * as PostsApi from "../services/postsService";
 import { useAuth } from "./AuthContext";
 import { i18nText } from "../utils/i18nText";
 import { shouldPersistInternetData } from "../utils/dataCacheSettings";
+import { POST_TYPES } from "../utils/postComposer";
 import useStartupGate from "../hooks/useStartupGate";
 
 
@@ -31,7 +32,9 @@ const PostsContext = createContext();
 export const usePosts = () => useContext(PostsContext);
 
 const FEED_CACHE_KEY = "feed_cache_v1";
-const FILTERS = ["all", "review", "list", "following"];
+// Tip filtreleri composer'ın desteklediği paylaşım tiplerinden türetilir —
+// yeni bir tip eklendiğinde feed filtresi de kendiliğinden gelir.
+const FILTERS = ["all", ...POST_TYPES, "following"];
 const SORTS = ["recent", "likes", "comments"];
 
 const sortLoadedPosts = (posts, sort) => {
@@ -115,7 +118,7 @@ export function PostsProvider({ children }) {
         setPosts((prev) => (sameIds(prev, fresh) ? prev : fresh));
         lastDocRef.current = lastDoc;
         setHasMore(fresh.length > 0);
-        if (shouldPersistInternetData()) {
+        if (shouldPersistInternetData({ category: "posts" })) {
           AsyncStorage.setItem(FEED_CACHE_KEY, JSON.stringify(fresh)).catch(
             () => {},
           );
@@ -155,7 +158,7 @@ export function PostsProvider({ children }) {
         const extra = prev.slice(15);
         return [...live, ...extra];
       });
-      if (shouldPersistInternetData()) {
+      if (shouldPersistInternetData({ category: "posts" })) {
         AsyncStorage.setItem(FEED_CACHE_KEY, JSON.stringify(live)).catch(
           () => {},
         );
@@ -260,7 +263,7 @@ export function PostsProvider({ children }) {
         setPosts(p);
         lastDocRef.current = lastDoc;
         setHasMore(p.length > 0);
-        if (filter === "all" && sort === "recent" && shouldPersistInternetData()) {
+        if (filter === "all" && sort === "recent" && shouldPersistInternetData({ category: "posts" })) {
           AsyncStorage.setItem(FEED_CACHE_KEY, JSON.stringify(p)).catch(
             () => {},
           );

@@ -4,6 +4,7 @@ import axios from "axios";
 import { Image } from "expo-image";
 import PosterImage from "./PosterImage";
 import ListBadges from "./ListBadges";
+import { RatingBadge, POSTER_BADGE_POS } from "./PosterInfoBadges";
 import PaginatedRail from "./PaginatedRail";
 import SeeAllHeader from "./SeeAllHeader";
 import { MovieSkeleton } from "./Skeleton";
@@ -89,11 +90,11 @@ const DiscoveryCard = memo(function DiscoveryCard({
           transition={120}
         />
         {posterBadges?.tmdbRating !== false && Number(item.vote_average) > 0 && (
-          <View style={[styles.rating, { backgroundColor: theme.secondaryt }]}>
-            <Text allowFontScaling={false} style={styles.ratingText}>
-              {Number(item.vote_average).toFixed(1)}
-            </Text>
-          </View>
+          <RatingBadge
+            value={item.vote_average}
+            votes={item.vote_count}
+            style={POSTER_BADGE_POS.bottomRight}
+          />
         )}
         <ListBadges
           mediaId={item.id}

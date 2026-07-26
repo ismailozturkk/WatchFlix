@@ -184,7 +184,7 @@ function MovieCard({
                 allowFontScaling={false}
                 style={[styles.infoText, { color: theme.text.muted }]}
               >
-                {reminder.movieMinutes} dk
+                {reminder.movieMinutes} {i18nText("autoI18n.dakika", "dk")}
               </Text>
             </View>
           )}
@@ -339,7 +339,7 @@ function EpisodeCard({
                 allowFontScaling={false}
                 style={[styles.infoText, { color: theme.text.muted }]}
               >
-                {episode.episodeMinutes} dk
+                {episode.episodeMinutes} {i18nText("autoI18n.dakika", "dk")}
               </Text>
             </View>
           )}

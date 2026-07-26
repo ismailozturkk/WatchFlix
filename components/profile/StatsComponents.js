@@ -40,7 +40,7 @@ import {
  * @param {string} color  hex veya hsl string
  * @param {number} alpha  0–1
  */
-const withAlpha = (color, alpha = 1) => {
+export const withAlpha = (color, alpha = 1) => {
   if (typeof color !== "string") return color;
   if (color.startsWith("hsl(")) {
     return color.replace("hsl(", "hsla(").replace(")", `, ${alpha})`);
@@ -166,8 +166,8 @@ export const StatsHeroCard = memo(function StatsHeroCard({
   secondaryLabel,
   tertiaryCount,
   tertiaryLabel,
-  time = {},
-  timeLabels = {},
+  chartDataByPeriod = {},
+  rewatchItems = [],
   expanded,
   onToggleExpand,
   rankColor,
@@ -181,9 +181,41 @@ export const StatsHeroCard = memo(function StatsHeroCard({
   genresLabel = i18nText("autoI18n.en_cok_izlenen", "En çok izlenen"),
   rankLabel = "Seviye",
 }) {
+  const [chartPeriod, setChartPeriod] = useState("daily");
+  const [chartUnit, setChartUnit] = useState("minutes");
+  const [selectedChartKey, setSelectedChartKey] = useState(null);
   // Gradient renkleri rank renginden türetiyoruz (dinamik).
   const grad1 = rankColor || theme.accent;
   const grad2 = theme.secondary;
+  const chartData = chartDataByPeriod?.[chartPeriod] || [];
+  const chartMax = Math.max(...chartData.map((item) => item.value), 1);
+  const selectedChartPoint = chartData.find((point) => point.key === selectedChartKey)
+    || [...chartData].reverse().find((point) => point.value > 0)
+    || chartData[chartData.length - 1];
+  const periodOptions = [
+    { key: "daily", label: i18nText("autoI18n.gunluk", "Günlük") },
+    { key: "monthly", label: i18nText("autoI18n.aylik", "Aylık") },
+    { key: "yearly", label: i18nText("autoI18n.yillik", "Yıllık") },
+  ];
+  const unitOptions = [
+    { key: "minutes", label: i18nText("autoI18n.dakika", "dk") },
+    { key: "hours", label: i18nText("autoI18n.saat_kisa", "sa") },
+    { key: "days", label: i18nText("autoI18n.gun_kisa", "gün") },
+  ];
+  const chartValueLabel = (minutes) => {
+    if (!minutes) return "";
+    const divisor = chartUnit === "days" ? 1440 : chartUnit === "hours" ? 60 : 1;
+    const value = minutes / divisor;
+    const decimals = chartUnit === "minutes"
+      ? 0
+      : value < 1
+        ? 2
+        : value < 10
+          ? 1
+          : 0;
+    const suffix = unitOptions.find((option) => option.key === chartUnit)?.label || "";
+    return `${value.toFixed(decimals).replace(/\.0$/, "")}${suffix}`;
+  };
 
   return (
     <View
@@ -262,48 +294,146 @@ export const StatsHeroCard = memo(function StatsHeroCard({
           )}
         </View>
 
-        {/* Time row */}
+        {/* Son 7 günlük izleme sütun grafiği */}
         <View
           style={[
-            heroStyles.timeRow,
+            heroStyles.chartCard,
             {
               backgroundColor: withAlpha(theme.primary, 0.35),
               borderColor: withAlpha(grad1, 0.16),
             },
           ]}
         >
-          {[
-            { v: time.years, l: timeLabels.years },
-            { v: time.months, l: timeLabels.months },
-            { v: time.days, l: timeLabels.days },
-            { v: time.hours, l: timeLabels.hours },
-            { v: time.minutes, l: timeLabels.minutes },
-          ]
-            // Sıfır olan üst birimleri gizle (örn. yıl=0 ay=0 ise direkt gün'den başla)
-            .reduce((acc, x, i, arr) => {
-              if (acc.length === 0 && x.v === 0) {
-                const remaining = arr.slice(i + 1).some((r) => r.v > 0);
-                if (remaining) return acc;
-              }
-              acc.push(x);
-              return acc;
-            }, [])
-            .map((x, i) => (
-              <View key={i} style={heroStyles.timeChunk}>
-                <Text
-                  style={[heroStyles.timeValue, { color: theme.text.primary }]}
-                  allowFontScaling={false}
-                >
-                  {x.v || 0}
+          <View style={heroStyles.chartHeader}>
+            <View style={heroStyles.chartTitleRow}>
+              <Ionicons name="stats-chart" size={13} color={grad1} />
+              <Text style={[heroStyles.chartTitle, { color: theme.text.secondary }]}>
+                {i18nText("autoI18n.izleme_ritmi", "İzleme ritmi")}
+              </Text>
+            </View>
+            {chartData.length > 0 && (
+              <View style={heroStyles.chartRangeWrap}>
+                <Text style={[heroStyles.chartRange, { color: theme.text.muted }]}>
+                  {chartData[0].dateLabel} – {chartData[chartData.length - 1].dateLabel}
                 </Text>
-                <Text
-                  style={[heroStyles.timeLabel, { color: theme.text.secondary }]}
-                  allowFontScaling={false}
-                >
-                  {x.l}
-                </Text>
+                {!!selectedChartPoint?.value && (
+                  <Text style={[heroStyles.chartSelectedValue, { color: grad1 }]}>
+                    {selectedChartPoint.dayLabel} · {chartValueLabel(selectedChartPoint.value)}
+                  </Text>
+                )}
               </View>
-            ))}
+            )}
+          </View>
+          <View style={heroStyles.chartControls}>
+            <View style={[heroStyles.segmented, { borderColor: withAlpha(grad1, 0.2) }]}>
+              {periodOptions.map((option) => {
+                const active = chartPeriod === option.key;
+                return (
+                  <TouchableOpacity
+                    key={option.key}
+                    onPress={() => setChartPeriod(option.key)}
+                    activeOpacity={0.78}
+                    style={[
+                      heroStyles.segmentButton,
+                      active && { backgroundColor: withAlpha(grad1, 0.2) },
+                    ]}
+                  >
+                    <Text style={[
+                      heroStyles.segmentText,
+                      { color: active ? grad1 : theme.text.muted },
+                    ]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={[heroStyles.segmented, heroStyles.unitSegmented, { borderColor: withAlpha(grad1, 0.2) }]}>
+              {unitOptions.map((option) => {
+                const active = chartUnit === option.key;
+                return (
+                  <TouchableOpacity
+                    key={option.key}
+                    onPress={() => setChartUnit(option.key)}
+                    activeOpacity={0.78}
+                    style={[
+                      heroStyles.segmentButton,
+                      active && { backgroundColor: withAlpha(grad1, 0.2) },
+                    ]}
+                  >
+                    <Text style={[
+                      heroStyles.segmentText,
+                      { color: active ? grad1 : theme.text.muted },
+                    ]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+          <View style={heroStyles.chartBars}>
+            {chartData.map((point) => {
+              const selected = selectedChartPoint?.key === point.key;
+              const dense = chartData.length > 12;
+              const height = point.value > 0
+                ? Math.max(7, Math.round((point.value / chartMax) * 52))
+                : 4;
+              const valueLabel = chartData.length <= 7 || selected
+                ? chartValueLabel(point.value)
+                : "";
+              const selectedUnit = unitOptions.find((option) => option.key === chartUnit)?.label || "";
+              const visibleValueLabel = dense && selected
+                ? `${point.dayLabel} · ${valueLabel || `0${selectedUnit}`}`
+                : valueLabel;
+              return (
+                <TouchableOpacity
+                  key={point.key}
+                  activeOpacity={0.75}
+                  onPress={() => setSelectedChartKey(point.key)}
+                  style={[heroStyles.chartColumn, selected && { zIndex: 10 }]}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      heroStyles.chartValue,
+                      dense && selected && heroStyles.chartValueTooltip,
+                      {
+                        color: dense && selected ? grad1 : theme.text.muted,
+                        backgroundColor: dense && selected ? theme.secondary : "transparent",
+                        borderColor: dense && selected ? withAlpha(grad1, 0.55) : "transparent",
+                      },
+                    ]}
+                  >
+                    {visibleValueLabel}
+                  </Text>
+                  <View style={heroStyles.chartTrack}>
+                    <LinearGradient
+                      colors={point.value > 0
+                        ? [withAlpha(grad1, 0.95), withAlpha(grad1, 0.42)]
+                        : [withAlpha(theme.text.muted, 0.18), withAlpha(theme.text.muted, 0.08)]}
+                      style={[
+                        heroStyles.chartBar,
+                        {
+                          height,
+                          width: dense ? 6 : chartData.length > 7 ? 12 : 18,
+                          borderColor: selected ? grad1 : "transparent",
+                          borderWidth: selected ? 1 : 0,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={[
+                    heroStyles.chartDay,
+                    dense && heroStyles.chartDayDense,
+                    { color: selected ? grad1 : theme.text.secondary },
+                  ]}>
+                    {point.dayLabel}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         {/* Expand toggle */}
@@ -336,7 +466,7 @@ export const StatsHeroCard = memo(function StatsHeroCard({
               <View style={heroStyles.totalLabel}>
                 <Fontisto name="stopwatch" size={14} color={theme.text.muted} />
                 <Text style={[heroStyles.totalLabelText, { color: theme.text.muted }]}>
-                  Toplam izlenme
+                  {i18nText("autoI18n.toplam_izlenme", "Toplam izlenme")}
                 </Text>
               </View>
               <View style={heroStyles.totalValue}>
@@ -382,6 +512,7 @@ export const StatsHeroCard = memo(function StatsHeroCard({
                 </View>
               </View>
             )}
+            <RewatchHighlights theme={theme} items={rewatchItems} embedded />
           </View>
         )}
       </LinearGradient>
@@ -453,19 +584,48 @@ const heroStyles = StyleSheet.create({
   label: { fontSize: 11, marginTop: 2, fontWeight: "600" },
   vDivider: { width: 1, height: 36, marginHorizontal: 10 },
 
-  timeRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "flex-end",
-    paddingVertical: 10,
-    paddingHorizontal: 6,
+  chartCard: {
+    paddingTop: 10,
+    paddingBottom: 8,
+    paddingHorizontal: 10,
     borderRadius: 14,
     borderWidth: 1,
     marginBottom: 10,
   },
-  timeChunk: { alignItems: "center", minWidth: 40 },
-  timeValue: { fontSize: 18, fontWeight: "700" },
-  timeLabel: { fontSize: 10, marginTop: 2, fontWeight: "600" },
+  chartHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  chartTitleRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  chartTitle: { fontSize: 11, fontWeight: "800" },
+  chartRangeWrap: { alignItems: "flex-end" },
+  chartRange: { fontSize: 9.5, fontWeight: "600" },
+  chartSelectedValue: { marginTop: 1, fontSize: 9, fontWeight: "800" },
+  chartControls: { marginTop: 9, flexDirection: "row", gap: 7 },
+  segmented: {
+    flex: 1.35,
+    minHeight: 30,
+    padding: 2,
+    borderRadius: 11,
+    borderWidth: 1,
+    flexDirection: "row",
+  },
+  unitSegmented: { flex: 1 },
+  segmentButton: { flex: 1, minHeight: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  segmentText: { fontSize: 9, fontWeight: "800" },
+  chartBars: { height: 87, marginTop: 7, flexDirection: "row", alignItems: "flex-end" },
+  chartColumn: { flex: 1, alignItems: "center" },
+  chartValue: { height: 18, lineHeight: 16, fontSize: 8, fontWeight: "700", textAlign: "center" },
+  chartValueTooltip: {
+    minWidth: 46,
+    paddingHorizontal: 5,
+    borderRadius: 7,
+    borderWidth: 1,
+    fontSize: 9.5,
+    fontWeight: "900",
+    overflow: "hidden",
+  },
+  chartTrack: { height: 52, justifyContent: "flex-end", alignItems: "center" },
+  chartBar: { width: 18, borderRadius: 6 },
+  chartDay: { marginTop: 3, fontSize: 9, fontWeight: "700" },
+  chartDayDense: { fontSize: 7 },
 
   expandBtn: {
     alignSelf: "center",
@@ -646,6 +806,7 @@ const FilterSearchInput = memo(function FilterSearchInput({
     <TextInput
       value={value}
       onChangeText={onChange}
+      maxLength={80}
       placeholder={placeholder}
       placeholderTextColor={theme.text.muted}
       style={[filterStyles.searchInput, { color: theme.text.primary }]}
@@ -1442,6 +1603,69 @@ const collapseStyles = StyleSheet.create({
   root: { flex: 1 },
   statusStrip: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 12 },
   header: { position: "absolute", left: 0, right: 0, zIndex: 10 },
+});
+
+// ─── REWATCH HIGHLIGHTS ────────────────────────────────────────────────────
+
+export const RewatchHighlights = memo(function RewatchHighlights({
+  theme,
+  items = [],
+  embedded = false,
+}) {
+  if (!items.length) return null;
+  return (
+    <View style={[
+      rewatchStyles.card,
+      embedded && rewatchStyles.embeddedCard,
+      {
+        backgroundColor: embedded ? withAlpha(theme.primary, 0.67) : theme.secondary,
+        borderColor: theme.border,
+      },
+    ]}>
+      <View style={rewatchStyles.header}>
+        <View style={[rewatchStyles.icon, { backgroundColor: withAlpha(theme.accent || "#A78BFA", 0.14) }]}>
+          <Ionicons name="repeat" size={16} color={theme.accent || "#A78BFA"} />
+        </View>
+        <View style={rewatchStyles.copy}>
+          <Text style={[rewatchStyles.title, { color: theme.text.primary }]}>
+            {i18nText("autoI18n.en_cok_tekrar_izlenenler", "En çok tekrar izlenenler")}
+          </Text>
+          <Text style={[rewatchStyles.subtitle, { color: theme.text.muted }]}>
+            {i18nText("autoI18n.tekrar_izleme_ozeti", "Birden fazla izlediğiniz yapımlar")}
+          </Text>
+        </View>
+      </View>
+      <View style={rewatchStyles.rows}>
+        {items.slice(0, 3).map(({ title, count }, index) => (
+          <View key={`${title}-${index}`} style={rewatchStyles.row}>
+            <Text style={[rewatchStyles.index, { color: theme.text.muted }]}>{index + 1}</Text>
+            <Text style={[rewatchStyles.name, { color: theme.text.primary }]} numberOfLines={1}>
+              {title}
+            </Text>
+            <View style={[rewatchStyles.count, { backgroundColor: withAlpha(theme.accent || "#A78BFA", 0.16) }]}>
+              <Text style={[rewatchStyles.countText, { color: theme.accent || "#A78BFA" }]}>×{count}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+});
+
+const rewatchStyles = StyleSheet.create({
+  card: { marginHorizontal: 16, marginTop: 10, padding: 14, borderRadius: 20, borderWidth: 1 },
+  embeddedCard: { marginHorizontal: 0, marginTop: 0, borderRadius: 14 },
+  header: { flexDirection: "row", alignItems: "center" },
+  icon: { width: 34, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  copy: { flex: 1, marginLeft: 10 },
+  title: { fontSize: 14, fontWeight: "800" },
+  subtitle: { fontSize: 11, marginTop: 2 },
+  rows: { marginTop: 10, gap: 7 },
+  row: { minHeight: 30, flexDirection: "row", alignItems: "center" },
+  index: { width: 22, fontSize: 11, fontWeight: "800" },
+  name: { flex: 1, fontSize: 13, fontWeight: "600" },
+  count: { minWidth: 40, height: 25, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  countText: { fontSize: 12, fontWeight: "900" },
 });
 
 // ─── EMPTY STATE ─────────────────────────────────────────────────────────────

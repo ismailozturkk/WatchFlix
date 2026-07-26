@@ -163,7 +163,7 @@ export function AiShowcase({ theme, accent, mediaItems = [], getTmdbUrl, lang = 
       <View style={ai.hintRow}>
         <Ionicons name="sparkles" size={11} color={accent} />
         <Text style={[ai.hintText, { color: theme.text.muted }]}>
-          {L(lang, "Watchify AI — 5 farklı cevap stili", "Watchify AI — 5 answer styles")}
+          {L(lang, "Seelogd AI — 5 farklı cevap stili", "Seelogd AI — 5 answer styles")}
         </Text>
       </View>
 

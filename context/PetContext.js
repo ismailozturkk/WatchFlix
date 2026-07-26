@@ -53,10 +53,10 @@ const DEFAULT_SELECTED = "astro";
 
 // Pet boyut ön ayarları (kare yüksekliği px). Ayarlardan seçilir.
 export const PET_SIZES = [
-  { key: "xs", label: "Minik", value: 72 },
-  { key: "s", label: "Küçük", value: 96 },
-  { key: "m", label: "Orta", value: 124 },
-  { key: "l", label: "Büyük", value: 152 },
+  { key: "xs", labelKey: "autoI18n.pet_boy_minik", label: "Minik", value: 72 },
+  { key: "s", labelKey: "autoI18n.pet_boy_kucuk", label: "Küçük", value: 96 },
+  { key: "m", labelKey: "autoI18n.pet_boy_orta", label: "Orta", value: 124 },
+  { key: "l", labelKey: "autoI18n.pet_boy_buyuk", label: "Büyük", value: 152 },
 ];
 const DEFAULT_SIZE = 124;
 
@@ -74,7 +74,9 @@ const STORAGE_KEYS = {
 const PetContext = createContext(undefined);
 
 export const PetProvider = ({ children }) => {
-  const [petEnabled, setPetEnabled] = useState(true);
+  // Yeni kurulumlarda pet kapalıdır; daha önce seçim yapan kullanıcıların
+  // AsyncStorage'daki tercihi açılışta aşağıda geri yüklenir.
+  const [petEnabled, setPetEnabled] = useState(false);
   const [ownedPets, setOwnedPets] = useState(DEFAULT_OWNED);
   const [selectedPetId, setSelectedPetId] = useState(DEFAULT_SELECTED);
   const [petState, setPetState] = useState("idle"); // runtime, kalıcı değil
@@ -142,6 +144,7 @@ export const PetProvider = ({ children }) => {
         await petCache.downloadPet(id);
         setCachedPets((c) => ({ ...c, [id]: true }));
         setPetSizes((c) => ({ ...c, [id]: petCache.getPetSize(id) }));
+        return true;
       } catch (e) {
         // Hatayı YÜZEYE ÇIKAR — sessizce geçilince APK'da "hiçbir şey olmuyor"
         // gibi görünüyordu; gerçek sebep (ağ/izin/depolama) artık görülebilir.
@@ -161,6 +164,7 @@ export const PetProvider = ({ children }) => {
               "İnternet bağlantını kontrol edip tekrar dene.",
             ),
         );
+        return false;
       } finally {
         setDownloadingPets((c) => {
           const next = { ...c };

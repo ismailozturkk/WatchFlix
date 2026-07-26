@@ -19,6 +19,7 @@ import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { useTvShow } from "../../context/TvShowContex";
 import { useLanguage } from "../../context/LanguageContext";
 import ListBadges from "../../components/ListBadges";
+import { RatingBadge, ReleaseDateBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 
@@ -57,18 +58,10 @@ const TvAiringTodayCard = memo(function TvAiringTodayCard({ item, navigation, th
         />
 
         {posterBadges?.releaseDate !== false && (
-          <View style={[styles.relaseDateCount, { backgroundColor: theme.secondaryt }]}>
-            <Text style={[styles.similarRatingText, { color: theme.text.secondary }]}>
-              {item.first_air_date}
-            </Text>
-          </View>
+          <ReleaseDateBadge date={item.first_air_date} variant="year" style={POSTER_BADGE_POS.topRight} />
         )}
         {posterBadges?.tmdbRating !== false && (
-          <View style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}>
-            <Text style={[styles.similarRatingText, { color: theme.colors.orange }]}>
-              {item.vote_average}
-            </Text>
-          </View>
+          <RatingBadge value={item.vote_average} votes={item.vote_count} style={POSTER_BADGE_POS.bottomRight} />
         )}
         <ListBadges
           mediaId={item.id}

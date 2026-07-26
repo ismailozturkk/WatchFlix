@@ -942,7 +942,7 @@ export default function StoryShareScreen({ route, navigation }) {
               pointerEvents="none"
             >
               <Image source={APP_LOGO} style={styles.wmLogo} resizeMode="contain" />
-              <Text style={styles.wmText}>Watchify</Text>
+              <Text style={styles.wmText}>Seelogd</Text>
             </View>
           </ViewShot>
         </Animated.View>
@@ -1238,7 +1238,7 @@ export default function StoryShareScreen({ route, navigation }) {
                       ? "Poster"
                       : b.type === "graph"
                         ? i18nText("autoI18n.bolum_graph", "Bölüm Graph")
-                        : b.text || "Boş yazı"}
+                        : b.text || i18nText("autoI18n.bos_yazi", "Boş yazı")}
                   </Text>
                   <TouchableOpacity
                     onPress={() => deleteBlock(b.id)}
@@ -1260,6 +1260,7 @@ export default function StoryShareScreen({ route, navigation }) {
                     ref={editRef}
                     value={selected.text}
                     onChangeText={(txt) => updateSelected({ text: txt })}
+                    maxLength={200}
                     placeholder={i18nText("autoI18n.yazini_gir", "Yazını gir...")}
                     placeholderTextColor={theme.text.muted}
                     multiline
@@ -1426,8 +1427,10 @@ export default function StoryShareScreen({ route, navigation }) {
                   <SliderControl
                     theme={theme}
                     icon="square-outline"
-                    label={`Köşe Yuvarlaklığı${
-                      selected.type === "image" && posterLinked ? " — bağlı" : ""
+                    label={`${i18nText("autoI18n.kose_yuvarlakligi", "Köşe Yuvarlaklığı")}${
+                      selected.type === "image" && posterLinked
+                        ? i18nText("autoI18n.bagli_eki", " — bağlı")
+                        : ""
                     }`}
                     value={selected.radius}
                     min={0}
@@ -1450,7 +1453,11 @@ export default function StoryShareScreen({ route, navigation }) {
                         theme={theme}
                         icon="link"
                         active={posterLinked}
-                        label={posterLinked ? "Arka plana bağlı" : "Arka plana bağla"}
+                        label={
+                          posterLinked
+                            ? i18nText("autoI18n.arka_plana_bagli", "Arka plana bağlı")
+                            : i18nText("autoI18n.arka_plana_bagla", "Arka plana bağla")
+                        }
                         onPress={() => setPosterLinked((v) => !v)}
                       />
                     )}
@@ -1495,7 +1502,13 @@ export default function StoryShareScreen({ route, navigation }) {
                         color: watermarkPos === p.id ? theme.accent : theme.text.muted,
                       }}
                     >
-                      {p.id === "bottom-right" ? "Sağ Alt" : p.id === "bottom-left" ? "Sol Alt" : p.id === "top-right" ? "Sağ Üst" : "Sol Üst"}
+                      {p.id === "bottom-right"
+                        ? i18nText("autoI18n.konum_sag_alt", "Sağ Alt")
+                        : p.id === "bottom-left"
+                          ? i18nText("autoI18n.konum_sol_alt", "Sol Alt")
+                          : p.id === "top-right"
+                            ? i18nText("autoI18n.konum_sag_ust", "Sağ Üst")
+                            : i18nText("autoI18n.konum_sol_ust", "Sol Üst")}
                     </Text>
                   </TouchableOpacity>
                 ))}

@@ -1,6 +1,9 @@
 import axios from "axios";
 import * as cacheStore from "./cacheStore";
-import { shouldPersistInternetData } from "./dataCacheSettings";
+import {
+  categoryForTmdbUrl,
+  shouldPersistInternetData,
+} from "./dataCacheSettings";
 
 const NS = "network";
 let installed = false;
@@ -31,7 +34,11 @@ export function installAxiosDataCache() {
   axios.interceptors.response.use(
     (response) => {
       const config = response?.config || {};
-      if (isGet(config) && shouldPersistInternetData()) {
+      // Kategori URL'den türetilir; TMDB dışı istekler yalnız ana anahtara tabi.
+      if (
+        isGet(config) &&
+        shouldPersistInternetData({ category: categoryForTmdbUrl(config.url) })
+      ) {
         cacheStore.setJSON(NS, cacheKey(config), response.data);
       }
       return response;

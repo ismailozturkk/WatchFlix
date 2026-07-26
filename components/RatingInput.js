@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Pressable, StyleSheet } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "@services/hapticsService";
 
 /**
  * RatingInput — interaktif yıldız puanlama (0-10 ölçeği, yarım yıldız destekli).

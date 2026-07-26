@@ -90,15 +90,15 @@ const TAB_LABEL_KEY = {
   interactions: "autoI18n.etkilesimler",
 };
 
-// Tür → renk/etiket/ikon
+// Tür → renk/etiket/ikon (label render sırasında i18nText ile çevrilir)
 const KIND_META = {
-  movie: { label: "FİLM", color: "#138DF0", icon: "film" },
-  tv: { label: "DİZİ", color: "#8b5cf6", icon: "tv" },
-  post: { label: "POST", color: "#22C55E", icon: "newspaper" },
-  list: { label: "LİSTE", color: "#FF7C25", icon: "list" },
-  story: { label: "STORY", color: "#EC4899", icon: "images" },
-  like: { label: "BEĞENİ", color: "#FF3B6B", icon: "heart" },
-  bookmark: { label: "KAYIT", color: "#138DF0", icon: "bookmark" },
+  movie: { labelKey: "autoI18n.kind_film", label: "FİLM", color: "#138DF0", icon: "film" },
+  tv: { labelKey: "autoI18n.kind_dizi", label: "DİZİ", color: "#8b5cf6", icon: "tv" },
+  post: { labelKey: "autoI18n.kind_post", label: "POST", color: "#22C55E", icon: "newspaper" },
+  list: { labelKey: "autoI18n.kind_liste", label: "LİSTE", color: "#FF7C25", icon: "list" },
+  story: { labelKey: "autoI18n.kind_story", label: "STORY", color: "#EC4899", icon: "images" },
+  like: { labelKey: "autoI18n.kind_begeni", label: "BEĞENİ", color: "#FF3B6B", icon: "heart" },
+  bookmark: { labelKey: "autoI18n.kind_kayit", label: "KAYIT", color: "#138DF0", icon: "bookmark" },
 };
 
 const STORY_COLS = 3;
@@ -586,6 +586,7 @@ export default function MyActivityScreen({ navigation, route }) {
             <TextInput
               value={editText}
               onChangeText={setEditText}
+              maxLength={500}
               multiline
               autoFocus
               placeholder={i18nText("autoI18n.yorumunu_yaz", "Yorumunu yaz…")}
@@ -659,7 +660,9 @@ function Row({ theme, poster, kind, title, subtitle, date, right, onPress, badge
           {km.label ? (
             <View style={[st.kindChip, { backgroundColor: km.color + "1F" }]}>
               <Ionicons name={km.icon} size={9} color={km.color} />
-              <Text style={[st.kindChipText, { color: km.color }]}>{km.label}</Text>
+              <Text style={[st.kindChipText, { color: km.color }]}>
+                {km.labelKey ? i18nText(km.labelKey, km.label) : km.label}
+              </Text>
             </View>
           ) : null}
           {badge ? (
@@ -848,7 +851,7 @@ function StoryMini({ theme, thumbnail, name, date, onPress }) {
         <View style={st.storyDraftOverlay} pointerEvents="none">
           <View style={[st.storyDraftTypeBadge, { backgroundColor: "rgba(0,0,0,0.55)" }]}>
             <Ionicons name="images" size={10} color="#fff" />
-            <Text style={st.storyDraftTypeText}>STORY</Text>
+            <Text style={st.storyDraftTypeText}>{i18nText("autoI18n.kind_story", "STORY")}</Text>
           </View>
           <View style={[st.storyDraftEditBadge, { backgroundColor: theme.accent }]}>
             <Ionicons name="create-outline" size={12} color="#fff" />

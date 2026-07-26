@@ -146,7 +146,7 @@ export const MediaActivityProvider = ({ children }) => {
   // Debounce'lu cache yazımı — iki listener art arda tetiklenince tek yazım.
   useEffect(() => {
     if (!user?.uid || !loaded) return undefined;
-    if (!shouldPersistInternetData()) return undefined;
+    if (!shouldPersistInternetData({ category: "activity" })) return undefined;
 
     const uid = user.uid;
     const timer = setTimeout(() => {

@@ -17,7 +17,7 @@ const TAB_W = (SCREEN_W - 32) / 2;
 import { useTheme } from "../../../context/ThemeContext";
 import { useProfileUi } from "../../../context/ProfileUiContext";
 import { useFriends } from "../../../context/FriendsContext";
-import IconBacground from "../../../components/IconBacground";
+import ScreenDecor from "../../../components/ScreenDecor";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../../components/BackButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -193,7 +193,7 @@ export default function FriendRequestsScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.primary }]}
     >
-      <IconBacground opacity={0.3} />
+      <ScreenDecor iconOpacity={0.3} />
 
       {/* Başlık */}
       <Animated.Text

@@ -171,8 +171,8 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
           </View>
           <Text style={[styles.title, { color: theme.text.primary }]}>
             {tr
-              ? "Watchify profilini tamamla"
-              : "Complete your Watchify profile"}
+              ? "Seelogd profilini tamamla"
+              : "Complete your Seelogd profile"}
           </Text>
           <Text style={[styles.subtitle, { color: theme.text.muted }]}>
             {tr
@@ -227,6 +227,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
               <TextInput
                 value={displayName}
                 onChangeText={setDisplayName}
+                maxLength={40}
                 style={[styles.input, { color: theme.text.primary }]}
                 placeholder={tr ? "Adın ve soyadın" : "Your name"}
                 placeholderTextColor={theme.text.muted}

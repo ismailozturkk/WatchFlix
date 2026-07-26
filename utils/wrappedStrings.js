@@ -1,14 +1,14 @@
 // utils/wrappedStrings.js
 //
-// Watchify Wrapped için iki dilli (TR/EN) UI etiketleri. Büyük çeviri JSON'larını
+// Seelogd Wrapped için iki dilli (TR/EN) UI etiketleri. Büyük çeviri JSON'larını
 // riske atmamak için özelliğe ait metinler burada merkezi tutulur. Ekran/bileşenler
 // getWrappedStrings(language) ile alıp prop olarak alt bileşenlere geçirir.
 
 const STRINGS = {
   tr: {
-    brand: "Watchify Wrapped",
+    brand: "Seelogd Wrapped",
     // Giriş kartı (profil)
-    entryTitle: "Watchify Wrapped",
+    entryTitle: "Seelogd Wrapped",
     entrySubtitle: "Yıllık izleme özetin hazır",
     entryCta: "Özetini gör",
     // Genel
@@ -19,6 +19,7 @@ const STRINGS = {
     save: "Kaydet",
     saving: "Kaydediliyor…",
     share: "Paylaş",
+    shareActionHint: "9:16 kartını gönder",
     otherYears: "Diğer yıllar",
     // Intro
     introHello: "Bu yıl neler izledin?",
@@ -75,7 +76,7 @@ const STRINGS = {
     visibleSections: "Gösterilecek bölümler",
     styleGlow: "Işıltılı",
     styleClean: "Sade",
-    themeSignature: "Watchify",
+    themeSignature: "Seelogd",
     themeSunset: "Gün batımı",
     themeOcean: "Okyanus",
     themeForest: "Orman",
@@ -102,8 +103,8 @@ const STRINGS = {
     errorPrefix: "Hata: ",
   },
   en: {
-    brand: "Watchify Wrapped",
-    entryTitle: "Watchify Wrapped",
+    brand: "Seelogd Wrapped",
+    entryTitle: "Seelogd Wrapped",
     entrySubtitle: "Your yearly watch recap is ready",
     entryCta: "See your recap",
     minutes: "minutes",
@@ -113,6 +114,7 @@ const STRINGS = {
     save: "Save",
     saving: "Saving…",
     share: "Share",
+    shareActionHint: "Send your 9:16 card",
     otherYears: "Other years",
     introHello: "What did you watch this year?",
     introTap: "Tap to begin",
@@ -159,7 +161,7 @@ const STRINGS = {
     visibleSections: "Visible sections",
     styleGlow: "Glow",
     styleClean: "Clean",
-    themeSignature: "Watchify",
+    themeSignature: "Seelogd",
     themeSunset: "Sunset",
     themeOcean: "Ocean",
     themeForest: "Forest",

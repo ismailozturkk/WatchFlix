@@ -165,6 +165,7 @@ export default function NomineeSearchModal({
               autoFocus
               value={q}
               onChangeText={(t) => { setQ(t); clearPending(); }}
+              maxLength={80}
               placeholder={i18nText("autoI18n.tournament_search_ph", "Aday ara…")}
               placeholderTextColor={theme.text.muted}
               style={[styles.searchInput, { color: theme.text.primary }]}

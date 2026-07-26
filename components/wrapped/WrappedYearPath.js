@@ -1,11 +1,12 @@
 // components/wrapped/WrappedYearPath.js
 //
-// Watchify Wrapped — dört sütunlu zikzak yıl yolu.
+// Seelogd Wrapped — dört sütunlu zikzak yıl yolu.
 // Yıllar ilk satırda soldan sağa, sonraki satırda sağdan sola ilerler. Böylece
 // kronolojik sıra, satırlar arasında kopmadan devam eden bir "yılan" yolu olur.
 
 import React, { memo, useMemo } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import { i18nText } from "../../utils/i18nText";
 import Svg, { Path, Defs, LinearGradient, Stop } from "react-native-svg";
 import AppIcon from "../AppIcon";
 
@@ -30,7 +31,7 @@ const WrappedYearPath = memo(function WrappedYearPath({
   onSelect,
   width = 300,
   accent = "#1DB954",
-  selectedText = "yılı seçildi",
+  selectedText,
 }) {
   const columns = Math.min(MAX_COLUMNS, Math.max(2, years.length));
 
@@ -177,7 +178,8 @@ const WrappedYearPath = memo(function WrappedYearPath({
           <AppIcon name="sparkles" size={12} color="#FFFFFF" />
         </View>
         <Text allowFontScaling={false} style={styles.selectedText}>
-          <Text style={styles.selectedYear}>{selectedYear}</Text> {selectedText}
+          <Text style={styles.selectedYear}>{selectedYear}</Text>{" "}
+          {selectedText || i18nText("autoI18n.yil_secildi", "yılı seçildi")}
         </Text>
       </View>
     </View>

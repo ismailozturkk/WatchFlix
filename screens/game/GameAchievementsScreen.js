@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import AppIcon from "@components/AppIcon";
+import AppBadge from "@components/badges/AppBadge";
 import { useAuth } from "@context/AuthContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
+import { rarityStyle } from "@theme/badgeTokens";
 import { loadGameData } from "@services/sceneGameService";
 import { i18nText } from "@utils/i18nText";
 import { GameScreenShell } from "./GameScreenShell";
@@ -42,10 +44,16 @@ export default function GameAchievementsScreen({ navigation }) {
       {achievements.map((item) => {
         const ratio = item.target ? item.progress / item.target : 0;
         return (
-          <View key={item.id} style={[styles.card, { backgroundColor: theme.secondary, borderColor: item.unlocked ? "#C084FC" : theme.border }]}>
-            <View style={[styles.icon, { backgroundColor: item.unlocked ? "rgba(192,132,252,0.18)" : theme.primary }]}>
-              <AppIcon family="Ionicons" name={item.unlocked ? item.icon.replace("-outline", "") : "lock-closed-outline"} size={24} color={item.unlocked ? "#C084FC" : theme.text.muted} />
-            </View>
+          <View key={item.id} style={[styles.card, { backgroundColor: theme.secondary, borderColor: item.unlocked ? rarityStyle(item.rarity, theme).color : theme.border }]}>
+            <AppBadge
+              glyph={item.icon}
+              glyphSolid={item.iconSolid}
+              rarity={item.rarity}
+              unlocked={item.unlocked}
+              progress={ratio}
+              size={52}
+              accessibilityLabel={item.title}
+            />
             <View style={styles.copy}>
               <Text style={[styles.title, { color: theme.text.primary }]}>{item.title}</Text>
               <Text style={[styles.description, { color: theme.text.muted }]}>{item.description}</Text>
@@ -68,7 +76,6 @@ export default function GameAchievementsScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   card: { minHeight: 84, borderRadius: 18, borderWidth: 1, padding: 14, flexDirection: "row", alignItems: "center", gap: 13 },
-  icon: { width: 50, height: 50, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   copy: { flex: 1 },
   title: { fontSize: 15, fontWeight: "850" },
   description: { fontSize: 11, lineHeight: 16, fontWeight: "650", marginTop: 3 },

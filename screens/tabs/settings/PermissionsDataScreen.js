@@ -11,6 +11,7 @@ import { appAlert } from "@components/AppAlert";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import { useConnectivity } from "@context/ConnectivityContext";
+import { useAutoDataCacheSettings } from "@context/AppSettingsContext";
 import { downloadAllData } from "@services/dataDownloader";
 import { getBreakdown } from "@services/cacheInspector";
 import { i18nText } from "@utils/i18nText";
@@ -21,6 +22,7 @@ import {
   Chevron,
   buildUiColors,
 } from "./settingsUi";
+import { DATA_TYPE_COUNT, countEnabledTypes, getDataTypeOptions } from "./dataTypes";
 
 const fmtBytes = (b) =>
   b >= 1024 * 1024
@@ -32,6 +34,20 @@ export default function PermissionsDataScreen() {
   const { theme } = useTheme();
   const C = buildUiColors(theme);
   const { isOnline } = useConnectivity();
+  const { autoDataCacheEnabled, dataCacheTypes } = useAutoDataCacheSettings();
+
+  // Ana anahtar kapalıyken indirme yok; açıkken yalnız seçili türler inilir.
+  const enabledTypeCount = countEnabledTypes(dataCacheTypes);
+  const canDownload = autoDataCacheEnabled && enabledTypeCount > 0;
+  const selectedLabels = getDataTypeOptions()
+    .filter((opt) => dataCacheTypes?.[opt.id] !== false)
+    .map((opt) => opt.label);
+  // Satır altyazısı kısa kalsın: hepsi seçiliyse tek cümle, değilse ilk 3 + kalan.
+  const typeSummary =
+    enabledTypeCount === DATA_TYPE_COUNT
+      ? i18nText("autoI18n.tum_veri_turleri", "Tüm veri türleri")
+      : selectedLabels.slice(0, 3).join(", ") +
+        (selectedLabels.length > 3 ? ` +${selectedLabels.length - 3}` : "");
 
   const [cacheSize, setCacheSize] = useState(0);
   const [downloading, setDownloading] = useState(false);
@@ -52,6 +68,26 @@ export default function PermissionsDataScreen() {
 
   const handleDownloadData = async () => {
     if (downloading) return;
+    if (!autoDataCacheEnabled) {
+      appAlert(
+        i18nText("autoI18n.veri_indirme_kapali", "Veri indirme kapalı"),
+        i18nText(
+          "autoI18n.veri_indirme_kapali_aciklama",
+          "Çevrimdışı veri indirmek için Ayarlar > Genel bölümünden \"Verileri İndir\" ayarını aç.",
+        ),
+      );
+      return;
+    }
+    if (enabledTypeCount === 0) {
+      appAlert(
+        i18nText("autoI18n.veri_turu_secilmedi", "Veri türü seçilmedi"),
+        i18nText(
+          "autoI18n.veri_turu_secilmedi_aciklama",
+          "Ayarlar > Genel bölümünden en az bir veri türü seç.",
+        ),
+      );
+      return;
+    }
     if (!isOnline) {
       appAlert(
         i18nText("autoI18n.cevrimdisi", "Çevrimdışı"),
@@ -67,6 +103,7 @@ export default function PermissionsDataScreen() {
     try {
       const res = await downloadAllData({
         language,
+        types: dataCacheTypes,
         onProgress: (p) => setDownloadPct(p),
       });
       await refreshCacheSize();
@@ -77,6 +114,26 @@ export default function PermissionsDataScreen() {
             "autoI18n.verilerIndirildi",
             "Veriler çevrimdışı kullanım için indirildi.",
           ),
+        );
+      } else if (res.blocked) {
+        // Ayar bu arada değişmiş olabilir (servis ikinci kapı olarak da bakar).
+        const reasons = {
+          "no-user": i18nText(
+            "autoI18n.oturum_gerekli",
+            "Bu işlem için oturum açman gerekiyor.",
+          ),
+          "no-types": i18nText(
+            "autoI18n.veri_turu_secilmedi_aciklama",
+            "Ayarlar > Genel bölümünden en az bir veri türü seç.",
+          ),
+          disabled: i18nText(
+            "autoI18n.veri_indirme_kapali_aciklama",
+            "Çevrimdışı veri indirmek için Ayarlar > Genel bölümünden \"Verileri İndir\" ayarını aç.",
+          ),
+        };
+        appAlert(
+          i18nText("autoI18n.veri_indirilemedi", "Veri indirilemedi"),
+          reasons[res.blocked] || reasons.disabled,
         );
       } else {
         appAlert(
@@ -102,20 +159,27 @@ export default function PermissionsDataScreen() {
       <View style={[ds.card, { backgroundColor: C.card, borderColor: C.border }]}>
         <SettingRow
           colors={C}
-          iconBg={C.iconBlue}
-          iconColor={C.blue}
+          iconBg={canDownload ? C.iconBlue : C.closeBg}
+          iconColor={canDownload ? C.blue : C.muted}
           iconFamily="MaterialCommunityIcons"
-          iconName="cloud-download-outline"
+          iconName={canDownload ? "cloud-download-outline" : "cloud-off-outline"}
           title={i18nText("autoI18n.verileriIndir", "Verileri indir")}
           subtitle={
             downloading
               ? `${i18nText("autoI18n.indiriliyor", "İndiriliyor")} · %${Math.round(
                   downloadPct * 100,
                 )}`
-              : i18nText(
-                  "autoI18n.verileriIndirAlt",
-                  "Çevrimdışı için listeler, notlar, hatırlatıcılar ve posterler",
-                )
+              : !autoDataCacheEnabled
+                ? i18nText(
+                    "autoI18n.verileriIndirKapaliAlt",
+                    'Kapalı — Ayarlar > Genel\'den "Verileri İndir"i aç',
+                  )
+                : enabledTypeCount === 0
+                  ? i18nText(
+                      "autoI18n.veri_turu_secilmedi_alt",
+                      "Hiçbir veri türü seçili değil",
+                    )
+                  : `${enabledTypeCount}/${DATA_TYPE_COUNT} · ${typeSummary}`
           }
           onPress={handleDownloadData}
           right={

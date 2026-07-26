@@ -75,6 +75,26 @@ export default function SearchScreen({ navigation, route }) {
   const [viewMode, setViewMode] = useState("row");
   const inputRef = useRef(null);
 
+  // Genişleme animasyonu bitti mi? Bittiğinde kabuk sabit ölçü yerine
+  // absoluteFill'e geçer; edge-to-edge'de kökün gerçek yüksekliği pencere
+  // yüksekliğinden büyük olduğu için (navigasyon çubuğu şeridi) aksi halde
+  // altta boyanmamış bir bant kalır ve transparentModal'ın altındaki ekran görünür.
+  const [expandDone, setExpandDone] = useState(!hasSearchOrigin);
+
+  // Kabuğun hedef ölçüsü kökün ölçülen layout'undan gelir; useWindowDimensions
+  // Android'de navigasyon çubuğunu hariç tutar.
+  const [rootSize, setRootSize] = useState(null);
+  const onRootLayout = useCallback((event) => {
+    const { width, height } = event.nativeEvent.layout;
+    setRootSize((prev) =>
+      prev && prev.width === width && prev.height === height
+        ? prev
+        : { width, height },
+    );
+  }, []);
+  const targetWidth = rootSize?.width ?? screenWidth;
+  const targetHeight = rootSize?.height ?? screenHeight;
+
   const searchBarAnim = useRef(new Animated.Value(0)).current;
   const expandAnim = useRef(new Animated.Value(hasSearchOrigin ? 0 : 1)).current;
   const contentRevealAnim = useRef(
@@ -118,7 +138,14 @@ export default function SearchScreen({ navigation, route }) {
       );
     }
 
-    Animated.parallel(animations).start();
+    let cancelled = false;
+    Animated.parallel(animations).start(() => {
+      if (!cancelled) setExpandDone(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [contentRevealAnim, expandAnim, hasSearchOrigin, searchBarAnim]);
 
   const searchBarStyle = {
@@ -151,33 +178,34 @@ export default function SearchScreen({ navigation, route }) {
     },
   ];
 
-  const expandingShellStyle = hasSearchOrigin
-    ? {
-        top: expandAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [searchOrigin.y, 0],
-        }),
-        left: expandAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [searchOrigin.x, 0],
-        }),
-        width: expandAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [searchOrigin.width, screenWidth],
-        }),
-        height: expandAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [searchOrigin.height, screenHeight],
-        }),
-        borderRadius: expandAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [10, 0],
-        }),
-      }
-    : StyleSheet.absoluteFillObject;
+  const expandingShellStyle =
+    hasSearchOrigin && !expandDone
+      ? {
+          top: expandAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [searchOrigin.y, 0],
+          }),
+          left: expandAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [searchOrigin.x, 0],
+          }),
+          width: expandAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [searchOrigin.width, targetWidth],
+          }),
+          height: expandAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [searchOrigin.height, targetHeight],
+          }),
+          borderRadius: expandAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [10, 0],
+          }),
+        }
+      : StyleSheet.absoluteFillObject;
 
   return (
-    <View style={styles.transitionRoot}>
+    <View style={styles.transitionRoot} onLayout={onRootLayout}>
       <Animated.View
         pointerEvents="none"
         style={[
@@ -216,6 +244,7 @@ export default function SearchScreen({ navigation, route }) {
             placeholderTextColor={theme.text?.muted ?? "#666"}
             value={searchQuery}
             onChangeText={setSearchQuery}
+            maxLength={80}
             returnKeyType="search"
             onSubmitEditing={() => Keyboard.dismiss()}
           />

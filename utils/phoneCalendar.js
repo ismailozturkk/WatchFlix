@@ -2,9 +2,10 @@ import * as Calendar from "expo-calendar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Toast from "react-native-toast-message";
 import { Platform } from "react-native";
+import { i18nText } from "./i18nText";
 
 const STORAGE_KEY = "phone_calendar_saved_events_v1";
-const CALENDAR_NAME = "Watchify";
+const CALENDAR_NAME = "Seelogd";
 
 async function getSavedMap() {
   try {
@@ -67,17 +68,17 @@ function buildEventPayload(item) {
   const start = new Date(dateStr + "T09:00:00");
   const end = new Date(dateStr + "T10:00:00");
 
-  let title = item.title || "Hatırlatma";
+  let title = item.title || i18nText("autoI18n.hatirlatma", "Hatırlatma");
   let notes = "";
   if (item.eventType === "note") {
-    title = item.title || item.content?.slice(0, 40) || "Not";
+    title = item.title || item.content?.slice(0, 40) || i18nText("autoI18n.not", "Not");
     notes = item.content || "";
   } else if (item.eventType === "reminder_movie") {
     title = `🎬 ${item.title}`;
-    notes = "Film vizyona giriyor (Watchify hatırlatması)";
+    notes = i18nText("autoI18n.film_vizyon_takvim_notu", "Film vizyona giriyor (Seelogd hatırlatması)");
   } else if (item.eventType === "reminder_tv") {
     title = `📺 ${item.title}`;
-    notes = "Yeni bölüm yayınlanıyor (Watchify hatırlatması)";
+    notes = i18nText("autoI18n.yeni_bolum_takvim_notu", "Yeni bölüm yayınlanıyor (Seelogd hatırlatması)");
   }
 
   return {
@@ -94,7 +95,7 @@ export async function saveEventToPhoneCalendar(item) {
   try {
     const { status } = await Calendar.requestCalendarPermissionsAsync();
     if (status !== "granted") {
-      Toast.show({ type: "error", text1: "Takvim izni reddedildi" });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.takvim_izni_reddedildi", "Takvim izni reddedildi") });
       return { ok: false };
     }
 
@@ -103,7 +104,7 @@ export async function saveEventToPhoneCalendar(item) {
     if (map[key]) {
       Toast.show({
         type: "info",
-        text1: "Zaten telefonun takvimine eklendi",
+        text1: i18nText("autoI18n.zaten_telefon_takviminde", "Zaten telefonun takvimine eklendi"),
       });
       return { ok: false, alreadySaved: true };
     }
@@ -115,13 +116,13 @@ export async function saveEventToPhoneCalendar(item) {
     map[key] = { eventId, savedAt: Date.now() };
     await setSavedMap(map);
 
-    Toast.show({ type: "success", text1: "Telefonun takvimine eklendi" });
+    Toast.show({ type: "success", text1: i18nText("autoI18n.telefon_takvimine_eklendi", "Telefonun takvimine eklendi") });
     return { ok: true, eventId };
   } catch (err) {
     console.error("Phone calendar save error:", err);
     Toast.show({
       type: "error",
-      text1: "Takvime eklenemedi",
+      text1: i18nText("autoI18n.takvime_eklenemedi", "Takvime eklenemedi"),
       text2: err.message,
     });
     return { ok: false, error: err };
@@ -136,7 +137,7 @@ export async function saveManyEventsToPhoneCalendar(items) {
   try {
     const { status } = await Calendar.requestCalendarPermissionsAsync();
     if (status !== "granted") {
-      Toast.show({ type: "error", text1: "Takvim izni reddedildi" });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.takvim_izni_reddedildi", "Takvim izni reddedildi") });
       return { added: 0, skipped: 0, failed: 0, total: items.length };
     }
 
@@ -146,7 +147,7 @@ export async function saveManyEventsToPhoneCalendar(items) {
     } catch (err) {
       Toast.show({
         type: "error",
-        text1: "Takvim hazırlanamadı",
+        text1: i18nText("autoI18n.takvim_hazirlanamadi", "Takvim hazırlanamadı"),
         text2: err.message,
       });
       return { added: 0, skipped: 0, failed: items.length, total: items.length };
@@ -179,18 +180,18 @@ export async function saveManyEventsToPhoneCalendar(items) {
     await setSavedMap(map);
 
     const parts = [];
-    if (added > 0)   parts.push(`${added} eklendi`);
-    if (skipped > 0) parts.push(`${skipped} zaten vardı`);
-    if (failed > 0)  parts.push(`${failed} başarısız`);
+    if (added > 0)   parts.push(i18nText("autoI18n.n_eklendi", "{{count}} eklendi", { count: added }));
+    if (skipped > 0) parts.push(i18nText("autoI18n.n_zaten_vardi", "{{count}} zaten vardı", { count: skipped }));
+    if (failed > 0)  parts.push(i18nText("autoI18n.n_basarisiz", "{{count}} başarısız", { count: failed }));
 
     Toast.show({
       type: added > 0 ? "success" : "info",
       text1:
         added > 0
-          ? "Telefonun takvimine aktarıldı"
+          ? i18nText("autoI18n.telefon_takvimine_aktarildi", "Telefonun takvimine aktarıldı")
           : skipped === items.length
-            ? "Hepsi zaten ekliydi"
-            : "Aktarım tamamlandı",
+            ? i18nText("autoI18n.hepsi_zaten_ekliydi", "Hepsi zaten ekliydi")
+            : i18nText("autoI18n.aktarim_tamamlandi", "Aktarım tamamlandı"),
       text2: parts.join(" • "),
     });
 
@@ -199,7 +200,7 @@ export async function saveManyEventsToPhoneCalendar(items) {
     console.error("Bulk save error:", err);
     Toast.show({
       type: "error",
-      text1: "Aktarım başarısız",
+      text1: i18nText("autoI18n.aktarim_basarisiz", "Aktarım başarısız"),
       text2: err.message,
     });
     return { added: 0, skipped: 0, failed: items.length, total: items.length };
@@ -218,7 +219,7 @@ export async function removeEventFromPhoneCalendar(item) {
     }
     delete map[key];
     await setSavedMap(map);
-    Toast.show({ type: "info", text1: "Telefonun takviminden kaldırıldı" });
+    Toast.show({ type: "info", text1: i18nText("autoI18n.telefon_takviminden_kaldirildi", "Telefonun takviminden kaldırıldı") });
     return { ok: true };
   } catch (err) {
     console.error("Phone calendar remove error:", err);
@@ -234,7 +235,7 @@ export async function removeManyEventsFromPhoneCalendar(items) {
   try {
     const { status } = await Calendar.requestCalendarPermissionsAsync();
     if (status !== "granted") {
-      Toast.show({ type: "error", text1: "Takvim izni reddedildi" });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.takvim_izni_reddedildi", "Takvim izni reddedildi") });
       return { removed: 0, skipped: 0, failed: 0, total: items.length };
     }
 
@@ -268,15 +269,15 @@ export async function removeManyEventsFromPhoneCalendar(items) {
     await setSavedMap(map);
 
     const parts = [];
-    if (removed > 0) parts.push(`${removed} silindi`);
-    if (skipped > 0) parts.push(`${skipped} zaten yoktu`);
+    if (removed > 0) parts.push(i18nText("autoI18n.n_silindi", "{{count}} silindi", { count: removed }));
+    if (skipped > 0) parts.push(i18nText("autoI18n.n_zaten_yoktu", "{{count}} zaten yoktu", { count: skipped }));
 
     Toast.show({
       type: removed > 0 ? "success" : "info",
       text1:
         removed > 0
-          ? "Telefon takviminden silindi"
-          : "Silinecek kayıt yok",
+          ? i18nText("autoI18n.telefon_takviminden_silindi", "Telefon takviminden silindi")
+          : i18nText("autoI18n.silinecek_kayit_yok", "Silinecek kayıt yok"),
       text2: parts.join(" • ") || undefined,
     });
 
@@ -285,7 +286,7 @@ export async function removeManyEventsFromPhoneCalendar(items) {
     console.error("Bulk remove error:", err);
     Toast.show({
       type: "error",
-      text1: "Silme başarısız",
+      text1: i18nText("autoI18n.silme_basarisiz", "Silme başarısız"),
       text2: err.message,
     });
     return { removed: 0, skipped: 0, failed: items.length, total: items.length };

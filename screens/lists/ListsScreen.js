@@ -33,7 +33,7 @@ import { BlurView } from "expo-blur";
 import { useImageQualitySettings, useListLayoutSettings } from "@context/AppSettingsContext";
 import CaseOpeningModal from "@components/modals/CaseOpeningModal";
 import Feather from "@expo/vector-icons/Feather";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "@services/hapticsService";
 import { i18nText } from "@utils/i18nText";
 import { reorderWatchedShows } from "../../services/watchedTvService";
 import {
@@ -626,6 +626,7 @@ export default function ListsScreen({ route, navigation }) {
                 placeholderTextColor={theme.text.muted}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
+                maxLength={80}
               />
               <TouchableOpacity
                 activeOpacity={0.8}
@@ -794,7 +795,7 @@ export default function ListsScreen({ route, navigation }) {
                           marginTop: 2,
                         }}
                       >
-                        TOPLAM
+                        {i18nText("autoI18n.toplam_upper", "TOPLAM")}
                       </Text>
                     </View>
 
@@ -906,7 +907,7 @@ export default function ListsScreen({ route, navigation }) {
                     color: tvShowStatus === true ? "#fff" : theme.text.muted,
                   }}
                 >
-                  Bitirilen
+                  {i18nText("autoI18n.bitirilen", "Bitirilen")}
                 </Text>
               </TouchableOpacity>
 
@@ -930,7 +931,7 @@ export default function ListsScreen({ route, navigation }) {
                     color: tvShowStatus === false ? "#fff" : theme.text.muted,
                   }}
                 >
-                  Devam Eden
+                  {i18nText("autoI18n.devam_eden", "Devam Eden")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1422,7 +1423,7 @@ export default function ListsScreen({ route, navigation }) {
                                     { color: theme.text.primary },
                                   ]}
                                 >
-                                  {season.seasonNumber}. Sezon
+                                  {i18nText("autoI18n.n_sezon", "{{n}}. Sezon", { n: season.seasonNumber })}
                                 </Text>
                                 <Text
                                   style={[
@@ -1771,7 +1772,7 @@ export default function ListsScreen({ route, navigation }) {
             >
               {/* Sıralama */}
               <Text style={[fStyles.section, { color: theme.text.muted }]}>
-                SIRALAMA
+                {i18nText("autoI18n.siralama_upper", "SIRALAMA")}
               </Text>
               {[
                 { key: "default", label: i18nText("autoI18n.varsayilan_liste_sirasi", "Varsayılan (liste sırası)"), icon: "list" },

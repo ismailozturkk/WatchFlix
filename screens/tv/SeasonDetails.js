@@ -19,16 +19,16 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import LottieView from "lottie-react-native";
-import { useSnow } from "../../context/SnowContext";
 import WatchedAdd from "./WatchedAdd";
 import { useWatchedShow } from "../../hooks/useWatchedShow";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import {
   useApiSettings,
   useImageQualitySettings,
-  useSnowSettings,
 } from "../../context/AppSettingsContext";
 import Reminder from "../../components/Reminder";
+import ScreenSnow from "../../components/ScreenSnow";
+import { daysUntil, parseAirDate } from "../../utils/airDate";
 
 const { width } = Dimensions.get("window");
 
@@ -62,6 +62,7 @@ const EpisodeCard = memo(
     onPress,
     adjustOpacity,
     isWatched,
+    watchEvents,
   }) => {
     const ratingColor = getRatingColor(episode.vote_average);
     const isUpcoming = dateDiff?.isRemaining;
@@ -243,6 +244,7 @@ const EpisodeCard = memo(
                 genres={genres}
                 size={32}
                 isWatched={isWatched}
+                watchEvents={watchEvents}
               />
             )}
           </View>
@@ -314,7 +316,6 @@ export default function SeasonDetails({ route, navigation }) {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const { API_KEY } = useApiSettings();
-  const { showSnow } = useSnowSettings();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
 
   // Tek abonelik: bu dizinin tüm izlenme durumu (bölüm bazında getDoc yok).
@@ -327,12 +328,15 @@ export default function SeasonDetails({ route, navigation }) {
 
   // ── Yardımcılar ───────────────────────────────────────────────────────────
   const formatDate = useCallback(
-    (ts) =>
-      new Intl.DateTimeFormat(language, {
+    (ts) => {
+      const date = parseAirDate(ts);
+      if (!date) return "";
+      return new Intl.DateTimeFormat(language, {
         day: "numeric",
         month: "long",
         year: "numeric",
-      }).format(new Date(ts)),
+      }).format(date);
+    },
     [language],
   );
 
@@ -342,12 +346,14 @@ export default function SeasonDetails({ route, navigation }) {
     return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${opacity})`;
   }, []);
 
+  // Takvim günü farkı (bkz. utils/airDate.js) — "geçen süre" ile hesaplanırsa
+  // yarın yayınlanacak bölüm için "Bugün" yazıyordu.
   const calculateDateDifference = useCallback(
     (airDate) => {
       if (!airDate) return null;
-      const diff = new Date(airDate).getTime() - Date.now();
-      if (diff < 0) return { text: formatDate(airDate), isRemaining: false };
-      const days = Math.floor(diff / 86400000);
+      const days = daysUntil(airDate);
+      if (days === null) return null;
+      if (days < 0) return { text: formatDate(airDate), isRemaining: false };
       const months = Math.floor(days / 30);
       const remDays = days % 30;
       let text;
@@ -665,6 +671,10 @@ export default function SeasonDetails({ route, navigation }) {
                 dateDiff={dateDiff}
                 adjustOpacity={adjustOpacity}
                 isWatched={watched.isEpisodeWatched(seasonNumber, episode.episode_number)}
+                watchEvents={watched.episodeWatchEvents(
+                  seasonNumber,
+                  episode.episode_number,
+                )}
                 onPress={() =>
                   navigation.navigate("EpisodeDetails", {
                     showId,
@@ -686,17 +696,7 @@ export default function SeasonDetails({ route, navigation }) {
       </View>
     </ScrollView>
 
-    {/* Kar: bölüm sayısına göre N adet yerine tek sabit overlay */}
-    {showSnow && (
-      <View style={styles.snowOverlay} pointerEvents="none">
-        <LottieView
-          style={{ flex: 1 }}
-          source={require("@lottie/snow.json")}
-          autoPlay
-          loop
-        />
-      </View>
-    )}
+    <ScreenSnow />
 
     <BackButton variant="blur" />
     </View>
@@ -760,14 +760,6 @@ const styles = StyleSheet.create({
     marginTop: 0,
     paddingHorizontal: 18,
     paddingTop: 16,
-  },
-  snowOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1,
   },
 
   // ── Başlık ────────────────────────────────────────────────────────────────

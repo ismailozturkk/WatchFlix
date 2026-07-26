@@ -47,7 +47,7 @@ function StoryActionBarComponent({ busy, onShare, onShareSticker, onOpenSettings
         >
           <Ionicons name="cut-outline" size={22} color={theme.text.secondary} />
           <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>
-            Sticker
+            {i18nText("autoI18n.sticker", "Sticker")}
           </Text>
         </TouchableOpacity>
       )}
@@ -60,7 +60,7 @@ function StoryActionBarComponent({ busy, onShare, onShareSticker, onOpenSettings
       >
         <Ionicons name="download-outline" size={22} color={theme.text.secondary} />
         <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>
-          Galeri
+          {i18nText("autoI18n.galeri", "Galeri")}
         </Text>
       </TouchableOpacity>
 

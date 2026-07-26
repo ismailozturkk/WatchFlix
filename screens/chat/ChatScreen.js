@@ -67,7 +67,7 @@ import {
   useHapticsSettings,
   useImageQualitySettings,
 } from "@context/AppSettingsContext";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "@services/hapticsService";
 import { useLanguage } from "@context/LanguageContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import { createSocialNotification } from "@services/socialNotificationsService";
@@ -2088,6 +2088,7 @@ export default function ChatScreen({ route, navigation }) {
                       multiline
                       numberOfLines={6}
                       onChangeText={handleTyping}
+                      maxLength={2000}
                       placeholder={i18nText("autoI18n.mesaj_yazin", "Mesaj yazın...")}
                       placeholderTextColor="rgba(255,255,255,0.2)"
                       onFocus={handleInputFocus}
@@ -2180,6 +2181,7 @@ export default function ChatScreen({ route, navigation }) {
                         setSearchText(val);
                         fetchSearchResults(searchChoise, val);
                       }}
+                      maxLength={80}
                       placeholder={i18nText("autoI18n.bir_seyler_yazin", "Bir şeyler yazın...")}
                       placeholderTextColor="rgba(255,255,255,0.25)"
                       selectionColor={ACCENT}

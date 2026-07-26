@@ -21,12 +21,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import LottieView from "lottie-react-native";
-import { useSnow } from "../../context/SnowContext";
 import Toast from "react-native-toast-message";
 import { getDoc, doc, updateDoc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
+import WatchHistorySheet from "@components/modals/WatchHistorySheet";
 import ListView from "../../components/ListView";
 import PosterImage from "../../components/PosterImage";
 import { useAppSettings, useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
@@ -41,10 +40,13 @@ import { BlurView } from "expo-blur";
 import { useListStatusContext } from "../../context/ListStatusContext";
 import {
   addToList,
+  markMovieWatch,
+  removeMovieWatchEvent,
   removeFromList,
   PREDEFINED_MOVIE_LISTS,
 } from "../../services/listItemsService";
-import IconBacground from "../../components/IconBacground";
+import { movieWatchEvents } from "../../utils/watchHistory";
+import ScreenDecor from "../../components/ScreenDecor";
 import { useAuth } from "../../context/AuthContext";
 import CommentSheetModal from "@components/modals/CommentSheetModal";
 import RatingSheetModal from "@components/modals/RatingSheetModal";
@@ -53,6 +55,7 @@ import ImageGalleryModal from "@components/modals/ImageGalleryModal";
 import TrailerSection from "@components/video/TrailerSection";
 import PaginatedRail from "../../components/PaginatedRail";
 import { i18nText } from "../../utils/i18nText";
+import { daysUntil, parseAirDate } from "../../utils/airDate";
 import AIChatScreen from "../AIChatScreen";
 
 
@@ -62,6 +65,8 @@ const BACKDROP_HEIGHT = width * (9 / 16);
 // (tablette aşırı genişlememesi için üst sınır var).
 const VIDEO_WIDTH = Math.min(width - 24, 720);
 const VIDEO_HEIGHT = Math.round((VIDEO_WIDTH * 9) / 16);
+// Fotoğrafı olmayan oyuncu kartındaki ikon: kart genişliğinin (width * 0.2) ~%45'i.
+const CAST_PLACEHOLDER_ICON = Math.round(width * 0.09);
 
 /* ─────────────────────────────────────────
    SimilarMovieItem
@@ -184,10 +189,11 @@ export default function MovieDetails({ navigation, route }) {
     }
   };
 
-  const { API_KEY, showSnow } = useAppSettings();
+  const { API_KEY } = useAppSettings();
   const { getTmdbUrl } = useImageQualitySettings();
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [watchHistoryVisible, setWatchHistoryVisible] = useState(false);
   const [aiVisible, setAiVisible] = useState(false);
   const [PosterModalVisible, setPosterModalVisible] = useState(false);
   const [backdropModalVisible, setBacdropModalVisible] = useState(false);
@@ -210,8 +216,8 @@ export default function MovieDetails({ navigation, route }) {
 
   const formatDate = (timestamp) => {
     if (!timestamp) return "";
-    const date = new Date(timestamp);
-    if (isNaN(date.getTime())) return "";
+    const date = parseAirDate(timestamp);
+    if (!date) return "";
     return new Intl.DateTimeFormat(language, {
       day: "numeric",
       month: "long",
@@ -219,11 +225,13 @@ export default function MovieDetails({ navigation, route }) {
     }).format(date);
   };
 
+  // Takvim günü farkı (bkz. utils/airDate.js) — "geçen süre" ile hesaplanırsa
+  // yarın vizyona girecek film için "Bugün" yazıyordu.
   const calculateDateDifference = (airDate) => {
     if (!airDate) return null;
-    const diff = new Date(airDate).getTime() - Date.now();
-    if (diff < 0) return { text: formatDate(airDate), isRemaining: false };
-    const days = Math.floor(diff / 86400000);
+    const days = daysUntil(airDate);
+    if (days === null) return null;
+    if (days < 0) return { text: formatDate(airDate), isRemaining: false };
     const months = Math.floor(days / 30);
     const rem = days % 30;
     const text =
@@ -379,7 +387,15 @@ export default function MovieDetails({ navigation, route }) {
     }
   };
 
-  const { allLists, statusIndex } = useListStatusContext();
+  const { allLists, statusIndex, watchedMoviesItems } = useListStatusContext();
+  const watchedMovieDoc = useMemo(
+    () => (watchedMoviesItems || []).find((item) => String(item.id) === String(id)) || null,
+    [watchedMoviesItems, id],
+  );
+  const watchEvents = useMemo(
+    () => movieWatchEvents(watchedMovieDoc),
+    [watchedMovieDoc],
+  );
 
   const getListName = (l) =>
     ({
@@ -412,7 +428,28 @@ export default function MovieDetails({ navigation, route }) {
         // Yeni model: her öğe ayrı doküman (listItemsService).
         const isIn = !!listStates[listType];
         setIsLoading(listType === "watchedMovies");
-        if (isIn) {
+        if (listType === "watchedMovies") {
+          if (!date) {
+            Toast.show({ type: "warning", text1: i18nText("autoI18n.lutfen_bir_tarih_secin", "Lütfen bir tarih seçin.") });
+            setIsLoading(false);
+            return;
+          }
+          await markMovieWatch(user.uid, {
+            id: details.id,
+            type: "movie",
+            name: details.title,
+            imagePath: details.poster_path,
+            dateAdded: date,
+            minutes: details.runtime,
+            genres: details.genres?.map((g) => g.name) || [],
+          }, date);
+          Toast.show({
+            type: "success",
+            text1: isIn
+              ? i18nText("autoI18n.tekrar_izleme_eklendi", "Tekrar izleme geçmişe eklendi.")
+              : i18nText("autoI18n.film_izlendi_eklendi", "Film izlendi olarak eklendi."),
+          });
+        } else if (isIn) {
           await removeFromList(user.uid, listType, type, details.id);
           toastRemove();
         } else {
@@ -496,16 +533,26 @@ export default function MovieDetails({ navigation, route }) {
       activeOpacity={0.8}
     >
       <View style={styles.castItem}>
-        <Image
-          source={
-            item.profile_path
-              ? {
-                  uri: getTmdbUrl(item.profile_path, 'poster', 200),
-                }
-              : require("../../assets/image/user.png")
-          }
-          style={[styles.castImage, { borderColor: theme.border }]}
-        />
+        {item.profile_path ? (
+          <Image
+            source={{ uri: getTmdbUrl(item.profile_path, 'poster', 200) }}
+            style={[styles.castImage, { borderColor: theme.border }]}
+          />
+        ) : (
+          <View
+            style={[
+              styles.castImage,
+              styles.castImagePlaceholder,
+              { borderColor: theme.border, backgroundColor: theme.secondary },
+            ]}
+          >
+            <FontAwesome
+              name="user"
+              size={CAST_PLACEHOLDER_ICON}
+              color={theme.text.muted}
+            />
+          </View>
+        )}
         <Text
           allowFontScaling={false}
           style={[styles.castName, { color: theme.text.primary }]}
@@ -561,7 +608,11 @@ export default function MovieDetails({ navigation, route }) {
   const aiPrompt = useMemo(() => {
     if (!details?.title) return "";
     const year = details.release_date ? ` (${String(details.release_date).slice(0, 4)})` : "";
-    return `${details.title}${year} filmi hakkında spoiler vermeden bilgi ver. Konusu, türü, öne çıkan oyuncuları, atmosferi, kimlere uygun olduğu ve neden izlenebileceğini kısa başlıklarla anlat.`;
+    return i18nText(
+      "autoI18n.film_ai_prompt",
+      "{{title}} filmi hakkında spoiler vermeden bilgi ver. Konusu, türü, öne çıkan oyuncuları, atmosferi, kimlere uygun olduğu ve neden izlenebileceğini kısa başlıklarla anlat.",
+      { title: `${details.title}${year}` },
+    );
   }, [details]);
 
   if (loading) return <DetailsSkeleton />;
@@ -585,7 +636,7 @@ export default function MovieDetails({ navigation, route }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
-      <IconBacground opacity={0.25} />
+      <ScreenDecor iconOpacity={0.25} />
       <StatusBar
         barStyle="light-content"
         translucent
@@ -731,6 +782,7 @@ export default function MovieDetails({ navigation, route }) {
             isReminderSet={isReminderSet}
             updateList={updateMovieList}
             updateWatchedList={openModal}
+            openWatchedHistory={() => setWatchHistoryVisible(true)}
             addReminder={addReminder}
             navigation={navigation}
             listStates={listStates}
@@ -1238,17 +1290,6 @@ export default function MovieDetails({ navigation, route }) {
         </View>
       </ScrollView>
 
-      {/* Kar: scroll boyunca 4 adet yerine tek sabit overlay (MovieScreen paterni) */}
-      {showSnow && (
-        <View style={styles.snowOverlay} pointerEvents="none">
-          <LottieView
-            style={{ flex: 1 }}
-            source={require("@lottie/snow.json")}
-            autoPlay
-            loop
-          />
-        </View>
-      )}
 
       {/* ─── ÜST OVERLAY BUTONLARI (her zaman tıklanabilir) ─── */}
       <TouchableOpacity
@@ -1324,6 +1365,34 @@ export default function MovieDetails({ navigation, route }) {
       </Modal>
 
       {/* İzleme tarihi */}
+      <WatchHistorySheet
+        visible={watchHistoryVisible}
+        onClose={() => setWatchHistoryVisible(false)}
+        title={details?.title}
+        events={watchEvents}
+        busy={isLoading}
+        onAddAgain={() => {
+          setWatchHistoryVisible(false);
+          setTimeout(openModal, 180);
+        }}
+        onDeleteEvent={async (event) => {
+          if (!user?.uid || !details?.id) return;
+          try {
+            setIsLoading(true);
+            await removeMovieWatchEvent(user.uid, details.id, event.id);
+            Toast.show({
+              type: "success",
+              text1: i18nText("autoI18n.izleme_kaydi_silindi", "Seçilen izleme kaydı silindi."),
+            });
+            if (watchEvents.length <= 1) setWatchHistoryVisible(false);
+          } catch (error) {
+            Toast.show({ type: "error", text1: i18nText("autoI18n.hata_2", "Hata: ") + error.message });
+          } finally {
+            setIsLoading(false);
+          }
+        }}
+      />
+
       <WatchedDateSheet
         visible={modalVisible}
         onClose={closeModal}
@@ -1412,14 +1481,6 @@ const styles = StyleSheet.create({
   },
 
   /* Lottie snow */
-  snowOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1,
-  },
 
   /* Info header */
   infoHeader: {
@@ -1616,6 +1677,7 @@ const styles = StyleSheet.create({
     marginBottom: 7,
     borderWidth: 1.5,
   },
+  castImagePlaceholder: { justifyContent: "center", alignItems: "center" },
   castName: {
     fontSize: 11.5,
     textAlign: "center",

@@ -22,6 +22,7 @@ import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
+import { CountdownBadge, ReleaseDateBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import { i18nText } from "../../utils/i18nText";
 
 const { width } = Dimensions.get("window");
@@ -59,17 +60,10 @@ const MovieUpcomingCard = memo(function MovieUpcomingCard({ item, navigation, th
         />
 
         {posterBadges?.countdown !== false && (
-          <View style={[styles.relaseDateCount, { backgroundColor: theme.secondaryt }]}>
-            <Text style={[styles.similarRatingText, { color: theme.text.secondary }]}>
-              {RelaseCount(item.release_date)}{i18nText("autoI18n.gun", "gün")}</Text>
-          </View>
+          <CountdownBadge date={item.release_date} style={POSTER_BADGE_POS.topLeft} />
         )}
         {posterBadges?.releaseDate !== false && (
-          <View style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}>
-            <Text style={[styles.similarRatingText, { color: theme.text.primary }]}>
-              {item.release_date}
-            </Text>
-          </View>
+          <ReleaseDateBadge date={item.release_date} style={POSTER_BADGE_POS.topRight} />
         )}
         <ListBadges
           mediaId={item.id}

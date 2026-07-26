@@ -1,6 +1,7 @@
 import React from "react";
 import { View, StyleSheet, TouchableOpacity, Dimensions } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { i18nText } from "../utils/i18nText";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -150,7 +151,7 @@ const SwipeCard = ({ children, leftButton, rightButton }) => {
             onPress={rightButton.onPress}
           >
             <Animated.Text style={styles.actionText}>
-              {rightButton.label || "Sağ"}
+              {rightButton.label || i18nText("autoI18n.sag", "Sağ")}
             </Animated.Text>
           </TouchableOpacity>
         </Animated.View>

@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Animated,
 } from "react-native";
+import { i18nText } from "../../utils/i18nText";
 import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
 import React, { memo, useEffect, useMemo, useRef } from "react";
@@ -20,6 +21,7 @@ import { MovieOscarSkeleton } from "../../components/Skeleton";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
+import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
@@ -80,11 +82,11 @@ const MovieOscarCard = memo(function MovieOscarCard({ item, index, navigation, t
             transition={120}
           />
           {posterBadges?.tmdbRating !== false && (
-            <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
-              <Text allowFontScaling={false} style={styles.similarRatingText}>
-                {item.vote_average.toFixed(1)}
-              </Text>
-            </View>
+            <RatingBadge
+              value={item.vote_average}
+              votes={item.vote_count}
+              style={POSTER_BADGE_POS.bottomRight}
+            />
           )}
         </View>
 
@@ -135,7 +137,7 @@ export default function MovieOscar({ navigation }) {
   }
 
   if (errorOscar) {
-    return <Text>Error: {errorOscar}</Text>;
+    return <Text>{i18nText("error", "Hata")}: {errorOscar}</Text>;
   }
   const renderMovieItem = ({ item, index }) => {
     if (!item.poster_path) return null;

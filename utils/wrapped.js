@@ -1,6 +1,6 @@
 // utils/wrapped.js
 //
-// Watchify Wrapped — saf hesaplama katmanı (Firestore/listener YOK).
+// Seelogd Wrapped — saf hesaplama katmanı (Firestore/listener YOK).
 // ProfileStatsContext'in zaten topladığı zaman damgalı izleme verisinden
 // (filmler: dateAdded, bölümler: episodeWatchTime) yıllık bir "recap" üretir.
 //
@@ -61,6 +61,28 @@ export const getAvailableYears = (movies = [], episodes = []) => {
   return [...set].sort((a, b) => b - a);
 };
 
+/**
+ * Bir bölümü ait olduğu diziye bağlayan anahtar.
+ * showId yoksa dizi adına düşer; bölümün kendi `id`si ASLA kullanılmaz —
+ * o `showId_sezon_bölüm_event` biçiminde bölüm başına tekil olduğundan
+ * her bölüm ayrı bir diziymiş gibi sayılırdı.
+ */
+const showKeyOf = (episode) => episode?.showId ?? episode?.showName ?? null;
+
+/**
+ * Bölüm listesindeki farklı dizi sayısı. Dizi sayısı üç yerde gösteriliyor
+ * (Wrapped özeti, profildeki giriş kartı, yıllık arşiv); hesap tek yerde
+ * tutulmazsa aynı yıl için farklı sayılar görünür.
+ */
+export const countShows = (episodes = []) => {
+  const set = new Set();
+  episodes.forEach((e) => {
+    const key = showKeyOf(e);
+    if (key != null) set.add(key);
+  });
+  return set.size;
+};
+
 // ─── Kişilik (tür → izleyici kişiliği rozeti) ────────────────────────────────
 
 const PERSONALITIES = [
@@ -119,7 +141,7 @@ export const buildYearlyRecap = ({ movies = [], episodes = [], year, language = 
   // ── En çok izlenen diziler (yıl içi bölüm sayısına göre) ──
   const showMap = {};
   myEps.forEach((e) => {
-    const id = e.showId ?? e.showName;
+    const id = showKeyOf(e);
     if (id == null) return;
     if (!showMap[id])
       showMap[id] = {

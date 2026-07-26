@@ -18,19 +18,22 @@ import {
   clearReminderWidget,
   syncReminderWidget,
 } from "../services/reminderWidgetService";
+import { daysUntil, parseAirDate } from "../utils/airDate";
 
 const ProfileRemindersContext = createContext();
 export const useProfileReminders = () => useContext(ProfileRemindersContext);
 
+// Takvim günü farkı üzerinden metin üretir — "geçen süre" değil (bkz.
+// utils/airDate.js). Bugün yayınlanan bir bölüm gün içinde saat kaç olursa
+// olsun "Bugün" der; yarınki her zaman "1 gün".
 const buildDateText = (airDate, t) => {
-  const diff = new Date(airDate).getTime() - Date.now();
-  if (diff < 0) return null;
-  const days   = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const days = daysUntil(airDate);
+  if (days === null || days < 0) return null; // geçersiz ya da geçmiş
+  if (days === 0) return t.today;
   const months = Math.floor(days / 30);
   const rem    = days % 30;
   if (months > 0) return rem > 0 ? `${months} ${t.month} ${rem} ${t.days}` : `${months} ${t.month}`;
-  if (days > 0)   return `${days} ${t.days}`;
-  return t.today;
+  return `${days} ${t.days}`;
 };
 
 // Migrate Reminders/{uid} doc arrays → subcollections
@@ -156,13 +159,13 @@ export const ProfileRemindersProvider = ({ children }) => {
               console.warn("Error checking old reminders:", err?.message);
           }
           setMovieReminders([]);
-          if (shouldPersistInternetData()) {
+          if (shouldPersistInternetData({ category: "reminders" })) {
             cacheStore.setJSON(...cacheKeys.reminders(uid, "movies"), []);
           }
         } else {
           const movies = snap.docs.map((d) => d.data());
           setMovieReminders(movies);
-          if (shouldPersistInternetData()) {
+          if (shouldPersistInternetData({ category: "reminders" })) {
             cacheStore.setJSON(...cacheKeys.reminders(uid, "movies"), movies);
           }
         }
@@ -192,7 +195,7 @@ export const ProfileRemindersProvider = ({ children }) => {
 
         if (showsSnap.empty) {
           setAllTvEpisodes([]);
-          if (shouldPersistInternetData()) {
+          if (shouldPersistInternetData({ category: "reminders" })) {
             cacheStore.setJSON(...cacheKeys.reminders(uid, "episodes"), []);
           }
           return;
@@ -208,7 +211,7 @@ export const ProfileRemindersProvider = ({ children }) => {
               epDataRef.current[sid] = epSnap.docs.map((d) => d.data());
               const all = Object.values(epDataRef.current).flat();
               setAllTvEpisodes(all);
-              if (shouldPersistInternetData()) {
+              if (shouldPersistInternetData({ category: "reminders" })) {
                 cacheStore.setJSON(...cacheKeys.reminders(uid, "episodes"), all);
               }
             },
@@ -243,17 +246,18 @@ export const ProfileRemindersProvider = ({ children }) => {
 
   const formatDate = (timestamp) => {
     if (!timestamp) return "";
-    const date = new Date(timestamp);
-    if (isNaN(date.getTime())) return typeof timestamp === "string" ? timestamp : "Bilinmeyen Tarih";
+    // parseAirDate: "2026-07-26" yerel gece yarısı olarak çözülür, yoksa
+    // negatif UTC ofsetli cihazlarda bir önceki gün yazardı.
+    const date = parseAirDate(timestamp);
+    if (!date) return typeof timestamp === "string" ? timestamp : "Bilinmeyen Tarih";
     return new Intl.DateTimeFormat(language, { day: "numeric", month: "long", year: "numeric" }).format(date);
   };
 
   const calculateDateDifference = (airDate) => {
-    if (isNaN(new Date(airDate))) return null;
+    const days = daysUntil(airDate);
+    if (days === null) return null;
     const text = buildDateText(airDate, t);
     if (text === null) return { text: formatDate(airDate), isRemaining: false };
-    const diff  = new Date(airDate).getTime() - Date.now();
-    const days  = Math.floor(diff / (1000 * 60 * 60 * 24));
     return { text, days, months: Math.floor(days / 30), isRemaining: true };
   };
 

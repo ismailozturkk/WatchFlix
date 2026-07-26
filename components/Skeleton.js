@@ -641,52 +641,68 @@ export const OnGoingSeriesSkeleton = () => {
 
 // ── Sosyal feed kartı (ShareContentScreen / PostDetail): avatar başlık + başlık
 // + poster rayı + aksiyon satırı. Gerçek PostCard (postStyles.card) ile aynı ölçü.
-export const PostCardSkeleton = () => {
+export const PostCardSkeleton = ({ fullWidth = false, showTopDivider = false }) => {
   const { theme } = useTheme();
   return (
     <View
-      style={{
-        marginHorizontal: 14,
-        marginBottom: 10,
-        borderRadius: 16,
-        padding: 13,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderLeftWidth: 2,
-        backgroundColor: theme.secondary,
-        borderColor: theme.border,
-        borderLeftColor: theme.border,
-      }}
+      style={
+        fullWidth
+          ? {
+              width: "100%",
+              paddingHorizontal: 16,
+              paddingTop: 15,
+              paddingBottom: 12,
+              borderTopWidth: showTopDivider ? StyleSheet.hairlineWidth : 0,
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              backgroundColor: theme.primary,
+              borderColor: theme.border,
+            }
+          : {
+              marginHorizontal: 14,
+              marginBottom: 10,
+              borderRadius: 16,
+              padding: 13,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderLeftWidth: 2,
+              backgroundColor: theme.secondary,
+              borderColor: theme.border,
+              borderLeftColor: theme.border,
+            }
+      }
     >
       {/* Başlık: avatar + isim/zaman + menü noktası */}
       <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
-        <Skeleton width={34} height={34} style={{ borderRadius: 17 }} />
+        <Skeleton
+          width={fullWidth ? 42 : 34}
+          height={fullWidth ? 42 : 34}
+          style={{ borderRadius: fullWidth ? 21 : 17 }}
+        />
         <View style={{ flex: 1, marginLeft: 10, gap: 6 }}>
           <Skeleton width={"42%"} height={12} style={{ borderRadius: 4 }} />
           <Skeleton width={"26%"} height={9} style={{ borderRadius: 4 }} />
         </View>
         <Skeleton width={4} height={16} style={{ borderRadius: 2 }} />
       </View>
-      {/* Başlık satırı */}
-      <Skeleton width={"70%"} height={15} style={{ borderRadius: 5, marginBottom: 12 }} />
-      {/* Poster rayı */}
-      <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
-        {[0, 1, 2].map((i) => (
-          <Skeleton key={i} width={78} height={117} style={{ borderRadius: 10 }} />
-        ))}
-      </View>
-      {/* Aksiyon satırı (beğen / yorum / paylaş) */}
-      <View
-        style={{
-          flexDirection: "row",
-          gap: 14,
-          paddingTop: 10,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: theme.border,
-        }}
-      >
-        {[46, 46, 40].map((w, i) => (
-          <Skeleton key={i} width={w} height={14} style={{ borderRadius: 6 }} />
-        ))}
+      <View style={fullWidth ? { marginLeft: 53 } : null}>
+        {/* Başlık satırı */}
+        <Skeleton width={"70%"} height={15} style={{ borderRadius: 5, marginBottom: 12 }} />
+        {/* Poster rayı */}
+        <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+          {[0, 1, 2].map((i) => (
+            <Skeleton
+              key={i}
+              width={fullWidth ? 86 : 78}
+              height={fullWidth ? 129 : 117}
+              style={{ borderRadius: fullWidth ? 13 : 10 }}
+            />
+          ))}
+        </View>
+        {/* Aksiyon satırı (beğen / yorum / paylaş) */}
+        <View style={{ flexDirection: "row", gap: 22 }}>
+          {[46, 46, 40].map((w, i) => (
+            <Skeleton key={i} width={w} height={14} style={{ borderRadius: 6 }} />
+          ))}
+        </View>
       </View>
     </View>
   );
@@ -696,7 +712,7 @@ export const PostCardSkeleton = () => {
 export const FeedSkeleton = ({ count = 4 }) => (
   <View style={{ paddingTop: 6 }}>
     {Array.from({ length: count }).map((_, i) => (
-      <PostCardSkeleton key={i} />
+      <PostCardSkeleton key={i} fullWidth showTopDivider={i === 0} />
     ))}
   </View>
 );

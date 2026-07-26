@@ -2,7 +2,7 @@
 //
 // Ayarlar hub'ı + alt ekranların paylaştığı yardımcılar, scaffold ve stiller.
 // Tek kaynak: SettingRow / SectionLabel / Chevron / buildUiColors + ortak `ui`
-// StyleSheet + SettingsSubScreen (root + IconBacground + ekran-içi BackButton
+// StyleSheet + SettingsSubScreen (root + ScreenDecor + ekran-içi BackButton
 // başlığı + ScrollView). Böylece her alt ekran aynı görünümü stil tekrarı
 // olmadan kullanır.
 
@@ -17,7 +17,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
 import BackButton from "@components/BackButton";
-import IconBacground from "@components/IconBacground";
+import ScreenDecor from "@components/ScreenDecor";
 import { useTheme } from "@context/ThemeContext";
 import { alpha } from "../../../theme/colors";
 
@@ -112,14 +112,24 @@ export function SettingRow({
 
 /**
  * Alt ayar ekranı iskeleti: arka plan + ekran-içi geri butonu/başlık + scroll.
+ *
+ * `scrollable={false}` verildiğinde gövde ScrollView'a sarılmaz; kendi
+ * kaydırmasını yöneten ekranlar (ör. sanallaştırılmış FlatList) için gerekli —
+ * FlatList'i ScrollView içine koymak sanallaştırmayı bozar.
  */
-export function SettingsSubScreen({ title, children }) {
+export function SettingsSubScreen({
+  title,
+  children,
+  background = null,
+  scrollable = true,
+}) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const C = buildUiColors(theme);
   return (
     <View style={[ui.root, { backgroundColor: C.bg }]}>
-      <IconBacground opacity={0.15} />
+      <ScreenDecor iconOpacity={0.15} />
+      {background}
       <View style={[ui.header, { paddingTop: insets.top + 8 }]}>
         <BackButton absolute={false} />
         <Text
@@ -131,14 +141,18 @@ export function SettingsSubScreen({ title, children }) {
         </Text>
         <View style={ui.headerSpacer} />
       </View>
-      <ScrollView
-        style={ui.scroll}
-        contentContainerStyle={ui.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {children}
-      </ScrollView>
+      {scrollable ? (
+        <ScrollView
+          style={ui.scroll}
+          contentContainerStyle={ui.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {children}
+        </ScrollView>
+      ) : (
+        <View style={ui.scroll}>{children}</View>
+      )}
     </View>
   );
 }

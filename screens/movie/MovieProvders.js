@@ -20,6 +20,7 @@ import {
 } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
+import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import PaginatedRail from "../../components/PaginatedRail";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -60,11 +61,11 @@ const MovieProvidersCard = memo(function MovieProvidersCard({ item, navigation, 
         />
 
         {posterBadges?.tmdbRating !== false && (
-          <View style={[styles.similarRating, { backgroundColor: theme.secondaryt }]}>
-            <Text allowFontScaling={false} style={styles.similarRatingText}>
-              {item.vote_average.toFixed(1)}
-            </Text>
-          </View>
+          <RatingBadge
+            value={item.vote_average}
+            votes={item.vote_count}
+            style={POSTER_BADGE_POS.bottomRight}
+          />
         )}
         <ListBadges
           mediaId={item.id}

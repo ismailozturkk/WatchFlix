@@ -1,7 +1,7 @@
 // ============================================================
 //  components/DatePickerModal.js
 //  Drum-picker tabanlı tarih seçici bottom sheet.
-//  Watchify tema sistemiyle uyumlu, izleme listesine ekleme
+//  Seelogd tema sistemiyle uyumlu, izleme listesine ekleme
 //  sırasında tarih seçimi için kullanılır.
 //
 //  Kullanım:
