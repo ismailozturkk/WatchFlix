@@ -1,9 +1,26 @@
-WhatchFlix/
-├── .agent/
-│   └── workflows/
-│       └── debug-screen.md
-├── .claude/
-│   └── settings.local.json
+Seelogd/
+├── __tests__/
+│   ├── accountConnectionsService.test.js
+│   ├── chatOptimistic.test.js
+│   ├── discoveryPersonalization.test.js
+│   ├── fuzzyMediaSearch.test.js
+│   ├── gameConfig.test.js
+│   ├── gameScoring.test.js
+│   ├── googleAuthService.test.js
+│   ├── groupRoles.test.js
+│   ├── ossLicenses.test.js
+│   ├── postComposer.test.js
+│   ├── premium.test.js
+│   ├── reminderWidgetService.test.js
+│   ├── revenueCatWebhook.test.js
+│   ├── streamingDiff.test.js
+│   ├── tournamentEngine.test.js
+│   ├── userProfileCreate.test.js
+│   ├── watchActivity.test.js
+│   ├── watchBadgeCatalog.test.js
+│   ├── watchHistory.test.js
+│   ├── watchLedgerCore.test.js
+│   └── watchScoring.test.js
 ├── assets/
 │   ├── avatar/
 │   │   ├── 0.png
@@ -244,9 +261,6 @@ WhatchFlix/
 │   ├── image/
 │   │   ├── no_image.png
 │   │   ├── pngwing.com.png
-│   │   ├── star_gray.png
-│   │   ├── star_half_orange.png
-│   │   ├── star_orange.png
 │   │   └── user.png
 │   ├── lottie/
 │   │   ├── 6_fireworks.json
@@ -290,19 +304,52 @@ WhatchFlix/
 │   │   ├── typingAnimation.json
 │   │   ├── warning.json
 │   │   └── yon.json
-│   ├── pets/
-│   │   ├── astro_pet_spritesheet.png
-│   │   ├── Astronaut-Sheet.png
-│   │   └── Warrior-character.png
 │   ├── android-icon-background.png
 │   ├── android-icon-foreground.png
 │   ├── android-icon-monochrome.png
 │   ├── favicon.png
 │   ├── icon.png
-│   └── splash-icon.png
+│   └── ossLicenses.json
 ├── components/
+│   ├── animated/
+│   │   └── RollingNumber.js
+│   ├── auth/
+│   │   └── EmailSuffixRow.js
+│   ├── badges/
+│   │   ├── AppBadge.js
+│   │   ├── badgeCatalog.js
+│   │   ├── WatchBadgeCard.js
+│   │   ├── watchBadgeCatalog.js
+│   │   └── WatchBadgeDetailModal.js
+│   ├── calendar/
+│   │   └── CalendarFilterPanel.js
+│   ├── chat/
+│   │   ├── GroupAvatar.js
+│   │   ├── GroupAvatarGrid.js
+│   │   ├── GroupAvatarPickerModal.js
+│   │   ├── GroupInfoModal.js
+│   │   ├── MessageReplyPreview.js
+│   │   ├── PinnedMessagesModal.js
+│   │   ├── PollMessage.js
+│   │   ├── SharedMediaCollection.js
+│   │   ├── SharedMediaMessage.js
+│   │   ├── SwipeReplyContainer.js
+│   │   └── TextPollComposer.js
+│   ├── detail/
+│   │   ├── SectionHeader.js
+│   │   └── WatchedDateSheet.js
+│   ├── game/
+│   │   ├── AnswerOptionCard.js
+│   │   ├── ExitGameSheet.js
+│   │   ├── GameErrorState.js
+│   │   ├── GameLoadingState.js
+│   │   ├── GameTimerBar.js
+│   │   ├── GameTopBar.js
+│   │   ├── JokerBar.js
+│   │   └── SceneResultShareCard.js
+│   ├── hub/
+│   │   └── TournamentWidget.js
 │   ├── lists/
-│   │   ├── ListFilters.js
 │   │   ├── ListGrid.js
 │   │   ├── ListHeader.js
 │   │   └── ListItemCard.js
@@ -311,53 +358,104 @@ WhatchFlix/
 │   │   ├── ChatModal.js
 │   │   ├── CommentSheetModal.js
 │   │   ├── CreatePostModal.js
+│   │   ├── CreateSharedListModal.js
 │   │   ├── DatePickerModal.js
-│   │   └── ImageGalleryModal.js
+│   │   ├── ImageGalleryModal.js
+│   │   ├── PostCommentSheetModal.js
+│   │   ├── RatingSheetModal.js
+│   │   └── WatchHistorySheet.js
+│   ├── pet/
+│   │   ├── PetCompanion.js
+│   │   ├── PetSettingsSection.js
+│   │   └── SpritePet.js
 │   ├── profile/
 │   │   ├── CalendarWidget.js
-│   │   └── StatsComponents.js
+│   │   ├── ProfileAvatarPickerModal.js
+│   │   ├── ProfileGamesModule.js
+│   │   ├── StatsComponents.js
+│   │   ├── WatchBadgeStrip.js
+│   │   └── WatchLevelCard.js
 │   ├── storyShare/
 │   │   ├── SaveDraftModal.js
 │   │   ├── StoryActionBar.js
 │   │   ├── StoryHeader.js
 │   │   ├── StorySlider.js
 │   │   └── StoryTabs.js
+│   ├── theme/
+│   │   ├── ColorPickerSheet.js
+│   │   └── ThemePreviewCard.js
+│   ├── tournament/
+│   │   ├── BracketTree.js
+│   │   ├── CountdownTimer.js
+│   │   ├── MatchCard.js
+│   │   ├── NomineeSearchModal.js
+│   │   ├── PodiumModal.js
+│   │   └── StageTimeline.js
+│   ├── video/
+│   │   ├── TrailerModal.js
+│   │   └── TrailerSection.js
+│   ├── wrapped/
+│   │   ├── WrappedShareCard.js
+│   │   ├── WrappedSlides.js
+│   │   └── WrappedYearPath.js
 │   ├── AICineCards.js
+│   ├── AppAlert.js
 │   ├── AppIcon.js
+│   ├── AppToast.js
+│   ├── BackButton.js
+│   ├── BatteryOptimizationNotice.js
+│   ├── CacheManagerModal.js
 │   ├── Comment.js
+│   ├── DiscoveryMediaRail.js
 │   ├── ErrorBoundary.js
 │   ├── IconBacground.js
 │   ├── ListBadges.js
 │   ├── ListView.js
 │   ├── ListViewTv.js
 │   ├── PaginatedRail.js
+│   ├── PermissionsSection.js
+│   ├── PosterImage.js
+│   ├── PosterInfoBadges.js
+│   ├── PosterMarqueeBackground.js
+│   ├── RatingInput.js
 │   ├── RatingStars.js
+│   ├── RatingSummary.js
 │   ├── Reminder.js
+│   ├── ScreenSnow.js
+│   ├── SeeAllHeader.js
+│   ├── SharedListsSection.js
 │   ├── Skeleton.js
 │   ├── SkeletonGraph.js
-│   ├── StableHorizontalList.js
+│   ├── StaggerItem.js
 │   ├── SwipeCard.js
 │   ├── SwitchToggle.js
+│   ├── TmdbLogo.js
 │   └── TVShowItem.js
 ├── context/
 │   ├── AppSettingsContext.js
 │   ├── AuthContext.js
 │   ├── CalendarContext.js
+│   ├── ConnectivityContext.js
+│   ├── DeviceNotificationsContext.js
 │   ├── FriendsContext.js
 │   ├── LanguageContext.js
 │   ├── ListStatusContext.js
+│   ├── MediaActivityContext.js
 │   ├── MovieContex.js
 │   ├── NotificationsContext.js
+│   ├── PetContext.js
 │   ├── PostsContext.js
+│   ├── PremiumContext.js
 │   ├── ProfileNotesContext.js
 │   ├── ProfileRemindersContext.js
-│   ├── ProfileScreenContext.js
 │   ├── ProfileStatsContext.js
 │   ├── ProfileUiContext.js
+│   ├── SharedListsContext.js
 │   ├── SnowContext.js
 │   ├── ThemeContext.js
 │   ├── TvShowContex.js
-│   └── UserProfileContext.js
+│   ├── UserProfileContext.js
+│   └── WatchProgressContext.js
 ├── docs/
 │   ├── memory-bank/
 │   │   ├── activeContext.md
@@ -366,29 +464,59 @@ WhatchFlix/
 │   │   ├── projectbrief.md
 │   │   ├── systemPatterns.md
 │   │   └── techContext.md
-│   ├── degisen.txt
-│   ├── docs_baseline_inventory.txt
-│   ├── dosyaların_eski_hali.txt
+│   ├── ACIK_KAYNAK_LISANSLARI.md
 │   ├── FIRESTORE_SCHEMA.txt
 │   ├── GELISTIRME_PLANI.txt
 │   ├── GEMINI.md
+│   ├── GOOGLE_AUTH_KURULUM.txt
 │   ├── MASTER_GOREV_LISTESI.txt
+│   ├── OYUN_KISMI_GELISTIRME.txt
+│   ├── ozellik-onerileri-arastirma.md
 │   ├── performance_optimization.txt
 │   ├── PERFORMANS_GUNCELLEME_ADIMLARI.txt
 │   ├── PERFORMANS_INCELEME_RAPORU.txt
 │   ├── PERFORMANS_OPTIMIZASYON_PLANI.txt
 │   ├── PROJE_ANALIZ_RAPORU.txt
 │   ├── PROJE_DOSYA_YAPISI.txt
-│   └── PROJECT_CONTEXT.md
+│   ├── PROJECT_CONTEXT.md
+│   ├── PUANLAMA_ROZET_SISTEMI.md
+│   ├── reminder-widget-ios-kurulum.md
+│   ├── REVENUECAT_KURULUM.md
+│   ├── streaming-bildirimleri-kurulum.md
+│   ├── UYGULAMA_BILGISI_VE_MIMARISI.md
+│   └── YAYIN_VE_GELIR_YOL_HARITASI.md
+├── functions/
+│   ├── scripts/
+│   │   └── purgeStaleTokens.js
+│   ├── .gitignore
+│   ├── index.js
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── README.md
+│   ├── revenueCatWebhook.js
+│   └── streamingDiff.js
 ├── hooks/
-│   ├── useListData.js
-│   ├── useListFilters.js
-│   └── useListStatus.js
+│   ├── useListStatus.js
+│   ├── useMediaActivity.js
+│   ├── useModalKeyboardLift.js
+│   ├── usePullToSearch.js
+│   ├── useRailPosterStyle.js
+│   ├── useSceneGame.js
+│   ├── useStartupGate.js
+│   ├── useWatchedShow.js
+│   └── useWatchProgress.js
+├── modules/
+│   └── reminder-widget/
+│       ├── ios/
+│       │   ├── ReminderWidget.podspec
+│       │   └── ReminderWidgetModule.swift
+│       └── expo-module.config.json
 ├── screens/
 │   ├── actor/
 │   │   └── ActorViewScreen.js
 │   ├── auth/
 │   │   ├── ForgotPasswordScreen.js
+│   │   ├── GoogleProfileCompletionScreen.js
 │   │   ├── LoginScreen.js
 │   │   └── RegisterScreen.js
 │   ├── calendar/
@@ -396,13 +524,30 @@ WhatchFlix/
 │   ├── chat/
 │   │   ├── AIChatScreen.js
 │   │   ├── ChatScreen.js
+│   │   ├── CreateGroupScreen.js
+│   │   ├── GroupsListScreen.js
+│   │   ├── MessagesScreen.js
 │   │   └── SwipeView.js
+│   ├── game/
+│   │   ├── GameAchievementsScreen.js
+│   │   ├── gameConfig.js
+│   │   ├── GameHubScreen.js
+│   │   ├── GameLeaderboardScreen.js
+│   │   ├── gameRegistry.js
+│   │   ├── GameScreenShell.js
+│   │   ├── gameSessionStore.js
+│   │   ├── GameStatsScreen.js
+│   │   ├── SceneGameDetailScreen.js
+│   │   ├── SceneGamePlayScreen.js
+│   │   ├── SceneGameResultScreen.js
+│   │   ├── SceneGameSetupScreen.js
+│   │   └── SceneGuessGameScreen.js
 │   ├── lists/
 │   │   ├── ListsScreen.js
-│   │   └── ListsViewScreen.js
+│   │   ├── ListsViewScreen.js
+│   │   └── SharedListScreen.js
 │   ├── movie/
 │   │   ├── components/
-│   │   │   ├── MovieCastItem.js
 │   │   │   └── MovieVideoItem.js
 │   │   ├── MovieBests.js
 │   │   ├── MovieCollection.js
@@ -416,6 +561,11 @@ WhatchFlix/
 │   ├── navigation/
 │   │   ├── TabScreen.js
 │   │   └── TabScreenNavigator.js
+│   ├── onboarding/
+│   │   ├── OnboardingScreen.js
+│   │   └── OnboardingShowcases.js
+│   ├── premium/
+│   │   └── PremiumScreen.js
 │   ├── search/
 │   │   ├── ActorSearch.js
 │   │   ├── MovieSearch.js
@@ -423,6 +573,10 @@ WhatchFlix/
 │   │   ├── SearchAll.js
 │   │   ├── SearchFriendsScreen.js
 │   │   └── TvShowSearch.js
+│   ├── shared/
+│   │   └── SeeAllScreen.js
+│   ├── social/
+│   │   └── PostDetailScreen.js
 │   ├── story/
 │   │   ├── StoryDraftsScreen.js
 │   │   └── StoryShareScreen.js
@@ -434,6 +588,10 @@ WhatchFlix/
 │   │   │   ├── FriendRequestsScreen.js
 │   │   │   ├── FriendsListScreen.js
 │   │   │   ├── MovieStatisticsScreen.js
+│   │   │   ├── MyActivityButton.js
+│   │   │   ├── MyActivityScreen.js
+│   │   │   ├── NotesCard.js
+│   │   │   ├── NotesScreen.js
 │   │   │   ├── PrivacySettingsScreen.js
 │   │   │   ├── ProfileLists.js
 │   │   │   ├── ProfileNotes.js
@@ -443,9 +601,21 @@ WhatchFlix/
 │   │   │   ├── StatisticsSection.js
 │   │   │   ├── TvStatisticsScreen.js
 │   │   │   ├── UploadToCloudinary.js
-│   │   │   └── UserAvatar.js
+│   │   │   └── WatchBadgesScreen.js
 │   │   ├── setting/
+│   │   │   ├── CustomThemeScreen.js
 │   │   │   └── SettingsTheme.js
+│   │   ├── settings/
+│   │   │   ├── AboutAppScreen.js
+│   │   │   ├── AccountConnectionsScreen.js
+│   │   │   ├── OpenSourceLicensesScreen.js
+│   │   │   ├── PermissionsDataScreen.js
+│   │   │   ├── PersonalizationScreen.js
+│   │   │   ├── PosterSettingsScreen.js
+│   │   │   ├── ReminderNotificationsScreen.js
+│   │   │   ├── settingsUi.js
+│   │   │   └── SocialNotificationsScreen.js
+│   │   ├── HubScreen.js
 │   │   ├── MovieScreen.js
 │   │   ├── MyPostsScreen.js
 │   │   ├── ProfileScreen.js
@@ -453,37 +623,78 @@ WhatchFlix/
 │   │   ├── SettingsScreen.js
 │   │   ├── ShareContentScreen.js
 │   │   └── TvShowScreen.js
-│   └── tv/
-│       ├── EpisodeDetails.js
-│       ├── OnGoingSeries.js
-│       ├── SeasonDetails.js
-│       ├── SeasonItem.js
-│       ├── TvGraphDetailScreen.js
-│       ├── TvOngoingSection.js
-│       ├── TvShowBests.js
-│       ├── TvShowsAiringToday.js
-│       ├── TvShowsDetails.js
-│       ├── TvShowsGenres.js
-│       ├── TvShowsOnTheAir.js
-│       ├── TvShowsProvders.js
-│       ├── TvShowsTrends.js
-│       └── WatchedAdd.js
+│   ├── tournament/
+│   │   └── TournamentScreen.js
+│   ├── tv/
+│   │   ├── components/
+│   │   ├── EpisodeDetails.js
+│   │   ├── OnGoingSeries.js
+│   │   ├── SeasonDeck.js
+│   │   ├── SeasonDetails.js
+│   │   ├── SeasonItem.js
+│   │   ├── TvGraphDetailScreen.js
+│   │   ├── TvOngoingSection.js
+│   │   ├── TvShowBests.js
+│   │   ├── TvShowsAiringToday.js
+│   │   ├── TvShowsDetails.js
+│   │   ├── TvShowsGenres.js
+│   │   ├── TvShowsOnTheAir.js
+│   │   ├── TvShowsProvders.js
+│   │   ├── TvShowsTrends.js
+│   │   └── WatchedAdd.js
+│   ├── wrapped/
+│   │   └── WrappedScreen.js
+│   ├── AIChatScreen.js
+│   └── StoryShareScreen.js
+├── scripts/
+│   └── generate-oss-licenses.js
 ├── services/
+│   ├── accountConnectionsService.js
 │   ├── accountService.js
+│   ├── activityService.js
 │   ├── aiCineService.js
 │   ├── aiCineStore.js
 │   ├── aiConversationsStore.js
 │   ├── aiUserContext.js
+│   ├── cacheInspector.js
+│   ├── chatRtdb.js
+│   ├── dataDownloader.js
 │   ├── friendsService.js
+│   ├── fuzzyMediaSearch.js
 │   ├── geminiService.js
+│   ├── googleAuthService.js
+│   ├── groupsService.js
+│   ├── imagePrefetch.js
+│   ├── listItemsService.js
 │   ├── notificationsService.js
+│   ├── petCache.js
 │   ├── postsService.js
 │   ├── presenceService.js
+│   ├── profilePropagation.js
+│   ├── pushNotificationsService.js
+│   ├── ratingsService.js
+│   ├── reminderNotificationScheduler.js
+│   ├── reminderWidgetService.js
+│   ├── revenueCatService.js
+│   ├── sceneGamePreferences.js
+│   ├── sceneGameService.js
+│   ├── sharedListsService.js
+│   ├── socialNotificationsService.js
 │   ├── StoryDraftService.js
 │   ├── tmdbLookup.js
-│   └── userService.js
+│   ├── tournamentEngine.js
+│   ├── tournamentService.js
+│   ├── userService.js
+│   ├── watchedTvService.js
+│   └── wrappedService.js
+├── targets/
+│   └── reminder-widget/
+│       ├── expo-target.config.js
+│       └── index.swift
 ├── theme/
-│   └── colors.js
+│   ├── badgeTokens.js
+│   ├── colors.js
+│   └── gameTokens.js
 ├── translations/
 │   ├── en.json
 │   ├── index.js
@@ -491,20 +702,56 @@ WhatchFlix/
 ├── utils/
 │   ├── apiCache.js
 │   ├── avatars.js
+│   ├── axiosDataCache.js
+│   ├── cachedRead.js
+│   ├── cacheKeys.js
+│   ├── cacheStore.js
+│   ├── chatOptimistic.js
+│   ├── colorUtils.js
+│   ├── dataCacheSettings.js
+│   ├── discoveryPersonalization.js
 │   ├── firestoreError.js
+│   ├── gameScoring.js
+│   ├── genreCanon.js
+│   ├── groupRoles.js
 │   ├── i18nText.js
-│   ├── listSorters.js
 │   ├── phoneCalendar.js
-│   └── tmdbImageUtils.js
+│   ├── postComposer.js
+│   ├── premium.js
+│   ├── r2.js
+│   ├── ratingColors.js
+│   ├── tmdbImageUtils.js
+│   ├── watchActivity.js
+│   ├── watchBadgeLedger.js
+│   ├── watchHistory.js
+│   ├── watchLedgerCore.js
+│   ├── watchScoring.js
+│   ├── watchState.js
+│   ├── wrapped.js
+│   └── wrappedStrings.js
+├── website/
+│   ├── shots/
+│   │   └── README.md
+│   ├── index.html
+│   ├── logo.png
+│   └── README.md
+├── .easignore
 ├── .env
+├── .env.example
+├── .firebaserc
 ├── .gitignore
 ├── App.js
 ├── app.json
 ├── babel.config.js
+├── database.rules.json
 ├── eas.json
 ├── firebase.js
+├── firebase.json
+├── firestore.indexes.json
 ├── firestore.rules
+├── google-services.json
 ├── index.js
+├── jest.config.js
 ├── package-lock.json
 ├── package.json
 ├── README.md

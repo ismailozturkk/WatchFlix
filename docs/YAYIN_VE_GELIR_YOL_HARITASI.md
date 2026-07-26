@@ -1,4 +1,4 @@
-# WATCHIFY — YAYIN VE GELİR YOL HARİTASI
+# SEELOGD — YAYIN VE GELİR YOL HARİTASI
 
 > Hazırlanma tarihi: **7 Temmuz 2026**
 > Hedef: Google Play + App Store'da para kazandıran bir uygulama olarak yayınlamak.
@@ -19,20 +19,20 @@ tarzı rakiplere göre gerçek bir farklılaşma sunuyor. Ancak:
 - **1 kritik güvenlik/maliyet açığı var**: Gemini API anahtarı istemciye gömülü —
   APK'dan çıkarılıp sınırsız kullanılabilir, faturası sana kesilir. Yayın blokeri.
 - **iOS tarafı hiç yapılandırılmamış** (bundle ID bile yok) — App Store için ayrı iş.
-- **Yasal riskler çözülmeli**: TMDB ticari kullanım koşulları, "Watchify" marka
+- **Yasal riskler çözülmeli**: TMDB ticari kullanım koşulları, "Seelogd" marka
   kontrolü, mağaza veri güvenliği formları.
 
 **Önerilen takvim (tek geliştirici):**
 
-| Kilometre taşı | Tarih |
-|---|---|
-| Faz 0 — Yayın blokerleri (güvenlik + yasal) | 7 Tem – 26 Tem 2026 |
-| Faz 1 — Gelir + ölçüm altyapısı | 27 Tem – 23 Ağu 2026 |
+| Kilometre taşı                                  | Tarih                |
+| ----------------------------------------------- | -------------------- |
+| Faz 0 — Yayın blokerleri (güvenlik + yasal)     | 7 Tem – 26 Tem 2026  |
+| Faz 1 — Gelir + ölçüm altyapısı                 | 27 Tem – 23 Ağu 2026 |
 | Faz 2 — Polish + kapalı test + mağaza hazırlığı | 24 Ağu – 13 Eyl 2026 |
-| 🚀 **Google Play TR yayını (soft launch)** | **21–25 Eylül 2026** |
-| Google Play global açılım | Ekim 2026 ortası |
-| 🚀 **App Store yayını (global)** | **19–30 Ekim 2026** |
-| Wrapped viral kampanyası | Aralık 2026 |
+| 🚀 **Google Play TR yayını (soft launch)**      | **21–25 Eylül 2026** |
+| Google Play global açılım                       | Ekim 2026 ortası     |
+| 🚀 **App Store yayını (global)**                | **19–30 Ekim 2026**  |
+| Wrapped viral kampanyası                        | Aralık 2026          |
 
 Toplam: Android yayınına ~11 hafta, tam global (iOS dahil) ~15-16 hafta.
 
@@ -42,20 +42,20 @@ Toplam: Android yayınına ~11 hafta, tam global (iOS dahil) ~15-16 hafta.
 
 ### 1.1 Özellik envanteri (güçlü yönler)
 
-| Alan | Durum |
-|---|---|
-| İçerik keşfi | TMDB tabanlı: trendler, türler, platformlar (watch providers), Oscar, koleksiyonlar, vizyondakiler |
-| Takip | İzlenen film/dizi, bölüm bazlı takip, listeler, notlar, hatırlatıcılar, takvim |
-| İstatistik | Film/dizi istatistik ekranları, MyActivity, **Wrapped** (yıl özeti — viral potansiyeli en yüksek özellik) |
-| Sosyal | Feed (post/beğeni/yorum/bookmark), arkadaşlık, takip, engelleme, bildirimler, presence |
-| Mesajlaşma | 1-1 chat + grup chat (anket, pin, alıntı) |
-| Oyun | Sahne tahmin oyunu: modlar, zorluklar, liderlik tabloları, başarımlar (Part 01-25 tamam) |
-| Turnuva | Aylık topluluk oylaması (bracket) |
-| AI | Gemini tabanlı film/dizi öneri sohbeti |
-| Kişiselleştirme | Temalar, custom theme, 56 avatar, pet companion, poster ayarları |
-| i18n | TR + EN |
-| Push | Cloud Functions + Expo Push backend kurulu ✅ |
-| Hesap silme | Uygulama içi mevcut ✅ (mağaza zorunluluğu) |
+| Alan            | Durum                                                                                                     |
+| --------------- | --------------------------------------------------------------------------------------------------------- |
+| İçerik keşfi    | TMDB tabanlı: trendler, türler, platformlar (watch providers), Oscar, koleksiyonlar, vizyondakiler        |
+| Takip           | İzlenen film/dizi, bölüm bazlı takip, listeler, notlar, hatırlatıcılar, takvim                            |
+| İstatistik      | Film/dizi istatistik ekranları, MyActivity, **Wrapped** (yıl özeti — viral potansiyeli en yüksek özellik) |
+| Sosyal          | Feed (post/beğeni/yorum/bookmark), arkadaşlık, takip, engelleme, bildirimler, presence                    |
+| Mesajlaşma      | 1-1 chat + grup chat (anket, pin, alıntı)                                                                 |
+| Oyun            | Sahne tahmin oyunu: modlar, zorluklar, liderlik tabloları, başarımlar (Part 01-25 tamam)                  |
+| Turnuva         | Aylık topluluk oylaması (bracket)                                                                         |
+| AI              | Gemini tabanlı film/dizi öneri sohbeti                                                                    |
+| Kişiselleştirme | Temalar, custom theme, 56 avatar, pet companion, poster ayarları                                          |
+| i18n            | TR + EN                                                                                                   |
+| Push            | Cloud Functions + Expo Push backend kurulu ✅                                                             |
+| Hesap silme     | Uygulama içi mevcut ✅ (mağaza zorunluluğu)                                                               |
 
 Bu genişlikte özellik seti kategoride nadir. **Sorun özellik eksikliği değil;
 ticarileştirme, ölçüm ve uyum eksikliği.**
@@ -123,13 +123,13 @@ kur, gerçek cihaz verisiyle devam et.
 
 ### 1.4 Eksik altyapı
 
-| Eksik | Neden kritik | Öneri |
-|---|---|---|
-| Analytics | Dönüşüm hunisi, retention, paywall ölçümü olmadan fiyat/özellik kararı verilemez | Firebase Analytics (ücretsiz) + temel event seti |
-| Crash reporting | Mağaza puanını en hızlı düşüren şey sessiz crash'ler | Sentry (ücretsiz katman) veya Crashlytics |
-| Otomatik test | Oyun skorlaması dışında yok | Yayın öncesi sadece kritik akış smoke testleri; genişletme sonra |
-| CI | Yok | EAS Build zaten var; şimdilik yeterli |
-| OTA güncelleme | Kritik bug'da mağaza onayı beklememek için | `expo-updates` (EAS Update) ekle — yayın sonrası hayat kurtarır |
+| Eksik           | Neden kritik                                                                     | Öneri                                                            |
+| --------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Analytics       | Dönüşüm hunisi, retention, paywall ölçümü olmadan fiyat/özellik kararı verilemez | Firebase Analytics (ücretsiz) + temel event seti                 |
+| Crash reporting | Mağaza puanını en hızlı düşüren şey sessiz crash'ler                             | Sentry (ücretsiz katman) veya Crashlytics                        |
+| Otomatik test   | Oyun skorlaması dışında yok                                                      | Yayın öncesi sadece kritik akış smoke testleri; genişletme sonra |
+| CI              | Yok                                                                              | EAS Build zaten var; şimdilik yeterli                            |
+| OTA güncelleme  | Kritik bug'da mağaza onayı beklememek için                                       | `expo-updates` (EAS Update) ekle — yayın sonrası hayat kurtarır  |
 
 ### 1.5 Yasal / mağaza uyumluluğu
 
@@ -139,8 +139,8 @@ kur, gerçek cihaz verisiyle devam et.
    Zorunlular: **"This product uses the TMDB API but is not endorsed or certified by
    TMDB"** atfı + logo (ayarlar/hakkında ekranı) ve watch-provider verisi için
    **JustWatch atfı** (MovieProviders/TvShowsProviders ekranlarına).
-2. **Marka kontrolü** 🔴: "Watchify" adı için TÜRKPATENT + EUIPO + USPTO ve her iki
-   mağazada ad çakışması kontrolü yap. (Slug'daki "WatchFlix" adını hiçbir görünür
+2. **Marka kontrolü** 🔴: "Seelogd" adı için TÜRKPATENT + EUIPO + USPTO ve her iki
+   mağazada ad çakışması kontrolü yap. (Slug'daki "Seelogd" adını hiçbir görünür
    yerde kullanma — "flix" Netflix'in agresif koruduğu bir ek.) Ad değişecekse en ucuz
    zaman şimdi.
 3. **Android izinleri** 🟠: `WRITE_EXTERNAL_STORAGE` (deprecated), `READ_MEDIA_AUDIO`,
@@ -175,16 +175,16 @@ TV Time premium örnekleri). Bu yüzden:
 feed, arkadaş/chat, temel istatistikler, oyunun temel modu, turnuva oylaması.
 Sosyal özellik kilitlemek ağ etkisini öldürür.
 
-**Watchify Premium içeriği:**
+**Seelogd Premium içeriği:**
 
-| Kategori | Özellik |
-|---|---|
-| Konfor | Reklamsız deneyim |
-| AI | AI sohbet: free 5 mesaj/gün → premium 100/gün (sunucu tarafı kota — Faz 0 proxy'si bunu mümkün kılıyor) |
-| İçgörü | Gelişmiş istatistikler, tüm-zamanlar Wrapped, CSV/dışa aktarım |
-| Kimlik | Özel temalar + custom theme, premium pet kostümleri, profil rozeti, özel avatar çerçeveleri |
-| Oyun | Premium oyun modları/kaynakları, gelişmiş başarım takibi |
-| Güç | Sınırsız liste/not/hatırlatıcı (free: örn. 5 liste, 50 hatırlatıcı) |
+| Kategori | Özellik                                                                                                 |
+| -------- | ------------------------------------------------------------------------------------------------------- |
+| Konfor   | Reklamsız deneyim                                                                                       |
+| AI       | AI sohbet: free 5 mesaj/gün → premium 100/gün (sunucu tarafı kota — Faz 0 proxy'si bunu mümkün kılıyor) |
+| İçgörü   | Gelişmiş istatistikler, tüm-zamanlar Wrapped, CSV/dışa aktarım                                          |
+| Kimlik   | Özel temalar + custom theme, premium pet kostümleri, profil rozeti, özel avatar çerçeveleri             |
+| Oyun     | Premium oyun modları/kaynakları, gelişmiş başarım takibi                                                |
+| Güç      | Sınırsız liste/not/hatırlatıcı (free: örn. 5 liste, 50 hatırlatıcı)                                     |
 
 Mevcut kod tabanı için iyi haber: temalar, pet, oyun modları, Wrapped ve AI zaten
 var — **premium paket %80 hazır, sadece kapı (entitlement) eklenecek.**
@@ -194,15 +194,16 @@ var — **premium paket %80 hazır, sadece kapı (entitlement) eklenecek.**
 Hedef kitle TR + EN → **bölgesel fiyatlandırma şart** (Türkiye'de küresel fiyat
 satmaz; küresel pazarda TR fiyatı para bırakır).
 
-| Plan | Türkiye | Global (ABD baz) | Not |
-|---|---|---|---|
-| Aylık | ₺59,99 | $3.99 | Psikolojik eşik altı |
-| Yıllık ⭐ | ₺399,99 (≈₺33/ay) | $24.99 | **7 gün ücretsiz deneme** yalnız yıllıkta — ana itici plan |
-| Lifetime | ₺1.199 | $59.99 | Erken kitle + nakit akışı; ilk yıl sonrası kaldırılabilir |
+| Plan                |              Türkiye | Global (ABD baz) | Not                                              |
+| ------------------- | -------------------: | ---------------: | ------------------------------------------------ |
+| Premium aylık       |               ₺79,99 |            $3.99 | 100 CineMatch AI mesajı/gün + Premium özellikler |
+| Premium yıllık ⭐   |    ₺599,99 (≈₺50/ay) |           $29.99 | Aylık ödemeye göre yaklaşık %37 avantaj          |
+| Unlimited aylık     |              ₺159,99 |            $7.99 | Sınırsız AI + sınırsız güç özellikleri           |
+| Unlimited yıllık ⭐ | ₺1.199,99 (≈₺100/ay) |           $59.99 | Aylık ödemeye göre yaklaşık %37 avantaj          |
 
 - Mağaza komisyonu: iki mağazada da küçük işletme programıyla **%15** → net ~%85.
-- Launch kampanyası: ilk 3 ay "kurucu üye" %40 indirimli yıllık (kalıcı fiyat kilidi
-  vaadiyle) — erken dönüşümü ve yorum/topluluk sadakatini besler.
+- İlk fiyat testi bu dört mağaza fiyatıyla başlatılır; kampanya/deneme uygulanacaksa
+  mağaza promosyonu olarak ayrıca tanımlanır ve arayüz yalnız gerçek oranı gösterir.
 - Fiyatları Faz 1'de RevenueCat üzerinden kur ki sonradan A/B test edebilesin.
 
 ### 2.3 Reklam (ikincil gelir)
@@ -231,14 +232,14 @@ okur. Firestore'a da yansıt ki Cloud Function'lar (AI kota) görebilsin.
 
 ### 3.1 Sabit maliyetler
 
-| Kalem | Maliyet |
-|---|---|
-| Google Play geliştirici | $25 (tek sefer) |
-| Apple Developer | $99/yıl |
-| Alan adı (watchifyapp.com vb.) | ~$15/yıl |
-| EAS Build | Ücretsiz kota başlangıç için yeterli; yoğunlaşınca $19/ay |
-| Firebase Hosting (politika sayfaları) | Ücretsiz |
-| RevenueCat / Sentry / Analytics | Ücretsiz katman |
+| Kalem                                 | Maliyet                                                   |
+| ------------------------------------- | --------------------------------------------------------- |
+| Google Play geliştirici               | $25 (tek sefer)                                           |
+| Apple Developer                       | $99/yıl                                                   |
+| Alan adı (seelogdapp.com vb.)        | ~$15/yıl                                                  |
+| EAS Build                             | Ücretsiz kota başlangıç için yeterli; yoğunlaşınca $19/ay |
+| Firebase Hosting (politika sayfaları) | Ücretsiz                                                  |
+| RevenueCat / Sentry / Analytics       | Ücretsiz katman                                           |
 
 **Toplam yıl-1 sabit: ~$150–400.** Giriş bariyeri fiilen yok.
 
@@ -258,14 +259,15 @@ Varsayımlar: %85'i TR kitle (soft launch sonrası), premium dönüşüm %1,5–
 (kategori normali), abone başına karma net ~₺55/ay (TR ağırlıklı, yıllık planlar
 aylığa bölünmüş, mağaza kesintisi düşülmüş).
 
-| Senaryo | Aylık altyapı maliyeti | Abonelik geliri (%2) | Reklam geliri | Net |
-|---|---|---|---|---|
-| 1.000 MAU | $40–90 | 20 abone ≈ ₺1.100 ($28) | ~$10–30 | 🔴 −$20…−50 |
-| 10.000 MAU | $300–650 | 200 abone ≈ ₺11.000 ($275) | ~$100–300 | 🟡 başabaş bandı |
-| 50.000 MAU | $1.400–3.000 | 1.000 abone ≈ ₺55.000 ($1.375) + global abonelerle üstü | ~$500–1.500 | 🟢 pozitif |
-| 50K MAU + %30 global kitle | aynı | global abone değeri TR'nin ~2,5 katı → ~$2.500–3.500 | ~$800–2.000 | 🟢 net kârlı |
+| Senaryo                    | Aylık altyapı maliyeti | Abonelik geliri (%2)                                    | Reklam geliri | Net              |
+| -------------------------- | ---------------------- | ------------------------------------------------------- | ------------- | ---------------- |
+| 1.000 MAU                  | $40–90                 | 20 abone ≈ ₺1.100 ($28)                                 | ~$10–30       | 🔴 −$20…−50      |
+| 10.000 MAU                 | $300–650               | 200 abone ≈ ₺11.000 ($275)                              | ~$100–300     | 🟡 başabaş bandı |
+| 50.000 MAU                 | $1.400–3.000           | 1.000 abone ≈ ₺55.000 ($1.375) + global abonelerle üstü | ~$500–1.500   | 🟢 pozitif       |
+| 50K MAU + %30 global kitle | aynı                   | global abone değeri TR'nin ~2,5 katı → ~$2.500–3.500    | ~$800–2.000   | 🟢 net kârlı     |
 
 **Çıkarımlar:**
+
 1. **Başabaş ~8–15K MAU bandında** — ilk 6 ayın tek hedefi bu bandı geçmek.
 2. **Global (EN) kullanıcı, TR kullanıcının ~2,5–4 katı gelir getirir** → iOS + global
    Android açılımı gelir planının parçası, "sonra bakarız" işi değil.
@@ -278,13 +280,13 @@ aylığa bölünmüş, mağaza kesintisi düşülmüş).
 
 ### 4.1 ASO (mağaza optimizasyonu)
 
-- **Başlık formülü:** "Watchify: Film & Dizi Takibi" (TR) / "Watchify: Movie & TV
+- **Başlık formülü:** "Seelogd: Film & Dizi Takibi" (TR) / "Seelogd: Movie & TV
   Tracker" (EN) — kategori anahtar kelimesi başlıkta olmalı.
 - Anahtar kelimeler TR: film takip, dizi takip, izleme listesi, film önerisi, dizi
   arkadaşı, film oyunu. EN: movie tracker, tv show tracker, watchlist, what to watch.
 - Ekran görüntüleri hikâye anlatmalı (ilk 3 tanesi indirme kararını verir):
-  1) "İzlediklerini takip et" 2) "Arkadaşlarınla paylaş" 3) "Wrapped — film yılın"
-  4) "Sahne tahmin oyunu" 5) "AI film önerisi". Koyu tema + gerçek içerik.
+  1. "İzlediklerini takip et" 2) "Arkadaşlarınla paylaş" 3) "Wrapped — film yılın"
+  2. "Sahne tahmin oyunu" 5) "AI film önerisi". Koyu tema + gerçek içerik.
 - Küçük ama etkili: yayın ilk haftasında 20–30 gerçek kullanıcı yorumu organize et
   (kapalı test grubuna in-app review prompt) — ilk sıralama sinyali.
 
@@ -318,69 +320,85 @@ aylığa bölünmüş, mağaza kesintisi düşülmüş).
 ### FAZ 0 — Yayın Blokerleri: Güvenlik + Yasal (7 Tem – 26 Tem, 3 hafta)
 
 **Hafta 1 (7–13 Tem)**
+
 - [x] Gemini proxy Cloud Function (`callGemini` callable) + istemcinin buna geçirilmesi
       (AIChatScreen, ChatModal, aiCineService — not: useSceneGame Gemini KULLANMIYORMUŞ,
-      kapsam dışı çıktı) *(8 Tem — kod tamam; deploy: `firebase deploy --only functions`)*
+      kapsam dışı çıktı) _(8 Tem — kod tamam; deploy: `firebase deploy --only functions`)_
 - [ ] Eski Gemini anahtarını iptal et; yeni anahtar yalnız Functions secret'ında
-      *(MANUEL: `firebase functions:secrets:set GEMINI_API_KEY` — bkz. functions/README.md)*
+      _(MANUEL: `firebase functions:secrets:set GEMINI_API_KEY` — bkz. functions/README.md)_
 - [x] Kullanıcı başına günlük AI kotası (Firestore sayaç `AiUsage/{uid}`, sunucu tarafı;
-      free 5 / premium 100) *(8 Tem)*
+      free 5 / premium 100) _(8 Tem)_
 - [ ] **Apple Developer hesabını bugün aç** (onay + D-U-N-S günler/haftalar sürebilir)
-- [ ] "Watchify" marka taraması (TÜRKPATENT/EUIPO/USPTO + mağaza araması) → AD KARARI
+- [ ] "Seelogd" marka taraması (TÜRKPATENT/EUIPO/USPTO + mağaza araması) → AD KARARI
 
 **Hafta 2 (14–20 Tem)**
+
 - [ ] Firebase App Check (Play Integrity; iOS App Attest Faz 3'te)
-      *(kurulunca functions/index.js'te `enforceAppCheck: true` yapılmalı)*
+      _(kurulunca functions/index.js'te `enforceAppCheck: true` yapılmalı)_
 - [x] Firestore rules düzeltmeleri: counter increment kısıtı (±1), chat tam eşleşme
-      (`split('_')`), Lists gizlilik kuralı (`privacy.lists`) *(8 Tem — erken bitti;
-      deploy: `firebase deploy --only firestore:rules`)*
+      (`split('_')`), Lists gizlilik kuralı (`privacy.lists`) _(8 Tem — erken bitti;
+      deploy: `firebase deploy --only firestore:rules`)_
 - [x] Android izin temizliği (WRITE_EXTERNAL_STORAGE, READ_MEDIA_AUDIO/VIDEO,
       RECORD_AUDIO çıkarıldı — manifest `tools:node="remove"` + app.json
-      `blockedPermissions`) *(8 Tem — erken bitti)*
-- [ ] TMDB'ye ticari kullanım için yaz *(MANUEL)* — [x] TMDB (zorunlu cümle + resmi
+      `blockedPermissions`) _(8 Tem — erken bitti)_
+- [ ] TMDB'ye ticari kullanım için yaz _(MANUEL)_ — [x] TMDB (zorunlu cümle + resmi
       logo, Ayarlar→Hakkında) + JustWatch atıfları (provider ekranları) uygulamaya
-      eklendi *(8 Tem)*
+      eklendi _(8 Tem)_
 
 **Hafta 3 (21–26 Tem)**
-- [ ] Gizlilik politikası + kullanım şartları + web hesap silme sayfası (Firebase Hosting)
+
+- [x] Gizlilik politikası + kullanım şartları + web hesap silme sayfası (Firebase Hosting)
+      _(25 Tem — `website/privacy.html`, `website/terms.html`,
+      `website/delete-account.html` + ortak `legal.css`/`legal.js`; TR/EN dil
+      anahtarı landing ile aynı localStorage'ı paylaşıyor, landing footer'ına
+      linkler eklendi. KALAN: sayfalardaki `mark.todo` alanları (veri
+      sorumlusunun kimliği/ülkesi, yetkili mahkeme) doldurulacak +
+      `firebase deploy --only hosting,firestore:rules`)_
+      Aynı turda: `waitlist` kuralı `read`→`get` (koleksiyon listeleme kapatıldı;
+      e-postalar herkese dökülebiliyordu).
 - [ ] expo-updates (EAS Update) entegrasyonu — yayın sonrası acil yama kanalı
 - [ ] Kapalı test için 12+ test kullanıcısı listesini kesinleştir
 
 ### FAZ 1 — Gelir + Ölçüm Altyapısı (27 Tem – 23 Ağu, 4 hafta)
 
 **Hafta 4 (27 Tem – 2 Ağu)**
+
 - [ ] Firebase Analytics + Sentry kurulumu; temel event seti
       (signup, content_tracked, post_created, game_played, ai_message,
       paywall_view, trial_start, purchase)
 - [ ] Google Play Console hesabı + ürün kaydı; IAP ürünlerinin tanımı
 
 **Hafta 5–6 (3–16 Ağu)**
-- [ ] RevenueCat entegrasyonu + abonelik ürünleri (aylık/yıllık/lifetime, TR+global fiyat)
+
+- [ ] RevenueCat entegrasyonu + abonelik ürünleri (Premium/Unlimited aylık-yıllık, TR+global fiyat)
 - [ ] `usePremium()` entitlement katmanı + Firestore senkronu
-- [ ] Paywall ekranı (yıllık plan vurgulu, 7 gün deneme, kurucu üye kampanyası)
+- [ ] Paywall ekranı (yıllık plan vurgulu, mağaza bazlı deneme/fiyat testi)
 - [ ] Premium kapılar: AI kota farkı, temalar, pet kostümleri, oyun modları,
       gelişmiş istatistik/Wrapped, liste limitleri
 
 **Hafta 7 (17–23 Ağu)**
-- [ ] AdMob: feed native ad + oyun sonu interstitial + rewarded ("reklam izle → AI mesajı")
-      + UMP consent akışı (yalnız free kullanıcı)
+
+- [ ] AdMob: feed native ad + oyun sonu interstitial + rewarded ("reklam izle → AI mesajı") + UMP consent akışı (yalnız free kullanıcı)
 - [ ] Onboarding akışı: 3 ekran değer anlatımı → zevk seçimi → bildirim izni
       (paywall'u onboarding SONUNA koy, soft göster)
 
 ### FAZ 2 — Polish + Kapalı Test + Mağaza Hazırlığı (24 Ağu – 13 Eyl, 3 hafta)
 
 **Hafta 8 (24–30 Ağu)**
+
 - [ ] 🔑 **Kapalı test BAŞLAR (24 Ağu)** — Play 14 gün / 12 kullanıcı sayacı işlemeye başlar
 - [ ] Performans kritikleri: IconBacground lite-mode, PetCompanion device-tier,
       ProfileStats lazy hesaplama, ağır provider'ların ertelenmesi
 - [ ] Crash/ANR takibi: test grubundan gelen Sentry verisiyle düzeltme turu
 
 **Hafta 9 (31 Ağu – 6 Eyl)**
+
 - [ ] Mağaza varlıkları: ekran görüntüleri (TR+EN), feature graphic, tanıtım videosu (30 sn)
 - [ ] Data Safety formu + IARC anketi + ASO metinleri
 - [ ] Düşük cihaz + tablet + büyük font + TR/EN test matrisi
 
 **Hafta 10 (7–13 Eyl)**
+
 - [ ] 7 Eyl: 14 gün doldu → production erişim başvurusu
 - [ ] Paywall/onboarding verisiyle son ayar; sürüm dondurma (release candidate)
 - [ ] iOS paralel başlangıç: bundle ID, Firebase iOS app, GoogleService-Info.plist,
@@ -410,16 +428,17 @@ aylığa bölünmüş, mağaza kesintisi düşülmüş).
 
 ## 6. RİSKLER VE KARARLAR
 
-| Risk | Olasılık | Etki | Aksiyon |
-|---|---|---|---|
-| TMDB ticari kullanımı reddeder/ücret ister | Düşük-orta | Yüksek | Faz 0'da yazılı iletişim; B planı: Trakt/OMDb hibrit veya lisans ücreti bütçele |
-| "Watchify" marka çakışması | Orta | Orta | Faz 0 hafta 1'de tarama; gerekiyorsa yeniden adlandırma (şimdi ucuz, sonra pahalı) |
-| Apple, UGC/moderasyon nedeniyle reddeder | Orta | Orta | Rapor+engelle+gizle akışlarını Review notlarında belgele; demo hesap ver |
-| AI maliyeti patlar | Düşük (kota sonrası) | Orta | Sunucu kota + günlük bütçe alarmı (Billing alert $50/$100) |
-| Play 14 gün kapalı test gecikmesi | Orta | Takvim | Test kullanıcılarını Temmuz'da topla; 24 Ağu'da kesin başlat |
-| Tek geliştirici tükenmişliği | Orta | Yüksek | Faz kapsamlarını KORU — yeni özellik ekleme dondurması: yayına kadar sadece bu listedekiler |
+| Risk                                       | Olasılık             | Etki   | Aksiyon                                                                                     |
+| ------------------------------------------ | -------------------- | ------ | ------------------------------------------------------------------------------------------- |
+| TMDB ticari kullanımı reddeder/ücret ister | Düşük-orta           | Yüksek | Faz 0'da yazılı iletişim; B planı: Trakt/OMDb hibrit veya lisans ücreti bütçele             |
+| "Seelogd" marka çakışması                 | Orta                 | Orta   | Faz 0 hafta 1'de tarama; gerekiyorsa yeniden adlandırma (şimdi ucuz, sonra pahalı)          |
+| Apple, UGC/moderasyon nedeniyle reddeder   | Orta                 | Orta   | Rapor+engelle+gizle akışlarını Review notlarında belgele; demo hesap ver                    |
+| AI maliyeti patlar                         | Düşük (kota sonrası) | Orta   | Sunucu kota + günlük bütçe alarmı (Billing alert $50/$100)                                  |
+| Play 14 gün kapalı test gecikmesi          | Orta                 | Takvim | Test kullanıcılarını Temmuz'da topla; 24 Ağu'da kesin başlat                                |
+| Tek geliştirici tükenmişliği               | Orta                 | Yüksek | Faz kapsamlarını KORU — yeni özellik ekleme dondurması: yayına kadar sadece bu listedekiler |
 
 **Şimdi verilmesi gereken 3 karar:**
+
 1. Uygulama adı (marka taraması sonrası) — her şey buna bağlı.
 2. Reklam ilk sürümde olacak mı? (Önerim: evet ama minimal — rewarded + oyun sonu;
    feed native ad'i global açılıma ertele.)
@@ -427,4 +446,4 @@ aylığa bölünmüş, mağaza kesintisi düşülmüş).
 
 ---
 
-*Bu doküman canlı tutulmalı: her faz sonunda durum işaretle, tarih kayarsa tabloyu güncelle.*
+_Bu doküman canlı tutulmalı: her faz sonunda durum işaretle, tarih kayarsa tabloyu güncelle._

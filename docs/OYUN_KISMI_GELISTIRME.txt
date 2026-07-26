@@ -1,4 +1,4 @@
-WATCHIFY - OYUN KISMI GELISTIRME PLANI
+SEELOGD - OYUN KISMI GELISTIRME PLANI
 ========================================
 
 Dokuman amaci
@@ -994,7 +994,7 @@ Uygulananlar:
   Paylas; alt aksiyon Oyun Merkezine Don. Geri donus istatistigi tekrar
   tetiklemez (oturum sonucu silinir).
 - Paylasim karti (13.4): spoiler sahne gorseli icermeyen; skor, mod, zorluk,
-  dogruluk, seri ve Watchify markasi tasiyan statik kart captureRef ile
+  dogruluk, seri ve Seelogd markasi tasiyan statik kart captureRef ile
   yakalanip expo-sharing ile paylasiliyor (Wrapped paylasim altyapisi deseni).
 
 Dogrulama:
@@ -1046,7 +1046,7 @@ sahne gorselleri yerine:
 - Zorluk
 - Dogruluk
 - Seri
-- Watchify marka alani
+- Seelogd marka alani
 kullanilmalidir.
 
 
@@ -1676,7 +1676,7 @@ Grep sonucu / BILEREK DOKUNULMAYANLAR:
   marka renklerini (#7C3AED, #FF2D87, #E8B931, #160C24 vb.) BILEREK korur:
   bu kart captureRef ile yakalanip disari paylasilan SABIT GORSEL bir
   marka materyali, kullanicinin uygulama temasina gore degismemesi tasarim
-  geregi (Part 13.4: "spoiler olmayan ... Watchify marka alani").
+  geregi (Part 13.4: "spoiler olmayan ... Seelogd marka alani").
   Tema tokenlarina baglamak bu tasarim amacina aykiri olurdu.
 - GameTopBar.js'deki "#FF5A5F" (Hayatta Kalma can rozeti) bilerek
   gameTokens.incorrect'e esitlenmedi: can rozeti ile yanlis-cevap rengi ayni

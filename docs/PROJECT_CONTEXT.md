@@ -1,4 +1,4 @@
-# Watchify — Project Context
+# Seelogd — Project Context
 
 > Yeni bir geliştirici / AI ajanı için tek dosyalık genel bağlam. Hızlı orijinte oluş için.
 > Detaylı şema: [`FIRESTORE_SCHEMA.txt`](./FIRESTORE_SCHEMA.txt).
@@ -8,7 +8,7 @@
 
 ## 🎬 Proje nedir?
 
-**Watchify** — kullanıcıların film/dizi izleme geçmişini takip eden, sosyal özelliklerle (arkadaş, paylaşım, beğeni, bildirim) zenginleştirilmiş bir React Native mobil uygulaması. TMDB API'sinden içerik çeker, Firebase Firestore'da kullanıcı verisini tutar.
+**Seelogd** — kullanıcıların film/dizi izleme geçmişini takip eden, sosyal özelliklerle (arkadaş, paylaşım, beğeni, bildirim) zenginleştirilmiş bir React Native mobil uygulaması. TMDB API'sinden içerik çeker, Firebase Firestore'da kullanıcı verisini tutar.
 
 **Hedef kitle:** Türk + İngiliz dilini konuşan film/dizi tutkunları.
 
@@ -32,7 +32,7 @@
 ## 📂 Klasör Yapısı
 
 ```
-WhatchFlix/
+Seelogd/
 ├── App.js                       # Root component, Provider hiyerarşisi, Stack navigator
 ├── firebase.js                  # Firebase initApp
 ├── firestore.rules              # Security rules (v2 şema)

@@ -1,8 +1,8 @@
 ================================================================
-WATCHIFY - KAPSAMLI PERFORMANS VE KOD KALİTESİ ANALİZİ
+SEELOGD - KAPSAMLI PERFORMANS VE KOD KALİTESİ ANALİZİ
 ================================================================
 Tarih: 10.04.2026
-Proje: Watchify - React Native (Expo SDK 54)
+Proje: Seelogd - React Native (Expo SDK 54)
 Analiz: Tüm kaynak dosyalar tek tek incelenerek hazırlanmıştır.
 ================================================================
 

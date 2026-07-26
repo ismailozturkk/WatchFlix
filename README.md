@@ -1,6 +1,6 @@
-# 🎬 Watchify
+# 🎬 Seelogd
 
-**Watchify**, kullanıcıların film ve dizi izleme alışkanlıklarını takip etmelerini, yeni içerikler keşfetmelerini ve kişiselleştirilmiş bir deneyim yaşamalarını sağleyen kapsamlı bir React Native (Expo) uygulamasıdır.
+**Seelogd**, kullanıcıların film ve dizi izleme alışkanlıklarını takip etmelerini, yeni içerikler keşfetmelerini ve kişiselleştirilmiş bir deneyim yaşamalarını sağleyen kapsamlı bir React Native (Expo) uygulamasıdır.
 
 ---
 
@@ -66,7 +66,7 @@ Bu proje modern mobil geliştirme standartlarına uygun olarak inşa edilmiştir
 ### 📂 Klasör Yapısı
 
 ```
-WhatchFlix/
+Seelogd/
 ├── screens/          # 54+ uygulama ekranı (Movie, TV, Auth, Tabs...)
 ├── components/       # Tekrar kullanılabilir UI bileşenleri
 ├── context/          # 9 adet Context API modülü (State Management)

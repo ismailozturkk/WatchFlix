@@ -5,7 +5,7 @@ Bu dosya KOD ile cozulemeyen adimlari anlatir. Kod tarafi hazir; asagidaki
 adimlar yapilmadan Google girisi HICBIR sekilde calismaz.
 
 Firebase projesi : movieandtv-2832a
-Android paketi   : com.smlztrk.Watchify
+Android paketi   : com.smlztrk.seelogd
 Web client ID    : 427087836931-in7lreg3vjgnvudn5h8gauradaeo58kc.apps.googleusercontent.com
                    (google-services.json'daki client_type:3 ile ayni olmali)
 
@@ -41,7 +41,7 @@ COZUM:
           uygulama Store'dan indirildiginde calismaz, dahili build'de calisir.
 
   b) Firebase Console > Project settings > Your apps > Android
-     (com.smlztrk.Watchify) > "Add fingerprint" ile her SHA-1'i ekle.
+     (com.smlztrk.seelogd) > "Add fingerprint" ile her SHA-1'i ekle.
 
   c) Guncellenmis google-services.json'u indir ve IKI yere birden koy:
          ./google-services.json
@@ -52,7 +52,7 @@ COZUM:
 
   d) Dogrula — yeni dosyada su blok GORUNMELI:
          { "client_type": 1,
-           "android_info": { "package_name": "com.smlztrk.Watchify",
+           "android_info": { "package_name": "com.smlztrk.seelogd",
                              "certificate_hash": "..." } }
      Gorunmuyorsa SHA-1 kaydedilmemistir, tekrar deneyin.
 

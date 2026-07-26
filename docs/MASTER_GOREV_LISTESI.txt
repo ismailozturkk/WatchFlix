@@ -1,5 +1,5 @@
 ================================================================================
-  WATCHIFY — MASTER GÖREV LİSTESİ
+  SEELOGD — MASTER GÖREV LİSTESİ
   Oluşturuldu: 2026-05-17
   Kaynak: 6 ayrı geliştirme/performans dosyası birleştirildi
   (GELISTIRME_PLANI, PERFORMANS_OPTIMIZASYON_PLANI, performance_optimization,
@@ -407,7 +407,7 @@ Görev bitince:   [~] → [x]
 
 [ ] B1. Gemini AI film/dizi önerileri (ChatModal'a AI modu)
 [ ] B2. expo-notifications ile push bildirim (Reminder'lar için)
-[ ] B3. Deep link desteği — watchify://movie/123 (expo-linking)
+[ ] B3. Deep link desteği — seelogd://movie/123 (expo-linking)
 [ ] B4. expo-image ile image caching (Image bileşenini değiştir)
 [ ] B5. Uygulama içi film/dizi puanlama sistemi (1-10 kendi puanı)
 [ ] B6. Grup sohbet (groups koleksiyonu + davet sistemi)

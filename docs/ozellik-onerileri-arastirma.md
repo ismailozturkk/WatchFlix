@@ -1,11 +1,11 @@
-# Whatchify — Eklenebilecek Özellikler (Araştırma Raporu)
+# Seelogd — Eklenebilecek Özellikler (Araştırma Raporu)
 
 > Tarih: 2026-07-16
 > Kapsam: Kod tabanı analizi + sektör araştırması (Letterboxd, Trakt, Simkl, Serializd, TV Time, JustWatch, Teleparty ve 2026 trendleri)
 
 ## Konumlandırma (özet tespit)
 
-Whatchify sosyal + oyunlaştırma tarafında rakiplerin **çok önünde**: story, wrapped, grup sohbet,
+Seelogd sosyal + oyunlaştırma tarafında rakiplerin **çok önünde**: story, wrapped, grup sohbet,
 turnuva, sahne tahmin oyunu, pet, başarımlar — bunların hiçbiri Letterboxd/Trakt/Simkl'de yok.
 Buna karşılık **çekirdek "izleme takibi" faydası** ve **elde tutma kancaları** tarafında rakiplerin
 standart hâline gelmiş bazı şeyler eksik.
@@ -42,7 +42,7 @@ istatistikler, takvim, push bildirimleri (FCM + Cloud Functions), temalar, çokl
 ### 4. Ana ekran / kilit ekranı widget'ları *(elde tutma kancası)*
 - **Durum (2026-07-16):** Android "Yaklaşanlar" OS widget'ı **zaten mevcut ve bağlı** —
   `reminderWidgetService.js` → native `ReminderWidgetModule` → `ReminderWidgetProvider` (ana ekranda
-  başlık + sayaç + ilk 2 yaklaşan film/bölüm, geri sayımla; tıklayınca `watchify://reminders`).
+  başlık + sayaç + ilk 2 yaklaşan film/bölüm, geri sayımla; tıklayınca `seelogd://reminders`).
   `ProfileRemindersContext` canlı besliyor.
 - **Eksikler:** (a) Widget'ın yeni native dosyaları git'e eklenmemiş (ignore+untracked) → temiz
   checkout/CI derlenmez; commit tutarlı hâle getirilmeli. (b) iOS widget'ı yok (WidgetKit gerekir).

@@ -1,4 +1,4 @@
-WATCHIFY PERFORMANS INCELEME RAPORU
+SEELOGD PERFORMANS INCELEME RAPORU
 Tarih: 2026-04-17
 
 Bu rapor proje icindeki calisan kaynak kod dosyalari taranarak hazirlandi.

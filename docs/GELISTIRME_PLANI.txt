@@ -1,5 +1,5 @@
 =========================================================
-  WATCHIFY - KAPSAMLI GELİŞTİRME PLANI
+  SEELOGD - KAPSAMLI GELİŞTİRME PLANI
   Oluşturulma: 2026-04-08
   Toplam Ekran: 54 | Toplam Context: 9 | Toplam Component: 11
 =========================================================
@@ -479,7 +479,7 @@ Durum   : memory-bank'ta "[ ] Group Chat?" olarak listelendi.
 ──────────────────────────────────────────────────────────
 36. DEEP LINK DESTEĞİ
 ──────────────────────────────────────────────────────────
-Öneri   : watchify://movie/123 formatında deep link.
+Öneri   : seelogd://movie/123 formatında deep link.
           Arkadaşa film linki paylaşılınca direkt açılsın.
           expo-linking ile uygulanabilir.
 
