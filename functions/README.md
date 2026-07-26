@@ -1,4 +1,4 @@
-# Watchify Cloud Functions — Push Bildirim + Gemini Proxy Sunucusu
+# Seelogd Cloud Functions — Push Bildirim + Gemini Proxy Sunucusu
 
 1. **Push bildirim:** uygulama kapalı/arka plandayken bile sosyal bildirimleri
    (beğeni, yorum, mention, arkadaşlık, mesaj) push olarak gönderir.

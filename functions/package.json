@@ -1,6 +1,6 @@
 {
   "name": "functions",
-  "description": "Watchify Cloud Functions — push bildirim gönderimi (Expo Push API)",
+  "description": "Seelogd Cloud Functions — push bildirim gönderimi (Expo Push API)",
   "main": "index.js",
   "engines": {
     "node": "22"

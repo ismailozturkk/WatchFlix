@@ -1,6 +1,6 @@
 // functions/index.js
 //
-// Watchify push bildirim sunucusu (Cloud Functions v2 + Expo Push API).
+// Seelogd push bildirim sunucusu (Cloud Functions v2 + Expo Push API).
 //
 // Akış:
 //   1) İstemci bir sosyal bildirim yazınca → Users/{uid}/notifications/{notifId}
@@ -20,7 +20,7 @@ const {
   onDocumentUpdated,
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret } = require("firebase-functions/params");
@@ -30,7 +30,14 @@ const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { Expo } = require("expo-server-sdk");
+const { createHash, timingSafeEqual } = require("node:crypto");
 const { extractRegionProviders, computeNewlyAvailable } = require("./streamingDiff");
+const {
+  getTransferChanges,
+  parseRevenueCatPremiumState,
+  resolveFirebaseUserId,
+  resolvePremiumWebhookState,
+} = require("./revenueCatWebhook");
 
 initializeApp();
 const db = getFirestore();
@@ -43,6 +50,146 @@ setGlobalOptions({ maxInstances: 10 });
 // Istemcideki googleAuthService WEB_CLIENT_ID ile ayni kalmali.
 const GOOGLE_WEB_CLIENT_ID =
   "427087836931-in7lreg3vjgnvudn5h8gauradaeo58kc.apps.googleusercontent.com";
+
+// RevenueCat Dashboard > Integrations > Webhooks ekranındaki Authorization
+// header ile aynı olmalı. Public SDK anahtarı değildir.
+const REVENUECAT_WEBHOOK_AUTH = defineSecret("REVENUECAT_WEBHOOK_AUTH");
+const REVENUECAT_SECRET_API_KEY = defineSecret("REVENUECAT_SECRET_API_KEY");
+
+function webhookAuthorizationMatches(received, expected) {
+  if (!received || !expected) return false;
+  const normalized = received.startsWith("Bearer ")
+    ? received.slice("Bearer ".length)
+    : received;
+  const left = Buffer.from(normalized);
+  const right = Buffer.from(expected);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+async function fetchRevenueCatPremiumState(uid) {
+  const response = await fetch(
+    `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(uid)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${REVENUECAT_SECRET_API_KEY.value()}`,
+        Accept: "application/json",
+      },
+    },
+  );
+  if (!response.ok) {
+    throw new Error(`RevenueCat customer lookup failed: ${response.status}`);
+  }
+  return parseRevenueCatPremiumState(await response.json());
+}
+
+function premiumEntitlementPatch(event, state) {
+  return {
+    entitlements: {
+      premium: state.premium,
+      premiumUnlimited: state.premiumUnlimited,
+      premiumPlan: state.premiumPlan,
+      premiumProductId: state.productId,
+      premiumStore: event.store || null,
+      premiumExpiresAt: state.expiresAt,
+      premiumSyncedAt: FieldValue.serverTimestamp(),
+      premiumSource: "revenuecat",
+    },
+  };
+}
+
+exports.revenueCatWebhook = onRequest(
+  {
+    secrets: [REVENUECAT_WEBHOOK_AUTH, REVENUECAT_SECRET_API_KEY],
+    cors: false,
+  },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.set("Allow", "POST").status(405).send("Method Not Allowed");
+      return;
+    }
+
+    if (
+      !webhookAuthorizationMatches(
+        req.get("authorization"),
+        REVENUECAT_WEBHOOK_AUTH.value(),
+      )
+    ) {
+      res.status(401).send("Unauthorized");
+      return;
+    }
+
+    const event = req.body?.event;
+    if (!event?.id || !event?.type) {
+      res.status(400).send("Invalid RevenueCat event");
+      return;
+    }
+
+    const transferChanges = getTransferChanges(event);
+    const premiumState = resolvePremiumWebhookState(event);
+    const firebaseUserId = resolveFirebaseUserId(event);
+    const candidateChanges = transferChanges.length
+      ? transferChanges
+      : premiumState !== null && firebaseUserId
+        ? [{ uid: firebaseUserId, premium: premiumState }]
+        : [];
+
+    if (candidateChanges.length === 0) {
+      res.status(200).json({ received: true, ignored: true });
+      return;
+    }
+
+    // Webhook türü tek başına yeterli değildir: CANCELLATION bir dönem
+    // sonu iptali veya anında refund olabilir; birden fazla ürün de aynı
+    // entitlement'ı açabilir. RevenueCat Customer Info'yu server-to-server
+    // okuyarak webhook anındaki gerçek aktif durumu tek kaynak kabul et.
+    const changes = await Promise.all(
+      candidateChanges.map(async ({ uid, premium }) => ({
+        uid,
+        state:
+          transferChanges.length && premium === false
+            ? {
+                premium: false,
+                premiumUnlimited: false,
+                premiumPlan: "free",
+                productId: null,
+                expiresAt: null,
+              }
+            : await fetchRevenueCatPremiumState(uid),
+      })),
+    );
+
+    // Event ID'yi path'e doğrudan koyma; beklenmedik '/' karakteri doküman
+    // yolunu bozmasın. Transaction event tekrarını ve entitlement yazımını
+    // atomik tutar: yarıda kalan webhook "işlendi" diye kaybolmaz.
+    const eventKey = createHash("sha256").update(String(event.id)).digest("hex");
+    const eventRef = db.doc(`RevenueCatWebhookEvents/${eventKey}`);
+    let duplicate = false;
+
+    await db.runTransaction(async (tx) => {
+      const eventSnap = await tx.get(eventRef);
+      if (eventSnap.exists) {
+        duplicate = true;
+        return;
+      }
+
+      for (const change of changes) {
+        tx.set(
+          db.doc(`Users/${change.uid}`),
+          premiumEntitlementPatch(event, change.state),
+          { merge: true },
+        );
+      }
+      tx.create(eventRef, {
+        eventId: String(event.id),
+        type: event.type,
+        appUserId: event.app_user_id || null,
+        processedAt: FieldValue.serverTimestamp(),
+      });
+    });
+
+    res.status(200).json({ received: true, duplicate });
+  },
+);
 
 /**
  * Google ile giris yapilmadan ONCE hesap cakismasini guvenli bicimde denetler.
@@ -119,7 +266,7 @@ exports.checkGoogleSignInEligibility = onCall(async (request) => {
 //    yeni bir anahtar üret ve yalnız yukarıdaki secret'a koy)
 //
 // Kota: kullanıcı başına GÜNLÜK mesaj tavanı — AiUsage/{uid} dokümanında
-// transaction'lı sayaç (UTC gün). Free 5 / premium 100 (yol haritası §2.1).
+// transaction'lı sayaç (UTC gün). Free 5 / premium 100 / Unlimited sınırsız.
 // Premium durumu Users/{uid}.entitlements.premium alanından okunur (Faz 1'de
 // RevenueCat webhook'u bu alanı dolduracak; alan yoksa herkes free'dir).
 //
@@ -284,11 +431,16 @@ exports.callGemini = onCall(
     }
     const contents = buildAiContents(history, userMessage);
 
-    // ── Premium → kota tavanı ──
+    // ── Üyelik seviyesi → kota tavanı ──
     let limit = AI_DAILY_LIMIT_FREE;
+    let unlimited = false;
     try {
       const userSnap = await db.doc(`Users/${uid}`).get();
-      if (userSnap.exists && userSnap.data()?.entitlements?.premium === true) {
+      const entitlements = userSnap.data()?.entitlements;
+      unlimited =
+        entitlements?.premiumUnlimited === true ||
+        entitlements?.premiumPlan === "unlimited";
+      if (!unlimited && entitlements?.premium === true) {
         limit = AI_DAILY_LIMIT_PREMIUM;
       }
     } catch (e) {
@@ -296,7 +448,9 @@ exports.callGemini = onCall(
     }
 
     // ── Kota tüket (yetersizse burada resource-exhausted fırlar) ──
-    const quota = await consumeAiQuota(uid, limit);
+    const quota = unlimited
+      ? { used: null, limit: null, remaining: null, unlimited: true }
+      : await consumeAiQuota(uid, limit);
 
     // ── Gemini isteği ──
     const body = {
@@ -320,7 +474,7 @@ exports.callGemini = onCall(
 
     const apiKey = GEMINI_API_KEY.value();
     if (!apiKey) {
-      await refundAiQuota(uid);
+      if (!unlimited) await refundAiQuota(uid);
       console.error("[callGemini] GEMINI_API_KEY secret tanımsız!");
       throw new HttpsError("failed-precondition", "AI is not configured");
     }
@@ -335,14 +489,15 @@ exports.callGemini = onCall(
         data = await postGeminiOnce(body, apiKey);
       }
       const u = data?.usageMetadata || {};
+      const quotaLabel = unlimited ? "unlimited" : `${quota.used}/${quota.limit}`;
       console.log(
-        `[callGemini] uid=${uid} mode=${mode} kota=${quota.used}/${quota.limit} ` +
+        `[callGemini] uid=${uid} mode=${mode} kota=${quotaLabel} ` +
           `token(giriş/çıkış/toplam)=${u.promptTokenCount || 0}/${u.candidatesTokenCount || 0}/${u.totalTokenCount || 0}`,
       );
       return { data, quota };
     } catch (err) {
       // Üst akış başarısız → kullanıcının hakkını iade et.
-      await refundAiQuota(uid);
+      if (!unlimited) await refundAiQuota(uid);
       if (err.status === 429) {
         throw new HttpsError("resource-exhausted", "Upstream rate limited", {
           reason: "UPSTREAM_RATE_LIMIT",
