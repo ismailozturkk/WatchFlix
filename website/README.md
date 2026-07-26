@@ -18,6 +18,12 @@ localStorage anahtarını (`wf_lang`) paylaşır. İçindekiler listesi, aktif d
 bloğunun `h2[id]` başlıklarından üretilir — başlık eklerken TOC'a dokunmak
 gerekmez, sadece `id` ve (isteğe bağlı) kısa `data-toc` ver.
 
+**`?lang=tr|en`:** Uygulama içi bağlantılar (Ayarlar → Hakkında → Gizlilik
+Politikası / Kullanım Şartları) bu parametreyi ekler ve kaydedilmiş tercihi
+geçersiz kılar. Telefonun dili uygulamanın diliyle aynı olmak zorunda değil;
+metin kullanıcının uygulamada seçtiği dilde açılmalı. Parametre ayrıca
+`wf_lang`'e yazılır, böylece sayfalar arası gezinmede dil sabit kalır.
+
 > ⚠️ Sayfalarda `mark.todo` ile işaretlenmiş **doldurulmayı bekleyen alanlar**
 > var: veri sorumlusunun kimliği/ülkesi ve yetkili mahkeme. Mağazaya
 > göndermeden önce doldur; tarayıcıda amber renkte göründükleri için gözden

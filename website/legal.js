@@ -8,7 +8,9 @@
  * yasal metin her koşulda okunabilir olmalı.
  *
  * Dil seçimi landing (index.html) ile aynı localStorage anahtarını
- * paylaşır: "wf_lang".
+ * paylaşır: "wf_lang". Uygulama içindeki bağlantılar `?lang=tr|en` ekler:
+ * telefonun dili uygulamanın diliyle aynı olmak zorunda değil, yasal metin
+ * kullanıcının uygulamada seçtiği dilde açılmalı.
  */
 (function () {
   "use strict";
@@ -27,6 +29,14 @@
 
   function store(lang) {
     try { localStorage.setItem(KEY, lang); } catch (e) { /* yoksay */ }
+  }
+
+  /* ?lang=tr / ?lang=en — uygulamadan gelen bağlantı bunu ekler.
+     "tr-TR" gibi bölgeli değerler de kabul edilir (ilk iki harf). */
+  function readParam() {
+    var m = /[?&]lang=([a-z-]+)/i.exec(location.search || "");
+    var v = m ? m[1].toLowerCase().slice(0, 2) : null;
+    return LANGS.indexOf(v) !== -1 ? v : null;
   }
 
   function detect() {
@@ -194,5 +204,10 @@
     document.body.removeChild(ta);
   }
 
-  apply(readStored() || detect());
+  /* Sıra önemli: adres çubuğundaki istek, daha önce kaydedilmiş tercihten
+     önce gelir. Parametreyle gelen dil ayrıca kaydedilir; kullanıcı yasal
+     sayfalar arasında gezinirken (bağlantılarda parametre yok) dil sabit kalsın. */
+  var fromParam = readParam();
+  if (fromParam) store(fromParam);
+  apply(fromParam || readStored() || detect());
 })();

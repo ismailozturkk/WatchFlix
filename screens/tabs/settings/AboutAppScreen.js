@@ -38,6 +38,10 @@ if (
 const SUPPORT_EMAIL = "support@seelogd.com";
 const APP_VERSION = "v1.21.1";
 
+// Yasal metinler uygulamada değil sitede tutuluyor: mağaza formları da aynı
+// URL'leri istiyor ve metin değiştiğinde yeni sürüm yayınlamak gerekmiyor.
+const LEGAL_SITE = "https://seelogd.com";
+
 export default function AboutAppScreen() {
   const navigation = useNavigation();
   const { language } = useLanguage();
@@ -74,6 +78,24 @@ export default function AboutAppScreen() {
       }
     } catch (e) {
       copyEmailToClipboard();
+    }
+  };
+
+  /* Yasal sayfa iki dili tek dosyada tutuyor ve dili tarayıcıdan seçiyor.
+     ?lang= ile uygulamanın dilini geçiyoruz; aksi halde Türkçe uygulamayı
+     İngilizce cihazda kullanan biri metni İngilizce görürdü. */
+  const openLegalPage = async (page) => {
+    const url = `${LEGAL_SITE}/${page}?lang=${isTr ? "tr" : "en"}`;
+    try {
+      await Linking.openURL(url);
+    } catch (e) {
+      // Tarayıcı yoksa/açılmazsa bağlantı en azından panoda kalsın.
+      Clipboard.setString(url);
+      Toast.show({
+        type: "info",
+        text1: isTr ? "Bağlantı Kopyalandı" : "Link Copied",
+        text2: url,
+      });
     }
   };
 
@@ -151,6 +173,45 @@ export default function AboutAppScreen() {
         ? "Tüm verileriniz Firebase ve bulut sunucularımızda şifrelenmiş olarak saklanır. Kişisel bilgileriniz hiçbir şekilde 3. şahıslarla paylaşılmaz veya satılmaz."
         : "All your data is encrypted and stored on Firebase and cloud servers. Personal info is never shared or sold to third parties.",
       icon: "shield-checkmark-outline",
+    },
+  ];
+
+  const LEGAL_ROWS = [
+    {
+      key: "privacy",
+      title: isTr ? "Gizlilik Politikası" : "Privacy Policy",
+      sub: isTr
+        ? "Hangi verileri topluyoruz, nasıl kullanıyoruz"
+        : "What data we collect and how we use it",
+      icon: "shield-checkmark-outline",
+      color: C.blue,
+      bg: C.iconBlue,
+      external: true,
+      onPress: () => openLegalPage("privacy.html"),
+    },
+    {
+      key: "terms",
+      title: isTr ? "Kullanım Şartları" : "Terms of Use",
+      sub: isTr
+        ? "Hesap kuralları, içerik ve abonelik şartları"
+        : "Account rules, content and subscription terms",
+      icon: "reader-outline",
+      color: C.purple,
+      bg: C.iconPurple,
+      external: true,
+      onPress: () => openLegalPage("terms.html"),
+    },
+    {
+      key: "oss",
+      title: isTr ? "Açık Kaynak Lisansları" : "Open Source Licenses",
+      sub: isTr
+        ? "Kullanılan kütüphaneler ve lisans metinleri"
+        : "Third-party libraries and open source terms",
+      icon: "document-text-outline",
+      color: C.teal,
+      bg: C.iconTeal,
+      external: false,
+      onPress: () => navigation.navigate("OpenSourceLicensesScreen"),
     },
   ];
 
@@ -310,32 +371,48 @@ export default function AboutAppScreen() {
           { backgroundColor: C.card, borderColor: C.border },
         ]}
       >
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => navigation.navigate("OpenSourceLicensesScreen")}
-          style={styles.legalRow}
-        >
-          <View style={[styles.legalIconWrap, { backgroundColor: C.iconTeal }]}>
-            <AppIcon name="document-text-outline" size={18} color={C.teal} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text
-              allowFontScaling={false}
-              style={[styles.legalTitle, { color: C.text }]}
+        {LEGAL_ROWS.map((row, index) => {
+          const isLast = index === LEGAL_ROWS.length - 1;
+          return (
+            <TouchableOpacity
+              key={row.key}
+              activeOpacity={0.7}
+              onPress={row.onPress}
+              style={[
+                styles.legalRow,
+                !isLast && {
+                  borderBottomWidth: 1,
+                  borderBottomColor: C.borderMuted,
+                },
+              ]}
             >
-              {isTr ? "Açık Kaynak Lisansları" : "Open Source Licenses"}
-            </Text>
-            <Text
-              allowFontScaling={false}
-              style={[styles.legalSub, { color: C.muted }]}
-            >
-              {isTr
-                ? "Kullanılan kütüphaneler ve lisans metinleri"
-                : "Third-party libraries and open source terms"}
-            </Text>
-          </View>
-          <AppIcon name="chevron-forward" size={16} color={C.muted} />
-        </TouchableOpacity>
+              <View style={[styles.legalIconWrap, { backgroundColor: row.bg }]}>
+                <AppIcon name={row.icon} size={18} color={row.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.legalTitle, { color: C.text }]}
+                >
+                  {row.title}
+                </Text>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.legalSub, { color: C.muted }]}
+                >
+                  {row.sub}
+                </Text>
+              </View>
+              {/* Tarayıcıda açılan satırlar ayrı ikon alır: kullanıcı
+                  uygulamadan çıkacağını basmadan önce görsün. */}
+              <AppIcon
+                name={row.external ? "open-outline" : "chevron-forward"}
+                size={16}
+                color={C.muted}
+              />
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* ❓ Sıkça Sorulan Sorular (SSS) */}
