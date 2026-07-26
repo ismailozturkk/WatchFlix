@@ -1,15 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node -e \"require\\('fs'\\).writeFileSync\\('c:/Users/ismail/Desktop/projeler/MainProject/WhatchFlix/screens/ChatScreen.js', require\\('fs'\\).readFileSync\\('c:/Users/ismail/Desktop/projeler/MainProject/WhatchFlix/screens/ChatScreen.js.bak','utf8'\\), 'utf8'\\); console.log\\('restored'\\);\")",
-      "Bash(git -C C:\\\\Users\\\\ismail\\\\Desktop\\\\projeler\\\\MainProject\\\\WhatchFlix status --short)",
+      "Bash(node -e \"require\\('fs'\\).writeFileSync\\('c:/Users/ismail/Desktop/projeler/MainProject/Seelogd/screens/ChatScreen.js', require\\('fs'\\).readFileSync\\('c:/Users/ismail/Desktop/projeler/MainProject/Seelogd/screens/ChatScreen.js.bak','utf8'\\), 'utf8'\\); console.log\\('restored'\\);\")",
+      "Bash(git -C C:\\\\Users\\\\ismail\\\\Desktop\\\\projeler\\\\MainProject\\\\Seelogd status --short)",
       "Bash(node -c screens/tv/TvShowsTrends.js)",
       "Bash(node -c screens/tv/TvShowBests.js)",
       "Bash(node -c screens/tv/TvShowsAiringToday.js)",
       "Bash(node -c screens/tv/TvShowsOnTheAir.js)",
       "Bash(node -c screens/tv/TvShowsGenres.js)",
       "Bash(node -c screens/tv/TvShowsProvders.js)",
-      "Bash(node -e \"require\\('fs'\\).readFileSync\\('C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\ismail\\\\\\\\\\\\\\\\Desktop\\\\\\\\\\\\\\\\projeler\\\\\\\\\\\\\\\\MainProject\\\\\\\\\\\\\\\\WhatchFlix\\\\\\\\\\\\\\\\screens\\\\\\\\\\\\\\\\tabs\\\\\\\\\\\\\\\\profile\\\\\\\\\\\\\\\\ProfileNotes.js','utf8'\\); console.log\\('OK file is readable, length:', require\\('fs'\\).statSync\\('C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\ismail\\\\\\\\\\\\\\\\Desktop\\\\\\\\\\\\\\\\projeler\\\\\\\\\\\\\\\\MainProject\\\\\\\\\\\\\\\\WhatchFlix\\\\\\\\\\\\\\\\screens\\\\\\\\\\\\\\\\tabs\\\\\\\\\\\\\\\\profile\\\\\\\\\\\\\\\\ProfileNotes.js'\\).size\\)\")",
+      "Bash(node -e \"require\\('fs'\\).readFileSync\\('C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\ismail\\\\\\\\\\\\\\\\Desktop\\\\\\\\\\\\\\\\projeler\\\\\\\\\\\\\\\\MainProject\\\\\\\\\\\\\\\\Seelogd\\\\\\\\\\\\\\\\screens\\\\\\\\\\\\\\\\tabs\\\\\\\\\\\\\\\\profile\\\\\\\\\\\\\\\\ProfileNotes.js','utf8'\\); console.log\\('OK file is readable, length:', require\\('fs'\\).statSync\\('C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\ismail\\\\\\\\\\\\\\\\Desktop\\\\\\\\\\\\\\\\projeler\\\\\\\\\\\\\\\\MainProject\\\\\\\\\\\\\\\\Seelogd\\\\\\\\\\\\\\\\screens\\\\\\\\\\\\\\\\tabs\\\\\\\\\\\\\\\\profile\\\\\\\\\\\\\\\\ProfileNotes.js'\\).size\\)\")",
       "Bash(node -e \"const c=require\\('fs'\\).readFileSync\\('screens/tabs/profile/ProfileNotes.js','utf8'\\); console.log\\('length:',c.length\\); console.log\\('last 100:', c.slice\\(-100\\)\\);\")",
       "Bash(npx --yes esbuild --bundle=false --loader=jsx screens/tabs/profile/ProfileNotes.js)",
       "Bash(npx --yes esbuild --bundle=false \"--loader:.js=jsx\" screens/CalendarScreen.js)",
