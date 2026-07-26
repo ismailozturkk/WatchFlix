@@ -1,9 +1,10 @@
 // services/googleAuthService.js
 //
-// Google ile giriş + hesap bağlama.
+// Google ile giriş + hesap bağlama + yeniden doğrulama.
 //
 // Akış: native hesap seçici → idToken → Firebase credential →
-// signInWithCredential (giriş) veya linkWithCredential (bağlama).
+// signInWithCredential (giriş), linkWithCredential (bağlama) veya
+// reauthenticateWithCredential (hesap silme gibi hassas işlemler).
 //
 // Hata sözleşmesi: bu modülün fırlattığı her hata `code` taşır (GoogleAuthCode).
 // UI koda göre yerelleştirir; ham Firebase metni ("Firebase: Error
@@ -26,6 +27,7 @@ import {
   GoogleAuthProvider,
   fetchSignInMethodsForEmail,
   linkWithCredential,
+  reauthenticateWithCredential,
   signInWithCredential,
   signOut as firebaseSignOut,
   unlink,
@@ -49,6 +51,7 @@ export const GoogleAuthCode = {
   ACCOUNT_REQUIRES_LINK: "google/account-requires-link",
   ALREADY_LINKED_ELSEWHERE: "google/already-linked-elsewhere",
   ALREADY_LINKED_HERE: "google/already-linked-here",
+  WRONG_ACCOUNT: "google/wrong-account",
   REQUIRES_RECENT_LOGIN: "google/requires-recent-login",
   LAST_PROVIDER: "google/last-provider",
   UNKNOWN: "google/unknown",
@@ -100,7 +103,7 @@ function toGoogleAuthError(error) {
     case "auth/credential-already-in-use":
       return new GoogleAuthError(
         GoogleAuthCode.ALREADY_LINKED_ELSEWHERE,
-        "Bu Google hesabı başka bir Watchify hesabına bağlı.",
+        "Bu Google hesabı başka bir Seelogd hesabına bağlı.",
         error,
       );
     case "auth/email-already-in-use":
@@ -115,6 +118,15 @@ function toGoogleAuthError(error) {
       return new GoogleAuthError(
         GoogleAuthCode.ALREADY_LINKED_HERE,
         "Google hesabın zaten bağlı.",
+        error,
+      );
+    // Yeniden doğrularken oturumdakinden başka bir Google hesabı seçildi.
+    // Hesap seçici her seferinde açıldığı için (bkz. getGoogleCredential)
+    // bu, sıradan bir kullanıcı hatası — ayrı bir kod hak ediyor.
+    case "auth/user-mismatch":
+      return new GoogleAuthError(
+        GoogleAuthCode.WRONG_ACCOUNT,
+        "Seçilen Google hesabı oturumdaki hesap değil.",
         error,
       );
     case "auth/requires-recent-login":
@@ -144,12 +156,16 @@ function toGoogleAuthError(error) {
 
 const ERROR_TEXT = {
   [GoogleAuthCode.ALREADY_LINKED_ELSEWHERE]: {
-    tr: "Bu Google hesabı başka bir Watchify hesabına bağlı. Önce o hesaptan bağlantıyı kaldır.",
-    en: "This Google account is linked to another Watchify account. Disconnect it there first.",
+    tr: "Bu Google hesabı başka bir Seelogd hesabına bağlı. Önce o hesaptan bağlantıyı kaldır.",
+    en: "This Google account is linked to another Seelogd account. Disconnect it there first.",
   },
   [GoogleAuthCode.ALREADY_LINKED_HERE]: {
     tr: "Google hesabın zaten bağlı.",
     en: "Your Google account is already connected.",
+  },
+  [GoogleAuthCode.WRONG_ACCOUNT]: {
+    tr: "Farklı bir Google hesabı seçtin. Oturumu açtığın hesabı seç.",
+    en: "You picked a different Google account. Choose the one you signed in with.",
   },
   [GoogleAuthCode.REQUIRES_RECENT_LOGIN]: {
     tr: "Güvenlik için çıkış yapıp tekrar giriş yaptıktan sonra dene.",
@@ -160,8 +176,8 @@ const ERROR_TEXT = {
     en: "Could not reach the network. Check your connection.",
   },
   [GoogleAuthCode.ACCOUNT_REQUIRES_LINK]: {
-    tr: "Bu e-posta ile zaten bir Watchify hesabı var. Önce e-posta ve şifrenle giriş yap, ardından Ayarlar > Hesap bağlantıları bölümünden Google'ı bağla.",
-    en: "A Watchify account already uses this email. Sign in with email and password first, then connect Google from Settings > Account connections.",
+    tr: "Bu e-posta ile zaten bir Seelogd hesabı var. Önce e-posta ve şifrenle giriş yap, ardından Ayarlar > Hesap bağlantıları bölümünden Google'ı bağla.",
+    en: "A Seelogd account already uses this email. Sign in with email and password first, then connect Google from Settings > Account connections.",
   },
   [GoogleAuthCode.PLAY_SERVICES]: {
     tr: "Google Play Hizmetleri bu cihazda kullanılamıyor.",
@@ -439,6 +455,47 @@ export async function linkGoogleAccount() {
     // sunucuyla tazeleme. Başarısız olması bağlamayı geçersiz kılmaz, bu
     // yüzden fatal değil — aksi halde "bağlandı ama UI bağlanmadı" derdi.
     await current.reload().catch(() => {});
+
+    return { cancelled: false };
+  });
+}
+
+/**
+ * Google hesabıyla yeniden doğrulama — hesap silme gibi "yakın zamanda giriş"
+ * isteyen işlemler için. Şifresi olmayan (yalnızca Google ile açılmış)
+ * hesapların tek reauth yolu budur.
+ *
+ * Taze bir idToken alıp reauthenticateWithCredential çağırır; oturumu
+ * değiştirmez, yalnızca mevcut kullanıcının kimliğini tazeler.
+ *
+ * @returns {Promise<{cancelled: boolean}>} Kullanıcı seçiciyi kapatırsa
+ *   { cancelled: true } — iptal bir hata değildir.
+ */
+export async function reauthenticateWithGoogle() {
+  return withLock(async () => {
+    const current = auth.currentUser;
+    if (!current) {
+      throw new GoogleAuthError(GoogleAuthCode.NO_SESSION, "Oturum bulunamadı.");
+    }
+
+    let credential;
+    try {
+      const selected = await getGoogleCredential();
+      if (!selected) return { cancelled: true };
+      credential = selected.credential;
+    } catch (error) {
+      throw toGoogleAuthError(error);
+    }
+
+    try {
+      await reauthenticateWithCredential(current, credential);
+    } catch (error) {
+      // Doğrulama reddedildi (çoğunlukla auth/user-mismatch: yanlış hesap).
+      // Native oturumu bırakma ki kullanıcı tekrar denerken doğru hesabı
+      // seçebilsin — yoksa SDK aynı yanlış hesapla sessizce devam eder.
+      await GoogleSignin.signOut().catch(() => {});
+      throw toGoogleAuthError(error);
+    }
 
     return { cancelled: false };
   });

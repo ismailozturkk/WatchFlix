@@ -36,7 +36,7 @@ import { clampAvatarIndex, getAvatarSource } from "../utils/avatars";
 import { alpha } from "../theme/colors";
 import { BlurView } from "expo-blur";
 import { MaterialCommunityIcons, Ionicons, Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "@services/hapticsService";
 import LottieView from "lottie-react-native";
 import appAlert from "./AppAlert";
 import Toast from "react-native-toast-message";
@@ -662,6 +662,10 @@ const Comment = ({
         setDoc(doc(db, "Users", currentUser.uid, "myComments", newRef.id), {
           kind: collectionName === "TvComment" ? "tv" : "movie",
           targetId: cid,
+          // Hesap silme purge'u yanıtın yolunu (comments/{parentId}/replies/{id})
+          // YALNIZ buradan kurabilir; üst yorum id'si olmadan yanıt bulunamaz
+          // (services/accountService.js → "media-comments" adımı).
+          parentId: isReply ? parentId : null,
           text: text.trim(),
           title: mediaTitle || "",
           poster: mediaPoster || null,
@@ -899,6 +903,7 @@ const Comment = ({
             onChangeText={(t) =>
               setCommentInputState((p) => ({ ...p, text: t }))
             }
+            maxLength={500}
             multiline
           />
 

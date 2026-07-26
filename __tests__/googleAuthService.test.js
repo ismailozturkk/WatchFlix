@@ -286,7 +286,7 @@ describe("describeGoogleAuthError", () => {
 
   it("bilinen kodlari iki dilde esler", () => {
     const err = { code: GoogleAuthCode.ALREADY_LINKED_ELSEWHERE };
-    expect(describeGoogleAuthError(err, true)).toMatch(/başka bir Watchify/);
-    expect(describeGoogleAuthError(err, false)).toMatch(/another Watchify/);
+    expect(describeGoogleAuthError(err, true)).toMatch(/başka bir Seelogd/);
+    expect(describeGoogleAuthError(err, false)).toMatch(/another Seelogd/);
   });
 });
