@@ -92,7 +92,8 @@
           "project": "react-native",
           "organization": "seelogd"
         }
-      ]
+      ],
+      "./plugins/withAndroidWidgets.js"
     ],
     "owner": "smlztrk",
     "updates": {

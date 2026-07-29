@@ -1,0 +1,33 @@
+<!-- Seelogd ana ekran widget'larının string kaynakları.
+     plugins/withAndroidWidgets.js bu dosyayı prebuild sırasında
+     android/app/src/main/res/values/ altına kopyalar; Android, values
+     altındaki tüm dosyaları otomatik birleştirdiği için stok strings.xml'e
+     dokunmak gerekmez. Manifest receiver label'ları (@string/*_widget_name)
+     ve appwidget info description'ları buradaki tanımlara başvurur. -->
+<resources>
+  <string name="reminder_widget_name">Seelogd Yaklaşanlar</string>
+  <string name="reminder_widget_description">Yaklaşan film ve dizi bölümlerini gösterir</string>
+  <string name="reminder_widget_preview_title">Yaklaşanlar</string>
+  <string name="reminder_widget_preview_count">0 hatırlatma</string>
+  <string name="reminder_widget_empty">Yaklaşan film veya bölüm yok</string>
+  <string name="reminder_widget_more">+0 daha</string>
+  <string name="lists_widget_name">Seelogd Listelerim</string>
+  <string name="lists_widget_description">Listelerindeki posterleri ızgara olarak gösterir</string>
+  <string name="lists_widget_preview_title">Favoriler</string>
+  <string name="lists_widget_preview_position">1/4</string>
+  <string name="lists_widget_empty">Bu listede henüz içerik yok</string>
+  <string name="lists_widget_prev">Önceki liste</string>
+  <string name="lists_widget_next">Sonraki liste</string>
+  <string name="stats_widget_name">Seelogd İstatistikler</string>
+  <string name="stats_widget_description">İzleme istatistiklerini ana ekranda gösterir</string>
+  <string name="stats_widget_preview_title">İstatistikler</string>
+  <string name="stats_widget_preview_total">Toplam Süre</string>
+  <string name="stats_widget_preview_movies">Film</string>
+  <string name="stats_widget_preview_shows">Dizi</string>
+  <string name="stats_widget_preview_episodes">Bölüm</string>
+  <string name="stats_widget_preview_years">Yıl</string>
+  <string name="stats_widget_preview_months">Ay</string>
+  <string name="stats_widget_preview_days">Gün</string>
+  <string name="stats_widget_preview_hours">Saat</string>
+  <string name="stats_widget_preview_minutes">Dakika</string>
+</resources>

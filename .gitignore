@@ -20,46 +20,9 @@ ios/
 *.mobileprovision
 credentials.json
 
-# Keep the renamed Android application package sources visible to Git.
-!android/
-android/*
-!android/app/
-android/app/*
-!android/app/src/
-android/app/src/*
-!android/app/src/main/
-android/app/src/main/*
-!android/app/src/main/java/
-android/app/src/main/java/*
-!android/app/src/main/java/com/
-android/app/src/main/java/com/*
-!android/app/src/main/java/com/smlztrk/
-android/app/src/main/java/com/smlztrk/*
-!android/app/src/main/java/com/smlztrk/seelogd/
-android/app/src/main/java/com/smlztrk/seelogd/*
-!android/app/src/main/java/com/smlztrk/seelogd/MainActivity.kt
-!android/app/src/main/java/com/smlztrk/seelogd/MainApplication.kt
-# Widget kaynak sınıflarının TAMAMI izlenir. Önceden dosya-dosya beyaz liste
-# vardı ve sonradan eklenen her sınıf sessizce commit dışı kalıyordu
-# (ReminderWidgetRemoteViewsService.kt bu yüzden hiç izlenmemişti — widget
-# temiz bir klonda derlenmezdi).
-!android/app/src/main/java/com/smlztrk/seelogd/widget/
-
-# Widget res kaynakları (layout / drawable / xml). Aynı tuzak burada da vardı:
-# android/app/src/main/* kuralı res'i komple eliyor, bu yüzden yeni layout ve
-# drawable'lar eklenince görünmüyordu. "*widget*" kalıbıyla yalnız widget
-# kaynakları izlenir; Expo'nun ürettiği diğer res dosyaları yok sayılmaya devam.
-!android/app/src/main/res/
-android/app/src/main/res/*
-!android/app/src/main/res/layout/
-android/app/src/main/res/layout/*
-!android/app/src/main/res/layout/*widget*.xml
-!android/app/src/main/res/drawable/
-android/app/src/main/res/drawable/*
-!android/app/src/main/res/drawable/*widget*.xml
-!android/app/src/main/res/xml/
-android/app/src/main/res/xml/*
-!android/app/src/main/res/xml/*widget*.xml
+# NOT: android/ artık TAMAMEN üretilen bir dizin (CNG). Widget native kaynağı
+# native/android-widgets/ altında yaşar ve plugins/withAndroidWidgets.js her
+# prebuild'de enjekte eder. Eski seçici izleme kuralları (ve tuzakları) kalktı.
 
 # Metro
 .metro-health-check*
