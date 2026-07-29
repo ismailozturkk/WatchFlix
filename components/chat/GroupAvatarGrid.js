@@ -7,11 +7,13 @@ import {
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { ICON_BACKGROUND_IMAGES } from "@components/IconBacground";
+import { ICON_BACKGROUND_COUNT } from "@components/IconBacground";
 import { i18nText } from "@utils/i18nText";
 import GroupAvatar from "@components/chat/GroupAvatar";
 
-const AVATAR_INDEXES = ICON_BACKGROUND_IMAGES.map((_, index) => index);
+// Yalnız SAYI lazım: görsellerin kendisi GroupAvatar hücre hücre çizerken
+// (getIconBackgroundSource) lazy yükleniyor.
+const AVATAR_INDEXES = Array.from({ length: ICON_BACKGROUND_COUNT }, (_, index) => index);
 
 const AvatarCell = memo(function AvatarCell({
   index,

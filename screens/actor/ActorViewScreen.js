@@ -21,7 +21,7 @@ import {
 } from "../../context/AppSettingsContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -363,9 +363,9 @@ const ActorViewScreen = ({ route, navigation }) => {
           onPress={() => navigation.goBack()}
           activeOpacity={0.85}
         >
-          <BlurView tint="dark" intensity={55} style={styles.backBtn}>
+          <AdaptiveBlurView tint="dark" intensity={55} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={22} color="#fff" />
-          </BlurView>
+          </AdaptiveBlurView>
         </TouchableOpacity>
       </SafeAreaView>
 

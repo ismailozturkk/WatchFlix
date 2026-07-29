@@ -48,7 +48,7 @@ import WatchedDateSheet from "@components/detail/WatchedDateSheet";
 import WatchHistorySheet from "@components/modals/WatchHistorySheet";
 import ListViewTv from "../../components/ListViewTv";
 import PosterImage from "../../components/PosterImage";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
 import ListBadges from "../../components/ListBadges";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { useListStatusContext } from "../../context/ListStatusContext";
@@ -1665,9 +1665,9 @@ export default function TvShowsDetails({ route, navigation }) {
         onPress={() => navigation.goBack()}
         activeOpacity={0.8}
       >
-        <BlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
+        <AdaptiveBlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
           <Ionicons name="chevron-back" size={22} color="#fff" />
-        </BlurView>
+        </AdaptiveBlurView>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -1689,9 +1689,9 @@ export default function TvShowsDetails({ route, navigation }) {
         }
         activeOpacity={0.8}
       >
-        <BlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
+        <AdaptiveBlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
           <Ionicons name="share-social-outline" size={20} color="#fff" />
-        </BlurView>
+        </AdaptiveBlurView>
       </TouchableOpacity>
 
       {/* ═══ MODALS ═══ */}

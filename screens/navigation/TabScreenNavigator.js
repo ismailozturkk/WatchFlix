@@ -24,7 +24,7 @@ import MovieScreen from "@screens/tabs/MovieScreen";
 import TvShowScreen from "@screens/tabs/TvShowScreen";
 import { MovieProvider } from "@context/MovieContex";
 import { CalendarProvider } from "@context/CalendarContext";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
 import { LinearGradient } from "expo-linear-gradient";
 import { Screen, ScreenContainer } from "react-native-screens";
 import PetCompanion from "@components/pet/PetCompanion";
@@ -310,10 +310,16 @@ function TabScreenNavigator({ navigation, route }) {
           <View
             style={styles.tabClip}
           >
-            <BlurView
+            {/* Sekme çubuğu içerik ÜSTÜNDE yüzer: blur kalktığında arkadaki
+                posterler net göründüğü için etiketler okunamaz hale gelirdi.
+                Düşük katmanda bu yüzden tema yüzeyini neredeyse opak
+                (0.82 + üstteki 0.34'lük katman) çiziyoruz. */}
+            <AdaptiveBlurView
               tint="dark"
               intensity={40}
               experimentalBlurMethod="dimezisBlurView"
+              fallbackColor={theme.tab || theme.secondary}
+              fallbackAlpha={0.82}
               style={styles.tabContainer}
             >
               <View
@@ -336,7 +342,7 @@ function TabScreenNavigator({ navigation, route }) {
                   theme={theme}
                 />
               ))}
-            </BlurView>
+            </AdaptiveBlurView>
           </View>
         </View>
       </View>

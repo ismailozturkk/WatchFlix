@@ -29,7 +29,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Progress from "react-native-progress";
 import Toast from "react-native-toast-message";
 import SwipeCard from "@components/SwipeCard";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
 import { useImageQualitySettings, useListLayoutSettings } from "@context/AppSettingsContext";
 import CaseOpeningModal from "@components/modals/CaseOpeningModal";
 import Feather from "@expo/vector-icons/Feather";
@@ -1117,7 +1117,7 @@ export default function ListsScreen({ route, navigation }) {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalContainer}>
-          <BlurView
+          <AdaptiveBlurView
             tint="dark"
             intensity={50}
             experimentalBlurMethod="dimezisBlurView"
@@ -1474,7 +1474,7 @@ export default function ListsScreen({ route, navigation }) {
         statusBarTranslucent
         onRequestClose={closeReorderModal}
       >
-        <BlurView
+        <AdaptiveBlurView
           tint="dark"
           intensity={65}
           experimentalBlurMethod="dimezisBlurView"
@@ -1745,7 +1745,7 @@ export default function ListsScreen({ route, navigation }) {
         onRequestClose={() => setFilterModalVisible(false)}
       >
         <View style={{ flex: 1, justifyContent: "flex-end" }}>
-          <BlurView tint="dark" intensity={30} style={StyleSheet.absoluteFill} />
+          <AdaptiveBlurView tint="dark" intensity={30} style={StyleSheet.absoluteFill} />
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
             activeOpacity={1}

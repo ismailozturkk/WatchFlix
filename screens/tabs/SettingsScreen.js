@@ -38,7 +38,7 @@ import SwipeCard from "@components/SwipeCard";
 import PetSettingsSection from "@components/pet/PetSettingsSection";
 import PermissionsSection from "@components/PermissionsSection";
 import BatteryOptimizationNotice from "@components/BatteryOptimizationNotice";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
 import { LinearGradient } from "expo-linear-gradient";
 import CountryFlag from "react-native-country-flag";
 import ScreenDecor from "../../components/ScreenDecor";
@@ -1139,7 +1139,7 @@ export default function SettingsScreen() {
                 setProviderSearch("");
               }}
             />
-            <BlurView
+            <AdaptiveBlurView
               tint="dark"
               intensity={40}
               experimentalBlurMethod="dimezisBlurView"
@@ -1323,7 +1323,7 @@ export default function SettingsScreen() {
                   setLangSearch("");
                 }}
               />
-              <BlurView
+              <AdaptiveBlurView
                 tint="dark"
                 intensity={40}
                 experimentalBlurMethod="dimezisBlurView"

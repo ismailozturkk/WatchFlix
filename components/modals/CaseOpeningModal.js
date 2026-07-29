@@ -13,7 +13,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../common/AdaptiveBlurView";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
@@ -315,7 +315,7 @@ export default function CaseOpeningModal({
       onRequestClose={handleClose}
     >
       <View style={styles.modalRoot}>
-        <BlurView
+        <AdaptiveBlurView
           tint="dark"
           intensity={80}
           experimentalBlurMethod="dimezisBlurView"

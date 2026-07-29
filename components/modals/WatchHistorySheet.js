@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../common/AdaptiveBlurView";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -50,7 +50,7 @@ export default function WatchHistorySheet({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.root}>
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose}>
-          <BlurView tint="dark" intensity={42} style={StyleSheet.absoluteFill} />
+          <AdaptiveBlurView tint="dark" intensity={42} style={StyleSheet.absoluteFill} />
         </TouchableOpacity>
         <View
           style={[

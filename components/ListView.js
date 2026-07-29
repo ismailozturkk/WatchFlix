@@ -19,7 +19,8 @@ import { useListStatusContext } from "../context/ListStatusContext";
 import { useSharedLists } from "../context/SharedListsContext";
 import SharedListsSection from "./SharedListsSection";
 import { useHapticsSettings } from "../context/AppSettingsContext";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "./common/AdaptiveBlurView";
+import ListActionIcon from "./common/ListActionIcon";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as Haptics from "@services/hapticsService";
 import { i18nText } from "../utils/i18nText";
@@ -102,10 +103,13 @@ const GridCard = ({
           },
         ]}
       >
-        <Ionicons
-          name={isIn ? "checkmark-circle" : "folder-outline"}
+        <ListActionIcon
+          active={isIn}
+          activeName="checkmark-circle"
+          inactiveName="folder-outline"
+          activeColor={theme.colors.green}
+          inactiveColor={theme.text.muted}
           size={26}
-          color={isIn ? theme.colors.green : theme.text.muted}
         />
       </View>
       <Text
@@ -174,32 +178,40 @@ const ListView = ({
   const trueCount = otherListKeys.filter((list) => getIsActive(list)).length;
 
   /* ── Animasyonlar ── */
-  const animateBounce = (name) => {
+  // `mode`: "add" (listeye giriyor) | "remove" (çıkıyor) | "neutral" (modal açma
+  // gibi durum değiştirmeyen dokunuşlar). Ekleme ile çıkarma AYNI hissi
+  // vermemeli: ekleme daha derin bir squash + belirgin zıplama, çıkarma sığ ve
+  // yaysız. Dokunsal geri bildirim de yönle birlikte değişir, böylece kullanıcı
+  // ekrana bakmadan hangi yöne gittiğini ayırt edebilir.
+  const animateBounce = (name, mode = "neutral") => {
     if (hapticsEnabled) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Haptics.impactAsync(
+        mode === "add"
+          ? Haptics.ImpactFeedbackStyle.Medium
+          : Haptics.ImpactFeedbackStyle.Light,
+      );
     }
     const sc = scaleValuesRef.current[name];
     if (!sc) return;
-    
+
     // Animasyonu anında resetle ve küçült
     sc.stopAnimation();
-    sc.setValue(0.75);
-    
-    // Zıplayarak geri dön
+    sc.setValue(mode === "add" ? 0.72 : 0.86);
+
     Animated.spring(sc, {
       toValue: 1,
       mass: 1,
-      stiffness: 250,
-      damping: 12, // Düşük damping = daha fazla zıplama (bounce)
+      stiffness: mode === "add" ? 260 : 300,
+      damping: mode === "add" ? 10 : 19, // düşük damping = daha fazla zıplama
       useNativeDriver: true,
     }).start();
   };
 
   const handleOptimisticPress = (key, action, toggle = true) => {
-    animateBounce(key);
-    
+    const currentState = getIsActive(key);
+    animateBounce(key, toggle ? (currentState ? "remove" : "add") : "neutral");
+
     if (toggle) {
-      const currentState = getIsActive(key);
       setOptimisticStates((prev) => ({ ...prev, [key]: !currentState }));
     }
     // Animasyonun donmaması için ana işlemi bir sonraki event loop'a bırak
@@ -248,8 +260,10 @@ const ListView = ({
   const ICONS = [
     {
       key: "watchList",
-      icon: getIsActive("watchList") ? "bookmark" : "bookmark-outline",
-      color: getIsActive("watchList") ? theme.colors.blue : theme.text.secondary,
+      activeName: "bookmark",
+      inactiveName: "bookmark-outline",
+      activeColor: theme.colors.blue,
+      inactiveColor: theme.text.secondary,
       label: getIsActive("watchList")
         ? i18nText("autoI18n.listede", "Listede")
         : i18nText("autoI18n.izleme_listesi", "İzleme Listesi"),
@@ -261,8 +275,10 @@ const ListView = ({
     },
     {
       key: "favorites",
-      icon: getIsActive("favorites") ? "heart" : "heart-outline",
-      color: getIsActive("favorites") ? theme.colors.red : theme.text.secondary,
+      activeName: "heart",
+      inactiveName: "heart-outline",
+      activeColor: theme.colors.red,
+      inactiveColor: theme.text.secondary,
       label: getIsActive("favorites")
         ? i18nText("autoI18n.favorim", "Favorim")
         : i18nText("autoI18n.favori", "Favori"),
@@ -278,7 +294,7 @@ const ListView = ({
       ]}
     >
       {/* ── Standart butonlar ── */}
-      {ICONS.map(({ key, icon, color, label, onPress, isEye }) => {
+      {ICONS.map(({ key, activeName, inactiveName, activeColor, inactiveColor, label, onPress, isEye }) => {
         if (isEye) {
           const isReminderMode = isRemaining || isReminderSet;
           return (
@@ -296,14 +312,21 @@ const ListView = ({
                 }
               >
                 {isReminderMode ? (
-                  <MaterialCommunityIcons
-                    name={getIsActive("reminder") ? "bell-ring" : "bell-ring-outline"}
-                    size={30}
-                    color={getIsActive("reminder") ? theme.colors.orange : theme.text.secondary}
+                  <ListActionIcon
+                    active={!!getIsActive("reminder")}
+                    IconSet={MaterialCommunityIcons}
+                    activeName="bell-ring"
+                    inactiveName="bell-ring-outline"
+                    activeColor={theme.colors.orange}
+                    inactiveColor={theme.text.secondary}
                   />
-                ) : getIsActive("watchedMovies") ? (
-                  <Ionicons name="eye" size={30} color={theme.colors.green} />
-                ) : isLoading ? (
+                ) : /* Yükleme göstergesi YALNIZ henüz işaretlenmemişken çıkar.
+                       Eskiden `isLoading` tek başına kontrol ediyordu: kullanıcı
+                       "izledim" der demez ikonun yerini dönen Lottie alıyor,
+                       geçiş animasyonu daha başlamadan ekrandan siliniyordu.
+                       İyimser (optimistic) durum zaten sonucu gösterdiği için
+                       işaretliyken dönen göstermeye gerek yok. */
+                isLoading && !getIsActive("watchedMovies") ? (
                   <LottieView
                     source={require("@lottie/loading15.json")}
                     style={{ width: 30, height: 30 }}
@@ -311,7 +334,13 @@ const ListView = ({
                     loop
                   />
                 ) : (
-                  <Ionicons name="eye-outline" size={30} color={theme.text.secondary} />
+                  <ListActionIcon
+                    active={!!getIsActive("watchedMovies")}
+                    activeName="eye"
+                    inactiveName="eye-outline"
+                    activeColor={theme.colors.green}
+                    inactiveColor={theme.text.secondary}
+                  />
                 )}
               </ActionButton>
               <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>
@@ -331,7 +360,13 @@ const ListView = ({
               opacity={opacityValuesRef.current[key]}
               onPress={onPress}
             >
-              <Ionicons name={icon} size={30} color={color} />
+              <ListActionIcon
+                active={!!getIsActive(key)}
+                activeName={activeName}
+                inactiveName={inactiveName}
+                activeColor={activeColor}
+                inactiveColor={inactiveColor}
+              />
             </ActionButton>
             <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>
               {label}
@@ -394,7 +429,7 @@ const ListView = ({
       >
         <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeModal} />
-          <BlurView
+          <AdaptiveBlurView
             tint="dark"
             intensity={50}
             experimentalBlurMethod="dimezisBlurView"

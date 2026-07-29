@@ -19,7 +19,7 @@ import React, { useEffect, useMemo, useRef } from "react";
 import {
   Animated, Dimensions, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../common/AdaptiveBlurView";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 import AppBadge from "@components/badges/AppBadge";
@@ -114,7 +114,7 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
     <Modal transparent visible={visible} animationType="none" onRequestClose={kapat} statusBarTranslucent>
       <View style={styles.root}>
         <Animated.View style={[styles.backdrop, { opacity: backdrop }]}>
-          <BlurView tint="dark" intensity={28} experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
+          <AdaptiveBlurView tint="dark" intensity={28} experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
           <LinearGradient
             colors={["rgba(0,0,0,0.1)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.82)"]}
             style={StyleSheet.absoluteFill}

@@ -26,7 +26,7 @@ import {
 } from "react-native";
 import axios from "axios";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../common/AdaptiveBlurView";
 import { Image } from "expo-image";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { useTheme } from "../../context/ThemeContext";
@@ -118,7 +118,7 @@ function TrailerPlayerModal({ visible, video, onClose, theme }) {
       supportedOrientations={["portrait", "landscape"]}
     >
       <View style={styles.playerRoot}>
-        <BlurView
+        <AdaptiveBlurView
           tint="dark"
           intensity={60}
           experimentalBlurMethod="dimezisBlurView"
@@ -157,9 +157,9 @@ function TrailerPlayerModal({ visible, video, onClose, theme }) {
                 accessibilityRole="button"
                 accessibilityLabel={i18nText("autoI18n.youtube_da_ac", "YouTube'da aç")}
               >
-                <BlurView tint="dark" intensity={45} style={styles.playerBtn}>
+                <AdaptiveBlurView tint="dark" intensity={45} style={styles.playerBtn}>
                   <Ionicons name="logo-youtube" size={19} color="#fff" />
-                </BlurView>
+                </AdaptiveBlurView>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={onClose}
@@ -167,9 +167,9 @@ function TrailerPlayerModal({ visible, video, onClose, theme }) {
                 accessibilityRole="button"
                 accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
               >
-                <BlurView tint="dark" intensity={45} style={styles.playerBtn}>
+                <AdaptiveBlurView tint="dark" intensity={45} style={styles.playerBtn}>
                   <Ionicons name="close" size={20} color="#fff" />
-                </BlurView>
+                </AdaptiveBlurView>
               </TouchableOpacity>
             </View>
           </View>

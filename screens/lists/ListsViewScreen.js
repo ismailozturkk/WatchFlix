@@ -39,7 +39,6 @@ import { PREDEFINED_MOVIE_LISTS } from "../../services/listItemsService";
 import { useSharedLists } from "../../context/SharedListsContext";
 import CreateSharedListModal from "../../components/modals/CreateSharedListModal";
 import { collection, getDocs, limit, query } from "firebase/firestore";
-import { BlurView } from "expo-blur";
 import { i18nText } from "@utils/i18nText";
 // İkon/vurgu eşlemesi profil rayı ve Android widget'ı ile ORTAK.
 import {

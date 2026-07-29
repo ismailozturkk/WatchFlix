@@ -1,5 +1,5 @@
 import React, {
-  createContext, useContext, useEffect, useState, useMemo,
+  createContext, useContext, useEffect, useState, useMemo, useRef, useCallback,
 } from "react";
 import { doc, collection, onSnapshot, updateDoc, deleteField } from "firebase/firestore";
 import { Animated } from "react-native";
@@ -118,6 +118,20 @@ const getTopGenreNames = (items, limit = 3) => {
     .slice(0, limit)
     .map(([genre]) => genre);
 };
+
+// ─── Talebe bağlı (lazy) türetme ─────────────────────────────────────────────
+// Bu context uygulamanın KÖKÜNDE mount. Sıralama / tarihe göre gruplama /
+// en çok tekrar izlenenler gibi ağır türetmeler ise YALNIZ istatistik ve
+// Wrapped ekranlarında okunuyor. Eskiden hepsi useMemo ile her snapshot'ta
+// koşulsuz hesaplanıyordu: kullanıcı o ekranlara hiç girmese de her izleme
+// kaydı değişiminde tüm geçmiş sıralanıp gruplanıyordu.
+//
+// Çözüm: bu alanları context değerinde GETTER olarak yayınla. Hesap ancak bir
+// ekran o alanı gerçekten okuduğunda çalışır; sonuç girdi kimliğine göre
+// cache'lenir, yani aynı veriyle tekrar tekrar okumak bedava ve dönen referans
+// stabil (tüketicilerin useMemo bağımlılıkları bozulmaz).
+const sameDeps = (a, b) =>
+  a.length === b.length && a.every((dep, i) => Object.is(dep, b[i]));
 
 // ─── Provider ────────────────────────────────────────────────────────────────
 
@@ -264,6 +278,20 @@ export const ProfileStatsProvider = ({ children }) => {
     return () => unsub();
   }, [uid, startupReady]);
 
+  // Talebe bağlı türetme cache'i: { key: { deps, value } }
+  const lazyCacheRef = useRef({});
+  const lazy = useCallback((key, deps, compute) => {
+    const hit = lazyCacheRef.current[key];
+    if (hit && sameDeps(hit.deps, deps)) return hit.value;
+    const value = compute();
+    lazyCacheRef.current[key] = { deps, value };
+    return value;
+  }, []);
+
+  // ── Eager türetmeler ─────────────────────────────────────────────────────
+  // Bunlar sayaçları (film/dizi/bölüm sayısı, toplam süre) besliyor; sayaçlar
+  // da profil başlığı, ana ekran widget'ları ve rozet defteri tarafından her
+  // durumda okunuyor. Ertelemenin anlamı yok.
   const movieHistoryItems = useMemo(
     () => flattenMovieWatchEntries(listItems.filter((item) => item.type === "movie")),
     [listItems],
@@ -277,6 +305,13 @@ export const ProfileStatsProvider = ({ children }) => {
     [listItemsTv],
   );
 
+  // Bölüm listesi hem dizi sayaçlarının hem StatisticsSection/Wrapped'in girdisi.
+  // (Eskiden dizi istatistik effect'i içinde İKİNCİ kez flatten ediliyordu.)
+  const flatEpisodesTv = useMemo(
+    () => flattenTvEpisodeWatchEntries(listItemsTv),
+    [listItemsTv],
+  );
+
   // ── Film istatistikleri — her izleme occurrence'ını say ─────────────────
   useEffect(() => {
     const totalMin = movieHistoryItems.reduce((acc, movie) => acc + (movie.minutes || 0), 0);
@@ -287,7 +322,7 @@ export const ProfileStatsProvider = ({ children }) => {
 
   // ── Dizi istatistikleri — tekrarlar bölüm/süreye dahil edilir ───────────
   useEffect(() => {
-    const episodeEntries = flattenTvEpisodeWatchEntries(listItemsTv);
+    const episodeEntries = flatEpisodesTv;
     const showCount = tvHistoryStates.reduce((sum, state) => {
       const completeWatches = state.watchEvents.filter((event) => event.scope === "show").length;
       return sum + Math.max(1, completeWatches);
@@ -315,7 +350,7 @@ export const ProfileStatsProvider = ({ children }) => {
     setTotalEpisodesCount(episodeEntries.length);
     setTotalMinutesTimeTv(totalMinTv);
     setTotalWatchedTimeTv(formatTime(totalMinTv));
-  }, [listItemsTv, tvHistoryStates]);
+  }, [flatEpisodesTv, tvHistoryStates]);
 
   // ── Animation values for movie stats list ────────────────────────────────
   // Only create new Animated.Values for new items — existing ones are preserved
@@ -374,69 +409,65 @@ export const ProfileStatsProvider = ({ children }) => {
     }
   };
 
-  // ── Derived movie stats ──────────────────────────────────────────────────
-  const sortedListItems = useMemo(
-    () => [...movieHistoryItems].sort((a, b) => parseDate(b.dateAdded) - parseDate(a.dateAdded)),
-    [movieHistoryItems],
-  );
-  const groupedData = useMemo(() => groupByDate(sortedListItems), [sortedListItems]);
-  const uniqueDates = useMemo(() => [...new Set(sortedListItems.map((item) => {
-    if (typeof item.dateAdded === "string") return item.dateAdded;
-    if (item.dateAdded?.seconds) return new Date(item.dateAdded.seconds * 1000).toISOString().slice(0, 10);
-    return "";
-  }))].filter(Boolean), [sortedListItems]);
+  // ── Talebe bağlı türetmeler (yalnız okununca hesaplanır) ─────────────────
+  // Aşağıdaki getXxx fonksiyonları context değerinde getter olarak yayınlanır;
+  // sonuçlar `lazy` ile girdi kimliğine göre cache'lenir. Birbirini çağıranlar
+  // (groupedData → sortedListItems) aynı cache'i paylaşır, iş tekrarlanmaz.
 
-  const topMovieGenres = useMemo(() => getTopGenreNames(movieHistoryItems), [movieHistoryItems]);
-  const mostWatchedGenre = topMovieGenres[0] || null;
-  const secondWatchedGenre = topMovieGenres[1] || "-";
-  const threeWatchedGenre = topMovieGenres[2] || "-";
+  // Film
+  const getSortedListItems = () =>
+    lazy("sortedListItems", [movieHistoryItems], () =>
+      [...movieHistoryItems].sort((a, b) => parseDate(b.dateAdded) - parseDate(a.dateAdded)),
+    );
+  const getGroupedData = () =>
+    lazy("groupedData", [movieHistoryItems], () => groupByDate(getSortedListItems()));
+  const getUniqueDates = () =>
+    lazy("uniqueDates", [movieHistoryItems], () =>
+      [...new Set(getSortedListItems().map((item) => {
+        if (typeof item.dateAdded === "string") return item.dateAdded;
+        if (item.dateAdded?.seconds) return new Date(item.dateAdded.seconds * 1000).toISOString().slice(0, 10);
+        return "";
+      }))].filter(Boolean),
+    );
+  const getTopMovieGenres = () =>
+    lazy("topMovieGenres", [movieHistoryItems], () => getTopGenreNames(movieHistoryItems));
+  const getMostRewatchedMovies = () =>
+    lazy("mostRewatchedMovies", [movieHistoryItems], () =>
+      mostRewatched(movieHistoryItems, (item) => item.id),
+    );
 
-  // ── Derived TV stats ─────────────────────────────────────────────────────
-  const flatEpisodesTv = useMemo(
-    () => flattenTvEpisodeWatchEntries(listItemsTv),
-    [listItemsTv],
-  );
-
-  const sortedFlatEpisodesTv = useMemo(() =>
-    [...flatEpisodesTv].sort((a, b) => {
-      const ts = (t) => t?.seconds ? new Date(t.seconds * 1000) : typeof t === "string" ? new Date(t) : 0;
-      return ts(b.episodeWatchTime) - ts(a.episodeWatchTime);
-    }),
-    [flatEpisodesTv],
-  );
-
-  const groupedDataTv = useMemo(() => groupByDateFlatTv(sortedFlatEpisodesTv), [sortedFlatEpisodesTv]);
-
-  const uniqueDatesTv = useMemo(() =>
-    [...new Set(sortedFlatEpisodesTv.map((item) => {
-      if (item.episodeWatchTime?.seconds) return new Date(item.episodeWatchTime.seconds * 1000).toISOString().slice(0, 10);
-      if (typeof item.episodeWatchTime === "string") return item.episodeWatchTime.slice(0, 10);
-      return null;
-    }).filter(Boolean))].sort((a, b) => new Date(b) - new Date(a)),
-    [sortedFlatEpisodesTv],
-  );
-
-  const topTvGenres = useMemo(() => getTopGenreNames(flatEpisodesTv), [flatEpisodesTv]);
-  const mostWatchedGenreTv = topTvGenres[0] || "-";
-  const secondWatchedGenreTv = topTvGenres[1] || "-";
-  const thirdWatchedGenreTv = topTvGenres[2] || "-";
-
-  const mostRewatchedMovies = useMemo(
-    () => mostRewatched(movieHistoryItems, (item) => item.id),
-    [movieHistoryItems],
-  );
-  const tvFullWatchEntries = useMemo(
-    () => tvHistoryStates.flatMap(({ show, watchEvents }) =>
-      watchEvents
-        .filter((event) => event.scope === "show")
-        .map((event) => ({ ...show, watchEvent: event })),
-    ),
-    [tvHistoryStates],
-  );
-  const mostRewatchedTv = useMemo(
-    () => mostRewatched(tvFullWatchEntries, (item) => item.id),
-    [tvFullWatchEntries],
-  );
+  // Dizi
+  const getSortedFlatEpisodesTv = () =>
+    lazy("sortedFlatEpisodesTv", [flatEpisodesTv], () =>
+      [...flatEpisodesTv].sort((a, b) => {
+        const ts = (t) => t?.seconds ? new Date(t.seconds * 1000) : typeof t === "string" ? new Date(t) : 0;
+        return ts(b.episodeWatchTime) - ts(a.episodeWatchTime);
+      }),
+    );
+  const getGroupedDataTv = () =>
+    lazy("groupedDataTv", [flatEpisodesTv], () => groupByDateFlatTv(getSortedFlatEpisodesTv()));
+  const getUniqueDatesTv = () =>
+    lazy("uniqueDatesTv", [flatEpisodesTv], () =>
+      [...new Set(getSortedFlatEpisodesTv().map((item) => {
+        if (item.episodeWatchTime?.seconds) return new Date(item.episodeWatchTime.seconds * 1000).toISOString().slice(0, 10);
+        if (typeof item.episodeWatchTime === "string") return item.episodeWatchTime.slice(0, 10);
+        return null;
+      }).filter(Boolean))].sort((a, b) => new Date(b) - new Date(a)),
+    );
+  const getTopTvGenres = () =>
+    lazy("topTvGenres", [flatEpisodesTv], () => getTopGenreNames(flatEpisodesTv));
+  const getTvFullWatchEntries = () =>
+    lazy("tvFullWatchEntries", [tvHistoryStates], () =>
+      tvHistoryStates.flatMap(({ show, watchEvents }) =>
+        watchEvents
+          .filter((event) => event.scope === "show")
+          .map((event) => ({ ...show, watchEvent: event })),
+      ),
+    );
+  const getMostRewatchedTv = () =>
+    lazy("mostRewatchedTv", [tvHistoryStates], () =>
+      mostRewatched(getTvFullWatchEntries(), (item) => item.id),
+    );
 
   // ── Rank colors ──────────────────────────────────────────────────────────
   const rankInfo = useMemo(() => ({
@@ -539,34 +570,57 @@ export const ProfileStatsProvider = ({ children }) => {
     watchedTvCount, totalEpisodesCount, totalMinutesTimeTv, totalWatchedTimeTv,
   ]);
 
-  const value = useMemo(() => ({
-    // Lists / delete
-    lists: displayLists, selectedList, setSelectedList, modalDeleteVisible, setModalDeleteVisible, deleteList, isLoading,
-    // Movie stats
-    watchedMovieCount, totalWatchedTime, totalMinutesTime, listItems, setListItems,
-    movieHistoryItems, mostRewatchedMovies,
-    isloadingMovieInfo, loadingMovies, groupedData, uniqueDates, selectedDate, setSelectedDate,
-    mostWatchedGenre, secondWatchedGenre, threeWatchedGenre, topMovieGenres, scaleValues,
-    // TV stats
-    watchedTvCount, totalSeasonsCount, totalEpisodesCount, totalWatchedTimeTv, totalMinutesTimeTv,
-    listItemsTv, loadingTv, isloadingShowInfo, flatEpisodesTv, groupedDataTv, uniqueDatesTv,
-    mostRewatchedTv,
-    selectedDateTv, setSelectedDateTv, mostWatchedGenreTv, secondWatchedGenreTv, thirdWatchedGenreTv, topTvGenres,
-    // Shared helpers
-    timeDisplayMode, handleTimeClick, formatTotalDurationTime, formatDate, onPressIn, onPressOut,
-    t,
-    // Rank
-    ...rankInfo,
-  }), [
+  const value = useMemo(() => {
+    const base = {
+      // Lists / delete
+      lists: displayLists, selectedList, setSelectedList, modalDeleteVisible, setModalDeleteVisible, deleteList, isLoading,
+      // Movie stats
+      watchedMovieCount, totalWatchedTime, totalMinutesTime, listItems, setListItems,
+      movieHistoryItems,
+      isloadingMovieInfo, loadingMovies, selectedDate, setSelectedDate,
+      scaleValues,
+      // TV stats
+      watchedTvCount, totalSeasonsCount, totalEpisodesCount, totalWatchedTimeTv, totalMinutesTimeTv,
+      listItemsTv, loadingTv, isloadingShowInfo, flatEpisodesTv,
+      selectedDateTv, setSelectedDateTv,
+      // Shared helpers
+      timeDisplayMode, handleTimeClick, formatTotalDurationTime, formatDate, onPressIn, onPressOut,
+      t,
+      // Rank
+      ...rankInfo,
+    };
+
+    // Ağır alanlar getter olarak: hesap ancak bir ekran gerçekten okuyunca
+    // çalışır (bkz. yukarıdaki "Talebe bağlı türetme" notu).
+    const defineLazy = (key, get) =>
+      Object.defineProperty(base, key, { enumerable: true, configurable: true, get });
+
+    defineLazy("groupedData", getGroupedData);
+    defineLazy("uniqueDates", getUniqueDates);
+    defineLazy("topMovieGenres", getTopMovieGenres);
+    defineLazy("mostWatchedGenre", () => getTopMovieGenres()[0] || null);
+    defineLazy("secondWatchedGenre", () => getTopMovieGenres()[1] || "-");
+    defineLazy("threeWatchedGenre", () => getTopMovieGenres()[2] || "-");
+    defineLazy("mostRewatchedMovies", getMostRewatchedMovies);
+
+    defineLazy("groupedDataTv", getGroupedDataTv);
+    defineLazy("uniqueDatesTv", getUniqueDatesTv);
+    defineLazy("topTvGenres", getTopTvGenres);
+    defineLazy("mostWatchedGenreTv", () => getTopTvGenres()[0] || "-");
+    defineLazy("secondWatchedGenreTv", () => getTopTvGenres()[1] || "-");
+    defineLazy("thirdWatchedGenreTv", () => getTopTvGenres()[2] || "-");
+    defineLazy("mostRewatchedTv", getMostRewatchedTv);
+
+    return base;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
     displayLists, selectedList, modalDeleteVisible, isLoading,
     watchedMovieCount, totalWatchedTime, totalMinutesTime, listItems,
-    movieHistoryItems, mostRewatchedMovies,
-    isloadingMovieInfo, loadingMovies, groupedData, uniqueDates, selectedDate,
-    mostWatchedGenre, secondWatchedGenre, threeWatchedGenre, topMovieGenres, scaleValues,
+    movieHistoryItems,
+    isloadingMovieInfo, loadingMovies, selectedDate, scaleValues,
     watchedTvCount, totalSeasonsCount, totalEpisodesCount, totalWatchedTimeTv, totalMinutesTimeTv,
-    listItemsTv, loadingTv, isloadingShowInfo, flatEpisodesTv, groupedDataTv, uniqueDatesTv,
-    mostRewatchedTv,
-    selectedDateTv, mostWatchedGenreTv, secondWatchedGenreTv, thirdWatchedGenreTv, topTvGenres,
+    listItemsTv, loadingTv, isloadingShowInfo, flatEpisodesTv, tvHistoryStates,
+    selectedDateTv,
     timeDisplayMode, rankInfo, t,
   ]);
 

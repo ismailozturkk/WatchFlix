@@ -1,6 +1,17 @@
-import React, { memo, useEffect, useState } from "react";
+import React, { memo, useEffect } from "react";
 import { View, StyleSheet } from "react-native";
 import { Image } from "expo-image";
+import Animated, {
+  Easing,
+  ReduceMotion,
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
+import useAppActive from "@hooks/useAppActive";
+import { perfPreset } from "@services/deviceTier";
 
 // ─── Sprite sheet geometrisi ──────────────────────────────────────────────
 // astro.webp / jonsnow.webp: 1536 x 1872, 8 sütun x 9 satır → her kare 192 x 208.
@@ -44,27 +55,60 @@ export const PET_STATE_ORDER = [
 /**
  * Tek bir sprite sheet karesini gösterir ve durumun karelerini animasyonlar.
  * `size` = gösterilecek kare YÜKSEKLİĞİ (px); genişlik orana göre hesaplanır.
+ *
+ * KARE İLERLETME NEDEN REANIMATED İLE: pet tab navigator'ın üstünde YAŞAR,
+ * yani uygulama açık olduğu sürece animasyon hiç durmaz. Eski hâlinde her kare
+ * bir `setInterval` + `setState` idi → saniyede 3-7 React render'ı, sonsuza
+ * kadar, JS thread'inde (aynı thread scroll/dokunma olaylarını da işliyor).
+ * Şimdi kare sayacı UI thread'inde bir shared value; JS tarafı yalnız durum
+ * değişince (tap/sürükleme) çalışır. `Easing.steps` ara değer üretmeden
+ * kareden kareye atlatır — görüntü birebir aynı, JS maliyeti sıfır.
  */
 function SpritePet({ source, state = "idle", size = 130, playing = true }) {
   const cfg = PET_STATES[state] || PET_STATES.idle;
-  const [frame, setFrame] = useState(0);
   const scale = size / FRAME_H;
+  const appActive = useAppActive();
+  const frame = useSharedValue(0);
+
+  // Düşük katman cihazda kare hızını kıs (görüntü aynı, iş daha az).
+  const fps = Math.max(1, Math.round(cfg.fps * (perfPreset.spriteFpsScale ?? 1)));
+  const shouldPlay = playing && appActive && cfg.frames > 1;
 
   useEffect(() => {
-    setFrame(0);
-    if (!playing || cfg.frames <= 1) return undefined;
-    const interval = Math.max(50, Math.round(1000 / cfg.fps));
-    const id = setInterval(() => {
-      setFrame((f) => {
-        const next = f + 1;
-        if (next >= cfg.frames) return cfg.loop ? 0 : cfg.frames - 1;
-        return next;
-      });
-    }, interval);
-    return () => clearInterval(id);
-  }, [state, playing, cfg.frames, cfg.fps, cfg.loop]);
+    cancelAnimation(frame);
+    frame.value = 0;
+    if (!shouldPlay) return undefined;
 
-  const col = Math.min(frame, cfg.frames - 1);
+    // withTiming hedefi kare SAYISI; steps easing değeri 0,1,2,…,frames-1
+    // basamaklarında tutar. Döngü olmayan durumlarda son karede kalır.
+    const duration = Math.max(50, Math.round((cfg.frames / fps) * 1000));
+    const step = withTiming(cfg.frames, {
+      duration,
+      easing: Easing.steps(cfg.frames, false),
+      // "Hareketi azalt" sistem ayarı açıkken Reanimated animasyonu atlar ve
+      // değeri son karede bırakır — pet donmuş/bozuk görünürdü. Buradaki
+      // hareket ekranda gezinen bir geçiş değil, karakterin ÇİZİMİ; eski
+      // setInterval davranışıyla aynı kalsın diye muaf tutuluyor.
+      reduceMotion: ReduceMotion.Never,
+    });
+    frame.value = cfg.loop
+      ? withRepeat(step, -1, false, undefined, ReduceMotion.Never)
+      : step;
+
+    return () => cancelAnimation(frame);
+    // `state` bilerek bağımlılıkta: iki durumun kare sayısı/hızı aynı olsa bile
+    // (working ↔ research) animasyon eski davranıştaki gibi 0. kareden başlasın.
+  }, [frame, state, shouldPlay, cfg.frames, cfg.loop, fps]);
+
+  const frameStyle = useAnimatedStyle(() => {
+    const col = Math.min(Math.max(Math.floor(frame.value), 0), cfg.frames - 1);
+    return {
+      transform: [
+        { translateX: -col * FRAME_W * scale },
+        { translateY: -cfg.row * FRAME_H * scale },
+      ],
+    };
+  }, [cfg.frames, cfg.row, scale]);
 
   // Pet henüz indirilmediyse source null gelir — boş bir kare alanı ayır.
   if (!source) {
@@ -85,18 +129,20 @@ function SpritePet({ source, state = "idle", size = 130, playing = true }) {
         { width: FRAME_W * scale, height: FRAME_H * scale },
       ]}
     >
-      <Image
-        source={source}
-        contentFit="fill"
-        cachePolicy="memory-disk"
-        style={{
-          position: "absolute",
-          width: SHEET_W * scale,
-          height: SHEET_H * scale,
-          left: -col * FRAME_W * scale,
-          top: -cfg.row * FRAME_H * scale,
-        }}
-      />
+      <Animated.View
+        style={[
+          styles.sheet,
+          { width: SHEET_W * scale, height: SHEET_H * scale },
+          frameStyle,
+        ]}
+      >
+        <Image
+          source={source}
+          contentFit="fill"
+          cachePolicy="memory-disk"
+          style={styles.fill}
+        />
+      </Animated.View>
     </View>
   );
 }
@@ -104,6 +150,15 @@ function SpritePet({ source, state = "idle", size = 130, playing = true }) {
 const styles = StyleSheet.create({
   window: {
     overflow: "hidden",
+  },
+  sheet: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+  },
+  fill: {
+    width: "100%",
+    height: "100%",
   },
 });
 

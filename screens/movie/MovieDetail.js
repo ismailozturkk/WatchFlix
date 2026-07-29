@@ -36,7 +36,7 @@ import Comment from "../../components/Comment";
 import SwipeCard from "@components/SwipeCard";
 import ListBadges from "../../components/ListBadges";
 import YoutubePlayer from "react-native-youtube-iframe";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
 import { useListStatusContext } from "../../context/ListStatusContext";
 import {
   addToList,
@@ -1297,9 +1297,9 @@ export default function MovieDetails({ navigation, route }) {
         onPress={() => navigation.goBack()}
         activeOpacity={0.8}
       >
-        <BlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
+        <AdaptiveBlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
           <Ionicons name="chevron-back" size={22} color="#fff" />
-        </BlurView>
+        </AdaptiveBlurView>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -1321,9 +1321,9 @@ export default function MovieDetails({ navigation, route }) {
         }
         activeOpacity={0.8}
       >
-        <BlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
+        <AdaptiveBlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
           <Ionicons name="share-social-outline" size={20} color="#fff" />
-        </BlurView>
+        </AdaptiveBlurView>
       </TouchableOpacity>
 
       {/* ═══════ MODALS ═══════ */}

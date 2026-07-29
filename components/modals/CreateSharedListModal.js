@@ -10,7 +10,7 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../common/AdaptiveBlurView";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
 import { useTheme } from "@context/ThemeContext";
@@ -210,7 +210,7 @@ export default function CreateSharedListModal({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <BlurView tint="dark" intensity={40} style={StyleSheet.absoluteFill} />
+        <AdaptiveBlurView tint="dark" intensity={40} style={StyleSheet.absoluteFill} />
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
           activeOpacity={1}

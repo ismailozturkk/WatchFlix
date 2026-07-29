@@ -19,6 +19,7 @@ import SpritePet, {
   spriteFrameWidth,
 } from "@components/pet/SpritePet";
 import { usePet, AI_CHAT_EVENT } from "@context/PetContext";
+import useAppActive from "@hooks/useAppActive";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -61,6 +62,12 @@ function PetCompanion() {
     cacheReady,
   } = usePet();
 
+  // Pet de AI FAB'ı da tab navigator'ın üstünde sürekli görünür. Uygulama arka
+  // plana geçtiğinde ikisi de görünmez ama animasyonları dönmeye devam eder —
+  // bedava pil tüketimi. Ön plan durumunu ikisine de bağlıyoruz.
+  const appActive = useAppActive();
+  const aiFabRef = useRef(null);
+
   const pet = catalog.find((p) => p.id === selectedPetId);
   // Sprite source önbellekten gelir; indirilmemişse null.
   const petSource = pet ? getPetSource(pet.id) : null;
@@ -74,6 +81,14 @@ function PetCompanion() {
       downloadPet(pet.id);
     }
   }, [cacheReady, petEnabled, pet, petSource, downloadingPets, downloadPet]);
+
+  // AI FAB Lottie'sini ön plan durumuna bağla. `autoPlay` yalnız mount anında
+  // geçerli olduğu için arka plandan dönüşte oynatmayı ref üzerinden sürdürüyoruz.
+  useEffect(() => {
+    if (visible) return; // pet gösteriliyorsa FAB mount edilmemiştir
+    if (appActive) aiFabRef.current?.play();
+    else aiFabRef.current?.pause();
+  }, [appActive, visible]);
 
   // Boyuta bağlı sınırlar (her render'da güncellenir → gesture worklet'i yakalar).
   const petW = spriteFrameWidth(petSize);
@@ -231,9 +246,10 @@ function PetCompanion() {
         style={styles.aiFab}
       >
         <LottieView
+          ref={aiFabRef}
           style={styles.aiFabLottie}
           source={require("@lottie/gemini.json")}
-          autoPlay
+          autoPlay={appActive}
           loop
         />
       </TouchableOpacity>

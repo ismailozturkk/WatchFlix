@@ -34,7 +34,7 @@ import { useUserProfile } from "../context/UserProfileContext";
 import { getUserProfile } from "../services/userService";
 import { clampAvatarIndex, getAvatarSource } from "../utils/avatars";
 import { alpha } from "../theme/colors";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "./common/AdaptiveBlurView";
 import { MaterialCommunityIcons, Ionicons, Feather } from "@expo/vector-icons";
 import * as Haptics from "@services/hapticsService";
 import LottieView from "lottie-react-native";
@@ -342,14 +342,14 @@ const CommentItem = memo(
                 onPress={() => setShowSpoiler(true)}
                 style={styles.spoilerCover}
               >
-                <BlurView intensity={25} tint="dark" style={styles.spoilerBlur}>
+                <AdaptiveBlurView intensity={25} tint="dark" style={styles.spoilerBlur}>
                   <Ionicons
                     name="eye-off"
                     size={16}
                     color={theme.text.secondary}
                   />
                   <Text allowFontScaling={false} style={styles.spoilerText}>{i18nText("autoI18n.spoiler_icerigi_gor", "Spoiler içeriği gör")}</Text>
-                </BlurView>
+                </AdaptiveBlurView>
               </TouchableOpacity>
             ) : (
               <View style={styles.commentContentWrapper}>

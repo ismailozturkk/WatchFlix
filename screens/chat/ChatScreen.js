@@ -94,7 +94,6 @@ import {
   FontAwesome,
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
 import IconBacground from "@components/IconBacground"; // Arka plan dekor
 import { Octicons } from "@expo/vector-icons";
 import { i18nText } from "@utils/i18nText";

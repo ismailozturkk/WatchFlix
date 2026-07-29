@@ -18,7 +18,7 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useProfileNotes } from "../../../context/ProfileNotesContext";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "@components/common/AdaptiveBlurView";
 import DatePickerModal from "@components/modals/DatePickerModal";
 import { i18nText } from "../../../utils/i18nText";
 
@@ -938,7 +938,7 @@ export default function ProfileNotes() {
                     },
                   ]}
                 >
-                  <BlurView
+                  <AdaptiveBlurView
                     tint="dark"
                     intensity={60}
                     experimentalBlurMethod="dimezisBlurView"

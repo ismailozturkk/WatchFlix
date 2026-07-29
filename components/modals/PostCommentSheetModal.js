@@ -37,7 +37,7 @@ import {
   FlatList,
   ActivityIndicator,
 } from "react-native";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../common/AdaptiveBlurView";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   Ionicons,
@@ -489,7 +489,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
     >
       {/* Karartma */}
       <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
-        <BlurView
+        <AdaptiveBlurView
           tint="dark"
           intensity={28}
           experimentalBlurMethod="dimezisBlurView"

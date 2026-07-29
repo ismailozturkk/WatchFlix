@@ -11,7 +11,7 @@ import {
   Pressable,
 } from "react-native";
 import { Image } from "expo-image";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "@components/common/AdaptiveBlurView";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "../../components/AppIcon";
 import RatingStars from "../../components/RatingStars";
@@ -351,7 +351,7 @@ export default function MyPostsScreen({ navigation }) {
         onRequestClose={() => setMenuPost(null)}
       >
         <Pressable style={menu.backdrop} onPress={() => setMenuPost(null)}>
-          <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+          <AdaptiveBlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
           <View
             style={[menu.sheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}
           >
@@ -522,7 +522,7 @@ export default function MyPostsScreen({ navigation }) {
         onRequestClose={() => setConfirmPost(null)}
       >
         <View style={menu.dialogBackdrop}>
-          <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+          <AdaptiveBlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
           <View
             style={[menu.dialog, { backgroundColor: theme.secondary, borderColor: theme.border }]}
           >

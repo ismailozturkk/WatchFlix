@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "@components/common/AdaptiveBlurView";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Feather from "@expo/vector-icons/Feather";
 import Toast from "react-native-toast-message";
@@ -395,7 +395,7 @@ export default function SharedListScreen({ route, navigation }) {
         onRequestClose={() => setMembersVisible(false)}
       >
         <View style={styles.overlay}>
-          <BlurView tint="dark" intensity={40} style={StyleSheet.absoluteFill} />
+          <AdaptiveBlurView tint="dark" intensity={40} style={StyleSheet.absoluteFill} />
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
             activeOpacity={1}

@@ -23,7 +23,7 @@ import {
 import { Image } from "expo-image";
 import AppIcon from "../../components/AppIcon";
 import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "@components/common/AdaptiveBlurView";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useTheme } from "../../context/ThemeContext";
@@ -512,7 +512,7 @@ const PostCard = memo(function PostCard({
           style={menuStyles.backdrop}
           onPress={() => setMenuOpen(false)}
         >
-          <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+          <AdaptiveBlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
           <View
             style={[
               menuStyles.sheet,
@@ -710,7 +710,7 @@ const PostCard = memo(function PostCard({
         onRequestClose={() => setConfirmDelete(false)}
       >
         <View style={menuStyles.backdrop}>
-          <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+          <AdaptiveBlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
           <View
             style={[
               menuStyles.dialog,

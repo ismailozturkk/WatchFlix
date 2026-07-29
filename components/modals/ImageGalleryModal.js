@@ -13,7 +13,7 @@ import {
   UIManager,
   Text
 } from "react-native";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../common/AdaptiveBlurView";
 import axios from "axios";
 import {
   useApiSettings,
@@ -310,7 +310,7 @@ const ImageGalleryModal = ({
       animationType="fade"
       transparent
     >
-      <BlurView
+      <AdaptiveBlurView
         tint="dark"
         intensity={60}
         experimentalBlurMethod="dimezisBlurView"

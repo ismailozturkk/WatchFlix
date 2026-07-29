@@ -12,7 +12,7 @@
 
 import React, { useEffect, useState } from "react";
 import { TouchableOpacity, StyleSheet } from "react-native";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "./common/AdaptiveBlurView";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -67,9 +67,9 @@ export default function BackButton({
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         style={[positionStyle, style]}
       >
-        <BlurView tint="dark" intensity={60} style={styles.blurBox}>
+        <AdaptiveBlurView tint="dark" intensity={60} style={styles.blurBox}>
           <Ionicons name={iconName} size={22} color={color || "#fff"} />
-        </BlurView>
+        </AdaptiveBlurView>
       </TouchableOpacity>
     );
   }

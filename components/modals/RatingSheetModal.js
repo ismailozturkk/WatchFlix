@@ -32,7 +32,7 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
 } from "react-native";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../common/AdaptiveBlurView";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Toast from "react-native-toast-message";
@@ -224,7 +224,7 @@ export default function RatingSheetModal({
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
-        <BlurView
+        <AdaptiveBlurView
           tint="dark"
           intensity={28}
           experimentalBlurMethod="dimezisBlurView"

@@ -20,7 +20,8 @@ import { useListStatusContext } from "../context/ListStatusContext";
 import { useSharedLists } from "../context/SharedListsContext";
 import SharedListsSection from "./SharedListsSection";
 import { useHapticsSettings } from "../context/AppSettingsContext";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "./common/AdaptiveBlurView";
+import ListActionIcon from "./common/ListActionIcon";
 import * as Haptics from "@services/hapticsService";
 import { i18nText } from "../utils/i18nText";
 import {
@@ -101,10 +102,13 @@ const GridCard = ({
           },
         ]}
       >
-        <Ionicons
-          name={isIn ? "checkmark-circle" : "folder-outline"}
+        <ListActionIcon
+          active={isIn}
+          activeName="checkmark-circle"
+          inactiveName="folder-outline"
+          activeColor={theme.colors.green}
+          inactiveColor={theme.text.muted}
           size={26}
-          color={isIn ? theme.colors.green : theme.text.muted}
         />
       </View>
       <Text
@@ -173,32 +177,38 @@ const ListViewTv = ({
   const trueCount = otherListKeys.filter((list) => getIsActive(list)).length;
 
   /* ── Animasyonlar ── */
-  const animateBounce = (name) => {
+  // `mode`: "add" (listeye giriyor) | "remove" (çıkıyor) | "neutral" (durum
+  // değiştirmeyen dokunuş). Film tarafıyla (components/ListView.js) birebir
+  // aynı davranış — iki detay ekranı arasında his farkı olmamalı.
+  const animateBounce = (name, mode = "neutral") => {
     if (hapticsEnabled) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Haptics.impactAsync(
+        mode === "add"
+          ? Haptics.ImpactFeedbackStyle.Medium
+          : Haptics.ImpactFeedbackStyle.Light,
+      );
     }
     const sc = scaleValuesRef.current[name];
     if (!sc) return;
-    
+
     // Animasyonu anında resetle ve küçült
     sc.stopAnimation();
-    sc.setValue(0.75);
-    
-    // Zıplayarak geri dön
+    sc.setValue(mode === "add" ? 0.72 : 0.86);
+
     Animated.spring(sc, {
       toValue: 1,
       mass: 1,
-      stiffness: 250,
-      damping: 12, // Düşük damping = daha fazla zıplama (bounce)
+      stiffness: mode === "add" ? 260 : 300,
+      damping: mode === "add" ? 10 : 19, // düşük damping = daha fazla zıplama
       useNativeDriver: true,
     }).start();
   };
 
   const handleOptimisticPress = (key, action, toggle = true) => {
-    animateBounce(key);
-    
+    const currentState = getIsActive(key);
+    animateBounce(key, toggle ? (currentState ? "remove" : "add") : "neutral");
+
     if (toggle) {
-      const currentState = getIsActive(key);
       setOptimisticStates((prev) => ({ ...prev, [key]: !currentState }));
     }
     // Animasyonun donmaması için ana işlemi erteliyoruz
@@ -269,10 +279,12 @@ const ListViewTv = ({
           : i18nText("autoI18n.izleme_listesi", "İzleme Listesi")}
         theme={theme}
       >
-        <Ionicons
-          name={getIsActive("watchList") ? "bookmark" : "bookmark-outline"}
-          size={30}
-          color={getIsActive("watchList") ? theme.colors.blue : theme.text.secondary}
+        <ListActionIcon
+          active={!!getIsActive("watchList")}
+          activeName="bookmark"
+          inactiveName="bookmark-outline"
+          activeColor={theme.colors.blue}
+          inactiveColor={theme.text.secondary}
         />
       </ActionButton>
 
@@ -302,7 +314,7 @@ const ListViewTv = ({
           label={watchedLabel}
           theme={theme}
         >
-          {isLoading ? (
+          {isLoading && !isWatchedActive ? (
             <LottieView
               source={require("@lottie/loading15.json")}
               style={{ width: 30, height: 30 }}
@@ -310,10 +322,16 @@ const ListViewTv = ({
               loop
             />
           ) : (
-            <Ionicons
-              name={isWatchedActive ? "eye" : "eye-outline"}
-              size={30}
-              color={isWatchedActive ? watchedColor : theme.text.secondary}
+            // `pulseKey`: dizi 4 durumlu (izlenmedi / kısmen / tamamen …).
+            // Kısmen → tamamen geçişinde ikon "eye" olarak AYNI kalır, yalnız
+            // renk değişir; pulseKey olmasa bu geçiş sessiz geçerdi.
+            <ListActionIcon
+              active={isWatchedActive}
+              activeName="eye"
+              inactiveName="eye-outline"
+              activeColor={watchedColor}
+              inactiveColor={theme.text.secondary}
+              pulseKey={showWatchState}
             />
           )}
         </ActionButton>
@@ -329,10 +347,12 @@ const ListViewTv = ({
           : i18nText("autoI18n.favori", "Favori")}
         theme={theme}
       >
-        <Ionicons
-          name={getIsActive("favorites") ? "heart" : "heart-outline"}
-          size={30}
-          color={getIsActive("favorites") ? theme.colors.red : theme.text.secondary}
+        <ListActionIcon
+          active={!!getIsActive("favorites")}
+          activeName="heart"
+          inactiveName="heart-outline"
+          activeColor={theme.colors.red}
+          inactiveColor={theme.text.secondary}
         />
       </ActionButton>
 
@@ -401,7 +421,7 @@ const ListViewTv = ({
       >
         <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} />
-          <BlurView
+          <AdaptiveBlurView
             tint="dark"
             intensity={50}
             experimentalBlurMethod="dimezisBlurView"

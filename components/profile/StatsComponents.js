@@ -23,7 +23,7 @@ import {
 const { height: SCREEN_H } = Dimensions.get("window");
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../common/AdaptiveBlurView";
 import { i18nText } from "../../utils/i18nText";
 
 import {
@@ -1344,12 +1344,12 @@ export const StatsPosterCard = memo(function StatsPosterCard({
 
           {/* Minutes badge (top-right) */}
           {minutes > 0 && (
-            <BlurView intensity={20} tint="dark" style={cardStyles.minBadge}>
+            <AdaptiveBlurView intensity={20} tint="dark" style={cardStyles.minBadge}>
               <MaterialCommunityIcons name="clock-time-four" size={9} color="#fff" />
               <Text style={cardStyles.minText}>
                 {minutes} {minutesLabel}
               </Text>
-            </BlurView>
+            </AdaptiveBlurView>
           )}
 
           {/* Title overlay */}

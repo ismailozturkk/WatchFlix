@@ -28,7 +28,7 @@ import MyActivityButton from "./profile/MyActivityButton";
 import CircularProgress, {
   CircularProgressBase,
 } from "react-native-circular-progress-indicator";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
 import ScreenDecor from "../../components/ScreenDecor";
 // BackButton bilinçli olarak yok: profil sekme kökü olarak render edilir
 // (TabScreenNavigator), stack'e push edilmez — buton yalnızca üstteki ekrandan
@@ -760,7 +760,7 @@ const ProfileScreen = ({ navigation }) => {
                 style={styles.positionStyle}
                 onPress={() => setModalVisibleLogout(false)}
               />
-              <BlurView
+              <AdaptiveBlurView
                 tint="dark"
                 intensity={50}
                 experimentalBlurMethod="dimezisBlurView"

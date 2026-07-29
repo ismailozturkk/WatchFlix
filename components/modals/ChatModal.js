@@ -55,7 +55,7 @@ import Reanimated, {
 import LottieView from "lottie-react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useProfileStats } from "@context/ProfileStatsContext";
-import { BlurView } from "expo-blur";
+import AdaptiveBlurView from "../common/AdaptiveBlurView";
 
 import {
   askGemini,
@@ -882,7 +882,7 @@ export const ChatModal = () => {
               { backgroundColor: "transparent", zIndex: 11, shadowColor: theme.shadow, overflow: "hidden" },
             ]}
           >
-            <BlurView
+            <AdaptiveBlurView
               tint="dark"
               intensity={50}
               experimentalBlurMethod="dimezisBlurView"
