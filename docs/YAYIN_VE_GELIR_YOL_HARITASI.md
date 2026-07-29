@@ -112,6 +112,11 @@ envanter çıkarmış. Yayın öncesi **mutlaka** yapılacak alt küme:
   görseline indir.
 - **PetCompanion sürekli animasyon + BlurView**: düşük cihazlarda `deviceTier`
   kontrolüyle kapat/durağanlaştır.
+  - Sprite kare hızı kısma ✅ (`perfPreset.spriteFpsScale`).
+  - BlurView: `components/common/AdaptiveBlurView.js` eklendi — `low` katmanda
+    blur yerine yarı saydam düz katman çizer, mid/high'da görüntü birebir aynı.
+    **Geçiş TAMAMLANDI (29 Tem):** 28 dosya AdaptiveBlurView kullanıyor;
+    `expo-blur`'ü doğrudan import eden tek dosya sarmalayıcının kendisi.
 - **ProfileStatsContext global ağır türetme**: hesaplamayı ekrana girişte lazy yap.
 - **Açılışta toptan provider mount**: ağır context'leri (Posts, Stats) ilk kullanım
   anına ertele.
@@ -356,39 +361,103 @@ aylığa bölünmüş, mağaza kesintisi düşülmüş).
       `firebase deploy --only hosting,firestore:rules`)_
       Aynı turda: `waitlist` kuralı `read`→`get` (koleksiyon listeleme kapatıldı;
       e-postalar herkese dökülebiliyordu).
-- [ ] expo-updates (EAS Update) entegrasyonu — yayın sonrası acil yama kanalı
+- [x] expo-updates (EAS Update) entegrasyonu — yayın sonrası acil yama kanalı
+      _(26 Tem — `expo-updates ~29.0.19`, app.json'a `updates.url` +
+      `runtimeVersion`, eas.json'daki 3 profile `channel` (kanalsız build
+      hiçbir güncellemeye abone olmaz).
+      **runtimeVersion politikası `appVersion`, `fingerprint` DEĞİL:**
+      fingerprint parmak izi yerel `node_modules`'tan hesaplanıyor ve
+      Windows'ta üretilen hash EAS'in Linux imajınınkiyle tutmuyordu
+      (dokunulmamış paketlerde bile: skia, svg, screens, webview…). O hâliyle
+      yerelden yayınlanan hiçbir OTA güncellemesi build'lere ULAŞAMAZDI.
+      **Bunun getirdiği disiplin:** runtime sürümü artık app.json'daki
+      `version` alanı. Native tarafı değiştiren her şeyde (paket ekleme/çıkarma,
+      SDK yükseltme, config plugin) `version` MUTLAKA artırılmalı — yoksa eski
+      native'e uymayan bir JS güncellemesi eski build'lere düşer ve çökertir.
+      Yalnız JS değiştiyse `version` sabit kalır, OTA doğru şekilde ulaşır.)_
 - [ ] Kapalı test için 12+ test kullanıcısı listesini kesinleştir
 
 ### FAZ 1 — Gelir + Ölçüm Altyapısı (27 Tem – 23 Ağu, 4 hafta)
 
 **Hafta 4 (27 Tem – 2 Ağu)**
 
-- [ ] Firebase Analytics + Sentry kurulumu; temel event seti
+- [x] Firebase Analytics + Sentry kurulumu; temel event seti
       (signup, content_tracked, post_created, game_played, ai_message,
       paywall_view, trial_start, purchase)
+      _(26 Tem — erken bitti, KOD tarafı. Paketler: `@sentry/react-native`,
+      `@react-native-firebase/app` + `/analytics` (app.json'a config plugin
+      olarak eklendi). Sarmalayıcılar: `services/analytics.js`,
+      `services/crashReporting.js` — uygulamanın hiçbir yeri Sentry/Firebase'i
+      doğrudan import etmez; DSN veya native modül yoksa her çağrı sessiz
+      no-op olur (mevcut dev client patlamaz). Olay adı/parametre doğrulaması
+      `utils/analyticsEvents.js`'te saf ve testli (Firebase geçersiz olayı
+      SESSİZCE atar; artık __DEV__'de görünür hata veriyor). `signup` →
+      GA4'ün önerdiği `sign_up` adıyla, `method: email|google`.
+      Bağlanan yerler: ErrorBoundary (üretimde iz bırakmadan yutulan React
+      hataları), `utils/firestoreError.js` (sessizce yutulan snapshot
+      hataları — enjekte edilen raporlayıcı ile), NavigationContainer
+      `onStateChange` → `screen_view`, auth durumu → user id, PremiumContext →
+      `premium_tier` özelliği, `services/deviceTier.js` → `device_tier`.
+      Olaylar servis katmanına bağlandı (ekranlara değil): listItemsService /
+      watchedTvService (`content_tracked`), postsService, sceneGameService,
+      aiCineService (token sayımlarıyla), revenueCatService (paywall `source`
+      parametresiyle + `purchase`/`trial_start` ayrımı), userService.
+      ①② TAMAM _(29 Tem — Sentry projesi açıldı: org `seelogd`, proje
+      `react-native`, bölge de.sentry.io; app.json plugin'inde
+      organization/project/url var. DSN + `SENTRY_AUTH_TOKEN` EAS'te
+      preview+production ortamlarında, "sensitive" görünürlükte. TUZAK:
+      token EAS'e ilk yapıştırmada son ~5 karakteri kırpılmıştı → build
+      Sentry upload'da "Invalid org token (401)" ile düştü. Doğrulama:
+      token'ı ekrana basmadan uzunluk (org token 187 krk) + API'ye curl
+      ile 200 kontrolü. 29 Tem preview build yeşil, source map yüklemesi
+      çalışıyor.)_
+      **KALAN (manuel):** ③ **YENİ development build al** —
+      native modüller eklendiği için mevcut client'ta ölçüm çalışmaz,
+      ④ Firebase Console → Analytics'te DebugView ile olayları doğrula.)_
 - [ ] Google Play Console hesabı + ürün kaydı; IAP ürünlerinin tanımı
 
 **Hafta 5–6 (3–16 Ağu)**
 
-- [ ] RevenueCat entegrasyonu + abonelik ürünleri (Premium/Unlimited aylık-yıllık, TR+global fiyat)
-- [ ] `usePremium()` entitlement katmanı + Firestore senkronu
-- [ ] Paywall ekranı (yıllık plan vurgulu, mağaza bazlı deneme/fiyat testi)
+- [x] RevenueCat entegrasyonu — KOD tarafı _(erken bitti, commit 2b77a93:
+      `services/revenueCatService.js`, Pro/Unlimited akışı. KALAN: Play
+      Console'da abonelik ürünlerinin tanımı (TR+global fiyat) + RevenueCat
+      panelinde Play service credentials bağlanması — Play Console hesabı
+      ön koşul)_
+- [x] `usePremium()` entitlement katmanı _(`context/PremiumContext.js`;
+      Firestore senkronunun kapsamı doğrulanacak)_
+- [x] Paywall ekranı _(`screens/premium/PremiumScreen.js`; mağaza bazlı
+      deneme/fiyat testi ürünler Play'de tanımlanınca)_
 - [ ] Premium kapılar: AI kota farkı, temalar, pet kostümleri, oyun modları,
-      gelişmiş istatistik/Wrapped, liste limitleri
+      gelişmiş istatistik/Wrapped, liste limitleri _(kodda kısmen mevcut —
+      kapıların tam listesi çıkarılıp tek tek doğrulanacak)_
 
 **Hafta 7 (17–23 Ağu)**
 
 - [ ] AdMob: feed native ad + oyun sonu interstitial + rewarded ("reklam izle → AI mesajı") + UMP consent akışı (yalnız free kullanıcı)
 - [ ] Onboarding akışı: 3 ekran değer anlatımı → zevk seçimi → bildirim izni
       (paywall'u onboarding SONUNA koy, soft göster)
+      _(kodda `screens/onboarding/OnboardingScreen.js` + `OnboardingShowcases.js`
+      mevcut — buradaki kapsamla karşılaştırılıp ona göre işaretlenecek)_
 
 ### FAZ 2 — Polish + Kapalı Test + Mağaza Hazırlığı (24 Ağu – 13 Eyl, 3 hafta)
 
 **Hafta 8 (24–30 Ağu)**
 
 - [ ] 🔑 **Kapalı test BAŞLAR (24 Ağu)** — Play 14 gün / 12 kullanıcı sayacı işlemeye başlar
-- [ ] Performans kritikleri: IconBacground lite-mode, PetCompanion device-tier,
+- [x] Performans kritikleri: IconBacground lite-mode, PetCompanion device-tier,
       ProfileStats lazy hesaplama, ağır provider'ların ertelenmesi
+      _(26 Tem — erken bitti. Cihaz sınıfı altyapısı: `utils/deviceTier.js` (saf,
+      testli) + `services/deviceTier.js`. IconBacground: 174 desen görseli ayrı
+      modüle alınıp LAZY require edildi (desen varsayılan kapalı — kapalıyken
+      artık hiç asset kaydı yok), 345 → 174 çift require temizlendi, düşük
+      katmanda ızgara 45 → 24 öğe. SpritePet: kare ilerletme setInterval+setState
+      yerine Reanimated shared value ile UI thread'inde; pet/AI FAB uygulama arka
+      plandayken duruyor (`hooks/useAppActive.js`). ProfileStats: sıralama /
+      gruplama / en çok tekrar izlenenler artık getter — yalnız istatistik ve
+      Wrapped ekranları okuyunca hesaplanıyor; bölüm listesi iki kez flatten
+      ediliyordu, teke indi. Ağır provider ertelemesi zaten yapılmıştı:
+      useStartupGate (Posts 2200 / Stats 3200 / DeviceNotifications 4200) +
+      TabScreen sekmeleri kademeli mount ediyor.)_
 - [ ] Crash/ANR takibi: test grubundan gelen Sentry verisiyle düzeltme turu
 
 **Hafta 9 (31 Ağu – 6 Eyl)**

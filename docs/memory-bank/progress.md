@@ -1,5 +1,8 @@
 # Proje İlerleme Durumu ve Yol Haritası
 
+> _Son güncelleme: 29 Tem 2026. Güncel yayın planı için tek doğruluk kaynağı:
+> `docs/YAYIN_VE_GELIR_YOL_HARITASI.md`._
+
 ## ✅ Tamamlananlar
 
 ### Core Infrastructure
@@ -46,9 +49,9 @@
 ## 🚧 Üzerinde Çalışılanlar
 
 - 🔄 **Reanimated 4 Migrasyon**: Deprecated API temizliği devam ediyor
-- 🔄 **Gemini AI Entegrasyonu**: Akıllı öneri motoru için API bağlantısı planlanıyor
-- 🔄 **Reanimated 4 Migrasyon**: Deprecated API temizliği devam ediyor
-- 🔄 **Gemini AI Entegrasyonu**: Akıllı öneri motoru için API bağlantısı planlanıyor
+- ✅ **Gemini AI Entegrasyonu**: Kod tarafı CANLI — `callGemini` Cloud Function
+  proxy'si + kullanıcı başına günlük kota; istemcide `aiCineService`/`ChatModal`.
+  (Deploy, Firebase billing'in açılmasını bekliyor.)
 - ✅ **Performans İyileştirmeleri**: Context'lerin optimizasyonu (Firebase Read maliyetleri %80+ azaltıldı)
 
 ## 🎯 Sonraki Adımlar (Öncelikli)
@@ -77,11 +80,11 @@
 - TTL (Time To Live) stratejisi
 - Stale-while-revalidate pattern
 
-### 4. Gemini AI Entegrasyonu (Orta Öncelik)
+### 4. Gemini AI Entegrasyonu — ✅ TAMAMLANDI
 
-- Kullanıcı izleme geçmişine dayalı öneri sistemi
-- Tür analizi ve kişiselleştirme
-- Context-aware chat desteği
+- ✅ Kullanıcı izleme geçmişine dayalı öneri sistemi (`aiCineService`)
+- ✅ Context-aware chat desteği (`ChatModal` → `callGemini` proxy)
+- Kalan: Cloud Function deploy'u (billing) — bkz. yol haritası Faz 0
 
 ### 5. Performans & Optimizasyon (Tamamlananlar)
 
@@ -94,7 +97,7 @@
 - [x] **Skeleton Loading**
   - [x] Fix dimension mismatches in `Skeleton.js` for Oscar, Upcoming, and Search.
   - [x] Create `MovieBestsSkeleton`.
-- [ ] **Next Features**
-  - [ ] Group Chat?
-  - [ ] Media Sharing?
+- [x] **Next Features**
+  - [x] Group Chat — yapıldı (`services/groupsService.js`, grup sohbeti canlı)
+  - [x] Media Sharing — yapıldı (`services/postsService.js`, `ShareContentScreen`)
 - Image caching & optimization
