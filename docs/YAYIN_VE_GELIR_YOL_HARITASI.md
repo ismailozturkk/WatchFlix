@@ -424,7 +424,10 @@ aylığa bölünmüş, mağaza kesintisi düşülmüş).
       ③ TAMAM _(29 Tem — yeni development build alındı, ölçümün native
       modülleri içinde.)_ **KALAN (manuel):** ④ Firebase Console →
       Analytics'te DebugView ile olayları doğrula.)_
-- [ ] Google Play Console hesabı + ürün kaydı; IAP ürünlerinin tanımı
+- [x] Google Play Console hesabı _(29 Tem — developer hesabı AÇILDI)_
+      — [ ] ürün kaydı; IAP ürünlerinin tanımı (Pro/Unlimited abonelikleri,
+      TR+global fiyat; RevenueCat panel bağlantısı + webhook yapılandırması
+      bununla birlikte)
 
 **Hafta 5–6 (3–16 Ağu)**
 
