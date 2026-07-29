@@ -43,7 +43,7 @@
       </p>
       <div class="stamp">
         <span>Yürürlük: <b>25 Temmuz 2026</b></span>
-        <span>Son güncelleme: <b>25 Temmuz 2026</b></span>
+        <span>Son güncelleme: <b>26 Temmuz 2026</b></span>
         <span>Sürüm: <b>1.0</b></span>
       </div>
     </div>
@@ -137,8 +137,13 @@
               <td>Otomatik</td>
             </tr>
             <tr>
+              <td><strong>Kullanım ve kararlılık</strong></td>
+              <td>Uygulamada yaptığınız temel eylemlerin <em>adı</em> ve sayısal özellikleri (ör. “bir film izlendi olarak işaretlendi”, “oyun oynandı”, “gönderi oluşturuldu”, açılan ekranın adı); çökme ve hata kayıtları (hata mesajı, kod yığını, cihaz modeli, işletim sistemi ve uygulama sürümü). <strong>Yazdığınız metinler bu kayıtlara girmez</strong>: not, mesaj, yorum, liste adı ve AI sohbeti içeriği gönderilmez.</td>
+              <td>Otomatik</td>
+            </tr>
+            <tr>
               <td><strong>Web sitesi</strong></td>
-              <td>Bekleme listesine yazdığınız e-posta adresi ve sıra numaranız; gönderdiğiniz özellik istekleri (metin, e-postasız)</td>
+              <td>Bekleme listesine yazdığınız e-posta adresi ve sıra numaranız</td>
               <td>Sizden</td>
             </tr>
           </tbody>
@@ -150,9 +155,17 @@
           Konum verisi, rehber/kişiler, arama geçmişi, reklam kimliği,
           biyometrik veri veya sağlık verisi toplamıyoruz. Uygulamada
           fotoğraf/video yükleme özelliği yok; profil resimleri uygulamayla
-          gelen hazır avatarlardır. Şu an <strong>reklam ağı ve üçüncü taraf
-          analitik/izleme SDK’sı kullanmıyoruz</strong>. Bu değişirse politikayı
-          güncelleyip uygulama içinde duyururuz.
+          gelen hazır avatarlardır. Şu an <strong>hiçbir reklam ağı
+          kullanmıyoruz</strong> ve verilerinizi reklam amaçlı profilleme için
+          işlemiyoruz.
+        </p>
+        <p>
+          Uygulamanın nasıl kullanıldığını ve nerede çöktüğünü görebilmek için
+          <strong>kullanım ölçümü (Firebase Analytics) ve hata raporlama
+          (Sentry)</strong> kullanıyoruz. Bunlar reklam amaçlı değildir ve
+          <strong>içeriklerinizi okumaz</strong> — yalnızca eylem adları,
+          sayısal özellikler ve teknik hata bilgisi gider. Ayrıntı için
+          “Kullanım ölçümü ve hata raporlama” bölümüne bakın.
         </p>
       </div>
 
@@ -186,6 +199,10 @@
             <tr>
               <td>Aboneliği ve premium hak sahipliğini yönetmek</td>
               <td>Sözleşmenin ifası + hukuki yükümlülük — KVKK m.5/2-c, 5/2-a · GDPR m.6(1)(b)/(c)</td>
+            </tr>
+            <tr>
+              <td>Hataları ve çökmeleri tespit edip gidermek, hangi özelliklerin kullanıldığını ölçerek uygulamayı geliştirmek</td>
+              <td>Meşru menfaat — KVKK m.5/2-f · GDPR m.6(1)(f)</td>
             </tr>
             <tr>
               <td>Bekleme listesi: lansmanı duyurmak</td>
@@ -235,6 +252,16 @@
               <td><strong>Google Firebase</strong><br /><a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Politika</a></td>
               <td>Kimlik doğrulama, veritabanı (Firestore + Realtime Database), sunucu fonksiyonları, web barındırma</td>
               <td>Yukarıdaki tablodaki tüm hesap ve uygulama verileri</td>
+            </tr>
+            <tr>
+              <td><strong>Google Firebase Analytics</strong><br /><a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Politika</a></td>
+              <td>Kullanım ölçümü — hangi özelliklerin kullanıldığını görmek</td>
+              <td>Eylem adları ve sayısal özellikler, açılan ekran adları, kullanıcı kimliğiniz, cihaz/uygulama sürümü bilgisi. İçerik metni gitmez.</td>
+            </tr>
+            <tr>
+              <td><strong>Sentry</strong><br /><a href="https://sentry.io/privacy/" target="_blank" rel="noopener">Politika</a></td>
+              <td>Çökme ve hata raporlama</td>
+              <td>Hata mesajı ve kod yığını, cihaz modeli, işletim sistemi ve uygulama sürümü, kullanıcı kimliğiniz. Verileri AB (Frankfurt) bölgesinde işlenir.</td>
             </tr>
             <tr>
               <td><strong>Google Gemini API</strong><br /><a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener">Şartlar</a></td>
@@ -293,7 +320,35 @@
         kişisel bilgi yazmamanızı öneririz.
       </p>
 
-      <h2 id="tr-7" data-toc="Yurt dışına aktarım">Verilerin yurt dışına aktarımı</h2>
+      <h2 id="tr-7" data-toc="Kullanım ölçümü ve hata raporlama">Kullanım ölçümü ve hata raporlama</h2>
+      <p>
+        Uygulamayı geliştirebilmek ve çöktüğü yerleri görebilmek için iki
+        hizmet kullanıyoruz: <strong>Firebase Analytics</strong> (kullanım
+        ölçümü) ve <strong>Sentry</strong> (hata/çökme raporlama). Bunların
+        hiçbiri reklam amaçlı değildir ve size reklam göstermek ya da profil
+        çıkarmak için kullanılmaz.
+      </p>
+      <p>Ölçüme <strong>giden</strong> veri:</p>
+      <ul>
+        <li>Bir eylemin <strong>adı</strong> ve sayısal/kategorik özellikleri — örneğin “bir film izlendi olarak işaretlendi” (içerik türü, tekrar izleme mi), “oyun oynandı” (mod, zorluk, skor), “gönderi oluşturuldu” (gönderi tipi), “AI mesajı gönderildi” (dil, jeton sayısı).</li>
+        <li>Açtığınız ekranın adı (ör. <em>Ayarlar</em>, <em>Premium</em>).</li>
+        <li>Hesap kimliğiniz (uid) ve premium/ücretsiz durumunuz, cihaz sınıfı, uygulama dili.</li>
+        <li>Çökme ve hata durumunda: hata mesajı, kod yığını (stack trace), cihaz modeli, işletim sistemi ve uygulama sürümü.</li>
+      </ul>
+      <p>Ölçüme <strong>gitmeyen</strong> veri:</p>
+      <ul>
+        <li>Yazdığınız hiçbir metin: mesajlar, yorumlar, notlar, liste adları, gönderi içeriği, AI sohbetiniz.</li>
+        <li>E-posta adresiniz, şifreniz ve ödeme bilgileriniz.</li>
+        <li>Hangi filmi/diziyi izlediğinizin <em>adı</em> — yalnızca içeriğin sayısal kimliği ve türü gider.</li>
+        <li>Konum, rehber, reklam kimliği.</li>
+      </ul>
+      <p>
+        Sentry’de verileriniz <strong>AB (Frankfurt)</strong> bölgesinde
+        işlenir. Bu ölçümü meşru menfaatimize dayanarak yapıyoruz; itiraz etme
+        hakkınız için “Haklarınız” bölümüne bakabilirsiniz.
+      </p>
+
+      <h2 id="tr-8" data-toc="Yurt dışına aktarım">Verilerin yurt dışına aktarımı</h2>
       <p>
         Altyapımız Google Cloud üzerinde çalışıyor ve sunucu fonksiyonlarımız
         Google’ın ABD bölgesinde barındırılıyor. Bu nedenle verileriniz
@@ -304,7 +359,7 @@
         standart sözleşme hükümlerine dayanır (GDPR m.46).
       </p>
 
-      <h2 id="tr-8" data-toc="Saklama süresi">Verileri ne kadar saklıyoruz?</h2>
+      <h2 id="tr-9" data-toc="Saklama süresi">Verileri ne kadar saklıyoruz?</h2>
       <ul>
         <li><strong>Hesap ve içerik verileri:</strong> hesabınız açık olduğu sürece. Hesabı silerseniz aynı anda silinir.</li>
         <li><strong>Mesajlar:</strong> sohbet içinde silinene ya da hesap kapatılana kadar. Birebir sohbetleri hesabınızı silerken kaldırırız.</li>
@@ -318,7 +373,7 @@
         yazdık.
       </p>
 
-      <h2 id="tr-9" data-toc="Haklarınız">Haklarınız ve nasıl kullanılır</h2>
+      <h2 id="tr-10" data-toc="Haklarınız">Haklarınız ve nasıl kullanılır</h2>
       <p>
         KVKK m.11 ve GDPR m.15–22 kapsamında şu haklara sahipsiniz: verilerinizin
         işlenip işlenmediğini öğrenme, bilgi ve kopya talep etme, düzeltme,
@@ -343,7 +398,7 @@
         ülkenin veri koruma otoritesine şikâyet edebilirsiniz.
       </p>
 
-      <h2 id="tr-10" data-toc="Güvenlik">Veri güvenliği</h2>
+      <h2 id="tr-11" data-toc="Güvenlik">Veri güvenliği</h2>
       <ul>
         <li>Tüm trafik TLS (HTTPS) ile şifrelenir; veriler Google Cloud’da bekleme hâlinde şifreli tutulur.</li>
         <li>Veritabanına erişim, kullanıcı bazlı sunucu güvenlik kurallarıyla sınırlıdır: kural düzeyinde kendi verinizden başkasını yazamazsınız, gizlilik tercihiniz okuma iznini de belirler.</li>
@@ -360,7 +415,7 @@
         öngördüğü süre içinde sizi ve yetkili otoriteyi bilgilendiririz.
       </p>
 
-      <h2 id="tr-11" data-toc="Çocukların gizliliği">Çocukların gizliliği</h2>
+      <h2 id="tr-12" data-toc="Çocukların gizliliği">Çocukların gizliliği</h2>
       <p>
         seelogd <strong>13 yaşın altındaki</strong> kullanıcılara yönelik
         değildir ve bilerek 13 yaş altından veri toplamayız. Uygulamada
@@ -369,7 +424,7 @@
         hesap açtığını fark ederseniz bize yazın; hesabı ve verilerini sileriz.
       </p>
 
-      <h2 id="tr-12" data-toc="Çerezler ve yerel depolama">Çerezler ve yerel depolama</h2>
+      <h2 id="tr-13" data-toc="Çerezler ve yerel depolama">Çerezler ve yerel depolama</h2>
       <p>
         Web sitemizde <strong>reklam veya izleme çerezi kullanmıyoruz</strong>.
         Yalnızca tarayıcınızın yerel depolamasında dil tercihinizi ve bekleme
@@ -378,7 +433,7 @@
         ve önbellek için cihazın yerel depolamasını kullanır.
       </p>
 
-      <h2 id="tr-13" data-toc="Değişiklikler">Bu politikadaki değişiklikler</h2>
+      <h2 id="tr-14" data-toc="Değişiklikler">Bu politikadaki değişiklikler</h2>
       <p>
         Politikayı güncellersek bu sayfadaki “son güncelleme” tarihini
         değiştiririz. Önemli değişikliklerde (örneğin yeni bir veri kategorisi,
@@ -387,7 +442,7 @@
         politikayı kabul ettiğiniz anlamına gelir.
       </p>
 
-      <h2 id="tr-14" data-toc="İletişim">İletişim</h2>
+      <h2 id="tr-15" data-toc="İletişim">İletişim</h2>
       <p>
         Sorularınız için: <a href="mailto:contact@seelogd.com">contact@seelogd.com</a><br />
         İlgili sayfalar: <a href="terms.html">Kullanım Şartları</a> ·
@@ -411,7 +466,7 @@
       </p>
       <div class="stamp">
         <span>Effective: <b>25 July 2026</b></span>
-        <span>Last updated: <b>25 July 2026</b></span>
+        <span>Last updated: <b>26 July 2026</b></span>
         <span>Version: <b>1.0</b></span>
       </div>
     </div>
@@ -506,8 +561,13 @@
               <td>Automatic</td>
             </tr>
             <tr>
+              <td><strong>Usage &amp; stability</strong></td>
+              <td>The <em>name</em> of core actions you take in the app and their numeric attributes (e.g. “a movie was marked watched”, “a game was played”, “a post was created”, the name of the screen you opened); crash and error records (error message, stack trace, device model, OS and app version). <strong>Text you write never enters these records</strong>: notes, messages, comments, list names and AI chat content are not sent.</td>
+              <td>Automatic</td>
+            </tr>
+            <tr>
               <td><strong>Website</strong></td>
-              <td>The e-mail address you submit to the waitlist and your queue number; feature requests you send (text only, no e-mail attached)</td>
+              <td>The e-mail address you submit to the waitlist and your queue number</td>
               <td>From you</td>
             </tr>
           </tbody>
@@ -519,9 +579,16 @@
           We do not collect location data, contacts, browsing history,
           advertising identifiers, biometric data or health data. The app has no
           photo or video upload feature; profile pictures are avatars shipped
-          with the app. We currently use <strong>no ad networks and no
-          third-party analytics or tracking SDKs</strong>. If that changes we
-          will update this policy and announce it in the app.
+          with the app. We currently use <strong>no ad networks</strong> and we
+          do not process your data for advertising profiling.
+        </p>
+        <p>
+          To see how the app is used and where it crashes we do use
+          <strong>usage analytics (Firebase Analytics) and error reporting
+          (Sentry)</strong>. Neither is used for advertising and neither
+          <strong>reads your content</strong> — only action names, numeric
+          attributes and technical error information are sent. See “Usage
+          analytics and error reporting” for the details.
         </p>
       </div>
 
@@ -555,6 +622,10 @@
             <tr>
               <td>Managing subscriptions and premium entitlements</td>
               <td>Contract + legal obligation — GDPR Art. 6(1)(b)/(c) · KVKK Art. 5/2-c, 5/2-a</td>
+            </tr>
+            <tr>
+              <td>Detecting and fixing errors and crashes, and measuring which features are used in order to improve the app</td>
+              <td>Legitimate interests — GDPR Art. 6(1)(f) · KVKK Art. 5/2-f</td>
             </tr>
             <tr>
               <td>Waitlist: telling you when we launch</td>
@@ -604,6 +675,16 @@
               <td><strong>Google Firebase</strong><br /><a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Policy</a></td>
               <td>Authentication, database (Firestore + Realtime Database), server functions, web hosting</td>
               <td>All account and app data listed above</td>
+            </tr>
+            <tr>
+              <td><strong>Google Firebase Analytics</strong><br /><a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Policy</a></td>
+              <td>Usage analytics — seeing which features are used</td>
+              <td>Action names and numeric attributes, screen names, your user id, device and app version. No content text is sent.</td>
+            </tr>
+            <tr>
+              <td><strong>Sentry</strong><br /><a href="https://sentry.io/privacy/" target="_blank" rel="noopener">Policy</a></td>
+              <td>Crash and error reporting</td>
+              <td>Error message and stack trace, device model, OS and app version, your user id. Processed in the EU (Frankfurt) region.</td>
             </tr>
             <tr>
               <td><strong>Google Gemini API</strong><br /><a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener">Terms</a></td>
@@ -661,7 +742,35 @@
         recommend not typing sensitive personal information into the chat.
       </p>
 
-      <h2 id="en-7" data-toc="International transfers">International transfers</h2>
+      <h2 id="en-7" data-toc="Usage analytics and error reporting">Usage analytics and error reporting</h2>
+      <p>
+        To improve the app and to see where it crashes we use two services:
+        <strong>Firebase Analytics</strong> (usage analytics) and
+        <strong>Sentry</strong> (error and crash reporting). Neither is used for
+        advertising, and neither is used to show you ads or to build a profile
+        about you.
+      </p>
+      <p>What <strong>is</strong> sent:</p>
+      <ul>
+        <li>The <strong>name</strong> of an action and its numeric or categorical attributes — for example “a movie was marked watched” (content type, whether it is a rewatch), “a game was played” (mode, difficulty, score), “a post was created” (post type), “an AI message was sent” (language, token counts).</li>
+        <li>The name of the screen you opened (e.g. <em>Settings</em>, <em>Premium</em>).</li>
+        <li>Your account id (uid) and premium/free status, device class, app language.</li>
+        <li>On a crash or error: the error message, stack trace, device model, OS and app version.</li>
+      </ul>
+      <p>What is <strong>not</strong> sent:</p>
+      <ul>
+        <li>Any text you write: messages, comments, notes, list names, post content, your AI chat.</li>
+        <li>Your e-mail address, password or payment details.</li>
+        <li>The <em>title</em> of the movie or show you watched — only its numeric id and type are sent.</li>
+        <li>Location, contacts, advertising identifiers.</li>
+      </ul>
+      <p>
+        In Sentry your data is processed in the <strong>EU (Frankfurt)</strong>
+        region. We rely on our legitimate interests for this measurement; see
+        “Your rights” for how to object.
+      </p>
+
+      <h2 id="en-8" data-toc="International transfers">International transfers</h2>
       <p>
         Our infrastructure runs on Google Cloud and our server functions are
         hosted in a Google region in the United States. Your data is therefore
@@ -672,7 +781,7 @@
         explicit consent to this transfer (KVKK Art. 9).
       </p>
 
-      <h2 id="en-8" data-toc="Retention">How long we keep data</h2>
+      <h2 id="en-9" data-toc="Retention">How long we keep data</h2>
       <ul>
         <li><strong>Account and content data:</strong> as long as your account exists. Deleting the account deletes it at the same time.</li>
         <li><strong>Messages:</strong> until deleted in the chat or until the account is closed. Direct chats are removed when you delete your account.</li>
@@ -685,7 +794,7 @@
         on the <a href="delete-account.html">account deletion page</a>.
       </p>
 
-      <h2 id="en-9" data-toc="Your rights">Your rights and how to use them</h2>
+      <h2 id="en-10" data-toc="Your rights">Your rights and how to use them</h2>
       <p>
         Under GDPR Art. 15–22 and KVKK Art. 11 you have the right to know
         whether we process your data, to obtain information and a copy, and to
@@ -710,7 +819,7 @@
         Protection Authority (KVKK) in Türkiye.
       </p>
 
-      <h2 id="en-10" data-toc="Security">Data security</h2>
+      <h2 id="en-11" data-toc="Security">Data security</h2>
       <ul>
         <li>All traffic is encrypted with TLS (HTTPS); data is encrypted at rest on Google Cloud.</li>
         <li>Database access is constrained by per-user server security rules: at the rule level you cannot write anyone else’s data, and your privacy preference also governs read access.</li>
@@ -727,7 +836,7 @@
         applicable law.
       </p>
 
-      <h2 id="en-11" data-toc="Children">Children’s privacy</h2>
+      <h2 id="en-12" data-toc="Children">Children’s privacy</h2>
       <p>
         seelogd is not directed at children <strong>under 13</strong>, and we do
         not knowingly collect data from them. Because the app contains
@@ -736,7 +845,7 @@
         will delete the account and its data.
       </p>
 
-      <h2 id="en-12" data-toc="Cookies">Cookies and local storage</h2>
+      <h2 id="en-13" data-toc="Cookies">Cookies and local storage</h2>
       <p>
         Our website uses <strong>no advertising or tracking cookies</strong>. We
         only keep your language preference and waitlist queue number in your
@@ -745,7 +854,7 @@
         settings and cache.
       </p>
 
-      <h2 id="en-13" data-toc="Changes">Changes to this policy</h2>
+      <h2 id="en-14" data-toc="Changes">Changes to this policy</h2>
       <p>
         If we update this policy we will change the “last updated” date on this
         page. For material changes — for example a new data category, ads or
@@ -753,7 +862,7 @@
         the service after a change means you accept the updated policy.
       </p>
 
-      <h2 id="en-14" data-toc="Contact">Contact</h2>
+      <h2 id="en-15" data-toc="Contact">Contact</h2>
       <p>
         Questions: <a href="mailto:contact@seelogd.com">contact@seelogd.com</a><br />
         Related pages: <a href="terms.html">Terms of Use</a> ·

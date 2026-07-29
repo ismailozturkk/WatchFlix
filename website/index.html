@@ -451,92 +451,6 @@
   .sec-title { font-family: var(--font-display); font-size: clamp(34px, 6vw, 58px); letter-spacing: .03em; margin-top: 12px; }
   .sec-sub { margin-top: 12px; color: var(--ink-muted); max-width: 560px; line-height: 1.6; }
 
-  /* ── 3) HYPE PANOSU ───────────────────────────────────────────── */
-  .hype-sec { background: linear-gradient(180deg, transparent, rgba(14,17,22,.9) 18%, rgba(14,17,22,.9) 82%, transparent); }
-  .hype-inner { max-width: 760px; margin: 0 auto; }
-  .done-panel {
-    margin: -14px 0 32px; padding: 18px;
-    border: 1px solid rgba(108,196,255,.22); border-radius: 18px;
-    background: linear-gradient(160deg, rgba(18,22,29,.78), rgba(10,13,18,.82));
-    box-shadow: 0 22px 70px -42px rgba(19,141,240,.5);
-  }
-  .done-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; margin-bottom: 14px; }
-  .done-title { font-family: var(--font-display); font-size: 24px; letter-spacing: .05em; color: var(--paper); }
-  .done-copy { color: var(--ink-muted); font-size: 13px; line-height: 1.5; max-width: 420px; }
-  .done-list { list-style: none; display: grid; gap: 9px; }
-  .done-item {
-    display: grid; grid-template-columns: 108px 1fr; align-items: center; gap: 12px;
-    padding: 12px 14px; border-radius: 13px;
-    background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.065);
-  }
-  .done-text { color: var(--paper); font-size: 14px; line-height: 1.45; font-weight: 600; }
-  .composer {
-    display: flex; gap: 8px; padding: 8px; margin-bottom: 8px;
-    background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
-    transition: border-color .3s;
-  }
-  .composer:focus-within { border-color: rgba(19,141,240,.55); }
-  .composer input {
-    flex: 1; min-width: 0; background: transparent; border: 0; outline: 0;
-    color: var(--paper); font: 500 15.5px var(--font-body); padding: 0 14px;
-  }
-  .composer input::placeholder { color: var(--ink-dim); }
-  .composer button {
-    font-weight: 700; font-size: 14px; letter-spacing: .04em;
-    background: transparent; color: var(--blue-hi); border: 1px solid rgba(19,141,240,.5);
-    border-radius: 11px; padding: 12px 20px; cursor: pointer; transition: all .2s;
-  }
-  .composer button:hover { background: rgba(19,141,240,.14); }
-  .composer-hint { font-size: 12.5px; color: var(--ink-dim); margin: 0 6px 26px; display: flex; justify-content: space-between; }
-
-  .hype-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
-  .hype-card {
-    display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 14px;
-    background: var(--surface); border: 1px solid var(--line);
-    border-radius: 16px; padding: 16px 16px 16px 10px;
-    transition: border-color .25s, transform .25s;
-  }
-  .hype-card:hover { border-color: #334052; }
-  .hype-card.top1 { border-color: rgba(19,141,240,.6); box-shadow: 0 14px 44px -20px rgba(19,141,240,.45); }
-  .rank { font-family: var(--font-display); font-size: 24px; text-align: center; color: var(--ink-faint); }
-  .top1 .rank, .top2 .rank, .top3 .rank { color: var(--blue-hi); }
-  .hype-text { font-size: 15.5px; line-height: 1.45; font-weight: 500; }
-  .hype-meta { display: block; margin-top: 5px; font-size: 12px; color: var(--ink-dim); }
-  .top1 .hype-meta::after { content: "  ·  EN HYPE 👑"; color: var(--blue-hi); letter-spacing: .08em; font-weight: 700; }
-  .hype-btn {
-    position: relative; display: inline-flex; align-items: center; gap: 8px;
-    font: 700 14px var(--font-body);
-    background: transparent; color: var(--paper); cursor: pointer;
-    border: 1px solid #334052; border-radius: 999px; padding: 10px 16px;
-    transition: transform .18s cubic-bezier(.34,1.56,.64,1), background .2s, border-color .2s;
-  }
-  .hype-btn:hover { border-color: var(--flame); transform: translateY(-1px); }
-  .hype-btn:active { transform: scale(.92); }
-  .hype-btn.hyped {
-    background: linear-gradient(180deg, rgba(255,107,53,.22), rgba(255,107,53,.08));
-    border-color: var(--flame); color: #ffb599; cursor: default;
-  }
-  .hype-btn .cnt { font-family: var(--font-display); font-size: 16px; letter-spacing: .04em; }
-  .hype-btn.pop .cnt { animation: cntPop .45s cubic-bezier(.34,1.56,.64,1); }
-  @keyframes cntPop { 40% { transform: scale(1.55); color: var(--flame); } }
-  .spark { position: fixed; z-index: 60; pointer-events: none; font-size: 15px; }
-  .feature-status {
-    display: inline-flex; align-items: center; justify-content: center; min-width: 96px;
-    border-radius: 999px; padding: 10px 14px;
-    font-size: 11px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
-    border: 1px solid rgba(108,196,255,.36);
-    color: var(--blue-hi); background: rgba(19,141,240,.12);
-  }
-  .feature-status.done {
-    color: #9ff0c2; border-color: rgba(90,224,147,.42); background: rgba(90,224,147,.12);
-  }
-  .feature-status.doing {
-    color: #ffd18a; border-color: rgba(255,184,77,.42); background: rgba(255,184,77,.11);
-  }
-  .hype-card.done { border-color: rgba(90,224,147,.32); }
-  .hype-card.doing { border-color: rgba(255,184,77,.34); }
-
-  /* ── 4) FİLM ŞERİDİ: uygulama özellikleri ─────────────────────── */
   .features-sec .sec-head { text-align: center; }
   .features-sec .sec-sub { margin-inline: auto; }
   .filmstrip { margin-top: 10px; background: #0b0d11; border-block: 1px solid #1a212c; }
@@ -649,9 +563,6 @@
     
     .ticket.sticky { top: 54px; left: 12px; transform: scale(0.30); }
 
-    .hype-card { grid-template-columns: 36px 1fr; padding: 14px 14px 14px 8px; }
-    .hype-card .hype-btn, .hype-card .feature-status { grid-column: 2; justify-self: start; margin-top: 4px; }
-    .rank { font-size: 20px; }
     
     .frame { flex: 0 0 85vw; padding: 12px 12px 20px; }
     .frame-icon { font-size: 28px; }
@@ -833,9 +744,6 @@
   }
   @keyframes shotSheen { 60%, 100% { background-position: -200% 0, 0 0; } }
 
-  /* hype kartları */
-  .hype-card:hover { transform: translateY(-3px); }
-
   /* konfeti */
   .confetti { position: fixed; z-index: 80; pointer-events: none; border-radius: 2px; }
 
@@ -883,7 +791,7 @@
   }
 
   /* Performans: ekran dışı bölümleri render etme (yalnızca görünen kısım işlenir) */
-  .features-sec, .hype-sec, footer {
+  .features-sec, footer {
     content-visibility: auto;
     contain-intrinsic-size: auto 900px;
   }
@@ -922,7 +830,6 @@
   @media (max-width: 640px) {
     .lc-label, .promo-badge { font-size: 11.5px; letter-spacing: .24em; }
     .frame-no { font-size: 11px; letter-spacing: .2em; }
-    .feature-status { font-size: 11.5px; min-width: 84px; }
     .join-form input { padding: 13px 14px; min-height: 46px; }
     .join-form button { min-height: 48px; }
   }
@@ -967,7 +874,6 @@
 <nav class="top-nav" id="topNav" aria-label="Main navigation">
   <a class="nav-brand" href="#">seelogd</a>
   <a href="#ozellikler" data-i18n="navFeatures">Features</a>
-  <a href="#istekler" data-i18n="navRequests">Requests</a>
   <a class="nav-cta" href="#join" data-i18n="navJoin">Join the list</a>
 </nav>
 <div class="grain" aria-hidden="true"></div>
@@ -1236,43 +1142,10 @@
     <p class="strip-hint reveal" data-i18n="stripHint">← DRAG THE STRIP →</p>
   </section>
 
-  <!-- ── 3) ÖZELLİK İSTEKLERİ / HYPE ──────────────────────────── -->
-  <section class="hype-sec" id="istekler">
-    <div class="hype-inner">
-      <div class="sec-head reveal-left">
-        <p class="overline" data-i18n="hypeOverline">Feature Requests</p>
-        <h2 class="sec-title" data-i18n="hypeTitle">YOU ASK, WE BUILD</h2>
-        <p class="sec-sub" data-i18n="hypeSub">Write the feature you want to see in the app and let the community vote with 🔥.
-          The most hyped requests move up the roadmap.</p>
-      </div>
-
-      <form class="composer reveal-right" id="composer">
-        <input type="text" id="featureInput" maxlength="140"
-               data-i18n-placeholder="featurePlaceholder" placeholder="Example: I want a home screen widget..." aria-label="Feature request" />
-        <button type="submit" data-i18n="featureShareBtn">Share</button>
-      </form>
-      <p class="composer-hint reveal-right" style="transition-delay: .1s"><span data-i18n="composerHint">The best requests are short and clear 😉</span><span id="charLeft">140</span></p>
-
-      <div class="done-panel reveal-left" id="donePanel" style="transition-delay: .15s">
-        <div class="done-head">
-          <div>
-            <p class="overline" data-i18n="doneOverline">Product Progress</p>
-            <h3 class="done-title" data-i18n="doneTitle">DONE SO FAR</h3>
-          </div>
-          <p class="done-copy" data-i18n="doneCopy">Completed and in-progress items are separated from the hype list; open requests keep collecting votes below.</p>
-        </div>
-        <ol class="done-list" id="doneList"></ol>
-      </div>
-
-      <ol class="hype-list" id="hypeList"></ol>
-    </div>
-  </section>
-
   <footer>
     <div class="f-brand">seelogd</div>
     <nav class="f-links" aria-label="Footer navigation">
       <a href="#ozellikler" data-i18n="navFeatures">Features</a>
-      <a href="#istekler" data-i18n="navRequests">Requests</a>
       <a href="#join" data-i18n="navJoin">Join the list</a>
       <a href="privacy.html" data-i18n="navPrivacy">Privacy</a>
       <a href="terms.html" data-i18n="navTerms">Terms</a>
@@ -1319,7 +1192,6 @@ const I18N = {
     cdLabels: ["MO","DAY","HR","MIN","SEC"],
     launchLbl: "PREMIERE NIGHT",
     navFeatures: "Features",
-    navRequests: "Requests",
     navJoin: "Join the list",
     ticker: ["TRACK","SHARE","PLAY","GUESS THE SCENE","AI PICKS","WRAPPED","TOURNAMENTS"],
     /* ── Hero ── */
@@ -1343,42 +1215,6 @@ const I18N = {
     ticketOver: "WAITLIST TICKET · 2026 PREMIERE",
     ticketTitle: "YOU'RE IN LINE! 🎟️",
     ticketLbl: "QUEUE NO",
-    /* ── Hype / Feature Requests ── */
-    hypeOverline: "Feature Requests",
-    hypeTitle: "YOU ASK, WE BUILD",
-    hypeSub: "Write the feature you want to see in the app and let the community vote with 🔥. The most hyped requests move up the roadmap.",
-    featurePlaceholder: "Example: I want a home screen widget...",
-    featureShareBtn: "Share",
-    composerHint: "The best requests are short and clear 😉",
-    doneOverline: "Product Progress",
-    doneTitle: "DONE SO FAR",
-    doneCopy: "Completed and in-progress items are separated from the hype list; open requests keep collecting votes below.",
-    statusDone: "Done",
-    statusDoing: "In Progress",
-    communityRequest: "community request",
-    topHype: "  ·  TOP HYPE 👑",
-    hypeAriaLabel: "Hype this request",
-    justNow: "just now",
-    /* ── Feature Seeds (bilingual) ── */
-    seeds: {
-      f_done_chat_media: "Share movies / TV shows in chat and group chat",
-      f_doing_tournament: "Monthly tournament: users vote to pick the champion of the month",
-      f_done_list_share: "Share lists in chat and group chat",
-      f_done_random_pick: "Random pick in chat and group chat",
-      f_done_polls: "Polls in chat and group chat",
-      f1: "Import my Letterboxd / IMDb lists",
-      f2: "Home screen widget — my watchlist + today's new episodes",
-      f3: "Live watch party with friends 🍿",
-      f4: "Offline mode (let me mark shows on the plane!)",
-      f5: "Share Wrapped as an Instagram story",
-      f6: "Steam-style profile badges and leveling system",
-    },
-    seedWhens: {
-      f_done_chat_media: "Done", f_doing_tournament: "In Progress",
-      f_done_list_share: "Done", f_done_random_pick: "Done", f_done_polls: "Done",
-      f1: "3 days ago", f2: "5 days ago", f3: "1 week ago",
-      f4: "2 days ago", f5: "4 days ago", f6: "6 hours ago",
-    },
     /* ── Features Section ── */
     featOverline: "What's Inside",
     featTitle: "FRAMES FROM THE TRAILER",
@@ -1409,7 +1245,6 @@ const I18N = {
     cdLabels: ["AY","GÜN","SAAT","DK","SN"],
     launchLbl: "PRÖMİYER GECESİ",
     navFeatures: "Özellikler",
-    navRequests: "İstekler",
     navJoin: "Sıraya gir",
     ticker: ["TAKİP ET","PAYLAŞ","OYNA","SAHNEYİ TAHMİN ET","AI ÖNERİLERİ","WRAPPED","TURNUVALAR"],
     tagline: 'Film ve dizi evrenin: takip et, paylaş, oyna. <em>Hepsi tek uygulamada.</em>',
@@ -1430,40 +1265,6 @@ const I18N = {
     ticketOver: "BEKLEME LİSTESİ BİLETİ · 2026 PREMİYER",
     ticketTitle: "SIRAYA GİRDİN! 🎟️",
     ticketLbl: "SIRA NO",
-    hypeOverline: "Özellik İstekleri",
-    hypeTitle: "SEN İSTE, BİZ YAPALIM",
-    hypeSub: "Uygulamada görmek istediğin özelliği yaz ve topluluk 🔥 ile oylasın. En çok hype alan istekler yol haritasında yukarı çıkar.",
-    featurePlaceholder: "Örnek: Ana ekran widget'ı istiyorum...",
-    featureShareBtn: "Paylaş",
-    composerHint: "En iyi istekler kısa ve net olanlardır 😉",
-    doneOverline: "Ürün İlerlemesi",
-    doneTitle: "ŞİMDİYE KADAR YAPILAN",
-    doneCopy: "Tamamlanan ve devam eden öğeler hype listesinden ayrılmıştır; açık istekler aşağıda oy toplamaya devam eder.",
-    statusDone: "Yapıldı",
-    statusDoing: "Yapılıyor",
-    communityRequest: "topluluk isteği",
-    topHype: "  ·  EN HYPE 👑",
-    hypeAriaLabel: "Bu isteği hype'la",
-    justNow: "az önce",
-    seeds: {
-      f_done_chat_media: "Sohbet ve grup sohbetinde film / dizi paylaşma",
-      f_doing_tournament: "Aylık turnuva: kullanıcılar oylayarak film veya dizi arasından ayın şampiyonunu seçiyor",
-      f_done_list_share: "Sohbet ve grup sohbetinde liste paylaşma",
-      f_done_random_pick: "Sohbet ve grup sohbetinde rastgele seçme",
-      f_done_polls: "Sohbet ve grup sohbetinde anketleme",
-      f1: "Letterboxd / IMDb listelerimi içe aktarma",
-      f2: "Ana ekran widget'ı — izleme listem + bugün çıkan bölümler",
-      f3: "Arkadaşlarla senkron canlı izleme partisi 🍿",
-      f4: "Çevrimdışı mod (uçakta dizi işaretleyeyim!)",
-      f5: "Wrapped'ı Instagram story olarak paylaşma",
-      f6: "Steam tarzı profil rozetleri ve seviye sistemi",
-    },
-    seedWhens: {
-      f_done_chat_media: "Yapıldı", f_doing_tournament: "Yapılıyor",
-      f_done_list_share: "Yapıldı", f_done_random_pick: "Yapıldı", f_done_polls: "Yapıldı",
-      f1: "3 gün önce", f2: "5 gün önce", f3: "1 hafta önce",
-      f4: "2 gün önce", f5: "4 gün önce", f6: "6 saat önce",
-    },
     featOverline: "İçeride Ne Var",
     featTitle: "FRAGMANDAN KARELER",
     featSub: "seelogd sadece bir izleme listesi değil; tüm film ve dizi hayatın için tek bir sahne.",
@@ -1528,9 +1329,6 @@ function setLang(lang) {
   currentLang = lang;
   localStorage.setItem("wf_lang", lang);
   applyI18n();
-  // Re-render dynamic lists with new language
-  renderDone();
-  renderHype();
 }
 
 // Language switch event
@@ -1541,28 +1339,6 @@ document.querySelector(".language-switch").addEventListener("click", (e) => {
 });
 
 /* ── Depolama katmanı (localStorage demo / Firestore) ─────────── */
-const progressSeed = [
-  { id: "f_done_chat_media", hype: 384, status: "done" },
-  { id: "f_doing_tournament", hype: 362, status: "doing" },
-  { id: "f_done_list_share", hype: 331, status: "done" },
-  { id: "f_done_random_pick", hype: 306, status: "done" },
-  { id: "f_done_polls", hype: 292, status: "done" },
-];
-const demoRequestSeed = [
-  { id: "f1", hype: 214 },
-  { id: "f2", hype: 178 },
-  { id: "f3", hype: 156 },
-  { id: "f4", hype: 121 },
-  { id: "f5", hype: 98 },
-  { id: "f6", hype: 64 },
-];
-
-// Seed text/when are resolved at render time from I18N
-function getSeedText(id) { return (I18N[currentLang].seeds && I18N[currentLang].seeds[id]) || id; }
-function getSeedWhen(id) { return (I18N[currentLang].seedWhens && I18N[currentLang].seedWhens[id]) || ""; }
-
-const demoSeed = [...progressSeed, ...demoRequestSeed];
-
 const LS = {
   get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
   set(k, v) { localStorage.setItem(k, JSON.stringify(v)); },
@@ -1575,16 +1351,6 @@ function withTimeout(promise, ms, label) {
     promise,
     new Promise((_, reject) => setTimeout(() => reject(new Error(label || "timeout")), ms)),
   ]);
-}
-
-function mergeDemoFeatures(list, includeDemoRequests = true) {
-  const merged = new Map((Array.isArray(list) ? list : []).map(f => [f.id, f]));
-  const seeds = includeDemoRequests ? demoSeed : progressSeed;
-  seeds.forEach(seed => {
-    if (!merged.has(seed.id)) merged.set(seed.id, { ...seed });
-    else if (seed.status && !merged.get(seed.id).status) merged.set(seed.id, { ...merged.get(seed.id), ...seed });
-  });
-  return [...merged.values()];
 }
 
 const store = {
@@ -1635,59 +1401,6 @@ const store = {
     list.push(email);
     LS.set("wf_emails", list);
     return { email, queueNo: CONFIG.baseCount + list.length, exists: false };
-  },
-  async listFeatures() {
-    if (db) {
-      const q = db.fs.query(db.fs.collection(db.app, "featureRequests"),
-        db.fs.orderBy("hype", "desc"), db.fs.limit(100));
-      let snap = await db.fs.getDocs(q);
-      
-      // Seed default items if not present in Firestore
-      const hasSeed = snap.docs.some(d => d.id.startsWith("f"));
-      if (!hasSeed) {
-        try {
-          const batch = db.fs.writeBatch(db.app);
-          demoSeed.forEach(seed => {
-            const docRef = db.fs.doc(db.app, "featureRequests", seed.id);
-            batch.set(docRef, {
-              text: I18N.en.seeds[seed.id] || seed.id,
-              hype: seed.hype,
-              status: seed.status || "waiting",
-              source: "landing_seed",
-              createdAt: db.fs.serverTimestamp()
-            });
-          });
-          await batch.commit();
-          snap = await db.fs.getDocs(q);
-        } catch (e) {
-          console.warn("Failed to seed default features to Firestore:", e);
-        }
-      }
-      return snap.docs.map(d => ({ id: d.id, when: "", ...d.data() }));
-    }
-    const list = mergeDemoFeatures(LS.get("wf_features", demoSeed));
-    LS.set("wf_features", list);
-    return list;
-  },
-  async addFeature(text) {
-    if (db) {
-      const ref = await db.fs.addDoc(db.fs.collection(db.app, "featureRequests"),
-        { text, hype: 0, status: "waiting", source: "landing", createdAt: db.fs.serverTimestamp() });
-      return { id: ref.id, text, hype: 0, status: "waiting", when: t("justNow") };
-    }
-    const f = { id: "u" + Date.now(), text, hype: 0, status: "waiting", when: t("justNow") };
-    const list = LS.get("wf_features", demoSeed); list.push(f); LS.set("wf_features", list);
-    return f;
-  },
-  async hype(id) {
-    if (db) {
-      await db.fs.updateDoc(db.fs.doc(db.app, "featureRequests", id),
-        { hype: db.fs.increment(1) });
-      return;
-    }
-    const list = LS.get("wf_features", demoSeed);
-    const f = list.find(x => x.id === id); if (f) f.hype++;
-    LS.set("wf_features", list);
   },
 };
 
@@ -1840,154 +1553,6 @@ joinForm.addEventListener("submit", async (e) => {
   }
 });
 
-/* ── 3) Hype panosu ───────────────────────────────────────────── */
-const hypeList = document.getElementById("hypeList");
-const doneList = document.getElementById("doneList");
-const composer = document.getElementById("composer");
-const featureInput = document.getElementById("featureInput");
-const charLeft = document.getElementById("charLeft");
-let features = [];
-const myHypes = new Set(LS.get("wf_myhypes", []));
-
-featureInput.addEventListener("input", () => { charLeft.textContent = 140 - featureInput.value.length; });
-
-function getFeatureText(f) {
-  // User-submitted features have their own text; seed features pull from i18n
-  if (I18N[currentLang].seeds && I18N[currentLang].seeds[f.id]) return getSeedText(f.id);
-  return f.text || f.id;
-}
-function getFeatureWhen(f) {
-  if (I18N[currentLang].seedWhens && I18N[currentLang].seedWhens[f.id]) return getSeedWhen(f.id);
-  return f.when || t("communityRequest");
-}
-
-function cardHtml(f, rank) {
-  const hyped = myHypes.has(f.id);
-  const statusDone = t("statusDone");
-  const statusDoing = t("statusDoing");
-  const statusLabels = { done: statusDone, doing: statusDoing };
-  const status = f.status && statusLabels[f.status]
-    ? `<span class="feature-status ${f.status}">${statusLabels[f.status]}</span>`
-    : "";
-  return `
-    <span class="rank">${rank}</span>
-    <div>
-      <p class="hype-text">${escapeHtml(getFeatureText(f))}</p>
-      <span class="hype-meta">${getFeatureWhen(f)}</span>
-    </div>
-    ${status || `
-    <button class="hype-btn ${hyped ? "hyped" : ""}" data-id="${f.id}" ${hyped ? "disabled" : ""}
-            aria-label="${t("hypeAriaLabel")}">
-      🔥 <span class="cnt">${f.hype.toLocaleString("tr-TR")}</span>
-    </button>`}`;
-}
-
-function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
-function renderHype() {
-  const openFeatures = features.filter(f => !f.status || f.status === "waiting").sort((a, b) => b.hype - a.hype);
-  hypeList.innerHTML = "";
-  openFeatures.forEach((f, i) => {
-    const li = document.createElement("li");
-    li.className = `hype-card reveal-right ${i === 0 ? "top1" : i === 1 ? "top2" : i === 2 ? "top3" : ""}`;
-    li.dataset.id = f.id;
-    li.style.transitionDelay = `${0.1 + i * 0.08}s`;
-    li.innerHTML = cardHtml(f, i + 1);
-    hypeList.appendChild(li);
-    setTimeout(() => io.observe(li), 0);
-  });
-}
-
-function renderDone() {
-  const items = features
-    .filter(f => f.status === "done" || f.status === "doing")
-    .sort((a, b) => (a.status === "done" ? 0 : 1) - (b.status === "done" ? 0 : 1) || b.hype - a.hype);
-  doneList.innerHTML = "";
-  items.forEach((f, i) => {
-    const li = document.createElement("li");
-    li.className = `done-item reveal-left ${f.status}`;
-    li.style.transitionDelay = `${0.2 + i * 0.08}s`;
-    li.innerHTML = `
-      <span class="feature-status ${f.status}">${f.status === "done" ? t("statusDone") : t("statusDoing")}</span>
-      <span class="done-text">${escapeHtml(getFeatureText(f))}</span>`;
-    doneList.appendChild(li);
-    setTimeout(() => io.observe(li), 0);
-  });
-}
-
-/* FLIP: hype sonrası kartların yeni sırasına akarak gitmesi */
-function resortWithFlip() {
-  const firstTops = new Map([...hypeList.children].map(el => [el.dataset.id, el.getBoundingClientRect().top]));
-  renderHype();
-  [...hypeList.children].forEach(el => {
-    const dy = (firstTops.get(el.dataset.id) ?? el.getBoundingClientRect().top) - el.getBoundingClientRect().top;
-    if (dy) el.animate(
-      [{ transform: `translateY(${dy}px)` }, { transform: "translateY(0)" }],
-      { duration: 550, easing: "cubic-bezier(.22,1,.36,1)" });
-  });
-}
-
-function burst(btn) {
-  const r = btn.getBoundingClientRect();
-  for (let i = 0; i < 7; i++) {
-    const s = document.createElement("span");
-    s.className = "spark"; s.textContent = Math.random() < .5 ? "🔥" : "✨";
-    s.style.left = r.left + r.width / 2 + "px"; s.style.top = r.top + "px";
-    document.body.appendChild(s);
-    const ang = -Math.PI / 2 + (Math.random() - .5) * 1.6, dist = 46 + Math.random() * 56;
-    s.animate([
-      { transform: "translate(-50%,-50%) scale(.6)", opacity: 1 },
-      { transform: `translate(calc(-50% + ${Math.cos(ang) * dist}px), calc(-50% + ${Math.sin(ang) * dist}px)) scale(1.25) rotate(${(Math.random() - .5) * 90}deg)`, opacity: 0 },
-    ], { duration: 720 + Math.random() * 300, easing: "cubic-bezier(.22,1,.36,1)" }).onfinish = () => s.remove();
-  }
-}
-
-hypeList.addEventListener("click", async (e) => {
-  const btn = e.target.closest(".hype-btn");
-  if (!btn || btn.disabled) return;
-  const id = btn.dataset.id;
-  btn.disabled = true; btn.classList.add("hyped", "pop");
-  myHypes.add(id); LS.set("wf_myhypes", [...myHypes]);
-  const f = features.find(x => x.id === id);
-  f.hype++; btn.querySelector(".cnt").textContent = f.hype.toLocaleString("tr-TR");
-  burst(btn);
-  try { await store.hype(id); } catch {}
-  setTimeout(resortWithFlip, 620);
-});
-
-composer.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const text = featureInput.value.trim();
-  if (text.length < 4) { featureInput.focus(); return; }
-  
-  const btn = composer.querySelector("button");
-  const originalText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = "...";
-  
-  try {
-    const f = await store.addFeature(text);
-    featureInput.value = ""; 
-    charLeft.textContent = "140";
-    features.push(f);
-    renderDone();
-    renderHype();
-    const el = [...hypeList.children].find(x => x.dataset.id === f.id);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.animate([{ borderColor: "rgba(19,141,240,.9)", transform: "scale(1.02)" }, { transform: "scale(1)" }],
-        { duration: 900, easing: "ease-out" });
-    }
-  } catch (err) {
-    console.error("Failed to add feature:", err);
-    alert(t("formErrGeneric"));
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalText;
-  }
-});
 
 /* ── 4) Scroll reveal + toz zerreleri ─────────────────────────── */
 const io = new IntersectionObserver(entries => {
@@ -2192,18 +1757,7 @@ function runIntro() {
   try { await store.init(); } catch (e) { console.warn("Firebase could not start, running in demo mode:", e); }
   // logo artık inline SVG wordmark — PNG yedeğine gerek yok
   startCountdown();
-  features = mergeDemoFeatures([], false);
-  renderDone();
-  renderHype();
   startCounter();
-  try {
-    features = await withTimeout(store.listFeatures(), 4500, "features-timeout");
-  } catch (err) {
-    console.warn("Feature requests could not be read from Firestore, using local list:", err);
-    features = mergeDemoFeatures(LS.get("wf_features", demoSeed));
-  }
-  renderDone();
-  renderHype();
 })();
 </script>
 <script>

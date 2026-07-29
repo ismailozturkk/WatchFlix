@@ -26,7 +26,7 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid in chatId.split('_');
     }
 
-    // ─── Landing sitesi: geçici bekleme listesi + özellik istekleri ──────
+    // ─── Landing sitesi: geçici bekleme listesi ─────────────────────────
     match /waitlist/{docId} {
       // E-posta adresi kişisel veridir: koleksiyonu LİSTELEMEK serbest olamaz,
       // yoksa herkes tüm bekleme listesini dökebilir (docId = base64(email) ve
@@ -54,19 +54,11 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    match /featureRequests/{id} {
-      allow read: if true;
-      allow create: if request.resource.data.keys().hasOnly(['text', 'hype', 'source', 'createdAt', 'status'])
-                    && request.resource.data.text is string
-                    && request.resource.data.text.size() >= 4
-                    && request.resource.data.text.size() <= 140
-                    && request.resource.data.hype is int
-                    && request.resource.data.hype >= 0
-                    && (request.resource.data.source == 'landing' || request.resource.data.source == 'landing_seed');
-      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hype'])
-                    && request.resource.data.hype == resource.data.hype + 1;
-      allow delete: if false;
-    }
+    // NOT: /featureRequests kuralı 26 Tem 2026'da kaldırıldı — landing
+    // sayfasındaki "sen iste, biz yapalım" bölümü kaldırıldığı için okuyan ya
+    // da yazan bir istemci kalmadı. Kural yokken koleksiyon varsayılan olarak
+    // kapalıdır; koleksiyondaki ESKİ KAYITLAR silinmez, Firebase Console'dan
+    // temizlenmeli.
 
     // ─── Listeler ───────────────────────────────────────────────────────
     // Gizlilik artık yalnız UI'da değil, KURALDA da uygulanır:

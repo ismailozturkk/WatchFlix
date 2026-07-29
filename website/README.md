@@ -105,20 +105,20 @@ katmanının ikisinin altına da kaçmaz.
   Firebase projesine (`movieandtv-2832a`) bağlıdır. Site Firestore'a yazar:
   - `waitlist/{emailHash}` — e-posta kayıtları (hash doc-id sayesinde mükerrer kayıt engellenir)
   - `meta/waitlist` — toplam sayaç (`count`)
-  - `featureRequests/{id}` — özellik istekleri + `hype` sayacı
-- **Demo mod:** `CONFIG.firebaseConfig = null` yapılırsa e-postalar ve hype oyları
-  tarayıcının localStorage'ında tutulur. Sadece tasarım denemesi için kullan.
+- **Demo mod:** `CONFIG.firebaseConfig = null` yapılırsa e-postalar tarayıcının
+  localStorage'ında tutulur. Sadece tasarım denemesi için kullan.
 
 `CONFIG.baseCount` sayacın başlangıç ofsetidir; gerçek kayıt sayısının üstüne eklenir.
 
-Tamamlanan/yapımı süren ürün maddeleri `progressSeed` içinde sabit tutulur ve normal
-hype listesinden ayrı "Yapılanlar" panelinde gösterilir. Kullanıcıların eklediği açık
-istekler Firestore'daki `featureRequests` koleksiyonunda oylanır.
+> **26 Tem 2026 — kaldırıldı:** "SEN İSTE, BİZ YAPALIM" (özellik istekleri / hype
+> panosu) bölümü siteden çıkarıldı; ilgili HTML, CSS, JS, i18n anahtarları ve
+> `featureRequests` Firestore kuralı silindi. Koleksiyondaki eski kayıtlar
+> Firebase Console'dan temizlenmeli — kural kaldırmak veriyi silmez.
 
 ## Firestore kuralları
 
 Kurallar tek kaynakta: kökteki [firestore.rules](../firestore.rules) →
-"Landing sitesi" bölümü (`waitlist`, `meta/waitlist`, `featureRequests`).
+"Landing sitesi" bölümü (`waitlist`, `meta/waitlist`).
 Buraya kopyalanmış eski bir sürüm vardı ve gerçek kurallarla ayrışmıştı; kopya
 kaldırıldı — kural değişikliğini yalnız `firestore.rules` üzerinde yap.
 
@@ -134,8 +134,6 @@ Bilinmesi gerekenler:
 - Bu uçlar anonim yazıma açıktır (bekleme listesi doğası gereği). Spam'e karşı
   Firebase **App Check (reCAPTCHA Enterprise/v3)** etkinleştirilmesi şiddetle
   önerilir.
-- Uygunsuz özellik istekleri Firestore konsolundan silinir (istemciden delete
-  kapalı).
 
 ## Yayınlama (Firebase Hosting)
 
