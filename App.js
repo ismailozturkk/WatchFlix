@@ -134,6 +134,15 @@ import { preloadAllCache } from "./utils/apiCache";
 import { installAxiosDataCache } from "./utils/axiosDataCache";
 import { hydrateAutoDataCacheSetting } from "./utils/dataCacheSettings";
 import { startPresence, stopPresence } from "./services/presenceService";
+import { initCrashReporting, captureError, setCrashUser, wrapRoot } from "./services/crashReporting";
+import {
+  USER_PROPERTIES,
+  setAnalyticsUser,
+  setAnalyticsUserProperty,
+  trackScreen,
+} from "./services/analytics";
+import { setSnapshotErrorReporter } from "./utils/firestoreError";
+import { deviceTier } from "./services/deviceTier";
 import * as ExpoSplashScreen from "expo-splash-screen";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -141,10 +150,26 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 import Feather from "@expo/vector-icons/Feather";
 import Octicons from "@expo/vector-icons/Octicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+// Sentry kurulumu bilerek burada DEĞİL: tek kaynak services/crashReporting.js
+// (aşağıdaki initCrashReporting). Sihirbazın buraya eklediği ikinci Sentry.init
+// PII'yi ve %10 oturumda ekran kaydını açıyordu; sarmalayıcıdaki KVKK/GDPR
+// kararını eziyordu.
 
 enableFreeze(true);
 installAxiosDataCache();
 ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Hata raporlama İLK iş: bundan sonra çalışan her şeyin (cache preload, font
+// yükleme, provider'lar) hatası yakalanabilsin. DSN yoksa sessiz no-op.
+initCrashReporting();
+// Sessizce yutulan Firestore snapshot hatalarını raporlayıcıya bağla
+// (utils/firestoreError.js saf kalsın diye enjeksiyonla).
+setSnapshotErrorReporter((error, label) =>
+  captureError(error, { tags: { source: "firestore_snapshot", label } }),
+);
+// Cihaz sınıfı kullanıcı özelliği: crash ve performans verisini düşük/orta/üst
+// katmana göre ayırabilmek için (utils/deviceTier.js).
+setAnalyticsUserProperty(USER_PROPERTIES.DEVICE_TIER, deviceTier);
 
 // Bildirime dokunulduğunda yönlendirme için global navigation ref.
 const navigationRef = createNavigationContainerRef();
@@ -306,6 +331,9 @@ function AppContent() {
         // state resmi tipte undefined olabilir — guard olmadan crash riski.
         const routeName = state?.routes?.[state.index]?.name;
         if (!routeName) return;
+        // Ekran görüntüleme: huni analizinin (onboarding → paywall → satın alma)
+        // temeli. Firebase otomatik screen_view'ı React Navigation'ı görmez.
+        trackScreen(routeName);
         // Control modal visibility based on the current screen
         if (
           routeName === "OnboardingScreen" ||
@@ -768,7 +796,7 @@ function AppContent() {
   );
 }
 
-export default function App() {
+export default wrapRoot(function App() {
   const [splashVisible, setSplashVisible] = useState(true);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -835,6 +863,10 @@ export default function App() {
       } else {
         stopPresence();
       }
+      // Ölçüm kimliği: crash raporunda hangi kullanıcı, analytics'te hangi
+      // huni. Çıkışta null ile temizlenir — sonraki hesabın verisine sızmasın.
+      setAnalyticsUser(u?.uid || null);
+      setCrashUser(u?.uid || null);
     });
     return () => {
       authUnsubscribe();
@@ -909,7 +941,7 @@ export default function App() {
       </GestureHandlerRootView>
     </ErrorBoundary>
   );
-}
+});
 
 const styles = StyleSheet.create({
   splashContainer: {

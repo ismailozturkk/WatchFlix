@@ -82,9 +82,25 @@
             "photo"
           ]
         }
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/analytics",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://de.sentry.io/",
+          "project": "react-native",
+          "organization": "seelogd"
+        }
       ]
     ],
     "owner": "smlztrk",
+    "updates": {
+      "url": "https://u.expo.dev/9c17fe1c-ca63-4de3-af7a-76d131e3db7a"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "extra": {
       "eas": {
         "build": {

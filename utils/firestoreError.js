@@ -16,10 +16,22 @@ export function isAuthTransitionError(err) {
   return code === "permission-denied" || code === "unauthenticated";
 }
 
+// Hata raporlayıcı DIŞARIDAN enjekte edilir (App.js açılışta bağlar).
+// Sentry'yi buradan import ETMİYORUZ: bu modül saf kalsın (jest onu import
+// eden context'leri de yükleyebilsin) ve açılış sırasında Sentry'nin
+// yüklenme anına bağımlılık oluşmasın.
+let reporter = null;
+export function setSnapshotErrorReporter(fn) {
+  reporter = typeof fn === "function" ? fn : null;
+}
+
 // onSnapshot için standart hata callback'i üretir.
 export function snapshotErrorHandler(label) {
   return (err) => {
     if (isAuthTransitionError(err)) return; // çıkış sırasında beklenen, sustur
     if (__DEV__) console.warn(`[${label}] snapshot error:`, err?.message || err);
+    // Üretimde bu hatalar tamamen sessizdi: eksik index, hatalı kural veya
+    // kota aşımı ekranı boş bırakır ve kimsenin haberi olmazdı.
+    reporter?.(err, label);
   };
 }

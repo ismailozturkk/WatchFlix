@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { i18nText } from "../utils/i18nText";
+import { captureError } from "../services/crashReporting";
 
 
 export default class ErrorBoundary extends React.Component {
@@ -17,6 +18,13 @@ export default class ErrorBoundary extends React.Component {
     if (__DEV__) {
       console.error("ErrorBoundary caught:", error, info);
     }
+    // Üretimde bu sınır yakalandığında kullanıcı "bir şeyler ters gitti"
+    // ekranını görüp devam ediyordu ve hatadan GERİYE HİÇBİR İZ KALMIYORDU.
+    // Uygulamayı çökmekten kurtaran her yakalama artık rapora düşüyor.
+    captureError(error, {
+      tags: { boundary: "root" },
+      extra: { componentStack: info?.componentStack },
+    });
   }
 
   render() {

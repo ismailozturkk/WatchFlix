@@ -9,4 +9,9 @@ module.exports = {
   transform: {
     "^.+\\.[jt]sx?$": "babel-jest",
   },
+  // `__DEV__` normalde Metro tarafından tanımlanır; jest'te yok. Test edilen
+  // saf modüller bile artık (analytics/crash raporlama sarmalayıcıları
+  // üzerinden) bu bayrağı okuyabiliyor — tanımsız kalırsa ReferenceError.
+  // `false` seçildi: geliştirme günlükleri test çıktısını kirletmesin.
+  globals: { __DEV__: false },
 };
