@@ -18,6 +18,7 @@ ios/
 *.p12
 *.key
 *.mobileprovision
+credentials.json
 
 # Keep the renamed Android application package sources visible to Git.
 !android/
