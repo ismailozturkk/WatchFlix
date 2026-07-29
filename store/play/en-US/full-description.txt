@@ -1,0 +1,37 @@
+Every movie and show you watch, in one place — seelogd is your watch diary, social network, and movie game in a single app.
+
+🎬 TRACK
+• Log the movies you watch and track TV shows episode by episode
+• Rate, review, and take personal notes
+• Automatic stats from your watch history: genres, hours, habits
+• Discover your year with a personal "Wrapped" recap every December
+
+📋 ORGANIZE
+• Build a watchlist, favorites, and custom lists
+• Create shared lists with friends and fill them together
+• Get reminders for new episodes and release dates
+• Home screen widgets put your lists and stats one glance away
+
+👥 SHARE
+• Add friends, browse their profiles and stats
+• Share posts, comment, and like
+• Plan movie nights in one-to-one and group chats
+
+🎮 PLAY
+• Test your movie knowledge with the scene-guessing game
+• Collect points, level up, and earn badges
+• Raise the virtual pet that keeps you company
+
+🤖 DISCOVER
+• AI-powered recommendations tailored to your watch history
+• "Where to watch?" — find which streaming platform carries what you're looking for
+
+⭐ PREMIUM
+Check out the Pro and Unlimited plans for more AI messages, exclusive themes, advanced statistics, and more.
+
+Available in English and Turkish. Dark theme included. Free to use.
+
+—
+This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming availability data provided by JustWatch.
+
+Privacy policy: https://seelogd.com/privacy.html

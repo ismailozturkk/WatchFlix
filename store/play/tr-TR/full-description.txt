@@ -1,0 +1,37 @@
+İzlediğin her film ve dizi bir yerde — seelogd, izleme günlüğün, sosyal ağın ve film oyunun aynı uygulamada.
+
+🎬 TAKİP ET
+• İzlediğin filmleri ve dizileri bölüm bölüm kaydet
+• Puan ver, yorum yaz, notlar al
+• İzleme geçmişinden otomatik istatistikler: türler, süreler, alışkanlıklar
+• Yıl sonunda kişisel "Wrapped" özetinle yılını keşfet
+
+📋 LİSTELE
+• İzleme listesi, favoriler ve özel listeler oluştur
+• Arkadaşlarınla ortak listeler kur — birlikte doldurun
+• Yeni bölüm ve vizyon tarihleri için hatırlatıcılar al
+• Ana ekran widget'larıyla listelerine ve istatistiklerine tek bakışta ulaş
+
+👥 PAYLAŞ
+• Arkadaş ekle, profillerini ve istatistiklerini gör
+• Gönderi paylaş, yorum yap, beğen
+• Birebir ve grup sohbetleriyle film gecelerini planla
+
+🎮 OYNA
+• Sahne tahmin oyunuyla film bilgini test et
+• Puan topla, seviye atla, rozetler kazan
+• Sana eşlik eden sanal evcil hayvanını büyüt
+
+🤖 KEŞFET
+• Yapay zekâ destekli öneriler: izleme geçmişine göre sana özel film ve dizi tavsiyeleri
+• "Nerede izlenir?" — platform bilgisiyle aradığın yapımın yayın adresini bul
+
+⭐ PREMIUM
+Daha fazla yapay zekâ mesajı, özel temalar, gelişmiş istatistikler ve daha fazlası için Pro ve Unlimited planlarına göz at.
+
+Türkçe ve İngilizce dil desteği. Karanlık tema. Ücretsiz kullanılabilir.
+
+—
+Bu uygulama TMDB API'sini kullanır ancak TMDB tarafından onaylanmış veya sertifikalandırılmış değildir. Yayın platformu verileri JustWatch tarafından sağlanmaktadır.
+
+Gizlilik politikası: https://seelogd.com/privacy.html
