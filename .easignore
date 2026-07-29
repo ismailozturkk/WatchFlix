@@ -1,3 +1,11 @@
+# DİKKAT: Bu dosya varken EAS `.gitignore`'u YOK SAYAR — yükleme kapsamını
+# yalnız buradaki liste belirler. .gitignore'a yeni bir şey eklerken buraya da
+# eklemezsen sessizce buluta yüklenir.
+#
+# 28 Tem 2026: tarball 83 MB'a çıkmıştı ve yükleme ECONNRESET ile düştü. Sebep
+# .gitignore'da olup burada olmayan iki klasördü: .claude/worktrees (~50 MB) ve
+# .expo-check-export (~25 MB). Liste aşağıda .gitignore ile hizalandı.
+
 # Dependencies (installed on EAS server)
 node_modules/
 
@@ -7,11 +15,19 @@ ios/
 
 # Expo
 .expo/
+.expo-check-export/
 dist/
 web-build/
 
+# Claude Code — worktrees tek başına ~50 MB
+.claude/
+
+# Firebase hosting deploy önbelleği
+.firebase/
+
 # Build artifacts
 *.tsbuildinfo
+crash.txt
 
 # IDE / OS
 .DS_Store
@@ -29,3 +45,17 @@ yarn-error.*
 # Environment files
 .env
 .env*.local
+
+# İmzalama anahtarları ve servis hesapları — build tarball'ında işleri yok.
+# (Keystore, credentialsSource ayarıyla ayrı kanaldan gider, buradan değil.)
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+*-firebase-adminsdk-*.json
+
+# Rebrand öncesi ölü ikon yedekleri (~4,5 MB)
+assets/oldicon/
+assets/oldicon1/

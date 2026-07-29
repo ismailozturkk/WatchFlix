@@ -83,6 +83,10 @@ yarn-error.*
 crash.txt
 .expo-check-export/
 
+# Claude Code worktree'leri (~50 MB). .claude/launch.json ve settings.local.json
+# bilerek izleniyor, yalnız worktrees haric tutuluyor.
+.claude/worktrees/
+
 # FCM / service account (gizli — asla commit etme)
 *-firebase-adminsdk-*.json
 
@@ -97,3 +101,5 @@ nul
 # gecmise girmesin. Gerceklestirilen ikonlar assets/ kokunde.
 assets/oldicon/
 assets/oldicon1/
+
+.env.local
