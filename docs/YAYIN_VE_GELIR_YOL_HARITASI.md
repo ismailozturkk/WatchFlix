@@ -328,9 +328,17 @@ aylığa bölünmüş, mağaza kesintisi düşülmüş).
 
 - [x] Gemini proxy Cloud Function (`callGemini` callable) + istemcinin buna geçirilmesi
       (AIChatScreen, ChatModal, aiCineService — not: useSceneGame Gemini KULLANMIYORMUŞ,
-      kapsam dışı çıktı) _(8 Tem — kod tamam; deploy: `firebase deploy --only functions`)_
-- [ ] Eski Gemini anahtarını iptal et; yeni anahtar yalnız Functions secret'ında
-      _(MANUEL: `firebase functions:secrets:set GEMINI_API_KEY` — bkz. functions/README.md)_
+      kapsam dışı çıktı) _(8 Tem — kod; **29 Tem — DEPLOY EDİLDİ**: billing (Blaze)
+      açıldı, 7 fonksiyonun tamamı canlı. Secret'lar: GEMINI_API_KEY,
+      TMDB_API_KEY, REVENUECAT_WEBHOOK_AUTH, REVENUECAT_SECRET_API_KEY (v1 sk_).
+      callGemini doğrulandı: anonim istek 401 UNAUTHENTICATED — 404 değil.
+      "Asistan şu anda kullanılamıyor" hatası bununla çözüldü. NOT: RevenueCat
+      webhook'unun PANEL tarafı yapılandırılmadı — Play ürünleri tanımlanınca
+      Integrations→Webhooks'a fonksiyon URL'si + Authorization değeri girilecek.)_
+- [ ] Eski Gemini anahtarını iptal et _(yeni anahtar 29 Tem'de Functions
+      secret'ına kondu ve canlıda çalışıyor; KALAN: AI Studio'da ESKİ anahtarın
+      — ve yanlışlıkla komut satırına yazılıp iptal edilmesi istenen ara
+      anahtarın — silindiğinin teyidi)_
 - [x] Kullanıcı başına günlük AI kotası (Firestore sayaç `AiUsage/{uid}`, sunucu tarafı;
       free 5 / premium 100) _(8 Tem)_
 - [ ] **Apple Developer hesabını bugün aç** (onay + D-U-N-S günler/haftalar sürebilir)
@@ -341,8 +349,8 @@ aylığa bölünmüş, mağaza kesintisi düşülmüş).
 - [ ] Firebase App Check (Play Integrity; iOS App Attest Faz 3'te)
       _(kurulunca functions/index.js'te `enforceAppCheck: true` yapılmalı)_
 - [x] Firestore rules düzeltmeleri: counter increment kısıtı (±1), chat tam eşleşme
-      (`split('_')`), Lists gizlilik kuralı (`privacy.lists`) _(8 Tem — erken bitti;
-      deploy: `firebase deploy --only firestore:rules`)_
+      (`split('_')`), Lists gizlilik kuralı (`privacy.lists`) _(8 Tem — kod;
+      **29 Tem — rules DEPLOY EDİLDİ**, featureRequests kuralı kaldırılmış hâliyle)_
 - [x] Android izin temizliği (WRITE_EXTERNAL_STORAGE, READ_MEDIA_AUDIO/VIDEO,
       RECORD_AUDIO çıkarıldı — manifest `tools:node="remove"` + app.json
       `blockedPermissions`) _(8 Tem — erken bitti)_
@@ -356,9 +364,11 @@ aylığa bölünmüş, mağaza kesintisi düşülmüş).
       _(25 Tem — `website/privacy.html`, `website/terms.html`,
       `website/delete-account.html` + ortak `legal.css`/`legal.js`; TR/EN dil
       anahtarı landing ile aynı localStorage'ı paylaşıyor, landing footer'ına
-      linkler eklendi. KALAN: sayfalardaki `mark.todo` alanları (veri
-      sorumlusunun kimliği/ülkesi, yetkili mahkeme) doldurulacak +
-      `firebase deploy --only hosting,firestore:rules`)_
+      linkler eklendi. **29 Tem — hosting DEPLOY EDİLDİ**: seelogd.com özel alan
+      adı dahil tüm sayfalar 200 dönüyor — Play formlarına girilecek adresler:
+      https://seelogd.com/privacy.html + https://seelogd.com/delete-account.html.
+      KALAN: sayfalardaki `mark.todo` alanları (veri sorumlusunun
+      kimliği/ülkesi, yetkili mahkeme) doldurulacak)_
       Aynı turda: `waitlist` kuralı `read`→`get` (koleksiyon listeleme kapatıldı;
       e-postalar herkese dökülebiliyordu).
 - [x] expo-updates (EAS Update) entegrasyonu — yayın sonrası acil yama kanalı
