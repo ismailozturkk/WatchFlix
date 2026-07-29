@@ -421,9 +421,9 @@ aylığa bölünmüş, mağaza kesintisi düşülmüş).
       token'ı ekrana basmadan uzunluk (org token 187 krk) + API'ye curl
       ile 200 kontrolü. 29 Tem preview build yeşil, source map yüklemesi
       çalışıyor.)_
-      **KALAN (manuel):** ③ **YENİ development build al** —
-      native modüller eklendiği için mevcut client'ta ölçüm çalışmaz,
-      ④ Firebase Console → Analytics'te DebugView ile olayları doğrula.)_
+      ③ TAMAM _(29 Tem — yeni development build alındı, ölçümün native
+      modülleri içinde.)_ **KALAN (manuel):** ④ Firebase Console →
+      Analytics'te DebugView ile olayları doğrula.)_
 - [ ] Google Play Console hesabı + ürün kaydı; IAP ürünlerinin tanımı
 
 **Hafta 5–6 (3–16 Ağu)**
