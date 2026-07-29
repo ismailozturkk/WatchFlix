@@ -17,6 +17,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { computeLevel, validateSessionResult } from "../utils/gameScoring";
+import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 import { cachedRead } from "../utils/cachedRead";
 
 // ── Cache ────────────────────────────────────────────────────────────────────
@@ -672,7 +673,7 @@ export async function saveGameScore(uid, gameData) {
     // ile ayni davranis korunur).
     const leaderboardRef = isPersonalForBoard ? null : leaderboardEntryRef(boardId, uid);
 
-    return await runTransaction(db, async (transaction) => {
+    const result = await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(ref);
       const existing = snap.exists() ? snap.data() : {};
       const recentSessionIds = Array.isArray(existing.recentSessionIds)
@@ -890,6 +891,25 @@ export async function saveGameScore(uid, gameData) {
 
       return { ...existing, ...data, duplicate: false, newRecord };
     });
+
+    // Oyun oturumu tamamlandı. Tekrar (duplicate) yazımları saymıyoruz;
+    // aynı sessionId ile ikinci çağrı oturum sayısını şişirirdi.
+    if (result && !result.duplicate) {
+      trackEvent(ANALYTICS_EVENTS.GAME_PLAYED, {
+        mode: gameData.modeId || null,
+        difficulty: gameData.difficultyId || null,
+        source: gameData.sourceId || null,
+        score: Number(gameData.score) || 0,
+        correct_count: Number(gameData.totalCorrect) || 0,
+        wrong_count: Number(gameData.totalWrong) || 0,
+        best_streak: Number(gameData.bestStreak) || 0,
+        joker_count: Number(gameData.jokerCount) || 0,
+        outcome: gameData.outcome || "completed",
+        new_record: !!result.newRecord,
+      });
+    }
+
+    return result;
   } catch (e) {
     if (__DEV__) console.warn("saveGameScore error:", e?.message);
     return null;

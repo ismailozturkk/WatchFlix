@@ -41,6 +41,7 @@ import {
   materializeMovieWatchEvents,
   normalizeWatchDate,
 } from "../utils/watchHistory";
+import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 
 export const PREDEFINED_MOVIE_LISTS = ["favorites", "watchList", "watchedMovies"];
 const CUSTOM_ITEMS = "customItems";
@@ -96,10 +97,12 @@ export async function markMovieWatch(uid, item, watchDate) {
     recordedAt: new Date().toISOString(),
   };
 
+  let watchNumber = 1;
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     const existing = snap.exists() ? snap.data() : {};
     const watchEvents = [...materializeMovieWatchEvents(existing), event];
+    watchNumber = watchEvents.length;
     tx.set(
       ref,
       {
@@ -110,6 +113,16 @@ export async function markMovieWatch(uid, item, watchDate) {
       { merge: true },
     );
   });
+
+  // Ürünün çekirdek eylemi: "içerik takip edildi". Retention ve aktivasyon
+  // (D1/D7) bu olayın üzerine kurulacak.
+  trackEvent(ANALYTICS_EVENTS.CONTENT_TRACKED, {
+    content_type: "movie",
+    content_id: String(item.id),
+    is_rewatch: watchNumber > 1,
+    watch_number: watchNumber,
+  });
+
   return event;
 }
 

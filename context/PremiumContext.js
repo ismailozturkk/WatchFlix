@@ -24,6 +24,7 @@ import {
   PREMIUM_PLAN,
   REVENUECAT_PRODUCT_IDS,
 } from "../utils/premium";
+import { USER_PROPERTIES, setAnalyticsUserProperty } from "../services/analytics";
 
 const PremiumContext = createContext(null);
 
@@ -143,13 +144,16 @@ export function PremiumProvider({ children }) {
   }, [customerInfo]);
 
   const showPaywall = useCallback(
-    async ({ onlyIfNeeded = false } = {}) => {
+    // `source` = paywall'ı açan kapı ("ai_quota", "themes", "lists_limit"...).
+    // Analytics'te hangi kapının dönüştüğünü ölçmek için çağıranlar geçirmeli.
+    async ({ onlyIfNeeded = false, source = "unknown" } = {}) => {
       setBusyAction("paywall");
       try {
         const result = await presentRevenueCatPaywall({
           offering: offerings?.current,
           entitlementId: config.entitlementId,
           onlyIfNeeded,
+          source,
         });
         if (result.customerInfo) setCustomerInfo(result.customerInfo);
         return result;
@@ -177,6 +181,14 @@ export function PremiumProvider({ children }) {
       setBusyAction(null);
     }
   }, [customerInfo]);
+
+  // Analytics segmentasyonu: her olay hangi katmandaki kullanıcıdan geldi?
+  // Bu özellik olmadan "premium kullanıcı daha çok mu oynuyor / daha az mı
+  // çıkıyor" sorularının hiçbiri cevaplanamaz.
+  const currentPlan = getPremiumPlan(customerInfo, config.entitlementId);
+  useEffect(() => {
+    setAnalyticsUserProperty(USER_PROPERTIES.PREMIUM_TIER, currentPlan);
+  }, [currentPlan]);
 
   const value = useMemo(() => {
     const plan = getPremiumPlan(customerInfo, config.entitlementId);

@@ -35,6 +35,7 @@ import {
 import { updateProfile } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { clampAvatarIndex, DEFAULT_AVATAR_INDEX } from "../utils/avatars";
+import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 
 export const SCHEMA_VERSION = 2;
 
@@ -137,6 +138,9 @@ export async function createUserProfile({
   email,
   displayName,
   avatarIndex = DEFAULT_AVATAR_INDEX,
+  // GA4 `sign_up` olayının `method` parametresi: "email" | "google".
+  // Kayıt hunisinde hangi yöntemin dönüştüğünü ayırt etmek için.
+  method = "unknown",
 }) {
   if (!uid)
     throw new UserProfileError(
@@ -151,7 +155,14 @@ export async function createUserProfile({
 
   const usernameLower = normalizeUsername(username);
 
+  // Bu çağrı hem YENİ profil açar hem de var olanın kimlik alanlarını tazeler
+  // (Google bağlayan eski kullanıcı). `sign_up` yalnız gerçekten yeni profil
+  // açıldığında gitmeli, yoksa kayıt sayısı her tazelemede şişer.
+  // Transaction yeniden denenebildiği için bayrak her denemede sıfırlanır.
+  let profileCreated = false;
+
   await runTransaction(db, async (tx) => {
+    profileCreated = false;
     const usernameRef = doc(db, "Usernames", usernameLower);
     const userRef = doc(db, "Users", uid);
 
@@ -233,7 +244,13 @@ export async function createUserProfile({
       createdAt: serverTimestamp(),
       _schemaVersion: SCHEMA_VERSION,
     });
+
+    profileCreated = true;
   });
+
+  if (profileCreated) {
+    trackEvent(ANALYTICS_EVENTS.SIGNUP, { method });
+  }
 }
 
 /**

@@ -37,6 +37,7 @@ import {
   materializeTvWatchState,
   normalizeWatchDate,
 } from "../utils/watchHistory";
+import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 
 // Doküman id şeması: `tv_${showId}` — TÜM liste öğesi koleksiyonlarıyla aynı
 // (`${type}_${id}`). favorites/watchList film+dizi karışık tuttuğu için type
@@ -340,6 +341,19 @@ export async function markEpisodes(
       { merge: true },
     );
   });
+
+  // markSeason da buraya delege ediyor; `scope` hangisi olduğunu ayırır.
+  // (markShow ayrı bir transaction kuruyor, kendi olayını kendisi gönderir.)
+  if (createdEvent) {
+    trackEvent(ANALYTICS_EVENTS.CONTENT_TRACKED, {
+      content_type: "tv",
+      content_id: String(showMeta.id),
+      scope: options.scope || "episode",
+      episode_count: episodes.length,
+      season_number: seasonMeta.seasonNumber,
+    });
+  }
+
   return createdEvent;
 }
 
@@ -438,6 +452,17 @@ export async function markShow(uid, showMeta, seasonsWithEpisodes, watchDate) {
       ...recomputeAggregates(result.seasons),
     }, { merge: true });
   });
+
+  if (createdEvent) {
+    trackEvent(ANALYTICS_EVENTS.CONTENT_TRACKED, {
+      content_type: "tv",
+      content_id: String(showMeta.id),
+      scope: "show",
+      season_count: targets.length,
+      episode_count: targets.reduce((sum, s) => sum + s.episodes.length, 0),
+    });
+  }
+
   return createdEvent;
 }
 

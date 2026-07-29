@@ -194,6 +194,7 @@ export default function RegisterScreen({ navigation }) {
         email,
         displayName,
         avatarIndex: 0,
+        method: "email",
       });
       profileCreated = true;
 

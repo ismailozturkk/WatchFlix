@@ -94,6 +94,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
         email: user.email,
         displayName: cleanName,
         avatarIndex: 0,
+        method: "google",
       });
       // Profil yazıldı → kapıyı HEMEN aç. Bunu updateProfile'dan sonraya
       // bırakmak, o ağ çağrısı hata aldığında kullanıcıyı tamamlanmış bir

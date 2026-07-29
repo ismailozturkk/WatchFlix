@@ -54,6 +54,7 @@ import { i18nText } from "../utils/i18nText";
 import { clampAvatarIndex, DEFAULT_AVATAR_INDEX } from "../utils/avatars";
 // Paylaşım tipleri tek yerden gelir (composer + feed filtreleri aynı listeyi kullanır).
 import { POST_TYPES } from "../utils/postComposer";
+import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 import {
   createSocialNotification,
   notifyOnComment,
@@ -145,6 +146,14 @@ export async function createPost(user, payload) {
     postsCount: increment(1),
     avatarIndex: authorAvatarIndex,
   }).catch(() => {});
+
+  trackEvent(ANALYTICS_EVENTS.POST_CREATED, {
+    post_type: payload.type,
+    media_count: (payload.mediaList || []).length,
+    has_rating: payload.userRating != null,
+    has_spoiler: !!payload.hasSpoiler,
+    visibility: base.visibility,
+  });
 
   return postRef.id;
 }

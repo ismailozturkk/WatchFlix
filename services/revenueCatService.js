@@ -5,6 +5,7 @@ import {
   PREMIUM_ENTITLEMENT_ID,
   REVENUECAT_PRODUCT_IDS,
 } from "../utils/premium";
+import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 
 const PRODUCTION_API_KEYS = {
   android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY,
@@ -85,10 +86,34 @@ export async function loadRevenueCatState() {
   return { customerInfo, offerings, standaloneProducts };
 }
 
-export const purchaseRevenueCatPackage = (aPackage) =>
-  aPackage?.isStandaloneProduct
-    ? Purchases.purchaseStoreProduct(aPackage.product)
-    : Purchases.purchasePackage(aPackage);
+// Satın alma olayı GA4'ün önerilen `purchase` şemasıyla gönderilir (currency +
+// value + item_id) — konsoldaki hazır gelir raporları bu alanları bekler.
+// Deneme (trial) başlangıcı AYRI olay: dönüşüm hunisinde "deneme başlattı" ile
+// "para ödedi" aynı şey değil; ikisini karıştırmak dönüşüm oranını şişirir.
+export async function purchaseRevenueCatPackage(aPackage) {
+  const result = aPackage?.isStandaloneProduct
+    ? await Purchases.purchaseStoreProduct(aPackage.product)
+    : await Purchases.purchasePackage(aPackage);
+
+  const product = aPackage?.product || {};
+  const params = {
+    item_id: product.identifier || result?.productIdentifier || null,
+    currency: product.currencyCode || null,
+    value: typeof product.price === "number" ? product.price : null,
+    package_type: aPackage?.packageType || null,
+  };
+
+  const isTrial = Boolean(
+    product.introPrice?.periodNumberOfUnits &&
+      Number(product.introPrice?.price) === 0,
+  );
+  trackEvent(
+    isTrial ? ANALYTICS_EVENTS.TRIAL_START : ANALYTICS_EVENTS.PURCHASE,
+    params,
+  );
+
+  return result;
+}
 
 export const restoreRevenueCatPurchases = () => Purchases.restorePurchases();
 
@@ -96,7 +121,16 @@ export async function presentRevenueCatPaywall({
   offering,
   entitlementId = PREMIUM_ENTITLEMENT_ID,
   onlyIfNeeded = false,
+  source = "unknown",
 } = {}) {
+  // `source`: paywall'ı hangi kapı açtı (ai_quota, themes, lists_limit...).
+  // Hangi kapının para kazandırdığını bilmeden fiyat/paket kararı verilemez.
+  trackEvent(ANALYTICS_EVENTS.PAYWALL_VIEW, {
+    source,
+    offering: offering?.identifier || null,
+    only_if_needed: onlyIfNeeded,
+  });
+
   const result = onlyIfNeeded
     ? await RevenueCatUI.presentPaywallIfNeeded({
         requiredEntitlementIdentifier: entitlementId,

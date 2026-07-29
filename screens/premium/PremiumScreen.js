@@ -555,7 +555,10 @@ export default function PremiumScreen() {
   const openPaywall = async () => {
     if (busy) return;
     try {
-      const { result } = await showPaywall();
+      // `source` = paywall'ı açan kapı. Bugün tek giriş burası; ileride
+      // AI kotası / tema kilidi gibi kapılar eklenince kendi adlarını geçsin
+      // ki hangi kapının dönüştüğü ölçülebilsin.
+      const { result } = await showPaywall({ source: "premium_screen" });
       if (result === "PURCHASED" || result === "RESTORED") {
         Toast.show({
           type: "success",

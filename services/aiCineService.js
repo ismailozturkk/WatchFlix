@@ -17,6 +17,7 @@ import {
   callGeminiProxy,
   sanitizeHistory,
 } from "./geminiService";
+import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 
 export { GeminiError, isGeminiError } from "./geminiService";
 
@@ -373,5 +374,17 @@ export async function askCineStructured({
 
   // Maliyet analizi: token kullanımı + tahmini ücreti console'a yaz.
   logUsage(data);
+
+  // AI mesajı = uygulamanın kullanıcı başına DEĞİŞKEN maliyeti olan tek
+  // özelliği. Token sayısı da gidiyor: konsolda "mesaj başı ortalama token"
+  // olmadan kota (free 5 / premium 100) doğru fiyatlanamaz.
+  trackEvent(ANALYTICS_EVENTS.AI_MESSAGE, {
+    mode: "cine",
+    language,
+    history_length: Array.isArray(history) ? history.length : 0,
+    prompt_tokens: data?.usageMetadata?.promptTokenCount ?? null,
+    output_tokens: data?.usageMetadata?.candidatesTokenCount ?? null,
+  });
+
   return parseCineResponse(data);
 }
