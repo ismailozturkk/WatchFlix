@@ -18,7 +18,6 @@ import {
   Pressable,
   ActivityIndicator,
   Modal,
-  Share,
 } from "react-native";
 import { Image } from "expo-image";
 import AppIcon from "../../components/AppIcon";
@@ -304,7 +303,6 @@ const PostCard = memo(function PostCard({
   onEdit,
   onDelete,
   onPressAuthor,
-  onShare,
   onReport,
   onVote,
   getTmdbUrl,
@@ -972,7 +970,7 @@ const PostCard = memo(function PostCard({
           onPress={() => onLike(post.id)}
           theme={theme}
         />
-        {/* Yorum: post'ta yorum varsa dolu + mavi (LikeButton'la aynı dil) */}
+        {/* Yorum: post'ta yorum varsa dolu ikon (renk nötr kalır) */}
         <TouchableOpacity
           style={postStyles.actionBtn}
           activeOpacity={0.7}
@@ -982,22 +980,10 @@ const PostCard = memo(function PostCard({
             family="Ionicons"
             name={post.commentsCount > 0 ? "chatbubble" : "chatbubble-outline"}
             size={18}
-            color={
-              post.commentsCount > 0
-                ? theme.colors?.blue || "#4a7cf6"
-                : theme.text.secondary
-            }
+            color={theme.text.secondary}
           />
           <Text
-            style={[
-              postStyles.actionText,
-              {
-                color:
-                  post.commentsCount > 0
-                    ? theme.colors?.blue || "#4a7cf6"
-                    : theme.text.secondary,
-              },
-            ]}
+            style={[postStyles.actionText, { color: theme.text.secondary }]}
           >
             {post.commentsCount || 0}
           </Text>
@@ -1013,18 +999,6 @@ const PostCard = memo(function PostCard({
             name={post.bookmarkedByMe ? "bookmark" : "bookmark-outline"}
             size={18}
             color={post.bookmarkedByMe ? theme.accent : theme.text.secondary}
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={postStyles.actionBtn}
-          activeOpacity={0.7}
-          onPress={() => onShare?.(post)}
-        >
-          <AppIcon
-            family="Ionicons"
-            name="share-social-outline"
-            size={18}
-            color={theme.text.secondary}
           />
         </TouchableOpacity>
       </View>
@@ -1224,21 +1198,6 @@ export default function ShareContentScreen({ route }) {
     setCommentPost(null);
   }, []);
 
-  // Gönderiyi cihazın native paylaşım sayfasıyla paylaş (başlık + içerik).
-  const handleSharePost = useCallback(async (post) => {
-    if (!post) return;
-    try {
-      const lines = [post.title, post.content].filter(Boolean);
-      await Share.share({
-        message:
-          lines.join("\n\n") ||
-          i18nText("autoI18n.bir_paylasima_goz_at", "Bir paylaşıma göz at"),
-      });
-    } catch (e) {
-      if (__DEV__) console.warn("[Share] post:", e?.message);
-    }
-  }, []);
-
   // Başkasının gönderisini şikayet et (onay → PostReports'a yaz).
   const handleReportPost = useCallback(
     (post) => {
@@ -1424,7 +1383,6 @@ export default function ShareContentScreen({ route }) {
           onEdit={handleEditRequest}
           onDelete={deletePost}
           onPressAuthor={handleOpenProfile}
-          onShare={handleSharePost}
           onReport={handleReportPost}
           onVote={votePoll}
           getTmdbUrl={getTmdbUrl}
@@ -1432,7 +1390,7 @@ export default function ShareContentScreen({ route }) {
         />
       </StaggerItem>
     ),
-    [theme, ts, user?.uid, toggleLike, toggleBookmark, handleOpenComments, handleOpenProfile, handleEditRequest, deletePost, handleSharePost, handleReportPost, votePoll, getTmdbUrl, postListPosterLayout],
+    [theme, ts, user?.uid, toggleLike, toggleBookmark, handleOpenComments, handleOpenProfile, handleEditRequest, deletePost, handleReportPost, votePoll, getTmdbUrl, postListPosterLayout],
   );
 
   const listFooter = useMemo(() => {
