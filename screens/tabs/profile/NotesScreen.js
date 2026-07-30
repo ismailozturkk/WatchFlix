@@ -8,6 +8,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Clipboard,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -28,6 +29,7 @@ import { useLanguage } from "../../../context/LanguageContext";
 import { useProfileNotes } from "../../../context/ProfileNotesContext";
 import ScreenDecor from "../../../components/ScreenDecor";
 import DatePickerModal from "@components/modals/DatePickerModal";
+import { toast } from "@components/AppToast";
 import { i18nText } from "../../../utils/i18nText";
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -107,7 +109,7 @@ const EmptyState = ({ tab, theme }) => (
 );
 
 // ─── Not Kartı ────────────────────────────────────────────────────────────────
-const NoteCard = ({ note, theme, language, onPress, onDelete }) => {
+const NoteCard = ({ note, theme, language, onPress, onEdit, onCopy, onDelete }) => {
   const todos = note.todos || [];
   const activeTodos = todos.filter((t) => !t.done);
   const doneTodos = todos.filter((t) => t.done);
@@ -134,9 +136,21 @@ const NoteCard = ({ note, theme, language, onPress, onDelete }) => {
                 ? i18nText("autoI18n.basliksiz_liste", "Başlıksız Liste")
                 : i18nText("autoI18n.basliksiz_not", "Başlıksız Not"))}
           </Text>
-          <TouchableOpacity onPress={onDelete} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="trash-outline" size={16} color={theme.text.muted} />
-          </TouchableOpacity>
+          {/* Kart aksiyonları: todo'da düzenle + kopyala + sil, notta kopyala + sil
+              (karta dokunmak da düzenleme modalını açar) */}
+          <View style={styles.cardActions}>
+            {isTodo && (
+              <TouchableOpacity onPress={onEdit} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}>
+                <Ionicons name="pencil-outline" size={16} color={theme.text.muted} />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={onCopy} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}>
+              <Ionicons name="copy-outline" size={16} color={theme.text.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onDelete} hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}>
+              <Ionicons name="trash-outline" size={16} color={theme.text.muted} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {note.scheduledDate ? (
@@ -552,6 +566,24 @@ export default function NotesScreen({ navigation }) {
     setDeleteTargetId(null);
   };
 
+  /* Panoya kopyala: not = başlık + içerik, todo = başlık + ☐/☑ maddeler */
+  const copyNote = useCallback((note) => {
+    const text =
+      note.type === "todo"
+        ? [
+            note.title,
+            ...(note.todos || []).map(
+              (item) => `${item.done ? "☑" : "☐"} ${item.text}`,
+            ),
+          ]
+            .filter(Boolean)
+            .join("\n")
+        : [note.title, note.content].filter(Boolean).join("\n\n");
+    if (!text.trim()) return;
+    Clipboard.setString(text);
+    toast.success(i18nText("autoI18n.panoya_kopyalandi", "Panoya kopyalandı"));
+  }, []);
+
   const openNew = () => {
     setEditingNote(null);
     setModalVisible(true);
@@ -642,6 +674,8 @@ export default function NotesScreen({ navigation }) {
               theme={theme}
               language={language}
               onPress={() => openEdit(item)}
+              onEdit={() => openEdit(item)}
+              onCopy={() => copyNote(item)}
               onDelete={() => requestDelete(item.id)}
             />
           )}
@@ -742,6 +776,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   cardTitle: { fontSize: 15, fontWeight: "700", flex: 1, marginRight: 8 },
+  cardActions: { flexDirection: "row", alignItems: "center", gap: 12 },
   cardContent: { fontSize: 13, lineHeight: 18, marginBottom: 6 },
   cardDate: { fontSize: 10, marginTop: 8, paddingBottom: 10 },
   todoPreviewRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 },
