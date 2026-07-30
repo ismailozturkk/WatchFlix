@@ -346,8 +346,18 @@ aylığa bölünmüş, mağaza kesintisi düşülmüş).
 
 **Hafta 2 (14–20 Tem)**
 
-- [ ] Firebase App Check (Play Integrity; iOS App Attest Faz 3'te)
-      _(kurulunca functions/index.js'te `enforceAppCheck: true` yapılmalı)_
+- [x] Firebase App Check — KOD tarafı _(29 Tem: `@react-native-firebase/app-check`
+      25.1.0 + `services/appCheck.js`. Native katman Play Integrity token'ı
+      üretir (dev'de "debug" provider), web SDK'ya CustomProvider köprüsüyle
+      bağlanır — Firestore/Functions istekleri token taşır. Native modül
+      eklendiği için `version` 1.4.1'e çekildi. **KALAN (sırasıyla):**
+      ① Firebase Console → App Check → Android uygulamasını Play Integrity
+      ile kaydet; dev için logcat'teki debug token'ı Console'a ekle,
+      ② yeni build dağıtıldıktan sonra Console metriklerinde "verified"
+      isteklerin oranını izle, ③ TÜM aktif build'ler App Check'li olunca:
+      functions/index.js `enforceAppCheck: true` + deploy ve Console'dan
+      Firestore/RTDB enforcement — ERKEN açılırsa eski build'ler kırılır.
+      iOS App Attest Faz 3'te.)_
 - [x] Firestore rules düzeltmeleri: counter increment kısıtı (±1), chat tam eşleşme
       (`split('_')`), Lists gizlilik kuralı (`privacy.lists`) _(8 Tem — kod;
       **29 Tem — rules DEPLOY EDİLDİ**, featureRequests kuralı kaldırılmış hâliyle)_

@@ -16,6 +16,7 @@
     "@react-native-community/netinfo": "11.4.1",
     "@react-native-firebase/analytics": "^25.1.0",
     "@react-native-firebase/app": "^25.1.0",
+    "@react-native-firebase/app-check": "^25.1.0",
     "@react-native-google-signin/google-signin": "^16.1.2",
     "@react-native-masked-view/masked-view": "^0.3.2",
     "@react-native-picker/picker": "2.11.1",

@@ -23,6 +23,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
+// App Check: Firestore/Functions istekleri Play Integrity token'ı taşısın.
+// Auth/Firestore handle'ları oluşmadan ÖNCE kurulmalı; native modül yoksa
+// sessiz no-op (bkz. services/appCheck.js).
+// eslint-disable-next-line global-require
+require("./services/appCheck").initAppCheck(app);
+
 // Firebase Auth'un zaten başlatılıp başlatılmadığını kontrol edin
 const auth = initializeAuth(app, {
   persistence: getReactNativePersistence(AsyncStorage),
