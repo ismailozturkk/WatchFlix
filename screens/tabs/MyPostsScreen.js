@@ -21,9 +21,10 @@ import { MyPostsSkeleton } from "@components/Skeleton";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { usePosts } from "../../context/PostsContext";
+import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { fetchUserPosts } from "../../services/postsService";
 import { i18nText } from "../../utils/i18nText";
-import { postTypeBadge } from "../../utils/postComposer";
+import { postTypeBadge, tallyVotes } from "../../utils/postComposer";
 
 
 // Basit göreli zaman (TR)
@@ -74,10 +75,51 @@ function PosterStack({ mediaList, theme }) {
   );
 }
 
+// Görseli olmayan tipler (text/poll) için poster ölçülerinde tip ikonlu kutu
+function TypeIconBox({ icon, accent }) {
+  return (
+    <View
+      style={[
+        styles.poster,
+        { backgroundColor: accent + "18", alignItems: "center", justifyContent: "center" },
+      ]}
+    >
+      <AppIcon family="Ionicons" name={icon} size={24} color={accent} />
+    </View>
+  );
+}
+
 function MyPostCard({ post, theme, onMenu }) {
   // Rozet + vurgu rengi feed'deki PostCard ile ortak (review/list/text/poll).
   const badge = postTypeBadge(post.type, theme.colors);
   const accent = badge.color;
+  const { getTmdbUrl } = useImageQualitySettings();
+
+  // Sol görsel alan: review/list poster yığını; text ikon kutusu;
+  // poll'de medya anketiyse seçenek posterleri, yoksa ikon kutusu.
+  let visual;
+  if (post.type === "text") {
+    visual = <TypeIconBox icon="chatbubble-ellipses" accent={accent} />;
+  } else if (post.type === "poll") {
+    const pollPosters =
+      post.poll?.type === "media"
+        ? (post.poll.options || [])
+            .filter((o) => o?.media?.poster_path)
+            .slice(0, 3)
+            .map((o, i) => ({
+              id: o.id ?? i,
+              poster: getTmdbUrl(o.media.poster_path, "poster", 200),
+            }))
+        : [];
+    visual =
+      pollPosters.length > 0 ? (
+        <PosterStack mediaList={pollPosters} theme={theme} />
+      ) : (
+        <TypeIconBox icon="stats-chart" accent={accent} />
+      );
+  } else {
+    visual = <PosterStack mediaList={post.mediaList} theme={theme} />;
+  }
 
   return (
     <View
@@ -90,7 +132,7 @@ function MyPostCard({ post, theme, onMenu }) {
         },
       ]}
     >
-      <PosterStack mediaList={post.mediaList} theme={theme} />
+      {visual}
 
       <View style={{ flex: 1 }}>
         <View style={styles.metaRow}>
@@ -138,10 +180,57 @@ function MyPostCard({ post, theme, onMenu }) {
           {post.title}
         </Text>
         {post.content ? (
-          <Text style={[styles.content, { color: theme.text.secondary }]} numberOfLines={2}>
+          // Sohbet'te görsel alan boş kalmadığından metne bir satır daha yer var
+          <Text
+            style={[styles.content, { color: theme.text.secondary }]}
+            numberOfLines={post.type === "text" ? 3 : 2}
+          >
             {post.content}
           </Text>
         ) : null}
+
+        {/* Anket gövdesi: en çok oy alan 2 seçenek mini bar + özet (poll verisi yoksa çizilmez) */}
+        {post.type === "poll" && post.poll?.options?.length > 0 && (() => {
+          const { counts, total } = tallyVotes(post.poll.votes);
+          // Composer dışı/eski veride null seçenek veya id'siz seçenek olabilir
+          const top2 = post.poll.options
+            .map((o, i) => ({ ...(o || {}), _idx: i, _count: counts[o?.id] || 0 }))
+            .sort((a, b) => b._count - a._count)
+            .slice(0, 2);
+          return (
+            <View style={styles.pollBox}>
+              {top2.map((o) => {
+                const p = total > 0 ? Math.round((o._count / total) * 100) : 0;
+                return (
+                  <View key={o.id ?? o._idx} style={styles.pollRow}>
+                    <Text
+                      style={[styles.pollLabel, { color: theme.text.secondary }]}
+                      numberOfLines={1}
+                    >
+                      {o.label ||
+                        i18nText("autoI18n.secenek_n", "Seçenek {{n}}", { n: o._idx + 1 })}
+                    </Text>
+                    <View style={[styles.pollBarTrack, { backgroundColor: theme.border }]}>
+                      <View
+                        style={[
+                          styles.pollBarFill,
+                          { width: `${p}%`, backgroundColor: accent },
+                        ]}
+                      />
+                    </View>
+                    <Text style={[styles.pollPct, { color: theme.text.muted }]}>%{p}</Text>
+                  </View>
+                );
+              })}
+              <Text style={[styles.pollSummary, { color: theme.text.muted }]}>
+                {i18nText("autoI18n.anket_ozeti", "{{options}} seçenek · {{votes}} oy", {
+                  options: post.poll.options.length,
+                  votes: total,
+                })}
+              </Text>
+            </View>
+          );
+        })()}
 
         {post.type === "review" && post.userRating > 0 && (
           <View style={styles.ratingRow}>
@@ -180,6 +269,7 @@ export default function MyPostsScreen({ navigation }) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { deletePost: ctxDeletePost, editPost: ctxEditPost } = usePosts();
+  const { getTmdbUrl } = useImageQualitySettings(); // menü önizlemesi (medya anketi posterleri)
   const uid = user?.uid;
 
   const [posts, setPosts] = useState([]);
@@ -217,7 +307,16 @@ export default function MyPostsScreen({ navigation }) {
         setPosts((prev) =>
           prev.map((x) =>
             x.id === editingPost.id
-              ? { ...x, ...payload, _createdAtMs: x._createdAtMs }
+              ? {
+                  ...x,
+                  ...payload,
+                  // Composer poll'u votes:{} ile gönderir; mevcut oylar yerelde
+                  // sıfırlanmasın (sunucuda zaten updatePost poll'a yazmıyor).
+                  poll: payload.poll
+                    ? { ...payload.poll, votes: x.poll?.votes || {} }
+                    : x.poll,
+                  _createdAtMs: x._createdAtMs,
+                }
               : x,
           ),
         );
@@ -367,16 +466,33 @@ export default function MyPostsScreen({ navigation }) {
                   ]}
                 >
                   {(() => {
-                    const posters = (menuPost.mediaList || [])
+                    // Kartla aynı görsel dil: medya anketinde seçenek
+                    // posterleri, görselsiz text/poll'de rozet renkli ikon.
+                    const pBadge = postTypeBadge(menuPost.type, theme.colors);
+                    let posters = (menuPost.mediaList || [])
                       .filter((m) => m?.poster)
                       .slice(0, 3);
+                    if (menuPost.type === "poll" && menuPost.poll?.type === "media") {
+                      const optPosters = (menuPost.poll.options || [])
+                        .filter((o) => o?.media?.poster_path)
+                        .slice(0, 3)
+                        .map((o, i) => ({
+                          id: o.id ?? i,
+                          poster: getTmdbUrl(o.media.poster_path, "poster", 200),
+                        }));
+                      if (optPosters.length > 0) posters = optPosters;
+                    }
                     if (posters.length === 0) {
+                      const tinted =
+                        menuPost.type === "text" || menuPost.type === "poll";
                       return (
                         <View
                           style={[
                             menu.previewPoster,
                             {
-                              backgroundColor: theme.border,
+                              backgroundColor: tinted
+                                ? pBadge.color + "18"
+                                : theme.border,
                               alignItems: "center",
                               justifyContent: "center",
                             },
@@ -384,9 +500,15 @@ export default function MyPostsScreen({ navigation }) {
                         >
                           <AppIcon
                             family="Ionicons"
-                            name="film-outline"
+                            name={
+                              menuPost.type === "text"
+                                ? "chatbubble-ellipses"
+                                : menuPost.type === "poll"
+                                  ? "stats-chart"
+                                  : "film-outline"
+                            }
                             size={20}
-                            color={theme.text.muted}
+                            color={tinted ? pBadge.color : theme.text.muted}
                           />
                         </View>
                       );
@@ -420,13 +542,9 @@ export default function MyPostsScreen({ navigation }) {
                         menu.previewBadge,
                         {
                           backgroundColor:
-                            (menuPost.type === "list"
-                              ? theme.colors?.green || "#3ddc84"
-                              : theme.colors?.blue || "#4a7cf6") + "22",
+                            postTypeBadge(menuPost.type, theme.colors).color + "22",
                           borderColor:
-                            (menuPost.type === "list"
-                              ? theme.colors?.green || "#3ddc84"
-                              : theme.colors?.blue || "#4a7cf6") + "55",
+                            postTypeBadge(menuPost.type, theme.colors).color + "55",
                         },
                       ]}
                     >
@@ -608,6 +726,13 @@ const styles = StyleSheet.create({
   content: { fontSize: 13, lineHeight: 18, marginBottom: 6 },
   ratingRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
   ratingText: { fontSize: 12, fontWeight: "600" },
+  pollBox: { gap: 5, marginBottom: 6 },
+  pollRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  pollLabel: { fontSize: 10, fontWeight: "600", maxWidth: "38%" },
+  pollBarTrack: { flex: 1, height: 4, borderRadius: 2, overflow: "hidden" },
+  pollBarFill: { height: "100%", borderRadius: 2 },
+  pollPct: { fontSize: 10, fontWeight: "700", minWidth: 28, textAlign: "right" },
+  pollSummary: { fontSize: 10, marginTop: 1 },
   statsRow: { flexDirection: "row", gap: 16, marginTop: 2 },
   stat: { flexDirection: "row", alignItems: "center", gap: 4 },
   statText: { fontSize: 12, fontWeight: "600" },

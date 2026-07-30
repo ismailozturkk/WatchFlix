@@ -382,13 +382,23 @@ export default function MyActivityScreen({ navigation, route }) {
           />
         );
         break;
-      case "posts":
+      case "posts": {
+        // Medya anketinde yığın, mediaList yerine seçenek posterlerinden kurulur.
+        const pollPosters =
+          item.type === "poll" && item.poll?.type === "media"
+            ? (item.poll.options || [])
+                .map((o) => o?.media?.poster_path)
+                .filter(Boolean)
+                .slice(0, 3)
+                .map((p) => getTmdbUrl(p, "poster", 200))
+            : [];
+        const mediaPosters = (item.mediaList || []).map((m) => m?.poster).filter(Boolean);
         node = (
           <PostMini
             theme={theme}
             type={item.type}
             poll={item.poll}
-            posters={(item.mediaList || []).map((m) => m?.poster).filter(Boolean)}
+            posters={pollPosters.length > 0 ? pollPosters : mediaPosters}
             title={item.title}
             content={item.content}
             userRating={item.userRating}
@@ -400,6 +410,7 @@ export default function MyActivityScreen({ navigation, route }) {
           />
         );
         break;
+      }
       case "drafts": {
         const posters = (item.selectedMedia || [])
           .map((m) => m?.poster || (m?.poster_path ? getTmdbUrl(m.poster_path, "poster", 300) : null))
@@ -724,9 +735,22 @@ function Row({ theme, poster, kind, title, subtitle, date, right, onPress, badge
 }
 
 // ── Üst üste binen poster yığını (MyPostsScreen görünümü) ──
-function PosterStack({ posters = [], theme }) {
+function PosterStack({ posters = [], type, theme }) {
   const list = posters.slice(0, 3);
   if (list.length === 0) {
+    // Görselsiz tipler (sohbet/anket) boş placeholder yerine rozet renkli tip ikonu alır.
+    if (type === "text" || type === "poll") {
+      const badge = postTypeBadge(type, theme.colors);
+      return (
+        <View style={[st.pPoster, st.pPosterEmpty, { backgroundColor: badge.color + "18" }]}>
+          <Ionicons
+            name={type === "poll" ? "stats-chart" : "chatbubble-ellipses"}
+            size={22}
+            color={badge.color}
+          />
+        </View>
+      );
+    }
     return (
       <View style={[st.pPoster, st.pPosterEmpty, { backgroundColor: theme.border }]}>
         <Ionicons name="film-outline" size={22} color={theme.text.muted} />
@@ -760,7 +784,7 @@ function PostMini({ theme, type, poll, posters = [], title, content, userRating,
       {...(onPress ? { onPress, activeOpacity: 0.85 } : {})}
       style={[st.pCard, { backgroundColor: theme.secondary, borderColor: theme.border, borderLeftColor: accent }]}
     >
-      <PosterStack posters={posters} theme={theme} />
+      <PosterStack posters={posters} type={type} theme={theme} />
       <View style={{ flex: 1 }}>
         <View style={st.pMeta}>
           <View style={[st.pBadge, { backgroundColor: accent + "22", borderColor: accent + "55" }]}>
@@ -784,8 +808,9 @@ function PostMini({ theme, type, poll, posters = [], title, content, userRating,
         <Text style={[st.pTitle, { color: theme.text.primary }]} numberOfLines={2}>
           {title}
         </Text>
+        {/* Sohbet'te sol görsel alan boş kalmadığından metne bir satır daha yer var */}
         {content ? (
-          <Text style={[st.pContent, { color: theme.text.secondary }]} numberOfLines={2}>
+          <Text style={[st.pContent, { color: theme.text.secondary }]} numberOfLines={type === "text" ? 3 : 2}>
             {content}
           </Text>
         ) : null}
@@ -797,17 +822,7 @@ function PostMini({ theme, type, poll, posters = [], title, content, userRating,
           </View>
         ) : null}
 
-        {type === "poll" && poll ? (
-          <View style={st.pRatingRow}>
-            <Ionicons name="stats-chart" size={12} color={accent} />
-            <Text style={[st.pRatingText, { color: theme.text.secondary }]}>
-              {i18nText("autoI18n.anket_ozeti", "{{options}} seçenek · {{votes}} oy", {
-                options: poll.options?.length || 0,
-                votes: tallyVotes(poll.votes).total,
-              })}
-            </Text>
-          </View>
-        ) : null}
+        {type === "poll" && poll ? <PollMiniBody poll={poll} accent={accent} theme={theme} /> : null}
 
         {action ? (
           <View style={st.pActionRow}>
@@ -845,6 +860,46 @@ function PostMini({ theme, type, poll, posters = [], title, content, userRating,
         ) : null}
       </View>
     </Wrapper>
+  );
+}
+
+// ── Anket gövdesi (PostMini içi): en çok oy alan 2 seçenek + özet satırı ──
+function PollMiniBody({ poll, accent, theme }) {
+  const { counts, total } = tallyVotes(poll.votes);
+  // 0 oy → yüzde 0 (bölme/NaN yok); etiketi boş medya seçeneği için sıra no fallback'i.
+  const top = (poll.options || [])
+    .map((o, i) => ({ opt: o, idx: i, count: counts[o?.id] || 0 }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 2);
+  return (
+    <View style={st.pPollBody}>
+      {top.map(({ opt, idx, count }) => {
+        const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+        const label =
+          (opt?.label || "").trim() ||
+          i18nText("autoI18n.secenek_n", "Seçenek {{n}}", { n: idx + 1 });
+        return (
+          <View key={opt?.id || idx} style={st.pPollBarRow}>
+            <Text style={[st.pPollBarLabel, { color: theme.text.secondary }]} numberOfLines={1}>
+              {label}
+            </Text>
+            <View style={[st.pPollBarTrack, { backgroundColor: accent + "1F" }]}>
+              <View style={[st.pPollBarFill, { backgroundColor: accent, width: `${pct}%` }]} />
+            </View>
+            <Text style={[st.pPollBarPct, { color: accent }]}>%{pct}</Text>
+          </View>
+        );
+      })}
+      <View style={st.pRatingRow}>
+        <Ionicons name="stats-chart" size={12} color={accent} />
+        <Text style={[st.pRatingText, { color: theme.text.secondary }]}>
+          {i18nText("autoI18n.anket_ozeti", "{{options}} seçenek · {{votes}} oy", {
+            options: poll.options?.length || 0,
+            votes: total,
+          })}
+        </Text>
+      </View>
+    </View>
   );
 }
 
@@ -1076,6 +1131,13 @@ const st = StyleSheet.create({
   pContent: { fontSize: 12.5, marginTop: 2, lineHeight: 17 },
   pRatingRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 },
   pRatingText: { fontSize: 12, fontWeight: "700" },
+  // ── PostMini anket gövdesi (top-2 mini bar) ──
+  pPollBody: { marginTop: 6, gap: 4 },
+  pPollBarRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  pPollBarLabel: { fontSize: 10, fontWeight: "600", maxWidth: 72 },
+  pPollBarTrack: { flex: 1, height: 4, borderRadius: 2, overflow: "hidden" },
+  pPollBarFill: { height: "100%", borderRadius: 2 },
+  pPollBarPct: { fontSize: 10, fontWeight: "800", minWidth: 30, textAlign: "right" },
   pStats: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
   pStatText: { fontSize: 12, fontWeight: "700" },
   pActionRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8 },
