@@ -1154,6 +1154,14 @@ export default function ListsScreen({ route, navigation }) {
                 const sortedSeasons = [...(item.seasons || [])].sort(
                   (a, b) => a.seasonNumber - b.seasonNumber,
                 );
+                // Gövde yüksekliği sezon sayısına göre esner: satır başına
+                // kompakt kart yüksekliği (poster 2:3 + iç boşluk), ekranın
+                // %55'i ile sınırlı — az sezonda kısa, çok sezonda uzun modal.
+                const seasonCardW = (width - 60) / 3;
+                const seasonCardH = (seasonCardW - 12) * 1.5 + 12;
+                const seasonRows = Math.max(1, Math.ceil(sortedSeasons.length / 3));
+                const seasonGridH =
+                  seasonRows * seasonCardH + (seasonRows - 1) * 10;
                 const posterSource = item.imagePath
                   ? {
                       uri: getTmdbUrl(item.imagePath, "poster", 200),
@@ -1338,7 +1346,7 @@ export default function ListsScreen({ route, navigation }) {
                       </View>
 
                       <ScrollView
-                        style={{ maxHeight: height * 0.36 }}
+                        style={{ maxHeight: Math.min(height * 0.55, seasonGridH + 4) }}
                         contentContainerStyle={styles.seasonGrid}
                         showsVerticalScrollIndicator={false}
                       >
@@ -1381,15 +1389,10 @@ export default function ListsScreen({ route, navigation }) {
                                   <LinearGradient
                                     colors={[
                                       "transparent",
-                                      "rgba(0,0,0,0.75)",
+                                      "rgba(0,0,0,0.82)",
                                     ]}
                                     style={styles.seasonPosterShade}
                                   />
-                                  <View style={styles.seasonNoBadge}>
-                                    <Text style={styles.seasonNoText}>
-                                      S{season.seasonNumber}
-                                    </Text>
-                                  </View>
                                   {sComplete && (
                                     <View
                                       style={[
@@ -1406,6 +1409,24 @@ export default function ListsScreen({ route, navigation }) {
                                       />
                                     </View>
                                   )}
+                                  {/* Sezon adı + bölüm sayısı poster üstünde
+                                      (alt gölge okunurluğu sağlar) */}
+                                  <View style={styles.seasonOverlay}>
+                                    <Text
+                                      numberOfLines={1}
+                                      style={styles.seasonName}
+                                    >
+                                      {i18nText("autoI18n.n_sezon", "{{n}}. Sezon", { n: season.seasonNumber })}
+                                    </Text>
+                                    <Text
+                                      style={[
+                                        styles.seasonEpText,
+                                        { color: sColor },
+                                      ]}
+                                    >
+                                      {sw}/{st}
+                                    </Text>
+                                  </View>
                                   <View style={styles.seasonMiniTrack}>
                                     <View
                                       style={{
@@ -1416,23 +1437,6 @@ export default function ListsScreen({ route, navigation }) {
                                     />
                                   </View>
                                 </View>
-                                <Text
-                                  numberOfLines={1}
-                                  style={[
-                                    styles.seasonName,
-                                    { color: theme.text.primary },
-                                  ]}
-                                >
-                                  {i18nText("autoI18n.n_sezon", "{{n}}. Sezon", { n: season.seasonNumber })}
-                                </Text>
-                                <Text
-                                  style={[
-                                    styles.seasonEpText,
-                                    { color: sColor },
-                                  ]}
-                                >
-                                  {sw}/{st}
-                                </Text>
                               </TouchableOpacity>
                             );
                           })
@@ -2516,7 +2520,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 6,
     alignItems: "center",
-    gap: 6,
   },
   seasonPosterWrap: {
     width: "100%",
@@ -2532,18 +2535,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: "45%",
+    // Üstüne bindirilen sezon adı/bölüm sayısı okunsun diye yüksek gölge
+    height: "55%",
   },
-  seasonNoBadge: {
-    position: "absolute",
-    top: 5,
-    left: 5,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    backgroundColor: "rgba(0,0,0,0.55)",
-  },
-  seasonNoText: { color: "#fff", fontSize: 9, fontWeight: "800" },
   seasonCheck: {
     position: "absolute",
     top: 5,
@@ -2564,8 +2558,19 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.25)",
     overflow: "hidden",
   },
-  seasonName: { fontSize: 11, fontWeight: "700", textAlign: "center" },
-  seasonEpText: { fontSize: 10, fontWeight: "800" },
+  // Poster üstü bilgi satırı: solda sezon adı, sağda izlenen/toplam bölüm
+  seasonOverlay: {
+    position: "absolute",
+    left: 6,
+    right: 6,
+    bottom: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 4,
+  },
+  seasonName: { flex: 1, color: "#fff", fontSize: 10, fontWeight: "700" },
+  seasonEpText: { fontSize: 9, fontWeight: "800" },
 
   // Count chips
   countRow: {
