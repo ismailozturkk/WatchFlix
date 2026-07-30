@@ -43,6 +43,7 @@ import { getAuth } from "firebase/auth";
 import {
   collection,
   doc,
+  getDoc,
   addDoc,
   onSnapshot,
   orderBy,
@@ -73,7 +74,7 @@ import { useProfileUi } from "@context/ProfileUiContext";
 import { createSocialNotification } from "@services/socialNotificationsService";
 import {
   subscribeToUserPresence,
-  isOnlineEffective,
+  isOnlineVisible,
 } from "@services/presenceService";
 import {
   enterChat,
@@ -881,12 +882,37 @@ export default function ChatScreen({ route, navigation }) {
           friendInChat: meta.inChat,
         }));
       });
-      unsubPresence = subscribeToUserPresence(friendUid, (presence) => {
+      // Arkadaşın privacy.onlineStatus tercihi sohbette de geçerli: "none"
+      // seçtiyse yeşil nokta VE son görülme gizlenir. 1-1 sohbet arkadaşlar
+      // arası olduğundan viewerIsFriend=true. Privacy yüklenene dek çevrimdışı
+      // varsayılır (anlık "çevrimiçi" sızıntısı olmasın); okuma başarısızsa
+      // varsayılan (görünür) davranışa düşülür.
+      let friendPrivacy = null;
+      let privacyReady = false;
+      let lastPresence = null;
+      const applyPresence = () => {
+        if (!privacyReady) return;
+        const hidden = friendPrivacy?.onlineStatus === "none";
         setChatData((prev) => ({
           ...prev,
-          friendIsOnline: isOnlineEffective(presence),
-          friendPresence: presence,
+          friendIsOnline: isOnlineVisible(lastPresence, friendPrivacy, {
+            viewerIsFriend: true,
+          }),
+          friendPresence: hidden ? null : lastPresence,
         }));
+      };
+      getDoc(doc(db, "Users", friendUid))
+        .then((snap) => {
+          friendPrivacy = snap.data()?.privacy || null;
+        })
+        .catch(() => {})
+        .finally(() => {
+          privacyReady = true;
+          applyPresence();
+        });
+      unsubPresence = subscribeToUserPresence(friendUid, (presence) => {
+        lastPresence = presence;
+        applyPresence();
       });
     }
 

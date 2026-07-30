@@ -23,19 +23,18 @@ const OPTIONS = {
   profile: [
     { value: "public",  label: i18nText("autoI18n.herkese_acik", "Herkese Açık"), icon: "earth", desc: i18nText("autoI18n.tum_kullanicilar_profilini_gorur", "Tüm kullanıcılar profilini görür") },
     { value: "friends", label: i18nText("autoI18n.arkadaslar", "Arkadaşlar"),   icon: "people", desc: i18nText("autoI18n.sadece_arkadaslarin_gorur", "Sadece arkadaşların görür") },
-    { value: "private", label: "Gizli",        icon: "lock-closed", desc: i18nText("autoI18n.sadece_sen_gorursun", "Sadece sen görürsün") },
+    { value: "private", label: i18nText("autoI18n.gizli", "Gizli"), icon: "lock-closed", desc: i18nText("autoI18n.sadece_sen_gorursun", "Sadece sen görürsün") },
   ],
   lists: [
     { value: "public",  label: i18nText("autoI18n.herkese_acik", "Herkese Açık"), icon: "earth", desc: i18nText("autoI18n.izleme_listelerini_herkes_gorur", "İzleme listelerini herkes görür") },
     { value: "friends", label: i18nText("autoI18n.arkadaslar", "Arkadaşlar"),   icon: "people", desc: i18nText("autoI18n.sadece_arkadaslarin_gorur", "Sadece arkadaşların görür") },
-    { value: "private", label: "Gizli",        icon: "lock-closed", desc: i18nText("autoI18n.sadece_sen_gorursun", "Sadece sen görürsün") },
+    { value: "private", label: i18nText("autoI18n.gizli", "Gizli"), icon: "lock-closed", desc: i18nText("autoI18n.sadece_sen_gorursun", "Sadece sen görürsün") },
   ],
-  posts: [
-    { value: "public",  label: i18nText("autoI18n.herkese_acik", "Herkese Açık"), icon: "earth", desc: i18nText("autoI18n.paylasimlarini_herkes_gorur", "Paylaşımlarını herkes görür") },
-    { value: "friends", label: i18nText("autoI18n.arkadaslar", "Arkadaşlar"),   icon: "people", desc: i18nText("autoI18n.sadece_arkadaslarin_gorur", "Sadece arkadaşların görür") },
-  ],
+  // NOT: "posts" burada bilerek yok — paylaşım görünürlüğü post atarken
+  // seçilen post-başına `visibility` alanıyla yönetiliyor (postsService),
+  // Users.privacy.posts hiçbir okuma yolunda kullanılmıyor.
   onlineStatus: [
-    { value: "everyone", label: "Herkes",     icon: "earth",  desc: i18nText("autoI18n.herkes_online_oldugunu_gorur", "Herkes online olduğunu görür") },
+    { value: "everyone", label: i18nText("autoI18n.herkes", "Herkes"), icon: "earth", desc: i18nText("autoI18n.herkes_online_oldugunu_gorur", "Herkes online olduğunu görür") },
     { value: "friends",  label: i18nText("autoI18n.arkadaslar", "Arkadaşlar"), icon: "people", desc: i18nText("autoI18n.sadece_arkadaslarin_gorur", "Sadece arkadaşların görür") },
     { value: "none",     label: i18nText("autoI18n.hic_kimse", "Hiç Kimse"),  icon: "eye-off", desc: i18nText("autoI18n.hic_kimse_online_oldugunu_gormez", "Hiç kimse online olduğunu görmez") },
   ],
@@ -44,7 +43,6 @@ const OPTIONS = {
 const SECTIONS = [
   { key: "profile",      title: i18nText("autoI18n.profil_gorunurlugu", "Profil Görünürlüğü"),     icon: "person-circle" },
   { key: "lists",        title: i18nText("autoI18n.liste_gorunurlugu", "Liste Görünürlüğü"),      icon: "list" },
-  { key: "posts",        title: i18nText("autoI18n.paylasim_gorunurlugu", "Paylaşım Görünürlüğü"),   icon: "share-social" },
   { key: "onlineStatus", title: i18nText("autoI18n.cevrimici_durumu", "Çevrimiçi Durumu"),        icon: "ellipse" },
 ];
 
