@@ -89,6 +89,30 @@ export function buildPollObject({ pollType, question, options = [] }) {
   };
 }
 
+// Post tipi → rozet dili (feed'deki PostCard ile ortak: list=yeşil,
+// poll=mor, text/review=mavi). Modül SAF kaldığı için i18n burada
+// uygulanmaz; çağıran taraf i18nText(labelKey, fallback) ile çevirir.
+const POST_TYPE_BADGES = {
+  review: { labelKey: "autoI18n.inceleme_upper", fallback: "İNCELEME", colorKey: "blue",   colorFallback: "#4a7cf6" },
+  list:   { labelKey: "autoI18n.liste_upper",    fallback: "LİSTE",    colorKey: "green",  colorFallback: "#3ddc84" },
+  text:   { labelKey: "autoI18n.sohbet_upper",   fallback: "SOHBET",   colorKey: "blue",   colorFallback: "#4a7cf6" },
+  poll:   { labelKey: "autoI18n.anket_upper",    fallback: "ANKET",    colorKey: "purple", colorFallback: "#a855f7" },
+};
+
+/**
+ * @param {string} type        POST_TYPES üyesi (bilinmeyen tip → review)
+ * @param {Object} themeColors theme.colors (yoksa sabit fallback renkleri)
+ * @returns {{ labelKey: string, fallback: string, color: string }}
+ */
+export function postTypeBadge(type, themeColors) {
+  const meta = POST_TYPE_BADGES[type] || POST_TYPE_BADGES.review;
+  return {
+    labelKey: meta.labelKey,
+    fallback: meta.fallback,
+    color: themeColors?.[meta.colorKey] || meta.colorFallback,
+  };
+}
+
 /**
  * Oy haritasından ({ [uid]: optionId }) seçenek başına sayı + toplam.
  * PollMessage'daki sayımla birebir (feed + chat tutarlı).

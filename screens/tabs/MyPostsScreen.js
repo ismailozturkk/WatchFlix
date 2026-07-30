@@ -23,6 +23,7 @@ import { useAuth } from "../../context/AuthContext";
 import { usePosts } from "../../context/PostsContext";
 import { fetchUserPosts } from "../../services/postsService";
 import { i18nText } from "../../utils/i18nText";
+import { postTypeBadge } from "../../utils/postComposer";
 
 
 // Basit göreli zaman (TR)
@@ -74,10 +75,9 @@ function PosterStack({ mediaList, theme }) {
 }
 
 function MyPostCard({ post, theme, onMenu }) {
-  const accent =
-    post.type === "list"
-      ? theme.colors?.green || "#3ddc84"
-      : theme.colors?.blue || "#4a7cf6";
+  // Rozet + vurgu rengi feed'deki PostCard ile ortak (review/list/text/poll).
+  const badge = postTypeBadge(post.type, theme.colors);
+  const accent = badge.color;
 
   return (
     <View
@@ -101,7 +101,7 @@ function MyPostCard({ post, theme, onMenu }) {
             ]}
           >
             <Text style={[styles.badgeText, { color: accent }]}>
-              {post.type === "list" ? i18nText("autoI18n.liste_upper", "LİSTE") : i18nText("autoI18n.inceleme_upper", "İNCELEME")}
+              {i18nText(badge.labelKey, badge.fallback)}
             </Text>
           </View>
           {post.hasSpoiler && (
@@ -433,15 +433,13 @@ export default function MyPostsScreen({ navigation }) {
                       <Text
                         style={[
                           menu.previewBadgeText,
-                          {
-                            color:
-                              menuPost.type === "list"
-                                ? theme.colors?.green || "#3ddc84"
-                                : theme.colors?.blue || "#4a7cf6",
-                          },
+                          { color: postTypeBadge(menuPost.type, theme.colors).color },
                         ]}
                       >
-                        {menuPost.type === "list" ? i18nText("autoI18n.liste_upper", "LİSTE") : i18nText("autoI18n.inceleme_upper", "İNCELEME")}
+                        {i18nText(
+                          postTypeBadge(menuPost.type, theme.colors).labelKey,
+                          postTypeBadge(menuPost.type, theme.colors).fallback,
+                        )}
                       </Text>
                     </View>
                     <Text

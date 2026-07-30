@@ -35,7 +35,7 @@ import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import { appAlert } from "@components/AppAlert";
 import { i18nText } from "@utils/i18nText";
-import { validatePost, buildPollObject, reorderArray } from "@utils/postComposer";
+import { validatePost, buildPollObject, reorderArray, postTypeBadge } from "@utils/postComposer";
 
 // Karakter sınırları — büyük Firestore dökümanlarını ve aşırı uzun
 // içerikleri önler. Sayaçlar bu sabitlere göre gösterilir.
@@ -686,13 +686,14 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                             <Text style={[s.draftName, { color: theme.text.primary }]}>{user?.displayName || i18nText("autoI18n.siz", "Siz")}</Text>
                             <View style={[s.badge, {
-                              backgroundColor: draft.postType === "list"
-                                ? `${accentGreen}18` : `${accentBlue}18`,
-                              borderColor: draft.postType === "list"
-                                ? `${accentGreen}45` : `${accentBlue}45`,
+                              backgroundColor: `${postTypeBadge(draft.postType, theme.colors).color}18`,
+                              borderColor: `${postTypeBadge(draft.postType, theme.colors).color}45`,
                             }]}>
-                              <Text style={[s.badgeText, { color: draft.postType === "list" ? accentGreen : accentBlue }]}>
-                                {draft.postType === "review" ? i18nText("autoI18n.inceleme_upper", "İNCELEME") : i18nText("autoI18n.liste_upper", "LİSTE")}
+                              <Text style={[s.badgeText, { color: postTypeBadge(draft.postType, theme.colors).color }]}>
+                                {i18nText(
+                                  postTypeBadge(draft.postType, theme.colors).labelKey,
+                                  postTypeBadge(draft.postType, theme.colors).fallback,
+                                )}
                               </Text>
                             </View>
                             {draft.hasSpoiler && (

@@ -29,6 +29,7 @@ import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { i18nText } from "@utils/i18nText";
+import { postTypeBadge, tallyVotes } from "@utils/postComposer";
 import RatingStars from "@components/RatingStars";
 import StaggerItem from "@components/StaggerItem";
 import { ActivityListSkeleton } from "@components/Skeleton";
@@ -386,6 +387,7 @@ export default function MyActivityScreen({ navigation, route }) {
           <PostMini
             theme={theme}
             type={item.type}
+            poll={item.poll}
             posters={(item.mediaList || []).map((m) => m?.poster).filter(Boolean)}
             title={item.title}
             content={item.content}
@@ -394,6 +396,7 @@ export default function MyActivityScreen({ navigation, route }) {
             date={item._createdAtMs}
             likes={item.likesCount}
             comments={item.commentsCount}
+            onPress={() => navigation.navigate("PostDetailScreen", { postId: item.id })}
           />
         );
         break;
@@ -747,9 +750,10 @@ function PosterStack({ posters = [], theme }) {
 }
 
 // ── Post kartı (Postlar / Taslaklar / Beğeniler) — paylaşım ekranı görünümü ──
-function PostMini({ theme, type, posters = [], title, content, userRating, hasSpoiler, date, likes, comments, draft, action, onPress, onRemove }) {
-  const isList = type === "list";
-  const accent = isList ? theme.colors?.green || "#22C55E" : theme.colors?.blue || "#138DF0";
+function PostMini({ theme, type, poll, posters = [], title, content, userRating, hasSpoiler, date, likes, comments, draft, action, onPress, onRemove }) {
+  // Rozet + vurgu rengi feed'deki PostCard ile ortak (review/list/text/poll).
+  const badge = postTypeBadge(type, theme.colors);
+  const accent = badge.color;
   const Wrapper = onPress ? TouchableOpacity : View;
   return (
     <Wrapper
@@ -761,7 +765,7 @@ function PostMini({ theme, type, posters = [], title, content, userRating, hasSp
         <View style={st.pMeta}>
           <View style={[st.pBadge, { backgroundColor: accent + "22", borderColor: accent + "55" }]}>
             <Text style={[st.pBadgeText, { color: accent }]}>
-              {isList ? i18nText("autoI18n.liste_upper", "LİSTE") : i18nText("autoI18n.inceleme_upper", "İNCELEME")}
+              {i18nText(badge.labelKey, badge.fallback)}
             </Text>
           </View>
           {hasSpoiler ? (
@@ -790,6 +794,18 @@ function PostMini({ theme, type, posters = [], title, content, userRating, hasSp
           <View style={st.pRatingRow}>
             <RatingStars rating={userRating} max={5} size={12} color={theme.colors.orange} />
             <Text style={[st.pRatingText, { color: theme.text.secondary }]}>{userRating}/5</Text>
+          </View>
+        ) : null}
+
+        {type === "poll" && poll ? (
+          <View style={st.pRatingRow}>
+            <Ionicons name="stats-chart" size={12} color={accent} />
+            <Text style={[st.pRatingText, { color: theme.text.secondary }]}>
+              {i18nText("autoI18n.anket_ozeti", "{{options}} seçenek · {{votes}} oy", {
+                options: poll.options?.length || 0,
+                votes: tallyVotes(poll.votes).total,
+              })}
+            </Text>
           </View>
         ) : null}
 

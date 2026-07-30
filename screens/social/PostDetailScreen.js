@@ -24,6 +24,7 @@ import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import { getAvatarSource } from "@utils/avatars";
 import { i18nText } from "@utils/i18nText";
+import { postTypeBadge } from "@utils/postComposer";
 import AppIcon from "@components/AppIcon";
 import RatingStars from "@components/RatingStars";
 import PostCommentSheetModal from "@components/modals/PostCommentSheetModal";
@@ -120,10 +121,9 @@ export default function PostDetailScreen({ route, navigation }) {
     });
   }, [postId]);
 
-  const accent =
-    post?.type === "list"
-      ? theme.colors?.green || "#3ddc84"
-      : theme.colors?.blue || "#4a7cf6";
+  // Rozet + vurgu rengi feed'deki PostCard ile ortak (review/list/text/poll).
+  const typeBadge = postTypeBadge(post?.type, theme.colors);
+  const accent = typeBadge.color;
 
   return (
     <SafeAreaView
@@ -182,9 +182,7 @@ export default function PostDetailScreen({ route, navigation }) {
             </View>
             <View style={[styles.badge, { backgroundColor: accent + "22", borderColor: accent + "55" }]}>
               <Text style={[styles.badgeText, { color: accent }]}>
-                {post.type === "list"
-                  ? i18nText("autoI18n.liste_upper", "LİSTE")
-                  : i18nText("autoI18n.inceleme_upper", "İNCELEME")}
+                {i18nText(typeBadge.labelKey, typeBadge.fallback)}
               </Text>
             </View>
           </View>
