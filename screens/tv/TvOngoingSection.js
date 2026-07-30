@@ -206,7 +206,9 @@ export default function TvOngoingSection({ navigation }) {
         </Text>
         <TouchableOpacity
           style={[styles.seeAll, { backgroundColor: theme.secondary }]}
-          onPress={() => navigation.navigate("OnGoingSeries")}
+          onPress={() =>
+            navigation.navigate("ListsScreen", { listName: "watchedTv" })
+          }
         >
           <Text
             allowFontScaling={false}

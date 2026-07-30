@@ -596,49 +596,6 @@ export const ActorSkeleton = () => {
   );
 };
 
-// Devam Eden Diziler (başlık + 4 istatistik kartı + 2 sütun poster grid)
-export const OnGoingSeriesSkeleton = () => {
-  const POSTER_W = (width - 48) / 2;
-  const POSTER_H = POSTER_W * 1.5;
-  const STAT_W = (width - 48) / 4;
-  return (
-    <View style={{ flex: 1, paddingTop: 12 }}>
-      {/* Başlık */}
-      <View style={{ paddingHorizontal: 16, gap: 8, marginBottom: 16 }}>
-        <Skeleton width={width * 0.55} height={22} style={{ borderRadius: 6 }} />
-        <Skeleton width={width * 0.3} height={14} style={{ borderRadius: 4 }} />
-      </View>
-      {/* İstatistik kartları */}
-      <View
-        style={{
-          flexDirection: "row",
-          paddingHorizontal: 12,
-          gap: 8,
-          marginBottom: 16,
-        }}
-      >
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton
-            key={i}
-            width={STAT_W}
-            height={70}
-            style={{ borderRadius: 12 }}
-          />
-        ))}
-      </View>
-      {/* Dizi grid (2 sütun) */}
-      <View style={{ paddingHorizontal: 12, gap: 12 }}>
-        {[0, 1, 2].map((r) => (
-          <View key={r} style={{ flexDirection: "row", gap: 12 }}>
-            <Skeleton width={POSTER_W} height={POSTER_H} style={{ borderRadius: 14 }} />
-            <Skeleton width={POSTER_W} height={POSTER_H} style={{ borderRadius: 14 }} />
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-};
-
 // ── Sosyal feed kartı (ShareContentScreen / PostDetail): avatar başlık + başlık
 // + poster rayı + aksiyon satırı. Gerçek PostCard (postStyles.card) ile aynı ölçü.
 export const PostCardSkeleton = ({ fullWidth = false, showTopDivider = false }) => {

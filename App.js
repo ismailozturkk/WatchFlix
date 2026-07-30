@@ -116,7 +116,6 @@ import MovieSearchScreen from "./screens/search/MovieSearchScreen";
 import SplashPosterWave from "./components/SplashPosterWave";
 import CalendarScreen from "@screens/calendar/CalendarScreen";
 import { CalendarProvider } from "./context/CalendarContext";
-import OnGoingSeries from "./screens/tv/OnGoingSeries";
 import SceneGuessGameScreen from "./screens/game/SceneGuessGameScreen";
 import GameHubScreen from "./screens/game/GameHubScreen";
 import TournamentScreen from "./screens/tournament/TournamentScreen";
@@ -710,14 +709,6 @@ function AppContent() {
             </CalendarProvider>
           )}
         </Stack.Screen>
-        <Stack.Screen
-          name="OnGoingSeries"
-          component={OnGoingSeries}
-          options={{
-            headerShown: false,
-            animation: "slide_from_right",
-          }}
-        />
         <Stack.Screen
           name="SceneGuessGameScreen"
           component={SceneGuessGameScreen}
