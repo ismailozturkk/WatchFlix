@@ -350,9 +350,10 @@ aylığa bölünmüş, mağaza kesintisi düşülmüş).
       25.1.0 + `services/appCheck.js`. Native katman Play Integrity token'ı
       üretir (dev'de "debug" provider), web SDK'ya CustomProvider köprüsüyle
       bağlanır — Firestore/Functions istekleri token taşır. Native modül
-      eklendiği için `version` 1.4.1'e çekildi. **KALAN (sırasıyla):**
-      ① Firebase Console → App Check → Android uygulamasını Play Integrity
-      ile kaydet; dev için logcat'teki debug token'ı Console'a ekle,
+      eklendiği için `version` 1.4.1'e çekildi. ① TAMAM _(30 Tem: App Check
+      API etkin, Android uygulaması Play Integrity ile kayıtlı, dev cihazın
+      debug token'ı izin listesinde, dev build logcat'i attestation hatasız.)_
+      **KALAN (sırasıyla):**
       ② yeni build dağıtıldıktan sonra Console metriklerinde "verified"
       isteklerin oranını izle, ③ TÜM aktif build'ler App Check'li olunca:
       functions/index.js `enforceAppCheck: true` + deploy ve Console'dan
