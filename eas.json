@@ -22,20 +22,6 @@
       "autoIncrement": true,
       "channel": "production",
       "environment": "production"
-    },
-    "preview2": {
-      "environment": "preview",
-      "android": {
-        "gradleCommand": ":app:assembleRelease"
-      }
-    },
-    "preview3": {
-      "environment": "development",
-      "developmentClient": true
-    },
-    "preview4": {
-      "environment": "preview",
-      "distribution": "internal"
     }
   },
   "submit": {
