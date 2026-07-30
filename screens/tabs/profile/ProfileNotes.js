@@ -1,4 +1,5 @@
 import {
+  Clipboard,
   Modal,
   ScrollView,
   StyleSheet,
@@ -21,6 +22,7 @@ import { useProfileNotes } from "../../../context/ProfileNotesContext";
 import AdaptiveBlurView from "@components/common/AdaptiveBlurView";
 import DatePickerModal from "@components/modals/DatePickerModal";
 import { i18nText } from "../../../utils/i18nText";
+import { toast } from "@components/AppToast";
 
 
 // ─── Renk seçici sabitleri ────────────────────────────────────────────────────
@@ -273,6 +275,23 @@ export default function ProfileNotes() {
     backgroundColorNotes,
     handleUpdateTodoNote,
   ]);
+
+  /* ── Panoya kopyala: not = içerik, todo = başlık + ☐/☑ maddeler ── */
+  const copyNoteToClipboard = useCallback(() => {
+    if (!selectedNote) return;
+    let text;
+    if (selectedNote.type === "todo") {
+      const src = isEditable ? localEditTodos : selectedNote.todos || [];
+      const title = (isEditable ? localEditTitle : selectedNote.title) || "";
+      const lines = src.map((item) => `${item.done ? "☑" : "☐"} ${item.text}`);
+      text = [title, ...lines].filter(Boolean).join("\n");
+    } else {
+      text = noteContent || selectedNote.content || "";
+    }
+    if (!text.trim()) return;
+    Clipboard.setString(text);
+    toast.success(i18nText("autoI18n.panoya_kopyalandi", "Panoya kopyalandı"));
+  }, [selectedNote, isEditable, localEditTodos, localEditTitle, noteContent]);
 
   /* ── Filtrelenmiş notlar ── */
   const filteredNotes = useMemo(
@@ -1217,6 +1236,20 @@ export default function ProfileNotes() {
                         <TouchableOpacity
                           style={[
                             styles.actionBtn,
+                            { backgroundColor: "#64748b" },
+                          ]}
+                          onPress={copyNoteToClipboard}
+                          activeOpacity={0.85}
+                        >
+                          <Ionicons name="copy" size={15} color="#fff" />
+                          <Text
+                            allowFontScaling={false}
+                            style={styles.actionBtnText}
+                          >{i18nText("autoI18n.kopyala", "Kopyala")}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.actionBtn,
                             { backgroundColor: "#ef4444" },
                           ]}
                           onPress={() => handleDeleteNote(selectedNote.id)}
@@ -1232,7 +1265,7 @@ export default function ProfileNotes() {
                         </TouchableOpacity>
                       </>
                     ) : (
-                      /* View modu: Düzenle | Sil */
+                      /* View modu: Düzenle | Kopyala | Sil */
                       <>
                         <TouchableOpacity
                           style={[
@@ -1253,6 +1286,20 @@ export default function ProfileNotes() {
                         <TouchableOpacity
                           style={[
                             styles.actionBtn,
+                            { backgroundColor: "#64748b" },
+                          ]}
+                          onPress={copyNoteToClipboard}
+                          activeOpacity={0.85}
+                        >
+                          <Ionicons name="copy" size={15} color="#fff" />
+                          <Text
+                            allowFontScaling={false}
+                            style={styles.actionBtnText}
+                          >{i18nText("autoI18n.kopyala", "Kopyala")}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.actionBtn,
                             { backgroundColor: "#ef4444" },
                           ]}
                           onPress={() => handleDeleteNote(selectedNote.id)}
@@ -1269,39 +1316,58 @@ export default function ProfileNotes() {
                       </>
                     )
                   ) : (
-                    /* NOT aksiyonları: Düzenle | Kaydet | Sil */
+                    /* NOT aksiyonları — view: Düzenle | Kopyala | Sil,
+                       edit: Kaydet | Kopyala | Sil (Kaydet yalnız edit
+                       modunda anlamlı; içerik view modunda düzenlenemez) */
                     <>
+                      {isEditable ? (
+                        <TouchableOpacity
+                          style={[
+                            styles.actionBtn,
+                            { backgroundColor: borderColorNotes },
+                          ]}
+                          onPress={() => handleUpdateNote(selectedNote.id)}
+                          activeOpacity={0.85}
+                        >
+                          <Ionicons name="save" size={15} color="#fff" />
+                          <Text
+                            allowFontScaling={false}
+                            style={styles.actionBtnText}
+                          >
+                            {t.profileScreen.Notes.notesSave || "Kaydet"}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={[
+                            styles.actionBtn,
+                            { backgroundColor: borderColorNotes },
+                          ]}
+                          onPress={() => setIsEditable(true)}
+                          activeOpacity={0.85}
+                        >
+                          <Ionicons name="pencil" size={15} color="#fff" />
+                          <Text
+                            allowFontScaling={false}
+                            style={styles.actionBtnText}
+                          >
+                            {t.profileScreen.Notes.notesEdit || i18nText("autoI18n.duzenle", "Düzenle")}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                       <TouchableOpacity
                         style={[
                           styles.actionBtn,
-                          { backgroundColor: borderColorNotes },
+                          { backgroundColor: "#64748b" },
                         ]}
-                        onPress={() => setIsEditable(!isEditable)}
+                        onPress={copyNoteToClipboard}
                         activeOpacity={0.85}
                       >
-                        <Ionicons name="pencil" size={15} color="#fff" />
+                        <Ionicons name="copy" size={15} color="#fff" />
                         <Text
                           allowFontScaling={false}
                           style={styles.actionBtnText}
-                        >
-                          {t.profileScreen.Notes.notesEdit || i18nText("autoI18n.duzenle", "Düzenle")}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          styles.actionBtn,
-                          { backgroundColor: borderColorNotes },
-                        ]}
-                        onPress={() => handleUpdateNote(selectedNote.id)}
-                        activeOpacity={0.85}
-                      >
-                        <Ionicons name="save" size={15} color="#fff" />
-                        <Text
-                          allowFontScaling={false}
-                          style={styles.actionBtnText}
-                        >
-                          {t.profileScreen.Notes.notesSave || "Kaydet"}
-                        </Text>
+                        >{i18nText("autoI18n.kopyala", "Kopyala")}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[

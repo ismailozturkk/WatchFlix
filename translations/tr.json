@@ -1067,6 +1067,8 @@
     "uye": "Üye",
     "anket": "Anket",
     "anket_upper": "ANKET",
+    "kopyala": "Kopyala",
+    "panoya_kopyalandi": "Panoya kopyalandı",
     "anket_ozeti": "{{options}} seçenek · {{votes}} oy",
     "medya": "Medya",
     "n_icerik": "{{n}} içerik",

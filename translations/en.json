@@ -1067,6 +1067,8 @@
     "uye": "Member",
     "anket": "Poll",
     "anket_upper": "POLL",
+    "kopyala": "Copy",
+    "panoya_kopyalandi": "Copied to clipboard",
     "anket_ozeti": "{{options}} options · {{votes}} votes",
     "medya": "Media",
     "n_icerik": "{{n}} items",
