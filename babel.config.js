@@ -24,5 +24,13 @@ module.exports = function (api) {
       ],
       "react-native-reanimated/plugin", // En sonda olmalı!
     ],
+    // Release bundle'da console.* çağrılarını kaldır (Metro, dev=false iken
+    // BABEL_ENV=production ayarlar). error/warn bilerek hariç: Sentry
+    // breadcrumb'ları ve logcat'teki gerçek hata sinyali kaybolmasın.
+    env: {
+      production: {
+        plugins: [["transform-remove-console", { exclude: ["error", "warn"] }]],
+      },
+    },
   };
 };
