@@ -60,7 +60,7 @@ const getDisplayName = (listName) => {
     case "watchedTv":
       return i18nText("autoI18n.izlenen_diziler", "İzlenen Diziler");
     case "favorites":
-      return "Favoriler";
+      return i18nText("autoI18n.favoriler", "Favoriler");
     case "watchList":
       return i18nText("autoI18n.izlenecekler", "İzlenecekler");
     default:

@@ -597,7 +597,7 @@ export default function ListsScreen({ route, navigation }) {
           : listName == "watchedTv"
             ? i18nText("autoI18n.izlenen_diziler", "İzlenen Diziler")
             : listName == "favorites"
-              ? "Favoriler"
+              ? i18nText("autoI18n.favoriler", "Favoriler")
               : listName == "watchList"
                 ? i18nText("autoI18n.izlenecekler", "İzlenecekler")
                 : listName}
