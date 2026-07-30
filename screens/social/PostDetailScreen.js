@@ -265,11 +265,25 @@ export default function PostDetailScreen({ route, navigation }) {
             >
               <AppIcon
                 family="Ionicons"
-                name="chatbubble-outline"
+                name={post.commentsCount > 0 ? "chatbubble" : "chatbubble-outline"}
                 size={20}
-                color={theme.text.secondary}
+                color={
+                  post.commentsCount > 0
+                    ? theme.colors?.blue || "#4a7cf6"
+                    : theme.text.secondary
+                }
               />
-              <Text style={[styles.actionText, { color: theme.text.secondary }]}>
+              <Text
+                style={[
+                  styles.actionText,
+                  {
+                    color:
+                      post.commentsCount > 0
+                        ? theme.colors?.blue || "#4a7cf6"
+                        : theme.text.secondary,
+                  },
+                ]}
+              >
                 {post.commentsCount || 0}
               </Text>
             </TouchableOpacity>

@@ -972,6 +972,7 @@ const PostCard = memo(function PostCard({
           onPress={() => onLike(post.id)}
           theme={theme}
         />
+        {/* Yorum: post'ta yorum varsa dolu + mavi (LikeButton'la aynı dil) */}
         <TouchableOpacity
           style={postStyles.actionBtn}
           activeOpacity={0.7}
@@ -979,24 +980,37 @@ const PostCard = memo(function PostCard({
         >
           <AppIcon
             family="Ionicons"
-            name="chatbubble-outline"
+            name={post.commentsCount > 0 ? "chatbubble" : "chatbubble-outline"}
             size={18}
-            color={theme.text.secondary}
+            color={
+              post.commentsCount > 0
+                ? theme.colors?.blue || "#4a7cf6"
+                : theme.text.secondary
+            }
           />
           <Text
-            style={[postStyles.actionText, { color: theme.text.secondary }]}
+            style={[
+              postStyles.actionText,
+              {
+                color:
+                  post.commentsCount > 0
+                    ? theme.colors?.blue || "#4a7cf6"
+                    : theme.text.secondary,
+              },
+            ]}
           >
             {post.commentsCount || 0}
           </Text>
         </TouchableOpacity>
+        {/* Kaydet: kaydedildiyse dolu + accent (Feather'da dolu varyant yok) */}
         <TouchableOpacity
           style={postStyles.actionBtn}
           activeOpacity={0.7}
           onPress={() => onBookmark(post.id)}
         >
           <AppIcon
-            family="Feather"
-            name="bookmark"
+            family="Ionicons"
+            name={post.bookmarkedByMe ? "bookmark" : "bookmark-outline"}
             size={18}
             color={post.bookmarkedByMe ? theme.accent : theme.text.secondary}
           />
