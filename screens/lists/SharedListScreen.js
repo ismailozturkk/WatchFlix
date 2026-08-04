@@ -25,6 +25,7 @@ import { useAuth } from "@context/AuthContext";
 import { getAvatarSource } from "@utils/avatars";
 import { i18nText } from "@utils/i18nText";
 import CreateSharedListModal from "../../components/modals/CreateSharedListModal";
+import ScreenDecor from "@components/ScreenDecor";
 import {
   subscribeToSharedList,
   subscribeToSharedListItems,
@@ -306,6 +307,8 @@ export default function SharedListScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
+      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
+      <ScreenDecor iconOpacity={0.3} />
       {/* ── Başlık ── */}
       <View style={styles.header}>
         <View style={{ flex: 1, minWidth: 0 }}>

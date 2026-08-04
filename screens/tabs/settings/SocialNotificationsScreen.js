@@ -16,6 +16,7 @@ import { useDeviceNotifications } from "@context/DeviceNotificationsContext";
 import { auth, db } from "../../../firebase";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { SettingsSubScreen, SettingRow, buildUiColors } from "./settingsUi";
+import { i18nText } from "@utils/i18nText";
 
 const NOTIFICATION_ROWS = [
   {
@@ -175,8 +176,8 @@ export default function SocialNotificationsScreen() {
             iconBg={C.iconBlue}
             iconColor={C.blue}
             iconName={sendingTestPush ? "hourglass-outline" : "paper-plane-outline"}
-            title="Test push gönder (bana)"
-            subtitle="DEV-only · arka plan push zincirini test eder"
+            title={i18nText("autoI18n.test_push_gonder", "Test bildirimi gönder (bana)")}
+            subtitle={i18nText("autoI18n.test_push_aciklama", "Yalnızca geliştirme · arka plan bildirim zincirini test eder")}
             last
             onPress={handleSendTestPush}
             right={

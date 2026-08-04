@@ -1,4 +1,6 @@
 const {
+  countMovieWatchStats,
+  countTvWatchStats,
   flattenMovieWatchEntries,
   flattenTvEpisodeWatchEntries,
   materializeTvWatchState,
@@ -148,4 +150,112 @@ test("watch chart aggregates monthly and yearly periods", () => {
   expect(yearly[0]).toEqual(expect.objectContaining({ key: "2026-01", value: 60 }));
   expect(yearly[2]).toEqual(expect.objectContaining({ key: "2026-03", value: 120 }));
   expect(yearly.reduce((sum, point) => sum + point.value, 0)).toBe(180);
+});
+
+describe("tekrarlı / tekrarsız sayaçlar", () => {
+  test("aynı filmin beş izlemesi tek film sayılır", () => {
+    const entries = flattenMovieWatchEntries([
+      {
+        id: 12,
+        type: "movie",
+        watchEvents: [1, 2, 3, 4, 5].map((n) => ({
+          id: `w${n}`,
+          watchedAt: `2026-0${n}-01`,
+          scope: "movie",
+        })),
+      },
+      { id: 13, type: "movie", dateAdded: "2026-02-02" },
+    ]);
+
+    expect(countMovieWatchStats(entries)).toEqual({ total: 6, unique: 2 });
+  });
+
+  test("kimliksiz eski kayıtlar tek filme çökmez", () => {
+    expect(countMovieWatchStats([{ name: "A" }, { name: "B" }])).toEqual({
+      total: 2,
+      unique: 2,
+    });
+  });
+
+  test("boş girdi sıfır döner", () => {
+    expect(countMovieWatchStats()).toEqual({ total: 0, unique: 0 });
+    expect(countTvWatchStats()).toEqual({
+      shows: { total: 0, unique: 0 },
+      seasons: { total: 0, unique: 0 },
+      episodes: { total: 0, unique: 0 },
+    });
+  });
+
+  test("iki kez baştan izlenen dizi tekrarsız sayımda tek kalır", () => {
+    const show = {
+      id: 44,
+      seasons: [{
+        seasonNumber: 1,
+        episodes: [
+          {
+            episodeNumber: 1,
+            episodeMinutes: 40,
+            watchEvents: [
+              { id: "a", watchedAt: "2026-01-01", scope: "show" },
+              { id: "b", watchedAt: "2026-05-01", scope: "show" },
+            ],
+          },
+          {
+            episodeNumber: 2,
+            episodeMinutes: 40,
+            watchEvents: [
+              { id: "a", watchedAt: "2026-01-01", scope: "show" },
+              { id: "b", watchedAt: "2026-05-01", scope: "show" },
+            ],
+          },
+        ],
+      }],
+    };
+    const counts = countTvWatchStats([materializeTvWatchState(show)]);
+
+    expect(counts.shows).toEqual({ total: 2, unique: 1 });
+    expect(counts.seasons).toEqual({ total: 2, unique: 1 });
+    expect(counts.episodes).toEqual({ total: 4, unique: 2 });
+  });
+
+  test("tek tek işaretlenen bölümler diziyi ve sezonu şişirmez", () => {
+    const show = {
+      id: 45,
+      seasons: [{
+        seasonNumber: 1,
+        episodes: [
+          { episodeNumber: 1, episodeWatchTime: "2026-01-01" },
+          { episodeNumber: 2, episodeWatchTime: "2026-01-08" },
+          { episodeNumber: 3, episodeWatchTime: "2026-01-15" },
+        ],
+      }],
+    };
+    const counts = countTvWatchStats([materializeTvWatchState(show)]);
+
+    expect(counts.shows).toEqual({ total: 1, unique: 1 });
+    expect(counts.seasons).toEqual({ total: 1, unique: 1 });
+    expect(counts.episodes).toEqual({ total: 3, unique: 3 });
+  });
+
+  test("tekrarlı bölüm toplamı flatten çıktısıyla birebir aynı", () => {
+    const shows = [
+      {
+        id: 46,
+        seasons: [{
+          seasonNumber: 1,
+          episodes: [{
+            episodeNumber: 1,
+            watchEvents: [
+              { id: "x", watchedAt: "2026-01-01", scope: "episode" },
+              { id: "y", watchedAt: "2026-02-01", scope: "episode" },
+            ],
+          }],
+        }],
+      },
+      { id: 47, seasons: [{ seasonNumber: 2, episodes: [{ episodeNumber: 5, episodeWatchTime: "2026-03-03" }] }] },
+    ];
+
+    expect(countTvWatchStats(shows.map(materializeTvWatchState)).episodes.total)
+      .toBe(flattenTvEpisodeWatchEntries(shows).length);
+  });
 });

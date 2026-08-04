@@ -98,9 +98,12 @@ export const SharedListsProvider = ({ children }) => {
     return buildSharedListIndex(sharedItemsByList);
   }, [sharedItemsByList]);
 
+  // sharedItemsByList: listId → item[] (canlı). Detay ekranındaki "Ortak
+  // Listeler" bölümü üyelik durumunu buradan okur; böylece başka bir üye
+  // ekleyip çıkardığında kart rengi de anında güncellenir.
   const value = useMemo(
-    () => ({ sharedLists, sharedListIndex, loading }),
-    [sharedLists, sharedListIndex, loading],
+    () => ({ sharedLists, sharedItemsByList, sharedListIndex, loading }),
+    [sharedLists, sharedItemsByList, sharedListIndex, loading],
   );
 
   return (

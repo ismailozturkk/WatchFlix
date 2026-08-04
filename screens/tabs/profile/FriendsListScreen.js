@@ -195,27 +195,38 @@ export default function FriendsListScreen({ navigation }) {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
       <ScreenDecor iconOpacity={0.3} />
 
-      {/* Başlık + arkadaş sayısı */}
-      <Animated.View
-        style={[
-          styles.headerRow,
-          {
-            opacity: titleAnim,
-            transform: [{
-              translateY: titleAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }),
-            }],
-          },
-        ]}
-      >
-        <Text style={[styles.pageTitle, { color: theme.text?.primary ?? "#fff" }]}>{i18nText("autoI18n.arkadaslar", "Arkadaşlar")}</Text>
-        {friends.length > 0 && (
-          <View style={[styles.countBadge, { backgroundColor: theme.secondary }]}>
-            <Text style={[styles.countBadgeText, { color: theme.text?.secondary ?? "#aaa" }]}>
-              {friends.length}
-            </Text>
-          </View>
-        )}
-      </Animated.View>
+      {/* Geri + başlık + arkadaş sayısı */}
+      <View style={styles.headerBar}>
+        <View style={styles.headerSide}>
+          <BackButton absolute={false} />
+        </View>
+        <Animated.View
+          style={[
+            styles.headerRow,
+            {
+              opacity: titleAnim,
+              transform: [{
+                translateY: titleAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }),
+              }],
+            },
+          ]}
+        >
+          <Text
+            allowFontScaling={false}
+            numberOfLines={1}
+            style={[styles.pageTitle, { color: theme.text?.primary ?? "#fff" }]}
+          >{i18nText("autoI18n.arkadaslar", "Arkadaşlar")}</Text>
+          {friends.length > 0 && (
+            <View style={[styles.countBadge, { backgroundColor: theme.secondary }]}>
+              <Text style={[styles.countBadgeText, { color: theme.text?.secondary ?? "#aaa" }]}>
+                {friends.length}
+              </Text>
+            </View>
+          )}
+        </Animated.View>
+        {/* Başlık geri butonuna rağmen ortalı kalsın diye simetrik boşluk */}
+        <View style={styles.headerSide} />
+      </View>
 
       {/* Liste */}
       {friends.length === 0 ? (
@@ -232,7 +243,6 @@ export default function FriendsListScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         />
       )}
-      <BackButton />
     </SafeAreaView>
   );
 }
@@ -240,15 +250,25 @@ export default function FriendsListScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 10 },
 
+  // Geri butonu satır içinde: eskiden absolute olduğu için başlığın üstüne
+  // biniyordu. headerSide iki yanda eşit boşluk bırakıp başlığı ortalı tutar.
+  headerBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    marginBottom: 14,
+    marginTop: 4,
+  },
+  headerSide: { width: 40 },
   headerRow: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    marginBottom: 14,
-    marginTop: 4,
   },
   pageTitle: {
+    flexShrink: 1,
     fontSize: 26,
     fontWeight: "800",
     textAlign: "center",

@@ -25,6 +25,8 @@ import {
   useImageQualitySettings,
 } from "../../context/AppSettingsContext";
 import ScreenSnow from "../../components/ScreenSnow";
+import ScopedCommentButton from "../../components/comments/ScopedCommentButton";
+import { COMMENT_SCOPE } from "../../utils/commentScope";
 
 const { width } = Dimensions.get("window");
 
@@ -329,6 +331,23 @@ export default function EpisodeDetails({ route, navigation }) {
           </View>
         )}
 
+        {/* ── Bölüm yorumları ──────────────────────────────────────────── */}
+        {/* Dizinin ortak yorum sayfası, bu bölüme süzülmüş olarak açılır. */}
+        <ScopedCommentButton
+          theme={theme}
+          showId={showId}
+          showName={showName}
+          showPosterPath={showPosterPath}
+          seasonCount={showSeasonCount}
+          scope={{
+            scope: COMMENT_SCOPE.EPISODE,
+            seasonNumber,
+            episodeNumber,
+            scopeTitle: details.name || "",
+          }}
+          style={styles.commentButton}
+        />
+
         <View
           style={[
             styles.divider,
@@ -583,6 +602,10 @@ const styles = StyleSheet.create({
   ratingPillMax: {
     fontSize: 13,
     fontWeight: "500",
+  },
+
+  commentButton: {
+    marginBottom: 18,
   },
 
   divider: {

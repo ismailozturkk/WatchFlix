@@ -6,10 +6,10 @@ import { i18nText } from "../../utils/i18nText";
 
 
 const TABS = [
-  { id: "background", icon: "image-outline", label: "Arka Plan" },
+  { id: "background", icon: "image-outline", label: i18nText("autoI18n.arka_plan", "Arka Plan") },
   { id: "poster", icon: "film-outline", label: "Poster" },
   { id: "content", icon: "layers-outline", label: i18nText("autoI18n.icerik", "İçerik") },
-  { id: "style", icon: "color-palette-outline", label: "Stil" },
+  { id: "style", icon: "color-palette-outline", label: i18nText("autoI18n.stil", "Stil") },
 ];
 
 function StoryTabsComponent({ activeTab, onChangeTab }) {

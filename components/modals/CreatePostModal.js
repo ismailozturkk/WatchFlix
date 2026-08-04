@@ -36,6 +36,20 @@ import { useProfileUi } from "@context/ProfileUiContext";
 import { appAlert } from "@components/AppAlert";
 import { i18nText } from "@utils/i18nText";
 import { validatePost, buildPollObject, reorderArray, postTypeBadge } from "@utils/postComposer";
+import { listItemToMedia, MAX_SHARED_LIST_ITEMS } from "@utils/listShare";
+import {
+  applyFacts,
+  describeMediaMeta,
+  formatMinutes,
+  mediaSignature,
+  mergeFactsIntoList,
+  pickFactTargets,
+  sumListMinutes,
+} from "@utils/mediaFacts";
+import { fetchMediaFactsBatch, peekMediaFacts } from "@services/tmdbFacts";
+import { buildGenreMap } from "@utils/genreLabels";
+import { ANALYTICS_EVENTS, trackEvent } from "@services/analytics";
+import ProfileListPickerModal from "@components/modals/ProfileListPickerModal";
 
 // Karakter sınırları — büyük Firestore dökümanlarını ve aşırı uzun
 // içerikleri önler. Sayaçlar bu sabitlere göre gösterilir.
@@ -135,6 +149,15 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
       poster_path: m.poster_path || null,
       year: m.year || "",
       genre_ids: m.genre_ids || [],
+      // Tür ADLARI ve süre olguları: düzenlemede taşınmazsa TEK bir "Düzenle"
+      // dokunuşu hepsini KALICI ve SESSİZ siler (updatePost mediaList'in
+      // tamamını değiştiriyor, merge yok).
+      genres: Array.isArray(m.genres) ? m.genres : [],
+      minutes: m.minutes ?? null,
+      episodeMinutes: m.episodeMinutes ?? null,
+      episodeCount: m.episodeCount ?? null,
+      seasonCount: m.seasonCount ?? null,
+      factsAt: m.factsAt ?? null,
     }));
 
   // Kayıtlı anketin seçeneklerini composer şekline çevir (düzenleme için).
@@ -176,6 +199,13 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
   const [drafts, setDrafts] = useState([]);
   const [showDrafts, setShowDrafts] = useState(false);
   const [currentDraftId, setCurrentDraftId] = useState(null);
+
+  // Profildeki listeden aktarma
+  const [listPickerVisible, setListPickerVisible] = useState(false);
+  // Paylaşım anındaki olgu telafisi: { done, total } — belirli ilerleme.
+  const [hydrating, setHydrating] = useState(null);
+  // Paylaşımın hangi listeden doğduğu — yalnız ölçüm için, Firestore'a gitmez.
+  const importedListRef = useRef(null);
 
   const handleRate = (rating) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -263,7 +293,10 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
       existing.postType === postType &&
       existing.userRating === userRating &&
       existing.hasSpoiler === hasSpoiler &&
-      JSON.stringify(existing.selectedMedia) === JSON.stringify(selectedMedia)
+      // KİMLİK imzası, tam nesne değil: süre/tür arka planda dolarken taslak
+      // "değişmiş" görünüp yer imi ikonunu söndürmesin ve kapanışta gereksiz
+      // "Paylaşımı bırak?" uyarısı çıkmasın.
+      mediaSignature(existing.selectedMedia) === mediaSignature(selectedMedia)
     );
   }, [currentDraftId, title, content, postType, userRating, hasSpoiler, selectedMedia, drafts]);
 
@@ -328,6 +361,44 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     return () => clearTimeout(timer);
   }, [searchQuery, searchType, isSearchActive]);
 
+  // ─── OLGU HİDRASYONU (süre / bölüm-sezon / tür adları) ──────────────────
+  // TMDB ARAMA sonucu hafiftir: süre yoktur. Profil listesi öğesi ise süreyi
+  // gerçekten kullanıyor (liste ekranındaki rozet ve toplam). Seçilen her eser
+  // için TEK bir detay isteği atılır, sonuç kart kart işlenir.
+  //
+  // Bağımlılık `selectedMedia` DEĞİL hedeflerin İMZASI: effect kendi yazdığını
+  // tetikleyemez. Hidrasyon bitince imza boşalır ve durur — sonsuz döngü
+  // matematiksel olarak imkânsız.
+  const factsReqRef = useRef(0);
+  const factsPlan = useMemo(() => {
+    const targets = pickFactTargets(selectedMedia, { limit: MAX_SHARED_LIST_ITEMS });
+    return { targets, sig: targets.map((t) => `${t.type}:${t.id}`).join(",") };
+  }, [selectedMedia]);
+
+  useEffect(() => {
+    if (!visible || !API_KEY || !factsPlan.sig) return undefined;
+    const reqId = ++factsReqRef.current;
+    let alive = true;
+    const cancelled = () => !alive || reqId !== factsReqRef.current;
+
+    fetchMediaFactsBatch(factsPlan.targets, {
+      apiKey: API_KEY,
+      language,
+      concurrency: 5,
+      isCancelled: cancelled,
+      // Toptan yazma YOK: kullanıcı bu sırada bir öğeyi silerse ya da
+      // sıralarsa, prev üzerinden birleştirmek o işlemi geri almaz.
+      onResolved: (facts) => {
+        if (cancelled()) return;
+        setSelectedMedia((prev) => mergeFactsIntoList(prev, [facts]));
+      },
+    });
+
+    return () => {
+      alive = false;
+    };
+  }, [factsPlan.sig, visible, API_KEY, language]);
+
   const fetchPopularMedia = async (reqId) => {
     setLoadingSearch(true);
     try {
@@ -376,7 +447,16 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     }
   };
 
-  const handleSelectMedia = (item) => {
+  const handleSelectMedia = (rawItem) => {
+    // Sıcak başlangıç: bu eser daha önce çözüldüyse süre ANINDA görünür,
+    // hiç "boş" aşama olmaz (hidrasyon effect'i de istek atmaz).
+    const hot = peekMediaFacts({
+      id: rawItem?.id,
+      mediaType: rawItem?.media_type || rawItem?.type,
+      language,
+    });
+    const item = hot ? applyFacts(rawItem, hot) : rawItem;
+
     if (postType === "poll") {
       // Anket medya seçeneği ekle (max 4, tekrar yok).
       setPollOptions((prev) => {
@@ -396,6 +476,39 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
       setSelectedMedia([...selectedMedia, item]);
     }
     closeSearch();
+  };
+
+  /**
+   * Profildeki bir listeyi composer'a aktarır: başlık liste adı olur, öğeler
+   * medya seçimine dönüşür. Başlıkta yazı varsa ona dokunulmaz — kullanıcının
+   * yazdığı metni silmek geri alınamaz bir kayıp olurdu.
+   */
+  const handleImportList = (list) => {
+    // İzlenen diziler listesindeki eski kayıtlarda `type` boş olabiliyor;
+    // liste anahtarı tipi kesin olarak biliyor.
+    const fallbackType = list?.key === "watchedTv" ? "tv" : "movie";
+    const media = (list?.items || [])
+      .slice(0, MAX_SHARED_LIST_ITEMS)
+      .map((item) => listItemToMedia(item, { fallbackType }))
+      .filter(Boolean);
+    if (media.length === 0) return;
+
+    setPostType("list");
+    setSelectedMedia(media);
+    if (!title.trim()) setTitle(list.label.slice(0, MAX_TITLE));
+    setError("");
+    importedListRef.current = { key: list.key, count: media.length };
+    setListPickerVisible(false);
+    // Tavan aşıldıysa bunu SÖYLE: 500 filmlik listeden 100 gelmesi sessizce
+    // olursa kullanıcı eksikliği paylaştıktan sonra fark eder.
+    const truncated = (list.items?.length || 0) > media.length;
+    Toast.show({
+      type: "success",
+      text1: i18nText("autoI18n.liste_aktarildi", "Liste aktarıldı"),
+      text2: truncated
+        ? `${list.label} · ${i18nText("autoI18n.liste_tavani_asildi", "ilk {{count}} içerik alındı", { count: media.length })}`
+        : `${list.label} · ${media.length}`,
+    });
   };
 
   const handleRemoveMedia = (id) => setSelectedMedia(selectedMedia.filter((m) => m.id !== id));
@@ -435,20 +548,64 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     }
     setError("");
 
+    // PAYLAŞIM ANI TELAFİSİ: arka plan hidrasyonu bitmeden paylaşılırsa eksik
+    // kalanlar burada toplanır. Bütçeli (12 öğe / 2.5 sn) ve BLOKLAMAZ —
+    // süre gelmezse paylaşım yine gider, kısmi sonuç bile kullanılır.
+    let media = selectedMedia;
+    if (postType !== "poll" && API_KEY) {
+      const missing = pickFactTargets(media, { limit: 12 });
+      if (missing.length > 0) {
+        const reqId = ++factsReqRef.current;
+        setHydrating({ done: 0, total: missing.length });
+        try {
+          const facts = await fetchMediaFactsBatch(missing, {
+            apiKey: API_KEY,
+            language,
+            concurrency: 6,
+            timeoutMs: 2500,
+            isCancelled: () => reqId !== factsReqRef.current,
+            onResolved: () => setHydrating((h) => (h ? { ...h, done: h.done + 1 } : h)),
+          });
+          // setSelectedMedia ÇAĞRILMAZ: gönderim sırasında gereksiz render yok.
+          media = mergeFactsIntoList(media, facts);
+        } finally {
+          setHydrating(null);
+        }
+      }
+    }
+
     // mediaList'i Firestore'a uygun, sade bir şekle dönüştür.
-    const mediaList = selectedMedia.map((m) => ({
-      id: m.id,
-      type: m.media_type || m.type || (m.title ? "movie" : "tv"),
-      title: m.title || m.name || "",
-      poster: m.poster_path
-        ? `https://image.tmdb.org/t/p/w500${m.poster_path}`
-        : m.poster || null,
-      year:
-        (m.release_date || m.first_air_date || "").split("-")[0] ||
-        m.year ||
-        "",
-      genre_ids: m.genre_ids || [],
-    }));
+    // `poster_path`, `genres` ve süre olguları EK alanlar: paylaşılan liste
+    // profile kaydedilirken poster yolunu URL'den ayrıştırmak, türü yeniden
+    // aramak ve süreyi yeniden çekmek zorunda kalmamak için.
+    //
+    // Alan kuralı: değer yoksa `null` yazılır, ASLA `undefined` — createPost
+    // hiçbir temizlik yapmıyor ve tek bir undefined tüm paylaşımı düşürür.
+    const mediaList = media.map((m) => {
+      const type = m.media_type || m.type || (m.title ? "movie" : "tv");
+      return {
+        id: m.id,
+        type,
+        title: m.title || m.name || "",
+        poster: m.poster_path
+          ? `https://image.tmdb.org/t/p/w500${m.poster_path}`
+          : m.poster || null,
+        poster_path: m.poster_path || null,
+        year:
+          (m.release_date || m.first_air_date || "").split("-")[0] ||
+          m.year ||
+          "",
+        genre_ids: m.genre_ids || [],
+        genres: Array.isArray(m.genres) ? m.genres.filter((g) => typeof g === "string") : [],
+        // `minutes` YALNIZ film: toplam izleme süresi hesapları bu alanı
+        // filmler üzerinden topluyor, diziye sızdırmak onları şişirirdi.
+        minutes: type === "tv" ? null : Number.isFinite(m.minutes) ? m.minutes : null,
+        episodeMinutes: Number.isFinite(m.episodeMinutes) ? m.episodeMinutes : null,
+        episodeCount: Number.isFinite(m.episodeCount) ? m.episodeCount : null,
+        seasonCount: Number.isFinite(m.seasonCount) ? m.seasonCount : null,
+        factsAt: Number.isFinite(m.factsAt) ? m.factsAt : null,
+      };
+    });
 
     const payload = {
       type: postType,
@@ -489,6 +646,15 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
           setSubmitting(false);
           return;
         }
+        if (postType === "list" && importedListRef.current) {
+          trackEvent(ANALYTICS_EVENTS.LIST_SHARED_FROM_PROFILE, {
+            source_list: importedListRef.current.key,
+            item_count: selectedMedia.length,
+            // Aktardıktan sonra elle ekleyip çıkardıysa liste birebir değildir.
+            edited: importedListRef.current.count !== selectedMedia.length,
+            ranked,
+          });
+        }
         setSubmitting(false);
         handleClose();
       } catch (e) {
@@ -510,6 +676,11 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     setPostType("review"); setShowDrafts(false); setCurrentDraftId(null);
     setHasSpoiler(false); setUserRating(0);
     setRanked(false); setPollOptions([]); setPollKind("media");
+    setListPickerVisible(false);
+    importedListRef.current = null;
+    // Devam eden hidrasyon yazmalarını iptal et (unmount sonrası setState yok).
+    factsReqRef.current += 1;
+    setHydrating(null);
     postTypeAnim.setValue(0);
     searchTypeAnim.setValue(0);
     closeSearch();
@@ -566,38 +737,48 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     postType === "list" || postType === "poll" ? [accentGreen, "#1f8f5a"] : [accentBlue, "#2b5fb0"];
 
   // ─── GENRE MAP ───────────────────────────────────────────────────────────────
-  // useMemo([language]): dil değişince yeniden çözülür, her render'da kurulmaz.
-  const GENRE_MAP = useMemo(
+  // Tablo utils/genreLabels.js'te: paylaşılan listeyi KAYDEDEN taraf da aynı
+  // haritayı kullanıyor, böylece tür adları alıcının dilinde çözülüyor.
+  const GENRE_MAP = useMemo(() => buildGenreMap(), [language]);
+
+  // Süre etiketleri saf mediaFacts fonksiyonlarına PARAMETRE geçilir
+  // (o modül i18nText import etmiyor).
+  const durationLabels = useMemo(
     () => ({
-      28: i18nText("autoI18n.aksiyon", "Aksiyon"),
-      12: i18nText("autoI18n.macera", "Macera"),
-      16: i18nText("autoI18n.animasyon", "Animasyon"),
-      35: i18nText("autoI18n.komedi", "Komedi"),
-      80: i18nText("autoI18n.suc", "Suç"),
-      99: i18nText("autoI18n.belgesel", "Belgesel"),
-      18: i18nText("autoI18n.dram", "Dram"),
-      10751: i18nText("autoI18n.aile", "Aile"),
-      14: i18nText("autoI18n.fantastik", "Fantastik"),
-      36: i18nText("autoI18n.tarih", "Tarih"),
-      27: i18nText("autoI18n.korku", "Korku"),
-      10402: i18nText("autoI18n.muzik", "Müzik"),
-      9648: i18nText("autoI18n.gizem", "Gizem"),
-      10749: i18nText("autoI18n.romantik", "Romantik"),
-      878: i18nText("autoI18n.bilim_kurgu", "Bilim Kurgu"),
-      53: i18nText("autoI18n.gerilim", "Gerilim"),
-      10752: i18nText("autoI18n.savas", "Savaş"),
-      37: i18nText("autoI18n.vahsi_bati", "Vahşi Batı"),
-      10759: i18nText("autoI18n.aksiyon_macera", "Aksiyon & Macera"),
-      10762: i18nText("autoI18n.cocuk", "Çocuk"),
-      10765: i18nText("autoI18n.bilim_kurgu_fantastik", "Bilim Kurgu & Fantastik"),
+      hourLabel: i18nText("autoI18n.saat_kisa_birim", "sa"),
+      minuteLabel: i18nText("autoI18n.dakika_kisa_birim", "dk"),
+      seasonLabel: i18nText("autoI18n.sezon_birim", "sezon"),
+      episodeLabel: i18nText("autoI18n.bolum_birim", "bölüm"),
+      perEpisodeLabel: i18nText("autoI18n.dk_bolum", "dk/bölüm"),
     }),
     [language],
   );
 
+  // Listenin toplam süresi. `known === 0` iken çip HİÇ çizilmez: "0 dk"
+  // yanlış bilgidir. Bir kısmı bilinmiyorsa "en az" öneki kullanılır.
+  const listTotal = useMemo(() => sumListMinutes(selectedMedia), [selectedMedia]);
+  const listTotalLabel = useMemo(() => {
+    const text = formatMinutes(listTotal.total, durationLabels);
+    if (!text || listTotal.known === 0) return null;
+    return listTotal.unknown > 0
+      ? `${i18nText("autoI18n.en_az", "en az")} ${text}`
+      : text;
+  }, [listTotal, durationLabels]);
+
+  // Tür rozetleri: TMDB aramasından gelen öğede tür id'si, profildeki listeden
+  // aktarılan öğede tür ADI var. İkisi de aynı rozet şeridini besler.
   const listGenres = useMemo(() => {
-    const ids = new Set();
-    selectedMedia.forEach((m) => m.genre_ids?.forEach((id) => ids.add(id)));
-    return Array.from(ids).map((id) => GENRE_MAP[id]).filter(Boolean).slice(0, 6);
+    const names = new Set();
+    selectedMedia.forEach((m) => {
+      m.genre_ids?.forEach((id) => {
+        const name = GENRE_MAP[id];
+        if (name) names.add(name);
+      });
+      m.genres?.forEach((name) => {
+        if (typeof name === "string" && name.trim()) names.add(name);
+      });
+    });
+    return Array.from(names).slice(0, 6);
   }, [selectedMedia, GENRE_MAP]);
 
   // ─── RENDER ──────────────────────────────────────────────────────────────────
@@ -862,6 +1043,13 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                                   style={s.posterSlotGradient}
                                 >
                                   <Ionicons name="swap-horizontal" size={14} color="rgba(255,255,255,0.7)" />
+                                  {/* İnceleme paylaşımında da süre çekilir ve
+                                      posterin altında gösterilir. */}
+                                  {!!describeMediaMeta(selectedMedia[0], durationLabels) && (
+                                    <Text style={s.posterSlotMeta} numberOfLines={1}>
+                                      {describeMediaMeta(selectedMedia[0], durationLabels)}
+                                    </Text>
+                                  )}
                                 </LinearGradient>
                               </>
                             ) : (
@@ -1086,6 +1274,25 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                       <View style={s.listSection}>
                         <Text style={[s.sectionLabel, { color: theme.text.muted }]}>{i18nText("autoI18n.liste_icerikleri", "LİSTE İÇERİKLERİ")}</Text>
 
+                        {/* Profildeki listeyi olduğu gibi aktar — tek tek
+                            aramak yerine hazır listeyi paylaşmanın kısa yolu. */}
+                        <TouchableOpacity
+                          style={[s.importListBtn, { borderColor: `${accentGreen}55`, backgroundColor: `${accentGreen}12` }]}
+                          onPress={() => setListPickerVisible(true)}
+                          activeOpacity={0.85}
+                        >
+                          <Ionicons name="albums-outline" size={16} color={accentGreen} />
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={[s.importListText, { color: accentGreen }]} numberOfLines={1}>
+                              {i18nText("autoI18n.listemden_aktar", "Listemden aktar")}
+                            </Text>
+                            <Text style={[s.importListHint, { color: theme.text.muted }]} numberOfLines={1}>
+                              {i18nText("autoI18n.listemden_aktar_aciklama", "Profilindeki bir listeyi olduğu gibi paylaş")}
+                            </Text>
+                          </View>
+                          <Ionicons name="chevron-forward" size={16} color={theme.text.muted} />
+                        </TouchableOpacity>
+
                         {/* Sıralı liste toggle (#1, #2...) */}
                         <TouchableOpacity
                           style={[s.rankedToggle, { borderColor: theme.border, backgroundColor: theme.secondary }, ranked && { borderColor: accentGreen, backgroundColor: `${accentGreen}14` }]}
@@ -1099,9 +1306,16 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                           <Ionicons name={ranked ? "checkmark-circle" : "ellipse-outline"} size={18} color={ranked ? accentGreen : theme.text.muted} />
                         </TouchableOpacity>
 
-                        {/* Genre chips */}
-                        {listGenres.length > 0 && (
+                        {/* Toplam süre + tür çipleri. Süre çipi mavi: tür
+                            çiplerinden (yeşil) farklı bir bilgi türü. */}
+                        {(listGenres.length > 0 || !!listTotalLabel) && (
                           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                            {!!listTotalLabel && (
+                              <View style={[s.chip, s.durationChip, { backgroundColor: `${accentBlue}14`, borderColor: `${accentBlue}35` }]}>
+                                <Ionicons name="time-outline" size={11} color={accentBlue} />
+                                <Text style={[s.chipText, { color: accentBlue }]}>{listTotalLabel}</Text>
+                              </View>
+                            )}
                             {listGenres.map((genre) => (
                               <View key={genre} style={[s.chip, { backgroundColor: `${accentGreen}14`, borderColor: `${accentGreen}35` }]}>
                                 <Text style={[s.chipText, { color: accentGreen }]}>{genre}</Text>
@@ -1139,11 +1353,23 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                                   </View>
                                 ) : (
                                   <View style={[s.mediaTypeBadge, { backgroundColor: item.media_type === 'tv' ? (theme.colors?.orange || '#f5a623') : accentBlue }]}>
-                                    <Text style={s.mediaTypeText}>{item.media_type === 'tv' ? 'Dizi' : 'Film'}</Text>
+                                    <Text style={s.mediaTypeText}>
+                                      {item.media_type === 'tv'
+                                        ? i18nText("autoI18n.dizi", "Dizi")
+                                        : i18nText("autoI18n.film", "Film")}
+                                    </Text>
                                   </View>
                                 )}
                                 <LinearGradient colors={["transparent", "rgba(0,0,0,0.75)"]} style={s.listPosterOverlay}>
-                                  <Text style={s.listPosterTitle} numberOfLines={2}>{item.title || item.name}</Text>
+                                  {/* Sıralı listede alt-orta ok tuşları aynı
+                                      bölgeyi kullanıyor: başlık tek satıra
+                                      düşer, meta satırı yine sığar. */}
+                                  <Text style={s.listPosterTitle} numberOfLines={ranked ? 1 : 2}>{item.title || item.name}</Text>
+                                  {!!describeMediaMeta(item, durationLabels) && (
+                                    <Text style={s.listPosterMeta} numberOfLines={1}>
+                                      {describeMediaMeta(item, durationLabels)}
+                                    </Text>
+                                  )}
                                 </LinearGradient>
                                 {ranked && (
                                   <View style={s.reorderRow}>
@@ -1267,15 +1493,24 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                 <TouchableOpacity
                   onPress={handleShare}
                   activeOpacity={0.8}
-                  disabled={submitting}
+                  disabled={submitting || !!hydrating}
                 >
                   <LinearGradient
                     colors={shareGradient}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={[s.shareBtn, { shadowColor: currentAccent }, submitting && { opacity: 0.6 }]}
+                    style={[s.shareBtn, { shadowColor: currentAccent }, (submitting || !!hydrating) && { opacity: 0.6 }]}
                   >
-                    {submitting ? (
+                    {/* Olgu telafisi BELİRLİ ilerleme gösterir; gönderim fazının
+                        belirsiz spinner'ından ayırt edilebilsin. */}
+                    {hydrating ? (
+                      <>
+                        <Text style={s.shareBtnText}>
+                          {i18nText("autoI18n.bilgiler_aliniyor", "Bilgiler alınıyor")} {hydrating.done}/{hydrating.total}
+                        </Text>
+                        <ActivityIndicator size="small" color="#fff" />
+                      </>
+                    ) : submitting ? (
                       <ActivityIndicator size="small" color="#fff" />
                     ) : (
                       <>
@@ -1297,6 +1532,12 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      <ProfileListPickerModal
+        visible={listPickerVisible}
+        onClose={() => setListPickerVisible(false)}
+        onSelect={handleImportList}
+      />
     </Modal>
   );
 }
@@ -1353,6 +1594,7 @@ const s = StyleSheet.create({
   posterSlotImg: { width: "100%", height: "100%" },
   posterSlotGradient: { position: "absolute", bottom: 0, left: 0, right: 0, height: 40, alignItems: "center", justifyContent: "flex-end", paddingBottom: 6 },
   posterSlotLabel: { fontSize: 11, fontWeight: "600", marginTop: 5, letterSpacing: 0.2 },
+  posterSlotMeta: { color: "#fff", fontSize: 10, fontWeight: "800", marginTop: 2 },
   reviewTextarea: { flex: 1, minHeight: 160, borderRadius: 16, padding: 14, borderWidth: 0.5, fontSize: 15, lineHeight: 23 },
   miniStarBadge: { position: "absolute", top: 172, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 0.5 },
   miniStarText: { fontSize: 12, fontWeight: "700" },
@@ -1364,6 +1606,7 @@ const s = StyleSheet.create({
   listSection: { marginBottom: 20 },
   sectionLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 1.2, marginBottom: 12 },
   chip: { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999, borderWidth: 0.5, marginRight: 8 },
+  durationChip: { flexDirection: "row", alignItems: "center", gap: 4 },
   chipText: { fontSize: 11, fontWeight: "700" },
 
   // Stacked empty cards
@@ -1380,6 +1623,7 @@ const s = StyleSheet.create({
   listPosterImg: { width: "100%", height: "100%", borderRadius: 12 },
   listPosterOverlay: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 8, paddingTop: 20, borderBottomLeftRadius: 12, borderBottomRightRadius: 12 },
   listPosterTitle: { color: "#fff", fontSize: 10, fontWeight: "700", lineHeight: 13 },
+  listPosterMeta: { color: "rgba(255,255,255,0.78)", fontSize: 9, fontWeight: "700", lineHeight: 11, marginTop: 2 },
   mediaTypeBadge: { position: "absolute", top: 6, left: 6, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, zIndex: 4, opacity: 0.75 },
   mediaTypeText: { color: "#fff", fontSize: 9, fontWeight: "800", letterSpacing: 0.3 },
   removeBadge: { position: "absolute", top: -6, right: -6, backgroundColor: "#fff", borderRadius: 12, zIndex: 5 },
@@ -1431,6 +1675,9 @@ const s = StyleSheet.create({
   shareBtnText: { fontWeight: "700", fontSize: 16, color: "#FFF" },
 
   // Sıralı liste
+  importListBtn: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1, marginBottom: 12 },
+  importListText: { fontSize: 13, fontWeight: "800" },
+  importListHint: { fontSize: 10.5, fontWeight: "600", marginTop: 2 },
   rankedToggle: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 0.5, marginBottom: 14 },
   rankedToggleText: { flex: 1, fontSize: 13, fontWeight: "700" },
   rankBadge: { position: "absolute", top: 6, left: 6, minWidth: 22, height: 22, paddingHorizontal: 5, borderRadius: 8, alignItems: "center", justifyContent: "center", zIndex: 4 },

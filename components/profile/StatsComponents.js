@@ -162,10 +162,15 @@ export const StatsHeroCard = memo(function StatsHeroCard({
   theme,
   primaryCount,
   primaryLabel,
+  // Büyük sayı tekrarlı toplamı gösterir; alt satır aynı ölçünün tekrarsız
+  // karşılığıdır. İkisi yan yana durmadan "500 film" yanıltıcı okunuyordu.
+  primarySubLabel,
   secondaryCount,
   secondaryLabel,
+  secondarySubLabel,
   tertiaryCount,
   tertiaryLabel,
+  tertiarySubLabel,
   chartDataByPeriod = {},
   rewatchItems = [],
   expanded,
@@ -263,6 +268,11 @@ export const StatsHeroCard = memo(function StatsHeroCard({
             <Text style={[heroStyles.label, { color: theme.text.muted }]}>
               {primaryLabel}
             </Text>
+            {!!primarySubLabel && (
+              <Text style={[heroStyles.subLabel, { color: grad1 }]}>
+                {primarySubLabel}
+              </Text>
+            )}
           </View>
 
           {secondaryCount != null && (
@@ -275,6 +285,11 @@ export const StatsHeroCard = memo(function StatsHeroCard({
                 <Text style={[heroStyles.label, { color: theme.text.muted }]}>
                   {secondaryLabel}
                 </Text>
+                {!!secondarySubLabel && (
+                  <Text style={[heroStyles.subLabel, { color: grad1 }]}>
+                    {secondarySubLabel}
+                  </Text>
+                )}
               </View>
             </>
           )}
@@ -289,6 +304,11 @@ export const StatsHeroCard = memo(function StatsHeroCard({
                 <Text style={[heroStyles.label, { color: theme.text.muted }]}>
                   {tertiaryLabel}
                 </Text>
+                {!!tertiarySubLabel && (
+                  <Text style={[heroStyles.subLabel, { color: grad1 }]}>
+                    {tertiarySubLabel}
+                  </Text>
+                )}
               </View>
             </>
           )}
@@ -582,6 +602,7 @@ const heroStyles = StyleSheet.create({
     includeFontPadding: false,
   },
   label: { fontSize: 11, marginTop: 2, fontWeight: "600" },
+  subLabel: { fontSize: 9.5, marginTop: 3, fontWeight: "700" },
   vDivider: { width: 1, height: 36, marginHorizontal: 10 },
 
   chartCard: {

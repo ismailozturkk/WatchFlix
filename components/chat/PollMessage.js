@@ -4,13 +4,15 @@
 //   - type "text"  → metin seçenekleri (oy barı + yüzde)
 //   - type "media" → dizi/film poster seçenekleri (oy ile seçilir)
 // Oy verme tek-seçim + toggle (aynı seçeneğe tekrar basınca geri çekilir).
-// Oylar message.poll.votes = { [uid]: optionId } olarak Firestore'da; sayım UI'da.
+// Oylar message.poll.votes = { [uid]: optionId } olarak Firestore'da; sayım UI'da
+// (postComposer.tallyVotes — sohbet, feed ve post detayı aynı sayımı paylaşır).
 
 import React, { useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { i18nText } from "../../utils/i18nText";
+import { tallyVotes } from "../../utils/postComposer";
 
 export default function PollMessage({
   poll,
@@ -25,16 +27,7 @@ export default function PollMessage({
   const userVote = votes?.[currentUid] || null;
   const isFeed = variant === "feed" && theme;
 
-  const { counts, total } = useMemo(() => {
-    const c = {};
-    let t = 0;
-    Object.values(votes || {}).forEach((optId) => {
-      if (optId == null) return;
-      c[optId] = (c[optId] || 0) + 1;
-      t += 1;
-    });
-    return { counts: c, total: t };
-  }, [votes]);
+  const { counts, total } = useMemo(() => tallyVotes(votes), [votes]);
 
   const pct = (optId) => (total > 0 ? Math.round(((counts[optId] || 0) / total) * 100) : 0);
 
@@ -53,7 +46,14 @@ export default function PollMessage({
         </Text>
       </View>
 
-      <Text style={[styles.question, isFeed && { color: theme.text.primary }]}>{question}</Text>
+      {/* Stili başlık imzası taşısa da bu, KULLANICININ yazdığı anket sorusu —
+          dekoratif başlık fontuna sokulmamalı (bkz. utils/typographyRoles.js). */}
+      <Text
+        fontRole="body"
+        style={[styles.question, isFeed && { color: theme.text.primary }]}
+      >
+        {question}
+      </Text>
 
       {/* ── METİN ANKETİ ── */}
       {type === "text" && (

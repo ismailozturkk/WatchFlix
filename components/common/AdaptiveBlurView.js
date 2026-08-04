@@ -8,9 +8,11 @@
 // düşük RAM'li cihazlarda liste kaydırmada ve detay ekranlarında kare düşüşünün
 // bilinen kaynaklarından (bkz. docs/PERFORMANS_INCELEME_RAPORU.txt).
 //
-// DAVRANIŞ: mid/high katmanda mevcut BlurView aynen render edilir — görüntü
-// birebir değişmez. Yalnız `low` katmanda blur yerine yarı saydam düz bir View
-// çizilir; tek bir compositing geçişi, blur pass'i yok.
+// DAVRANIŞ: efekt modu "Tam" ya da "Orta" iken mevcut BlurView aynen render
+// edilir — görüntü birebir değişmez. Yalnız "Kapalı" modda blur yerine yarı
+// saydam düz bir View çizilir; tek bir compositing geçişi, blur pass'i yok.
+// Modu kullanıcı seçer (Ayarlar → Kişiselleştirme → Efektler); cihaz sınıfı
+// yalnız varsayılanı belirler (bkz. services/effectSettings.js).
 //
 // Çağrı yerleri BlurView'ı bire bir değiştirebilir: `tint`, `intensity`, `style`
 // ve diğer props aynı adlarla geçer.
@@ -18,7 +20,7 @@ import React from "react";
 import { View } from "react-native";
 import { BlurView } from "expo-blur";
 import { alpha } from "../../theme/colors";
-import { perfPreset } from "../../services/deviceTier";
+import { getEffectPresetNow, useEffectPreset } from "../../services/effectSettings";
 
 // Fallback'te blur olmadığı için arka planın yüksek frekanslı detayı (poster,
 // backdrop) olduğu gibi kalır — üstteki metin/ikon aynı kontrast payını
@@ -36,8 +38,12 @@ export function blurFallbackAlpha(intensity = 50) {
   return Math.min(FALLBACK_ALPHA_CEIL, Math.max(FALLBACK_ALPHA_FLOOR, scaled));
 }
 
-/** Düşük katmanda blur devre dışı mı — çağrı yerinin ek karar vermesi gerekirse. */
-export const blurEnabled = perfPreset.blurEnabled;
+/**
+ * Blur şu an açık mı — çağrı yerinin ek karar vermesi gerekirse.
+ * FONKSİYON, sabit değil: mod çalışma anında değişebiliyor ve modül yüklenirken
+ * dondurulmuş bir bayrak ayar değiştikten sonra yalan söylerdi.
+ */
+export const isBlurEnabled = () => getEffectPresetNow().blurEnabled;
 
 /**
  * @param {object}  props
@@ -57,7 +63,11 @@ const AdaptiveBlurView = ({
   children,
   ...rest
 }) => {
-  if (perfPreset.blurEnabled) {
+  // Abonelik: kullanıcı Ayarlar'dan modu değiştirdiğinde açık ekrandaki blur
+  // anında güncellenir (yeniden başlatma gerekmez).
+  const { blurEnabled } = useEffectPreset();
+
+  if (blurEnabled) {
     return (
       <BlurView tint={tint} intensity={intensity} style={style} {...rest}>
         {children}

@@ -154,7 +154,9 @@ const SectionHeader = ({ title, right, theme }) => (
    Main screen
 ───────────────────────────────────────── */
 export default function MovieDetails({ navigation, route }) {
-  const { id } = route.params;
+  // openComments: "Etkinliklerim → Yorumlarım" satırından gelindiğinde yorum
+  // sayfası doğrudan açılır (dizi tarafındaki davranışın filmdeki karşılığı).
+  const { id, openComments = false } = route.params;
   const { user } = useAuth();
   const { language, t } = useLanguage();
   const providerRegion = language === "tr" ? "TR" : "US";
@@ -162,7 +164,7 @@ export default function MovieDetails({ navigation, route }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showFullCast, setShowFullCast] = useState(false);
-  const [commandModalVisible, setCommentModalVisible] = useState(false);
+  const [commandModalVisible, setCommentModalVisible] = useState(!!openComments);
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
   const [headerScale] = useState(new Animated.Value(1));
 
@@ -614,6 +616,23 @@ export default function MovieDetails({ navigation, route }) {
       { title: `${details.title}${year}` },
     );
   }, [details]);
+
+  // Sohbet baloncuğunda uzun prompt yerine kısa istek + poster kartı görünür.
+  const aiDisplay = i18nText(
+    "autoI18n.film_ai_display",
+    "Bu film hakkında bilgi verir misin?",
+  );
+  const aiAttachment = useMemo(() => {
+    if (!details?.title) return null;
+    return {
+      mediaType: "movie",
+      id,
+      title: details.title,
+      year: details.release_date ? String(details.release_date).slice(0, 4) : "",
+      posterPath: details.poster_path || "",
+      rating: details.vote_average || 0,
+    };
+  }, [details, id]);
 
   if (loading) return <DetailsSkeleton />;
   if (!details)
@@ -1430,6 +1449,8 @@ export default function MovieDetails({ navigation, route }) {
         visible={aiVisible}
         onClose={() => setAiVisible(false)}
         initialPrompt={aiPrompt}
+        initialDisplay={aiDisplay}
+        initialAttachment={aiAttachment}
       />
     </View>
   );

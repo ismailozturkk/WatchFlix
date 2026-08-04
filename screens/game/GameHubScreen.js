@@ -195,7 +195,7 @@ function PlayerProfileBanner({ user, progress, theme }) {
       <View style={styles.xpTrackWrap}>
         <View style={styles.xpHeader}>
           <Text style={[styles.xpTitle, { color: theme.text.muted }]} allowFontScaling={false}>
-            XP İlerlemesi
+            {i18nText("autoI18n.xp_ilerlemesi", "XP İlerlemesi")}
           </Text>
           <Text style={[styles.xpValue, { color: theme.text.primary }]} allowFontScaling={false}>
             {currentXp} / {nextLevelXp} XP

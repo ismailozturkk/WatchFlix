@@ -10,6 +10,7 @@ import {
   StatusBar,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
+import { useFontFamilyForRole } from "@components/typography/AppText";
 import { useTheme } from "@context/ThemeContext";
 import { useCalendar } from "@context/CalendarContext";
 import { useLanguage } from "@context/LanguageContext";
@@ -17,6 +18,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { i18nText } from "@utils/i18nText";
+import ScreenDecor from "@components/ScreenDecor";
 import {
   CalendarFilterPanel,
   CalendarRangePicker,
@@ -446,6 +448,13 @@ export default function CalendarScreen({ navigation }) {
   );
 
   /* ── Takvim theme overrides ── */
+  // react-native-calendars metni node_modules içinde çizer; babel dönüşümü
+  // oraya ulaşmaz, font ancak theme'e düz bir aile adı yazılarak uygulanır.
+  // Üç yüzey üç role denk düşüyor: ay başlığı BAŞLIK, hafta günü satırı
+  // NORMAL YAZI, gün rakamları RAKAM.
+  const ayFontu = useFontFamilyForRole("heading", { fontWeight: "700" });
+  const gunBasligiFontu = useFontFamilyForRole("body", { fontWeight: "500" });
+  const gunFontu = useFontFamilyForRole("numeric", { fontWeight: "500" });
   const calendarTheme = useMemo(
     () => ({
       calendarBackground: "transparent",
@@ -460,12 +469,17 @@ export default function CalendarScreen({ navigation }) {
       arrowColor: theme.accent,
       monthTextColor: theme.text.primary,
       indicatorColor: theme.accent,
-      textDayFontWeight: "500",
-      textMonthFontWeight: "700",
+      // Aile adı doğru ağırlık dosyasını zaten gösteriyor; ayrıca fontWeight
+      // vermek Android'de sentetik kalınlık ekler.
+      textDayFontFamily: gunFontu,
+      textDayFontWeight: gunFontu ? "400" : "500",
+      textMonthFontFamily: ayFontu,
+      textMonthFontWeight: ayFontu ? "400" : "700",
+      textDayHeaderFontFamily: gunBasligiFontu,
       textMonthFontSize: 16,
       textDayHeaderFontSize: 11,
     }),
-    [theme],
+    [ayFontu, gunBasligiFontu, gunFontu, theme],
   );
 
   /* ── markedDates + odak gün ── */
@@ -513,6 +527,7 @@ export default function CalendarScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
+      <ScreenDecor iconOpacity={0.25} />
       <StatusBar barStyle="light-content" />
 
       {/* Header */}

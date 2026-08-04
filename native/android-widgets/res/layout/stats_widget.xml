@@ -23,6 +23,7 @@
         android:orientation="horizontal">
 
         <ImageView
+            android:id="@+id/stats_widget_logo"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:background="@drawable/reminder_widget_logo_badge"
@@ -60,6 +61,7 @@
 
         <!-- Sol panel: izlenen film sayısı -->
         <LinearLayout
+            android:id="@+id/stats_widget_movie_count_panel"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="43"
@@ -92,6 +94,7 @@
 
         <!-- Sağ panel: yıl / ay / gün / saat / dakika -->
         <LinearLayout
+            android:id="@+id/stats_widget_movie_time_panel"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_marginStart="5dp"
@@ -236,6 +239,7 @@
 
     <!-- ── Toplam süre şeridi ───────────────────────────────────────────── -->
     <LinearLayout
+        android:id="@+id/stats_widget_duration_strip"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="7dp"
@@ -362,6 +366,7 @@
 
         <!-- Sol panel: dizi + bölüm sayısı -->
         <LinearLayout
+            android:id="@+id/stats_widget_tv_count_panel"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="43"
@@ -426,6 +431,7 @@
 
         <!-- Sağ panel: yıl / ay / gün / saat / dakika -->
         <LinearLayout
+            android:id="@+id/stats_widget_tv_time_panel"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_marginStart="5dp"

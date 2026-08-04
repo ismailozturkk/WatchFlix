@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
 import { useTheme } from "@context/ThemeContext";
+import { i18nText } from "@utils/i18nText";
 
 export function GameScreenShell({ navigation, title, subtitle, children, scroll = true, onBack, headerRight }) {
   const { theme } = useTheme();
@@ -15,7 +16,7 @@ export function GameScreenShell({ navigation, title, subtitle, children, scroll 
       <View style={styles.header}>
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel="Geri"
+          accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
           onPress={onBack || (() => navigation.goBack())}
           style={[styles.backButton, { backgroundColor: theme.secondary, borderColor: theme.border }]}
         >

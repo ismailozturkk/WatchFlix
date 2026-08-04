@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
+import android.view.View
 import android.widget.RemoteViews
 import com.smlztrk.seelogd.MainActivity
 import com.smlztrk.seelogd.R
@@ -114,20 +115,48 @@ class ListsWidgetProvider : AppWidgetProvider() {
       val total = lists.length()
       val index = selectedIndex(context, widgetId, total)
       val selected: JSONObject? = if (total > 0) lists.optJSONObject(index) else null
+      val preferences = WidgetPreferences.load(context)
+      val appearance = preferences.listsAppearance
 
       val views = RemoteViews(context.packageName, R.layout.lists_widget)
+      WidgetThemeViews.tintBackground(
+        views,
+        R.id.lists_widget_root,
+        appearance.background,
+      )
+      WidgetThemeViews.tintBackground(
+        views,
+        R.id.lists_widget_header,
+        appearance.surface,
+      )
+      views.setViewVisibility(
+        R.id.lists_widget_icon,
+        if (preferences.listsShowTitle) View.VISIBLE else View.GONE,
+      )
+      views.setViewVisibility(
+        R.id.lists_widget_title,
+        if (preferences.listsShowTitle) View.VISIBLE else View.GONE,
+      )
 
-      val accent = parseColor(selected?.optString("accent"), ACCENT_DEFAULT)
+      val accent = appearance.accent
       views.setTextViewText(
         R.id.lists_widget_title,
         selected?.optString("name")?.takeIf { it.isNotBlank() }
           ?: if (isTurkish) "Listelerim" else "My Lists",
       )
+      views.setTextColor(R.id.lists_widget_title, appearance.text)
       views.setTextViewText(
         R.id.lists_widget_count,
         selected?.optInt("count", 0)?.toString() ?: "0",
       )
+      views.setViewVisibility(
+        R.id.lists_widget_count,
+        if (preferences.listsShowCount) View.VISIBLE else View.GONE,
+      )
       views.setTextColor(R.id.lists_widget_count, accent)
+      views.setTextColor(R.id.lists_widget_position, appearance.muted)
+      views.setInt(R.id.lists_widget_prev, "setColorFilter", appearance.secondaryText)
+      views.setInt(R.id.lists_widget_next, "setColorFilter", appearance.secondaryText)
       views.setInt(R.id.lists_widget_icon, "setColorFilter", accent)
       views.setImageViewResource(
         R.id.lists_widget_icon,
@@ -140,7 +169,9 @@ class ListsWidgetProvider : AppWidgetProvider() {
         R.id.lists_widget_position,
         if (total > 0) "${index + 1}/$total" else "0/0",
       )
-      val navVisibility = if (total > 1) android.view.View.VISIBLE else android.view.View.GONE
+      val navVisibility =
+        if (total > 1 && preferences.listsShowNavigation) View.VISIBLE
+        else View.GONE
       views.setViewVisibility(R.id.lists_widget_prev, navVisibility)
       views.setViewVisibility(R.id.lists_widget_next, navVisibility)
       views.setViewVisibility(R.id.lists_widget_position, navVisibility)

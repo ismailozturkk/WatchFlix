@@ -19,6 +19,7 @@ public class ReminderWidgetModule: Module {
   private let listsKey = "lists"
   private let statsKey = "stats"
   private let languageKey = "language"
+  private let preferencesKey = "preferences"
 
   private func write(_ payload: String?, forKey key: String, language: String?) {
     let defaults = UserDefaults(suiteName: appGroupId)
@@ -60,6 +61,10 @@ public class ReminderWidgetModule: Module {
 
     AsyncFunction("clearStats") {
       self.write(nil, forKey: self.statsKey, language: nil)
+    }
+
+    AsyncFunction("updatePreferences") { (payload: String) in
+      self.write(payload, forKey: self.preferencesKey, language: nil)
     }
   }
 }

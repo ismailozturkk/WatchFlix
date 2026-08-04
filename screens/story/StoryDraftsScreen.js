@@ -17,6 +17,7 @@ import { useTheme } from "@context/ThemeContext";
 import { StoryDraftService } from "@services/StoryDraftService";
 import { i18nText } from "@utils/i18nText";
 import { appAlert } from "@components/AppAlert";
+import ScreenDecor from "@components/ScreenDecor";
 
 
 const COLS = 3;
@@ -57,7 +58,10 @@ export default function StoryDraftsScreen({ navigation }) {
   };
 
   const handleDelete = (draft) => {
-    appAlert(i18nText("autoI18n.taslagi_sil", "Taslağı sil"), `"${draft.name}" silinsin mi?`, [
+    appAlert(
+      i18nText("autoI18n.taslagi_sil", "Taslağı sil"),
+      i18nText("autoI18n.taslak_sil_onay", "\"{{name}}\" silinsin mi?", { name: draft.name }),
+      [
       { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
       {
         text: i18nText("autoI18n.sil", "Sil"),
@@ -65,10 +69,11 @@ export default function StoryDraftsScreen({ navigation }) {
         onPress: async () => {
           await StoryDraftService.deleteDraft(draft.id);
           setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
-          Toast.show({ type: "success", text1: "Taslak silindi" });
+          Toast.show({ type: "success", text1: i18nText("autoI18n.taslak_silindi", "Taslak silindi") });
         },
       },
-    ]);
+      ],
+    );
   };
 
   const renderItem = ({ item }) => (
@@ -107,6 +112,7 @@ export default function StoryDraftsScreen({ navigation }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
+      <ScreenDecor iconOpacity={0.3} />
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
         <TouchableOpacity

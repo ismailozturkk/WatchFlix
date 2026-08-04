@@ -147,25 +147,6 @@ const MovieTrendCard = memo(function MovieTrendCard({
             recyclingKey={`movietrend-${item.id}`}
             transition={120}
           />
-        </Animated.View>
-        <Animated.View
-          style={[
-            styles.infoContainer,
-            {
-              shadowColor: theme.shadow,
-              transform: [
-                { scale: finalScale },
-                {
-                  translateY: finalScale.interpolate({
-                    inputRange: [0.9, 1],
-                    outputRange: [1, 20],
-                  }),
-                },
-              ],
-              opacity,
-            },
-          ]}
-        >
           {posterBadges?.tmdbRating !== false && (
             <RatingBadge
               value={item.vote_average}
@@ -178,7 +159,7 @@ const MovieTrendCard = memo(function MovieTrendCard({
             mediaId={item.id}
             mediaType="movie"
             theme={theme}
-            style={{ position: "absolute", left: 10, bottom: 30 }}
+            style={styles.trendListBadges}
           />
         </Animated.View>
       </TouchableOpacity>
@@ -248,6 +229,8 @@ export default function MovieTrends({ navigation }) {
       ]}
     >
       <Text
+        // Seçili filtre çipi 20px'e büyüyor ama başlık değil, bir butondur.
+        fontRole="body"
         style={[
           selectedCategoryTrends === item
             ? styles.selectedCategoryText
@@ -418,15 +401,12 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  infoContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
   trendRating: {
     position: "absolute",
-    top: -42,
-    right: 6,
+    right: 8,
+    bottom: 8,
   },
+  trendListBadges: { position: "absolute", left: 8, bottom: 8 },
   title: {
     textAlign: "center",
     fontSize: 16,

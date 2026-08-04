@@ -25,6 +25,7 @@ import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { fetchUserPosts } from "../../services/postsService";
 import { i18nText } from "../../utils/i18nText";
 import { postTypeBadge, tallyVotes } from "../../utils/postComposer";
+import ScreenDecor from "@components/ScreenDecor";
 
 
 // Basit göreli zaman (TR)
@@ -378,6 +379,8 @@ export default function MyPostsScreen({ navigation }) {
       style={[styles.container, { backgroundColor: theme.primary }]}
       edges={["top"]}
     >
+      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
+      <ScreenDecor iconOpacity={0.25} />
       {/* Başlık */}
       <View style={styles.header}>
         <TouchableOpacity

@@ -46,6 +46,7 @@ import { useTheme } from "@context/ThemeContext";
 import { useAppSettings, useImageQualitySettings } from "@context/AppSettingsContext";
 import { useProfileStats } from "@context/ProfileStatsContext";
 import { useListStatusContext } from "@context/ListStatusContext";
+import { usePremium } from "@context/PremiumContext";
 import { alpha } from "@theme/colors";
 
 import {
@@ -53,6 +54,7 @@ import {
   collectTitles,
   splitTitlesForLookup,
   buildPosterMap,
+  responseToHistoryText,
   friendlyError,
   toStr,
 } from "@services/aiCineService";
@@ -61,6 +63,7 @@ import { resolveCards } from "@services/tmdbLookup";
 import {
   loadCineConversations,
   persistCineConversations,
+  saveCineConversation,
   upsertCineConversation,
   removeCineConversation,
   makeId,
@@ -78,6 +81,11 @@ const FAB_ORIGIN = [SCREEN_W - 49, SCREEN_H - 109, 0];
 const TABS = ["explore", "plan", "lists"];
 const PREFS_KEY = "@seelogd/ai_cine_prefs";
 const DEFAULT_PREFS = { enabled: false, watchList: true, favorites: true, custom: true, watched: true };
+const AI_PLAN_LIMITS = {
+  free: { daily: 5, monthly: 30 },
+  premium: { daily: 20, monthly: 300 },
+  unlimited: { daily: 50, monthly: 900 },
+};
 const LIST_TOGGLES = [
   ["watchList", "listWatchList"],
   ["favorites", "listFavorites"],
@@ -137,6 +145,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
     thirdWatchedGenreTv,
   } = useProfileStats();
   const { combinedLists: allLists } = useListStatusContext();
+  const { plan: premiumPlan } = usePremium();
 
   const [view, setView] = useState("chat"); // "chat" | "history"
   const [message, setMessage] = useState("");
@@ -144,10 +153,29 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
   const [activeTab, setActiveTab] = useState("explore");
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [prefs, setPrefs] = useState(DEFAULT_PREFS);
+  const [quota, setQuota] = useState(null);
 
   const [messages, setMessages] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [conversations, setConversations] = useState([]);
+
+  const quotaPlan = AI_PLAN_LIMITS[premiumPlan] ? premiumPlan : "free";
+  const quotaText = useMemo(() => {
+    const serverPlan = AI_PLAN_LIMITS[quota?.plan] ? quota.plan : quotaPlan;
+    const planLabel = t?.AICineChat?.plans?.[serverPlan] || serverPlan;
+    const daily = quota?.daily;
+    const monthly = quota?.monthly;
+    const template = daily && monthly
+      ? t?.AICineChat?.quotaUsage || "{plan} · Bugün {dailyUsed}/{dailyLimit} · Bu ay {monthlyUsed}/{monthlyLimit}"
+      : t?.AICineChat?.quotaLimits || "{plan} · Günlük {dailyLimit} · Aylık {monthlyLimit}";
+    const limits = AI_PLAN_LIMITS[serverPlan];
+    return template
+      .replace("{plan}", planLabel)
+      .replace("{dailyUsed}", String(daily?.used ?? 0))
+      .replace("{dailyLimit}", String(daily?.limit ?? limits.daily))
+      .replace("{monthlyUsed}", String(monthly?.used ?? 0))
+      .replace("{monthlyLimit}", String(monthly?.limit ?? limits.monthly));
+  }, [premiumPlan, quota, quotaPlan, t]);
 
   // ── Aç/kapa animasyonu (FAB'dan büyür / FAB'a küçülür) ──────────────────────
   const anim = useRef(new Animated.Value(0)).current;
@@ -267,21 +295,18 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
   // ── Aktif sohbeti diske kaydet ──
   const saveActive = useCallback((msgs, id) => {
     if (!id || !msgs.length) return;
-    setConversations((prev) => {
-      const existing = prev.find((c) => c.id === id);
-      const now = Date.now();
-      const firstUser = msgs.find((m) => m.role === "user");
-      const conv = {
-        id,
-        title: existing?.title || summarizeTitle(firstUser?.display || firstUser?.text || "…"),
-        messages: msgs,
-        createdAt: existing?.createdAt || now,
-        updatedAt: now,
-      };
-      const next = upsertCineConversation(prev, conv);
-      persistCineConversations(next);
-      return next;
-    });
+    const now = Date.now();
+    const firstUser = msgs.find((m) => m.role === "user");
+    const conv = {
+      id,
+      title: summarizeTitle(firstUser?.display || firstUser?.text || "…"),
+      messages: msgs,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    setConversations((prev) => upsertCineConversation(prev, conv));
+    saveCineConversation(conv).then(setConversations).catch(() => {});
   }, []);
 
   // ── Asistanı çalıştır ──
@@ -295,10 +320,9 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
           .slice(0, -1)
           .map((m) => {
             if (m.role === "assistant" && m.aiResponse) {
-              const r = m.aiResponse;
               return {
                 role: "assistant",
-                text: [toStr(r.title), toStr(r.summary || r.content)].filter(Boolean).join(" — "),
+                text: responseToHistoryText(m.aiResponse),
               };
             }
             return { role: m.role, text: m.text || m.display || "" };
@@ -313,6 +337,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
           tvGenres,
           offTopicReply: t?.AICineChat?.offTopic,
           userLibrary: library?.librarySummary || "",
+          onQuota: setQuota,
         });
 
         // Başlıkları TMDB poster kartlarına çöz
@@ -326,6 +351,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
             series,
             language,
             includeAdult: adultContent,
+            includeDetails: response.type === "title_spotlight",
           });
           posterMap = buildPosterMap(cards);
         }
@@ -341,9 +367,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
           role: "assistant",
           aiResponse: finalResponse,
           posterMap,
-          text: [toStr(finalResponse.title), toStr(finalResponse.summary || finalResponse.content)]
-            .filter(Boolean)
-            .join(" — "),
+          text: responseToHistoryText(finalResponse),
         };
         const finalMessages = [...msgsIncludingUser, aiMsg];
         setMessages(finalMessages);
@@ -351,6 +375,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
         scrollToEndSoon();
       } catch (err) {
         const code = err?.code || "GENERIC";
+        if (err?.quota) setQuota(err.quota);
         if (__DEV__) {
           // eslint-disable-next-line no-console
           console.warn(i18nText("autoI18n.cinematch_pro_hata", "[CineMatch Pro] hata:"), code, err?.message);
@@ -513,12 +538,12 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
                 autoPlay
                 loop
               />
-              <View>
+              <View style={styles.headerCopy}>
                 <Text style={[styles.headerTitle, { color: theme.text.primary }]}>
                   {t?.AICineChat?.title || "CineMatch"}
                 </Text>
-                <Text style={[styles.headerSub, { color: theme.text.muted }]}>
-                  {t?.AICineChat?.subtitle || i18nText("autoI18n.film_dizi_asistani", "Film & dizi asistanı")}
+                <Text numberOfLines={1} style={[styles.headerSub, { color: theme.text.muted }]}>
+                  {quotaText}
                 </Text>
               </View>
             </View>
@@ -778,6 +803,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerBtn: { paddingHorizontal: 4, paddingVertical: 2 },
+  headerCopy: { flex: 1, minWidth: 0 },
   headerTitle: { fontSize: 16, fontWeight: "800", letterSpacing: -0.3 },
   headerSub: { fontSize: 11, marginTop: -1 },
 

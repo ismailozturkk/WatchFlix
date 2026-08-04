@@ -41,4 +41,15 @@ class ReminderWidgetModule(
       promise.reject("REMINDER_WIDGET_CLEAR_FAILED", error)
     }
   }
+
+  @ReactMethod
+  fun updatePreferences(payload: String, promise: Promise) {
+    try {
+      WidgetPreferences.save(context, payload)
+      ReminderWidgetProvider.refreshAll(context)
+      promise.resolve(null)
+    } catch (error: Exception) {
+      promise.reject("REMINDER_WIDGET_PREFERENCES_FAILED", error)
+    }
+  }
 }

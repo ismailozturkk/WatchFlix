@@ -236,12 +236,14 @@ function mapCallableError(err) {
   const details = err?.details;
 
   if (code.endsWith("resource-exhausted")) {
-    if (details?.reason === "DAILY_QUOTA") {
+    if (details?.reason === "DAILY_QUOTA" || details?.reason === "MONTHLY_QUOTA") {
       const e = new GeminiError(
-        "QUOTA",
-        `Daily AI quota exceeded (${details.used}/${details.limit})`,
+        details.reason === "MONTHLY_QUOTA" ? "MONTHLY_QUOTA" : "QUOTA",
+        details.reason === "MONTHLY_QUOTA"
+          ? `Monthly AI quota exceeded (${details.monthly?.used}/${details.monthly?.limit})`
+          : `Daily AI quota exceeded (${details.daily?.used ?? details.used}/${details.daily?.limit ?? details.limit})`,
       );
-      e.quota = details; // UI "3/5" gibi göstermek isterse
+      e.quota = details;
       return e;
     }
     return new GeminiError("RATE_LIMIT", "Rate limited by server");
@@ -283,7 +285,13 @@ function mapCallableError(err) {
  * @returns {Promise<object>} Gemini generateContent yanıtı
  * @throws {GeminiError}
  */
-export async function callGeminiProxy({ mode, history = [], userMessage, systemInstruction }) {
+export async function callGeminiProxy({
+  mode,
+  history = [],
+  userMessage,
+  systemInstruction,
+  onQuota,
+}) {
   let call;
   try {
     // Lazy require: bu modül saf JS kalsın (testler firebase'i yüklemesin).
@@ -309,7 +317,13 @@ export async function callGeminiProxy({ mode, history = [], userMessage, systemI
   }
   const quota = result?.data?.quota;
   if (quota) {
-    console.log(`[callGemini] 📊 Günlük AI kota: ${quota.used}/${quota.limit}`);
+    onQuota?.(quota);
+    const daily = quota.daily || quota;
+    const monthly = quota.monthly;
+    console.log(
+      `[callGemini] 📊 AI kota: günlük ${daily.used}/${daily.limit}` +
+        (monthly ? ` · aylık ${monthly.used}/${monthly.limit}` : ""),
+    );
   }
   return data;
 }

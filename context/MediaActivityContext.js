@@ -53,6 +53,8 @@ const buildActivityIndex = ({ ratingsMap, commentsMap }) => {
   );
   Object.values(commentsMap).forEach(({ kind, targetId }) => {
     if (kind !== "movie" && kind !== "tv") return; // post yorumları içerik rozeti değil
+    // Kapsam (dizi/sezon/bölüm) burada BİLEREK yok sayılır: rozet "bu içeriğe
+    // yorum yaptım" demektir, bir sezona yazmak da diziye yorum yapmaktır.
     mark(kind, targetId, "hasComment");
   });
 

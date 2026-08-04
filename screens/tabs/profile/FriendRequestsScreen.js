@@ -195,24 +195,35 @@ export default function FriendRequestsScreen() {
     >
       <ScreenDecor iconOpacity={0.3} />
 
-      {/* Başlık */}
-      <Animated.Text
-        style={[
-          styles.pageTitle,
-          { color: theme.text?.primary ?? "#fff" },
-          {
-            opacity: titleAnim,
-            transform: [
-              {
-                translateY: titleAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-16, 0],
-                }),
-              },
-            ],
-          },
-        ]}
-      >{i18nText("autoI18n.arkadaslik_istekleri", "Arkadaşlık İstekleri")}</Animated.Text>
+      {/* Geri + başlık */}
+      <View style={styles.headerBar}>
+        <View style={styles.headerSide}>
+          <BackButton absolute={false} />
+        </View>
+        <Animated.Text
+          allowFontScaling={false}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
+          style={[
+            styles.pageTitle,
+            { color: theme.text?.primary ?? "#fff" },
+            {
+              opacity: titleAnim,
+              transform: [
+                {
+                  translateY: titleAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-16, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >{i18nText("autoI18n.arkadaslik_istekleri", "Arkadaşlık İstekleri")}</Animated.Text>
+        {/* Başlık geri butonuna rağmen ortalı kalsın diye simetrik boşluk */}
+        <View style={styles.headerSide} />
+      </View>
 
       {/* Sekme çubuğu */}
       <View style={[styles.tabBar, { backgroundColor: theme.secondary }]}>
@@ -306,7 +317,6 @@ export default function FriendRequestsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
-      <BackButton />
     </SafeAreaView>
   );
 }
@@ -314,13 +324,22 @@ export default function FriendRequestsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 10 },
 
+  // Geri butonu satır içinde: eskiden absolute olduğu için başlığın üstüne
+  // biniyordu. headerSide iki yanda eşit boşluk bırakıp başlığı ortalı tutar.
+  headerBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    marginTop: 4,
+  },
+  headerSide: { width: 40 },
   pageTitle: {
+    flex: 1,
     fontSize: 26,
     fontWeight: "800",
     textAlign: "center",
     letterSpacing: -0.5,
-    marginBottom: 16,
-    marginTop: 4,
   },
 
   // ── Tab bar ──────────────────────────────────────────────────────────────

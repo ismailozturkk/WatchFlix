@@ -11,6 +11,8 @@
 //   - Avatar değişse bile "eski post'lar eski avatarı gösterir" problemine
 //     çözüm: post'ta sabit `authorAvatarIndex` snapshot'ı tutulur.
 
+import { randomInt } from "./randomPick";
+
 export const AVATARS = [
   require("../assets/avatar/0.png"),  require("../assets/avatar/1.png"),
   require("../assets/avatar/2.png"),  require("../assets/avatar/3.png"),
@@ -62,4 +64,13 @@ export function clampAvatarIndex(index) {
  */
 export function getAvatarSource(index) {
   return AVATARS[clampAvatarIndex(index)];
+}
+
+/**
+ * Yeni hesaplara atanacak rastgele avatar index'i.
+ * Herkesin 0 numaralı avatarla başlamaması ve dağılımın 56 görsele düzgün
+ * yayılması için CSPRNG kullanılır (bkz. utils/randomPick.js).
+ */
+export function randomAvatarIndex() {
+  return randomInt(AVATAR_COUNT);
 }

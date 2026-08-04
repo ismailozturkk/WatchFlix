@@ -36,6 +36,7 @@ import {
   useListLayoutSettings,
 } from "../../context/AppSettingsContext";
 import CreatePostModal from "@components/modals/CreatePostModal";
+import SaveSharedListModal from "@components/modals/SaveSharedListModal";
 import PostCommentSheetModal from "@components/modals/PostCommentSheetModal";
 import StaggerItem from "@components/StaggerItem";
 import BackButton from "@components/BackButton";
@@ -48,6 +49,7 @@ import { appAlert } from "@components/AppAlert";
 import { toast } from "@components/AppToast";
 import { reportPost } from "../../services/postsService";
 import axios from "axios";
+import ScreenDecor from "@components/ScreenDecor";
 
 const { width } = Dimensions.get("window");
 
@@ -305,6 +307,7 @@ const PostCard = memo(function PostCard({
   onPressAuthor,
   onReport,
   onVote,
+  onSaveList,
   getTmdbUrl,
   postListPosterLayout,
 }) {
@@ -1001,6 +1004,22 @@ const PostCard = memo(function PostCard({
             color={post.bookmarkedByMe ? theme.accent : theme.text.secondary}
           />
         </TouchableOpacity>
+        {/* Listeyi kaydet — yalnız liste paylaşımlarında. Yer imi post'u
+            saklar, bu ise içeriği kendi listene KOPYALAR; ikisi ayrı iş. */}
+        {post.type === "list" && post.mediaList?.length > 0 && (
+          <TouchableOpacity
+            style={[postStyles.actionBtn, postStyles.saveListBtn, { borderColor: `${accentColor}55` }]}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={i18nText("autoI18n.listeyi_kaydet", "Listeyi kaydet")}
+            onPress={() => onSaveList?.(post)}
+          >
+            <AppIcon family="Ionicons" name="albums-outline" size={16} color={accentColor} />
+            <Text style={[postStyles.saveListText, { color: accentColor }]} numberOfLines={1}>
+              {i18nText("autoI18n.listeyi_kaydet", "Listeyi kaydet")}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
         </View>
       </View>
@@ -1126,6 +1145,9 @@ export default function ShareContentScreen({ route }) {
   const [editingPost, setEditingPost] = useState(null); // null = create, obj = edit
   const [initialPost, setInitialPost] = useState(null);
   const [commentPost, setCommentPost] = useState(null); // yorum modalı açık post
+  // "Listeyi kaydet" sayfası kart başına değil ekran başına: 30 kartın her
+  // biri kendi modalını taşısaydı gereksiz ağaç kurulurdu.
+  const [saveListPost, setSaveListPost] = useState(null);
   const consumedComposeKey = useRef(null);
 
   useEffect(() => {
@@ -1385,6 +1407,7 @@ export default function ShareContentScreen({ route }) {
           onPressAuthor={handleOpenProfile}
           onReport={handleReportPost}
           onVote={votePoll}
+          onSaveList={setSaveListPost}
           getTmdbUrl={getTmdbUrl}
           postListPosterLayout={postListPosterLayout}
         />
@@ -1420,6 +1443,8 @@ export default function ShareContentScreen({ route }) {
       style={[mainStyles.container, { backgroundColor: theme.primary }]}
       edges={["top"]}
     >
+      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
+      <ScreenDecor iconOpacity={0.25} />
       <FlatList
         data={enrichedPosts}
         keyExtractor={(p) => p.id}
@@ -1465,6 +1490,12 @@ export default function ShareContentScreen({ route }) {
           onClose={handleCloseComments}
         />
       </Modal>
+
+      <SaveSharedListModal
+        visible={saveListPost != null}
+        post={saveListPost}
+        onClose={() => setSaveListPost(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -1795,6 +1826,17 @@ const postStyles = StyleSheet.create({
     paddingVertical: 7,
   },
   actionText: { fontSize: 12, fontWeight: "700" },
+  // Liste kaydetme aksiyonu diğerlerinden ayrılsın diye çerçeveli ve sağa
+  // yaslı: beğeni/yorum sayaçlarıyla aynı görsel ağırlıkta olmamalı.
+  saveListBtn: {
+    marginLeft: "auto",
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 5,
+    maxWidth: 165,
+  },
+  saveListText: { flexShrink: 1, fontSize: 11, fontWeight: "800" },
   pollWrap: {
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,

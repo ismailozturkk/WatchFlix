@@ -125,7 +125,7 @@ export function extractJSON(text) {
  */
 export function normalizeResponse(obj) {
   if (!obj || typeof obj !== "object") {
-    return { type: "general", title: "", summary: "", content: toStr(obj), tips: [] };
+    return { type: "general", content: toStr(obj) };
   }
   let type = obj.type;
   if (!CINE_VALID_TYPES.includes(type)) {
@@ -203,11 +203,37 @@ export function splitTitlesForLookup(pairs) {
 /** resolveCards çıktısını posterKey → card haritasına çevirir. */
 export function buildPosterMap(cards) {
   const map = {};
-  safeArr(cards).forEach((c) => {
+  const add = (c) => {
     if (!c) return;
     map[posterKey(c.mediaType, c.query)] = c;
-  });
+    safeArr(c.similar).forEach(add);
+  };
+  safeArr(cards).forEach(add);
   return map;
+}
+
+/** Yapılandırılmış cevabı kısa konuşma geçmişine çevirir. */
+export function responseToHistoryText(response) {
+  if (!response || typeof response !== "object") return "";
+  const titleOf = (item) => toStr(item?.title).trim();
+  const titlesOf = (items) => safeArr(items).map(titleOf).filter(Boolean);
+
+  switch (response.type) {
+    case "recommendations":
+      return `recommendations: ${titlesOf(response.items).join(", ")}`;
+    case "comparison":
+      return [`comparison: ${titleOf(response.left)} vs ${titleOf(response.right)}`, toStr(response.verdict)]
+        .filter(Boolean).join(" — ");
+    case "watch_plan":
+      return `watch plan: ${safeArr(response.sessions).flatMap((s) => titlesOf(s?.items)).join(", ")}`;
+    case "watchlist":
+      return `watchlist: ${safeArr(response.sections).flatMap((s) => titlesOf(s?.items)).join(", ")}`;
+    case "title_spotlight":
+      return [`title: ${titleOf(response)}`, toStr(response.take || response.summary)]
+        .filter(Boolean).join(" — ");
+    default:
+      return toStr(response.content || response.summary || response.title);
+  }
 }
 
 // ── GeminiError.code → lokalize hata mesajı ───────────────────────────────────
@@ -225,6 +251,8 @@ export function friendlyError(code, t) {
       return e.rateLimit || "Çok fazla istek. Biraz sonra tekrar dene.";
     case "QUOTA":
       return e.quota || "Bugünlük AI hakkın doldu. Yarın tekrar dene.";
+    case "MONTHLY_QUOTA":
+      return e.monthlyQuota || "Bu aylık AI hakkın doldu. Gelecek ay tekrar dene.";
     case "AUTH":
       return e.authRequired || "AI sohbet için giriş yapman gerekiyor.";
     case "BLOCKED":
@@ -265,13 +293,14 @@ export function buildCineSystemInstruction({
     : "USER TASTE PROFILE: unknown — infer from the conversation.";
 
   return [
-    `ROLE: You are "CineMatch", a film & TV expert living inside the Seelogd app. You help users discover and decide what to watch.`,
+    `ROLE: You are CineMatch, Seelogd's concise film and TV decision assistant.`,
 
     `OUTPUT FORMAT (CRITICAL):
 - Respond with a SINGLE valid JSON object and NOTHING else. No markdown, no code fences, no commentary outside JSON.
 - The JSON MUST have a "type" field set to one of: recommendations | comparison | watch_plan | watchlist | title_spotlight | general.
 - Every referenced title MUST be an object {"title": "Exact Title", "mediaType": "movie" | "tv"}. mediaType is REQUIRED.
-- Keep text fields concise and spoiler-free. Always write all human-readable text in ${language}.`,
+- Never invent TMDB IDs or factual metadata. Seelogd resolves IDs, posters, year, rating, genres, runtime, cast, crew, providers and similar titles from TMDB.
+- Keep every text field to one short spoiler-free sentence. Write human-readable text in ${language}.`,
 
     tasteBlock,
 
@@ -285,35 +314,35 @@ export function buildCineSystemInstruction({
 - recommendations → user wants suggestions ("öner", "recommend", "ne izlesem").
 - general         → greetings, trivia, or anything else on-topic that doesn't fit above.`,
 
-    `SCHEMAS (fill only the chosen type; omit fields you are unsure of):
+    `COMPACT SCHEMAS (return only the chosen schema; never add title, summary, tips or factual TMDB fields):
 
 recommendations:
-{"type":"recommendations","title":"...","summary":"...","items":[{"title":"...","mediaType":"movie","hook":"one-sentence spoiler-free hook","why":"why it fits the user","year":"2010","genre":"Sci-Fi","rating":8.4}],"tips":["..."]}
+{"type":"recommendations","items":[{"title":"Exact Title","mediaType":"movie","reason":"why it fits"}]}
 
 comparison:
-{"type":"comparison","title":"...","summary":"...","left":{"title":"...","mediaType":"movie"},"right":{"title":"...","mediaType":"movie"},"metrics":[{"label":"Story","leftScore":4,"rightScore":5},{"label":"Acting","leftScore":5,"rightScore":4},{"label":"Visuals","leftScore":5,"rightScore":5},{"label":"Rewatch","leftScore":3,"rightScore":4}],"leftPros":["..."],"leftCons":["..."],"rightPros":["..."],"rightCons":["..."],"verdict":"short conclusion","tips":["..."]}
+{"type":"comparison","left":{"title":"Exact Title","mediaType":"movie"},"right":{"title":"Exact Title","mediaType":"movie"},"metrics":[{"key":"story","left":4,"right":5}],"leftPros":["..."],"leftCons":["..."],"rightPros":["..."],"rightCons":["..."],"verdict":"short conclusion"}
 
 watch_plan:
-{"type":"watch_plan","title":"...","summary":"...","totalRuntime":"~18h","sessions":[{"label":"Day 1 — Pilot night","items":[{"title":"...","mediaType":"tv","runtime":"3 x 47m"}],"note":"short tip"}],"tips":["..."]}
+{"type":"watch_plan","sessions":[{"label":"Day 1","items":[{"title":"Exact Title","mediaType":"tv"}]}]}
 
 watchlist:
-{"type":"watchlist","title":"...","summary":"...","sections":[{"name":"Essentials","items":[{"title":"...","mediaType":"movie","note":"one line why","mustWatch":true}]}],"tips":["..."]}
+{"type":"watchlist","sections":[{"key":"essential","items":[{"title":"Exact Title","mediaType":"movie","reason":"why it belongs","mustWatch":true}]}]}
 
 title_spotlight:
-{"type":"title_spotlight","title":"...","mediaType":"movie","summary":"spoiler-free hook","year":"2021","genres":["Sci-Fi","Drama"],"rating":8.0,"runtime":"2h 35m","cast":["Actor A","Actor B"],"director":"...","whereToWatch":["Netflix"],"similar":[{"title":"...","mediaType":"movie"}],"tips":["..."]}
+{"type":"title_spotlight","title":"Exact Title","mediaType":"movie","take":"why it is worth considering"}
 
 general:
-{"type":"general","title":"...","content":"plain text answer","items":[{"title":"...","mediaType":"movie"}],"tips":["..."]}`,
+{"type":"general","content":"brief answer","items":[{"title":"Exact Title","mediaType":"movie"}]}`,
 
     `SCORING & SIZE RULES:
-- metric scores are integers 0–5. rating is an approximate IMDb-style number 0–10.
-- recommendations: 3–6 items. watchlist: 1–4 sections, 2–6 items each. comparison: 3–5 metrics.
-- tips: 1–3 short, actionable strings. Never repeat the same title twice in one response.`,
+- comparison metric keys may only be story, acting, visuals, pacing, emotion or rewatch; scores are integers 0–5.
+- recommendations: 3–5 items. watchlist: 1–3 sections with 2–5 items. comparison: 3–5 metrics.
+- general content: at most 80 words. Never repeat a title in one response.`,
 
     `BEHAVIOR:
 - If the user gives no details, confidently pick great titles from their taste profile — never stall.
 - If the request is unrelated to movies/TV/watchable content, return:
-  {"type":"general","title":"","summary":"","content":"${offTopicReply}","tips":[]}
+  {"type":"general","content":"${offTopicReply}"}
 - If a USER LIBRARY is provided: personalize with it, NEVER recommend titles listed under WATCHED HISTORY, and when the user refers to "my watchlist / favorites / my list" choose ONLY from the listed items.
 - Output JSON ONLY.`,
   ]
@@ -350,6 +379,7 @@ export async function askCineStructured({
   tvGenres = [],
   offTopicReply,
   userLibrary = "",
+  onQuota,
 } = {}) {
   if (!userMessage || userMessage.trim() === "") {
     throw new GeminiError("EMPTY", "Empty user message");
@@ -370,6 +400,7 @@ export async function askCineStructured({
       offTopicReply,
       userLibrary,
     }),
+    onQuota,
   });
 
   // Maliyet analizi: token kullanımı + tahmini ücreti console'a yaz.

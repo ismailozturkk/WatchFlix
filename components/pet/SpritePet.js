@@ -11,7 +11,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import useAppActive from "@hooks/useAppActive";
-import { perfPreset } from "@services/deviceTier";
+import { useEffectPreset } from "@services/effectSettings";
 
 // ─── Sprite sheet geometrisi ──────────────────────────────────────────────
 // astro.webp / jonsnow.webp: 1536 x 1872, 8 sütun x 9 satır → her kare 192 x 208.
@@ -70,8 +70,9 @@ function SpritePet({ source, state = "idle", size = 130, playing = true }) {
   const appActive = useAppActive();
   const frame = useSharedValue(0);
 
-  // Düşük katman cihazda kare hızını kıs (görüntü aynı, iş daha az).
-  const fps = Math.max(1, Math.round(cfg.fps * (perfPreset.spriteFpsScale ?? 1)));
+  // Efekt modu "Orta"/"Kapalı" iken kare hızını kıs (görüntü aynı, iş daha az).
+  const { spriteFpsScale } = useEffectPreset();
+  const fps = Math.max(1, Math.round(cfg.fps * (spriteFpsScale ?? 1)));
   const shouldPlay = playing && appActive && cfg.frames > 1;
 
   useEffect(() => {

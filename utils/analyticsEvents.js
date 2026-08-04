@@ -51,8 +51,20 @@ const NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_]*$/;
  */
 export const ANALYTICS_EVENTS = {
   SIGNUP: "sign_up",
+  ONBOARDING_STARTED: "onboarding_started",
+  ONBOARDING_STEP_VIEWED: "onboarding_step_viewed",
+  ONBOARDING_LANGUAGE_SELECTED: "onboarding_language_selected",
+  ONBOARDING_SKIPPED: "onboarding_skipped",
+  ONBOARDING_COMPLETED: "onboarding_completed",
+  FIRST_CONTENT_TRACKED: "first_content_tracked",
   CONTENT_TRACKED: "content_tracked",
+  UP_NEXT_VIEWED: "up_next_viewed",
+  UP_NEXT_COMPLETED: "up_next_completed",
   POST_CREATED: "post_created",
+  // Liste paylaşımı iki yönlü ölçülür: kaç paylaşım profildeki bir listeden
+  // doğdu ve paylaşılan listeler kaç kez kopyalandı.
+  LIST_SHARED_FROM_PROFILE: "list_shared_from_profile",
+  SHARED_LIST_SAVED: "shared_list_saved",
   GAME_PLAYED: "game_played",
   AI_MESSAGE: "ai_message",
   PAYWALL_VIEW: "paywall_view",

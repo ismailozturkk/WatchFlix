@@ -238,6 +238,8 @@ const TvRowItem = memo(({ item, navigation, imageQuality, theme, index }) => {
             theme={theme}
             variant="chip"
             vertical
+            iconSize={8}
+            chipSize={15}
           />
         </View>
       </TouchableOpacity>
@@ -288,12 +290,6 @@ const TvGridItem = memo(({ item, navigation, imageQuality, theme, index }) => {
               />
             </View>
           )}
-          {/* Alt gradient */}
-          <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.92)"]}
-            locations={[0.35, 1]}
-            style={styles.gridGradient}
-          />
           {/* Puan rozeti – sağ üst */}
           {posterBadges?.tmdbRating !== false && rating > 0 && (
             <View
@@ -305,25 +301,18 @@ const TvGridItem = memo(({ item, navigation, imageQuality, theme, index }) => {
               <Text style={styles.gridRatingText}>★ {rating.toFixed(1)}</Text>
             </View>
           )}
-          {/* Film adı + yıl + liste rozetleri */}
-          <View style={styles.gridFooter}>
-            {/* Liste rozetleri — yatay, ad üstünde */}
-            <ListBadges
-              mediaId={item.id}
-              mediaType="tv"
-              theme={theme}
-              variant="chip"
-              vertical={false}
-            />
-            <Text style={styles.gridTitle} numberOfLines={2}>
-              {item.name || "—"}
-            </Text>
-            {posterBadges?.releaseDate !== false && item.first_air_date && (
-              <Text style={styles.gridYear}>
-                {new Date(item.first_air_date).getFullYear()}
-              </Text>
-            )}
-          </View>
+          <ListBadges
+            mediaId={item.id}
+            mediaType="tv"
+            theme={theme}
+            variant="chip"
+            vertical
+            side="left"
+            verticalAlign="bottom"
+            iconSize={8}
+            chipSize={15}
+            style={styles.gridBadgeColumn}
+          />
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -1058,13 +1047,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  gridGradient: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: "60%",
-  },
   gridRatingBadge: {
     position: "absolute",
     top: 7,
@@ -1074,15 +1056,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   gridRatingText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-  gridFooter: { paddingHorizontal: 7, paddingBottom: 7 },
-  gridTitle: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 15,
-    marginBottom: 2,
-  },
-  gridYear: { color: "rgba(255,255,255,0.5)", fontSize: 10 },
+  gridBadgeColumn: { left: 3, bottom: 4 },
 
   // ── Paylaşılan ────────────────────────────────────────────────────────────
   ratingPill: {

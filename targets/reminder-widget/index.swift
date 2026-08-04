@@ -89,18 +89,29 @@ private struct ReminderEntry: TimelineEntry {
   let date: Date
   let items: [ReminderItem]
   let isTurkish: Bool
+  let preferences: WidgetDisplayPreferences
 }
 
 private struct ReminderProvider: TimelineProvider {
   func placeholder(in context: Context) -> ReminderEntry {
-    ReminderEntry(date: Date(), items: sampleItems, isTurkish: loadLanguage().hasPrefix("tr"))
+    ReminderEntry(
+      date: Date(),
+      items: sampleItems,
+      isTurkish: loadLanguage().hasPrefix("tr"),
+      preferences: loadWidgetPreferences()
+    )
   }
 
   func getSnapshot(in context: Context, completion: @escaping (ReminderEntry) -> Void) {
     let items = loadItems()
     let displayItems = (items.isEmpty || context.isPreview) ? sampleItems : items
     completion(
-      ReminderEntry(date: Date(), items: displayItems, isTurkish: loadLanguage().hasPrefix("tr"))
+      ReminderEntry(
+        date: Date(),
+        items: displayItems,
+        isTurkish: loadLanguage().hasPrefix("tr"),
+        preferences: loadWidgetPreferences()
+      )
     )
   }
 
@@ -108,7 +119,8 @@ private struct ReminderProvider: TimelineProvider {
     let entry = ReminderEntry(
       date: Date(),
       items: loadItems(),
-      isTurkish: loadLanguage().hasPrefix("tr")
+      isTurkish: loadLanguage().hasPrefix("tr"),
+      preferences: loadWidgetPreferences()
     )
     // Geri sayımlar doğru kalsın diye gece yarısından hemen sonra yenile.
     let nextRefresh = Calendar.current.nextDate(
@@ -125,6 +137,9 @@ private struct ReminderProvider: TimelineProvider {
 private struct ReminderRow: View {
   let item: ReminderItem
   let isTurkish: Bool
+  let showIcon: Bool
+  let showDate: Bool
+  let appearance: WidgetAppearancePreferences
 
   private var isMovie: Bool { item.type == "movie" }
   private var typeLabel: String {
@@ -134,31 +149,41 @@ private struct ReminderRow: View {
 
   var body: some View {
     HStack(spacing: 10) {
-      Text(isMovie ? "F" : "D")
-        .font(.system(size: 12, weight: .bold))
-        .foregroundColor(.white)
-        .frame(width: 26, height: 26)
-        .background(isMovie ? Color.wxMovie : Color.wxAccent)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+      if showIcon {
+        Text(isMovie ? "F" : "D")
+          .font(.system(size: 12, weight: .bold))
+          .foregroundColor(.white)
+          .frame(width: 26, height: 26)
+          .background(isMovie ? Color.wxMovie : appearance.accentColor)
+          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+      }
 
       VStack(alignment: .leading, spacing: 1) {
         Text(item.title)
           .font(.system(size: 12, weight: .semibold))
-          .foregroundColor(.wxTitle)
+          .foregroundColor(appearance.textColor)
           .lineLimit(1)
 
         Text(
-          [typeLabel, item.subtitle, countdownText(item.date, isTurkish: isTurkish)]
+          [
+            typeLabel,
+            item.subtitle,
+            showDate ? countdownText(item.date, isTurkish: isTurkish) : ""
+          ]
             .filter { !$0.isEmpty }
             .joined(separator: "  •  ")
         )
         .font(.system(size: 9))
-        .foregroundColor(.wxMeta)
+        .foregroundColor(appearance.secondaryTextColor)
         .lineLimit(1)
       }
 
       Spacer(minLength: 0)
     }
+    .padding(.horizontal, 8)
+    .padding(.vertical, 6)
+    .background(appearance.surfaceAltColor)
+    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
   }
 }
 
@@ -167,57 +192,75 @@ private struct ReminderWidgetEntryView: View {
   @Environment(\.widgetFamily) private var family
 
   private var maxRows: Int {
-    family == .systemLarge ? 6 : 3
+    min(
+      entry.preferences.reminderMaxItems,
+      family == .systemLarge
+        ? (entry.preferences.reminderCompact ? 8 : 6)
+        : (entry.preferences.reminderCompact ? 4 : 3)
+    )
   }
 
   var body: some View {
-    let shown = Array(entry.items.prefix(maxRows))
-    let overflow = entry.items.count - shown.count
+    let filtered = entry.items.filter {
+      entry.preferences.reminderContent == "all" ||
+        entry.preferences.reminderContent == $0.type
+    }
+    let shown = Array(filtered.prefix(maxRows))
+    let overflow = filtered.count - shown.count
+    let appearance = entry.preferences.reminderAppearance
 
     VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 8) {
-        Text("W")
-          .font(.system(size: 13, weight: .bold))
-          .foregroundColor(.white)
-          .frame(width: 26, height: 26)
-          .background(Color.wxAccent)
-          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+      if entry.preferences.reminderShowTitle {
+        HStack(spacing: 8) {
+          Text("S")
+            .font(.system(size: 13, weight: .bold))
+            .foregroundColor(.white)
+            .frame(width: 26, height: 26)
+            .background(appearance.accentColor)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-        Text(entry.isTurkish ? "Yaklaşanlar" : "Coming Up")
-          .font(.system(size: 15, weight: .bold))
-          .foregroundColor(.wxTitle)
+          Text(entry.isTurkish ? "Yaklaşanlar" : "Coming Up")
+            .font(.system(size: 15, weight: .bold))
+            .foregroundColor(appearance.textColor)
 
-        Spacer(minLength: 0)
+          Spacer(minLength: 0)
 
-        Text(entry.isTurkish ? "\(entry.items.count) hatırlatma" : "\(entry.items.count) reminders")
-          .font(.system(size: 10, weight: .bold))
-          .foregroundColor(.wxAccent)
+          Text(entry.isTurkish ? "\(filtered.count) hatırlatma" : "\(filtered.count) reminders")
+            .font(.system(size: 10, weight: .bold))
+            .foregroundColor(appearance.accentColor)
+        }
+
+        Divider().overlay(Color.white.opacity(0.12))
       }
-
-      Divider().overlay(Color.white.opacity(0.12))
 
       if shown.isEmpty {
         Spacer()
         Text(entry.isTurkish ? "Yaklaşan film veya bölüm yok" : "No upcoming movies or episodes")
           .font(.system(size: 12))
-          .foregroundColor(.wxMeta)
+          .foregroundColor(appearance.mutedColor)
           .frame(maxWidth: .infinity, alignment: .center)
         Spacer()
       } else {
         ForEach(shown) { item in
-          ReminderRow(item: item, isTurkish: entry.isTurkish)
+          ReminderRow(
+            item: item,
+            isTurkish: entry.isTurkish,
+            showIcon: entry.preferences.reminderShowPosters,
+            showDate: entry.preferences.reminderShowDates,
+            appearance: appearance
+          )
         }
         if overflow > 0 {
           Text(entry.isTurkish ? "+\(overflow) daha" : "+\(overflow) more")
             .font(.system(size: 10, weight: .bold))
-            .foregroundColor(.wxAccent)
+            .foregroundColor(appearance.accentColor)
             .frame(maxWidth: .infinity, alignment: .center)
         }
         Spacer(minLength: 0)
       }
     }
     .padding(14)
-    .widgetBackgroundCompat(Color.wxBackground)
+    .widgetBackgroundCompat(appearance.backgroundColor)
   }
 }
 

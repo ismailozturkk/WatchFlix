@@ -1,7 +1,7 @@
 // screens/tabs/settings/PersonalizationScreen.js
 //
-// Ayarlar > Kişiselleştirme. Kar efekti + ikon arka planı (görünürlük + opaklık +
-// düzen) + Pet/Dost. Hub'dan ayrı ekrana taşındı.
+// Ayarlar > Kişiselleştirme. Görsel efekt modu + kar efekti + ikon arka planı
+// (görünürlük + opaklık + düzen) + Pet/Dost. Hub'dan ayrı ekrana taşındı.
 
 import React, { useRef, useState } from "react";
 import {
@@ -13,13 +13,24 @@ import {
 } from "react-native";
 import SwitchToggle from "@components/SwitchToggle";
 import AppIcon from "@components/AppIcon";
+import {
+  IconPatternPreview,
+  SnowPreview,
+} from "@components/settings/SettingPreviews";
 import PetSettingsSection from "@components/pet/PetSettingsSection";
+import FontSettingsSection from "@components/typography/FontSettingsSection";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import {
   useSnowSettings,
   useIconBackgroundSettings,
 } from "@context/AppSettingsContext";
+import {
+  onerilenEffectMode,
+  setEffectMode,
+  useEffectMode,
+} from "@services/effectSettings";
+import { i18nText } from "@utils/i18nText";
 import { SettingsSubScreen, SettingRow, buildUiColors } from "./settingsUi";
 
 // İkon arka planı saydamlık kaydırıcısı (0.1–1). PanResponder, ek bağımlılık yok.
@@ -76,7 +87,7 @@ function OpacitySlider({ value, onChange, colors }) {
 }
 
 export default function PersonalizationScreen() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { theme } = useTheme();
   const C = buildUiColors(theme);
   const { showSnow, changeShowSnow } = useSnowSettings();
@@ -89,6 +100,40 @@ export default function PersonalizationScreen() {
     changeIconBackgroundOpacity,
   } = useIconBackgroundSettings();
 
+  // Görsel efekt modu. Cihaz sınıfı yalnız varsayılanı seçer; burada kullanıcı
+  // kendi dengesini kurar (bkz. utils/deviceTier.js, services/effectSettings.js).
+  const effectMode = useEffectMode();
+  const onerilen = onerilenEffectMode();
+  const efektSecenekleri = [
+    {
+      value: "full",
+      label: i18nText("autoI18n.efekt_tam", "Tam"),
+      hint: i18nText(
+        "autoI18n.efekt_tam_ipucu",
+        "Kısıtsız: bulanıklık açık, desen tam yoğunlukta, animasyonlar tam hızda.",
+      ),
+    },
+    {
+      value: "balanced",
+      label: i18nText("autoI18n.efekt_orta", "Orta"),
+      hint: i18nText(
+        "autoI18n.efekt_orta_ipucu",
+        "Dengeli: bulanıklık açık kalır, desen ve animasyon hafifletilir.",
+      ),
+    },
+    {
+      value: "off",
+      label: i18nText("autoI18n.efekt_kapali", "Kapalı"),
+      hint: i18nText(
+        "autoI18n.efekt_kapali_ipucu",
+        "Performans odaklı: bulanıklık kapalı, desen seyrek, animasyonlar en düşük hızda.",
+      ),
+    },
+  ];
+  const aktifEfekt =
+    efektSecenekleri.find((o) => o.value === effectMode) || efektSecenekleri[0];
+  const onerilenEtiket = efektSecenekleri.find((o) => o.value === onerilen)?.label;
+
   return (
     <SettingsSubScreen title={t.personalization}>
       <View
@@ -97,17 +142,102 @@ export default function PersonalizationScreen() {
           { backgroundColor: C.card, borderColor: C.border, marginTop: 8 },
         ]}
       >
+        <FontSettingsSection colors={C} language={language} />
+      </View>
+
+      <View style={ps.personalizationGap} />
+
+      <View
+        style={[
+          ps.card,
+          { backgroundColor: C.card, borderColor: C.border },
+        ]}
+      >
+        <View style={ps.effectBlock}>
+          <View style={ps.iconBgModeHeader}>
+            <View style={[ps.iconWrap, { backgroundColor: C.iconPurple }]}>
+              <AppIcon name="sparkles-outline" size={16} color={C.purple} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text allowFontScaling={false} style={[ps.rowTitle, { color: C.text }]}>
+                {i18nText("autoI18n.efektler", "Efektler")}
+              </Text>
+              <Text allowFontScaling={false} style={[ps.rowSub, { color: C.muted }]}>
+                {aktifEfekt.hint}
+              </Text>
+              {/* Cihaz kararını GÖRÜNÜR kılar: blur'ün neden kapalı açıldığı
+                  sorusunun cevabı burada, ayarın yanında durur. */}
+              {onerilenEtiket ? (
+                <Text allowFontScaling={false} style={[ps.rowSub, { color: C.muted }]}>
+                  {i18nText(
+                    "autoI18n.efekt_onerilen",
+                    `Cihazın için önerilen: ${onerilenEtiket}`,
+                    { mod: onerilenEtiket },
+                  )}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+          <View
+            style={[ps.segment, { backgroundColor: C.cardAlt, borderTopColor: C.border }]}
+          >
+            {efektSecenekleri.map((o) => {
+              const active = effectMode === o.value;
+              return (
+                <TouchableOpacity
+                  key={o.value}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  style={[ps.segOpt, active && { backgroundColor: C.accent }]}
+                  onPress={() => setEffectMode(o.value)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    allowFontScaling={false}
+                    style={[
+                      ps.segText,
+                      { color: active ? C.white : C.muted, fontWeight: active ? "700" : "500" },
+                    ]}
+                  >
+                    {o.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+
+      <View style={ps.personalizationGap} />
+
+      <View
+        style={[
+          ps.card,
+          { backgroundColor: C.card, borderColor: C.border },
+        ]}
+      >
+        {/* Kar KAPALIYKEN satırın zemininde önizleme yağar: kullanıcı açmadan
+            önce ne alacağını görür. AÇIKKEN önizleme yok — kar zaten tüm
+            ekranda yağıyor, ikinci bir Lottie boşuna maliyet. O durumda ikon da
+            kar tanesi değil kar küreme makinesi: satırın işlevi artık "aç"
+            değil "temizle". */}
         <SettingRow
           colors={C}
           iconBg={C.iconTeal}
           iconColor={C.teal}
-          iconName={showSnow ? "snow-sharp" : "snow-outline"}
+          iconFamily={showSnow ? "MaterialCommunityIcons" : "Ionicons"}
+          iconName={showSnow ? "bulldozer" : "snow-outline"}
           title={t.snow}
           subtitle={t.snowSubtitle}
+          background={showSnow ? null : <SnowPreview />}
           right={
             <SwitchToggle value={showSnow} onValueChange={changeShowSnow} size={36} />
           }
         />
+        {/* Desen önizlemesi hem açık hem kapalıyken durur: statik ve ucuz,
+            ayrıca ayar açıkken de "şu an bu desen kullanılıyor" bilgisini
+            veriyor. Sabit opaklık kullanılıyor — buradaki iş deseni
+            tanıtmak; opaklığın kendisinin ayarı aşağıdaki kaydırıcıda. */}
         <SettingRow
           colors={C}
           iconBg={C.iconBlue}
@@ -116,6 +246,7 @@ export default function PersonalizationScreen() {
           title={t.iconBackground}
           subtitle={t.iconBackgroundSubtitle}
           last={!showIconBackground}
+          background={<IconPatternPreview opacity={0.35} />}
           right={
             <SwitchToggle
               value={showIconBackground}
@@ -228,6 +359,7 @@ const ps = StyleSheet.create({
   rowTitle: { fontSize: 14, fontWeight: "500" },
   rowSub: { fontSize: 11, marginTop: 2 },
   personalizationGap: { height: 10 },
+  effectBlock: { paddingTop: 13 },
   iconBgMode: { paddingTop: 13 },
   iconBgModeHeader: {
     flexDirection: "row",

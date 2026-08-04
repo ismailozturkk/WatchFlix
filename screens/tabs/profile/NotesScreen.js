@@ -34,6 +34,9 @@ import { i18nText } from "../../../utils/i18nText";
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
+// Küçük ikon butonları için ortak dokunma alanı payı.
+const ICON_HIT_SLOP = { top: 8, bottom: 8, left: 6, right: 6 };
+
 // Tema'nın notesColor paletinden { color, background } çiftleri üret.
 const buildColorPairs = (notesColor) => [
   { color: notesColor.blue, background: notesColor.blueBackground },
@@ -109,7 +112,7 @@ const EmptyState = ({ tab, theme }) => (
 );
 
 // ─── Not Kartı ────────────────────────────────────────────────────────────────
-const NoteCard = ({ note, theme, language, onPress, onEdit, onCopy, onDelete }) => {
+const NoteCard = ({ note, theme, language, onPress, onCopy, onDelete }) => {
   const todos = note.todos || [];
   const activeTodos = todos.filter((t) => !t.done);
   const doneTodos = todos.filter((t) => t.done);
@@ -128,6 +131,9 @@ const NoteCard = ({ note, theme, language, onPress, onEdit, onCopy, onDelete }) 
         <View style={styles.cardHeader}>
           <Text
             allowFontScaling={false}
+            // Kullanıcının yazdığı not başlığı: "başlık" kelimesini taşısa da
+            // içerik kullanıcı metnidir, başlık fontuna girmemeli.
+            fontRole="body"
             style={[styles.cardTitle, { color: theme.text.primary }]}
             numberOfLines={1}
           >
@@ -136,14 +142,9 @@ const NoteCard = ({ note, theme, language, onPress, onEdit, onCopy, onDelete }) 
                 ? i18nText("autoI18n.basliksiz_liste", "Başlıksız Liste")
                 : i18nText("autoI18n.basliksiz_not", "Başlıksız Not"))}
           </Text>
-          {/* Kart aksiyonları: todo'da düzenle + kopyala + sil, notta kopyala + sil
-              (karta dokunmak da düzenleme modalını açar) */}
+          {/* Kart aksiyonları: kopyala + sil. Düzenleme karta dokununca açılan
+              modalda yapılır, bu yüzden ayrı bir düzenle butonu yok. */}
           <View style={styles.cardActions}>
-            {isTodo && (
-              <TouchableOpacity onPress={onEdit} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}>
-                <Ionicons name="pencil-outline" size={16} color={theme.text.muted} />
-              </TouchableOpacity>
-            )}
             <TouchableOpacity onPress={onCopy} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}>
               <Ionicons name="copy-outline" size={16} color={theme.text.muted} />
             </TouchableOpacity>
@@ -237,7 +238,15 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
   const [newTodoText, setNewTodoText] = useState("");
   const [scheduledDate, setScheduledDate] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  /* Satır içi madde düzenleme: düzenlenen maddenin id'si + taslak metni */
+  const [editingTodoId, setEditingTodoId] = useState(null);
+  const [editingTodoText, setEditingTodoText] = useState("");
+  /* Kopyalanan maddede kısa süre gösterilen onay ikonu */
+  const [copiedTodoId, setCopiedTodoId] = useState(null);
+  const copyTimerRef = useRef(null);
   const todoInputRef = useRef(null);
+
+  useEffect(() => () => clearTimeout(copyTimerRef.current), []);
 
   const todayStr = new Date().toISOString().split("T")[0];
   const dateLabel = scheduledDate
@@ -270,6 +279,9 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
       setScheduledDate(null);
     }
     setNewTodoText("");
+    setEditingTodoId(null);
+    setEditingTodoText("");
+    setCopiedTodoId(null);
   }, [visible, initialNote, defaultType]);
 
   const color = pair.color;
@@ -282,12 +294,139 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
   };
   const toggleTodo = (id) =>
     setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
-  const deleteTodo = (id) => setTodos((prev) => prev.filter((t) => t.id !== id));
+  const deleteTodo = (id) => {
+    if (editingTodoId === id) {
+      setEditingTodoId(null);
+      setEditingTodoText("");
+    }
+    setTodos((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  /* ── Madde aksiyonları: düzenle / kopyala ── */
+  const startEditTodo = (item) => {
+    // Başka bir madde düzenleniyorsa taslağı çöpe atma, önce onu yaz.
+    const pending = editingTodoText.trim();
+    if (editingTodoId && editingTodoId !== item.id && pending) {
+      setTodos((prev) =>
+        prev.map((t) => (t.id === editingTodoId ? { ...t, text: pending } : t)),
+      );
+    }
+    setEditingTodoId(item.id);
+    setEditingTodoText(item.text);
+  };
+  const cancelEditTodo = () => {
+    setEditingTodoId(null);
+    setEditingTodoText("");
+  };
+  const commitEditTodo = () => {
+    const text = editingTodoText.trim();
+    // Boş bırakılırsa düzenleme iptal edilir; silmek için çöp kutusu kullanılır.
+    if (text) {
+      setTodos((prev) =>
+        prev.map((t) => (t.id === editingTodoId ? { ...t, text } : t)),
+      );
+    }
+    cancelEditTodo();
+  };
+  const copyTodo = (item) => {
+    if (!item.text?.trim()) return;
+    Clipboard.setString(item.text);
+    toast.success(i18nText("autoI18n.panoya_kopyalandi", "Panoya kopyalandı"));
+    // Toast kök seviyede duruyor ve alt-sheet'in altında kalabiliyor; satırda da
+    // kısa bir onay göster.
+    setCopiedTodoId(item.id);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopiedTodoId(null), 1200);
+  };
+
+  /* Tek satır: yapılacak / yapılan ayrımı `item.done` ile yapılır. */
+  const renderTodoRow = (item) => {
+    const isEditing = editingTodoId === item.id;
+    const isCopied = copiedTodoId === item.id;
+    return (
+      <View key={item.id} style={styles.todoRow}>
+        <TouchableOpacity onPress={() => toggleTodo(item.id)} disabled={isEditing}>
+          <Ionicons
+            name={item.done ? "checkmark-circle" : "ellipse-outline"}
+            size={22}
+            color={isEditing ? theme.text.muted : color}
+          />
+        </TouchableOpacity>
+
+        {isEditing ? (
+          <TextInput
+            allowFontScaling={false}
+            style={[
+              styles.todoItemText,
+              styles.todoEditInput,
+              { color: theme.text.primary, borderBottomColor: color },
+            ]}
+            value={editingTodoText}
+            onChangeText={setEditingTodoText}
+            maxLength={60}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={commitEditTodo}
+          />
+        ) : (
+          <Text
+            allowFontScaling={false}
+            style={[
+              styles.todoItemText,
+              {
+                flex: 1,
+                color: item.done ? theme.text.muted : theme.text.primary,
+                textDecorationLine: item.done ? "line-through" : "none",
+              },
+            ]}
+          >
+            {item.text}
+          </Text>
+        )}
+
+        <View style={styles.todoRowActions}>
+          {isEditing ? (
+            <>
+              <TouchableOpacity onPress={commitEditTodo} hitSlop={ICON_HIT_SLOP}>
+                <Ionicons name="checkmark-circle" size={20} color={color} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={cancelEditTodo} hitSlop={ICON_HIT_SLOP}>
+                <Ionicons name="close-circle" size={20} color={theme.text.muted} />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity onPress={() => startEditTodo(item)} hitSlop={ICON_HIT_SLOP}>
+                <Ionicons name="pencil-outline" size={16} color={theme.text.muted} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => copyTodo(item)} hitSlop={ICON_HIT_SLOP}>
+                <Ionicons
+                  name={isCopied ? "checkmark-done" : "copy-outline"}
+                  size={16}
+                  color={isCopied ? color : theme.text.muted}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => deleteTodo(item.id)} hitSlop={ICON_HIT_SLOP}>
+                <Ionicons name="trash-outline" size={16} color={theme.text.muted} />
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </View>
+    );
+  };
 
   const handleSave = () => {
     const base = initialNote || { id: uid(), createdAt: Date.now() };
     const cleanContent = type === "note" ? content : "";
-    const cleanTodos = type === "todo" ? todos : [];
+    // Bir madde düzenlenirken kaydedilirse taslak metin kaybolmasın.
+    const pendingText = editingTodoText.trim();
+    const cleanTodos =
+      type === "todo"
+        ? todos.map((t) =>
+            t.id === editingTodoId && pendingText ? { ...t, text: pendingText } : t,
+          )
+        : [];
     // Tarih yalnızca todo UI'ında düzenlenir; mevcut not tarihleri korunur.
     const cleanScheduled =
       type === "todo"
@@ -430,22 +569,7 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
                     <Text allowFontScaling={false} style={[styles.sectionLabel, { color: theme.text.muted }]}>
                       {i18nText("autoI18n.yapilacaklar_upper", "YAPILACAKLAR")}
                     </Text>
-                    {activeTodos.map((item) => (
-                      <View key={item.id} style={styles.todoRow}>
-                        <TouchableOpacity onPress={() => toggleTodo(item.id)}>
-                          <Ionicons name="ellipse-outline" size={22} color={color} />
-                        </TouchableOpacity>
-                        <Text
-                          allowFontScaling={false}
-                          style={[styles.todoItemText, { color: theme.text.primary, flex: 1 }]}
-                        >
-                          {item.text}
-                        </Text>
-                        <TouchableOpacity onPress={() => deleteTodo(item.id)}>
-                          <Ionicons name="close" size={16} color={theme.text.muted} />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
+                    {activeTodos.map(renderTodoRow)}
                   </>
                 )}
 
@@ -456,25 +580,7 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
                         {i18nText("autoI18n.yapilanlar_upper", "YAPILANLAR")}
                       </Text>
                     </View>
-                    {doneTodos.map((item) => (
-                      <View key={item.id} style={styles.todoRow}>
-                        <TouchableOpacity onPress={() => toggleTodo(item.id)}>
-                          <Ionicons name="checkmark-circle" size={22} color={color} />
-                        </TouchableOpacity>
-                        <Text
-                          allowFontScaling={false}
-                          style={[
-                            styles.todoItemText,
-                            { color: theme.text.muted, flex: 1, textDecorationLine: "line-through" },
-                          ]}
-                        >
-                          {item.text}
-                        </Text>
-                        <TouchableOpacity onPress={() => deleteTodo(item.id)}>
-                          <Ionicons name="close" size={16} color={theme.text.muted} />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
+                    {doneTodos.map(renderTodoRow)}
                   </>
                 )}
               </ScrollView>
@@ -674,7 +780,6 @@ export default function NotesScreen({ navigation }) {
               theme={theme}
               language={language}
               onPress={() => openEdit(item)}
-              onEdit={() => openEdit(item)}
               onCopy={() => copyNote(item)}
               onDelete={() => requestDelete(item.id)}
             />
@@ -852,6 +957,8 @@ const styles = StyleSheet.create({
   doneDivider: { borderTopWidth: 1, marginTop: 8, marginBottom: 4, paddingTop: 6 },
   todoRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 5 },
   todoItemText: { fontSize: 14 },
+  todoRowActions: { flexDirection: "row", alignItems: "center", gap: 12 },
+  todoEditInput: { flex: 1, borderBottomWidth: 1, paddingVertical: 2, paddingHorizontal: 0 },
   addTodoRow: {
     flexDirection: "row",
     alignItems: "center",

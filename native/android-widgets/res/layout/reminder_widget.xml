@@ -17,6 +17,7 @@
 
         <!-- Uygulama logosu: monochrome ikon, accent gradyan rozet üstünde beyaz -->
         <ImageView
+            android:id="@+id/reminder_widget_logo"
             android:layout_width="28dp"
             android:layout_height="28dp"
             android:background="@drawable/reminder_widget_logo_badge"

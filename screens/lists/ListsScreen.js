@@ -30,12 +30,36 @@ import * as Progress from "react-native-progress";
 import Toast from "react-native-toast-message";
 import SwipeCard from "@components/SwipeCard";
 import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
-import { useImageQualitySettings, useListLayoutSettings } from "@context/AppSettingsContext";
+import {
+  useApiSettings,
+  useContentSettings,
+  useImageQualitySettings,
+  useListLayoutSettings,
+} from "@context/AppSettingsContext";
 import CaseOpeningModal from "@components/modals/CaseOpeningModal";
+import DatePickerModal from "@components/modals/DatePickerModal";
+import ListSearchBar from "@components/lists/ListSearchBar";
+import GlobalSearchResults from "@components/lists/GlobalSearchResults";
 import Feather from "@expo/vector-icons/Feather";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "@services/hapticsService";
 import { i18nText } from "@utils/i18nText";
+import { buildGenreMap } from "@utils/genreLabels";
+import { todayListDate } from "@utils/mediaFacts";
+import {
+  buildListKeySet,
+  GLOBAL_SEARCH_MIN_CHARS,
+  LIST_SEARCH_MODE,
+  listRequiresWatchDate,
+  matchesListQuery,
+} from "@utils/listSearch";
+import {
+  addMediaToList,
+  fetchSuggestionsForList,
+  searchForList,
+} from "@services/listQuickAdd";
 import { reorderWatchedShows } from "../../services/watchedTvService";
+import ScreenDecor from "@components/ScreenDecor";
 import {
   reorderList,
   PREDEFINED_MOVIE_LISTS,
@@ -59,7 +83,19 @@ export default function ListsScreen({ route, navigation }) {
   const { listName } = route.params;
   const [listItems, setListItems] = useState([]);
   const [listModalItems, setListModalItems] = useState([]);
-  const [searchQuery, setSearchQuery] = useState(""); // Arama için state
+  const [searchQuery, setSearchQuery] = useState(""); // iki kipte de ORTAK sorgu
+  // ── Arama kipi ────────────────────────────────────────────────────────────
+  // "list"   → aşağıdaki ızgarayı süzer
+  // "global" → TMDB'de arar, sonuç bu listeye eklenir (aşağıdaki blok)
+  const [searchMode, setSearchMode] = useState(LIST_SEARCH_MODE.IN_LIST);
+  const [globalResults, setGlobalResults] = useState([]);
+  const [globalLoading, setGlobalLoading] = useState(false);
+  const [globalError, setGlobalError] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [addingKey, setAddingKey] = useState(null); // eklenmekte olan eser
+  // İzlenenler listelerinde ekleme tarih ister; seçim yapılana kadar eser burada bekler.
+  const [pendingMedia, setPendingMedia] = useState(null);
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
   // ── Sıralama & filtreleme ───────────────────────────────────────────────
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [sortBy, setSortBy] = useState("default"); // default | dateAdded | name | minutes
@@ -87,6 +123,11 @@ export default function ListsScreen({ route, navigation }) {
   const accent = theme.between || theme.accent || "#4b69ff";
   const { t, language } = useLanguage();
   const { user } = useAuth();
+  const { API_KEY } = useApiSettings();
+  const { adultContent } = useContentSettings();
+  // Tür id → ad tablosu: global aramadan eklenen öğe tür adlarını KAYDEDENİN
+  // dilinde alsın (TMDB arama sonucu yalnız id taşıyor).
+  const genreMap = useMemo(() => buildGenreMap(), [language]);
   const {
     allLists,
     combinedLists,
@@ -409,7 +450,10 @@ export default function ListsScreen({ route, navigation }) {
   // hesaplanır (her render'da değil). Eskiden 5 ayrı .filter() + sort kopyası
   // her render'da çalışıyordu; ana yavaşlık buydu.
   const filteredItems = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    // Sorgu YALNIZ liste içi kipte süzer: kullanıcı global aramaya geçtiğinde
+    // alttaki liste (ve ondan beslenen sayaçlar/rastgele seçici) daralmasın.
+    const listQuery =
+      searchMode === LIST_SEARCH_MODE.IN_LIST ? searchQuery : "";
 
     const watchedCountOf = (item) =>
       Array.isArray(item.seasons)
@@ -423,7 +467,7 @@ export default function ListsScreen({ route, navigation }) {
     const rangeMs = dateRange === "all" ? 0 : Number(dateRange) * 86400000;
 
     const out = listItems.filter((item) => {
-      if (q && !(item.name || "").toLowerCase().includes(q)) return false;
+      if (!matchesListQuery(item, listQuery)) return false;
       if (
         tvShowStatus !== null &&
         (watchedCountOf(item) === item.showEpisodeCount) !== tvShowStatus
@@ -462,6 +506,7 @@ export default function ListsScreen({ route, navigation }) {
   }, [
     listItems,
     searchQuery,
+    searchMode,
     tvShowStatus,
     typeFilter,
     dateRange,
@@ -501,6 +546,194 @@ export default function ListsScreen({ route, navigation }) {
     const id = setTimeout(() => setFiltering(false), 280);
     return () => clearTimeout(id);
   }, [tvShowStatus, typeFilter, dateRange, genreFilter, sortBy, sortDir]);
+
+  // ── Global arama (TMDB) ────────────────────────────────────────────────────
+  // Bu listede zaten olan eserler sonuçta "tik"le işaretlenir; anahtar tip+id
+  // olduğundan aynı id'li film ve dizi karışmaz.
+  const existingKeys = useMemo(
+    () =>
+      buildListKeySet(listItems, {
+        fallbackType: listName === "watchedTv" ? "tv" : "movie",
+      }),
+    [listItems, listName],
+  );
+
+  // Eskimiş yanıt taze sonucun üstüne yazmasın (SearchAll deseni).
+  const globalReqRef = useRef(0);
+  useEffect(() => {
+    if (searchMode !== LIST_SEARCH_MODE.GLOBAL) return undefined;
+    const q = searchQuery.trim();
+    if (q.length < GLOBAL_SEARCH_MIN_CHARS) {
+      // Uçuştaki isteği geçersiz kıl: 2 karakterin altına inince ekran
+      // "öneriler"e döner, gecikmiş yanıt onu ezmemeli.
+      globalReqRef.current += 1;
+      setGlobalResults([]);
+      setGlobalLoading(false);
+      setGlobalError(false);
+      return undefined;
+    }
+
+    const reqId = ++globalReqRef.current;
+    setGlobalLoading(true);
+    setGlobalError(false);
+    const timer = setTimeout(async () => {
+      try {
+        const found = await searchForList({
+          listName,
+          query: q,
+          apiKey: API_KEY,
+          language,
+          adultContent,
+        });
+        if (reqId !== globalReqRef.current) return;
+        setGlobalResults(found);
+      } catch {
+        if (reqId !== globalReqRef.current) return;
+        setGlobalResults([]);
+        setGlobalError(true);
+      } finally {
+        if (reqId === globalReqRef.current) setGlobalLoading(false);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [searchMode, searchQuery, listName, API_KEY, language, adultContent]);
+
+  // Sorgu yokken gösterilen öneriler — liste başına bir kez, cache'li.
+  const suggestionsRef = useRef(null);
+  useEffect(() => {
+    if (searchMode !== LIST_SEARCH_MODE.GLOBAL) return undefined;
+    if (!API_KEY || suggestionsRef.current === listName) return undefined;
+    suggestionsRef.current = listName;
+    let alive = true;
+    fetchSuggestionsForList({ listName, apiKey: API_KEY, language })
+      .then((items) => {
+        if (alive) setSuggestions(items);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [searchMode, listName, API_KEY, language]);
+
+  // Boş listede kip doğrudan global açılır: ekranda eklenecek bir şey yokken
+  // "Bu liste boş" yazıp kullanıcıyı başka ekrana göndermenin anlamı yok.
+  const autoModeRef = useRef(null);
+  useEffect(() => {
+    if (isLoading || autoModeRef.current === listName) return;
+    autoModeRef.current = listName;
+    if (listItems.length === 0) setSearchMode(LIST_SEARCH_MODE.GLOBAL);
+  }, [isLoading, listItems.length, listName]);
+
+  const openMediaDetails = useCallback(
+    (media) => {
+      Keyboard.dismiss();
+      navigation.navigate(
+        media.type === "movie" ? "MovieDetails" : "TvShowsDetails",
+        { id: media.id },
+      );
+    },
+    [navigation],
+  );
+
+  const runAdd = useCallback(
+    async (media, watchDate) => {
+      setAddingKey(media.key);
+      try {
+        const { status } = await addMediaToList({
+          uid: user.uid,
+          listName,
+          media,
+          apiKey: API_KEY,
+          language,
+          genreMap,
+          watchDate,
+        });
+
+        if (status === "empty-show") {
+          Toast.show({
+            type: "warning",
+            text1: i18nText(
+              "autoI18n.bolum_bilgisi_bulunamadi",
+              "Bu dizinin bölüm bilgisi bulunamadı.",
+            ),
+          });
+          return;
+        }
+        if (status === "duplicate") {
+          Toast.show({
+            type: "info",
+            text1: i18nText("autoI18n.zaten_listede", "Bu içerik zaten listede."),
+          });
+          return;
+        }
+
+        Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success,
+        ).catch(() => {});
+        Toast.show({
+          type: "success",
+          text1: i18nText("autoI18n.listeye_eklendi", "Listeye eklendi"),
+          text2: media.title,
+        });
+      } catch (error) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(
+          () => {},
+        );
+        Toast.show({
+          type: "error",
+          text1: i18nText("autoI18n.eklenemedi", "Eklenemedi"),
+          text2: error?.message,
+        });
+      } finally {
+        setAddingKey(null);
+      }
+    },
+    [user?.uid, listName, API_KEY, language, genreMap],
+  );
+
+  const handleAddMedia = useCallback(
+    (media) => {
+      if (!user?.uid) {
+        Toast.show({
+          type: "warning",
+          text1: i18nText("autoI18n.once_giris_yap", "Önce giriş yapmalısın."),
+        });
+        return;
+      }
+      if (addingKey || existingKeys.has(media.key)) return;
+      Keyboard.dismiss();
+      // İzlenenler listelerinde `dateAdded` istatistik/rozet hesabına giren
+      // gerçek izleme tarihidir — "bugün" varsayılamaz, sorulur.
+      if (listRequiresWatchDate(listName)) {
+        setPendingMedia(media);
+        setDatePickerVisible(true);
+        return;
+      }
+      runAdd(media, null);
+    },
+    [user?.uid, addingKey, existingKeys, listName, runAdd],
+  );
+
+  const closeDatePicker = useCallback(() => {
+    setDatePickerVisible(false);
+    setPendingMedia(null);
+  }, []);
+
+  const confirmWatchDate = useCallback(
+    (value) => {
+      const media = pendingMedia;
+      setDatePickerVisible(false);
+      setPendingMedia(null);
+      if (!media) return;
+      const iso =
+        typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)
+          ? value.slice(0, 10)
+          : todayListDate(new Date(value || Date.now()));
+      runAdd(media, iso);
+    },
+    [pendingMedia, runAdd],
+  );
 
   const renderSkeleton = () => (
     <SkeletonPlaceholder>
@@ -588,6 +821,8 @@ export default function ListsScreen({ route, navigation }) {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.primary }]}
     >
+      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
+      <ScreenDecor iconOpacity={0.25} />
       <Text
         allowFontScaling={false}
         style={[styles.header, { color: theme.text.primary }]}
@@ -603,58 +838,70 @@ export default function ListsScreen({ route, navigation }) {
                 : listName}
       </Text>
 
-      {/* 15'ten fazla öğe varsa arama çubuğunu göster */}
-
       {isLoading ? (
         renderSkeleton()
-      ) : listItems.length === 0 ? (
-        <Text
-          allowFontScaling={false}
-          style={[styles.emptyText, { color: theme.text.muted }]}
-        >{i18nText("autoI18n.bu_liste_bos", "Bu liste boş.")}</Text>
       ) : (
         <>
-          {listItems.length > 12 && (
-            <View style={styles.searchRow}>
-              <TextInput
-                style={[
-                  styles.searchInput,
-                  styles.searchInputFlex,
-                  { backgroundColor: theme.secondary, color: theme.text.primary },
-                ]}
-                placeholder={i18nText("autoI18n.ara", "Ara...")}
-                placeholderTextColor={theme.text.muted}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                maxLength={80}
+          {/* Arama artık öğe sayısından BAĞIMSIZ olarak hep açık: eski
+              "12'den fazlaysa göster" eşiği, küçük ve boş listeleri hem
+              aramasız hem sıralama/filtresiz bırakıyordu. */}
+          <ListSearchBar
+            theme={theme}
+            accent={accent}
+            listName={listName}
+            mode={searchMode}
+            onModeChange={setSearchMode}
+            query={searchQuery}
+            onQueryChange={setSearchQuery}
+            onOpenFilters={() => setFilterModalVisible(true)}
+            activeFilterCount={activeFilterCount + (sortActive ? 1 : 0)}
+            filtering={filtering}
+            inListCount={filteredItems.length}
+            globalCount={globalResults.length}
+            globalLoading={globalLoading}
+          />
+
+          {searchMode === LIST_SEARCH_MODE.GLOBAL ? (
+            <GlobalSearchResults
+              theme={theme}
+              accent={accent}
+              listName={listName}
+              query={searchQuery}
+              results={globalResults}
+              suggestions={suggestions}
+              loading={globalLoading}
+              error={globalError}
+              existingKeys={existingKeys}
+              addingKey={addingKey}
+              onAdd={handleAddMedia}
+              onOpen={openMediaDetails}
+            />
+          ) : listItems.length === 0 ? (
+            <View style={styles.emptyWrap}>
+              <Ionicons
+                name="albums-outline"
+                size={40}
+                color={theme.text.muted}
               />
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => setFilterModalVisible(true)}
-                style={[
-                  styles.filterBtn,
-                  {
-                    backgroundColor: theme.secondary,
-                    borderColor:
-                      sortActive || activeFilterCount > 0 ? accent : theme.border,
-                  },
-                ]}
+              <Text
+                allowFontScaling={false}
+                style={[styles.emptyText, { color: theme.text.muted }]}
               >
-                {filtering ? (
-                  <ActivityIndicator size="small" color={accent} />
-                ) : (
-                  <Feather name="sliders" size={18} color={theme.text.primary} />
-                )}
-                {!filtering && (sortActive || activeFilterCount > 0) ? (
-                  <View style={[styles.filterDot, { backgroundColor: accent }]}>
-                    <Text style={styles.filterDotText}>
-                      {activeFilterCount + (sortActive ? 1 : 0)}
-                    </Text>
-                  </View>
-                ) : null}
+                {i18nText("autoI18n.bu_liste_bos", "Bu liste boş.")}
+              </Text>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => setSearchMode(LIST_SEARCH_MODE.GLOBAL)}
+                style={[styles.emptyCta, { backgroundColor: accent }]}
+              >
+                <Feather name="plus" size={16} color="#fff" />
+                <Text style={styles.emptyCtaText}>
+                  {i18nText("autoI18n.icerik_ekle", "İçerik ekle")}
+                </Text>
               </TouchableOpacity>
             </View>
-          )}
+          ) : (
+        <>
           {listName == "watchList" && (
             <View style={{ marginBottom: 95, marginHorizontal: 15 }}>
               {/* Interactive 3-Way Random Selector & Stats */}
@@ -1107,7 +1354,39 @@ export default function ListsScreen({ route, navigation }) {
                   : null}
               </View>
             )}
+            ListEmptyComponent={
+              <View style={styles.noMatchWrap}>
+                <Ionicons
+                  name="search-outline"
+                  size={34}
+                  color={theme.text.muted}
+                />
+                <Text
+                  style={[styles.emptyText, { color: theme.text.muted }]}
+                >
+                  {i18nText(
+                    "autoI18n.listede_eslesme_yok",
+                    "Bu listede eşleşen içerik yok.",
+                  )}
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => setSearchMode(LIST_SEARCH_MODE.GLOBAL)}
+                  style={[styles.emptyCta, { backgroundColor: accent }]}
+                >
+                  <Ionicons name="planet-outline" size={15} color="#fff" />
+                  <Text style={styles.emptyCtaText}>
+                    {i18nText(
+                      "autoI18n.tum_iceriklerde_ara",
+                      "Tüm içeriklerde ara",
+                    )}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            }
           />
+        </>
+          )}
         </>
       )}
       <Modal
@@ -1365,9 +1644,19 @@ export default function ListsScreen({ route, navigation }) {
                                 activeOpacity={0.85}
                                 onPress={() => {
                                   setModalVisible(false);
+                                  // Dizi üstverisi de taşınır: SeasonDetails
+                                  // bunları başlıkta ve yorum sayfasında
+                                  // (mediaTitle/mediaPoster → "Etkinliklerim →
+                                  // Yorumlarım" satırı) kullanır. Eksik
+                                  // geçilirse yorum kaydı adsız/postersiz kalır.
                                   navigation.navigate("SeasonDetails", {
                                     showId: item.id,
                                     seasonNumber: season.seasonNumber,
+                                    showName: item.name,
+                                    showPosterPath: item.imagePath || null,
+                                    showEpisodeCount: item.showEpisodeCount || 0,
+                                    showSeasonCount:
+                                      item.showSeasonCount || sortedSeasons.length,
                                   });
                                 }}
                                 style={[
@@ -1780,7 +2069,7 @@ export default function ListsScreen({ route, navigation }) {
               </Text>
               {[
                 { key: "default", label: i18nText("autoI18n.varsayilan_liste_sirasi", "Varsayılan (liste sırası)"), icon: "list" },
-                { key: "dateAdded", label: "Eklenme tarihi", icon: "calendar" },
+                { key: "dateAdded", label: i18nText("autoI18n.eklenme_tarihi", "Eklenme tarihi"), icon: "calendar" },
                 { key: "name", label: i18nText("autoI18n.isim", "İsim"), icon: "type" },
                 { key: "minutes", label: i18nText("autoI18n.sure", "Süre"), icon: "clock" },
               ].map((opt) => {
@@ -1930,7 +2219,7 @@ export default function ListsScreen({ route, navigation }) {
                   <Text style={[fStyles.section, { color: theme.text.muted }]}>{i18nText("autoI18n.tur", "TÜR")}</Text>
                   <View style={fStyles.segRow}>
                     {[
-                      { key: "all", label: "Hepsi" },
+                      { key: "all", label: i18nText("autoI18n.hepsi", "Hepsi") },
                       { key: "movie", label: t.typeMovies || i18nText("autoI18n.film", "Film") },
                       { key: "tv", label: t.typeTvSeries || i18nText("autoI18n.dizi", "Dizi") },
                     ].map((opt) => {
@@ -2058,6 +2347,28 @@ export default function ListsScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* ── İzleme tarihi — global aramadan izlenenler listesine ekleme ── */}
+      <DatePickerModal
+        visible={datePickerVisible}
+        value={todayListDate()}
+        onConfirm={confirmWatchDate}
+        onClose={closeDatePicker}
+        title={i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}
+        subtitle={
+          listName === "watchedTv"
+            ? i18nText(
+                "autoI18n.tum_bolumler_bu_tarihle",
+                "Tüm bölümler bu tarihle izlendi işaretlenecek",
+              )
+            : i18nText(
+                "autoI18n.bu_filmi_ne_zaman_izlediniz",
+                "Bu filmi ne zaman izlediniz?",
+              )
+        }
+        confirmLabel={i18nText("autoI18n.tarihi_onayla", "Tarihi Onayla")}
+        maxDate={new Date()}
+      />
       <BackButton />
     </SafeAreaView>
   );
@@ -2078,44 +2389,34 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingHorizontal: 15,
   },
-  searchInput: {
-    height: 40,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-  },
-  searchRow: {
-    width: "95%",
-    alignSelf: "center",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 10,
-  },
-  searchInputFlex: { flex: 1 },
-  filterBtn: {
-    width: 44,
-    height: 40,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  filterDot: {
-    position: "absolute",
-    top: -5,
-    right: -5,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 3,
-  },
-  filterDotText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+  // Arama satırı ve kip seçici components/lists/ListSearchBar.js'te.
   emptyText: {
     fontSize: 16,
     textAlign: "center",
   },
+  emptyWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingHorizontal: 30,
+    paddingTop: 20,
+  },
+  noMatchWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingTop: 40,
+    width: width - GRID_SIDE_PADDING * 2,
+  },
+  emptyCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  emptyCtaText: { color: "#fff", fontSize: 13, fontWeight: "700" },
 
   itemTvShow: {
     width: 120,

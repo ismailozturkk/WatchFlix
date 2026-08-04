@@ -43,6 +43,7 @@ import {
   signInWithGoogle as authenticateWithGoogle,
 } from "../../services/googleAuthService";
 import { i18nText } from "../../utils/i18nText";
+import { randomAvatarIndex } from "../../utils/avatars";
 
 const SUCCESS = "rgb(37, 211, 102)";
 const ERROR = "rgb(189, 8, 28)";
@@ -193,7 +194,9 @@ export default function RegisterScreen({ navigation }) {
         username,
         email,
         displayName,
-        avatarIndex: 0,
+        // Yeni hesaba rastgele avatar: herkes 0 numaralı görselle başlamasın.
+        // Kullanıcı Profil ekranından dilediği zaman değiştirebiliyor.
+        avatarIndex: randomAvatarIndex(),
         method: "email",
       });
       profileCreated = true;

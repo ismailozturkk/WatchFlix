@@ -3,6 +3,7 @@ import React, {
 } from "react";
 import { doc, collection, onSnapshot, updateDoc, deleteField } from "firebase/firestore";
 import { Animated } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 import { useLanguage } from "./LanguageContext";
@@ -21,6 +22,8 @@ import {
 import { i18nText } from "../utils/i18nText";
 import useStartupGate from "../hooks/useStartupGate";
 import {
+  countMovieWatchStats,
+  countTvWatchStats,
   flattenMovieWatchEntries,
   flattenTvEpisodeWatchEntries,
   materializeTvWatchState,
@@ -30,6 +33,11 @@ import {
 
 const ProfileStatsContext = createContext();
 export const useProfileStats = () => useContext(ProfileStatsContext);
+
+// Profil sayaçlarının tekrarlı/tekrarsız kipi. Varsayılan "total": mevcut
+// kullanıcıların alışık olduğu sayı güncellemeyle birlikte değişmesin.
+const STATS_COUNT_MODE_KEY = "statsCountMode";
+const STATS_COUNT_MODE_DEFAULT = "total";
 
 // ─── Pure helpers (stable — defined outside component) ───────────────────────
 
@@ -161,6 +169,16 @@ export const ProfileStatsProvider = ({ children }) => {
   const [totalWatchedTimeTv,  setTotalWatchedTimeTv]   = useState({});
   const [totalMinutesTimeTv,  setTotalMinutesTimeTv]   = useState(0);
 
+  // ── Tekrarsız (öz) sayaçlar ─────────────────────────────────────────────
+  // Yukarıdaki sayaçlar her izleme OLAYINI sayar: 100 filmi 5'er kez izleyen
+  // kullanıcı 500 görür. Bunlar ise kaç FARKLI eser izlendiğini söyler. İkisi
+  // de doğru; hangisinin gösterileceğini `statsCountMode` seçer. Süre her iki
+  // modda da tekrarları içerir — o dakikalar gerçekten harcandı.
+  const [uniqueMovieCount,    setUniqueMovieCount]    = useState(0);
+  const [uniqueTvCount,       setUniqueTvCount]       = useState(0);
+  const [uniqueSeasonsCount,  setUniqueSeasonsCount]  = useState(0);
+  const [uniqueEpisodesCount, setUniqueEpisodesCount] = useState(0);
+
   const [isLoading,          setIsLoading]          = useState(false);
   const [loadingTv,          setLoadingTv]          = useState(true);
   const [loadingMovies,      setLoadingMovies]      = useState(true);
@@ -173,6 +191,9 @@ export const ProfileStatsProvider = ({ children }) => {
   const [selectedDateTv, setSelectedDateTv] = useState(null);
   const [timeDisplayMode, setTimeDisplayMode] = useState("minutes");
   const [scaleValues,     setScaleValues]     = useState({});
+  // "total" = tekrarlı · "unique" = tekrarsız. Profil kartlarındaki anahtarla
+  // seçilir ve cihazda kalıcıdır: her açılışta yeniden seçtirmek gerekmez.
+  const [statsCountMode,  setStatsCountMode]  = useState(STATS_COUNT_MODE_DEFAULT);
 
   // ── Logout/hesap değişimi: önceki hesabın verisi yeni hesaba sızmasın ───
   // Listener effect'leri `!uid` iken sadece return ediyor; state'i burada
@@ -312,45 +333,60 @@ export const ProfileStatsProvider = ({ children }) => {
     [listItemsTv],
   );
 
-  // ── Film istatistikleri — her izleme occurrence'ını say ─────────────────
+  // ── Film istatistikleri ─────────────────────────────────────────────────
   useEffect(() => {
     const totalMin = movieHistoryItems.reduce((acc, movie) => acc + (movie.minutes || 0), 0);
-    setWatchedMovieCount(movieHistoryItems.length);
+    const counts = countMovieWatchStats(movieHistoryItems);
+    setWatchedMovieCount(counts.total);
+    setUniqueMovieCount(counts.unique);
     setTotalMinutesTime(totalMin);
     setTotalWatchedTime(formatTime(totalMin));
   }, [movieHistoryItems]);
 
-  // ── Dizi istatistikleri — tekrarlar bölüm/süreye dahil edilir ───────────
+  // ── Dizi istatistikleri ─────────────────────────────────────────────────
+  // Süre `flatEpisodesTv`ten, sayaçlar aynı kaynaktan türeyen izleme
+  // durumlarından gelir; ikisi de tekrarları içerir, `unique` alanları içermez.
   useEffect(() => {
-    const episodeEntries = flatEpisodesTv;
-    const showCount = tvHistoryStates.reduce((sum, state) => {
-      const completeWatches = state.watchEvents.filter((event) => event.scope === "show").length;
-      return sum + Math.max(1, completeWatches);
-    }, 0);
-    const seasonCount = tvHistoryStates.reduce((sum, state) => {
-      const base = state.seasons.length;
-      const repeatsBySeason = new Map();
-      state.watchEvents
-        .filter((event) => event.scope === "show" || event.scope === "season")
-        .forEach((event) => (event.seasonNumbers || []).forEach((seasonNumber) => {
-          repeatsBySeason.set(seasonNumber, (repeatsBySeason.get(seasonNumber) || 0) + 1);
-        }));
-      const extras = [...repeatsBySeason.values()].reduce(
-        (count, watches) => count + Math.max(0, watches - 1),
-        0,
-      );
-      return sum + base + extras;
-    }, 0);
-    const totalMinTv = episodeEntries.reduce(
+    const totalMinTv = flatEpisodesTv.reduce(
       (sum, episode) => sum + (Number(episode.episodeMinutes) || 0),
       0,
     );
-    setWatchedTvCount(showCount);
-    setTotalSeasonsCount(seasonCount);
-    setTotalEpisodesCount(episodeEntries.length);
+    const counts = countTvWatchStats(tvHistoryStates);
+    setWatchedTvCount(counts.shows.total);
+    setUniqueTvCount(counts.shows.unique);
+    setTotalSeasonsCount(counts.seasons.total);
+    setUniqueSeasonsCount(counts.seasons.unique);
+    setTotalEpisodesCount(counts.episodes.total);
+    setUniqueEpisodesCount(counts.episodes.unique);
     setTotalMinutesTimeTv(totalMinTv);
     setTotalWatchedTimeTv(formatTime(totalMinTv));
   }, [flatEpisodesTv, tvHistoryStates]);
+
+  // ── Tekrarlı/tekrarsız kipi — cihazda kalıcı ────────────────────────────
+  useEffect(() => {
+    let alive = true;
+    AsyncStorage.getItem(STATS_COUNT_MODE_KEY)
+      .then((stored) => {
+        if (alive && (stored === "total" || stored === "unique")) setStatsCountMode(stored);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  const toggleStatsCountMode = useCallback(() => {
+    setStatsCountMode((previous) => {
+      const next = previous === "unique" ? "total" : "unique";
+      AsyncStorage.setItem(STATS_COUNT_MODE_KEY, next).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  // Kartların, ana ekran widget'ının ve istatistik ekranlarının seçili kipte
+  // okuduğu sayılar. Tek yerde seçilir ki hiçbir yüzey diğeriyle çelişmesin.
+  const uniqueMode = statsCountMode === "unique";
+  const displayMovieCount    = uniqueMode ? uniqueMovieCount    : watchedMovieCount;
+  const displayTvCount       = uniqueMode ? uniqueTvCount       : watchedTvCount;
+  const displayEpisodesCount = uniqueMode ? uniqueEpisodesCount : totalEpisodesCount;
 
   // ── Animation values for movie stats list ────────────────────────────────
   // Only create new Animated.Values for new items — existing ones are preserved
@@ -535,13 +571,15 @@ export const ProfileStatsProvider = ({ children }) => {
     const timer = setTimeout(() => {
       syncStatsWidget(
         {
-          movieCount: watchedMovieCount,
+          // Widget profil kartlarının aynası: seçili kipi o da izler, aksi
+          // halde ana ekranda 500, profilde 100 yazardı.
+          movieCount: displayMovieCount,
           movieMinutes: totalMinutesTime,
           movieTime: totalWatchedTime,
           movieAccent: rankInfo.borderColorMovie,
           movieRankName: rankInfo.rankNameMovie,
-          tvShowCount: watchedTvCount,
-          episodeCount: totalEpisodesCount,
+          tvShowCount: displayTvCount,
+          episodeCount: displayEpisodesCount,
           tvMinutes: totalMinutesTimeTv,
           tvTime: totalWatchedTimeTv,
           tvAccent: rankInfo.borderColorTv,
@@ -566,8 +604,8 @@ export const ProfileStatsProvider = ({ children }) => {
     return () => clearTimeout(timer);
   }, [
     uid, language, t, rankInfo,
-    watchedMovieCount, totalMinutesTime, totalWatchedTime,
-    watchedTvCount, totalEpisodesCount, totalMinutesTimeTv, totalWatchedTimeTv,
+    displayMovieCount, totalMinutesTime, totalWatchedTime,
+    displayTvCount, displayEpisodesCount, totalMinutesTimeTv, totalWatchedTimeTv,
   ]);
 
   const value = useMemo(() => {
@@ -583,6 +621,11 @@ export const ProfileStatsProvider = ({ children }) => {
       watchedTvCount, totalSeasonsCount, totalEpisodesCount, totalWatchedTimeTv, totalMinutesTimeTv,
       listItemsTv, loadingTv, isloadingShowInfo, flatEpisodesTv,
       selectedDateTv, setSelectedDateTv,
+      // Tekrarsız sayaçlar + kip. `display*` seçili kipi uygular; ham sayaçlar
+      // istatistik ekranlarının ikisini birden göstermesi için açık durur.
+      uniqueMovieCount, uniqueTvCount, uniqueSeasonsCount, uniqueEpisodesCount,
+      statsCountMode, toggleStatsCountMode,
+      displayMovieCount, displayTvCount, displayEpisodesCount,
       // Shared helpers
       timeDisplayMode, handleTimeClick, formatTotalDurationTime, formatDate, onPressIn, onPressOut,
       t,
@@ -621,6 +664,9 @@ export const ProfileStatsProvider = ({ children }) => {
     watchedTvCount, totalSeasonsCount, totalEpisodesCount, totalWatchedTimeTv, totalMinutesTimeTv,
     listItemsTv, loadingTv, isloadingShowInfo, flatEpisodesTv, tvHistoryStates,
     selectedDateTv,
+    uniqueMovieCount, uniqueTvCount, uniqueSeasonsCount, uniqueEpisodesCount,
+    statsCountMode, toggleStatsCountMode,
+    displayMovieCount, displayTvCount, displayEpisodesCount,
     timeDisplayMode, rankInfo, t,
   ]);
 

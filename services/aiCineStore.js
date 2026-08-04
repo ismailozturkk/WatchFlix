@@ -20,6 +20,7 @@ export { makeId, summarizeTitle };
 
 const STORAGE_KEY = "@seelogd/ai_cine_conversations";
 const MAX_CONVERSATIONS = 50;
+let mutationQueue = Promise.resolve();
 
 /** Tüm sohbetleri yükler (en yeni en üstte). */
 export async function loadCineConversations() {
@@ -49,11 +50,31 @@ export async function persistCineConversations(list) {
 
 /** Bir sohbeti listeye ekler/günceller. */
 export function upsertCineConversation(list, conversation) {
-  const idx = list.findIndex((c) => c.id === conversation.id);
-  if (idx === -1) return [conversation, ...list];
-  const next = [...list];
-  next[idx] = conversation;
-  return next;
+  return [conversation, ...list.filter((c) => c.id !== conversation.id)].sort(
+    (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0),
+  );
+}
+
+/** Cevabı yeni sohbet olarak ekler; aynı id geldiyse mevcut sohbeti günceller. */
+export function saveCineConversation(conversation) {
+  const operation = mutationQueue.then(async () => {
+    if (!conversation?.id) return loadCineConversations();
+
+    const current = await loadCineConversations();
+    const existing = current.find((item) => item.id === conversation.id);
+    const now = Date.now();
+    const merged = {
+      ...existing,
+      ...conversation,
+      createdAt: existing?.createdAt || conversation.createdAt || now,
+      updatedAt: conversation.updatedAt || now,
+    };
+
+    return persistCineConversations(upsertCineConversation(current, merged));
+  });
+
+  mutationQueue = operation.catch(() => []);
+  return operation;
 }
 
 /** Bir sohbeti listeden çıkarır. */

@@ -15,7 +15,7 @@
 // şu an hangi düğümdesin, sıradaki eşik kaç. Kenar sayısı merdiveni de burada
 // ilk kez yan yana görünür — kare → beşgen → altıgen.
 
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated, Dimensions, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
@@ -26,7 +26,15 @@ import AppBadge from "@components/badges/AppBadge";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import { kademeRengi, kademeSekli, rarityStyle } from "@theme/badgeTokens";
-import { badgeAciklama, badgeAd, formatBadgeDeger } from "./watchBadgeCatalog";
+import {
+  badgeAciklama,
+  badgeAd,
+  formatBadgeAralik,
+  formatBadgeSayi,
+  sureBirimiBul,
+  SURE_BIRIMLERI,
+  SURE_BIRIM_VARSAYILAN,
+} from "./watchBadgeCatalog";
 import { withAlpha } from "@components/profile/StatsComponents";
 import { i18nText } from "@utils/i18nText";
 
@@ -54,6 +62,26 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
   const SHEET_H = EKRAN_H * SHEET_ORAN;
   const slide = useRef(new Animated.Value(SHEET_H)).current;
   const backdrop = useRef(new Animated.Value(0)).current;
+
+  // SÜRE ÇEVİRİCİSİ. Ekran süresi rozetlerinin ham değeri dakikadır; hangi
+  // birimle okunacağı kullanıcının işi: 74.040 dk / 1.234 sa / 51 gün aynı
+  // sayının üç okunuşu. Varsayılan dk (kullanıcı isteği), her açılışta sıfırlanır
+  // — modal bir önceki rozetin seçimini taşırsa sayı bambaşka bir şey sanılır.
+  //
+  // Sıfırlama EFEKTLE DEĞİL, render sırasında yapılır: bu modal profil rafında
+  // kapalıyken de mount kalıyor (components/profile/WatchBadgeStrip.js) ve
+  // efektle sıfırlamak yeni rozeti bir kare boyunca ÖNCEKİ rozetin birimiyle
+  // çizerdi. Seçim, ait olduğu açılışın anahtarıyla birlikte saklanır.
+  const acilisAnahtari = `${badge?.id ?? ""}|${visible ? 1 : 0}`;
+  const [birimSecimi, setBirimSecimi] = useState({
+    id: SURE_BIRIM_VARSAYILAN,
+    anahtar: acilisAnahtari,
+  });
+  const birimId =
+    birimSecimi.anahtar === acilisAnahtari
+      ? birimSecimi.id
+      : SURE_BIRIM_VARSAYILAN;
+  const secBirim = (id) => setBirimSecimi({ id, anahtar: acilisAnahtari });
 
   useEffect(() => {
     if (visible) {
@@ -98,6 +126,11 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
   if (!badge || !veri) return null;
 
   const { gizliKilitli, uyeler, dolgu, hedef } = veri;
+  // Çevirici yalnız zaman birimli rozetlerde anlamlı: rozetin kendisi, sıradaki
+  // hedefi ya da aile üyelerinden biri birim taşıyorsa gösterilir.
+  const sureli =
+    !!badge.birim || !!hedef?.birim || !!uyeler?.some((u) => u.birim);
+  const secilenBirim = sureli ? sureBirimiBul(birimId) : undefined;
   const nadirlik = rarityStyle(badge.rarity, theme);
   const sekil = kademeSekli(badge.tier, badge.aileToplam);
   const kadRenk = kademeRengi(sekil.kademe, theme);
@@ -192,8 +225,45 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
                   }]} />
                 </View>
                 <Text allowFontScaling={false} style={[styles.ilerlemeText, { color: theme.text.muted }]}>
-                  {formatBadgeDeger(hedef, hedef.ilerleme, lang)} / {formatBadgeDeger(hedef, hedef.target, lang)}
+                  {formatBadgeAralik(hedef, hedef.ilerleme, hedef.target, lang, secilenBirim)}
                 </Text>
+              </View>
+            ) : null}
+
+            {/* ── SÜRE BİRİMİ ÇEVİRİCİSİ ──
+                Ekran süresi dakika toplanır; hangi birimle okunacağını burada
+                kullanıcı seçer. Kilitli gizli rozette çizilmez — ilerleme satırı
+                da orada gizlidir, birim seçtirmek rozetin süre ölçtüğünü ele
+                verirdi. */}
+            {sureli && !gizliKilitli ? (
+              <View style={styles.birimSatir}>
+                {SURE_BIRIMLERI.map((b) => {
+                  const secili = b.id === birimId;
+                  return (
+                    <TouchableOpacity
+                      key={b.id}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: secili }}
+                      activeOpacity={0.85}
+                      onPress={() => secBirim(b.id)}
+                      style={[styles.birimChip, {
+                        backgroundColor: secili ? withAlpha(vurgu, 0.16) : theme.primary,
+                        borderColor: secili ? withAlpha(vurgu, 0.45) : theme.border,
+                      }]}
+                    >
+                      <Text
+                        allowFontScaling={false}
+                        style={[styles.birimChipText, { color: secili ? vurgu : theme.text.muted }]}
+                      >
+                        {/* Büyük harfe JS'te çevriliyor: style textTransform
+                            Android'de cihaz yereline göre çalışıyor ve Türkçe
+                            yerelli telefonda İngilizce arayüzde "min" → "MİN"
+                            oluyordu. */}
+                        {(tr ? b.ekTr : b.ekEn).toUpperCase()}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             ) : null}
 
@@ -255,7 +325,10 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
                           color: u.acik ? theme.text.primary : theme.text.muted,
                           fontWeight: suAnki ? "900" : "700",
                         }]}>
-                          {formatBadgeDeger(u, u.target, lang)}
+                          {/* Birim eki yok: çevirici çipleri hemen yukarıda
+                              hangi birimde okunduğunu söylüyor ve düğüm
+                              hücresi dar — "525.600 dk" burada kırpılırdı. */}
+                          {formatBadgeSayi(u, u.target, lang, secilenBirim)}
                         </Text>
                         <Text allowFontScaling={false} numberOfLines={2} style={[styles.dugumAd, {
                           color: u.acik ? theme.text.muted : withAlpha(theme.text.muted, 0.6),
@@ -314,6 +387,13 @@ const styles = StyleSheet.create({
   track: { flex: 1, height: 7, borderRadius: 4, overflow: "hidden" },
   fill: { height: "100%", borderRadius: 4 },
   ilerlemeText: { fontSize: 11, fontWeight: "850" },
+
+  birimSatir: { flexDirection: "row", gap: 6, marginTop: 10, alignSelf: "center" },
+  birimChip: {
+    borderRadius: 10, borderWidth: 1,
+    paddingHorizontal: 12, paddingVertical: 5, minWidth: 46, alignItems: "center",
+  },
+  birimChipText: { fontSize: 11, fontWeight: "900" },
 
   yolWrap: { width: "100%", marginTop: 24 },
   yolBaslik: { fontSize: 11, fontWeight: "850", letterSpacing: 0.7, textTransform: "uppercase", marginBottom: 14 },

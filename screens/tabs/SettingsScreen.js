@@ -1040,6 +1040,19 @@ export default function SettingsScreen() {
           />
           <SettingRow
             colors={C}
+            iconBg={C.iconTeal}
+            iconColor={C.teal}
+            iconName="grid-outline"
+            title={i18nText("autoI18n.widget_settings_title", "Widget’lar")}
+            subtitle={i18nText(
+              "autoI18n.widget_settings_description",
+              "Ana ekran widget’larının görünümünü özelleştir",
+            )}
+            onPress={() => navigation.navigate("WidgetSettingsScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
             iconBg={C.iconBlue}
             iconColor={C.blue}
             iconName="shield-checkmark-outline"
@@ -1101,7 +1114,7 @@ export default function SettingsScreen() {
                 Seelogd
               </Text>
               <Text allowFontScaling={false} style={[s.aboutMeta, { color: C.muted }]}>
-                created by ismail ozturk · © 2025
+                {i18nText("autoI18n.created_by", "Oluşturan: İsmail Öztürk · © 2025")}
               </Text>
               {/* TMDB koşulları: zorunlu atıf cümlesi + resmi logo birlikte */}
               <TmdbLogo width={72} style={{ marginTop: 8 }} />

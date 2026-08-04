@@ -34,6 +34,11 @@ const detectedTier = resolveDeviceTier({
 export const deviceTier =
   __DEV__ && DEV_TIER_OVERRIDE ? DEV_TIER_OVERRIDE : detectedTier;
 
+// Katmanın önerdiği bütçe. UYGULANAN bütçe artık burada DEĞİL: kullanıcı
+// Ayarlar'dan efekt modunu seçebiliyor ve modül yüklenirken dondurulmuş bir
+// nesne o seçimi göremez. Bileşenler `useEffectPreset()` kullanır
+// (bkz. services/effectSettings.js); bu değer yalnız varsayılanın ne olduğunu
+// söyler (teşhis/analitik).
 export const perfPreset = getTierPreset(deviceTier);
 
 export default perfPreset;

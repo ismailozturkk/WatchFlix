@@ -27,6 +27,7 @@ import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
 import { clamp, hexToHsl, hslToHex, luminance } from "@utils/colorUtils";
+import ScreenDecor from "@components/ScreenDecor";
 import {
   applyRelative,
   buildCustomTheme,
@@ -247,6 +248,8 @@ export default function CustomThemeScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: theme.primary }]} edges={["top"]}>
+      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
+      <ScreenDecor iconOpacity={0.12} />
       <View style={styles.header}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel={isEn ? "Back" : "Geri"} onPress={() => navigation.goBack()} style={[styles.iconBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
           <AppIcon family="Ionicons" name="arrow-back" size={21} color={theme.text.primary} />

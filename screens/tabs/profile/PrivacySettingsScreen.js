@@ -17,6 +17,7 @@ import { useTheme } from "../../../context/ThemeContext";
 import { useUserProfile } from "../../../context/UserProfileContext";
 import Toast from "react-native-toast-message";
 import { i18nText } from "../../../utils/i18nText";
+import ScreenDecor from "../../../components/ScreenDecor";
 
 
 const OPTIONS = {
@@ -109,6 +110,8 @@ export default function PrivacySettingsScreen({ navigation }) {
       style={[styles.container, { backgroundColor: theme.primary }]}
       edges={["top"]}
     >
+      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
+      <ScreenDecor iconOpacity={0.15} />
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity

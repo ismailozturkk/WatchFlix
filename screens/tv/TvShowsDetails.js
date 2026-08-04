@@ -164,10 +164,15 @@ const SimilarTvShow = memo(function SimilarTvShow({ item, navigation, theme }) {
 
 /* ─── Ana bileşen ── */
 export default function TvShowsDetails({ route, navigation }) {
-  const { id } = route.params;
+  // openComments / commentScope: "Etkinliklerim → Yorumlarım" satırından
+  // gelindiğinde yorum sayfası doğrudan o yorumun kapsamında (dizi/sezon/bölüm)
+  // açılır — kullanıcı kendi yorumunu aramak zorunda kalmasın.
+  const { id, openComments = false, commentScope = null } = route.params;
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [commentModalVisible, setCommentModalVisible] = useState(false);
+  const [commentModalVisible, setCommentModalVisible] = useState(
+    !!openComments || !!commentScope,
+  );
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
   // Sezon carousel'i: 5+ sezonda tek tek sayfalı görünüm; "Tümünü Gör" düz listeye açar.
   const [showAllSeasons, setShowAllSeasons] = useState(false);
@@ -613,6 +618,23 @@ export default function TvShowsDetails({ route, navigation }) {
       { title: `${details.name}${year}` },
     );
   }, [details]);
+
+  // Sohbet baloncuğunda uzun prompt yerine kısa istek + poster kartı görünür.
+  const aiDisplay = i18nText(
+    "autoI18n.dizi_ai_display",
+    "Bu dizi hakkında bilgi verir misin?",
+  );
+  const aiAttachment = useMemo(() => {
+    if (!details?.name) return null;
+    return {
+      mediaType: "tv",
+      id,
+      title: details.name,
+      year: details.first_air_date ? String(details.first_air_date).slice(0, 4) : "",
+      posterPath: details.poster_path || "",
+      rating: details.vote_average || 0,
+    };
+  }, [details, id]);
 
   // Oyuncu kartı — MovieDetail.renderCastMember ile birebir aynı yapı.
   const renderCastMember = useCallback(
@@ -1757,6 +1779,10 @@ export default function TvShowsDetails({ route, navigation }) {
           movieId={id}
           details={details}
           collectionName="TvComment"
+          // Sezon listesi kapsam seçiciyi besler: kullanıcı bölüm sayfasına
+          // girmeden buradan sezon/bölüm hedefleyip yorum yazabilir.
+          seasons={details?.seasons}
+          initialScope={commentScope}
         />
       </Modal>
 
@@ -1784,6 +1810,8 @@ export default function TvShowsDetails({ route, navigation }) {
         visible={aiVisible}
         onClose={() => setAiVisible(false)}
         initialPrompt={aiPrompt}
+        initialDisplay={aiDisplay}
+        initialAttachment={aiAttachment}
       />
     </View>
   );

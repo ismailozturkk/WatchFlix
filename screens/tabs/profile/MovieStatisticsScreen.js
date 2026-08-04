@@ -8,6 +8,7 @@ import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
 import { buildWatchChartData } from "../../../utils/watchHistory";
 import BackButton from "../../../components/BackButton";
+import ScreenDecor from "../../../components/ScreenDecor";
 import {
   StatsHeroCard,
   StatsScreenHeader,
@@ -23,6 +24,7 @@ const sectionKeyExtractor = (_item, index) => `m-${index}`;
 const MovieStatisticsScreen = ({ navigation }) => {
   const {
     watchedMovieCount,
+    uniqueMovieCount,
     formatDate,
     groupedData,
     uniqueDates,
@@ -168,6 +170,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
         theme={theme}
         primaryCount={watchedMovieCount}
         primaryLabel={t.profileScreen.movieWatched}
+        primarySubLabel={`${i18nText("autoI18n.tekrarsiz", "Tekrarsız")}: ${uniqueMovieCount}`}
         chartDataByPeriod={chartDataByPeriod}
         expanded={expanded}
         onToggleExpand={onToggleExpand}
@@ -204,6 +207,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
+      <ScreenDecor iconOpacity={0.25} />
       <StatsCollapsingList
         theme={theme}
         topInset={insets.top + 6}

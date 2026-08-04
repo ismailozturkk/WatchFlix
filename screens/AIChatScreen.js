@@ -54,6 +54,7 @@ import {
   collectTitles,
   splitTitlesForLookup,
   buildPosterMap,
+  responseToHistoryText,
   friendlyError,
   toStr,
 } from "../services/aiCineService";
@@ -62,6 +63,7 @@ import { resolveCards } from "../services/tmdbLookup";
 import {
   loadCineConversations,
   persistCineConversations,
+  saveCineConversation,
   upsertCineConversation,
   removeCineConversation,
   makeId,
@@ -120,7 +122,16 @@ const ConversationRow = ({ conv, theme, t, isActive, onOpen, onDelete }) => (
   </TouchableOpacity>
 );
 
-export default function AIChatScreen({ visible, onClose, fabOrigin, initialPrompt }) {
+export default function AIChatScreen({
+  visible,
+  onClose,
+  fabOrigin,
+  initialPrompt,
+  // Baloncukta gösterilecek kısa metin (AI'a yine initialPrompt gider)
+  initialDisplay,
+  // Baloncuğa iliştirilecek yapım kartı: { mediaType, id, title, year, posterPath, rating }
+  initialAttachment,
+}) {
   const navigation = useNavigation();
   const { t, language } = useLanguage();
   const { theme } = useTheme();
@@ -147,6 +158,9 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
   const [activeId, setActiveId] = useState(null);
   const [conversations, setConversations] = useState([]);
   const initialPromptRef = useRef(null);
+  // display/attachment referansları her render'da değişebildiği için efekt
+  // bağımlılığı yapılmaz; en güncel değerler bu ref üzerinden okunur.
+  const initialMetaRef = useRef({ display: "", attachment: null });
 
   // ── Aç/kapa animasyonu (FAB'dan büyür / FAB'a küçülür) ──────────────────────
   const anim = useRef(new Animated.Value(0)).current;
@@ -267,21 +281,20 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
   // ── Aktif sohbeti diske kaydet ──
   const saveActive = useCallback((msgs, id) => {
     if (!id || !msgs.length) return;
-    setConversations((prev) => {
-      const existing = prev.find((c) => c.id === id);
-      const now = Date.now();
-      const firstUser = msgs.find((m) => m.role === "user");
-      const conv = {
-        id,
-        title: existing?.title || summarizeTitle(firstUser?.display || firstUser?.text || "…"),
-        messages: msgs,
-        createdAt: existing?.createdAt || now,
-        updatedAt: now,
-      };
-      const next = upsertCineConversation(prev, conv);
-      persistCineConversations(next);
-      return next;
-    });
+    const now = Date.now();
+    const firstUser = msgs.find((m) => m.role === "user");
+    const conv = {
+      id,
+      title: summarizeTitle(
+        firstUser?.attachment?.title || firstUser?.display || firstUser?.text || "…",
+      ),
+      messages: msgs,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    setConversations((prev) => upsertCineConversation(prev, conv));
+    saveCineConversation(conv).then(setConversations).catch(() => {});
   }, []);
 
   // ── Asistanı çalıştır ──
@@ -295,10 +308,9 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
           .slice(0, -1)
           .map((m) => {
             if (m.role === "assistant" && m.aiResponse) {
-              const r = m.aiResponse;
               return {
                 role: "assistant",
-                text: [toStr(r.title), toStr(r.summary || r.content)].filter(Boolean).join(" — "),
+                text: responseToHistoryText(m.aiResponse),
               };
             }
             return { role: m.role, text: m.text || m.display || "" };
@@ -326,6 +338,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
             series,
             language,
             includeAdult: adultContent,
+            includeDetails: response.type === "title_spotlight",
           });
           posterMap = buildPosterMap(cards);
         }
@@ -341,9 +354,7 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
           role: "assistant",
           aiResponse: finalResponse,
           posterMap,
-          text: [toStr(finalResponse.title), toStr(finalResponse.summary || finalResponse.content)]
-            .filter(Boolean)
-            .join(" — "),
+          text: responseToHistoryText(finalResponse),
         };
         const finalMessages = [...msgsIncludingUser, aiMsg];
         setMessages(finalMessages);
@@ -395,12 +406,14 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
   );
 
   const startPromptChat = useCallback(
-    (promptText) => {
+    (promptText, options) => {
       if (loading) return;
       const text = String(promptText || "").trim();
       if (!text) return;
       const convId = makeId();
-      const userMsg = { id: makeId(), role: "user", text, display: text };
+      const display = String(options?.display || "").trim() || text;
+      const userMsg = { id: makeId(), role: "user", text, display };
+      if (options?.attachment?.title) userMsg.attachment = options.attachment;
       const msgs = [userMsg];
       setView("chat");
       setActiveId(convId);
@@ -413,11 +426,15 @@ export default function AIChatScreen({ visible, onClose, fabOrigin, initialPromp
   );
 
   useEffect(() => {
+    initialMetaRef.current = { display: initialDisplay, attachment: initialAttachment };
+  }, [initialDisplay, initialAttachment]);
+
+  useEffect(() => {
     if (!visible || !initialPrompt) return;
     const key = String(initialPrompt);
     if (initialPromptRef.current === key) return;
     initialPromptRef.current = key;
-    const timer = setTimeout(() => startPromptChat(key), 120);
+    const timer = setTimeout(() => startPromptChat(key, initialMetaRef.current), 120);
     return () => clearTimeout(timer);
   }, [visible, initialPrompt, startPromptChat]);
 

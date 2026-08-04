@@ -1,4 +1,4 @@
-# Watch Flix – Project Brief
+# Seelogd – Project Brief
 
 React Native (Expo) tabanlı bir film ve dizi izleme uygulaması.  
 Amacı, kullanıcıların izleme alışkanlıklarını analiz edip onlara özel öneriler sunmak.

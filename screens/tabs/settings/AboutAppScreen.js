@@ -492,7 +492,7 @@ export default function AboutAppScreen() {
           allowFontScaling={false}
           style={[styles.copyrightText, { color: C.muted }]}
         >
-          Created by İsmail Öztürk · © 2025 Seelogd
+          {i18nText("autoI18n.created_by_with_app", "Oluşturan: İsmail Öztürk · © 2025 Seelogd")}
         </Text>
       </View>
     </SettingsSubScreen>

@@ -29,6 +29,8 @@ import GroupAvatarPickerModal from "@components/chat/GroupAvatarPickerModal";
 import { i18nText } from "@utils/i18nText";
 import { toast } from "@components/AppToast";
 import { createGroup } from "@services/groupsService";
+import { ICON_BACKGROUND_COUNT } from "@components/IconBacground";
+import { randomInt, randomPick } from "@utils/randomPick";
 
 const GROUP_COLORS = [
   "#6C63FF", "#FF8A65", "#4FC3F7", "#81C784",
@@ -44,8 +46,13 @@ export default function CreateGroupScreen({ navigation }) {
   const [friends, setFriends] = useState([]);
   const [selected, setSelected] = useState({}); // uid -> friend
   const [name, setName] = useState("");
-  const [color, setColor] = useState(GROUP_COLORS[0]);
-  const [avatarIndex, setAvatarIndex] = useState(0);
+  // Ekran her açıldığında görsel + renk rastgele başlar; kullanıcı isterse
+  // aşağıdaki seçicilerden değiştirir. Sabit "0 + ilk renk" ile açılınca
+  // grupların çoğu aynı görünüyordu.
+  const [color, setColor] = useState(() => randomPick(GROUP_COLORS));
+  const [avatarIndex, setAvatarIndex] = useState(() =>
+    randomInt(ICON_BACKGROUND_COUNT),
+  );
   const [avatarPickerVisible, setAvatarPickerVisible] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -161,9 +168,18 @@ export default function CreateGroupScreen({ navigation }) {
       <ScreenDecor iconOpacity={0.3} />
 
       <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: theme.text?.primary ?? "#fff" }]}>
+        <View style={styles.headerSide}>
+          <BackButton absolute={false} />
+        </View>
+        <Text
+          allowFontScaling={false}
+          numberOfLines={1}
+          style={[styles.title, { color: theme.text?.primary ?? "#fff" }]}
+        >
           {i18nText("autoI18n.yeni_grup", "Yeni Grup")}
         </Text>
+        {/* Başlık geri butonuna rağmen ortalı kalsın diye simetrik boşluk */}
+        <View style={styles.headerSide} />
       </View>
 
       {/* Grup adı + renk önizleme */}
@@ -246,8 +262,6 @@ export default function CreateGroupScreen({ navigation }) {
         )}
       </TouchableOpacity>
 
-      <BackButton />
-
       <GroupAvatarPickerModal
         visible={avatarPickerVisible}
         selectedIndex={avatarIndex}
@@ -261,8 +275,23 @@ export default function CreateGroupScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 10 },
-  headerRow: { alignItems: "center", marginBottom: 12, marginTop: 4 },
-  title: { fontSize: 24, fontWeight: "800", letterSpacing: -0.5 },
+  // Geri butonu satır içinde: eskiden absolute olduğu için başlığın üstüne
+  // biniyordu. headerSide iki yanda eşit boşluk bırakıp başlığı ortalı tutar.
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  headerSide: { width: 40 },
+  title: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+    textAlign: "center",
+  },
 
   topSection: {
     flexDirection: "row",

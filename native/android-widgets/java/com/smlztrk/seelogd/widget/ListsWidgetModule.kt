@@ -45,4 +45,15 @@ class ListsWidgetModule(
       promise.reject("LISTS_WIDGET_CLEAR_FAILED", error)
     }
   }
+
+  @ReactMethod
+  fun updatePreferences(payload: String, promise: Promise) {
+    try {
+      WidgetPreferences.save(context, payload)
+      ListsWidgetProvider.refreshAll(context)
+      promise.resolve(null)
+    } catch (error: Exception) {
+      promise.reject("LISTS_WIDGET_PREFERENCES_FAILED", error)
+    }
+  }
 }

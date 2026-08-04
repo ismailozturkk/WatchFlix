@@ -5,6 +5,7 @@
 const {
   WATCH_BADGES, WATCH_BADGE_BY_ID, WATCH_BADGE_IDS, BOLUM, BOLUM_BASLIK,
   evaluateWatchBadges, gruplaAileler, badgeAd, badgeAciklama, formatBadgeDeger,
+  formatBadgeAralik, sureBirimiBul, SURE_BIRIMLERI, SURE_BIRIM_VARSAYILAN,
 } = require("../components/badges/watchBadgeCatalog");
 const { RARITY_ORDER } = require("../theme/badgeTokens");
 const IONICONS = require("../node_modules/expo/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/Ionicons.json");
@@ -482,9 +483,11 @@ describe("kademeli aileler tek karta iner", () => {
   });
 });
 
-describe("formatBadgeDeger — dakika→saat donusumu", () => {
+describe("formatBadgeDeger — dk/sa/gun cevirisi", () => {
   const yil = WATCH_BADGE_BY_ID.sure_yil;
   const film = WATCH_BADGE_BY_ID.film_2000;
+  const sa = sureBirimiBul("sa");
+  const gun = sureBirimiBul("gun");
 
   test("birimsiz rozet ham sayiyi yerellestirir", () => {
     expect(formatBadgeDeger(film, 2000, "en")).toBe("2,000");
@@ -492,27 +495,87 @@ describe("formatBadgeDeger — dakika→saat donusumu", () => {
     expect(formatBadgeDeger(film, 0, "tr")).toBe("0");
   });
 
-  test("SAAT birimi dakikayi saate bolup ek koyar", () => {
-    // 525.600 dk = 8.760 saat. Ekranda dakika ASLA gorunmemeli.
-    expect(formatBadgeDeger(yil, 525600, "tr")).toBe("8.760 sa");
-    expect(formatBadgeDeger(yil, 525600, "en")).toBe("8,760 h");
-    expect(formatBadgeDeger(yil, 10080, "tr")).toBe("168 sa");    // 1 hafta
-    expect(formatBadgeDeger(yil, 43200, "en")).toBe("720 h");     // 1 ay
+  test("VARSAYILAN birim dakika (cevirici olmadan dk gosterir)", () => {
+    expect(SURE_BIRIM_VARSAYILAN).toBe("dk");
+    expect(formatBadgeDeger(yil, 525600, "tr")).toBe("525.600 dk");
+    expect(formatBadgeDeger(yil, 525600, "en")).toBe("525,600 min");
+    expect(formatBadgeDeger(yil, 10080, "tr")).toBe("10.080 dk");   // 1 hafta
+  });
+
+  test("cevirici SAAT/GUN secince ayni ham deger bolunur", () => {
+    // 525.600 dk = 8.760 saat = 365 gun.
+    expect(formatBadgeDeger(yil, 525600, "tr", sa)).toBe("8.760 sa");
+    expect(formatBadgeDeger(yil, 525600, "en", sa)).toBe("8,760 h");
+    expect(formatBadgeDeger(yil, 525600, "tr", gun)).toBe("365 gün");
+    expect(formatBadgeDeger(yil, 525600, "en", gun)).toBe("365 d");
+    expect(formatBadgeDeger(yil, 10080, "tr", sa)).toBe("168 sa");   // 1 hafta
+    expect(formatBadgeDeger(yil, 43200, "en", sa)).toBe("720 h");    // 1 ay
+  });
+
+  test("buyuk birime dusen kucuk deger '0' olmaz, ondalik gosterir", () => {
+    // 500 dk gun cinsinden 0,347 — yuvarlansa "0 gun" cikar ve ilerleme hic
+    // yokmus gibi gorunurdu. 1'in altinda iki, 10'un altinda tek ondalik.
+    expect(formatBadgeDeger(yil, 500, "tr", gun)).toBe("0,34 gün");
+    expect(formatBadgeDeger(yil, 500, "en", sa)).toBe("8.3 h");
+    // 10'un ustu tam sayiya iner.
+    expect(formatBadgeDeger(yil, 720, "tr", sa)).toBe("12 sa");
+    // Dakikada ondalik hic olmaz (bol = 1).
+    expect(formatBadgeDeger(yil, 500, "tr")).toBe("500 dk");
+  });
+
+  test("TAM SAYI sonuca sahte ondalik eklenmez", () => {
+    // 10.080 dk tam olarak 7 gun; "7,0 gün" olmayan bir hassasiyet iddia eder.
+    expect(formatBadgeDeger(yil, 10080, "tr", gun)).toBe("7 gün");
+    expect(formatBadgeDeger(yil, 10080, "tr", sa)).toBe("168 sa");
+    expect(formatBadgeDeger(yil, 120, "en", sa)).toBe("2 h");
+  });
+
+  test("deger ASAGI kirpilir: kilitli rozet 'tamamlanmis' gorunmez", () => {
+    // 10.079 dk yuvarlansa 168 sa olur ve kilitli rozette "168/168 sa" yazardi.
+    expect(formatBadgeDeger(yil, 10079, "tr", sa)).toBe("167 sa");
+    expect(formatBadgeAralik(yil, 10079, 10080, "tr", sa)).toBe("167/168 sa");
+    // 43.199 dk (1 ay hedefinin bir dakika altı) gun cinsinden 29 gun kalir.
+    expect(formatBadgeDeger(yil, 43199, "tr", gun)).toBe("29 gün");
+    // Kirpma ondalikli araliga da uygulanir: 8,99 sa -> 8,9 sa.
+    expect(formatBadgeDeger(yil, 539, "tr", sa)).toBe("8,9 sa");
+  });
+
+  test("cevirici BIRIMSIZ rozette yok sayilir (film adedi bolunmez)", () => {
+    expect(formatBadgeDeger(film, 2000, "tr", gun)).toBe("2.000");
+    expect(formatBadgeDeger(film, 2000, "en", sa)).toBe("2,000");
   });
 
   test("bozuk/eksik girdide atmaz, 0 doner", () => {
-    expect(formatBadgeDeger(yil, undefined, "tr")).toBe("0 sa");
+    expect(formatBadgeDeger(yil, undefined, "tr")).toBe("0 dk");
+    expect(formatBadgeDeger(yil, undefined, "tr", gun)).toBe("0 gün");
     expect(formatBadgeDeger(null, 60, "tr")).toBe("60");
     expect(formatBadgeDeger({}, 1500, "en")).toBe("1,500");
   });
 
-  test("sure aile kartinda SONRAKI kademe de saat gosterir (birim tasindi)", () => {
-    // 1 haftalik kullanici: hafta acik, sonraki hedef 1 ay = 720 sa.
+  test("formatBadgeAralik birim ekini TEK KEZ, sonda yazar", () => {
+    // Kompakt kartta iki kez ek yazmak (525.600 dk/525.600 dk) satiri tasiriyordu.
+    expect(formatBadgeAralik(yil, 74040, 525600, "tr")).toBe("74.040/525.600 dk");
+    expect(formatBadgeAralik(yil, 74040, 525600, "tr", sa)).toBe("1.234/8.760 sa");
+    expect(formatBadgeAralik(yil, 74040, 525600, "en", gun)).toBe("51/365 d");
+    // Birimsiz rozette ek yok, sayilar oldugu gibi.
+    expect(formatBadgeAralik(film, 250, 2000, "tr")).toBe("250/2.000");
+    expect(formatBadgeAralik(film, 250, 2000, "en")).toBe("250/2,000");
+  });
+
+  test("sureBirimiBul bilinmeyen id'de dakikaya duser", () => {
+    expect(sureBirimiBul("yok").id).toBe("dk");
+    expect(sureBirimiBul(undefined).id).toBe("dk");
+    expect(SURE_BIRIMLERI.map((b) => b.id)).toEqual(["dk", "sa", "gun"]);
+  });
+
+  test("sure aile kartinda SONRAKI kademe de birim tasir", () => {
+    // 1 haftalik kullanici: hafta acik, sonraki hedef 1 ay = 43.200 dk = 720 sa.
     const kart = gruplaAileler(
       evaluateWatchBadges({ turSayaci: new Map(), etkinDakikaToplam: 10080 }, []),
     ).find((k) => k.family === "sure");
     expect(kart.sonrakiHedef.birim).toBeTruthy();
-    expect(formatBadgeDeger(kart.sonrakiHedef, kart.sonrakiHedef.target, "tr")).toBe("720 sa");
+    expect(formatBadgeDeger(kart.sonrakiHedef, kart.sonrakiHedef.target, "tr")).toBe("43.200 dk");
+    expect(formatBadgeDeger(kart.sonrakiHedef, kart.sonrakiHedef.target, "tr", sa)).toBe("720 sa");
   });
 });
 

@@ -136,7 +136,7 @@ export const ProfileNotesProvider = ({ children }) => {
         Toast.show({ type: "warning", text1: i18nText("autoI18n.bos_not_olusturulamaz", "Boş not oluşturulamaz") }); return;
       }
       if (noteType === "todo" && todoItems.every((t) => t.text.trim() === "")) {
-        Toast.show({ type: "warning", text1: "En az bir todo maddesi giriniz" }); return;
+        Toast.show({ type: "warning", text1: i18nText("autoI18n.en_az_bir_todo_maddesi_girin", "En az bir yapılacak madde girin") }); return;
       }
 
       const newId = Date.now().toString();
@@ -199,7 +199,7 @@ export const ProfileNotesProvider = ({ children }) => {
       await updateDoc(itemDoc(uid, noteId), {
         todos: [...(note.todos || []), newItem], updatedAt: Date.now(),
       });
-    } catch (err) { Toast.show({ type: "error", text1: "Madde eklenemedi" }); }
+    } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.madde_eklenemedi", "Madde eklenemedi") }); }
   };
 
   const handleDeleteTodoItem = async (noteId, todoId) => {
@@ -217,7 +217,7 @@ export const ProfileNotesProvider = ({ children }) => {
       await updateDoc(itemDoc(uid, noteId), {
         todos: (note.todos || []).filter((t) => t.id !== todoId), updatedAt: Date.now(),
       });
-    } catch (err) { Toast.show({ type: "error", text1: "Madde silinemedi" }); }
+    } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.madde_silinemedi", "Madde silinemedi") }); }
   };
 
   const handleUpdateNote = async (noteId) => {

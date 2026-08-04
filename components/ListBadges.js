@@ -18,9 +18,12 @@ import { useMediaActivity } from "@hooks/useMediaActivity";
  * Props:
  *  - mediaId, mediaType : useListStatus için ("movie" | "tv")
  *  - theme              : opsiyonel; verilmezse ThemeContext'ten alınır
- *  - variant            : "pill" (varsayılan, poster üstü dikey rozet) | "chip" (arama ekranları, tint'li yuvarlak çip)
+ *  - variant            : "pill" (varsayılan, ölçeklenen renkli rozet) | "chip" (arama ekranları, sabit boyutlu renkli rozet)
  *  - vertical           : chip varyantında dikey (true) / yatay (false) dizilim
+ *  - side               : dikey chip kolonunun kenarı ("left" | "right")
+ *  - verticalAlign      : dikey chip kolonunun konumu ("top" | "center" | "bottom")
  *  - iconSize           : ikon boyutu (pill varsayılan 11, chip varsayılan vertical?10:9)
+ *  - chipSize           : chip varyantındaki yuvarlak rozet çapı (varsayılan 18)
  *  - watchedIcon        : "izlendi" ikonu (bazı ekranlar "eye-off" kullanır, varsayılan "eye")
  *  - style              : konumlandırma / görünüm override'ı
  *  - scale              : ölçek katsayısı (varsayılan: poster ayarından türetilir)
@@ -44,7 +47,10 @@ const ListBadges = memo(function ListBadges({
   theme: themeProp,
   variant = "pill",
   vertical = true,
+  side = "right",
+  verticalAlign = "center",
   iconSize,
+  chipSize,
   watchedIcon = "eye",
   style,
   scale: scaleProp,
@@ -93,10 +99,34 @@ const ListBadges = memo(function ListBadges({
   // ── Arama ekranları: tint'li yuvarlak çipler ──
   if (variant === "chip") {
     const size = iconSize ?? (vertical ? 10 : 9);
+    const dimension = chipSize ?? 18;
     return (
-      <View style={[vertical ? styles.chipColumn : styles.chipRow, style]}>
+      <View
+        style={[
+          vertical ? styles.chipColumn : styles.chipRow,
+          vertical && { [side === "left" ? "left" : "right"]: 7 },
+          vertical &&
+            (verticalAlign === "bottom"
+              ? { bottom: 7 }
+              : verticalAlign === "top"
+                ? { top: 7 }
+                : { top: 0, bottom: 0, justifyContent: "center" }),
+          style,
+        ]}
+      >
         {items.map(({ key, icon, color }) => (
-          <View key={key} style={[styles.chip, { backgroundColor: color + "33" }]}>
+          <View
+            key={key}
+            style={[
+              styles.chip,
+              {
+                width: dimension,
+                height: dimension,
+                borderRadius: dimension / 2,
+                backgroundColor: color + "33",
+              },
+            ]}
+          >
             <Ionicons name={icon} size={size} color={color} />
           </View>
         ))}
@@ -104,28 +134,40 @@ const ListBadges = memo(function ListBadges({
     );
   }
 
-  // ── Varsayılan: poster üstü dikey pill ──
-  // İkon ve pill dolgusu poster boyutu + aktif rozet sayısıyla birlikte oranlanır.
+  // ── Varsayılan: poster üstü ölçeklenen renkli rozetler ──
+  // İkon ve rozet boyutu poster boyutu + aktif rozet sayısıyla birlikte oranlanır.
   // Çok sayıda rozet (4+) olduğunda rozetlerin posterden taşmasını önlemek için yoğunluk ölçeği uygulanır.
   const densityScale = items.length >= 6 ? 0.72 : items.length >= 5 ? 0.78 : items.length >= 4 ? 0.85 : 1.0;
   const effectiveScale = baseScale * densityScale;
   const size = Math.max(7, Math.round((iconSize ?? 11) * effectiveScale));
   const gap = Math.max(1, Math.round(2 * effectiveScale));
-  const paddingVertical = Math.max(1.5, Math.round(2.5 * effectiveScale));
-  const paddingHorizontal = Math.max(1, Math.round(1.5 * effectiveScale));
-  const radius = Math.max(4, Math.round(6 * effectiveScale));
+  const dimension = Math.max(size + 4, Math.round(18 * effectiveScale));
 
   return (
     <View
       style={[
         styles.pill,
-        { backgroundColor: theme?.secondaryt ?? "rgba(0,0,0,0.62)" },
-        { gap, paddingVertical, paddingHorizontal, borderRadius: radius, maxHeight: "90%" },
+        { gap, maxHeight: "90%" },
         style,
+        // Eski çağıranların verdiği ortak siyah kapsülü bilinçli olarak kaldır.
+        { backgroundColor: "transparent" },
       ]}
     >
       {items.map(({ key, icon, color }) => (
-        <Ionicons key={key} name={icon} size={size} color={color} />
+        <View
+          key={key}
+          style={[
+            styles.pillItem,
+            {
+              width: dimension,
+              height: dimension,
+              borderRadius: dimension / 2,
+              backgroundColor: color + "33",
+            },
+          ]}
+        >
+          <Ionicons name={icon} size={size} color={color} />
+        </View>
       ))}
     </View>
   );
@@ -134,22 +176,19 @@ const ListBadges = memo(function ListBadges({
 export default ListBadges;
 
 const styles = StyleSheet.create({
-  // pill (section / detay / profil arama kartları)
+  // Ölçeklenen renkli rozet kolonu (ana ekranlar, detaylar, poster rayları)
   pill: {
     gap: 2,
-    paddingVertical: 2,
-    paddingHorizontal: 1,
-    borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
+  },
+  pillItem: {
+    justifyContent: "center",
+    alignItems: "center",
   },
   // chip — dikey kolon (arama satır kartı)
   chipColumn: {
     position: "absolute",
-    right: 7,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
     gap: 3,
   },
   // chip — yatay satır (arama grid kartı)
@@ -159,9 +198,6 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   chip: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
     justifyContent: "center",
     alignItems: "center",
   },

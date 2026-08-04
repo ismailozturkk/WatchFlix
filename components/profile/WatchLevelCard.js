@@ -20,7 +20,7 @@ import { kademeRengi, kademeSekli, perdeStyle } from "@theme/badgeTokens";
 import { withAlpha } from "./StatsComponents";
 import {
   badgeAd,
-  formatBadgeDeger,
+  formatBadgeAralik,
 } from "@components/badges/watchBadgeCatalog";
 import { i18nText } from "@utils/i18nText";
 
@@ -375,16 +375,12 @@ function WatchLevelCard({ progress, onPress }) {
                   </Text>
                   <Text
                     allowFontScaling={false}
+                    numberOfLines={1}
                     style={[styles.yakinOran, { color: theme.text.muted }]}
                   >
-                    {formatBadgeDeger(
+                    {formatBadgeAralik(
                       b.hedef,
                       b.hedef.ilerleme,
-                      tr ? "tr" : "en"
-                    )}
-                    /
-                    {formatBadgeDeger(
-                      b.hedef,
                       b.hedef.target,
                       tr ? "tr" : "en"
                     )}

@@ -45,4 +45,15 @@ class StatsWidgetModule(
       promise.reject("STATS_WIDGET_CLEAR_FAILED", error)
     }
   }
+
+  @ReactMethod
+  fun updatePreferences(payload: String, promise: Promise) {
+    try {
+      WidgetPreferences.save(context, payload)
+      StatsWidgetProvider.refreshAll(context)
+      promise.resolve(null)
+    } catch (error: Exception) {
+      promise.reject("STATS_WIDGET_PREFERENCES_FAILED", error)
+    }
+  }
 }

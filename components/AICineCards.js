@@ -63,7 +63,33 @@ const Stars = memo(({ score, color, size = 12 }) => {
   );
 });
 
-const CardHero = memo(({ type, title, summary, theme }) => {
+const responseTypeLabel = (type, t) => {
+  const fallback = {
+    recommendations: "Sana Özel Öneriler",
+    comparison: "Karşılaştırma",
+    watch_plan: "İzleme Planı",
+    watchlist: "İzleme Listesi",
+    title_spotlight: "Yapım Detayı",
+  };
+  return t?.AICineChat?.responseTypes?.[type] || fallback[type] || "CineMatch";
+};
+
+const metricLabel = (metric, t) => {
+  const key = toStr(metric?.key).toLowerCase();
+  return t?.AICineChat?.metrics?.[key] || toStr(metric?.label || key);
+};
+
+const sectionLabel = (section, t) => {
+  const key = toStr(section?.key).toLowerCase();
+  return t?.AICineChat?.sections?.[key] || toStr(section?.name || key);
+};
+
+const formatRuntime = (minutes, t) => {
+  const value = Math.round(safeNum(minutes));
+  return value ? `${value} ${t?.AICineChat?.minutesShort || "dk"}` : "";
+};
+
+const CardHero = memo(({ type, theme, t }) => {
   const meta = typeMeta[type] || typeMeta.general;
   return (
     <LinearGradient
@@ -76,36 +102,9 @@ const CardHero = memo(({ type, title, summary, theme }) => {
         <Ionicons name={meta.icon} size={20} color="#fff" />
       </View>
       <View style={{ flex: 1 }}>
-        {!!toStr(title) && (
-          <Text style={s.heroTitle} numberOfLines={2}>
-            {toStr(title)}
-          </Text>
-        )}
-        {!!toStr(summary) && (
-          <Text style={s.heroSummary} numberOfLines={3}>
-            {toStr(summary)}
-          </Text>
-        )}
+        <Text style={s.heroTitle} numberOfLines={1}>{responseTypeLabel(type, t)}</Text>
       </View>
     </LinearGradient>
-  );
-});
-
-const TipsBlock = memo(({ tips, theme, t }) => {
-  const list = safeArr(tips).map(toStr).filter(Boolean);
-  if (!list.length) return null;
-  return (
-    <View style={[s.tips, { backgroundColor: alpha(theme.bold, 0.1), borderColor: theme.border }]}>
-      <Text style={[s.tipsTitle, { color: theme.bold }]}>
-        💡 {t?.AICineChat?.tipsTitle || i18nText("autoI18n.ipuclari", "İpuçları")}
-      </Text>
-      {list.map((tip, i) => (
-        <View key={i} style={s.tipRow}>
-          <Text style={{ color: theme.bold }}>•</Text>
-          <Text style={[s.tipText, { color: theme.text.secondary }]}>{tip}</Text>
-        </View>
-      ))}
-    </View>
   );
 });
 
@@ -166,10 +165,14 @@ const RecommendationsCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePre
   const items = safeArr(data.items);
   return (
     <View style={[s.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      <CardHero type="recommendations" title={data.title} summary={data.summary} theme={theme} />
+      <CardHero type="recommendations" theme={theme} t={t} />
       <View style={s.body}>
         {items.map((it, i) => {
           const mediaType = normMediaType(it?.mediaType);
+          const pcard = getPoster(posterMap, mediaType, toStr(it?.title));
+          const year = toStr(pcard?.year || it?.year);
+          const rating = safeNum(pcard?.rating || it?.rating);
+          const reason = toStr(it?.reason || it?.why || it?.hook);
           return (
             <View
               key={i}
@@ -187,27 +190,20 @@ const RecommendationsCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePre
               />
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <View style={s.recMetaRow}>
-                  {!!toStr(it?.year) && <Text style={[s.metaChipTxt, { color: theme.text.muted }]}>{toStr(it.year)}</Text>}
-                  {!!toStr(it?.genre) && (
-                    <Text style={[s.metaChipTxt, { color: theme.text.muted }]}>· {toStr(it.genre)}</Text>
-                  )}
-                  {safeNum(it?.rating) > 0 && (
-                    <Text style={[s.metaChipTxt, { color: ratingColor(safeNum(it.rating)), fontWeight: "800" }]}>
-                      · ★ {safeNum(it.rating).toFixed(1)}
+                  {!!year && <Text style={[s.metaChipTxt, { color: theme.text.muted }]}>{year}</Text>}
+                  {rating > 0 && (
+                    <Text style={[s.metaChipTxt, { color: ratingColor(rating), fontWeight: "800" }]}>
+                      · ★ {rating.toFixed(1)}
                     </Text>
                   )}
                 </View>
-                {!!toStr(it?.hook) && (
-                  <Text style={[s.recHook, { color: theme.text.primary }]}>{toStr(it.hook)}</Text>
-                )}
-                {!!toStr(it?.why) && (
-                  <Text style={[s.recWhy, { color: theme.text.secondary }]}>{toStr(it.why)}</Text>
+                {!!reason && (
+                  <Text style={[s.recWhy, { color: theme.text.secondary }]}>{reason}</Text>
                 )}
               </View>
             </View>
           );
         })}
-        <TipsBlock tips={data.tips} theme={theme} t={t} />
       </View>
     </View>
   );
@@ -236,7 +232,7 @@ const ComparisonCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress })
   const red = theme.colors.red;
   return (
     <View style={[s.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      <CardHero type="comparison" title={data.title} summary={data.summary} theme={theme} />
+      <CardHero type="comparison" theme={theme} t={t} />
       <View style={s.body}>
         {/* İki taraf posterleri */}
         <View style={s.cmpHeads}>
@@ -278,13 +274,13 @@ const ComparisonCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress })
                 style={[s.metricRow, i === metrics.length - 1 && { borderBottomWidth: 0 }, { borderColor: theme.border }]}
               >
                 <View style={s.metricSide}>
-                  <Stars score={m?.leftScore} color={theme.bold} />
+                  <Stars score={m?.left ?? m?.leftScore} color={theme.bold} />
                 </View>
                 <Text style={[s.metricLabel, { color: theme.text.between }]} numberOfLines={1}>
-                  {toStr(m?.label)}
+                  {metricLabel(m, t)}
                 </Text>
                 <View style={[s.metricSide, { alignItems: "flex-end" }]}>
-                  <Stars score={m?.rightScore} color={theme.accent} />
+                  <Stars score={m?.right ?? m?.rightScore} color={theme.accent} />
                 </View>
               </View>
             ))}
@@ -314,7 +310,6 @@ const ComparisonCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress })
             </Text>
           </View>
         )}
-        <TipsBlock tips={data.tips} theme={theme} t={t} />
       </View>
     </View>
   );
@@ -370,16 +365,8 @@ const WatchPlanCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress }) 
   const sessions = safeArr(data.sessions);
   return (
     <View style={[s.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      <CardHero type="watch_plan" title={data.title} summary={data.summary} theme={theme} />
+      <CardHero type="watch_plan" theme={theme} t={t} />
       <View style={s.body}>
-        {!!toStr(data.totalRuntime) && (
-          <View style={[s.totalChip, { backgroundColor: alpha(theme.bold, 0.14) }]}>
-            <Ionicons name="time-outline" size={14} color={theme.bold} />
-            <Text style={[s.totalChipText, { color: theme.bold }]}>
-              {t?.AICineChat?.totalRuntime || i18nText("autoI18n.toplam_sure", "Toplam süre")}: {toStr(data.totalRuntime)}
-            </Text>
-          </View>
-        )}
         {sessions.map((ses, i) => (
           <PlanSession
             key={i}
@@ -392,7 +379,6 @@ const WatchPlanCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress }) 
             onTitlePress={onTitlePress}
           />
         ))}
-        <TipsBlock tips={data.tips} theme={theme} t={t} />
       </View>
     </View>
   );
@@ -444,9 +430,9 @@ const WatchlistItem = ({ item, posterMap, getTmdbUrl, theme, t, onTitlePress }) 
           >
             {found ? pcard.title : title}
           </Text>
-          {!!toStr(item?.note) && (
+          {!!toStr(item?.reason || item?.note) && (
             <Text numberOfLines={2} style={[s.wlNote, { color: theme.text.secondary }]}>
-              {toStr(item.note)}
+              {toStr(item.reason || item.note)}
             </Text>
           )}
         </View>
@@ -466,14 +452,14 @@ const WatchlistCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress }) 
   const sections = safeArr(data.sections);
   return (
     <View style={[s.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      <CardHero type="watchlist" title={data.title} summary={data.summary} theme={theme} />
+      <CardHero type="watchlist" theme={theme} t={t} />
       <View style={s.body}>
         {sections.map((sec, i) => (
           <View key={i} style={{ marginBottom: 10 }}>
-            {!!toStr(sec?.name) && (
+            {!!sectionLabel(sec, t) && (
               <View style={s.sectionHead}>
                 <View style={[s.sectionDot, { backgroundColor: theme.bold }]} />
-                <Text style={[s.sectionName, { color: theme.text.primary }]}>{toStr(sec.name)}</Text>
+                <Text style={[s.sectionName, { color: theme.text.primary }]}>{sectionLabel(sec, t)}</Text>
               </View>
             )}
             {safeArr(sec?.items).map((it, j) => (
@@ -489,7 +475,6 @@ const WatchlistCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress }) 
             ))}
           </View>
         ))}
-        <TipsBlock tips={data.tips} theme={theme} t={t} />
       </View>
     </View>
   );
@@ -511,16 +496,21 @@ const TitleSpotlightCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePres
   const pcard = getPoster(posterMap, mediaType, toStr(data.title));
   const found = !!pcard?.found;
   const uri = found && pcard.posterPath ? getTmdbUrl(pcard.posterPath, "poster", 185) : null;
-  const rating = safeNum(data.rating) || safeNum(pcard?.rating);
-  const genres = safeArr(data.genres).map(toStr).filter(Boolean);
-  const cast = safeArr(data.cast).map(toStr).filter(Boolean);
-  const where = safeArr(data.whereToWatch).map(toStr).filter(Boolean);
-  const similar = safeArr(data.similar);
+  const rating = safeNum(pcard?.rating) || safeNum(data.rating);
+  const genres = safeArr(pcard?.genres || data.genres).map(toStr).filter(Boolean);
+  const cast = safeArr(pcard?.cast || data.cast).map(toStr).filter(Boolean);
+  const where = safeArr(pcard?.providers || data.whereToWatch).map(toStr).filter(Boolean);
+  const similar = safeArr(pcard?.similar || data.similar);
+  const displayTitle = toStr(pcard?.title || data.title);
+  const displayYear = toStr(pcard?.year || data.year);
+  const runtime = formatRuntime(pcard?.runtimeMinutes, t) || toStr(data.runtime);
+  const summary = toStr(data.take || pcard?.overview || data.summary);
+  const director = toStr(pcard?.director || data.director);
 
   return (
     <View style={[s.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      <CardHero type="title_spotlight" title="" summary="" theme={theme} />
-      <View style={[s.body, { marginTop: -34 }]}>
+      <CardHero type="title_spotlight" theme={theme} t={t} />
+      <View style={s.body}>
         <View style={s.spotHead}>
           <TouchableOpacity
             activeOpacity={0.85}
@@ -539,11 +529,11 @@ const TitleSpotlightCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePres
           </TouchableOpacity>
           <View style={{ flex: 1, paddingTop: 36 }}>
             <Text style={[s.spotTitle, { color: theme.text.primary }]} numberOfLines={2}>
-              {toStr(data.title)}
+              {displayTitle}
             </Text>
             <View style={s.spotMetaRow}>
-              {!!toStr(data.year) && <Chip icon="calendar-outline" label={toStr(data.year)} theme={theme} />}
-              {!!toStr(data.runtime) && <Chip icon="time-outline" label={toStr(data.runtime)} theme={theme} />}
+              {!!displayYear && <Chip icon="calendar-outline" label={displayYear} theme={theme} />}
+              {!!runtime && <Chip icon="time-outline" label={runtime} theme={theme} />}
               {rating > 0 && (
                 <View style={[s.chip, { backgroundColor: alpha(ratingColor(rating), 0.18), borderColor: alpha(ratingColor(rating), 0.5) }]}>
                   <Text style={{ color: ratingColor(rating), fontSize: 11, fontWeight: "800" }}>★ {rating.toFixed(1)}</Text>
@@ -560,14 +550,14 @@ const TitleSpotlightCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePres
           </View>
         </View>
 
-        {!!toStr(data.summary) && (
-          <Text style={[s.spotSummary, { color: theme.text.secondary }]}>{toStr(data.summary)}</Text>
+        {!!summary && (
+          <Text style={[s.spotSummary, { color: theme.text.secondary }]}>{summary}</Text>
         )}
 
-        {!!toStr(data.director) && (
+        {!!director && (
           <Text style={[s.spotLine, { color: theme.text.secondary }]}>
             <Text style={{ color: theme.text.muted }}>{t?.AICineChat?.director || i18nText("autoI18n.yonetmen", "Yönetmen")}: </Text>
-            {toStr(data.director)}
+            {director}
           </Text>
         )}
         {cast.length > 0 && (
@@ -610,7 +600,6 @@ const TitleSpotlightCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePres
             </ScrollView>
           </View>
         )}
-        <TipsBlock tips={data.tips} theme={theme} t={t} />
       </View>
     </View>
   );
@@ -620,10 +609,8 @@ const TitleSpotlightCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePres
 
 const GeneralCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress }) => {
   const items = safeArr(data.items);
-  const hasHero = !!toStr(data.title);
   return (
     <View style={[s.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      {hasHero && <CardHero type="general" title={data.title} summary="" theme={theme} />}
       <View style={s.body}>
         {!!toStr(data.content || data.summary) && (
           <Text style={[s.generalText, { color: theme.text.secondary }]}>
@@ -653,7 +640,6 @@ const GeneralCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress }) =>
             ))}
           </ScrollView>
         )}
-        <TipsBlock tips={data.tips} theme={theme} t={t} />
       </View>
     </View>
   );
@@ -670,12 +656,98 @@ const CARD_BY_TYPE = {
   general: GeneralCard,
 };
 
-const UserBubble = memo(({ text, theme }) => (
+/**
+ * Kullanıcı mesajına iliştirilen yapım kartı ("alıntı" görünümü).
+ * attachment: { mediaType, title, year, posterPath, rating, id }
+ * Poster/başlık yalnızca baloncukta gösterilir; AI'a giden metne dahil değildir.
+ */
+const UserAttachment = memo(({ attachment, theme, t, getTmdbUrl, onTitlePress }) => {
+  const mediaType = normMediaType(attachment?.mediaType);
+  const title = toStr(attachment?.title);
+  if (!title) return null;
+
+  const year = toStr(attachment?.year);
+  const rating = safeNum(attachment?.rating);
+  const posterPath = toStr(attachment?.posterPath);
+  const uri = posterPath && getTmdbUrl ? getTmdbUrl(posterPath, "poster", 185) : null;
+  const typeLabel =
+    mediaType === "movie"
+      ? t?.AICineChat?.movie || i18nText("autoI18n.film", "Film")
+      : t?.AICineChat?.series || i18nText("autoI18n.dizi", "Dizi");
+  const meta = [typeLabel, year].filter(Boolean).join(" · ");
+  const pressable = typeof onTitlePress === "function";
+
+  return (
+    <TouchableOpacity
+      activeOpacity={pressable ? 0.85 : 1}
+      disabled={!pressable}
+      onPress={() =>
+        onTitlePress?.({
+          mediaType,
+          id: attachment?.id,
+          found: !!attachment?.id,
+          title,
+          query: title,
+        })
+      }
+      style={s.attachCard}
+    >
+      <View style={s.attachBar} />
+      <View style={s.attachPoster}>
+        {uri ? (
+          <Image source={{ uri }} style={s.posterImg} contentFit="cover" />
+        ) : (
+          <Ionicons
+            name={mediaType === "movie" ? "film-outline" : "tv-outline"}
+            size={18}
+            color="rgba(255,255,255,0.75)"
+          />
+        )}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={s.attachTitle} numberOfLines={2}>
+          {title}
+        </Text>
+        <View style={s.attachMetaRow}>
+          {!!meta && <Text style={s.attachMeta}>{meta}</Text>}
+          {rating > 0 && (
+            <View style={s.attachRating}>
+              <Ionicons name="star" size={9} color="#fff" />
+              <Text style={s.attachRatingText}>{rating.toFixed(1)}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+      {pressable && (
+        <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.7)" />
+      )}
+    </TouchableOpacity>
+  );
+});
+
+const UserBubble = memo(({ text, attachment, theme, t, getTmdbUrl, onTitlePress }) => (
   <Reanimated.View entering={FadeInUp.duration(200)} style={[s.row, { justifyContent: "flex-end" }]}>
-    <View style={[s.userBubble, { backgroundColor: theme.accent }]}>
-      <Text selectable style={{ color: "#fff", fontSize: 14, lineHeight: 20 }}>
-        {text}
-      </Text>
+    <View
+      style={[
+        s.userBubble,
+        { backgroundColor: theme.accent },
+        attachment?.title && s.userBubbleWithAttachment,
+      ]}
+    >
+      {!!attachment?.title && (
+        <UserAttachment
+          attachment={attachment}
+          theme={theme}
+          t={t}
+          getTmdbUrl={getTmdbUrl}
+          onTitlePress={onTitlePress}
+        />
+      )}
+      {!!text && (
+        <Text selectable style={{ color: "#fff", fontSize: 14, lineHeight: 20 }}>
+          {text}
+        </Text>
+      )}
     </View>
   </Reanimated.View>
 ));
@@ -706,11 +778,20 @@ const ErrorBubble = memo(({ text, retry, onRetry, theme, t }) => (
 
 /**
  * Mesajı role/type'a göre doğru bileşene yönlendirir.
- * msg: { id, role, text?, display?, aiResponse?, posterMap?, status?, retry? }
+ * msg: { id, role, text?, display?, attachment?, aiResponse?, posterMap?, status?, retry? }
  */
 export const ChatBubble = memo(({ msg, theme, t, getTmdbUrl, onTitlePress, onRetry }) => {
   if (msg.role === "user") {
-    return <UserBubble text={msg.display || msg.text} theme={theme} />;
+    return (
+      <UserBubble
+        text={msg.display || msg.text}
+        attachment={msg.attachment}
+        theme={theme}
+        t={t}
+        getTmdbUrl={getTmdbUrl}
+        onTitlePress={onTitlePress}
+      />
+    );
   }
   if (msg.status === "error") {
     return <ErrorBubble text={msg.text} retry={msg.retry} onRetry={onRetry} theme={theme} t={t} />;
@@ -747,6 +828,43 @@ const s = StyleSheet.create({
     borderRadius: 18,
     borderBottomRightRadius: 5,
   },
+  // Yapım kartı iliştirildiğinde baloncuk biraz daha geniş durur
+  userBubbleWithAttachment: { maxWidth: "92%", minWidth: 232, padding: 8, paddingBottom: 9 },
+
+  // Kullanıcı mesajındaki "alıntı" yapım kartı
+  attachCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    padding: 7,
+    paddingRight: 9,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    marginBottom: 7,
+  },
+  attachBar: { width: 3, alignSelf: "stretch", borderRadius: 2, backgroundColor: "rgba(255,255,255,0.6)" },
+  attachPoster: {
+    width: 40,
+    height: 60,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "rgba(0,0,0,0.22)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  attachTitle: { color: "#fff", fontSize: 14, fontWeight: "800", letterSpacing: -0.2, lineHeight: 18 },
+  attachMetaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
+  attachMeta: { color: "rgba(255,255,255,0.82)", fontSize: 11, fontWeight: "600" },
+  attachRating: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 7,
+    backgroundColor: "rgba(0,0,0,0.22)",
+  },
+  attachRatingText: { color: "#fff", fontSize: 10, fontWeight: "800" },
 
   // Kart kabuğu
   card: {
@@ -774,13 +892,6 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   heroTitle: { color: "#fff", fontSize: 16, fontWeight: "800", letterSpacing: -0.2 },
-  heroSummary: { color: "rgba(255,255,255,0.9)", fontSize: 12, lineHeight: 17, marginTop: 2 },
-
-  // Tips
-  tips: { marginTop: 12, padding: 10, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },
-  tipsTitle: { fontSize: 12, fontWeight: "800", marginBottom: 4 },
-  tipRow: { flexDirection: "row", gap: 6, marginTop: 2 },
-  tipText: { flex: 1, fontSize: 12, lineHeight: 17 },
 
   // Poster
   posterWrap: { borderRadius: 10, overflow: "hidden", position: "relative" },
@@ -796,7 +907,6 @@ const s = StyleSheet.create({
   recRow: { flexDirection: "row", paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   recMetaRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 3, marginBottom: 3 },
   metaChipTxt: { fontSize: 11, fontWeight: "600" },
-  recHook: { fontSize: 13, fontWeight: "700", lineHeight: 18 },
   recWhy: { fontSize: 12, lineHeight: 17, marginTop: 2 },
 
   // Comparison
@@ -830,17 +940,6 @@ const s = StyleSheet.create({
   verdictText: { flex: 1, fontSize: 13, lineHeight: 18 },
 
   // Watch plan
-  totalChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-    marginBottom: 10,
-  },
-  totalChipText: { fontSize: 12, fontWeight: "700" },
   session: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, marginBottom: 8, overflow: "hidden" },
   sessionHead: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10 },
   sessionNum: { width: 24, height: 24, borderRadius: 12, justifyContent: "center", alignItems: "center" },

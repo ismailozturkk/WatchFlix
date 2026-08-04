@@ -38,6 +38,7 @@ import {
 } from "../../../services/googleAuthService";
 import { propagateProfileChange } from "../../../services/profilePropagation";
 import { i18nText } from "../../../utils/i18nText";
+import ScreenDecor from "../../../components/ScreenDecor";
 
 
 const BIO_MAX = 160;
@@ -275,9 +276,9 @@ export default function EditProfileScreen({ navigation }) {
   const usernameHint = () => {
     switch (usernameStatus) {
       case "invalid":
-        return { text: "3-20 karakter · a-z, 0-9, _", color: theme.colors.red };
+        return { text: i18nText("autoI18n.kullanici_adi_kurali", "3-20 karakter · a-z, 0-9, _"), color: theme.colors.red };
       case "checking":
-        return { text: "Kontrol ediliyor…", color: theme.text.muted };
+        return { text: i18nText("autoI18n.kontrol_ediliyor", "Kontrol ediliyor…"), color: theme.text.muted };
       case "taken":
         return { text: i18nText("autoI18n.bu_kullanici_adi_alinmis_2", "Bu kullanıcı adı alınmış"), color: theme.colors.red };
       case "available":
@@ -298,6 +299,7 @@ export default function EditProfileScreen({ navigation }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
+      <ScreenDecor iconOpacity={0.25} />
       <StatusBar barStyle="light-content" />
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         {/* Başlık */}
@@ -436,7 +438,7 @@ export default function EditProfileScreen({ navigation }) {
                 <TextInput
                   value={username}
                   onChangeText={(v) => setUsername(v.replace(/\s/g, ""))}
-                  placeholder="kullanici_adi"
+                  placeholder={i18nText("autoI18n.kullanici_adi_ornegi", "kullanici_adi")}
                   placeholderTextColor={theme.text.muted}
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -479,7 +481,7 @@ export default function EditProfileScreen({ navigation }) {
               <TextInput
                 value={bio}
                 onChangeText={(v) => setBio(v.slice(0, BIO_MAX))}
-                placeholder="Kendinden bahset…"
+                placeholder={i18nText("autoI18n.kendinden_bahset", "Kendinden bahset…")}
                 placeholderTextColor={theme.text.muted}
                 multiline
                 maxLength={BIO_MAX}

@@ -581,11 +581,11 @@ export default function StoryShareScreen({ route, navigation }) {
       } else {
         const nd = await StoryDraftService.saveDraft(data);
         setCurrentDraftId(nd.id);
-        Toast.show({ type: "success", text1: "Taslak kaydedildi", text2: data.name });
+        Toast.show({ type: "success", text1: i18nText("autoI18n.taslak_kaydedildi", "Taslak kaydedildi"), text2: data.name });
       }
       setSaveModalVisible(false);
     } catch (e) {
-      Toast.show({ type: "error", text1: "Taslak kaydedilemedi" });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.taslak_kaydedilemedi", "Taslak kaydedilemedi") });
     } finally {
       setSavingDraft(false);
     }
@@ -864,12 +864,12 @@ export default function StoryShareScreen({ route, navigation }) {
       setBusy(true);
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== "granted") {
-        Toast.show({ type: "error", text1: "Galeri izni gerekli" });
+        Toast.show({ type: "error", text1: i18nText("autoI18n.galeri_izni_gerekli", "Galeri izni gerekli") });
         return;
       }
       const uri = await capture();
       await MediaLibrary.saveToLibraryAsync(uri);
-      Toast.show({ type: "success", text1: "Galeriye kaydedildi" });
+      Toast.show({ type: "success", text1: i18nText("autoI18n.galeriye_kaydedildi", "Galeriye kaydedildi") });
     } catch (e) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.kaydetme_hatasi", "Kaydetme hatası: ") + e.message });
     } finally {
@@ -1276,7 +1276,7 @@ export default function StoryShareScreen({ route, navigation }) {
               <SliderControl
                 theme={theme}
                 icon="contrast-outline"
-                label="Karartma"
+                label={i18nText("autoI18n.karartma", "Karartma")}
                 value={scrim}
                 min={0}
                 max={0.85}
@@ -1377,7 +1377,7 @@ export default function StoryShareScreen({ route, navigation }) {
                   <SliderControl
                     theme={theme}
                     icon="resize-outline"
-                    label="Poster Boyutu"
+                    label={i18nText("autoI18n.poster_boyutu", "Poster Boyutu")}
                     value={posterBlock.widthFrac}
                     min={0.18}
                     max={0.95}
@@ -1646,7 +1646,7 @@ export default function StoryShareScreen({ route, navigation }) {
                   <SliderControl
                     theme={theme}
                     icon="text"
-                    label="Boyut"
+                    label={i18nText("autoI18n.boyut", "Boyut")}
                     value={selected.size}
                     min={10}
                     max={80}

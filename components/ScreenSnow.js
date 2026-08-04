@@ -26,11 +26,11 @@ import {
   StyleSheet,
   InteractionManager,
   AppState,
-  AccessibilityInfo,
 } from "react-native";
 import { NavigationContext } from "@react-navigation/native";
 import LottieView from "lottie-react-native";
 import { useSnowSettings } from "../context/AppSettingsContext";
+import useReduceMotion from "../hooks/useReduceMotion";
 
 // useIsFocused yerine manuel abonelik: useIsFocused navigator dışında (modal,
 // portal vb.) throw ediyor. Burada context yoksa ekran hep "odakta" sayılır,
@@ -55,29 +55,8 @@ function useScreenFocused() {
   return focused;
 }
 
-// Sistem "Hareketi Azalt" ayarı — açıkken kar efekti tamamen kapanır.
-function useReduceMotion() {
-  const [reduceMotion, setReduceMotion] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then((enabled) => {
-        if (alive) setReduceMotion(enabled);
-      })
-      .catch(() => {});
-    const sub = AccessibilityInfo.addEventListener(
-      "reduceMotionChanged",
-      setReduceMotion,
-    );
-    return () => {
-      alive = false;
-      sub?.remove?.();
-    };
-  }, []);
-
-  return reduceMotion;
-}
+// Sistem "Hareketi Azalt" ayarı hooks/useReduceMotion'da: ayarlardaki kar
+// önizlemesi de aynı kontrolü kullanıyor.
 
 // Uygulama ön planda mı — arka planda kar dönmesin.
 function useAppActive() {

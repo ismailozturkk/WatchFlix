@@ -162,6 +162,11 @@ ErrorBoundary
 
 ### Yorumlar (TMDB içeriğine)
 - `MovieComment/{movieId}/comments/{commentId}` + `/replies/{replyId}`
+- `TvComment/{tvId}/comments/{commentId}` + `/replies/{replyId}` — film ile aynı
+  yapı, üstüne **kapsam** alanları: `scope` (`show`/`season`/`episode`),
+  `seasonNumber`, `episodeNumber`, `scopeKey`, `scopeTitle`.
+  Sezon ve bölüm yorumları ayrı koleksiyona bölünmez; dizi sayfasındaki tek
+  listener hepsini getirir, süzme istemcide (`utils/commentScope.js`) yapılır.
 
 ---
 

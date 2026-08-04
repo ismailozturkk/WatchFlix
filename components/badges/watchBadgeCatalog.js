@@ -128,26 +128,82 @@ const defineWatchBadge = (def) => ({
 const turSayisi = (stats, id) => Number(stats?.turSayaci?.get?.(id)) || 0;
 const say = (stats, alan) => Number(stats?.[alan]) || 0;
 
-// Süre ailesi ham DAKİKA toplar (etkinDakikaToplam) ama SAAT gösterir: ham
-// dakika (525.600) kullanıcıya hiçbir şey ifade etmez, "8.760 saat" okunur bir
-// hedeftir. Puanlama ve eşik karşılaştırması dakikayla yapılmaya devam eder;
-// bu yalnızca görüntü katmanıdır (WatchBadgeCard / Modal / WatchLevelCard).
-const SAAT = { bol: 60, ekTr: "sa", ekEn: "h" };
+// Süre ailesi ham DAKİKA toplar (etkinDakikaToplam) ve VARSAYILAN OLARAK da
+// dakika gösterir (kullanıcı isteği). Tek bir sabit birim seçmek zorunda
+// değiliz: rozet detay modalindeki çevirici aynı ham değeri dk/sa/gün olarak
+// döndürür. Puanlama ve eşik karşılaştırması her hâlükârda dakikayla yapılır;
+// burası yalnızca görüntü katmanıdır (WatchBadgeCard / Modal / WatchLevelCard).
+const DAKIKA = { id: "dk", bol: 1, ekTr: "dk", ekEn: "min" };
+const SAAT = { id: "sa", bol: 60, ekTr: "sa", ekEn: "h" };
+const GUN = { id: "gun", bol: 1440, ekTr: "gün", ekEn: "d" };
+
+// Çeviricinin sırası; İLK eleman varsayılandır.
+export const SURE_BIRIMLERI = [DAKIKA, SAAT, GUN];
+export const SURE_BIRIM_VARSAYILAN = DAKIKA.id;
+
+/** Çevirici id'sini ("dk" | "sa" | "gun") birim tanımına çevirir. */
+export const sureBirimiBul = (id) =>
+  SURE_BIRIMLERI.find((b) => b.id === id) || DAKIKA;
 
 /**
  * Bir rozetin ilerleme/hedef sayısını GÖSTERİM için biçimler.
  * `birim` yoksa ham sayıyı yerelleştirir; varsa birime böler ve son ek ekler.
- * @param {object} badge  birim taşıyan rozet (ya da sonrakiHedef nesnesi)
- * @param {number} deger  ham değer (ör. dakika)
- * @param {string} lang   "tr" | "en"
+ * @param {object} badge          birim taşıyan rozet (ya da sonrakiHedef nesnesi)
+ * @param {number} deger          ham değer (ör. dakika)
+ * @param {string} lang           "tr" | "en"
+ * @param {object} [birimOverride] çeviriciden gelen birim; YALNIZCA rozetin
+ *   kendi birimi varsa dikkate alınır — birimsiz rozette (film adedi gibi)
+ *   bölme yapmak sayıyı bozardı.
  */
-export function formatBadgeDeger(badge, deger, lang) {
+export function formatBadgeDeger(badge, deger, lang, birimOverride) {
   const ham = Number(deger) || 0;
-  const yerel = (n) => Math.round(n).toLocaleString(lang === "tr" ? "tr-TR" : "en-US");
-  const b = badge?.birim;
-  if (!b) return yerel(ham);
+  const yerel = (n, ondalik = 0) =>
+    n.toLocaleString(lang === "tr" ? "tr-TR" : "en-US", {
+      minimumFractionDigits: ondalik,
+      maximumFractionDigits: ondalik,
+    });
+  const taban = badge?.birim;
+  if (!taban) return yerel(Math.round(ham));
+  const b = birimOverride || taban;
   const ek = lang === "tr" ? b.ekTr : b.ekEn;
-  return `${yerel(ham / b.bol)} ${ek}`;
+  const donusmus = ham / b.bol;
+  // Ondalık YALNIZ gerçekten kesirli değerlerde: 10.080 dk tam olarak 7 gündür,
+  // "7,0 gün" yazmak olmayan bir hassasiyet iddia eder. Kesirliyse büyük birime
+  // çevrilen küçük değer yuvarlanınca "0 gün" olup ilerleme yokmuş gibi
+  // görünüyordu; 1'in altında iki, 10'un altında bir ondalık gösterilir.
+  let ondalik = 0;
+  if (b.bol > 1 && donusmus > 0 && donusmus < 10 && !Number.isInteger(donusmus)) {
+    ondalik = donusmus < 1 ? 2 : 1;
+  }
+  // AŞAĞI kırpılır, yuvarlanmaz: 10.079 dk saat cinsinden 168'e yuvarlanıp
+  // kilitli bir rozette "168/168 sa" (tamamlanmış) gibi görünüyordu.
+  const carpan = 10 ** ondalik;
+  return `${yerel(Math.floor(donusmus * carpan) / carpan, ondalik)} ${ek}`;
+}
+
+/**
+ * Yalnız SAYI kısmı — birim eki başka bir yerde (çevirici çipi, aralık sonu)
+ * yazıldığında kullanılır. Dar hücrelerde "525.600 dk" kırpılıyordu.
+ */
+export function formatBadgeSayi(badge, deger, lang, birimOverride) {
+  const metin = formatBadgeDeger(badge, deger, lang, birimOverride);
+  const bosluk = metin.lastIndexOf(" ");
+  return bosluk < 0 ? metin : metin.slice(0, bosluk);
+}
+
+/**
+ * "ilerleme / hedef" ikilisini biçimler. Birim eki TEK KEZ, sonda yazılır:
+ * dakika gösteriminde sayılar altı haneye çıkabiliyor ("525.600 dk/525.600 dk")
+ * ve eki iki kez tekrarlamak kompakt rozet kartında satırı taşırıyordu.
+ */
+export function formatBadgeAralik(badge, ilerleme, target, lang, birimOverride) {
+  // Sayı ile ekini ayır: birimsiz rozette yerelleştirilmiş sayı boşluk
+  // içermez (tr "525.600", en "525,600"), o yüzden son boşluk güvenli sınır.
+  const hedefMetin = formatBadgeDeger(badge, target, lang, birimOverride);
+  const bosluk = hedefMetin.lastIndexOf(" ");
+  const ilerlemeSayi = formatBadgeSayi(badge, ilerleme, lang, birimOverride);
+  if (bosluk < 0) return `${ilerlemeSayi}/${hedefMetin}`;
+  return `${ilerlemeSayi}/${hedefMetin.slice(0, bosluk)} ${hedefMetin.slice(bosluk + 1)}`;
 }
 
 export const WATCH_BADGES = [
@@ -287,35 +343,35 @@ export const WATCH_BADGES = [
   // yerine saat gösterir; descTr/descEn dönüşümü açıkça yazar (kullanıcı isteği).
   defineWatchBadge({
     id: "sure_hafta", icon: "hourglass-outline", iconSolid: "hourglass", rarity: RARITY.uncommon,
-    family: "sure", tier: 1, birim: SAAT, tr: "Bir Hafta Perdede", en: "A Week on Screen",
+    family: "sure", tier: 1, birim: DAKIKA, tr: "Bir Hafta Perdede", en: "A Week on Screen",
     descTr: "Toplam 1 hafta (168 saat) ekran süresine ulaş",
     descEn: "Reach 1 week (168 hours) of total screen time",
     target: 10080, getProgress: (s) => say(s, "etkinDakikaToplam"),
   }),
   defineWatchBadge({
     id: "sure_ay", icon: "hourglass-outline", iconSolid: "hourglass", rarity: RARITY.uncommon,
-    family: "sure", tier: 2, birim: SAAT, tr: "Bir Ay Perdede", en: "A Month on Screen",
+    family: "sure", tier: 2, birim: DAKIKA, tr: "Bir Ay Perdede", en: "A Month on Screen",
     descTr: "Toplam 1 ay (720 saat) ekran süresine ulaş",
     descEn: "Reach 1 month (720 hours) of total screen time",
     target: 43200, getProgress: (s) => say(s, "etkinDakikaToplam"),
   }),
   defineWatchBadge({
     id: "sure_3ay", icon: "hourglass-outline", iconSolid: "hourglass", rarity: RARITY.rare,
-    family: "sure", tier: 3, birim: SAAT, tr: "Üç Ay Perdede", en: "Three Months on Screen",
+    family: "sure", tier: 3, birim: DAKIKA, tr: "Üç Ay Perdede", en: "Three Months on Screen",
     descTr: "Toplam 3 ay (2.160 saat) ekran süresine ulaş",
     descEn: "Reach 3 months (2,160 hours) of total screen time",
     target: 129600, getProgress: (s) => say(s, "etkinDakikaToplam"),
   }),
   defineWatchBadge({
     id: "sure_6ay", icon: "time-outline", iconSolid: "time", rarity: RARITY.rare,
-    family: "sure", tier: 4, birim: SAAT, tr: "Altı Ay Perdede", en: "Six Months on Screen",
+    family: "sure", tier: 4, birim: DAKIKA, tr: "Altı Ay Perdede", en: "Six Months on Screen",
     descTr: "Toplam 6 ay (4.320 saat) ekran süresine ulaş",
     descEn: "Reach 6 months (4,320 hours) of total screen time",
     target: 259200, getProgress: (s) => say(s, "etkinDakikaToplam"),
   }),
   defineWatchBadge({
     id: "sure_yil", icon: "time-outline", iconSolid: "time", rarity: RARITY.epic,
-    family: "sure", tier: 5, birim: SAAT, tr: "Bir Yıl Perdede", en: "A Year on Screen",
+    family: "sure", tier: 5, birim: DAKIKA, tr: "Bir Yıl Perdede", en: "A Year on Screen",
     descTr: "Toplam 1 yıl (8.760 saat) ekran süresine ulaş",
     descEn: "Reach 1 year (8,760 hours) of total screen time",
     target: 525600, getProgress: (s) => say(s, "etkinDakikaToplam"),

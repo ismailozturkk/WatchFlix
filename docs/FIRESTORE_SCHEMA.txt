@@ -123,6 +123,18 @@ UserStats/{uid}
 MovieComment/{movieId}/comments/{commentId}
 MovieComment/{movieId}/comments/{commentId}/replies/{replyId}
 
+TvComment/{tvId}/comments/{commentId}          # film ile aynı yapı + KAPSAM
+TvComment/{tvId}/comments/{commentId}/replies/{replyId}
+  scope         : "show" | "season" | "episode"   # yorum nereye referans veriyor
+  seasonNumber  : number | null
+  episodeNumber : number | null
+  scopeKey      : "show" | "s2" | "s2e5"          # tek alanlı sorgulanabilir kimlik
+  scopeTitle    : string | null                   # yazım anındaki sezon/bölüm adı
+  # Bütün sezon/bölüm yorumları AYNI koleksiyonda durur: dizi sayfasındaki tek
+  # onSnapshot hepsini getirir, süzme istemcide yapılır (composite index yok).
+  # Alanları taşımayan ESKİ yorumlar "show" sayılır (utils/commentScope.js).
+  # Yanıt, üst yorumun kapsamını devralır.
+
 chats/{chatId}             # chatId = "uid1_uid2"
 chats/{chatId}/messages/{msgId}
 

@@ -172,7 +172,12 @@ export default function MessagesScreen({ navigation }) {
       <ScreenDecor iconOpacity={0.3} />
 
       <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: theme.text?.primary ?? "#fff" }]}>
+        <BackButton absolute={false} />
+        <Text
+          allowFontScaling={false}
+          numberOfLines={1}
+          style={[styles.title, { color: theme.text?.primary ?? "#fff" }]}
+        >
           {i18nText("autoI18n.mesajlar", "Mesajlar")}
         </Text>
         {!isDm && (
@@ -233,23 +238,23 @@ export default function MessagesScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         />
       )}
-
-      <BackButton />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 10 },
+  // Geri butonu satır içinde duruyor (absolute değil): eskiden başlığın
+  // üstüne binip "Mesajlar" yazısını kapatıyordu.
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 12,
     paddingHorizontal: 16,
     marginBottom: 12,
     marginTop: 4,
   },
-  title: { fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
+  title: { flex: 1, fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
   newBtn: {
     flexDirection: "row",
     alignItems: "center",

@@ -9,6 +9,11 @@
 //   - Puanlar   → ratingsService (Users/{uid}/myRatings) — orada
 //
 // myComments/{commentId} → { kind:'movie'|'tv'|'post', targetId, text, title, createdAt }
+//   Dizi yorumlarında ayrıca KAPSAM alanları taşınır (utils/commentScope.js):
+//   scope ('show'|'season'|'episode'), seasonNumber, episodeNumber, scopeKey,
+//   scopeTitle. "Etkinliklerim → Yorumlarım" satırındaki S2·B5 rozeti ve
+//   satıra dokununca yorum sayfasının o kapsamda açılması bunlara dayanır.
+//   Alanları taşımayan ESKİ kayıtlar 'show' sayılır.
 
 import {
   collection,

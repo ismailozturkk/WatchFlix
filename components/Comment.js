@@ -41,6 +41,23 @@ import LottieView from "lottie-react-native";
 import appAlert from "./AppAlert";
 import Toast from "react-native-toast-message";
 import { i18nText } from "../utils/i18nText";
+import {
+  ALL_SCOPE_FILTER,
+  normalizeScope,
+  scopeKey,
+  scopeWriteFields,
+  filterForScope,
+  scopeForFilter,
+  scopeMatchesFilter,
+  filterAllowsShowLevelSources,
+  isAllFilter,
+  summarizeScopes,
+} from "../utils/commentScope";
+import CommentScopeBar from "./comments/CommentScopeBar";
+import CommentScopeSheet from "./comments/CommentScopeSheet";
+import CommentScopeBadge, { scopeVisual } from "./comments/CommentScopeBadge";
+import { scopeLong } from "./comments/scopeTexts";
+import ScreenDecor from "./ScreenDecor";
 
 
 const { height: SCREEN_H } = Dimensions.get("window");
@@ -171,6 +188,11 @@ const CommentItem = memo(
     isVisible,
     theme,
     avatarIndex, // yazarın güncel avatarı (uid → Users doc'tan); null ise legacy fallback
+    // Dizi yorumlarında "Topluluk" rozetinin yerini kapsam rozeti alır
+    // (S2·B5); kapsam bilgisi kaynak bilgisinden çok daha ayırt edicidir.
+    scopeEnabled = false,
+    showSourceBadge = true,
+    onScopePress,
   }) => {
     const styles = getStyles(theme);
     const [showSpoiler, setShowSpoiler] = useState(false);
@@ -225,6 +247,10 @@ const CommentItem = memo(
                 isReply: isReply,
                 replieName: item.username,
                 replieText: item.text,
+                // Düzenlemede kapsam korunur; üst seviye yorumda hedef
+                // seçiciyle değiştirilebilir (yanıtta üst yorumdan gelir).
+                editScope: isReply ? null : normalizeScope(item),
+                parentScope: isReply ? normalizeScope(item) : null,
               }),
           },
           {
@@ -248,6 +274,9 @@ const CommentItem = memo(
         replieName: item.username,
         replieText: item.text,
         editId: null,
+        // Yanıt, üst yorumun kapsamını devralır — bir bölüm yorumuna verilen
+        // yanıt da o bölümün altında kalsın.
+        parentScope: normalizeScope(item),
       }));
 
     return (
@@ -310,7 +339,14 @@ const CommentItem = memo(
               <Text allowFontScaling={false} style={styles.username} numberOfLines={1}>
                 {item.username}
               </Text>
-              {!isReply && (
+              {!isReply && scopeEnabled && (
+                <CommentScopeBadge
+                  scope={item}
+                  theme={theme}
+                  onPress={onScopePress ? () => onScopePress(item) : undefined}
+                />
+              )}
+              {!isReply && showSourceBadge && (
                 <View style={styles.sourceBadge}>
                   <Text allowFontScaling={false} style={styles.sourceBadgeText}>
                     {i18nText("autoI18n.topluluk", "Topluluk")}
@@ -426,14 +462,39 @@ const CommentItem = memo(
   },
 );
 
+// Boş girdi durumu — sıfırlamalar tek yerden.
+const EMPTY_INPUT = {
+  text: "",
+  isSpoiler: false,
+  parentId: null,
+  editId: null,
+  isReply: false,
+  replieName: null,
+  replieText: null,
+  parentScope: null,
+  editScope: null,
+};
+
 // ── Ana Bileşen ───────────────────────────────────────────
-// collectionName: "MovieComment" (film) | "TvComment" (dizi). Yapı birebir aynı.
+// collectionName: "MovieComment" (film) | "TvComment" (dizi).
+//
+// DİZİLERDE KAPSAM: yorumlar yine tek koleksiyonda durur, ama her yorum
+// dizinin geneline / bir sezona / bir bölüme referans verebilir
+// (utils/commentScope.js). Bu sayede kullanıcı bölüm sayfasına girmeden ana
+// yorum ekranından hedef seçip yazabilir, üstteki filtreyle de yalnız o kısmın
+// yorumlarını görebilir.
+//
+// Props:
+//   seasons      → TMDB sezon listesi (details.seasons). Verilirse kapsam UI'ı açılır.
+//   initialScope → ekran açılırken hedeflenecek kapsam (sezon/bölüm sayfasından)
 const Comment = ({
   contextId,
   collectionName = "MovieComment",
   mediaTitle = "",
   mediaPoster = null,
   tmdbReviews = [],
+  seasons = null,
+  initialScope = null,
 }) => {
   const { theme } = useTheme();
   const styles = getStyles(theme);
@@ -444,15 +505,26 @@ const Comment = ({
   const [sourceFilter, setSourceFilter] = useState("all");
   const [repliesMap, setRepliesMap] = useState({});
   const [replyVisibility, setReplyVisibility] = useState({});
-  const [commentInputState, setCommentInputState] = useState({
-    text: "",
-    isSpoiler: false,
-    parentId: null,
-    editId: null,
-    isReply: false,
-    replieName: null,
-    replieText: null,
-  });
+  const [commentInputState, setCommentInputState] = useState({ ...EMPTY_INPUT });
+
+  const isTv = collectionName === "TvComment";
+  const scopeEnabled = isTv;
+
+  // Aktif kapsam filtresi (üst çubuk) + yeni yorumun hedefi (girdi çubuğu).
+  // Ekran bir sezon/bölüm sayfasından açıldıysa ikisi de oraya kilitlenir.
+  const bootScope = useMemo(
+    () => (scopeEnabled && initialScope ? normalizeScope(initialScope) : null),
+    // initialScope her render'da yeni nesne olabilir; kimliği anahtarla sabitle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scopeEnabled, initialScope ? scopeKey(initialScope) : null],
+  );
+  const [scopeFilter, setScopeFilter] = useState(() =>
+    bootScope ? filterForScope(bootScope) : { ...ALL_SCOPE_FILTER },
+  );
+  const [targetScope, setTargetScope] = useState(
+    () => bootScope || normalizeScope(null),
+  );
+  const [scopeSheet, setScopeSheet] = useState({ visible: false, mode: "filter" });
 
   // One ref per comment — stores its active onSnapshot unsubscribe fn
   const replyUnsubsRef = useRef({});
@@ -512,36 +584,140 @@ const Comment = ({
     [tmdbReviews],
   );
 
+  // ── Kapsam (dizi / sezon / bölüm) ─────────────────────────────────────────
+  // Sayaç ağacı: filtre çipleri ve kapsam sayfası bunu okur.
+  const scopeSummary = useMemo(
+    () => (scopeEnabled ? summarizeScopes(comments) : null),
+    [scopeEnabled, comments],
+  );
+
+  // TMDB sezon listesi + yalnız yorumlarda görünen sezonların birleşimi
+  // (dizi güncellenmiş, sezon kaldırılmış olabilir — yorum kaybolmasın).
+  const seasonOptions = useMemo(() => {
+    if (!scopeEnabled) return [];
+    const map = new Map();
+    (Array.isArray(seasons) ? seasons : []).forEach((season) => {
+      const seasonNumber = Number(season?.season_number ?? season?.seasonNumber);
+      if (!Number.isFinite(seasonNumber)) return;
+      map.set(seasonNumber, {
+        seasonNumber,
+        name: season?.name || "",
+        episodeCount: Number(season?.episode_count ?? season?.episodeCount) || 0,
+      });
+    });
+    (scopeSummary?.seasons || []).forEach((bucket) => {
+      if (map.has(bucket.seasonNumber)) return;
+      map.set(bucket.seasonNumber, {
+        seasonNumber: bucket.seasonNumber,
+        name: bucket.title || "",
+        episodeCount: 0,
+      });
+    });
+    return [...map.values()].sort((a, b) => a.seasonNumber - b.seasonNumber);
+  }, [scopeEnabled, seasons, scopeSummary]);
+
+  // Başka bir içeriğe geçildiğinde (veya sayfa farklı bir kapsamla açıldığında)
+  // filtre/hedef sıfırlanmalı — önceki dizinin sezonu üzerinde kalmasın.
+  useEffect(() => {
+    setScopeFilter(bootScope ? filterForScope(bootScope) : { ...ALL_SCOPE_FILTER });
+    setTargetScope(bootScope || normalizeScope(null));
+    setCommentInputState({ ...EMPTY_INPUT });
+  }, [contextId, collectionName, bootScope]);
+
+  // TMDB incelemeleri dizinin GENELİNE aittir; sezon/bölüm süzgecinde gösterilmez.
+  const tmdbVisible = !scopeEnabled || filterAllowsShowLevelSources(scopeFilter);
+
+  const scopedComments = useMemo(
+    () =>
+      scopeEnabled && !isAllFilter(scopeFilter)
+        ? comments.filter((comment) => scopeMatchesFilter(comment, scopeFilter))
+        : comments,
+    [scopeEnabled, comments, scopeFilter],
+  );
+
+  const visibleTmdbReviews = tmdbVisible ? normalizedTmdbReviews : [];
+
   const feedItems = useMemo(() => {
-    const communityItems = comments.map((comment) => ({
+    const communityItems = scopedComments.map((comment) => ({
       ...comment,
       source: "community",
       feedId: `community:${comment.id}`,
     }));
 
     if (sourceFilter === "community") return communityItems;
-    if (sourceFilter === "tmdb") return normalizedTmdbReviews;
+    if (sourceFilter === "tmdb") return visibleTmdbReviews;
 
-    return [...communityItems, ...normalizedTmdbReviews].sort((a, b) => {
+    return [...communityItems, ...visibleTmdbReviews].sort((a, b) => {
       const timeDiff = getFeedTimestamp(b) - getFeedTimestamp(a);
       if (timeDiff !== 0) return timeDiff;
       return a.source === "community" ? -1 : 1;
     });
-  }, [comments, normalizedTmdbReviews, sourceFilter]);
+  }, [scopedComments, visibleTmdbReviews, sourceFilter]);
 
   const sourceFilters = [
     {
       key: "all",
       label: i18nText("autoI18n.tumu", "Tümü"),
-      count: comments.length + normalizedTmdbReviews.length,
+      count: scopedComments.length + visibleTmdbReviews.length,
     },
     {
       key: "community",
       label: i18nText("autoI18n.topluluk", "Topluluk"),
-      count: comments.length,
+      count: scopedComments.length,
     },
-    { key: "tmdb", label: "TMDB", count: normalizedTmdbReviews.length },
+    { key: "tmdb", label: "TMDB", count: visibleTmdbReviews.length },
   ];
+
+  // Kaynak süzgeci ancak süzecek TMDB incelemesi varken anlamlı — yoksa
+  // "Tümü" ile "Topluluk" aynı listedir, satır yer kaplamasın.
+  const showSourceFilter = normalizedTmdbReviews.length > 0;
+
+  // TMDB seçiliyken kapsam daraltılırsa liste boş kalmasın: kaynağı geri al.
+  useEffect(() => {
+    if (!tmdbVisible && sourceFilter === "tmdb") setSourceFilter("all");
+    if (!showSourceFilter && sourceFilter !== "all") setSourceFilter("all");
+  }, [tmdbVisible, showSourceFilter, sourceFilter]);
+
+  // Yanıt üst yorumun kapsamını devralır; düzenlemede yorumun kendi kapsamı
+  // korunur; yeni üst seviye yorumda hedef seçicinin değeri kullanılır.
+  const activeScope = commentInputState.isReply
+    ? commentInputState.parentScope || normalizeScope(null)
+    : commentInputState.editId
+      ? commentInputState.editScope || targetScope
+      : targetScope;
+  const scopeLocked = commentInputState.isReply;
+
+  const openScopeSheet = useCallback(
+    (mode) => setScopeSheet({ visible: true, mode }),
+    [],
+  );
+  const closeScopeSheet = useCallback(
+    () => setScopeSheet((prev) => ({ ...prev, visible: false })),
+    [],
+  );
+
+  const handleScopeFilterChange = useCallback((next) => {
+    setScopeFilter(next);
+    // Filtre değişince yeni yorumun hedefi de oraya kayar: bir sezonu süzüp
+    // doğrudan o sezona yazmak tek dokunuş olsun.
+    setTargetScope(scopeForFilter(next));
+  }, []);
+
+  const handleScopeSheetSelect = useCallback(
+    (selection) => {
+      if (scopeSheet.mode === "filter") {
+        handleScopeFilterChange(selection);
+        return;
+      }
+      const scope = normalizeScope(selection);
+      setTargetScope(scope);
+      // Düzenlenen üst seviye yorumun kapsamı da değişsin.
+      setCommentInputState((prev) =>
+        prev.editId && !prev.isReply ? { ...prev, editScope: scope } : prev,
+      );
+    },
+    [scopeSheet.mode, handleScopeFilterChange],
+  );
 
   // ── Comments listener ────────────────────────────────────
   useEffect(() => {
@@ -556,7 +732,7 @@ const Comment = ({
       setComments(loaded);
     });
     return () => unsub();
-  }, [contextId]);
+  }, [contextId, collectionName]);
 
   // ── Cleanup all reply subscriptions on unmount ───────────
   useEffect(() => {
@@ -596,7 +772,7 @@ const Comment = ({
         return { ...prev, [id]: willBeVisible };
       });
     },
-    [contextId],
+    [contextId, collectionName],
   );
 
   // ── Add / Edit ───────────────────────────────────────────
@@ -605,6 +781,8 @@ const Comment = ({
     if (!text.trim() || isSending) return;
     setIsSending(true);
     const cid = contextId.toString();
+    // Kapsam alanları YALNIZ dizide yazılır; filmde şema eskisi gibi kalır.
+    const scopeFields = scopeEnabled ? scopeWriteFields(activeScope) : null;
 
     try {
       let newRef = null;
@@ -612,7 +790,13 @@ const Comment = ({
         const ref = isReply
           ? doc(db, collectionName, cid, "comments", parentId, "replies", editId)
           : doc(db, collectionName, cid, "comments", editId);
-        await updateDoc(ref, { text: text.trim(), isSpoiler });
+        await updateDoc(ref, {
+          text: text.trim(),
+          isSpoiler,
+          // Yanıtın kapsamı üst yorumunkidir; üst seviye yorumda hedef
+          // düzenleme sırasında değiştirilmiş olabilir.
+          ...(scopeFields || {}),
+        });
       } else if (isReply) {
         newRef = await addDoc(
           collection(db, collectionName, cid, "comments", parentId, "replies"),
@@ -627,6 +811,7 @@ const Comment = ({
             likeCount:   0,
             likedBy:     {},
             timestamp:   serverTimestamp(),
+            ...(scopeFields || {}),
           },
         );
         // Increment replyCount on parent comment
@@ -648,6 +833,7 @@ const Comment = ({
             likedBy:     {},
             replyCount:  0,
             timestamp:   serverTimestamp(),
+            ...(scopeFields || {}),
           },
         );
       }
@@ -670,13 +856,24 @@ const Comment = ({
           title: mediaTitle || "",
           poster: mediaPoster || null,
           createdAt: serverTimestamp(),
+          // "Etkinliklerim → Yorumlarım" satırındaki S2·B5 rozeti buradan gelir.
+          ...(scopeFields || {}),
+        }).catch(() => {});
+      } else if (editId && scopeFields) {
+        // Kapsam düzenlemede değişmiş olabilir — mirror'ı da hizala.
+        updateDoc(doc(db, "Users", currentUser.uid, "myComments", editId), {
+          text: text.trim(),
+          ...scopeFields,
         }).catch(() => {});
       }
 
-      setCommentInputState({
-        text: "", isSpoiler: false, parentId: null,
-        editId: null, isReply: false, replieName: null, replieText: null,
-      });
+      // Yazılan yorum aktif süzgeçte görünmüyorsa (ör. "Tümü"yü gezerken S2·B5
+      // hedefine yazmak) listeyi oraya kaydır — yorum kaybolmuş gibi durmasın.
+      if (scopeFields && !scopeMatchesFilter(activeScope, scopeFilter)) {
+        setScopeFilter(filterForScope(activeScope));
+      }
+
+      setCommentInputState({ ...EMPTY_INPUT });
     } catch (e) {
       // Örn. yanıt yazarken üst yorum silinmişse updateDoc "No document to
       // update" ile reddeder — catch olmadan unhandled rejection olur ve
@@ -731,40 +928,64 @@ const Comment = ({
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       style={styles.container}
     >
-      <View style={styles.sourceFilterRow}>
-        {sourceFilters.map((filter) => {
-          const selected = sourceFilter === filter.key;
-          return (
-            <TouchableOpacity
-              key={filter.key}
-              activeOpacity={0.8}
-              onPress={() => setSourceFilter(filter.key)}
-              style={[styles.sourceFilterButton, selected && styles.sourceFilterButtonActive]}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.sourceFilterText, selected && styles.sourceFilterTextActive]}
+      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
+      <ScreenDecor iconOpacity={0.25} />
+      {scopeEnabled && (
+        <CommentScopeBar
+          theme={theme}
+          seasons={seasonOptions}
+          summary={scopeSummary}
+          value={scopeFilter}
+          onChange={handleScopeFilterChange}
+          onOpenPicker={() => openScopeSheet("filter")}
+        />
+      )}
+
+      {showSourceFilter && (
+        <View style={styles.sourceFilterRow}>
+          {sourceFilters.map((filter) => {
+            const selected = sourceFilter === filter.key;
+            const disabled = filter.key === "tmdb" && !tmdbVisible;
+            return (
+              <TouchableOpacity
+                key={filter.key}
+                activeOpacity={0.8}
+                disabled={disabled}
+                onPress={() => setSourceFilter(filter.key)}
+                style={[
+                  styles.sourceFilterButton,
+                  selected && styles.sourceFilterButtonActive,
+                  disabled && styles.sourceFilterButtonDisabled,
+                ]}
               >
-                {filter.label}
-              </Text>
-              <View style={[styles.sourceFilterCount, selected && styles.sourceFilterCountActive]}>
                 <Text
                   allowFontScaling={false}
-                  style={[styles.sourceFilterCountText, selected && styles.sourceFilterCountTextActive]}
+                  style={[styles.sourceFilterText, selected && styles.sourceFilterTextActive]}
                 >
-                  {filter.count}
+                  {filter.label}
                 </Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+                <View style={[styles.sourceFilterCount, selected && styles.sourceFilterCountActive]}>
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.sourceFilterCountText, selected && styles.sourceFilterCountTextActive]}
+                  >
+                    {filter.count}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
       <FlatList
         style={styles.commentList}
         data={feedItems}
         keyExtractor={(item) => item.feedId}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          scopeEnabled && styles.listContentScoped,
+        ]}
         keyboardShouldPersistTaps="handled"
         ItemSeparatorComponent={() => <View style={styles.feedSeparator} />}
         ListEmptyComponent={
@@ -775,13 +996,31 @@ const Comment = ({
               color={theme.text.muted}
             />
             <Text allowFontScaling={false} style={styles.emptyStateTitle}>
-              {i18nText("autoI18n.henuz_yorum_yok", "Henüz yorum yok")}
+              {scopeEnabled && !isAllFilter(scopeFilter)
+                ? i18nText("autoI18n.bu_kapsamda_yorum_yok", "Bu kısımda henüz yorum yok")
+                : i18nText("autoI18n.henuz_yorum_yok", "Henüz yorum yok")}
             </Text>
             <Text allowFontScaling={false} style={styles.emptyStateText}>
               {sourceFilter === "tmdb"
                 ? i18nText("autoI18n.tmdb_yorumu_bulunamadi", "Bu içerik için TMDB yorumu bulunamadı.")
-                : i18nText("autoI18n.ilk_yorumu_sen_yap", "İlk yorumu sen yap.")}
+                : scopeEnabled && !isAllFilter(scopeFilter)
+                  ? i18nText(
+                      "autoI18n.ilk_yorumu_bu_kisma_sen_yap",
+                      "Aşağıdaki hedef {scope} olarak ayarlı — ilk yorumu sen yaz.",
+                    ).replace(/\{\{?\s*scope\s*\}?\}/g, scopeLong(scopeForFilter(scopeFilter)))
+                  : i18nText("autoI18n.ilk_yorumu_sen_yap", "İlk yorumu sen yap.")}
             </Text>
+            {scopeEnabled && !isAllFilter(scopeFilter) && (
+              <TouchableOpacity
+                onPress={() => handleScopeFilterChange({ ...ALL_SCOPE_FILTER })}
+                style={styles.emptyStateAction}
+              >
+                <Ionicons name="albums-outline" size={14} color={theme.accent} />
+                <Text allowFontScaling={false} style={styles.emptyStateActionText}>
+                  {i18nText("autoI18n.tum_yorumlari_gor", "Tüm yorumları gör")}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         }
         renderItem={({ item }) =>
@@ -798,6 +1037,11 @@ const Comment = ({
               replies={repliesMap[item.id] || []}
               isVisible={replyVisibility[item.id]}
               toggleReplyVisibility={toggleReplyVisibility}
+              scopeEnabled={scopeEnabled}
+              showSourceBadge={showSourceFilter}
+              onScopePress={(comment) =>
+                handleScopeFilterChange(filterForScope(comment))
+              }
               handleLikeToggle={(id, liked) => {
                 if (!currentUser?.uid) return;
                 const ref = doc(db, collectionName, contextId.toString(), "comments", id);
@@ -868,16 +1112,49 @@ const Comment = ({
               </Text>
             </View>
             <TouchableOpacity
-              onPress={() =>
-                setCommentInputState({
-                  text: "", isSpoiler: false, parentId: null,
-                  editId: null, isReply: false, replieName: null, replieText: null,
-                })
-              }
+              onPress={() => setCommentInputState({ ...EMPTY_INPUT })}
             >
               <Ionicons name="close-circle" size={20} color={theme.colors.red} />
             </TouchableOpacity>
           </View>
+        )}
+
+        {/* Yorum hedefi — "her bölüme girmeden" buradan sezon/bölüm seçilir.
+            Yanıtta üst yorumun kapsamı devralınır ve kilitli gösterilir. */}
+        {scopeEnabled && (
+          <TouchableOpacity
+            activeOpacity={scopeLocked ? 1 : 0.8}
+            disabled={scopeLocked}
+            onPress={() => openScopeSheet("target")}
+            style={[
+              styles.targetPill,
+              {
+                borderColor: alpha(scopeVisual(activeScope, theme).color, 0.45),
+                backgroundColor: alpha(scopeVisual(activeScope, theme).color, 0.12),
+              },
+            ]}
+          >
+            <Ionicons
+              name={scopeVisual(activeScope, theme).icon}
+              size={13}
+              color={scopeVisual(activeScope, theme).color}
+            />
+            <Text allowFontScaling={false} style={styles.targetPillLabel}>
+              {i18nText("autoI18n.hedef", "Hedef")}
+            </Text>
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={styles.targetPillValue}
+            >
+              {scopeLong(activeScope)}
+            </Text>
+            <Ionicons
+              name={scopeLocked ? "lock-closed" : "chevron-down"}
+              size={scopeLocked ? 11 : 14}
+              color={theme.text.muted}
+            />
+          </TouchableOpacity>
         )}
 
         <View style={styles.inputRow}>
@@ -889,7 +1166,7 @@ const Comment = ({
                 commentInputState.isSpoiler && { color: theme.colors.red },
               ]}
             >
-              Spoiler
+              {i18nText("autoI18n.spoiler", "Spoiler")}
             </Text>
           )}
           <TextInput
@@ -897,7 +1174,7 @@ const Comment = ({
               styles.input,
               commentInputState.isSpoiler && styles.spoilerCoverInput,
             ]}
-            placeholder="Yorum yap..."
+            placeholder={i18nText("autoI18n.yorum_yap", "Yorum yap...")}
             placeholderTextColor="rgba(255,255,255,0.3)"
             value={commentInputState.text}
             onChangeText={(t) =>
@@ -949,6 +1226,20 @@ const Comment = ({
           </TouchableOpacity>
         </View>
       </View>
+
+      {scopeEnabled && (
+        <CommentScopeSheet
+          visible={scopeSheet.visible}
+          onClose={closeScopeSheet}
+          mode={scopeSheet.mode}
+          theme={theme}
+          showId={contextId}
+          seasons={seasonOptions}
+          summary={scopeSummary}
+          value={scopeSheet.mode === "filter" ? scopeFilter : activeScope}
+          onSelect={handleScopeSheetSelect}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -960,6 +1251,8 @@ const getStyles = (theme) =>
     // gap: üst seviye öğeler (yorum blokları / TMDB incelemeleri) arası boşluk;
     // araya feedSeparator çizgisi girer (gap ayraç öncesi/sonrasına da uygulanır).
     listContent: { padding: 15, paddingBottom: 160, flexGrow: 1, gap: 10 },
+    // Dizide girdi kutusunun üstünde bir de "Hedef" satırı var.
+    listContentScoped: { paddingBottom: 205 },
     // Üst seviye yorumlar arasındaki ince ayraç çizgisi — ekran kenarından
     // kenarına uzanır (negatif margin, listContent padding'ini sıfırlar).
     feedSeparator: {
@@ -993,6 +1286,8 @@ const getStyles = (theme) =>
       borderColor: alpha(theme.accent, 0.55),
       backgroundColor: alpha(theme.accent, 0.16),
     },
+    // Sezon/bölüm süzgecinde TMDB incelemesi yoktur — çip sönük ve pasif.
+    sourceFilterButtonDisabled: { opacity: 0.4 },
     sourceFilterText: { color: theme.text.muted, fontSize: 12, fontWeight: "700" },
     sourceFilterTextActive: { color: theme.text.primary },
     sourceFilterCount: {
@@ -1294,6 +1589,34 @@ const getStyles = (theme) =>
       borderRadius: 8,
     },
     indicatorText: { color: theme.accent, fontSize: 11, fontWeight: "700" },
+
+    // ── Yorum hedefi (dizi/sezon/bölüm) ──────────────────────────────────
+    targetPill: {
+      flexDirection: "row",
+      alignItems: "center",
+      alignSelf: "flex-start",
+      maxWidth: "100%",
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      marginBottom: 8,
+      borderRadius: 14,
+      borderWidth: 1,
+    },
+    targetPillLabel: {
+      color: theme.text.muted,
+      fontSize: 10.5,
+      fontWeight: "800",
+      textTransform: "uppercase",
+      letterSpacing: 0.4,
+    },
+    targetPillValue: {
+      flexShrink: 1,
+      color: theme.text.primary,
+      fontSize: 12,
+      fontWeight: "700",
+    },
+
     emptyState: {
       flex: 1,
       alignItems: "center",
@@ -1312,6 +1635,23 @@ const getStyles = (theme) =>
       fontSize: 12,
       textAlign: "center",
       marginTop: 4,
+    },
+    emptyStateAction: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: alpha(theme.accent, 0.45),
+      backgroundColor: alpha(theme.accent, 0.12),
+    },
+    emptyStateActionText: {
+      color: theme.accent,
+      fontSize: 12,
+      fontWeight: "800",
     },
   });
 

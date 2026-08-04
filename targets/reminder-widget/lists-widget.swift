@@ -75,22 +75,40 @@ private struct ListsEntry: TimelineEntry {
   let date: Date
   let lists: [ListSummary]
   let isTurkish: Bool
+  let preferences: WidgetDisplayPreferences
 }
 
 private struct ListsProvider: TimelineProvider {
   func placeholder(in context: Context) -> ListsEntry {
-    ListsEntry(date: Date(), lists: sampleLists, isTurkish: isTurkishLanguage())
+    ListsEntry(
+      date: Date(),
+      lists: sampleLists,
+      isTurkish: isTurkishLanguage(),
+      preferences: loadWidgetPreferences()
+    )
   }
 
   func getSnapshot(in context: Context, completion: @escaping (ListsEntry) -> Void) {
     let loaded = loadLists()
     let shown = (loaded.isEmpty || context.isPreview) ? sampleLists : loaded
-    completion(ListsEntry(date: Date(), lists: shown, isTurkish: isTurkishLanguage()))
+    completion(
+      ListsEntry(
+        date: Date(),
+        lists: shown,
+        isTurkish: isTurkishLanguage(),
+        preferences: loadWidgetPreferences()
+      )
+    )
   }
 
   func getTimeline(in context: Context, completion: @escaping (Timeline<ListsEntry>) -> Void) {
     // Listeler yalnız uygulama yazınca değişir (reloadAllTimelines).
-    let entry = ListsEntry(date: Date(), lists: loadLists(), isTurkish: isTurkishLanguage())
+    let entry = ListsEntry(
+      date: Date(),
+      lists: loadLists(),
+      isTurkish: isTurkishLanguage(),
+      preferences: loadWidgetPreferences()
+    )
     completion(Timeline(entries: [entry], policy: .never))
   }
 }
@@ -99,30 +117,34 @@ private struct ListsProvider: TimelineProvider {
 
 private struct ListRow: View {
   let list: ListSummary
+  let showCount: Bool
+  let appearance: WidgetAppearancePreferences
 
   var body: some View {
     HStack(spacing: 9) {
       Image(systemName: symbolName(for: list.icon))
         .font(.system(size: 11, weight: .semibold))
-        .foregroundColor(list.accent)
+        .foregroundColor(appearance.accentColor)
         .frame(width: 22, height: 22)
-        .background(list.accent.opacity(0.16))
+        .background(appearance.accentColor.opacity(0.16))
         .clipShape(Circle())
 
       Text(list.name)
         .font(.system(size: 12, weight: .semibold))
-        .foregroundColor(.wxTitle)
+        .foregroundColor(appearance.textColor)
         .lineLimit(1)
 
       Spacer(minLength: 0)
 
-      Text("\(list.count)")
-        .font(.system(size: 12, weight: .bold))
-        .foregroundColor(list.accent)
+      if showCount {
+        Text("\(list.count)")
+          .font(.system(size: 12, weight: .bold))
+          .foregroundColor(appearance.accentColor)
+      }
     }
     .padding(.horizontal, 8)
     .padding(.vertical, 7)
-    .background(Color.white.opacity(0.07))
+    .background(appearance.surfaceAltColor)
     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
   }
 }
@@ -131,43 +153,54 @@ private struct ListsWidgetEntryView: View {
   var entry: ListsEntry
   @Environment(\.widgetFamily) private var family
 
-  private var maxRows: Int { family == .systemLarge ? 7 : 3 }
+  private var maxRows: Int {
+    family == .systemLarge
+      ? (entry.preferences.listsCompact ? 8 : 7)
+      : (entry.preferences.listsCompact ? 4 : 3)
+  }
 
   var body: some View {
     let shown = Array(entry.lists.prefix(maxRows))
+    let appearance = entry.preferences.listsAppearance
 
     VStack(alignment: .leading, spacing: 7) {
-      HStack(spacing: 8) {
-        Image(systemName: "square.grid.2x2.fill")
-          .font(.system(size: 11, weight: .bold))
-          .foregroundColor(.white)
-          .frame(width: 24, height: 24)
-          .background(Color.wxAccent)
-          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+      if entry.preferences.listsShowTitle {
+        HStack(spacing: 8) {
+          Image(systemName: "square.grid.2x2.fill")
+            .font(.system(size: 11, weight: .bold))
+            .foregroundColor(.white)
+            .frame(width: 24, height: 24)
+            .background(appearance.accentColor)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-        Text(entry.isTurkish ? "Listelerim" : "My Lists")
-          .font(.system(size: 14, weight: .bold))
-          .foregroundColor(.wxTitle)
+          Text(entry.isTurkish ? "Listelerim" : "My Lists")
+            .font(.system(size: 14, weight: .bold))
+            .foregroundColor(appearance.textColor)
 
-        Spacer(minLength: 0)
+          Spacer(minLength: 0)
+        }
       }
 
       if shown.isEmpty {
         Spacer()
         Text(entry.isTurkish ? "Henüz liste yok" : "No lists yet")
           .font(.system(size: 12))
-          .foregroundColor(.wxMeta)
+          .foregroundColor(appearance.mutedColor)
           .frame(maxWidth: .infinity, alignment: .center)
         Spacer()
       } else {
         ForEach(shown) { list in
-          ListRow(list: list)
+          ListRow(
+            list: list,
+            showCount: entry.preferences.listsShowCount,
+            appearance: appearance
+          )
         }
         Spacer(minLength: 0)
       }
     }
     .padding(13)
-    .widgetBackgroundCompat(Color.wxBackground)
+    .widgetBackgroundCompat(appearance.backgroundColor)
   }
 }
 

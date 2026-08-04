@@ -800,7 +800,7 @@ export default function ProfileNotes() {
                     },
                   ]}
                   multiline
-                  placeholder="Notunu yaz..."
+                  placeholder={i18nText("autoI18n.notunu_yaz", "Notunu yaz...")}
                   placeholderTextColor={theme.text.muted}
                   value={message}
                   onChangeText={setMessage}
@@ -1123,7 +1123,7 @@ export default function ProfileNotes() {
                             value={localNewItemText}
                             onChangeText={setLocalNewItemText}
                             maxLength={60}
-                            placeholder="Yeni madde..."
+                            placeholder={i18nText("autoI18n.yeni_madde", "Yeni madde...")}
                             placeholderTextColor={theme.text.muted}
                             returnKeyType="done"
                             onSubmitEditing={localAddTodo}

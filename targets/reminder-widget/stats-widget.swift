@@ -130,22 +130,37 @@ private let sampleStats: StatsData = {
 private struct StatsEntry: TimelineEntry {
   let date: Date
   let stats: StatsData
+  let preferences: WidgetDisplayPreferences
 }
 
 private struct StatsProvider: TimelineProvider {
   func placeholder(in context: Context) -> StatsEntry {
-    StatsEntry(date: Date(), stats: sampleStats)
+    StatsEntry(
+      date: Date(),
+      stats: sampleStats,
+      preferences: loadWidgetPreferences()
+    )
   }
 
   func getSnapshot(in context: Context, completion: @escaping (StatsEntry) -> Void) {
     let loaded = loadStats()
-    completion(StatsEntry(date: Date(), stats: (context.isPreview ? nil : loaded) ?? sampleStats))
+    completion(
+      StatsEntry(
+        date: Date(),
+        stats: (context.isPreview ? nil : loaded) ?? sampleStats,
+        preferences: loadWidgetPreferences()
+      )
+    )
   }
 
   func getTimeline(in context: Context, completion: @escaping (Timeline<StatsEntry>) -> Void) {
     // İstatistikler yalnız uygulama yazınca değişir (reloadAllTimelines);
     // zamana bağlı bir yenilemeye gerek yok.
-    let entry = StatsEntry(date: Date(), stats: loadStats() ?? StatsData())
+    let entry = StatsEntry(
+      date: Date(),
+      stats: loadStats() ?? StatsData(),
+      preferences: loadWidgetPreferences()
+    )
     completion(Timeline(entries: [entry], policy: .never))
   }
 }
@@ -155,15 +170,16 @@ private struct StatsProvider: TimelineProvider {
 private struct StatBlock: View {
   let value: String
   let label: String
+  let appearance: WidgetAppearancePreferences
 
   var body: some View {
     VStack(spacing: 1) {
       Text(value)
         .font(.system(size: 15, weight: .bold))
-        .foregroundColor(.wxTitle)
+        .foregroundColor(appearance.textColor)
       Text(label)
         .font(.system(size: 8))
-        .foregroundColor(.wxMeta)
+        .foregroundColor(appearance.mutedColor)
         .lineLimit(1)
     }
     .frame(maxWidth: .infinity)
@@ -171,6 +187,7 @@ private struct StatBlock: View {
 }
 
 private struct StatsPanel<Content: View>: View {
+  let appearance: WidgetAppearancePreferences
   @ViewBuilder let content: Content
 
   var body: some View {
@@ -178,7 +195,7 @@ private struct StatsPanel<Content: View>: View {
       .padding(.vertical, 6)
       .padding(.horizontal, 4)
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .background(Color.black.opacity(0.35))
+      .background(appearance.surfaceAltColor)
       .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
   }
 }
@@ -187,22 +204,27 @@ private struct StatsCard: View {
   let leading: AnyView
   let time: StatsTime
   let units: [String]
+  let appearance: WidgetAppearancePreferences
 
   var body: some View {
     HStack(spacing: 5) {
-      StatsPanel { leading }
+      StatsPanel(appearance: appearance) { leading }
         .frame(maxWidth: .infinity)
-      StatsPanel {
+      StatsPanel(appearance: appearance) {
         HStack(spacing: 0) {
           ForEach(Array(time.values.enumerated()), id: \.offset) { index, value in
-            StatBlock(value: "\(value)", label: units.indices.contains(index) ? units[index] : "")
+            StatBlock(
+              value: "\(value)",
+              label: units.indices.contains(index) ? units[index] : "",
+              appearance: appearance
+            )
           }
         }
       }
       .frame(maxWidth: .infinity)
     }
     .padding(6)
-    .background(Color.wxAccent.opacity(0.14))
+    .background(appearance.surfaceColor)
     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
   }
 }
@@ -212,12 +234,13 @@ private struct DurationItem: View {
   let value: String
   let label: String
   let tint: Color
+  let muted: Color
 
   var body: some View {
     HStack(spacing: 5) {
       Image(systemName: systemName)
         .font(.system(size: 11))
-        .foregroundColor(.wxMeta)
+        .foregroundColor(muted)
       VStack(alignment: .leading, spacing: 0) {
         Text(value)
           .font(.system(size: 11, weight: .bold))
@@ -225,7 +248,7 @@ private struct DurationItem: View {
           .lineLimit(1)
         Text(label)
           .font(.system(size: 8))
-          .foregroundColor(.wxMeta)
+          .foregroundColor(muted)
           .lineLimit(1)
       }
       Spacer(minLength: 0)
@@ -239,75 +262,97 @@ private struct StatsWidgetEntryView: View {
 
   var body: some View {
     let stats = entry.stats
+    let appearance = entry.preferences.statsAppearance
 
     VStack(alignment: .leading, spacing: 7) {
-      HStack(spacing: 8) {
-        Text("S")
-          .font(.system(size: 13, weight: .bold))
-          .foregroundColor(.white)
-          .frame(width: 24, height: 24)
-          .background(Color.wxAccent)
-          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        Text(stats.title)
-          .font(.system(size: 14, weight: .bold))
-          .foregroundColor(.wxTitle)
-        Spacer(minLength: 0)
+      if entry.preferences.statsShowTitle {
+        HStack(spacing: 8) {
+          Text("S")
+            .font(.system(size: 13, weight: .bold))
+            .foregroundColor(.white)
+            .frame(width: 24, height: 24)
+            .background(appearance.accentColor)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+          Text(stats.title)
+            .font(.system(size: 14, weight: .bold))
+            .foregroundColor(appearance.textColor)
+          Spacer(minLength: 0)
+        }
       }
 
-      StatsCard(
-        leading: AnyView(
-          VStack(spacing: 1) {
-            Text(stats.movieCount)
-              .font(.system(size: 19, weight: .bold))
-              .foregroundColor(.wxTitle)
-            Text(stats.movieCountLabel)
-              .font(.system(size: 9))
-              .foregroundColor(.wxMeta)
-              .lineLimit(1)
-          }
-        ),
-        time: stats.movieTime,
-        units: stats.units
-      )
-
-      HStack(spacing: 0) {
-        DurationItem(
-          systemName: "clock",
-          value: stats.totalText,
-          label: stats.totalLabel,
-          tint: .wxAccent
-        )
-        DurationItem(
-          systemName: "film",
-          value: stats.movieText,
-          label: stats.movieLabel,
-          tint: Color(hex: stats.movieAccent) ?? .wxAccent
-        )
-        DurationItem(
-          systemName: "tv",
-          value: stats.tvText,
-          label: stats.tvLabel,
-          tint: Color(hex: stats.tvAccent) ?? .wxAccent
+      if entry.preferences.statsShowMovies {
+        StatsCard(
+          leading: AnyView(
+            VStack(spacing: 1) {
+              Text(stats.movieCount)
+                .font(.system(size: 19, weight: .bold))
+                .foregroundColor(appearance.textColor)
+              Text(stats.movieCountLabel)
+                .font(.system(size: 9))
+                .foregroundColor(appearance.mutedColor)
+                .lineLimit(1)
+            }
+          ),
+          time: stats.movieTime,
+          units: stats.units,
+          appearance: appearance
         )
       }
-      .padding(.horizontal, 8)
-      .padding(.vertical, 7)
-      .background(Color.white.opacity(0.07))
-      .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-      StatsCard(
-        leading: AnyView(
-          HStack(spacing: 0) {
-            StatBlock(value: stats.showCount, label: stats.showCountLabel)
-            StatBlock(value: stats.episodeCount, label: stats.episodeCountLabel)
-          }
-        ),
-        time: stats.tvTime,
-        units: stats.units
-      )
+      if entry.preferences.statsShowDuration {
+        HStack(spacing: 0) {
+          DurationItem(
+            systemName: "clock",
+            value: stats.totalText,
+            label: stats.totalLabel,
+            tint: appearance.accentColor,
+            muted: appearance.mutedColor
+          )
+          DurationItem(
+            systemName: "film",
+            value: stats.movieText,
+            label: stats.movieLabel,
+            tint: appearance.accentColor,
+            muted: appearance.mutedColor
+          )
+          DurationItem(
+            systemName: "tv",
+            value: stats.tvText,
+            label: stats.tvLabel,
+            tint: appearance.boldColor,
+            muted: appearance.mutedColor
+          )
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .background(appearance.surfaceAltColor)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+      }
+
+      if entry.preferences.statsShowTv {
+        StatsCard(
+          leading: AnyView(
+            HStack(spacing: 0) {
+              StatBlock(
+                value: stats.showCount,
+                label: stats.showCountLabel,
+                appearance: appearance
+              )
+              StatBlock(
+                value: stats.episodeCount,
+                label: stats.episodeCountLabel,
+                appearance: appearance
+              )
+            }
+          ),
+          time: stats.tvTime,
+          units: stats.units,
+          appearance: appearance
+        )
+      }
     }
-    .padding(13)
-    .widgetBackgroundCompat(Color.wxBackground)
+    .padding(entry.preferences.statsCompact ? 9 : 13)
+    .widgetBackgroundCompat(appearance.backgroundColor)
   }
 }
 

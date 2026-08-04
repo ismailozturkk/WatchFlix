@@ -56,6 +56,7 @@ import LottieView from "lottie-react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useProfileStats } from "@context/ProfileStatsContext";
 import AdaptiveBlurView from "../common/AdaptiveBlurView";
+import { useFontResolver } from "../typography/AppText";
 
 import {
   askGemini,
@@ -72,6 +73,7 @@ import { AI_CHAT_EVENT } from "@context/PetContext";
 import {
   loadConversations,
   persistConversations,
+  saveConversation,
   upsertConversation,
   removeConversation,
   makeId,
@@ -116,24 +118,39 @@ const formatRelative = (ts) => {
   ).padStart(2, "0")}`;
 };
 
-const makeMarkdownStyles = (theme) => ({
-  body: { color: theme.text.secondary, fontSize: 14, lineHeight: 21 },
+// react-native-markdown-display metni KENDİ <Text>'iyle çizer; babel dönüşümü
+// node_modules'e ulaşmadığı için font ancak stil nesnesine düz bir fontFamily
+// yazılarak uygulanabilir. Kütüphanede gerçek metin düğümü yalnız `text` ve
+// `textgroup` kurallarıdır — body/paragraph/heading* birer View olduğu için
+// onlara yazmak MİRAS YOLUYLA ÇALIŞMAZ (bkz. renderRules.js).
+// `fontlar` boş gelirse (sistem fontu) tüm alanlar undefined kalır ve stil
+// nesnesi bugünküyle birebir aynı davranır.
+const makeMarkdownStyles = (theme, fontlar = {}) => ({
+  body: {
+    color: theme.text.secondary,
+    fontSize: 14,
+    lineHeight: 21,
+    fontFamily: fontlar.body,
+  },
   heading1: {
     color: theme.text.primary,
     fontSize: 19,
-    fontWeight: "800",
+    fontFamily: fontlar.headingBold,
+    fontWeight: fontlar.headingBold ? "400" : "800",
     marginVertical: 6,
   },
   heading2: {
     color: theme.text.primary,
     fontSize: 16,
-    fontWeight: "700",
+    fontFamily: fontlar.headingBold,
+    fontWeight: fontlar.headingBold ? "400" : "700",
     marginVertical: 5,
   },
   heading3: {
     color: theme.text.secondary,
     fontSize: 14,
-    fontWeight: "600",
+    fontFamily: fontlar.heading,
+    fontWeight: fontlar.heading ? "400" : "600",
     marginVertical: 4,
   },
   paragraph: {
@@ -142,8 +159,20 @@ const makeMarkdownStyles = (theme) => ({
     flexDirection: "row",
     alignItems: "flex-start",
   },
-  strong: { fontWeight: "bold", color: theme.text.primary },
-  em: { fontStyle: "italic", color: theme.text.secondary },
+  strong: {
+    fontFamily: fontlar.bodyBold,
+    fontWeight: fontlar.bodyBold ? "400" : "bold",
+    color: theme.text.primary,
+  },
+  em: {
+    // Ailenin gerçek italik varyantı yoksa çözücü undefined döner; o zaman
+    // GÖVDE ailesinde kalıp eğmeyi RN'e bırakırız. Buraya undefined yazmak,
+    // markdown'ın miras zincirinde body'nin ailesini EZER ve italik kelime
+    // sistem fontuna düşerdi (kelime ortasında font değişimi).
+    fontFamily: fontlar.bodyItalic || fontlar.body,
+    fontStyle: fontlar.bodyItalic ? "normal" : "italic",
+    color: theme.text.secondary,
+  },
   s: { textDecorationLine: "line-through" },
   link: { color: theme.bold, textDecorationLine: "underline" },
   bullet_list: { paddingLeft: 4, marginVertical: 2 },
@@ -514,7 +543,21 @@ export const ChatModal = () => {
   const [genresTv, setGenresTv] = useState([]);
 
   const scrollRef = useRef(null);
-  const markdownStyles = useMemo(() => makeMarkdownStyles(theme), [theme]);
+  // Markdown metni node_modules içinde çizildiği için font düz bir dize olarak
+  // geçirilmeli; aynı çözücüden almak uygulamanın geri kalanıyla eşleşmesini
+  // garanti eder (elle yazılan bir aile adı ayarları takip etmez).
+  const fontCoz = useFontResolver();
+  const markdownStyles = useMemo(
+    () =>
+      makeMarkdownStyles(theme, {
+        body: fontCoz("body"),
+        bodyBold: fontCoz("body", { fontWeight: "700" }),
+        bodyItalic: fontCoz("body", { italic: true }),
+        heading: fontCoz("heading", { fontWeight: "600" }),
+        headingBold: fontCoz("heading", { fontWeight: "800" }),
+      }),
+    [fontCoz, theme],
+  );
 
   const threadMaxHeight = isKeyboardVisible ? SCREEN_H * 0.34 : SCREEN_H * 0.56;
 
@@ -610,21 +653,20 @@ export const ChatModal = () => {
   // ── Aktif sohbeti diske kaydet ──────────────────────────────────────────────
   const saveActiveConversation = useCallback((msgs, id) => {
     if (!id || !msgs.length) return;
-    setConversations((prev) => {
-      const existing = prev.find((c) => c.id === id);
-      const now = Date.now();
-      const firstUser = msgs.find((m) => m.role === "user");
-      const conv = {
-        id,
-        title: existing?.title || summarizeTitle(firstUser?.display || firstUser?.text || ""),
-        messages: msgs,
-        createdAt: existing?.createdAt || now,
-        updatedAt: now,
-      };
-      const next = upsertConversation(prev, conv);
-      persistConversations(next);
-      return next;
-    });
+    const now = Date.now();
+    const firstUser = msgs.find((m) => m.role === "user");
+    const conv = {
+      id,
+      title: summarizeTitle(firstUser?.display || firstUser?.text || ""),
+      messages: msgs,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Cevap görünür görünmez geçmişi güncelle; ardından depodaki kanonik
+    // listeyle eşitle. Aynı id sonraki cevaplarda yeni satır oluşturmaz.
+    setConversations((prev) => upsertConversation(prev, conv));
+    saveConversation(conv).then(setConversations).catch(() => {});
   }, []);
 
   // ── Asistanı çalıştır (yeni gönderim + tekrar dene ortak çekirdeği) ─────────

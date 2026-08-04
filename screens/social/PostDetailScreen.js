@@ -22,14 +22,18 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
+import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { getAvatarSource } from "@utils/avatars";
 import { i18nText } from "@utils/i18nText";
 import { postTypeBadge } from "@utils/postComposer";
 import AppIcon from "@components/AppIcon";
 import RatingStars from "@components/RatingStars";
+import PollMessage from "@components/chat/PollMessage";
 import PostCommentSheetModal from "@components/modals/PostCommentSheetModal";
+import SaveSharedListModal from "@components/modals/SaveSharedListModal";
 import { PostCardSkeleton } from "@components/Skeleton";
-import { fetchPost, isPostLiked, toggleLike } from "@services/postsService";
+import { fetchPost, isPostLiked, toggleLike, votePoll } from "@services/postsService";
+import ScreenDecor from "@components/ScreenDecor";
 
 // Basit göreli zaman (MyPostsScreen ile aynı kısaltmalar).
 const timeAgo = (ms) => {
@@ -50,12 +54,14 @@ export default function PostDetailScreen({ route, navigation }) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { selectAvatarIndex } = useProfileUi();
+  const { getTmdbUrl } = useImageQualitySettings();
 
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const [commentsVisible, setCommentsVisible] = useState(false);
+  const [saveListVisible, setSaveListVisible] = useState(false);
 
   const load = useCallback(async () => {
     if (!postId) {
@@ -113,6 +119,35 @@ export default function PostDetailScreen({ route, navigation }) {
     }
   }, [post, user, liked, selectAvatarIndex]);
 
+  // Anket oyu — PostsContext.votePoll ile aynı akış (optimistic toggle +
+  // hata durumunda rollback), tek post üzerinde.
+  const onVote = useCallback(
+    async (optionId) => {
+      if (!post?.poll || !user?.uid) return;
+      const uid = user.uid;
+      const currentVote = post.poll.votes?.[uid] ?? null;
+      const nextVote = currentVote === optionId ? null : optionId;
+
+      const applyVote = (voteVal) =>
+        setPost((prev) => {
+          if (!prev?.poll) return prev;
+          const votes = { ...(prev.poll.votes || {}) };
+          if (voteVal == null) delete votes[uid];
+          else votes[uid] = voteVal;
+          return { ...prev, poll: { ...prev.poll, votes } };
+        });
+
+      applyVote(nextVote); // optimistic
+      try {
+        await votePoll(post.id, uid, optionId, currentVote);
+      } catch (e) {
+        applyVote(currentVote); // rollback
+        if (__DEV__) console.warn("PostDetail vote:", e?.message);
+      }
+    },
+    [post, user?.uid],
+  );
+
   // Yorum sayfası kapanınca sayıyı tazele (yeni yorum eklenmiş olabilir).
   const onCloseComments = useCallback(() => {
     setCommentsVisible(false);
@@ -130,6 +165,8 @@ export default function PostDetailScreen({ route, navigation }) {
       style={[styles.container, { backgroundColor: theme.primary }]}
       edges={["top"]}
     >
+      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
+      <ScreenDecor iconOpacity={0.25} />
       {/* Başlık */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -234,6 +271,26 @@ export default function PostDetailScreen({ route, navigation }) {
             <Text style={[styles.content, { color: theme.text.secondary }]}>{post.content}</Text>
           ) : null}
 
+          {/* Anket gövdesi — feed'deki PostCard ile aynı PollMessage kullanılır. */}
+          {post.type === "poll" && post.poll && (
+            <View
+              style={[
+                styles.pollWrap,
+                { backgroundColor: theme.secondary, borderColor: theme.border },
+              ]}
+            >
+              <PollMessage
+                poll={post.poll}
+                currentUid={user?.uid}
+                accent={accent}
+                getTmdbUrl={getTmdbUrl}
+                onVote={onVote}
+                variant="feed"
+                theme={theme}
+              />
+            </View>
+          )}
+
           {/* Derecelendirme (inceleme) */}
           {post.type === "review" && post.userRating > 0 && (
             <View style={styles.ratingRow}>
@@ -273,6 +330,20 @@ export default function PostDetailScreen({ route, navigation }) {
                 {post.commentsCount || 0}
               </Text>
             </TouchableOpacity>
+
+            {/* Liste paylaşımını kendi profiline kopyala (feed'deki ile aynı akış) */}
+            {post.type === "list" && post.mediaList?.length > 0 && (
+              <TouchableOpacity
+                style={[styles.saveListBtn, { borderColor: `${accent}55` }]}
+                onPress={() => setSaveListVisible(true)}
+                activeOpacity={0.8}
+              >
+                <AppIcon family="Ionicons" name="albums-outline" size={16} color={accent} />
+                <Text style={[styles.saveListText, { color: accent }]} numberOfLines={1}>
+                  {i18nText("autoI18n.listeyi_kaydet", "Listeyi kaydet")}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </ScrollView>
       )}
@@ -291,6 +362,12 @@ export default function PostDetailScreen({ route, navigation }) {
           onClose={onCloseComments}
         />
       </Modal>
+
+      <SaveSharedListModal
+        visible={saveListVisible}
+        post={post}
+        onClose={() => setSaveListVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -338,6 +415,13 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: "800", marginBottom: 8, letterSpacing: -0.3 },
   content: { fontSize: 15, lineHeight: 22, marginBottom: 14 },
 
+  pollWrap: {
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 10,
+    marginBottom: 14,
+  },
+
   ratingRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14 },
   ratingText: { fontSize: 14, fontWeight: "600" },
 
@@ -350,4 +434,16 @@ const styles = StyleSheet.create({
   },
   action: { flexDirection: "row", alignItems: "center", gap: 6 },
   actionText: { fontSize: 14, fontWeight: "700" },
+  saveListBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginLeft: "auto",
+    paddingHorizontal: 12,
+    minHeight: 34,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    maxWidth: 180,
+  },
+  saveListText: { flexShrink: 1, fontSize: 12, fontWeight: "800" },
 });

@@ -45,6 +45,7 @@ private class ListsRemoteViewsFactory(
   private var posters: List<String> = emptyList()
   private var listKey: String = ""
   private var accent: Int = DEFAULT_ACCENT
+  private var preferences: WidgetPreferences = WidgetPreferences()
 
   override fun onCreate() { /* veri onDataSetChanged'de yüklenir */ }
 
@@ -53,6 +54,7 @@ private class ListsRemoteViewsFactory(
       ListsWidgetProvider.PREFS_NAME,
       Context.MODE_PRIVATE,
     )
+    preferences = WidgetPreferences.load(context)
     val lists = ListsWidgetProvider.parseLists(
       prefs.getString(ListsWidgetProvider.KEY_LISTS, "[]") ?: "[]",
     )
@@ -60,7 +62,7 @@ private class ListsRemoteViewsFactory(
     val selected = lists.optJSONObject(index)
 
     listKey = selected?.optString("key") ?: ""
-    accent = ListsWidgetProvider.parseColor(selected?.optString("accent"), DEFAULT_ACCENT)
+    accent = preferences.listsAppearance.accent
 
     val array = selected?.optJSONArray("posters")
     posters = if (array == null) {
@@ -71,7 +73,7 @@ private class ListsRemoteViewsFactory(
           val url = array.optString(i)
           if (!url.isNullOrBlank()) add(url)
         }
-      }
+      }.take(preferences.listsMaxPosters)
     }
   }
 
@@ -82,6 +84,20 @@ private class ListsRemoteViewsFactory(
   override fun getViewAt(position: Int): RemoteViews {
     val rv = RemoteViews(context.packageName, R.layout.lists_widget_item)
     val url = posters.getOrNull(position) ?: return rv
+    WidgetThemeViews.tintBackground(
+      rv,
+      R.id.lists_widget_item_root,
+      preferences.listsAppearance.surfaceAlt,
+    )
+    val density = context.resources.displayMetrics.density
+    val padding = ((if (preferences.listsCompact) 2 else 5) * density).toInt()
+    rv.setViewPadding(
+      R.id.lists_widget_item_root,
+      padding,
+      padding,
+      padding,
+      padding,
+    )
 
     val bitmap = loadPoster(url)
     if (bitmap != null) {

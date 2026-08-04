@@ -234,8 +234,8 @@ const DatePickerModal = memo(
           onConfirm={(iso) => onConfirm(iso)}
           onClose={onCancelPicker}
           title={i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}
-          subtitle="Bu sezonu ne zaman izlediniz?"
-          confirmLabel="Tarihi Onayla"
+          subtitle={i18nText("autoI18n.bu_sezonu_ne_zaman_izlediniz", "Bu sezonu ne zaman izlediniz?")}
+          confirmLabel={i18nText("autoI18n.tarihi_onayla", "Tarihi Onayla")}
           minDate={releaseDate}
           maxDate={new Date()}
         />
@@ -329,6 +329,21 @@ const SeasonItem = ({
     [language]
   );
 
+  // Kart başlığının yanında kullanılan kısa tarih ("5 Oca 2020") — uzun ay
+  // adları tek satırlık başlık satırını taşırıyordu.
+  const formatDateShort = useCallback(
+    (timestamp) => {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return "";
+      return new Intl.DateTimeFormat(language, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }).format(date);
+    },
+    [language]
+  );
+
   const formatDateSave = useCallback((timestamp) => {
     const date = new Date(timestamp);
     if (isNaN(date.getTime())) return "";
@@ -403,6 +418,16 @@ const SeasonItem = ({
       ? theme.colors?.green
       : theme.colors?.orange;
   const progressWidth = `${Math.round(seasonEpisodeWatch * 100)}%`;
+
+  // Başlığın yanına gelen tek satırlık bilgi: "10 Bölüm · 5 Oca 2020"
+  const seasonMetaText = [
+    season.episode_count
+      ? `${season.episode_count} ${t.episode}`
+      : t.episodeCountUnknown,
+    season.air_date ? formatDateShort(season.air_date) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -489,10 +514,11 @@ const SeasonItem = ({
 
               {/* ── Sağ: Bilgiler ──────────────────────────────────────── */}
               <View style={styles.infoCol}>
-                {/* Başlık + izlenme butonu */}
+                {/* Başlık + bölüm/tarih (tek satır) + izlenme butonu */}
                 <View style={styles.infoTopRow}>
-                  <View style={{ flex: 1, marginRight: 8 }}>
+                  <View style={styles.titleRow}>
                     <Text
+                      allowFontScaling={false}
                       style={[
                         styles.seasonTitle,
                         { color: theme.text?.primary ?? "#fff" },
@@ -501,19 +527,18 @@ const SeasonItem = ({
                     >
                       {season.name}
                     </Text>
-                    <Text
-                      style={[
-                        styles.seasonMeta,
-                        { color: theme.text?.secondary ?? "#aaa" },
-                      ]}
-                    >
-                      {season.episode_count
-                        ? `${season.episode_count} ${t.episode}`
-                        : t.episodeCountUnknown}
-                      {season.air_date
-                        ? `  ·  ${formatDate(season.air_date)}`
-                        : ""}
-                    </Text>
+                    {!!seasonMetaText && (
+                      <Text
+                        allowFontScaling={false}
+                        style={[
+                          styles.seasonMeta,
+                          { color: theme.text?.secondary ?? "#aaa" },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {`· ${seasonMetaText}`}
+                      </Text>
+                    )}
                   </View>
 
                   {/* İzlenme / Ekle / Hatırlat butonu (4 durum) */}
@@ -578,6 +603,7 @@ const SeasonItem = ({
                       ]}
                     >
                       <Text
+                        allowFontScaling={false}
                         style={[
                           styles.ratingPillText,
                           { color: getRatingColor(season.vote_average) },
@@ -590,10 +616,12 @@ const SeasonItem = ({
                   </View>
                 ) : (
                   <Text
+                    allowFontScaling={false}
                     style={[
                       styles.notRatedText,
                       { color: theme.text?.muted ?? "#555" },
                     ]}
+                    numberOfLines={1}
                   >
                     {t.notYetRated}
                   </Text>
@@ -601,6 +629,7 @@ const SeasonItem = ({
 
                 {/* Özet */}
                 <Text
+                  allowFontScaling={false}
                   style={[
                     styles.overviewText,
                     { color: theme.text?.secondary ?? "#aaa" },
@@ -768,21 +797,31 @@ const styles = StyleSheet.create({
   },
   infoTopRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     marginBottom: 4,
   },
+  // Sezon adı + bölüm/tarih aynı satırda; ikisi de daralabilir, uzun
+  // isimler/ay adları satırı taşırmak yerine "…" ile kırpılır.
+  titleRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 8,
+    gap: 5,
+  },
   seasonTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
-    marginBottom: 3,
     letterSpacing: -0.2,
+    flexShrink: 1,
   },
   seasonMeta: {
     fontSize: 11,
     lineHeight: 15,
+    flexShrink: 1,
   },
   watchBtn: {
-    marginTop: 2,
+    marginTop: 0,
   },
 
   // ── Puan ──────────────────────────────────────────────────────────────────

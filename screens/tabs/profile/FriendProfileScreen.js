@@ -55,7 +55,7 @@ const PROTECTED_LISTS = ["watchedMovies", "watchedTv", "watchList", "favorites"]
 const LIST_META = {
   watchedMovies: { icon: "movie-outline", iconLib: "mci", color: "#29b864", label: i18nText("autoI18n.izlenen_filmler", "İzlenen Filmler") },
   watchedTv:     { icon: "tv",            iconLib: "feather", color: "#29b864", label: i18nText("autoI18n.izlenen_diziler", "İzlenen Diziler") },
-  favorites:     { icon: "heart",         iconLib: "ion", color: "#e33",     label: "Favoriler" },
+  favorites:     { icon: "heart",         iconLib: "ion", color: "#e33",     label: i18nText("autoI18n.favoriler", "Favoriler") },
   watchList:     { icon: "bookmark",      iconLib: "ion", color: "#64b4ff",  label: i18nText("autoI18n.izlenecekler", "İzlenecekler") },
 };
 
@@ -586,6 +586,9 @@ export default function FriendProfileScreen({ route, navigation }) {
             <View style={styles.profileIdentity}>
               <Text
                 allowFontScaling={false}
+                // Kullanıcının kendi yazdığı ad — ProfileScreen'deki eşiyle
+                // aynı gerekçeyle başlık fontuna girmez (bkz. utils/typographyRoles.js).
+                fontRole="body"
                 style={[styles.displayName, { color: theme.text?.primary ?? "#fff" }]}
                 numberOfLines={2}
               >
@@ -754,7 +757,7 @@ export default function FriendProfileScreen({ route, navigation }) {
                       <Text allowFontScaling={false} style={[styles.watchSummaryLabel, { color: theme.text?.muted ?? "#666" }]}>
                         {i18nText("autoI18n.toplam_izleme_suresi", "Toplam izleme süresi")}
                       </Text>
-                      <Text allowFontScaling={false} numberOfLines={1} style={[styles.watchSummaryValue, { color: theme.text?.primary ?? "#fff" }]}>
+                      <Text allowFontScaling={false} numberOfLines={1} fontRole="numeric" style={[styles.watchSummaryValue, { color: theme.text?.primary ?? "#fff" }]}>
                         {formatDuration(stats.totalMinutes)}
                       </Text>
                     </View>

@@ -8,6 +8,7 @@ import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
 import { buildWatchChartData } from "../../../utils/watchHistory";
 import BackButton from "../../../components/BackButton";
+import ScreenDecor from "../../../components/ScreenDecor";
 import {
   StatsHeroCard,
   StatsScreenHeader,
@@ -37,6 +38,9 @@ const TvStatisticsScreen = ({ navigation }) => {
     topTvGenres,
     totalEpisodesCount,
     totalSeasonsCount,
+    uniqueTvCount,
+    uniqueEpisodesCount,
+    uniqueSeasonsCount,
     selectedDateTv,
     setSelectedDateTv,
     borderColorTv,
@@ -55,6 +59,10 @@ const TvStatisticsScreen = ({ navigation }) => {
   const [expanded, setExpanded] = useState(false);
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [filterVisible, setFilterVisible] = useState(false);
+
+  // Üç sütunun altında da aynı etiket kullanılıyor; profil anahtarındaki
+  // "Tekrarsız" ile birebir aynı sözcük olması bilinçli.
+  const tekrarsizLabel = i18nText("autoI18n.tekrarsiz", "Tekrarsız");
 
   const chartDataByPeriod = useMemo(
     () => Object.fromEntries(["daily", "monthly", "yearly"].map((period) => [
@@ -177,10 +185,13 @@ const TvStatisticsScreen = ({ navigation }) => {
         theme={theme}
         primaryCount={watchedTvCount}
         primaryLabel={t.profileScreen.tvShowWatched}
+        primarySubLabel={`${tekrarsizLabel}: ${uniqueTvCount}`}
         secondaryCount={totalEpisodesCount}
         secondaryLabel={t.profileScreen.tvShowEpisodetotalCount}
+        secondarySubLabel={`${tekrarsizLabel}: ${uniqueEpisodesCount}`}
         tertiaryCount={totalSeasonsCount}
         tertiaryLabel={t.profileScreen.tvShowSeasonCount}
+        tertiarySubLabel={`${tekrarsizLabel}: ${uniqueSeasonsCount}`}
         chartDataByPeriod={chartDataByPeriod}
         expanded={expanded}
         onToggleExpand={onToggleExpand}
@@ -217,6 +228,7 @@ const TvStatisticsScreen = ({ navigation }) => {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
+      <ScreenDecor iconOpacity={0.25} />
       <StatsCollapsingList
         theme={theme}
         topInset={insets.top + 6}

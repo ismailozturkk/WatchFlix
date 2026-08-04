@@ -6,8 +6,8 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.net.Uri
+import android.view.View
 import android.widget.RemoteViews
 import com.smlztrk.seelogd.MainActivity
 import com.smlztrk.seelogd.R
@@ -52,19 +52,60 @@ class StatsWidgetProvider : AppWidgetProvider() {
       val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
       val isTurkish = (prefs.getString(KEY_LANGUAGE, "tr") ?: "tr").startsWith("tr")
       val stats = parse(prefs.getString(KEY_STATS, "") ?: "")
+      val preferences = WidgetPreferences.load(context)
+      val appearance = preferences.statsAppearance
 
       val views = RemoteViews(context.packageName, R.layout.stats_widget)
+      WidgetThemeViews.tintBackground(
+        views,
+        R.id.stats_widget_root,
+        appearance.background,
+      )
+      listOf(
+        R.id.stats_widget_movie_card,
+        R.id.stats_widget_tv_card,
+      ).forEach { WidgetThemeViews.tintBackground(views, it, appearance.surface) }
+      listOf(
+        R.id.stats_widget_movie_count_panel,
+        R.id.stats_widget_movie_time_panel,
+        R.id.stats_widget_tv_count_panel,
+        R.id.stats_widget_tv_time_panel,
+        R.id.stats_widget_duration_strip,
+      ).forEach { WidgetThemeViews.tintBackground(views, it, appearance.surfaceAlt) }
+      views.setViewVisibility(
+        R.id.stats_widget_logo,
+        if (preferences.statsShowTitle) View.VISIBLE else View.GONE,
+      )
+      views.setViewVisibility(
+        R.id.stats_widget_title,
+        if (preferences.statsShowTitle) View.VISIBLE else View.GONE,
+      )
+      views.setViewVisibility(
+        R.id.stats_widget_movie_card,
+        if (preferences.statsShowMovies) View.VISIBLE else View.GONE,
+      )
+      views.setViewVisibility(
+        R.id.stats_widget_tv_card,
+        if (preferences.statsShowTv) View.VISIBLE else View.GONE,
+      )
+      views.setViewVisibility(
+        R.id.stats_widget_duration_strip,
+        if (preferences.statsShowDuration) View.VISIBLE else View.GONE,
+      )
 
       views.setTextViewText(
         R.id.stats_widget_title,
         stats?.optString("title")?.takeIf { it.isNotBlank() }
           ?: if (isTurkish) "İstatistikler" else "Statistics",
       )
+      views.setTextColor(R.id.stats_widget_title, appearance.text)
 
       // ── Film kartı ──────────────────────────────────────────────────────
       val movie = stats?.optJSONObject("movie")
       views.setTextViewText(R.id.stats_widget_movie_count, movie?.optString("count") ?: "0")
       views.setTextViewText(R.id.stats_widget_movie_count_label, movie?.optString("countLabel") ?: "")
+      views.setTextColor(R.id.stats_widget_movie_count, appearance.text)
+      views.setTextColor(R.id.stats_widget_movie_count_label, appearance.muted)
       bindTime(views, movie?.optJSONObject("time"), MOVIE_TIME_IDS)
 
       // ── Dizi kartı ──────────────────────────────────────────────────────
@@ -73,11 +114,16 @@ class StatsWidgetProvider : AppWidgetProvider() {
       views.setTextViewText(R.id.stats_widget_tv_count_label, tv?.optString("showCountLabel") ?: "")
       views.setTextViewText(R.id.stats_widget_episode_count, tv?.optString("episodeCount") ?: "0")
       views.setTextViewText(R.id.stats_widget_episode_count_label, tv?.optString("episodeCountLabel") ?: "")
+      views.setTextColor(R.id.stats_widget_tv_count, appearance.text)
+      views.setTextColor(R.id.stats_widget_episode_count, appearance.text)
+      views.setTextColor(R.id.stats_widget_tv_count_label, appearance.muted)
+      views.setTextColor(R.id.stats_widget_episode_count_label, appearance.muted)
       bindTime(views, tv?.optJSONObject("time"), TV_TIME_IDS)
 
       // ── Toplam süre şeridi ──────────────────────────────────────────────
       val duration = stats?.optJSONObject("duration")
       views.setTextViewText(R.id.stats_widget_total_value, duration?.optString("totalText") ?: "0")
+      views.setTextColor(R.id.stats_widget_total_value, appearance.accent)
       views.setTextViewText(R.id.stats_widget_total_label, duration?.optString("totalLabel") ?: "")
       views.setTextViewText(R.id.stats_widget_movie_value, duration?.optString("movieText") ?: "0")
       views.setTextViewText(R.id.stats_widget_movie_label, duration?.optString("movieLabel") ?: "")
@@ -86,12 +132,17 @@ class StatsWidgetProvider : AppWidgetProvider() {
       // Aksan renkleri profildeki türetilmiş rank renkleriyle aynı (payload'dan).
       views.setTextColor(
         R.id.stats_widget_movie_value,
-        parseColor(duration?.optString("movieAccent"), MOVIE_ACCENT),
+        appearance.accent,
       )
       views.setTextColor(
         R.id.stats_widget_tv_value,
-        parseColor(duration?.optString("tvAccent"), TV_ACCENT),
+        appearance.bold,
       )
+      listOf(
+        R.id.stats_widget_total_label,
+        R.id.stats_widget_movie_label,
+        R.id.stats_widget_tv_label,
+      ).forEach { views.setTextColor(it, appearance.muted) }
 
       // ── Birim etiketleri (Yıl / Ay / Gün / Saat / Dakika) ────────────────
       val units = stats?.optJSONObject("units")
@@ -99,7 +150,22 @@ class StatsWidgetProvider : AppWidgetProvider() {
         val label = units?.optString(key) ?: ""
         views.setTextViewText(MOVIE_UNIT_IDS[index], label)
         views.setTextViewText(TV_UNIT_IDS[index], label)
+        views.setTextColor(MOVIE_UNIT_IDS[index], appearance.muted)
+        views.setTextColor(TV_UNIT_IDS[index], appearance.muted)
+        views.setTextColor(MOVIE_TIME_IDS[index], appearance.text)
+        views.setTextColor(TV_TIME_IDS[index], appearance.text)
       }
+
+      val density = context.resources.displayMetrics.density
+      val horizontal = ((if (preferences.statsCompact) 8 else 12) * density).toInt()
+      val vertical = ((if (preferences.statsCompact) 7 else 11) * density).toInt()
+      views.setViewPadding(
+        R.id.stats_widget_root,
+        horizontal,
+        vertical,
+        horizontal,
+        vertical,
+      )
 
       // ── Dokunma hedefleri — profildeki kartlarla aynı ekranlar ───────────
       views.setOnClickPendingIntent(
@@ -137,15 +203,6 @@ class StatsWidgetProvider : AppWidgetProvider() {
     } catch (_: Exception) {
       null
     }
-
-    private fun parseColor(value: String?, fallback: Int): Int = try {
-      if (value.isNullOrBlank()) fallback else Color.parseColor(value)
-    } catch (_: Exception) {
-      fallback
-    }
-
-    private val MOVIE_ACCENT = 0xFF4FC3F7.toInt()
-    private val TV_ACCENT = 0xFFA78BFA.toInt()
 
     private val UNIT_KEYS = arrayOf("years", "months", "days", "hours", "minutes")
 

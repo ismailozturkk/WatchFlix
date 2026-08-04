@@ -7,7 +7,7 @@ Ayrıca kişisel zevke uygun film/dizi önerileri almak için farklı uygulamala
 
 ## 💡 Çözüm
 
-Watch Flix bu iki sorunu tek uygulamada çözer:
+Seelogd bu iki sorunu tek uygulamada çözer:
 
 - TMDB veritabanını kullanarak geniş içerik yelpazesi sunar
 - Kullanıcı davranışlarını ve tür tercihlerini analiz ederek öneriler üretir

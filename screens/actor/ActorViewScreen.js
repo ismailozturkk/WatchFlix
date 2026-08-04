@@ -27,6 +27,7 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ActorSkeleton } from "../../components/Skeleton";
 import { i18nText } from "../../utils/i18nText";
+import ScreenDecor from "../../components/ScreenDecor";
 
 
 const { width } = Dimensions.get("window");
@@ -339,6 +340,7 @@ const ActorViewScreen = ({ route, navigation }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
+      <ScreenDecor iconOpacity={0.25} />
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* ── Floating header (scroll sonrası görünür) ── */}

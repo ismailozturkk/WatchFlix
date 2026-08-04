@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
@@ -6,12 +6,14 @@ import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { useUserProfile } from "../context/UserProfileContext";
 import { useSharedLists } from "../context/SharedListsContext";
+import ListActionIcon from "./common/ListActionIcon";
 import {
   getSharedListItem,
   addItemToSharedList,
   removeItemFromSharedList,
   canAddToSharedList,
   canRemoveFromSharedList,
+  sharedItemKey,
 } from "../services/sharedListsService";
 import { i18nText } from "../utils/i18nText";
 
@@ -21,20 +23,59 @@ const ACCENT = "#38bdf8";
  * Detay ekranı "Diğer Listeler" modalındaki ORTAK LİSTELER bölümü.
  * ListView (film) ve ListViewTv (dizi) ortak kullanır.
  *
+ * Kart renkleri: içerik listede DEĞİLKEN "Diğer Listeler" kartlarıyla aynı
+ * nötr görünüm, listedeyken ortak listenin kendi rengi (ACCENT).
+ *
  * Props:
  *  - sharedItem : { id, type:'movie'|'tv', name, imagePath, minutes, genres }
- *  - visible    : modal açık mı — üyelik durumu modal açılınca çekilir
- *                 (global items aboneliği yerine hedefli getDoc'lar)
+ *  - visible    : modal açık mı — üyelik durumu modal açılınca hedefli
+ *                 getDoc'larla ilk kez çekilir; sonrasında SharedListsContext'in
+ *                 canlı items aboneliği durumu güncel tutar.
  */
 export default function SharedListsSection({ sharedItem, visible }) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { displayName, avatarIndex } = useUserProfile();
-  const { sharedLists } = useSharedLists();
+  const { sharedLists, sharedItemsByList } = useSharedLists();
 
   // listId → item verisi | null (bu içerik listede mi + kim eklemiş)
   const [states, setStates] = useState({});
   const [busy, setBusy] = useState({});
+  // Yazma sürerken canlı snapshot optimistik durumu geri almasın diye
+  // busy'nin senkron kopyası.
+  const busyRef = useRef({});
+
+  // Canlı üyelik: SharedListsContext zaten tüm ortak listelerin item'larına
+  // abone. Modal açılışındaki tek seferlik getDoc'lar ilk boyama için; asıl
+  // doğruluk buradan gelir — başka bir üye eklediğinde/çıkardığında da kart
+  // rengi güncellenir.
+  const liveStates = useMemo(() => {
+    if (sharedItem?.id == null) return null;
+    const key = sharedItemKey(sharedItem.type, sharedItem.id);
+    const next = {};
+    Object.entries(sharedItemsByList || {}).forEach(([listId, items]) => {
+      if (!Array.isArray(items)) return;
+      next[listId] = items.find((it) => it.key === key) || null;
+    });
+    return next;
+  }, [sharedItemsByList, sharedItem?.id, sharedItem?.type]);
+
+  useEffect(() => {
+    if (!liveStates) return;
+    setStates((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      Object.entries(liveStates).forEach(([listId, item]) => {
+        if (busyRef.current[listId]) return;
+        const prevItem = prev[listId] ?? null;
+        if (!!item !== !!prevItem || item?.addedBy !== prevItem?.addedBy) {
+          next[listId] = item;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [liveStates]);
 
   useEffect(() => {
     if (!visible || sharedItem?.id == null || sharedLists.length === 0) return;
@@ -54,7 +95,16 @@ export default function SharedListsSection({ sharedItem, visible }) {
           }
         }),
       );
-      if (!cancelled) setStates(next);
+      // Yazma sürerken gelen yanıt optimistik durumu ezmesin.
+      if (!cancelled) {
+        setStates((prev) => {
+          const merged = { ...prev };
+          Object.entries(next).forEach(([listId, item]) => {
+            if (!busyRef.current[listId]) merged[listId] = item;
+          });
+          return merged;
+        });
+      }
     })();
     return () => {
       cancelled = true;
@@ -65,6 +115,11 @@ export default function SharedListsSection({ sharedItem, visible }) {
   if (!sharedItem || sharedLists.length === 0) return null;
 
   const uid = user?.uid;
+
+  const setListBusy = (listId, value) => {
+    busyRef.current[listId] = value;
+    setBusy((b) => ({ ...b, [listId]: value }));
+  };
 
   const toggle = async (list) => {
     if (busy[list.id]) return;
@@ -81,7 +136,7 @@ export default function SharedListsSection({ sharedItem, visible }) {
         });
         return;
       }
-      setBusy((b) => ({ ...b, [list.id]: true }));
+      setListBusy(list.id, true);
       setStates((s) => ({ ...s, [list.id]: null })); // optimistik
       try {
         await removeItemFromSharedList(list.id, sharedItem.type, sharedItem.id);
@@ -89,7 +144,7 @@ export default function SharedListsSection({ sharedItem, visible }) {
         setStates((s) => ({ ...s, [list.id]: existing })); // geri al
         Toast.show({ type: "error", text1: e.message });
       } finally {
-        setBusy((b) => ({ ...b, [list.id]: false }));
+        setListBusy(list.id, false);
       }
       return;
     }
@@ -105,7 +160,7 @@ export default function SharedListsSection({ sharedItem, visible }) {
       return;
     }
     const optimistic = { addedBy: uid, addedByName: displayName };
-    setBusy((b) => ({ ...b, [list.id]: true }));
+    setListBusy(list.id, true);
     setStates((s) => ({ ...s, [list.id]: optimistic }));
     try {
       await addItemToSharedList({
@@ -117,7 +172,7 @@ export default function SharedListsSection({ sharedItem, visible }) {
       setStates((s) => ({ ...s, [list.id]: null }));
       Toast.show({ type: "error", text1: e.message });
     } finally {
-      setBusy((b) => ({ ...b, [list.id]: false }));
+      setListBusy(list.id, false);
     }
   };
 
@@ -133,7 +188,8 @@ export default function SharedListsSection({ sharedItem, visible }) {
         {sharedLists.map((list) => {
           const inList = !!states[list.id];
           const locked = !inList && !canAddToSharedList(list, uid);
-          const green = theme.colors?.green ?? "#29b864";
+          // Ekli DEĞİLKEN "Diğer Listeler" kartlarıyla aynı nötr görünüm;
+          // ekliyken ortak listenin kendi rengi (ACCENT).
           return (
             <TouchableOpacity
               key={list.id}
@@ -142,8 +198,8 @@ export default function SharedListsSection({ sharedItem, visible }) {
               style={[
                 styles.card,
                 {
-                  backgroundColor: inList ? green + "15" : theme.primary,
-                  borderColor: inList ? green + "60" : theme.border,
+                  backgroundColor: inList ? ACCENT + "15" : theme.primary,
+                  borderColor: inList ? ACCENT + "60" : theme.border,
                   opacity: locked ? 0.55 : 1,
                 },
               ]}
@@ -152,20 +208,17 @@ export default function SharedListsSection({ sharedItem, visible }) {
                 style={[
                   styles.cardIcon,
                   {
-                    backgroundColor: inList ? green + "25" : ACCENT + "18",
+                    backgroundColor: inList ? ACCENT + "25" : theme.secondary,
                   },
                 ]}
               >
-                <Ionicons
-                  name={
-                    inList
-                      ? "checkmark-circle"
-                      : locked
-                        ? "lock-closed"
-                        : "people"
-                  }
+                <ListActionIcon
+                  active={inList}
+                  activeName="checkmark-circle"
+                  inactiveName={locked ? "lock-closed" : "people-outline"}
+                  activeColor={ACCENT}
+                  inactiveColor={theme.text.muted}
                   size={22}
-                  color={inList ? green : locked ? theme.text.muted : ACCENT}
                 />
               </View>
               <Text
@@ -173,7 +226,7 @@ export default function SharedListsSection({ sharedItem, visible }) {
                 numberOfLines={2}
                 style={[
                   styles.cardLabel,
-                  { color: inList ? green : theme.text.secondary },
+                  { color: inList ? ACCENT : theme.text.secondary },
                 ]}
               >
                 {list.name}

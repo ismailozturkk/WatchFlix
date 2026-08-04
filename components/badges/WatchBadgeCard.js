@@ -17,7 +17,7 @@ import { useTheme } from "@context/ThemeContext";
 import { kademeRengi, kademeSekli, rarityStyle } from "@theme/badgeTokens";
 import { i18nText } from "@utils/i18nText";
 import { withAlpha } from "@components/profile/StatsComponents";
-import { badgeAciklama, badgeAd, formatBadgeDeger } from "./watchBadgeCatalog";
+import { badgeAciklama, badgeAd, formatBadgeAralik } from "./watchBadgeCatalog";
 
 const sayi = (n, lang) => Math.round(Number(n) || 0).toLocaleString(lang === "tr" ? "tr-TR" : "en-US");
 
@@ -174,8 +174,11 @@ function WatchBadgeCard({ badge, onPress, compact = false }) {
                 width: `${Math.round(ilerlemeKaynagi.oran * 100)}%`,
               }]} />
             </View>
-            <Text allowFontScaling={false} style={[styles.progressText, compact && styles.progressTextCompact, { color: theme.text.muted }]}> 
-              {formatBadgeDeger(ilerlemeKaynagi, ilerlemeKaynagi.ilerleme, lang)}/{formatBadgeDeger(ilerlemeKaynagi, ilerlemeKaynagi.target, lang)}
+            {/* Tek satır + gerekirse küçülme: dakika gösteriminde dize
+                "525.600/525.600 dk"e kadar uzayabiliyor ve kompakt kartın
+                yüksekliği sabit (124) — ikinci satır düzeni taşırırdı. */}
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} allowFontScaling={false} style={[styles.progressText, compact && styles.progressTextCompact, { color: theme.text.muted }]}>
+              {formatBadgeAralik(ilerlemeKaynagi, ilerlemeKaynagi.ilerleme, ilerlemeKaynagi.target, lang)}
             </Text>
           </View>
         ) : null}

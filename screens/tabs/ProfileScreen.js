@@ -349,6 +349,9 @@ const ProfileScreen = ({ navigation }) => {
                   <Text
                     allowFontScaling={false}
                     numberOfLines={1}
+                    // Ekranın en büyük metni olsa da bu kullanıcının kendi adı;
+                    // geniş bir başlık fontu tek satırda hemen kırpılır.
+                    fontRole="body"
                     style={[styles.textName, { color: theme.text.primary }]}
                   >
                     {profile?.displayName || user?.displayName}

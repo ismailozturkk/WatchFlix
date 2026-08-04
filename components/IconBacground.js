@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import React, { useMemo } from "react";
 import { Dimensions, StyleSheet, View } from "react-native";
 import { useIconBackgroundSettings } from "../context/AppSettingsContext";
-import { perfPreset } from "../services/deviceTier";
+import { useEffectPreset } from "../services/effectSettings";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -26,14 +26,13 @@ export function getIconBackgroundSource(index) {
     : null;
 }
 
-// Izgara yoğunluğu cihaz sınıfına göre: düşük katmanda 4x6 = 24 öğe,
-// diğerlerinde 5x9 = 45 öğe (bkz. utils/deviceTier.js).
-const COLS = perfPreset.iconBackgroundCols;
-const ROWS = perfPreset.iconBackgroundRows;
-
+// Izgara yoğunluğu EFEKT MODUNDAN gelir: "Tam"da 5x9 = 45 öğe, "Orta"/"Kapalı"da
+// 4x6 = 24 öğe (bkz. utils/deviceTier.js). Modül seviyesinde sabitlenmiyor —
+// kullanıcı ayarı çalışma anında değiştirebiliyor.
+//
 // Izgara (Grid) mantığı ile öğeleri dağıtır (üst üste binmeyi önler, boşlukları doldurur).
 // Her hücreyi baz alıp hücre içinde rastgele kaydırır; ardından sırayı karıştırır.
-function buildItems() {
+function buildItems(COLS, ROWS) {
   const cellWidth = SCREEN_WIDTH / COLS;
   const cellHeight = SCREEN_HEIGHT / ROWS;
   const generatedItems = [];
@@ -86,16 +85,26 @@ function renderItems(items, opacity) {
 // Ayrıca render edilen element ağacı opaklığa göre bir kez kurulup her ekranda
 // aynı referansla yeniden kullanılır → her ekran mount'unda 45 öğeyi yeniden
 // hesaplamak/kurmak yerine hazır ağaç paylaşılır (rastgele moddan daha hafif).
-let sharedItems = null;
+// Cache'ler YOĞUNLUĞA göre anahtarlanır: efekt modu değişince ızgara 45↔24
+// öğeye geçiyor ve tek bir düzeni saklamak, mod değiştikten sonra eski öğe
+// sayısını göstermeye devam ederdi.
+const sharedItemsByDensity = new Map();
 const sharedElementCache = new Map();
 
-function getSharedElement(opacity) {
-  if (!sharedItems) sharedItems = buildItems();
-  // Anahtarı 2 ondalığa yuvarla: saydamlık sürüklenirken sonsuz farklı float
-  // değeriyle cache'in şişmesini engeller (fark görsel olarak belirsiz).
-  const key = Math.round(opacity * 100) / 100;
+function getSharedElement(cols, rows, opacity) {
+  const yogunluk = `${cols}x${rows}`;
+  if (!sharedItemsByDensity.has(yogunluk)) {
+    sharedItemsByDensity.set(yogunluk, buildItems(cols, rows));
+  }
+  // Saydamlığı 2 ondalığa yuvarla: sürüklenirken sonsuz farklı float değeriyle
+  // cache'in şişmesini engeller (fark görsel olarak belirsiz).
+  const yuvarlak = Math.round(opacity * 100) / 100;
+  const key = `${yogunluk}@${yuvarlak}`;
   if (!sharedElementCache.has(key)) {
-    sharedElementCache.set(key, renderItems(sharedItems, key));
+    sharedElementCache.set(
+      key,
+      renderItems(sharedItemsByDensity.get(yogunluk), yuvarlak),
+    );
   }
   return sharedElementCache.get(key);
 }
@@ -106,6 +115,7 @@ const IconBacground = React.memo(({ opacity = 0.5 }) => {
     iconBackgroundMode,
     iconBackgroundOpacity = 1,
   } = useIconBackgroundSettings();
+  const { iconBackgroundCols, iconBackgroundRows } = useEffectPreset();
 
   // Ekranın kendi opaklığı, kullanıcının saydamlık çarpanıyla ölçeklenir (çarpan 1 = değişiklik yok).
   const effectiveOpacity = opacity * iconBackgroundOpacity;
@@ -115,8 +125,10 @@ const IconBacground = React.memo(({ opacity = 0.5 }) => {
   // boşuna 45 öğe hesaplanmasın.
   const randomItems = useMemo(
     () =>
-      showIconBackground && iconBackgroundMode === "random" ? buildItems() : null,
-    [showIconBackground, iconBackgroundMode],
+      showIconBackground && iconBackgroundMode === "random"
+        ? buildItems(iconBackgroundCols, iconBackgroundRows)
+        : null,
+    [showIconBackground, iconBackgroundMode, iconBackgroundCols, iconBackgroundRows],
   );
 
   if (!showIconBackground) {
@@ -127,8 +139,9 @@ const IconBacground = React.memo(({ opacity = 0.5 }) => {
     return renderItems(randomItems, effectiveOpacity);
   }
 
-  // Paylaşımlı (varsayılan, performanslı): bir kez üretilmiş ortak element (opaklığa göre cache'li).
-  return getSharedElement(effectiveOpacity);
+  // Paylaşımlı (varsayılan, performanslı): bir kez üretilmiş ortak element
+  // (yoğunluk + opaklığa göre cache'li).
+  return getSharedElement(iconBackgroundCols, iconBackgroundRows, effectiveOpacity);
 });
 
 export default IconBacground;

@@ -25,6 +25,11 @@ const ALLOWED = new Set([
   "Python-2.0",
   "Beerware",
   "MPL-2.0",
+  // @expo-google-fonts paket kodu MIT, içindeki font dosyaları SIL OFL 1.1.
+  // OFL; fontu uygulamayla birlikte dağıtmaya ve gömmeye izin verir.
+  "MIT AND OFL-1.1",
+  // Syncopate paket kodu MIT, font dosyası dağıtıma izin veren Apache 2.0.
+  "MIT AND Apache-2.0",
   "(MIT OR CC0-1.0)",
   "(MIT OR GPL-2.0)",
   "(BSD-3-Clause OR GPL-2.0)",

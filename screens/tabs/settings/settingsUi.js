@@ -64,6 +64,11 @@ export function SectionLabel({ children, color }) {
   );
 }
 
+/**
+ * @param {React.ReactNode} [background] Satırın ARKASINA çizilen dekor katmanı
+ *   (ör. ayarın ne yaptığını gösteren önizleme). Verildiğinde satır kendini
+ *   kırpar; yoksa efekt komşu satırlara taşardı.
+ */
 export function SettingRow({
   colors,
   iconBg,
@@ -76,6 +81,7 @@ export function SettingRow({
   onPress,
   danger,
   last,
+  background,
 }) {
   return (
     <TouchableOpacity
@@ -83,10 +89,16 @@ export function SettingRow({
         ui.row,
         { borderBottomColor: colors.borderMuted },
         last && { borderBottomWidth: 0 },
+        background && ui.rowClipped,
       ]}
       onPress={onPress}
       activeOpacity={0.65}
     >
+      {background ? (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          {background}
+        </View>
+      ) : null}
       <View style={ui.rowLeft}>
         <View style={[ui.iconWrap, { backgroundColor: iconBg }]}>
           <AppIcon family={iconFamily} name={iconName} size={15} color={iconColor} />
@@ -193,6 +205,7 @@ export const ui = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
   },
+  rowClipped: { overflow: "hidden" },
   rowLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   rowRight: { flexDirection: "row", alignItems: "center" },
   rowTexts: { flex: 1 },

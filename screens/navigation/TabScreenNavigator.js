@@ -1,4 +1,11 @@
-import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   View,
   StyleSheet,
@@ -10,6 +17,7 @@ import {
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  withSequence,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
@@ -30,41 +38,60 @@ import { Screen, ScreenContainer } from "react-native-screens";
 import PetCompanion from "@components/pet/PetCompanion";
 import { alpha } from "../../theme/colors";
 
+// Sıradaki artık sekme DEĞİL: içerik yalnız diziye dayandığı için film izleyen
+// ve yeni kullanıcılarda sekme sürekli boş kalıyordu. Yapı, TV ana ekranındaki
+// "Devam Eden Dizilerim" rayına taşındı (screens/tv/TvOngoingSection); tam
+// liste oradaki "Tümü" düğmesinden UpNextScreen olarak açılıyor.
 const TAB_NAMES = ["tvshows", "movies", "share", "settings", "profile"];
 const BACKGROUND_WARMUP_DELAY = 6000;
 const BACKGROUND_WARMUP_STEP = 1200;
 const TAB_SPRING = { mass: 0.55, damping: 15, stiffness: 190 };
+// İkon yayı bilerek daha az sönümlü: aşım, sekme değişiminde ikona küçük bir
+// "pop" veriyor. Ayrı bir ayar çünkü göstergenin kayışı sakin kalmalı.
+const ICON_SPRING = { mass: 0.5, damping: 11, stiffness: 240 };
+const INDICATOR_SPRING = { mass: 0.6, damping: 17, stiffness: 210 };
+const TAB_ICON_SIZE = 24;
+// Çubuğun tüm ölçüsü bu sabitlerden türüyor:
+//   • daire çapı  = yükseklik − 2×iç boşluk
+//   • yuva        = daire + sekmeler arası boşluk
+//   • köşe        = yükseklik / 2 → uçlar tam yarım daire (hap biçimi)
+//
+// İç boşluk 5'e çıkarken YÜKSEKLİK de büyütüldü: 50'de kalsaydı daire 46'dan
+// 40'a düşecek, bir önceki adımda büyütülen ikon/daire oranı geri gidecekti.
+// Yuvaya boşluk eklenince baştaki/sondaki daire çubuğun yuvarlak ucundan
+// boşluğun yarısı kadar (3px) içeride kalır — hap biçimi bunu doğal gösterir.
+const TAB_BAR_HEIGHT = 56;
+const TAB_BAR_PADDING = 5;
+const TAB_SLOT_GAP = 6;
+const INDICATOR_SIZE = TAB_BAR_HEIGHT - TAB_BAR_PADDING * 2;
+const TAB_BAR_RADIUS = TAB_BAR_HEIGHT / 2;
+const TAB_BAR_NATURAL_WIDTH =
+  (INDICATOR_SIZE + TAB_SLOT_GAP) * TAB_NAMES.length + TAB_BAR_PADDING * 2;
 
 const TabItem = memo(({ name, label, icon, isActive, onPress, theme }) => {
   const activeProgress = useSharedValue(isActive ? 1 : 0);
   const pressScale = useSharedValue(1);
 
   useEffect(() => {
-    activeProgress.value = withSpring(isActive ? 1 : 0, TAB_SPRING);
+    activeProgress.value = withSpring(isActive ? 1 : 0, ICON_SPRING);
   }, [isActive]);
 
   const motionStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: -1 * activeProgress.value },
-      { scale: pressScale.value },
-    ],
-  }));
-
-  const activeSurfaceStyle = useAnimatedStyle(() => ({
-    opacity: activeProgress.value,
-    transform: [{ scale: 0.82 + activeProgress.value * 0.18 }],
+    transform: [{ scale: pressScale.value }],
   }));
 
   const iconStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: -4 * activeProgress.value },
-      { scale: 1 + activeProgress.value * 0.05 },
-    ],
+    transform: [{ scale: 1 + activeProgress.value * 0.12 }],
   }));
 
-  const labelStyle = useAnimatedStyle(() => ({
-    opacity: activeProgress.value,
-    transform: [{ translateY: 4 * (1 - activeProgress.value) }],
+  // Renk geçişi iki ikon kopyasının çapraz sönümlemesiyle yapılıyor: vektör
+  // ikon rengi worklet'ten animasyonlanamıyor, anlık renk sıçraması ise kayan
+  // göstergenin ortasında göze batıyordu. Yay aşabildiği için opaklık kırpılır.
+  const activeIconStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, Math.max(0, activeProgress.value)),
+  }));
+  const idleIconStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, Math.max(0, 1 - activeProgress.value)),
   }));
 
   return (
@@ -75,47 +102,25 @@ const TabItem = memo(({ name, label, icon, isActive, onPress, theme }) => {
       style={styles.tab}
       onPress={() => onPress(name)}
       onPressIn={() => {
-        pressScale.value = withSpring(0.9, TAB_SPRING);
+        pressScale.value = withSpring(0.88, TAB_SPRING);
       }}
       onPressOut={() => {
         pressScale.value = withSpring(1, TAB_SPRING);
       }}
       activeOpacity={1}
     >
+      {/* Etiket YOK: adlar `accessibilityLabel` ile ekran okuyucuya kalıyor,
+          çubuk yalnız ikonlarla çalışıyor. Aktif yüzey de burada değil —
+          sekmeler arasında KAYAN tek bir gösterge olarak çubukta duruyor. */}
       <Animated.View style={[styles.tabMotion, motionStyle]}>
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.activeSurface,
-            { borderColor: alpha(theme.accent, 0.52) },
-            activeSurfaceStyle,
-          ]}
-        >
-          <LinearGradient
-            colors={[
-              alpha(theme.accent, 0.74),
-              alpha(theme.accent, 0.5),
-              alpha(theme.bold || theme.accent, 0.26),
-            ]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-        </Animated.View>
-
         <Animated.View style={[styles.iconWrap, iconStyle]}>
-          {icon(
-            isActive ? 20 : 22,
-            isActive ? "#FFFFFF" : theme.text.secondary
-          )}
+          <Animated.View style={[styles.iconLayer, idleIconStyle]}>
+            {icon(TAB_ICON_SIZE, theme.text.secondary)}
+          </Animated.View>
+          <Animated.View style={[styles.iconLayer, activeIconStyle]}>
+            {icon(TAB_ICON_SIZE, "#FFFFFF")}
+          </Animated.View>
         </Animated.View>
-
-        <Animated.Text
-          numberOfLines={1}
-          style={[styles.tabText, { color: "#FFFFFF" }, labelStyle]}
-        >
-          {label}
-        </Animated.Text>
       </Animated.View>
     </TouchableOpacity>
   );
@@ -135,7 +140,43 @@ function TabScreenNavigator({ navigation, route }) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
-  const tabBarWidth = Math.min(windowWidth - 80, 340);
+  // Etiketler kalkınca sekmenin genişliğe ihtiyacı kalmadı: çubuk yuvaların
+  // toplamı kadar — ortada yüzen bir hap. Kısıt yalnızca çok dar ekranlar için.
+  const tabBarWidth = Math.min(windowWidth - 32, TAB_BAR_NATURAL_WIDTH);
+  // Gösterge mutlak konumlu olduğu için yuvanın genişliği elle hesaplanıyor:
+  // çubuk genişliği eksi tabContainer'ın yatay iç boşluğu.
+  const slotWidth = (tabBarWidth - TAB_BAR_PADDING * 2) / TAB_NAMES.length;
+  const activeIndex = Math.max(0, TAB_NAMES.indexOf(activeTab));
+
+  const indicatorX = useSharedValue(activeIndex * slotWidth);
+  const indicatorPop = useSharedValue(1);
+  const indicatorPlaced = useRef(false);
+
+  useEffect(() => {
+    const target = activeIndex * slotWidth;
+    // İlk yerleşim ve ekran döndürme animasyonsuz: açılışta göstergenin soldan
+    // süzülmesi olmayan bir "sekme değişti" hissi verirdi.
+    if (!indicatorPlaced.current) {
+      indicatorPlaced.current = true;
+      indicatorX.value = target;
+      return;
+    }
+    indicatorX.value = withSpring(target, INDICATOR_SPRING);
+    // Ölçek TEK EKSENDE değil, her iki eksende birden: yalnız yatayda esnetmek
+    // daireyi elipse çevirirdi. Yola çıkarken büzülüp yerine oturduğunda yayla
+    // toparlanıyor — yuvarlaklık hiç bozulmuyor.
+    indicatorPop.value = withSequence(
+      withTiming(0.86, { duration: 120 }),
+      withSpring(1, ICON_SPRING)
+    );
+  }, [activeIndex, slotWidth]);
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: indicatorX.value },
+      { scale: indicatorPop.value },
+    ],
+  }));
 
   useEffect(() => {
     if (!TAB_NAMES.includes(route?.params?.initialTab)) return;
@@ -189,6 +230,8 @@ function TabScreenNavigator({ navigation, route }) {
 
   // useMemo: her render'da yeni icon closure'ları üretilirse memo'lu TabItem'lar
   // boşuna yeniden render olur (özellikle warmup'ta mountedTabs 4 kez değişirken).
+  // SIRA TAB_NAMES İLE AYNI OLMALI: kayan gösterge konumunu oradaki indeksten
+  // hesaplıyor.
   const tabs = useMemo(
     () => [
       {
@@ -296,7 +339,7 @@ function TabScreenNavigator({ navigation, route }) {
 
       <View
         pointerEvents="box-none"
-        style={[styles.bottomTabs, { bottom: Math.max(10, insets.bottom + 6) }]}
+        style={[styles.bottomTabs, { bottom: Math.max(18, insets.bottom + 12) }]}
       >
         <View
           style={[
@@ -331,6 +374,28 @@ function TabScreenNavigator({ navigation, route }) {
                   },
                 ]}
               />
+
+              {/* Aktif yüzey sekme başına açılıp kapanmıyor; TEK daire seçilen
+                  sekmeye kayıyor. Sarmalayıcı yuva genişliğinde (translateX
+                  hesabı buna dayanıyor), daire onun ortasında duruyor. */}
+              <Animated.View
+                pointerEvents="none"
+                style={[styles.indicator, { width: slotWidth }, indicatorStyle]}
+              >
+                <View style={styles.indicatorCircle}>
+                  <LinearGradient
+                    colors={[
+                      alpha(theme.accent, 0.82),
+                      alpha(theme.accent, 0.58),
+                      alpha(theme.bold || theme.accent, 0.32),
+                    ]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                </View>
+              </Animated.View>
+
               {tabs.map((tab) => (
                 <TabItem
                   key={tab.name}
@@ -381,46 +446,56 @@ const styles = StyleSheet.create({
     backfaceVisibility: "hidden",
     zIndex: 20,
   },
+  // ── Kompakt sekme çubuğu ──
+  // Yükseklik 60 → 48, etiketler kaldırıldı, genişlik 390 → 304. Çubuk içerik
+  // ÜSTÜNDE yüzdüğü için kapladığı her piksel ekrandan çalınıyor.
   tabShadow: {
-    borderRadius: 28,
+    borderRadius: TAB_BAR_RADIUS,
     shadowOffset: {
       width: 0,
-      height: 10,
+      height: 8,
     },
-    shadowOpacity: 0.28,
-    shadowRadius: 16,
-    elevation: 12,
+    shadowOpacity: 0.26,
+    shadowRadius: 14,
+    elevation: 10,
   },
   tabClip: {
-    height: 60,
-    borderRadius: 28,
+    height: TAB_BAR_HEIGHT,
+    borderRadius: TAB_BAR_RADIUS,
     overflow: "hidden",
   },
   tabContainer: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 3,
-    paddingVertical: 4,
+    paddingHorizontal: TAB_BAR_PADDING,
+    paddingVertical: TAB_BAR_PADDING,
   },
+  // Yuva tam daire genişliğinde; yatay iç boşluk dokunma alanını daraltırdı.
   tab: {
     flex: 1,
-    height: 52,
-    paddingHorizontal: 2,
+    height: INDICATOR_SIZE,
   },
   tabMotion: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  activeSurface: {
+  // Kayan aktif gösterge: yatay konumu translateX ile sürüldüğü için `left`
+  // sabit, sarmalayıcının genişliği yuva genişliğinden geliyor. Daire yuvanın
+  // ortasında; yatayda yuvaya yayılmıyor, çapını çubuğun YÜKSEKLİĞİ veriyor.
+  indicator: {
     position: "absolute",
-    top: 3,
-    right: 2,
-    bottom: 3,
-    left: 2,
-    borderRadius: 23,
-    borderWidth: 1,
+    top: TAB_BAR_PADDING,
+    bottom: TAB_BAR_PADDING,
+    left: TAB_BAR_PADDING,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  indicatorCircle: {
+    width: INDICATOR_SIZE,
+    height: INDICATOR_SIZE,
+    borderRadius: INDICATOR_SIZE / 2,
     overflow: "hidden",
   },
   iconWrap: {
@@ -429,16 +504,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  tabText: {
-    position: "absolute",
-    right: 3,
-    bottom: 5,
-    left: 3,
-    fontSize: 8,
-    lineHeight: 9,
-    fontWeight: "800",
-    letterSpacing: -0.1,
-    textAlign: "center",
+  iconLayer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
 

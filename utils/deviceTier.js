@@ -14,37 +14,76 @@ const GIB = 1024 * 1024 * 1024;
 
 export const DEVICE_TIERS = ["low", "mid", "high"];
 
-// Katman → performans bütçesi.
-// NOT: "mid" bilerek "high" ile AYNI görsel yoğunluğa sahip. Arka plan deseni
-// varsayılan KAPALI bir tercih; açan kullanıcının cihazı yetiyorsa deseni
-// seyreltmek görünür bir gerileme olurdu. Yalnız gerçekten zorlanan (low)
-// cihazlarda seyreltiyoruz.
-export const DEVICE_TIER_PRESETS = {
-  low: {
-    // 4x6 = 24 desen öğesi (varsayılanın ~yarısı)
+// ── EFEKT MODLARI (kullanıcı tercihi) ────────────────────────────────────────
+//
+// Cihaz sınıfı artık yalnızca VARSAYILANI seçer; son söz kullanıcınındır
+// (Ayarlar → Kişiselleştirme → Efektler). Cihaz sessizce karar verdiğinde
+// blur'ün "kaybolması" hata gibi görünüyordu; tercih görünür olunca hem sebebi
+// belli olur hem de kullanıcı kendi dengesini kurar.
+//
+// Üç kaldıraç var ve modlar bunları farklı sırayla feda eder:
+//   • blurEnabled          — her karede GPU'da yeniden çizilir (en pahalısı)
+//   • iconBackgroundCols/Rows — desen öğe sayısı (mount maliyeti + bellek)
+//   • spriteFpsScale       — sürekli çalışan animasyonun kare hızı
+//
+//   full     "Tam"    kısıtsız: üçü de tam. Görüntü odaklı.
+//   balanced "Orta"   blur KALIR (arayüzün kimliği odur), sürekli/yığın
+//                     maliyetler kısılır: desen yarıya iner, kare hızı düşer.
+//   off      "Kapalı" performans odaklı: blur yok, desen seyrek, en düşük kare
+//                     hızı. Fallback olarak yarı saydam düz katman çizilir
+//                     (bkz. components/common/AdaptiveBlurView.js).
+export const EFFECT_MODES = ["full", "balanced", "off"];
+
+export const EFFECT_MODE_PRESETS = {
+  full: {
+    iconBackgroundCols: 5,
+    iconBackgroundRows: 9,
+    spriteFpsScale: 1,
+    blurEnabled: true,
+  },
+  balanced: {
+    // 4x7 = 28 desen öğesi (tam modun ~%60'ı)
     iconBackgroundCols: 4,
-    iconBackgroundRows: 6,
-    // Sprite kare hızı çarpanı — daha az kare = daha az UI thread işi
+    iconBackgroundRows: 7,
     spriteFpsScale: 0.7,
-    // BlurView her karede GPU'da yeniden çizilir; Android'de
-    // (experimentalBlurMethod="dimezisBlurView") tüm arka planı offscreen
-    // buffer'a alıp bulanıklaştırdığı için liste/detay ekranlarında kare
-    // düşüşünün bilinen kaynağı. Kapatıldığında yerine yarı saydam düz bir
-    // katman çizilir (bkz. components/common/AdaptiveBlurView.js).
+    blurEnabled: true,
+  },
+  off: {
+    // 3x5 = 15 desen öğesi (tam modun üçte biri)
+    iconBackgroundCols: 3,
+    iconBackgroundRows: 5,
+    spriteFpsScale: 0.5,
     blurEnabled: false,
   },
-  mid: {
-    iconBackgroundCols: 5,
-    iconBackgroundRows: 9,
-    spriteFpsScale: 1,
-    blurEnabled: true,
-  },
-  high: {
-    iconBackgroundCols: 5,
-    iconBackgroundRows: 9,
-    spriteFpsScale: 1,
-    blurEnabled: true,
-  },
+};
+
+// HER BASAMAK GÖRÜNÜR OLMALI. İlk denemede "orta" ile "kapalı" aynı desen
+// yoğunluğunu paylaşıyordu; aradaki tek fark blur olunca "orta" seçeneği
+// varsayılan kurulumda (desen zaten kapalı, pet yoksa) hiçbir şeyi
+// değiştirmiyordu — yani kullanıcıya yalan söyleyen bir seçenekti. Şimdi üç
+// mod da hem yoğunlukta hem kare hızında ayrışıyor: 45 → 28 → 15 öğe,
+// %100 → %70 → %50 kare hızı, blur yalnız "kapalı"da gider.
+
+/** Bilinmeyen mod güvenli ortaya ("balanced") düşer. */
+export const getEffectPreset = (mode) =>
+  EFFECT_MODE_PRESETS[mode] || EFFECT_MODE_PRESETS.balanced;
+
+/**
+ * Kullanıcı bir şey seçmediğinde hangi mod açılır.
+ * Bugünkü davranış korunur: yalnız gerçekten zorlanan cihaz (low) kısıtlı
+ * başlar, diğer herkes tam efektle. "Orta" bilinçli bir tercihtir — kimseye
+ * sessizce dayatılmaz.
+ */
+export const defaultEffectMode = (tier) => (tier === "low" ? "off" : "full");
+
+// Katman → performans bütçesi. Mod tablosundan TÜRETİLİR ki iki yerde ayrışmasın.
+// NOT: "mid" bilerek "high" ile AYNI görsel yoğunlukta. Arka plan deseni
+// varsayılan KAPALI bir tercih; açan kullanıcının cihazı yetiyorsa deseni
+// seyreltmek görünür bir gerileme olurdu.
+export const DEVICE_TIER_PRESETS = {
+  low: EFFECT_MODE_PRESETS.off,
+  mid: EFFECT_MODE_PRESETS.full,
+  high: EFFECT_MODE_PRESETS.full,
 };
 
 /**

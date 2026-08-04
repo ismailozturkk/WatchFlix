@@ -25,6 +25,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const STORAGE_KEY = "@seelogd/ai_conversations";
 const MAX_CONVERSATIONS = 50; // sınırsız büyümesini engelle
+let mutationQueue = Promise.resolve();
 
 /** Basit, çakışması düşük id üretici. */
 export function makeId() {
@@ -69,11 +70,36 @@ export async function persistConversations(list) {
  * Var olan id güncellenir, yoksa eklenir.
  */
 export function upsertConversation(list, conversation) {
-  const idx = list.findIndex((c) => c.id === conversation.id);
-  if (idx === -1) return [conversation, ...list];
-  const next = [...list];
-  next[idx] = conversation;
-  return next;
+  return [conversation, ...list.filter((c) => c.id !== conversation.id)].sort(
+    (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0),
+  );
+}
+
+/**
+ * Tek bir sohbeti depodaki en güncel listeye göre ekler veya günceller.
+ * Farklı modal örneklerinin bellekte tuttuğu eski listelerin birbirini
+ * ezmemesi için her yazımdan önce depoyu yeniden okur; kuyruk da aynı anda
+ * tamamlanan iki cevabın son yazan-kazanır yarışına girmesini engeller.
+ */
+export function saveConversation(conversation) {
+  const operation = mutationQueue.then(async () => {
+    if (!conversation?.id) return loadConversations();
+
+    const current = await loadConversations();
+    const existing = current.find((item) => item.id === conversation.id);
+    const now = Date.now();
+    const merged = {
+      ...existing,
+      ...conversation,
+      createdAt: existing?.createdAt || conversation.createdAt || now,
+      updatedAt: conversation.updatedAt || now,
+    };
+
+    return persistConversations(upsertConversation(current, merged));
+  });
+
+  mutationQueue = operation.catch(() => []);
+  return operation;
 }
 
 /** Bir sohbeti listeden çıkarır. */

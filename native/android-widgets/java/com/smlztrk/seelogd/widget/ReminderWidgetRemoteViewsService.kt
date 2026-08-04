@@ -51,6 +51,7 @@ private class ReminderRemoteViewsFactory(
 
   private var items: List<WidgetItem> = emptyList()
   private var isTurkish: Boolean = true
+  private var preferences: WidgetPreferences = WidgetPreferences()
 
   override fun onCreate() { /* veri onDataSetChanged'de yüklenir */ }
 
@@ -60,9 +61,15 @@ private class ReminderRemoteViewsFactory(
       Context.MODE_PRIVATE,
     )
     isTurkish = (prefs.getString(ReminderWidgetProvider.KEY_LANGUAGE, "tr") ?: "tr").startsWith("tr")
+    preferences = WidgetPreferences.load(context)
     items = parseItems(prefs.getString(ReminderWidgetProvider.KEY_ITEMS, "[]") ?: "[]")
       .filter { it.dateEpoch >= startOfToday() }
+      .filter {
+        preferences.reminderContent == "all" ||
+          preferences.reminderContent == it.type
+      }
       .sortedBy { it.dateEpoch }
+      .take(preferences.reminderMaxItems)
   }
 
   override fun onDestroy() { items = emptyList() }
@@ -76,12 +83,12 @@ private class ReminderRemoteViewsFactory(
     val isMovie = item.type == "movie"
 
     // Poster: indir + yuvarlat. Başarısızsa tip ikonlu gradyan rozet göster.
-    val bitmap = loadPoster(item.poster)
-    if (bitmap != null) {
+    val bitmap = if (preferences.reminderShowPosters) loadPoster(item.poster) else null
+    if (preferences.reminderShowPosters && bitmap != null) {
       rv.setViewVisibility(R.id.reminder_widget_item_poster, View.VISIBLE)
       rv.setViewVisibility(R.id.reminder_widget_item_badge, View.GONE)
       rv.setImageViewBitmap(R.id.reminder_widget_item_poster, bitmap)
-    } else {
+    } else if (preferences.reminderShowPosters) {
       rv.setViewVisibility(R.id.reminder_widget_item_poster, View.GONE)
       rv.setViewVisibility(R.id.reminder_widget_item_badge, View.VISIBLE)
       rv.setImageViewResource(
@@ -94,9 +101,14 @@ private class ReminderRemoteViewsFactory(
         if (isMovie) R.drawable.reminder_widget_movie_badge
         else R.drawable.reminder_widget_tv_badge,
       )
+    } else {
+      rv.setViewVisibility(R.id.reminder_widget_item_poster, View.GONE)
+      rv.setViewVisibility(R.id.reminder_widget_item_badge, View.GONE)
     }
 
     rv.setTextViewText(R.id.reminder_widget_item_title, item.title)
+    val appearance = preferences.reminderAppearance
+    rv.setTextColor(R.id.reminder_widget_item_title, appearance.text)
 
     val typeLabel = when {
       isMovie && isTurkish -> "Film"
@@ -106,19 +118,39 @@ private class ReminderRemoteViewsFactory(
     }
     val meta = listOf(typeLabel, item.subtitle).filter { it.isNotBlank() }.joinToString("  •  ")
     rv.setTextViewText(R.id.reminder_widget_item_meta, meta)
+    rv.setTextColor(R.id.reminder_widget_item_meta, appearance.secondaryText)
 
     val isToday = startOfDay(item.dateEpoch) == startOfToday()
     rv.setTextViewText(R.id.reminder_widget_item_when, countdown(item.dateEpoch))
     rv.setTextColor(
       R.id.reminder_widget_item_when,
-      if (isToday) COUNTDOWN_TODAY else COUNTDOWN_DEFAULT,
+      if (isToday) appearance.accent else appearance.text,
     )
     rv.setTextViewText(R.id.reminder_widget_item_date, shortDate(item.dateEpoch))
-    rv.setInt(
+    rv.setViewVisibility(
+      R.id.reminder_widget_item_date,
+      if (preferences.reminderShowDates) View.VISIBLE else View.GONE,
+    )
+    rv.setTextColor(R.id.reminder_widget_item_date, appearance.muted)
+    if (preferences.reminderCompact) {
+      val density = context.resources.displayMetrics.density
+      rv.setViewPadding(
+        R.id.reminder_widget_item_root,
+        (6 * density).toInt(),
+        (4 * density).toInt(),
+        (6 * density).toInt(),
+        (4 * density).toInt(),
+      )
+      rv.setTextViewTextSize(
+        R.id.reminder_widget_item_title,
+        android.util.TypedValue.COMPLEX_UNIT_SP,
+        11f,
+      )
+    }
+    WidgetThemeViews.tintBackground(
+      rv,
       R.id.reminder_widget_item_root,
-      "setBackgroundResource",
-      if (isToday) R.drawable.reminder_widget_row_bg_today
-      else R.drawable.reminder_widget_row_bg,
+      if (isToday) appearance.surface else appearance.surfaceAlt,
     )
 
     // Tıklama: template provider'da; buradan sadece doldurma intent'i verilir.

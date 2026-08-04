@@ -29,6 +29,8 @@ import {
 import Reminder from "../../components/Reminder";
 import ScreenSnow from "../../components/ScreenSnow";
 import { daysUntil, parseAirDate } from "../../utils/airDate";
+import ScopedCommentButton from "../../components/comments/ScopedCommentButton";
+import { COMMENT_SCOPE } from "../../utils/commentScope";
 
 const { width } = Dimensions.get("window");
 
@@ -144,6 +146,7 @@ const EpisodeCard = memo(
                 style={{ marginRight: 3 }}
               />
               <Text
+                allowFontScaling={false}
                 style={[
                   styles.runtimeText,
                   { color: theme.text?.primary ?? "#fff" },
@@ -162,7 +165,10 @@ const EpisodeCard = memo(
                 { backgroundColor: ratingColor + "dd" },
               ]}
             >
-              <Text style={styles.ratingBadgeOnThumbText}>
+              <Text
+                allowFontScaling={false}
+                style={styles.ratingBadgeOnThumbText}
+              >
                 ★ {episode.vote_average.toFixed(1)}
               </Text>
             </View>
@@ -171,10 +177,12 @@ const EpisodeCard = memo(
 
         {/* ── Sağ: Bilgiler ─────────────────────────────────────────────── */}
         <View style={styles.episodeBody}>
-          {/* Üst satır: bölüm no + tarih + hatırlatıcı + izlendi */}
+          {/* Üst satır: bölüm no + tarih yan yana (tek satır) + hatırlatıcı + izlendi */}
           <View style={styles.episodeTopRow}>
             <View style={styles.episodeMetaLeft}>
               <Text
+                allowFontScaling={false}
+                numberOfLines={1}
                 style={[
                   styles.episodeNumText,
                   { color: theme.text?.secondary ?? "#aaa" },
@@ -194,6 +202,8 @@ const EpisodeCard = memo(
                   ]}
                 >
                   <Text
+                    allowFontScaling={false}
+                    numberOfLines={1}
                     style={[
                       styles.datePillText,
                       {
@@ -251,6 +261,7 @@ const EpisodeCard = memo(
 
           {/* Bölüm adı */}
           <Text
+            allowFontScaling={false}
             style={[
               styles.episodeName,
               { color: theme.text?.primary ?? "#fff" },
@@ -263,6 +274,7 @@ const EpisodeCard = memo(
           {/* Özet */}
           {episode.overview ? (
             <Text
+              allowFontScaling={false}
               style={[
                 styles.episodeOverview,
                 { color: theme.text?.secondary ?? "#aaa" },
@@ -340,6 +352,21 @@ export default function SeasonDetails({ route, navigation }) {
     [language],
   );
 
+  // Bölüm kartındaki tarih rozeti için kısa biçim ("5 Oca 2020"). Uzun ay
+  // adları bölüm no + tarih satırını alt satıra kaydırıyordu.
+  const formatDateCompact = useCallback(
+    (ts) => {
+      const date = parseAirDate(ts);
+      if (!date) return "";
+      return new Intl.DateTimeFormat(language, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }).format(date);
+    },
+    [language],
+  );
+
   const adjustOpacity = useCallback((rgbColor, opacity) => {
     const rgb = rgbColor.match(/\d+/g);
     if (!rgb) return rgbColor;
@@ -353,7 +380,8 @@ export default function SeasonDetails({ route, navigation }) {
       if (!airDate) return null;
       const days = daysUntil(airDate);
       if (days === null) return null;
-      if (days < 0) return { text: formatDate(airDate), isRemaining: false };
+      if (days < 0)
+        return { text: formatDateCompact(airDate), isRemaining: false };
       const months = Math.floor(days / 30);
       const remDays = days % 30;
       let text;
@@ -369,7 +397,7 @@ export default function SeasonDetails({ route, navigation }) {
       }
       return { text, isRemaining: true };
     },
-    [formatDate, t],
+    [formatDateCompact, t],
   );
 
   // ── Veri Çekme ────────────────────────────────────────────────────────────
@@ -597,6 +625,22 @@ export default function SeasonDetails({ route, navigation }) {
             </Text>
           )}
         </View>
+
+        {/* ── Sezon yorumları ──────────────────────────────────────────── */}
+        {/* Dizinin ortak yorum sayfasını bu sezona süzülmüş açar. */}
+        <ScopedCommentButton
+          theme={theme}
+          showId={showId}
+          showName={showName}
+          showPosterPath={showPosterPath}
+          seasonCount={showSeasonCount}
+          scope={{
+            scope: COMMENT_SCOPE.SEASON,
+            seasonNumber,
+            scopeTitle: details.name || "",
+          }}
+          style={styles.commentButton}
+        />
 
         <View
           style={[
@@ -831,6 +875,8 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
 
+  commentButton: { marginBottom: 18 },
+
   divider: { height: 1, marginBottom: 20 },
 
   // ── Seksiyon ──────────────────────────────────────────────────────────────
@@ -890,8 +936,11 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   episodeThumbnailWrapper: {
+    // Kart yüksekliği bu görselden geliyor. En yoğun içerik (bölüm no 32 +
+    // 2 satır ad 34 + 2 satır özet 28 + boşluklar ≈ 110px) tam sığar; daha
+    // fazlası kartı gereksiz uzatıyor.
     width: 155,
-    height: 110,
+    height: 112,
     position: "relative",
     borderRadius: 20,
     overflow: "hidden",
@@ -948,42 +997,45 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
 
-  // Kart sağ tarafı
+  // Kart sağ tarafı — "space-between" boşluğu satır aralarına dağıtıp kısa
+  // bölüm adlarında kartı seyrek gösteriyordu; blok artık dikeyde ortalanıyor.
   episodeBody: {
     flex: 1,
     padding: 5,
-    justifyContent: "space-between",
+    justifyContent: "center",
   },
   episodeTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 5,
+    marginBottom: 4,
   },
+  // Bölüm no + tarih hep yan yana: sarma kapalı, dar ekranda tarih kırpılır.
   episodeMetaLeft: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
-    gap: 5,
+    flexWrap: "nowrap",
+    gap: 4,
     flex: 1,
     marginRight: 6,
   },
-  episodeNumText: { fontSize: 12, fontWeight: "600" },
+  episodeNumText: { fontSize: 12, fontWeight: "600", flexShrink: 0 },
   datePill: {
-    paddingHorizontal: 7,
+    paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 10,
+    flexShrink: 1,
   },
   datePillText: { fontSize: 11, fontWeight: "500" },
   episodeName: {
     fontSize: 13,
     fontWeight: "700",
-    lineHeight: 18,
-    marginBottom: 4,
+    lineHeight: 17,
+    marginBottom: 2,
   },
   episodeOverview: {
     fontSize: 11,
-    lineHeight: 15,
+    lineHeight: 14,
     fontWeight: "300",
   },
 });

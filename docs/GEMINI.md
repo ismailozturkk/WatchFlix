@@ -1,4 +1,4 @@
-# Watch Flix – Gemini Integration
+# Seelogd – Gemini Integration
 
 Gemini, bu proje başlatıldığında otomatik olarak `/memory-bank/` klasörünü okuyacaktır.  
 Bu dosyalar, sistemin tam bağlamını oluşturur.

@@ -66,6 +66,14 @@ export default function CommentSheetModal({
   movieId,
   details,
   collectionName = "MovieComment", // "MovieComment" (film) | "TvComment" (dizi)
+  // ── Dizi kapsamı (yalnız collectionName="TvComment") ─────────────────────
+  // seasons      → TMDB sezon listesi; verilirse sezon/bölüm seçici açılır
+  // initialScope → sayfa açılırken hedeflenen kapsam; sezon/bölüm ekranından
+  //                gelen "Yorumlar" butonu doğrudan o kısmı süzer
+  seasons = null,
+  initialScope = null,
+  // Başlıkta film/dizi adı yerine gösterilecek metin (ör. "S2 · B5 — Ozymandias")
+  subtitle = null,
 }) {
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const { theme } = useTheme();
@@ -189,13 +197,28 @@ export default function CommentSheetModal({
                 />
               </View>
             )}
-            <Text
-              allowFontScaling={false}
-              style={styles.moviePillTitle}
-              numberOfLines={1}
-            >
-              {details?.title || details?.name || i18nText("autoI18n.film", "Film")}
-            </Text>
+            <View style={styles.moviePillTextGroup}>
+              <Text
+                allowFontScaling={false}
+                style={styles.moviePillTitle}
+                numberOfLines={1}
+              >
+                {details?.title ||
+                  details?.name ||
+                  (collectionName === "TvComment"
+                    ? i18nText("autoI18n.dizi", "Dizi")
+                    : i18nText("autoI18n.film", "Film"))}
+              </Text>
+              {subtitle ? (
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.moviePillSubtitle, { color: theme.accent }]}
+                  numberOfLines={1}
+                >
+                  {subtitle}
+                </Text>
+              ) : null}
+            </View>
             {details?.vote_average > 0 && (
               <View style={styles.moviePillRating}>
                 <Ionicons name="star" size={9} color="#FFD54F" />
@@ -246,6 +269,8 @@ export default function CommentSheetModal({
                 ? getTmdbUrl(details.poster_path, "poster", 300)
                 : null
             }
+            seasons={seasons ?? details?.seasons ?? null}
+            initialScope={initialScope}
           />
         </View>
       </Animated.View>
@@ -349,12 +374,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexShrink: 0,
   },
+  moviePillTextGroup: { flex: 1, minWidth: 0 },
   moviePillTitle: {
-    flex: 1,
     fontSize: 12,
     fontWeight: "600",
     color: "rgba(255,255,255,0.75)",
     letterSpacing: 0.1,
+  },
+  // Sezon/bölüm ekranından açıldığında hangi kısımda olunduğunu gösterir.
+  moviePillSubtitle: {
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 1,
   },
   moviePillRating: {
     flexDirection: "row",

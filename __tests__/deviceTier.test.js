@@ -1,6 +1,10 @@
 import {
   DEVICE_TIER_PRESETS,
   DEVICE_TIERS,
+  EFFECT_MODES,
+  EFFECT_MODE_PRESETS,
+  defaultEffectMode,
+  getEffectPreset,
   getTierPreset,
   resolveDeviceTier,
 } from "../utils/deviceTier";
@@ -91,5 +95,74 @@ describe("tier presetleri", () => {
   test("bilinmeyen katman mid'e düşer", () => {
     expect(getTierPreset("bilinmeyen")).toBe(DEVICE_TIER_PRESETS.mid);
     expect(getTierPreset(undefined)).toBe(DEVICE_TIER_PRESETS.mid);
+  });
+});
+
+describe("efekt modları (kullanıcı tercihi)", () => {
+  test("üç mod var ve hepsinde tüm bütçe alanları tanımlı", () => {
+    expect(EFFECT_MODES).toEqual(["full", "balanced", "off"]);
+    const alanlar = Object.keys(EFFECT_MODE_PRESETS.full).sort();
+    EFFECT_MODES.forEach((mod) => {
+      expect([mod, Object.keys(EFFECT_MODE_PRESETS[mod]).sort()]).toEqual([mod, alanlar]);
+    });
+  });
+
+  test("HER basamak görünür: yoğunluk ve kare hızı kesin azalır", () => {
+    // Orta ile kapalı aynı yoğunluğu paylaşırsa "orta" seçeneği varsayılan
+    // kurulumda hiçbir şeyi değiştirmeyen bir yalan olur — bu testin varlık
+    // sebebi o: iki lever de her basamakta KESİN azalmalı.
+    const [tam, orta, kapali] = EFFECT_MODES.map(getEffectPreset);
+    const desen = (p) => p.iconBackgroundCols * p.iconBackgroundRows;
+    expect(desen(tam)).toBeGreaterThan(desen(orta));
+    expect(desen(orta)).toBeGreaterThan(desen(kapali));
+    expect(tam.spriteFpsScale).toBeGreaterThan(orta.spriteFpsScale);
+    expect(orta.spriteFpsScale).toBeGreaterThan(kapali.spriteFpsScale);
+  });
+
+  test("preset DEĞERLERİ sabitlenir (sessiz kayma testte patlasın)", () => {
+    expect(getEffectPreset("full")).toEqual({
+      iconBackgroundCols: 5,
+      iconBackgroundRows: 9,
+      spriteFpsScale: 1,
+      blurEnabled: true,
+    });
+    expect(getEffectPreset("balanced")).toEqual({
+      iconBackgroundCols: 4,
+      iconBackgroundRows: 7,
+      spriteFpsScale: 0.7,
+      blurEnabled: true,
+    });
+    expect(getEffectPreset("off")).toEqual({
+      iconBackgroundCols: 3,
+      iconBackgroundRows: 5,
+      spriteFpsScale: 0.5,
+      blurEnabled: false,
+    });
+  });
+
+  test("ORTA blur'u KORUR, KAPALI kapatır (modların ayırt edici farkı)", () => {
+    // "Orta"nın sözü şu: arayüzün kimliği (bulanıklık) kalsın, sürekli maliyet
+    // kısılsın. Blur burada kapanırsa "Kapalı"dan ayrı bir moda gerek kalmaz.
+    expect(getEffectPreset("full").blurEnabled).toBe(true);
+    expect(getEffectPreset("balanced").blurEnabled).toBe(true);
+    expect(getEffectPreset("off").blurEnabled).toBe(false);
+  });
+
+  test("bilinmeyen mod güvenli ortaya düşer", () => {
+    expect(getEffectPreset("turbo")).toBe(EFFECT_MODE_PRESETS.balanced);
+    expect(getEffectPreset(undefined)).toBe(EFFECT_MODE_PRESETS.balanced);
+  });
+
+  test("varsayılan mod cihaz sınıfından türer — bugünkü davranış korunur", () => {
+    expect(defaultEffectMode("low")).toBe("off");
+    expect(defaultEffectMode("mid")).toBe("full");
+    expect(defaultEffectMode("high")).toBe("full");
+    // Katman presetleri mod tablosundan türetilir; ikisi ayrışamaz.
+    DEVICE_TIERS.forEach((tier) => {
+      expect([tier, getTierPreset(tier)]).toEqual([
+        tier,
+        getEffectPreset(defaultEffectMode(tier)),
+      ]);
+    });
   });
 });

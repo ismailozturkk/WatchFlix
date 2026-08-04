@@ -51,6 +51,9 @@ import {
 import { StoryDraftService } from "@services/StoryDraftService";
 import { readCache, writeCache } from "@utils/cachedRead";
 import { cacheKeys } from "@utils/cacheKeys";
+import { scopeShort } from "@components/comments/scopeTexts";
+import { normalizeScope, scopeKey } from "@utils/commentScope";
+import ScreenDecor from "@components/ScreenDecor";
 
 // ─── Tarih yardımcıları ──────────────────────────────────────────────────────
 const toMs = (v) => {
@@ -225,10 +228,29 @@ export default function MyActivityScreen({ navigation, route }) {
   }, [likes, bookmarks]);
 
   const openMedia = useCallback(
-    (mediaType, id) => {
-      navigation.navigate(mediaType === "movie" ? "MovieDetails" : "TvShowsDetails", { id });
+    (mediaType, id, params) => {
+      navigation.navigate(mediaType === "movie" ? "MovieDetails" : "TvShowsDetails", {
+        id,
+        ...(params || {}),
+      });
     },
     [navigation],
+  );
+
+  // "Yorumlarım" satırı → içeriğin yorum sayfasını doğrudan aç. Dizide yorum
+  // bir sezona/bölüme referans veriyorsa sayfa o kapsamda süzülü açılır
+  // (components/Comment.js#initialScope) — kullanıcı kendi yorumunu aramasın.
+  const openMediaComment = useCallback(
+    (item) => {
+      const scope = normalizeScope(item);
+      openMedia(item.kind, item.targetId, {
+        openComments: true,
+        ...(item.kind === "tv" && scopeKey(scope) !== "show"
+          ? { commentScope: scope }
+          : {}),
+      });
+    },
+    [openMedia],
   );
 
   // ── Etkileşim kaldır (beğeni / kayıt) ──
@@ -375,8 +397,15 @@ export default function MyActivityScreen({ navigation, route }) {
             kind={item.kind}
             title={item.title || (item.kind === "post" ? i18nText("autoI18n.gonderi", "Gönderi") : "")}
             subtitle={item.text}
+            // Dizi yorumu bir sezona/bölüme referans veriyorsa rozetle göster
+            // (components/Comment.js mirror'a kapsam alanlarını da yazar).
+            badge={
+              item.kind === "tv" && item.scopeKey && item.scopeKey !== "show"
+                ? scopeShort(item)
+                : undefined
+            }
             date={item.createdAt}
-            onPress={item.kind === "post" ? undefined : () => openMedia(item.kind, item.targetId)}
+            onPress={item.kind === "post" ? undefined : () => openMediaComment(item)}
             onEdit={item.kind === "post" ? () => openEdit(item) : undefined}
             onDelete={item.kind === "post" ? () => removeComment(item) : undefined}
           />
@@ -468,6 +497,8 @@ export default function MyActivityScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={[st.container, { backgroundColor: theme.primary }]} edges={["top"]}>
+      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
+      <ScreenDecor iconOpacity={0.25} />
       {/* ── Gradient başlık ── */}
       <LinearGradient
         colors={[theme.accent + "26", "transparent"]}

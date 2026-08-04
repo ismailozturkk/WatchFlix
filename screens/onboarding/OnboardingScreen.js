@@ -20,6 +20,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import * as Haptics from "@services/hapticsService";
+import { ANALYTICS_EVENTS, trackEvent } from "@services/analytics";
 import IconBacground from "../../components/IconBacground";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -91,31 +92,13 @@ const COPY = {
         tags: ["Kişisel öneri", "Karşılaştırma", "İzleme planı"],
       },
       {
-        kind: "group",
-        icon: "people-outline",
-        eyebrow: "SOHBET & GRUP",
-        title: "İzlediklerin sohbete dönüşsün.",
-        titleAccent: "sohbete",
-        desc: "Birebir sohbette film kartları ve listeler paylaş; grup sohbetinde anket açıp film gecesini birlikte planlayın.",
-        tags: ["Birebir sohbet", "Grup anketi", "Film gecesi"],
-      },
-      {
-        kind: "play",
-        icon: "game-controller-outline",
-        eyebrow: "OYNA & YARIŞ",
-        title: "Sadece izleme, oyuna katıl.",
-        titleAccent: "oyuna katıl",
-        desc: "Sahneyi tahmin et, aylık turnuvada oy ver; skorunu ve incelemelerini toplulukla paylaş.",
-        tags: ["Sahne tahmini", "Turnuvalar", "Paylaşım"],
-      },
-      {
         kind: "profile",
         icon: "stats-chart-outline",
-        eyebrow: "SENİN HİKÂYEN",
-        title: "Her izleme bir iz bıraksın.",
-        titleAccent: "iz bıraksın",
-        desc: "İstatistiklerini ve yıl sonu özetini gör; arkadaş profillerini keşfet, takipleş ve listelerini incele.",
-        tags: ["Detaylı istatistik", "Yıllık özet", "Arkadaş profilleri"],
+        eyebrow: "PAYLAŞ & HATIRLA",
+        title: "İzleme hikâyen sana özel.",
+        titleAccent: "sana özel",
+        desc: "İstatistiklerini ve Wrapped'ını gör; arkadaşlarınla paylaş, sahne oyununda yarış ve izlediklerini unutma.",
+        tags: ["Wrapped", "Arkadaşlar", "Oyunlar"],
       },
     ],
     cta: {
@@ -164,31 +147,13 @@ const COPY = {
         tags: ["Personal picks", "Compare", "Watch plans"],
       },
       {
-        kind: "group",
-        icon: "people-outline",
-        eyebrow: "CHAT & GROUPS",
-        title: "Turn every watch into a conversation.",
-        titleAccent: "conversation",
-        desc: "Share title cards and lists in DMs; open polls in group chats and plan movie night together.",
-        tags: ["Direct chat", "Group polls", "Movie night"],
-      },
-      {
-        kind: "play",
-        icon: "game-controller-outline",
-        eyebrow: "PLAY & COMPETE",
-        title: "Don't just watch. Join the game.",
-        titleAccent: "Join the game",
-        desc: "Guess the scene, vote in monthly tournaments and share your scores and reviews with the community.",
-        tags: ["Guess the scene", "Tournaments", "Sharing"],
-      },
-      {
         kind: "profile",
         icon: "stats-chart-outline",
-        eyebrow: "YOUR STORY",
-        title: "Let every watch leave a mark.",
-        titleAccent: "mark",
-        desc: "See your stats and yearly recap, then explore friend profiles, follow each other and browse their lists.",
-        tags: ["Deep stats", "Yearly recap", "Friend profiles"],
+        eyebrow: "SHARE & REMEMBER",
+        title: "Your watching story is yours.",
+        titleAccent: "is yours",
+        desc: "See your stats and Wrapped, share with friends, compete in scene games and never lose track of a watch.",
+        tags: ["Wrapped", "Friends", "Games"],
       },
     ],
     cta: {
@@ -224,12 +189,37 @@ export default function OnboardingScreen({ navigation }) {
   const [posters, setPosters] = useState([]); // TMDB poster URI'leri (kayan arka plan)
   const [posterPaths, setPosterPaths] = useState([]); // ham poster_path'ler (turnuva ağacı için)
   const [mediaItems, setMediaItems] = useState([]); // tam film/dizi nesneleri (gerçek içerik için)
+  const onboardingStartedAt = useRef(Date.now());
+  const startedEventSent = useRef(false);
+  const lastTrackedStep = useRef(null);
 
   const scrollRef = useRef(null);
   const scrollX = useRef(new Animated.Value(0)).current;
 
   const SLIDE_COUNT = copy.features.length + 1; // özellikler + 1 kayıt
   const isCtaSlide = index === SLIDE_COUNT - 1;
+
+  useEffect(() => {
+    if (startedEventSent.current) return;
+    startedEventSent.current = true;
+    trackEvent(ANALYTICS_EVENTS.ONBOARDING_STARTED, {
+      entry_language: language === "en" ? "en" : "tr",
+      feature_step_count: copy.features.length,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "main") return;
+    const stepKey = `${index}:${language}`;
+    if (lastTrackedStep.current === stepKey) return;
+    lastTrackedStep.current = stepKey;
+    trackEvent(ANALYTICS_EVENTS.ONBOARDING_STEP_VIEWED, {
+      step_number: index + 1,
+      step_name: isCtaSlide ? "account_cta" : copy.features[index]?.kind || "unknown",
+      total_steps: SLIDE_COUNT,
+      language: language === "en" ? "en" : "tr",
+    });
+  }, [copy.features, index, isCtaSlide, language, phase, SLIDE_COUNT]);
 
   // En çok oy alan film + dizi verisini (tam nesne + tür isimleri) çek.
   // Tüm mock içerikleri bu GERÇEK verilerden üretilir → poster/başlık/puan/yıl tutarlı.
@@ -324,7 +314,15 @@ export default function OnboardingScreen({ navigation }) {
   }, []);
 
   const goTo = useCallback(
-    async (routeName) => {
+    async (routeName, source) => {
+      trackEvent(ANALYTICS_EVENTS.ONBOARDING_COMPLETED, {
+        destination: routeName === "RegisterScreen" ? "register" : "login",
+        source: source || "cta",
+        duration_seconds: Math.max(
+          1,
+          Math.round((Date.now() - onboardingStartedAt.current) / 1000),
+        ),
+      });
       await markSeen();
       navigation.reset({ index: 0, routes: [{ name: routeName }] });
     },
@@ -350,8 +348,12 @@ export default function OnboardingScreen({ navigation }) {
   // "Atla" kullanıcıyı akıştan çıkarmaz; doğrudan kayıt (CTA) slaytına götürür.
   const handleSkip = useCallback(() => {
     buzz();
+    trackEvent(ANALYTICS_EVENTS.ONBOARDING_SKIPPED, {
+      from_step: index + 1,
+      total_steps: SLIDE_COUNT,
+    });
     scrollToIndex(SLIDE_COUNT - 1);
-  }, [scrollToIndex, SLIDE_COUNT]);
+  }, [index, scrollToIndex, SLIDE_COUNT]);
 
   const onMomentumEnd = useCallback((e) => {
     const i = Math.round(e.nativeEvent.contentOffset.x / width);
@@ -576,11 +578,11 @@ export default function OnboardingScreen({ navigation }) {
               posters={posters}
               onRegister={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-                goTo("RegisterScreen");
+                goTo("RegisterScreen", "register_cta");
               }}
               onLogin={() => {
                 buzz();
-                goTo("LoginScreen");
+                goTo("LoginScreen", "login_cta");
               }}
             />
           </AnimatedScrollView>
@@ -686,6 +688,9 @@ export default function OnboardingScreen({ navigation }) {
           bottomInset={insets.bottom}
           onPick={(code) => {
             buzz();
+            trackEvent(ANALYTICS_EVENTS.ONBOARDING_LANGUAGE_SELECTED, {
+              language: code,
+            });
             toggleLanguage(code);
           }}
           onContinue={() => {

@@ -217,6 +217,76 @@ export function flattenTvEpisodeWatchEntries(shows = []) {
   });
 }
 
+// ── Profil sayaçları ────────────────────────────────────────────────────────
+//
+// Her ölçünün İKİ karşılığı var ve ikisi de doğru:
+//   total  → her izleme olayı ayrı sayılır (tekrarlı). 100 filmi 5'er kez
+//            izleyen kullanıcı 500 görür; harcanan emeğin karşılığı budur.
+//   unique → kaç FARKLI eser izlendiği (tekrarsız). "İzlenen Filmler"
+//            etiketinin gerçekte söylediği sayı ve rozet motorunun
+//            (watchScoring.js) kullandığı tanım.
+// Hangisinin gösterileceğini kullanıcı profildeki anahtarla seçer. Süre
+// hesapları bu ayrımın dışında: o dakikalar her iki kipte de harcandı.
+
+export function countMovieWatchStats(movieHistoryItems = []) {
+  // Kimliksiz eski kayıt indeksle ayrışır; aksi halde hepsi tek filme çökerdi.
+  const unique = new Set(
+    movieHistoryItems.map((movie, index) => String(movie?.id ?? `#${index}`)),
+  );
+  return { total: movieHistoryItems.length, unique: unique.size };
+}
+
+/** Girdi: materializeTvWatchState() çıktılarının listesi. */
+export function countTvWatchStats(states = []) {
+  let showTotal = 0;
+  let seasonTotal = 0;
+  let seasonUnique = 0;
+  let episodeTotal = 0;
+  let episodeUnique = 0;
+
+  states.forEach((state) => {
+    const seasons = state?.seasons || [];
+    const watchEvents = state?.watchEvents || [];
+
+    // Tekrarlı dizi sayısı = baştan sona izleme adedi; hiç tam izleme
+    // kaydı yoksa dizi yine de bir kez sayılır (kısmi izlemeler kaybolmasın).
+    showTotal += Math.max(
+      1,
+      watchEvents.filter((event) => event?.scope === "show").length,
+    );
+
+    // Sezon tekrarları yalnızca sezon/dizi kapsamlı olaylardan gelir; tek tek
+    // işaretlenen bölümler sezonu ikinci kez saydırmaz.
+    const repeatsBySeason = new Map();
+    watchEvents
+      .filter((event) => event?.scope === "show" || event?.scope === "season")
+      .forEach((event) => (event?.seasonNumbers || []).forEach((seasonNumber) => {
+        repeatsBySeason.set(seasonNumber, (repeatsBySeason.get(seasonNumber) || 0) + 1);
+      }));
+    const seasonExtras = [...repeatsBySeason.values()].reduce(
+      (count, watches) => count + Math.max(0, watches - 1),
+      0,
+    );
+    seasonTotal += seasons.length + seasonExtras;
+    seasonUnique += seasons.length;
+
+    seasons.forEach((season) => {
+      const episodes = season?.episodes || [];
+      episodeUnique += episodes.length;
+      episodeTotal += episodes.reduce(
+        (sum, episode) => sum + (episode?.watchEvents?.length || 0),
+        0,
+      );
+    });
+  });
+
+  return {
+    shows:    { total: showTotal,    unique: states.length },
+    seasons:  { total: seasonTotal,  unique: seasonUnique },
+    episodes: { total: episodeTotal, unique: episodeUnique },
+  };
+}
+
 export function mostRewatched(items = [], idOf = (item) => item?.id, limit = 5) {
   const grouped = new Map();
   items.forEach((item) => {

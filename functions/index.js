@@ -21,6 +21,12 @@ const {
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
+const {
+  resolveAiPlan,
+  getAiPlanLimits,
+  readAiUsage,
+  buildAiQuota,
+} = require("./aiQuota");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret } = require("firebase-functions/params");
@@ -265,8 +271,9 @@ exports.checkGoogleSignInEligibility = onCall(async (request) => {
 //   (eski EXPO_PUBLIC_GEMINI_API_KEY anahtarını Google AI Studio'dan İPTAL ET,
 //    yeni bir anahtar üret ve yalnız yukarıdaki secret'a koy)
 //
-// Kota: kullanıcı başına GÜNLÜK mesaj tavanı — AiUsage/{uid} dokümanında
-// transaction'lı sayaç (UTC gün). Free 5 / premium 100 / Unlimited sınırsız.
+// Kota: kullanıcı başına günlük + aylık mesaj tavanı — AiUsage/{uid}
+// dokümanında transaction'lı sayaç (UTC). Free 5/30, Premium 20/300,
+// Unlimited 50/900.
 // Premium durumu Users/{uid}.entitlements.premium alanından okunur (Faz 1'de
 // RevenueCat webhook'u bu alanı dolduracak; alan yoksa herkes free'dir).
 //
@@ -280,8 +287,6 @@ const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const TMDB_API_KEY = defineSecret("TMDB_API_KEY");
 
 const AI_MODEL = "gemini-2.5-flash";
-const AI_DAILY_LIMIT_FREE = 5;
-const AI_DAILY_LIMIT_PREMIUM = 100;
 const AI_UPSTREAM_TIMEOUT_MS = 25000;
 // İstek boyutu tavanları (kötüye kullanım / maliyet freni)
 const AI_MAX_HISTORY = 12;          // istemcideki MAX_HISTORY_MESSAGES ile aynı
@@ -294,6 +299,11 @@ const aiSleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** UTC gün anahtarı (kota penceresi). */
 function aiTodayKey() {
   return new Date().toISOString().slice(0, 10); // "2026-07-08"
+}
+
+/** UTC ay anahtarı. */
+function aiMonthKey() {
+  return new Date().toISOString().slice(0, 7); // "2026-07"
 }
 
 /** İstemciden gelen history'yi doğrula + Gemini `contents` dizisine çevir. */
@@ -314,45 +324,74 @@ function buildAiContents(history, userMessage) {
   return contents;
 }
 
-/** Kota transaction'ı: hakkı varsa sayacı artırır, yoksa resource-exhausted atar. */
-async function consumeAiQuota(uid, limit) {
+/** Kota transaction'ı: günlük ve aylık hakkı birlikte, atomik olarak tüketir. */
+async function consumeAiQuota(uid, plan) {
   const ref = db.doc(`AiUsage/${uid}`);
   const today = aiTodayKey();
+  const month = aiMonthKey();
+  const limits = getAiPlanLimits(plan);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const data = snap.exists ? snap.data() : {};
-    const used = data.date === today ? data.count || 0 : 0;
-    if (used >= limit) {
+    const { dailyUsed, monthlyUsed } = readAiUsage(data, today, month);
+    if (dailyUsed >= limits.daily) {
       throw new HttpsError("resource-exhausted", "Daily AI quota exceeded", {
         reason: "DAILY_QUOTA",
-        used,
-        limit,
+        ...buildAiQuota(plan, dailyUsed, monthlyUsed),
       });
     }
+    if (monthlyUsed >= limits.monthly) {
+      throw new HttpsError("resource-exhausted", "Monthly AI quota exceeded", {
+        reason: "MONTHLY_QUOTA",
+        ...buildAiQuota(plan, dailyUsed, monthlyUsed),
+      });
+    }
+
+    const nextDaily = dailyUsed + 1;
+    const nextMonthly = monthlyUsed + 1;
     tx.set(
       ref,
       {
+        dailyKey: today,
+        dailyCount: nextDaily,
+        monthKey: month,
+        monthlyCount: nextMonthly,
+        plan,
+        dailyLimit: limits.daily,
+        monthlyLimit: limits.monthly,
+        // Geriye dönük uyumluluk.
         date: today,
-        count: used + 1,
-        limit,
+        count: nextDaily,
+        limit: limits.daily,
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
     );
-    return { used: used + 1, limit, remaining: limit - used - 1 };
+    return buildAiQuota(plan, nextDaily, nextMonthly);
   });
 }
 
-/** Üst akış hatasında sayacı geri al (kullanıcı hakkı boşa gitmesin). */
+/** Üst akış hatasında günlük ve aylık sayaçları birlikte geri al. */
 async function refundAiQuota(uid) {
   try {
     const ref = db.doc(`AiUsage/${uid}`);
+    const today = aiTodayKey();
+    const month = aiMonthKey();
     await db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       if (!snap.exists) return;
       const data = snap.data();
-      if (data.date !== aiTodayKey() || !(data.count > 0)) return;
-      tx.update(ref, { count: data.count - 1 });
+      const patch = {};
+      if (data.dailyKey === today && data.dailyCount > 0) {
+        patch.dailyCount = data.dailyCount - 1;
+        patch.count = patch.dailyCount;
+      } else if (data.date === today && data.count > 0) {
+        patch.count = data.count - 1;
+      }
+      if (data.monthKey === month && data.monthlyCount > 0) {
+        patch.monthlyCount = data.monthlyCount - 1;
+      }
+      if (Object.keys(patch).length) tx.update(ref, patch);
     });
   } catch (e) {
     console.warn("AI kota iadesi başarısız:", e?.message);
@@ -432,25 +471,17 @@ exports.callGemini = onCall(
     const contents = buildAiContents(history, userMessage);
 
     // ── Üyelik seviyesi → kota tavanı ──
-    let limit = AI_DAILY_LIMIT_FREE;
-    let unlimited = false;
+    let plan = "free";
     try {
       const userSnap = await db.doc(`Users/${uid}`).get();
       const entitlements = userSnap.data()?.entitlements;
-      unlimited =
-        entitlements?.premiumUnlimited === true ||
-        entitlements?.premiumPlan === "unlimited";
-      if (!unlimited && entitlements?.premium === true) {
-        limit = AI_DAILY_LIMIT_PREMIUM;
-      }
+      plan = resolveAiPlan(entitlements);
     } catch (e) {
       console.warn("[callGemini] Users okunamadı (free varsayıldı):", e?.message);
     }
 
     // ── Kota tüket (yetersizse burada resource-exhausted fırlar) ──
-    const quota = unlimited
-      ? { used: null, limit: null, remaining: null, unlimited: true }
-      : await consumeAiQuota(uid, limit);
+    const quota = await consumeAiQuota(uid, plan);
 
     // ── Gemini isteği ──
     const body = {
@@ -460,7 +491,8 @@ exports.callGemini = onCall(
         temperature: mode === "cine" ? 0.8 : 0.85,
         topP: 0.95,
         topK: 40,
-        maxOutputTokens: 8192,
+        // CineMatch yalnız kompakt JSON döndürür; düz sohbet biraz daha geniş kalır.
+        maxOutputTokens: mode === "cine" ? 1200 : 2048,
         responseMimeType: mode === "cine" ? "application/json" : "text/plain",
         thinkingConfig: { thinkingBudget: 0 },
       },
@@ -474,7 +506,7 @@ exports.callGemini = onCall(
 
     const apiKey = GEMINI_API_KEY.value();
     if (!apiKey) {
-      if (!unlimited) await refundAiQuota(uid);
+      await refundAiQuota(uid);
       console.error("[callGemini] GEMINI_API_KEY secret tanımsız!");
       throw new HttpsError("failed-precondition", "AI is not configured");
     }
@@ -489,7 +521,9 @@ exports.callGemini = onCall(
         data = await postGeminiOnce(body, apiKey);
       }
       const u = data?.usageMetadata || {};
-      const quotaLabel = unlimited ? "unlimited" : `${quota.used}/${quota.limit}`;
+      const quotaLabel =
+        `${quota.plan} daily=${quota.daily.used}/${quota.daily.limit} ` +
+        `monthly=${quota.monthly.used}/${quota.monthly.limit}`;
       console.log(
         `[callGemini] uid=${uid} mode=${mode} kota=${quotaLabel} ` +
           `token(giriş/çıkış/toplam)=${u.promptTokenCount || 0}/${u.candidatesTokenCount || 0}/${u.totalTokenCount || 0}`,
@@ -497,7 +531,7 @@ exports.callGemini = onCall(
       return { data, quota };
     } catch (err) {
       // Üst akış başarısız → kullanıcının hakkını iade et.
-      if (!unlimited) await refundAiQuota(uid);
+      await refundAiQuota(uid);
       if (err.status === 429) {
         throw new HttpsError("resource-exhausted", "Upstream rate limited", {
           reason: "UPSTREAM_RATE_LIMIT",

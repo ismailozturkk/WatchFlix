@@ -1,6 +1,6 @@
 # System Design Patterns
 
-Bu doküman, Watch Flix uygulamasında kullanılan ve hedeflenen temel yazılım tasarım desenlerini açıklar.
+Bu doküman, Seelogd uygulamasında kullanılan ve hedeflenen temel yazılım tasarım desenlerini açıklar.
 
 ## ✅ Mevcut Desenler
 

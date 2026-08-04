@@ -31,6 +31,7 @@ import { useTheme } from "@context/ThemeContext";
 import { useWatchProgressContext } from "@context/WatchProgressContext";
 import { withAlpha } from "@components/profile/StatsComponents";
 import { i18nText } from "@utils/i18nText";
+import ScreenDecor from "@components/ScreenDecor";
 
 const FILTRELER = [
   { id: "tumu", key: "autoI18n.rozet_filtre_tumu", fallback: "Tümü" },
@@ -160,6 +161,8 @@ export default function WatchBadgesScreen({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: theme.primary }]}>
+      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
+      <ScreenDecor iconOpacity={0.3} />
       <View style={styles.header}>
         <TouchableOpacity
           accessibilityRole="button"

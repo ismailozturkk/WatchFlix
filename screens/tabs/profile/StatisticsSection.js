@@ -21,15 +21,19 @@ import { LinearGradient } from "expo-linear-gradient";
 import { countShows, getAvailableYears, toDate } from "../../../utils/wrapped";
 import { getWrappedStrings } from "../../../utils/wrappedStrings";
 
+const COUNT_MODES = ["total", "unique"];
+
 const StatisticsSection = () => {
   const navigation = useNavigation();
   const { theme } = useTheme();
   const { t, language } = useLanguage();
   const {
-    watchedMovieCount,
+    displayMovieCount,
+    statsCountMode,
+    toggleStatsCountMode,
     totalWatchedTime,
-    watchedTvCount,
-    totalEpisodesCount,
+    displayTvCount,
+    displayEpisodesCount,
     totalWatchedTimeTv,
     totalMinutesTime,
     totalMinutesTimeTv,
@@ -458,12 +462,54 @@ const StatisticsSection = () => {
       </Modal>
 
       <View style={styles.section}>
-        <Text
-          allowFontScaling={false}
-          style={[styles.sectionTitle, { color: theme.text.muted }]}
-        >
-          {i18nText("autoI18n.istatistikler_upper", "İSTATİSTİKLER")}
-        </Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.sectionTitle, { color: theme.text.muted }]}
+          >
+            {i18nText("autoI18n.istatistikler_upper", "İSTATİSTİKLER")}
+          </Text>
+
+          {/* Tekrarlı / tekrarsız anahtarı — kartlardaki sayıları belirler.
+              Süre her iki kipte de aynı kalır, o dakikalar gerçekten harcandı. */}
+          <View
+            style={[
+              styles.countModeSwitch,
+              { backgroundColor: theme.primary, borderColor: theme.border },
+            ]}
+          >
+            {COUNT_MODES.map((mode) => {
+              const active = statsCountMode === mode;
+              return (
+                <TouchableOpacity
+                  key={mode}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    if (!active) toggleStatsCountMode();
+                  }}
+                  style={[
+                    styles.countModeButton,
+                    active && { backgroundColor: theme.accent },
+                  ]}
+                >
+                  <Text
+                    allowFontScaling={false}
+                    style={[
+                      styles.countModeText,
+                      { color: active ? "#FFFFFF" : theme.text.muted },
+                    ]}
+                  >
+                    {mode === "total"
+                      ? i18nText("autoI18n.tekrarli", "Tekrarlı")
+                      : i18nText("autoI18n.tekrarsiz", "Tekrarsız")}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
         {isloadingShowInfo ? (
           <WatchedInfoSkeleton />
         ) : (
@@ -512,7 +558,7 @@ const StatisticsSection = () => {
                     },
                   ]}
                 >
-                  {watchedMovieCount}
+                  {displayMovieCount}
                 </Text>
                 <Text
                   style={[
@@ -771,7 +817,7 @@ const StatisticsSection = () => {
                       },
                     ]}
                   >
-                    {watchedTvCount}
+                    {displayTvCount}
                   </Text>
                   <Text
                     style={[
@@ -794,7 +840,7 @@ const StatisticsSection = () => {
                       },
                     ]}
                   >
-                    {totalEpisodesCount}
+                    {displayEpisodesCount}
                   </Text>
                   <Text
                     style={[
@@ -1235,11 +1281,34 @@ const styles = StyleSheet.create({
   section: {
     width: "90%",
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   sectionTitle: {
     fontSize: 14,
     marginBottom: 10,
     marginLeft: 10,
     textTransform: "uppercase",
+  },
+  countModeSwitch: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 2,
+    marginBottom: 10,
+    marginRight: 6,
+  },
+  countModeButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  countModeText: {
+    fontSize: 10.5,
+    fontWeight: "800",
   },
   watchStats: {
     flexDirection: "row",

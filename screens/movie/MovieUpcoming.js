@@ -14,6 +14,7 @@ import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { Dropdown } from "react-native-element-dropdown";
+import { useFontFamilyForRole } from "../../components/typography/AppText";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { MovieUpComingSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
@@ -79,6 +80,13 @@ const MovieUpcomingCard = memo(function MovieUpcomingCard({ item, navigation, th
 export default function MovieUpcoming({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
+  // react-native-element-dropdown metnini node_modules içinde çizer; font
+  // ancak stil nesnesine düz bir aile adı yazılarak uygulanır. Aile adı doğru
+  // ağırlık dosyasını gösterdiği için fontWeight'i 400'e sabitliyoruz.
+  const dropdownFontu = useFontFamilyForRole("body", { fontWeight: "500" });
+  const dropdownFontStili = dropdownFontu
+    ? { fontFamily: dropdownFontu, fontWeight: "400" }
+    : null;
   const {
     dateData,
     addTimeToDate,
@@ -119,11 +127,18 @@ export default function MovieUpcoming({ navigation }) {
             placeholderStyle={[
               styles.placeholderStyle,
               { color: theme.text.primary },
+              dropdownFontStili,
             ]}
             selectedTextStyle={[
               styles.selectedTextStyle,
               { color: theme.text.secondary },
+              dropdownFontStili,
             ]}
+            // RENK BİLEREK VERİLMİYOR: açılan listenin kabı kütüphanede sabit
+            // BEYAZ (react-native-element-dropdown styles.container) ve bu ekran
+            // containerStyle geçmiyor. Tema metin rengi (açık gri/mavi) beyaz
+            // zeminde okunmuyor; kütüphanenin siyah varsayılanı kalsın.
+            itemTextStyle={[styles.selectedTextStyle, dropdownFontStili]}
             iconStyle={styles.iconStyle}
             data={dateData}
             maxHeight={200}
@@ -187,11 +202,15 @@ export default function MovieUpcoming({ navigation }) {
           placeholderStyle={[
             styles.placeholderStyle,
             { color: theme.text.primary },
+            dropdownFontStili,
           ]}
           selectedTextStyle={[
             styles.selectedTextStyle,
             { color: theme.text.secondary },
+            dropdownFontStili,
           ]}
+          // Renk için yukarıdaki nota bak: liste kabı kütüphanede sabit beyaz.
+          itemTextStyle={[styles.selectedTextStyle, dropdownFontStili]}
           iconStyle={styles.iconStyle}
           data={dateData}
           maxHeight={200}

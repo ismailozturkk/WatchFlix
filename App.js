@@ -48,6 +48,7 @@ import LottieView from "lottie-react-native";
 import { useTheme } from "./context/ThemeContext";
 import { SnowProvider, useSnow } from "./context/SnowContext";
 import { AppSettingsProvider } from "./context/AppSettingsContext";
+import { TypographyProvider } from "./context/TypographyContext";
 import { ConnectivityProvider } from "./context/ConnectivityContext";
 import { PetProvider } from "./context/PetContext";
 import { ListStatusProvider } from "./context/ListStatusContext";
@@ -61,6 +62,7 @@ import { toastConfig } from "@components/AppToast";
 import { AppAlertHost } from "@components/AppAlert";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import ListsScreen from "@screens/lists/ListsScreen";
+import UpNextScreen from "@screens/tabs/UpNextScreen";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import ListsViewScreen from "@screens/lists/ListsViewScreen";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -102,6 +104,7 @@ import PermissionsDataScreen from "./screens/tabs/settings/PermissionsDataScreen
 import OpenSourceLicensesScreen from "./screens/tabs/settings/OpenSourceLicensesScreen";
 import AccountConnectionsScreen from "./screens/tabs/settings/AccountConnectionsScreen";
 import AboutAppScreen from "./screens/tabs/settings/AboutAppScreen";
+import WidgetSettingsScreen from "./screens/tabs/settings/WidgetSettingsScreen";
 import PremiumScreen from "./screens/premium/PremiumScreen";
 import { PremiumProvider } from "./context/PremiumContext";
 import ChatScreen from "@screens/chat/ChatScreen";
@@ -183,6 +186,7 @@ const linking = {
       RemindersScreen: "reminders",
       ListsViewScreen: "lists",
       ListsScreen: "lists/:listName",
+      UpNextScreen: "upnext",
       MovieStatisticsScreen: "stats/movies",
       TvStatisticsScreen: "stats/tv",
     },
@@ -518,6 +522,15 @@ function AppContent() {
             headerShown: false,
           }}
         />
+        {/* Sıradaki: sekme çubuğundan çıkarıldı, TV ana ekranındaki
+            "Devam Eden Dizilerim" rayının "Tümü" düğmesinden açılıyor. */}
+        <Stack.Screen
+          name="UpNextScreen"
+          component={UpNextScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
         <Stack.Screen
           name="SharedListScreen"
           component={SharedListScreen}
@@ -666,6 +679,11 @@ function AppContent() {
         <Stack.Screen
           name="AboutAppScreen"
           component={AboutAppScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="WidgetSettingsScreen"
+          component={WidgetSettingsScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
@@ -869,9 +887,10 @@ export default wrapRoot(function App() {
       <GestureHandlerRootView>
         <SafeAreaProvider>
           <ConnectivityProvider>
-          <AppSettingsProvider>
-          <LanguageProvider>
-            <ThemeProvider>
+          <TypographyProvider>
+            <AppSettingsProvider>
+            <LanguageProvider>
+              <ThemeProvider>
               <SnowProvider>
                 <AuthProvider>
                   <PremiumProvider>
@@ -924,9 +943,10 @@ export default wrapRoot(function App() {
                   </PremiumProvider>
                 </AuthProvider>
               </SnowProvider>
-            </ThemeProvider>
-          </LanguageProvider>
-        </AppSettingsProvider>
+              </ThemeProvider>
+            </LanguageProvider>
+          </AppSettingsProvider>
+          </TypographyProvider>
           </ConnectivityProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

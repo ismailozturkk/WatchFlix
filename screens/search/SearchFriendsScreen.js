@@ -242,10 +242,19 @@ export default function SearchFriendsScreen({ navigation }) {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
       <ScreenDecor iconOpacity={0.3} />
 
-      {/* Başlık */}
-      <Animated.Text
-        style={[styles.pageTitle, { color: theme.text?.primary ?? "#fff" }, titleStyle]}
-      >{i18nText("autoI18n.arkadas_ara", "Arkadaş Ara")}</Animated.Text>
+      {/* Geri + başlık */}
+      <View style={styles.headerBar}>
+        <View style={styles.headerSide}>
+          <BackButton absolute={false} />
+        </View>
+        <Animated.Text
+          allowFontScaling={false}
+          numberOfLines={1}
+          style={[styles.pageTitle, { color: theme.text?.primary ?? "#fff" }, titleStyle]}
+        >{i18nText("autoI18n.arkadas_ara", "Arkadaş Ara")}</Animated.Text>
+        {/* Başlık geri butonuna rağmen ortalı kalsın diye simetrik boşluk */}
+        <View style={styles.headerSide} />
+      </View>
 
       {/* Arama kutusu */}
       <Animated.View style={[styles.searchRow, searchBarStyle]}>
@@ -304,7 +313,6 @@ export default function SearchFriendsScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         />
       )}
-      <BackButton />
     </SafeAreaView>
   );
 }
@@ -312,13 +320,22 @@ export default function SearchFriendsScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 10 },
 
+  // Geri butonu satır içinde: eskiden absolute olduğu için başlığın üstüne
+  // biniyordu. headerSide iki yanda eşit boşluk bırakıp başlığı ortalı tutar.
+  headerBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    marginBottom: 14,
+    marginTop: 4,
+  },
+  headerSide: { width: 40 },
   pageTitle: {
+    flex: 1,
     fontSize: 26,
     fontWeight: "800",
     textAlign: "center",
     letterSpacing: -0.5,
-    marginBottom: 14,
-    marginTop: 4,
   },
 
   searchRow: {

@@ -1427,6 +1427,9 @@ export default function PremiumScreen() {
                         <View style={styles.discountPlaceholder} />
                       )}
                       <Text
+                        // "₺149,99" — para birimi yüzünden saf rakam sayılmaz,
+                        // ama rolü fiyattır: rakam fontunu kullanmalı.
+                        fontRole="numeric"
                         style={[
                           styles.billingPrice,
                           { color: savings ? C.green : C.text },

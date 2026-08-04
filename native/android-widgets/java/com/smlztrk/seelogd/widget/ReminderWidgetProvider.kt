@@ -53,21 +53,42 @@ class ReminderWidgetProvider : AppWidgetProvider() {
       val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
       val language = prefs.getString(KEY_LANGUAGE, "tr") ?: "tr"
       val isTurkish = language.startsWith("tr")
-      val count = countUpcoming(prefs.getString(KEY_ITEMS, "[]") ?: "[]")
+      val preferences = WidgetPreferences.load(context)
+      val count = countUpcoming(
+        prefs.getString(KEY_ITEMS, "[]") ?: "[]",
+        preferences,
+      )
 
       val views = RemoteViews(context.packageName, R.layout.reminder_widget)
+      val appearance = preferences.reminderAppearance
+      WidgetThemeViews.tintBackground(
+        views,
+        R.id.reminder_widget_root,
+        appearance.background,
+      )
+      views.setViewVisibility(
+        R.id.reminder_widget_logo,
+        if (preferences.reminderShowTitle) View.VISIBLE else View.GONE,
+      )
+      views.setViewVisibility(
+        R.id.reminder_widget_title,
+        if (preferences.reminderShowTitle) View.VISIBLE else View.GONE,
+      )
       views.setTextViewText(
         R.id.reminder_widget_title,
         if (isTurkish) "Yaklaşanlar" else "Coming Up",
       )
+      views.setTextColor(R.id.reminder_widget_title, appearance.text)
       views.setTextViewText(
         R.id.reminder_widget_count,
         if (isTurkish) "$count hatırlatma" else "$count reminders",
       )
+      views.setTextColor(R.id.reminder_widget_count, appearance.accent)
       views.setTextViewText(
         R.id.reminder_widget_empty_text,
         if (isTurkish) "Yaklaşan film veya bölüm yok" else "No upcoming movies or episodes",
       )
+      views.setTextColor(R.id.reminder_widget_empty_text, appearance.muted)
 
       // Liste adaptörü — servise widgetId'yi veri olarak koy ki her örnek
       // kendi adaptörünü alsın (RemoteViews adapter cache'i buna dayanır).
@@ -97,15 +118,22 @@ class ReminderWidgetProvider : AppWidgetProvider() {
       manager.notifyAppWidgetViewDataChanged(widgetId, R.id.reminder_widget_list)
     }
 
-    private fun countUpcoming(raw: String): Int = try {
+    private fun countUpcoming(
+      raw: String,
+      preferences: WidgetPreferences,
+    ): Int = try {
       val array = JSONArray(raw)
       val start = startOfToday()
       var n = 0
       for (i in 0 until array.length()) {
         val obj = array.optJSONObject(i) ?: continue
-        if (obj.optLong("dateEpoch", -1L) >= start) n++
+        val type = obj.optString("type")
+        val typeMatches =
+          preferences.reminderContent == "all" ||
+            preferences.reminderContent == type
+        if (typeMatches && obj.optLong("dateEpoch", -1L) >= start) n++
       }
-      n
+      n.coerceAtMost(preferences.reminderMaxItems)
     } catch (_: Exception) {
       0
     }

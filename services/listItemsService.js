@@ -41,7 +41,9 @@ import {
   materializeMovieWatchEvents,
   normalizeWatchDate,
 } from "../utils/watchHistory";
+import { resolveListName } from "../utils/listShare";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
+import { trackFirstContentActivation } from "./activationAnalytics";
 
 export const PREDEFINED_MOVIE_LISTS = ["favorites", "watchList", "watchedMovies"];
 const CUSTOM_ITEMS = "customItems";
@@ -60,7 +62,15 @@ function normalizeItem(item) {
     dateAdded: item.dateAdded ?? null,
     genres: Array.isArray(item.genres) ? item.genres : [],
   };
-  if (item.minutes != null) out.minutes = item.minutes;
+  // DİKKAT: bu bir BEYAZ LİSTE. Buraya eklenmeyen alan sessizce düşer, hiçbir
+  // hata log'lanmaz. Süre/bölüm olguları (utils/mediaFacts) buradan geçmezse
+  // paylaşımdan kaydedilen liste yine bilgisiz kalır.
+  if (item.minutes != null) out.minutes = item.minutes;              // yalnız film
+  if (item.episodeMinutes != null) out.episodeMinutes = item.episodeMinutes;
+  if (item.episodeCount != null) out.episodeCount = item.episodeCount;
+  if (item.seasonCount != null) out.seasonCount = item.seasonCount;
+  // Dizinin toplam süresi: ListsScreen'in süre rozeti ve sıralaması bunu okur.
+  if (item.totalMinutes != null) out.totalMinutes = item.totalMinutes;
   if (Number.isFinite(item.listOrder)) out.listOrder = item.listOrder;
   return out;
 }
@@ -121,6 +131,11 @@ export async function markMovieWatch(uid, item, watchDate) {
     content_id: String(item.id),
     is_rewatch: watchNumber > 1,
     watch_number: watchNumber,
+  });
+  trackFirstContentActivation(uid, {
+    content_type: "movie",
+    content_id: String(item.id),
+    source: "movie_watch",
   });
 
   return event;
@@ -245,6 +260,85 @@ export async function reorderCustomList(uid, listId, orderedItems, fromIndex, to
     toIndex,
     (it) => doc(db, "Lists", uid, CUSTOM_ITEMS, customDocId(listId, it.type, it.id)),
   );
+}
+
+/**
+ * Öğeyi ESKİ MODELDEKİ özel listeye (kök doküman alanındaki dizi) ekler.
+ *
+ * Part B'ye kadar özel listeler hâlâ `Lists/{uid}.<listeAdı>[]` dizisinde
+ * duruyor (ListStatusContext.combinedLists oradan okuyor); `addToCustomList`
+ * ise yeni `customItems` koleksiyonuna yazar ve ekranda GÖRÜNMEZ. Liste
+ * ekranından yapılan hızlı ekleme bu yüzden buradan geçer.
+ *
+ * İki incelik:
+ *  • Transaction: kök doküman TÜM özel listeleri taşıyor. Oku-değiştir-yaz'ı
+ *    istemcide yapmak, başka bir cihazdaki eşzamanlı eklemeyi sessizce siler.
+ *  • `tx.set(..., { merge: true })` — `updateDoc` DEĞİL: updateDoc string
+ *    anahtardaki noktaları alan yolu ayracı sayar ve "S.W.A.T. Favorilerim"
+ *    gibi bir liste adı iç içe map'e dönüşüp liste tamamen kaybolur.
+ *
+ * @returns {Promise<boolean>} eklendiyse true, öğe zaten listedeyse false
+ */
+export async function addToCustomRootList(uid, listName, item) {
+  if (!uid || !listName || item?.id == null || !item?.type) return false;
+  const ref = doc(db, "Lists", uid);
+  let added = false;
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.exists() ? snap.data() : {};
+    const current = Array.isArray(data[listName]) ? data[listName] : [];
+    const exists = current.some(
+      (it) =>
+        it &&
+        String(it.id) === String(item.id) &&
+        (it.type || "movie") === item.type,
+    );
+    if (exists) return;
+    tx.set(ref, { [listName]: [...current, normalizeItem(item)] }, { merge: true });
+    added = true;
+  });
+
+  return added;
+}
+
+// ── Paylaşılan listeyi profile kopyalama ─────────────────────────────────────
+
+/**
+ * Feed'de paylaşılmış bir listeyi profile YENİ bir özel liste olarak yazar.
+ *
+ * Ad çakışması İŞLEM İÇİNDE, sunucudaki güncel duruma göre çözülür: kullanıcı
+ * arayüzdeki liste adlarını gördüğünden beri başka bir cihazda liste açmış
+ * olabilir; ekrandaki listeye bakarak karar vermek sessizce üzerine yazardı.
+ *
+ * Özel listeler hâlâ kök dokümanın alanlarında duruyor (Part B'de customItems'a
+ * taşınacak); buradaki yazma da bu yüzden ListsViewScreen'in `addNewList`
+ * yoluyla aynı biçimde.
+ *
+ * @returns {Promise<string|null>} kullanılan liste adı (ad üretilemezse null)
+ */
+export async function saveSharedListToProfile(uid, name, items, meta = {}) {
+  if (!uid || !Array.isArray(items) || items.length === 0) return null;
+  const ref = doc(db, "Lists", uid);
+  let finalName = null;
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.exists() ? snap.data() : {};
+    finalName = resolveListName(name, Object.keys(data));
+    if (!finalName) throw new Error("saveSharedListToProfile: liste adı çözülemedi");
+    // setDoc+merge (updateDoc değil): updateDoc string anahtardaki noktaları
+    // field-path ayracı sayar, "S.W.A.T. Favorilerim" iç içe map'e dönüşür ve
+    // liste hiç görünmezdi. tx.set data anahtarlarını literal işler.
+    tx.set(ref, { [finalName]: items.map(normalizeItem) }, { merge: true });
+  });
+
+  trackEvent(ANALYTICS_EVENTS.SHARED_LIST_SAVED, {
+    item_count: items.length,
+    renamed: finalName !== String(name || "").trim(),
+    source_post_id: meta.postId ? String(meta.postId) : "",
+  });
+  return finalName;
 }
 
 // Ortak reorder: yalnız taşınan aralığı yaz; tüm liste listOrder içermiyorsa

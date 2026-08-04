@@ -40,6 +40,7 @@ import { useSharedLists } from "../../context/SharedListsContext";
 import CreateSharedListModal from "../../components/modals/CreateSharedListModal";
 import { collection, getDocs, limit, query } from "firebase/firestore";
 import { i18nText } from "@utils/i18nText";
+import ScreenDecor from "../../components/ScreenDecor";
 // İkon/vurgu eşlemesi profil rayı ve Android widget'ı ile ORTAK.
 import {
   getListAccent,
@@ -601,6 +602,8 @@ export default function ListsViewScreen({ navigation }) {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.primary }]}
     >
+      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
+      <ScreenDecor iconOpacity={0.3} />
       <StatusBar barStyle="light-content" />
 
       {/* ── Başlık ──────────────────────────────────────────────────────── */}

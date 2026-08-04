@@ -48,6 +48,7 @@ import {
 } from "@services/tournamentService";
 import StageTimeline from "@components/tournament/StageTimeline";
 import PodiumModal from "@components/tournament/PodiumModal";
+import ScreenDecor from "@components/ScreenDecor";
 
 // Her faz kendi gradyanı + 4 bilgi kartı (Tür/Ortam/Ay/Aşama) için kendi renk
 // paletiyle gelir; hero her fazda görsel olarak FARKLI hissettirsin diye
@@ -990,6 +991,8 @@ export default function TournamentScreen() {
 
   return (
     <SafeAreaView edges={["top"]} style={[styles.container, { backgroundColor: theme.primary }]}>
+      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
+      <ScreenDecor iconOpacity={0.25} />
       {Header}
       {__DEV__ && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.devStrip}>
