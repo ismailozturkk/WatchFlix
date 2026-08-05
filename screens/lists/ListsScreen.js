@@ -2422,7 +2422,13 @@ const styles = StyleSheet.create({
     //paddingTop: 0,
     paddingHorizontal: 0,
     alignItems: "center",
-    justifyContent: "center",
+    // flex-start ZORUNLU: "center" iken içerik kısa olduğunda (boş liste,
+    // yükleme iskeleti, iki öğelik liste) TÜM sütun dikeyde ortalanıyor ve
+    // başlık ile arama çubuğu ekranın ortasına kayıyordu — liste doldukça
+    // yukarı zıplıyorlardı. Ayrıca içerik ekrandan uzun olduğunda "center"
+    // taşmayı iki uca bölüştürdüğü için ÜST kırpılıyordu. Başlık ve arama
+    // çubuğu artık her durumda aynı yerde duruyor.
+    justifyContent: "flex-start",
   },
   header: {
     fontWeight: "bold",
@@ -2437,6 +2443,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   emptyWrap: {
+    // Kapsayıcı artık flex-start olduğu için boş durum blokunun kalan alanı
+    // kendisi kaplaması gerekiyor; aksi halde arama çubuğuna yapışıp altında
+    // koca bir boşluk bırakırdı. Böylece başlık/arama üstte SABİT kalırken
+    // "Bu liste boş" mesajı eskisi gibi ortada durur.
+    flex: 1,
+    alignSelf: "stretch",
     alignItems: "center",
     justifyContent: "center",
     gap: 12,
