@@ -35,6 +35,7 @@ import {
 } from "./listItemsService";
 import { markShow } from "./watchedTvService";
 import { cachedTmdb } from "../utils/cachedRead";
+import { resolveGenreIds } from "../utils/discoveryPersonalization";
 import { applyFacts, langOf, todayListDate } from "../utils/mediaFacts";
 import { mediaToListItem } from "../utils/listShare";
 import {
@@ -45,6 +46,7 @@ import {
 
 const TMDB = "https://api.themoviedb.org/3";
 const SUGGESTION_TTL = 6 * 60 * 60 * 1000; // popüler listesi gün içinde oynamaz
+const GENRE_CATALOG_TTL = 30 * 24 * 60 * 60 * 1000; // TMDB tür tablosu neredeyse hiç değişmez
 
 const categoryOf = (type) => (type === "tv" ? "tvContent" : "movieContent");
 
@@ -107,31 +109,107 @@ export async function searchForList({
 }
 
 /**
- * Sorgu yokken gösterilen öneriler (popüler içerik). Cache'li: aynı gün
- * içinde ekrana her girişte ağa çıkılmaz, çevrimdışıyken de dolu gelir.
+ * Liste öğelerindeki tür ADLARINI bu medya tipinin TMDB tür ID'lerine çevirir.
+ *
+ * NEDEN AD→ID: liste öğeleri türü yerelleştirilmiş ad olarak saklıyor
+ * (utils/listShare.mediaToListItem), discover ise id istiyor. Tablo HEM tr-TR
+ * HEM en-US çekilir çünkü öğeler, o an hangi dil açıksa o dilde kaydedilmiş
+ * olabilir — Türkçe kaydedilmiş "Aksiyon", arayüz İngilizceyken de çözülmeli.
+ *
+ * Film ve dizi tür ID'leri AYRI evrenlerdir (film 28 "Aksiyon", dizi 10759
+ * "Aksiyon & Macera"). Tablo tipe göre çekildiği için karışık listelerde o tipte
+ * karşılığı olmayan adlar sessizce elenir — resolveGenreIds zaten filtreliyor.
+ */
+async function resolveListGenreIds({ type, genreNames, apiKey }) {
+  if (!genreNames?.length) return [];
+  const catalogs = await Promise.all(
+    ["tr-TR", "en-US"].map(async (locale) => {
+      try {
+        const { data } = await cachedTmdb(
+          `${TMDB}/genre/${type}/list?language=${locale}`,
+          { headers: { accept: "application/json", Authorization: apiKey } },
+          { maxAge: GENRE_CATALOG_TTL, category: categoryOf(type) },
+        );
+        return data?.genres || [];
+      } catch {
+        return [];
+      }
+    }),
+  );
+  return resolveGenreIds(genreNames, ...catalogs);
+}
+
+/**
+ * Sorgu yokken gösterilen öneriler. Cache'li: aynı gün içinde ekrana her
+ * girişte ağa çıkılmaz, çevrimdışıyken de dolu gelir.
+ *
+ * ÖNCELİK SIRASI:
+ *   1. `genreNames` verilmişse (listede en çok geçen 3 tür, bkz.
+ *      utils/listSearch.topListGenres) discover ile O TÜRLERDEN öner.
+ *   2. Tür çözülemez, discover patlar ya da BOŞ dönerse popülere düş.
+ *
+ * Boş sonuçta da düşülmesi bilinçli: nadir bir tür üçlüsü + yüksek oy eşiği
+ * hiç sonuç vermeyebilir ve kullanıcıya boş öneri paneli göstermektense genel
+ * popülerler daha iyidir.
  */
 export async function fetchSuggestionsForList({
   listName,
   apiKey,
   language,
+  genreNames = [],
   limit = 20,
 }) {
   if (!apiKey) return [];
   const types = listAcceptedTypes(listName);
+  const wantedGenres = [
+    ...new Set(
+      (Array.isArray(genreNames) ? genreNames : [])
+        .map((name) => String(name ?? "").trim())
+        .filter((name) => name && name !== "-"),
+    ),
+  ].slice(0, 3);
 
   const groups = await Promise.all(
     types.map(async (type) => {
-      try {
-        const { data } = await cachedTmdb(
-          `${TMDB}/${type}/popular?language=${langOf(language)}&page=1`,
-          { headers: { accept: "application/json", Authorization: apiKey } },
-          { maxAge: SUGGESTION_TTL, category: categoryOf(type) },
-        );
+      const headers = { accept: "application/json", Authorization: apiKey };
+      const readList = async (url) => {
+        const { data } = await cachedTmdb(url, { headers }, {
+          maxAge: SUGGESTION_TTL,
+          category: categoryOf(type),
+        });
         return toCandidates(data?.results, {
           fallbackType: type,
           acceptedTypes: [type],
           limit,
         });
+      };
+
+      if (wantedGenres.length) {
+        try {
+          const ids = await resolveListGenreIds({
+            type,
+            genreNames: wantedGenres,
+            apiKey,
+          });
+          if (ids.length) {
+            // vote_count eşiği DiscoveryMediaRail ile aynı (300): tür başına
+            // çöp sonuç yerine gerçekten bilinen yapımlar gelsin.
+            const byGenre = await readList(
+              `${TMDB}/discover/${type}?language=${langOf(language)}&page=1` +
+                `&include_adult=false&sort_by=popularity.desc&vote_count.gte=300` +
+                `&with_genres=${ids.join("|")}`,
+            );
+            if (byGenre.length) return byGenre;
+          }
+        } catch {
+          // Popülere düşülecek.
+        }
+      }
+
+      try {
+        return await readList(
+          `${TMDB}/${type}/popular?language=${langOf(language)}&page=1`,
+        );
       } catch {
         return [];
       }

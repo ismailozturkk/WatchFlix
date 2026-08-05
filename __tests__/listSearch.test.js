@@ -11,6 +11,7 @@ import {
   shouldQueryGlobal,
   toCandidate,
   toCandidates,
+  topListGenres,
 } from "../utils/listSearch";
 
 describe("liste tipi kuralları", () => {
@@ -195,6 +196,50 @@ describe("film + dizi sonuçlarının birleşmesi", () => {
   test("iki grupta da geçen eser bir kez döner", () => {
     const merged = mergeRankedGroups([[movie(4, 1)], [movie(4, 1)]]);
     expect(merged).toHaveLength(1);
+  });
+});
+
+describe("listenin baskın türleri (öneri kişiselleştirmesi)", () => {
+  const it = (genres) => ({ id: 1, genres });
+
+  test("en çok geçen 3 tür, çoktan aza döner", () => {
+    const items = [
+      it(["Aksiyon", "Dram"]),
+      it(["Aksiyon", "Komedi"]),
+      it(["Aksiyon", "Dram"]),
+      it(["Korku"]),
+    ];
+    expect(topListGenres(items)).toEqual(["Aksiyon", "Dram", "Komedi"]);
+  });
+
+  test("limit ayarlanabilir", () => {
+    const items = [it(["Aksiyon", "Dram", "Komedi", "Korku"])];
+    expect(topListGenres(items, { limit: 2 })).toHaveLength(2);
+    expect(topListGenres(items, { limit: 0 })).toEqual([]);
+  });
+
+  test("aynı öğede tekrar eden tür bir kez sayılır", () => {
+    const items = [it(["Dram", "Dram", "Dram"]), it(["Aksiyon"]), it(["Aksiyon"])];
+    // Dram tek öğede 3 kez geçse de 1 sayılır; Aksiyon 2 öğede geçtiği için önde.
+    expect(topListGenres(items)[0]).toBe("Aksiyon");
+  });
+
+  test("eşitlik ada göre deterministik kırılır (her açılışta aynı öneri)", () => {
+    const items = [it(["Zombi"]), it(["Aksiyon"]), it(["Macera"])];
+    expect(topListGenres(items)).toEqual(["Aksiyon", "Macera", "Zombi"]);
+  });
+
+  test("tür bilgisi yoksa boş döner (çağıran popülere düşer)", () => {
+    expect(topListGenres([])).toEqual([]);
+    expect(topListGenres([{ id: 1 }, { id: 2, genres: [] }])).toEqual([]);
+    expect(topListGenres([it(["", "  ", "-"])])).toEqual([]);
+  });
+
+  test("bozuk girdide patlamaz", () => {
+    expect(topListGenres(null)).toEqual([]);
+    expect(topListGenres(undefined)).toEqual([]);
+    expect(topListGenres([null, undefined, { genres: null }])).toEqual([]);
+    expect(topListGenres([it([null, 5, "Dram"])])).toEqual(["5", "Dram"]);
   });
 });
 

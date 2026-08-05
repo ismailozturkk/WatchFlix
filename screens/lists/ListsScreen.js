@@ -52,6 +52,7 @@ import {
   LIST_SEARCH_MODE,
   listRequiresWatchDate,
   matchesListQuery,
+  topListGenres,
 } from "@utils/listSearch";
 import {
   addMediaToList,
@@ -136,6 +137,10 @@ export default function ListsScreen({ route, navigation }) {
     loading: listsLoading,
   } = useListStatusContext();
   const [isLoading, setIsLoading] = useState(listsLoading);
+  // `listItems` gerçekten kaynaktan okundu mu? Boş dizi tek başına "liste boş"
+  // demek değil, "henüz okumadım" da olabilir; kip otomatiği bu ikisini
+  // ayırt etmek zorunda (bkz. autoModeRef effect'i).
+  const [itemsReady, setItemsReady] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [reorderModalVisible, setReorderModalVisible] = useState(false);
   const [index, setIndex] = useState(0);
@@ -249,6 +254,9 @@ export default function ListsScreen({ route, navigation }) {
     const sourceLoading =
       listsLoading || (listName === "watchedTv" && !watchedTvLoaded);
     setIsLoading(sourceLoading);
+    // Aşağıdaki setListItems çağrılarıyla AYNI toplu güncellemeye girer; böylece
+    // sonraki render'da "okundu" bayrağı ile öğeler birlikte tazedir.
+    setItemsReady(!sourceLoading);
     if (!sourceLoading) {
       // İzlenen diziler subcollection'da (gömülü seasons); diğer listeler kök doc'ta.
       if (listName === "watchedTv") {
@@ -599,14 +607,29 @@ export default function ListsScreen({ route, navigation }) {
     return () => clearTimeout(timer);
   }, [searchMode, searchQuery, listName, API_KEY, language, adultContent]);
 
-  // Sorgu yokken gösterilen öneriler — liste başına bir kez, cache'li.
+  // Öneriler listenin KENDİ türlerinden gelsin: bu listede en çok geçen 3 tür
+  // (yoksa boş → servis popülere düşer).
+  const suggestionGenres = useMemo(
+    () => topListGenres(listItems, { limit: 3 }),
+    [listItems],
+  );
+
+  // Sorgu yokken gösterilen öneriler — cache'li. Anahtar liste ADI + TÜR ÜÇLÜSÜ:
+  // liste değişince olduğu gibi, listeye ekleme yapılıp baskın türler değişince
+  // de öneriler tazelenir; türler aynı kaldıkça (olağan durum) ağa çıkılmaz.
   const suggestionsRef = useRef(null);
   useEffect(() => {
-    if (searchMode !== LIST_SEARCH_MODE.GLOBAL) return undefined;
-    if (!API_KEY || suggestionsRef.current === listName) return undefined;
-    suggestionsRef.current = listName;
+    if (searchMode !== LIST_SEARCH_MODE.GLOBAL || !API_KEY) return undefined;
+    const cacheKey = `${listName}|${suggestionGenres.join(",")}`;
+    if (suggestionsRef.current === cacheKey) return undefined;
+    suggestionsRef.current = cacheKey;
     let alive = true;
-    fetchSuggestionsForList({ listName, apiKey: API_KEY, language })
+    fetchSuggestionsForList({
+      listName,
+      apiKey: API_KEY,
+      language,
+      genreNames: suggestionGenres,
+    })
       .then((items) => {
         if (alive) setSuggestions(items);
       })
@@ -614,16 +637,35 @@ export default function ListsScreen({ route, navigation }) {
     return () => {
       alive = false;
     };
-  }, [searchMode, listName, API_KEY, language]);
+  }, [searchMode, listName, API_KEY, language, suggestionGenres]);
 
   // Boş listede kip doğrudan global açılır: ekranda eklenecek bir şey yokken
   // "Bu liste boş" yazıp kullanıcıyı başka ekrana göndermenin anlamı yok.
+  //
+  // DİKKAT — `isLoading` ile korumak YETMEZ: bu ekrana zaten yüklü bir liste
+  // listesinden geliniyor, yani `listsLoading` mount anında çoğunlukla false ve
+  // `isLoading` da false başlıyor. İlk render'da `listItems` ise henüz `[]`
+  // (yükleme effect'i çalışmadı). Eski koşul bu yüzden DOLU listelerde de
+  // tetikleniyor, `autoModeRef` mandalı kapanıyor ve her liste "Tüm içerikler"
+  // kipinde açılıyordu. Bunun yerine, verinin gerçekten okunduğunu bildiren
+  // `itemsReady` beklenir: o bayrak `setListItems` ile AYNI effect'te
+  // ayarlandığı için sonraki render'da ikisi birlikte doğru olur.
+  // Kip HER İKİ YÖNDE de açıkça kurulur: aynı ekran başka bir `listName` ile
+  // yeniden kullanılırsa (route param değişimi) önceki listeden kalan global kip
+  // dolu listeye taşınmasın. Mandal liste başına bir kez düşer, sonrasında
+  // kullanıcının seçimine karışılmaz. `ListSearchBar` yalnız yükleme bittikten
+  // sonra çizildiği için (yukarıda `isLoading ? renderSkeleton()`), bu ilk
+  // kurulum kullanıcının erken bir dokunuşunu ezemez.
   const autoModeRef = useRef(null);
   useEffect(() => {
-    if (isLoading || autoModeRef.current === listName) return;
+    if (!itemsReady || autoModeRef.current === listName) return;
     autoModeRef.current = listName;
-    if (listItems.length === 0) setSearchMode(LIST_SEARCH_MODE.GLOBAL);
-  }, [isLoading, listItems.length, listName]);
+    setSearchMode(
+      listItems.length === 0
+        ? LIST_SEARCH_MODE.GLOBAL
+        : LIST_SEARCH_MODE.IN_LIST,
+    );
+  }, [itemsReady, listItems.length, listName]);
 
   const openMediaDetails = useCallback(
     (media) => {

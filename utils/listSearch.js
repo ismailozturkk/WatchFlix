@@ -207,6 +207,41 @@ export function mergeRankedGroups(groups, { limit = 40 } = {}) {
 }
 
 /**
+ * Listede EN ÇOK geçen tür adları (varsayılan ilk 3).
+ *
+ * Sorgu yokken gösterilen "ÖNERİLER" bloğu bununla kişiselleşir: liste bir
+ * korku listesiyse öneri de korku gelsin, genel popülerler değil. Tür bilgisi
+ * yoksa boş döner ve çağıran popülere düşer (bkz.
+ * services/listQuickAdd.fetchSuggestionsForList).
+ *
+ * Liste öğeleri türü TMDB id'si olarak DEĞİL, yerelleştirilmiş AD olarak tutuyor
+ * (bkz. utils/listShare.mediaToListItem) — bu yüzden burada ad sayılır, id'ye
+ * çevirme işi servis katmanında TMDB tür tablosuyla yapılır.
+ *
+ * Aynı öğede tekrar eden tür bir kez sayılır; sıralama eşitliğinde ad'a göre
+ * deterministik kırılır (aksi halde her açılışta farklı öneri gelirdi).
+ */
+export function topListGenres(items, { limit = 3 } = {}) {
+  const counts = new Map();
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    const genres = Array.isArray(item?.genres) ? item.genres : [];
+    const seenInItem = new Set();
+    genres.forEach((raw) => {
+      const name = String(raw ?? "").trim();
+      // "-" bazı göç kayıtlarında "tür yok" anlamında yazılmış.
+      if (!name || name === "-" || seenInItem.has(name)) return;
+      seenInItem.add(name);
+      counts.set(name, (counts.get(name) || 0) + 1);
+    });
+  });
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "tr"))
+    .slice(0, Math.max(0, limit))
+    .map(([name]) => name);
+}
+
+/**
  * Global aramaya çıkılmalı mı? (kip + sorgu uzunluğu)
  * Kısa sorguda ağa çıkmak yerine ekran "öneriler"i gösterir.
  */
