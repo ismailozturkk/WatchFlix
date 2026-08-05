@@ -6,12 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/android-icon-foreground.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1E1E1E"
-    },
     "scheme": "seelogd",
     "ios": {
       "bundleIdentifier": "com.smlztrk.seelogd",
@@ -28,11 +22,6 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      },
-      "splash": {
-        "image": "./assets/android-icon-foreground.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#1E1E1E"
       },
       "package": "com.smlztrk.seelogd",
       "googleServicesFile": "./google-services.json",
@@ -54,6 +43,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/android-icon-foreground.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#1E1E1E"
+        }
+      ],
       "@bacons/apple-targets",
       "@react-native-google-signin/google-signin",
       [

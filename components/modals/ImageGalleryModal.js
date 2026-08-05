@@ -22,6 +22,11 @@ import {
 import { useLanguage } from "@context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as MediaLibrary from "expo-media-library";
+// SDK 57: `saveToLibraryAsync` ana giriste artik yalnizca CALISMA ANINDA HATA
+// FIRLATAN bir kabuk (bkz. expo-media-library/build/legacyWarnings.js). Izin
+// fonksiyonlari ana giriste desteklenmeye devam ediyor, sadece bu cagri legacy
+// girisinden alinmali. Alternatifi yeni sinif tabanli `Asset.create()` API'si.
+import { saveToLibraryAsync } from "expo-media-library/legacy";
 import { File, Paths } from "expo-file-system";
 import Toast from "react-native-toast-message";
 import { i18nText } from "@utils/i18nText";
@@ -187,7 +192,7 @@ const ImageGalleryModal = ({
       const dest = new File(Paths.cache, fileName);
       if (dest.exists) dest.delete();
       const out = await File.downloadFileAsync(url, dest);
-      await MediaLibrary.saveToLibraryAsync(out.uri);
+      await saveToLibraryAsync(out.uri);
       Toast.show({
         type: "success",
         text1: isPoster ? "Poster galeriye kaydedildi" : i18nText("autoI18n.gorsel_galeriye_kaydedildi", "Görsel galeriye kaydedildi"),

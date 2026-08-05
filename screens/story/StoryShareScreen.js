@@ -18,6 +18,9 @@ import {
 import ViewShot, { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import * as MediaLibrary from "expo-media-library";
+// SDK 57: `saveToLibraryAsync` ana giriste calisma aninda hata firlatiyor;
+// legacy girisinden alinmali (izin fonksiyonlari ana giriste gecerli).
+import { saveToLibraryAsync } from "expo-media-library/legacy";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import axios from "axios";
@@ -868,7 +871,7 @@ export default function StoryShareScreen({ route, navigation }) {
         return;
       }
       const uri = await capture();
-      await MediaLibrary.saveToLibraryAsync(uri);
+      await saveToLibraryAsync(uri);
       Toast.show({ type: "success", text1: i18nText("autoI18n.galeriye_kaydedildi", "Galeriye kaydedildi") });
     } catch (e) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.kaydetme_hatasi", "Kaydetme hatası: ") + e.message });

@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
   },
   savingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
     gap: 9,

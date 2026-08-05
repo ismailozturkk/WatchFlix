@@ -2106,7 +2106,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 160,
   },
-  graphBackdrop: { ...StyleSheet.absoluteFillObject, resizeMode: "cover" },
+  graphBackdrop: { ...StyleSheet.absoluteFill, resizeMode: "cover" },
   graphContent: {
     flex: 1,
     flexDirection: "row",
@@ -2195,7 +2195,7 @@ const styles = StyleSheet.create({
   },
   videoImage: { width: "100%", height: "100%" },
   playIconContainer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: "center",
     alignItems: "center",
   },

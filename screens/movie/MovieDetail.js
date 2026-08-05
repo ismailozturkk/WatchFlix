@@ -1750,7 +1750,7 @@ const styles = StyleSheet.create({
   },
   videoImage: { width: "100%", height: "100%" },
   playIconContainer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: "center",
     alignItems: "center",
   },

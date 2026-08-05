@@ -31,6 +31,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import * as MediaLibrary from "expo-media-library";
+// SDK 57: `saveToLibraryAsync` ana giriste calisma aninda hata firlatiyor;
+// legacy girisinden alinmali (izin fonksiyonlari ana giriste gecerli).
+import { saveToLibraryAsync } from "expo-media-library/legacy";
 import * as Haptics from "@services/hapticsService";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -360,7 +363,7 @@ export default function WrappedScreen({ route, navigation }) {
         return;
       }
       const uri = await capture();
-      await MediaLibrary.saveToLibraryAsync(uri);
+      await saveToLibraryAsync(uri);
       // Kaydederken arşivi de güncelle (üzerine yaz).
       if (uid) archiveWrapped(uid, recap.year, recap);
       Toast.show({ type: "success", text1: str.savedToast });

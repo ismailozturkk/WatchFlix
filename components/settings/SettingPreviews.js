@@ -128,6 +128,6 @@ export function IconPatternPreview({ opacity = 0.5 }) {
 }
 
 const styles = StyleSheet.create({
-  fill: { ...StyleSheet.absoluteFillObject },
+  fill: { ...StyleSheet.absoluteFill },
   patternIcon: { position: "absolute" },
 });

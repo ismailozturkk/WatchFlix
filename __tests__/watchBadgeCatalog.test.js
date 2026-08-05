@@ -8,7 +8,10 @@ const {
   formatBadgeAralik, sureBirimiBul, SURE_BIRIMLERI, SURE_BIRIM_VARSAYILAN,
 } = require("../components/badges/watchBadgeCatalog");
 const { RARITY_ORDER } = require("../theme/badgeTokens");
-const IONICONS = require("../node_modules/expo/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/Ionicons.json");
+// SDK 57'de expo artik @expo/vector-icons'i kendi bagimliligi olarak tasimiyor;
+// paket dogrudan bagimlilik oldu ve kokte duruyor (eskiden expo/node_modules
+// altinda ic ice cozuluyordu).
+const IONICONS = require("@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/Ionicons.json");
 
 const sayimlar = () => WATCH_BADGES.reduce((acc, b) => {
   acc[b.rarity] = (acc[b.rarity] || 0) + 1; return acc;

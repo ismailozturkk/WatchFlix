@@ -89,7 +89,7 @@ function PosterMarqueeBackground({ posters = [], paused = false, style }) {
 export default memo(PosterMarqueeBackground);
 
 const styles = StyleSheet.create({
-  clip: { ...StyleSheet.absoluteFillObject, overflow: "hidden" },
+  clip: { ...StyleSheet.absoluteFill, overflow: "hidden" },
   inner: {
     position: "absolute",
     top: -POSTER_H,

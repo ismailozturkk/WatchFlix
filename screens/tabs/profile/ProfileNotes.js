@@ -1,5 +1,4 @@
 import {
-  Clipboard,
   Modal,
   ScrollView,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import React, { useState, useRef, useCallback, useMemo } from "react";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useTheme } from "../../../context/ThemeContext";
@@ -277,7 +277,7 @@ export default function ProfileNotes() {
   ]);
 
   /* ── Panoya kopyala: not = içerik, todo = başlık + ☐/☑ maddeler ── */
-  const copyNoteToClipboard = useCallback(() => {
+  const copyNoteToClipboard = useCallback(async () => {
     if (!selectedNote) return;
     let text;
     if (selectedNote.type === "todo") {
@@ -289,7 +289,7 @@ export default function ProfileNotes() {
       text = noteContent || selectedNote.content || "";
     }
     if (!text.trim()) return;
-    Clipboard.setString(text);
+    await Clipboard.setStringAsync(text);
     toast.success(i18nText("autoI18n.panoya_kopyalandi", "Panoya kopyalandı"));
   }, [selectedNote, isEditable, localEditTodos, localEditTitle, noteContent]);
 

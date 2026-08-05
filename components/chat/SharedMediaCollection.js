@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
   },
   ratingText: { color: "#fff", fontSize: 8, fontWeight: "700" },
   pickedOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: "center",
     alignItems: "center",
   },

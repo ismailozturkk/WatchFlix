@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   compactTint: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   copy: { flex: 1 },
   copyCompact: { flex: 0, width: "100%", alignItems: "center" },

@@ -8,7 +8,6 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Clipboard,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -22,6 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../../context/ThemeContext";
@@ -328,9 +328,9 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
     }
     cancelEditTodo();
   };
-  const copyTodo = (item) => {
+  const copyTodo = async (item) => {
     if (!item.text?.trim()) return;
-    Clipboard.setString(item.text);
+    await Clipboard.setStringAsync(item.text);
     toast.success(i18nText("autoI18n.panoya_kopyalandi", "Panoya kopyalandı"));
     // Toast kök seviyede duruyor ve alt-sheet'in altında kalabiliyor; satırda da
     // kısa bir onay göster.
@@ -673,7 +673,7 @@ export default function NotesScreen({ navigation }) {
   };
 
   /* Panoya kopyala: not = başlık + içerik, todo = başlık + ☐/☑ maddeler */
-  const copyNote = useCallback((note) => {
+  const copyNote = useCallback(async (note) => {
     const text =
       note.type === "todo"
         ? [
@@ -686,7 +686,7 @@ export default function NotesScreen({ navigation }) {
             .join("\n")
         : [note.title, note.content].filter(Boolean).join("\n\n");
     if (!text.trim()) return;
-    Clipboard.setString(text);
+    await Clipboard.setStringAsync(text);
     toast.success(i18nText("autoI18n.panoya_kopyalandi", "Panoya kopyalandı"));
   }, []);
 

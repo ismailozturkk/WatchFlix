@@ -2462,7 +2462,7 @@ export default function ChatScreen({ route, navigation }) {
           >
             <View style={styles.modalOverlay}>
               <TouchableOpacity
-                style={StyleSheet.absoluteFillObject}
+                style={StyleSheet.absoluteFill}
                 onPress={() => setOptionsVisible(false)}
               />
               <View style={styles.modalSheet}>
@@ -3015,7 +3015,7 @@ const styles = StyleSheet.create({
     marginBottom: 9,
   },
   inputBlurBg: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(108,99,255,0.03)",
   },
   inputRow: {
@@ -3218,7 +3218,7 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   searchCardSelectedOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 13,
     borderWidth: 2.5,
     borderColor: ACCENT,

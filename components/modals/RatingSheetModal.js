@@ -396,7 +396,7 @@ export default function RatingSheetModal({
 
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: "flex-end" },
-  backdrop: { ...StyleSheet.absoluteFillObject },
+  backdrop: { ...StyleSheet.absoluteFill },
   backdropTouchable: {
     position: "absolute",
     top: 0,

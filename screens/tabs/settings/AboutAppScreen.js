@@ -15,8 +15,8 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
-  Clipboard,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
@@ -90,7 +90,7 @@ export default function AboutAppScreen() {
       await Linking.openURL(url);
     } catch (e) {
       // Tarayıcı yoksa/açılmazsa bağlantı en azından panoda kalsın.
-      Clipboard.setString(url);
+      await Clipboard.setStringAsync(url);
       Toast.show({
         type: "info",
         text1: isTr ? "Bağlantı Kopyalandı" : "Link Copied",
@@ -99,8 +99,8 @@ export default function AboutAppScreen() {
     }
   };
 
-  const copyEmailToClipboard = () => {
-    Clipboard.setString(SUPPORT_EMAIL);
+  const copyEmailToClipboard = async () => {
+    await Clipboard.setStringAsync(SUPPORT_EMAIL);
     Toast.show({
       type: "info",
       text1: isTr ? "E-Posta Kopyalandı" : "Email Copied",

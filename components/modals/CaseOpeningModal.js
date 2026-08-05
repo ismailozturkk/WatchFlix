@@ -627,7 +627,7 @@ const styles = StyleSheet.create({
     elevation: 24,
   },
   backdropWrap: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     opacity: 0.42,
   },
   header: {

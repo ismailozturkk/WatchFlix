@@ -59,8 +59,21 @@ export function initAppCheck(webApp) {
   if (!rnfb || !webApp) return false;
 
   try {
-    const { firebase } = rnfb;
-    const provider = firebase.appCheck().newReactNativeFirebaseAppCheckProvider();
+    // RNFB 26 kırıcı değişikliği: paket artık namespaced `firebase` nesnesini
+    // dışa aktarmıyor (`firebase.appCheck()` yok). Provider, başlatma ve token
+    // alma modular API'den geliyor. Eski kod burada TypeError atıp aşağıdaki
+    // catch'e düşerdi — uygulama çalışmaya devam eder ama App Check SESSİZCE
+    // kapalı kalırdı, yani istekler Play Integrity token'ı taşımazdı.
+    //
+    // `initializeAppCheck` de v26'da firebase-js-sdk ile hizalanıp senkron
+    // olarak AppCheck örneği döndürüyor (native kurulum arka planda sürüyor).
+    // İlk argüman app; `undefined` verilince varsayılan uygulama kullanılır.
+    const {
+      initializeAppCheck: initNativeAppCheck,
+      getToken: getNativeAppCheckToken,
+      ReactNativeFirebaseAppCheckProvider,
+    } = rnfb;
+    const provider = new ReactNativeFirebaseAppCheckProvider();
     const dev = typeof __DEV__ !== "undefined" && __DEV__;
     provider.configure({
       android: {
@@ -73,7 +86,7 @@ export function initAppCheck(webApp) {
         provider: dev ? "debug" : "appAttestWithDeviceCheckFallback",
       },
     });
-    firebase.appCheck().initializeAppCheck({
+    const nativeInstance = initNativeAppCheck(undefined, {
       provider,
       isTokenAutoRefreshEnabled: true,
     });
@@ -84,7 +97,7 @@ export function initAppCheck(webApp) {
     initializeAppCheck(webApp, {
       provider: new CustomProvider({
         getToken: async () => {
-          const result = await firebase.appCheck().getToken(false);
+          const result = await getNativeAppCheckToken(nativeInstance, false);
           return {
             token: result.token,
             // RNFB süre bilgisini vermez; native SDK kendi önbelleğini

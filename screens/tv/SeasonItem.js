@@ -855,7 +855,7 @@ const styles = StyleSheet.create({
 
   // ── İlerleme çubuğu ───────────────────────────────────────────────────────
   progressClipLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 16,
     overflow: "hidden",
     zIndex: 4,

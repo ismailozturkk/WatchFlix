@@ -202,7 +202,7 @@ export default function SearchScreen({ navigation, route }) {
             outputRange: [10, 0],
           }),
         }
-      : StyleSheet.absoluteFillObject;
+      : StyleSheet.absoluteFill;
 
   return (
     <View style={styles.transitionRoot} onLayout={onRootLayout}>

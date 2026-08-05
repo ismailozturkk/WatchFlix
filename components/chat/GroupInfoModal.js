@@ -775,7 +775,7 @@ const styles = StyleSheet.create({
   avatarGridWrap: { height: 310, position: "relative" },
   avatarGrid: { flex: 1 },
   avatarSavingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(10,10,18,0.48)",

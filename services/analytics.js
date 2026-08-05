@@ -71,9 +71,16 @@ export function trackEvent(name, params) {
   if (!analyticsApi || !instance) return false;
 
   // Analytics ateşle-unut: hiçbir kullanıcı akışı buna bağlı beklememeli.
-  analyticsApi.logEvent(instance, event.name, event.params).catch((error) => {
+  // RNFB 26 kırıcı değişikliği: `logEvent` artık firebase-js-sdk ile hizalı
+  // olarak SENKRON `void` dönüyor (setUserId/logScreenView hâlâ Promise).
+  // Eski `.catch(...)` zinciri burada "undefined.catch is not a function" ile
+  // her olayda patlardı; hata yakalama try/catch'e taşındı.
+  try {
+    analyticsApi.logEvent(instance, event.name, event.params);
+  } catch (error) {
     if (__DEV__) console.warn("[analytics] logEvent:", error?.message || error);
-  });
+    return false;
+  }
   return true;
 }
 

@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     paddingRight: 2,
   },
   pillFade: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 16,
   },
   iconBubble: {

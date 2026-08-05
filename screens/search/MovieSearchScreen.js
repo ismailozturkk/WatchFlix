@@ -56,7 +56,7 @@ export default function MovieSearchScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   fullScreen: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)" },
-  backdrop: { ...StyleSheet.absoluteFillObject },
+  backdrop: { ...StyleSheet.absoluteFill },
   searchBar: {
     paddingTop: 60,
     paddingBottom: 20,

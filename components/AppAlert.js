@@ -284,7 +284,7 @@ export function AppAlertHost() {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.45)" },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.45)" },
   center: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 28 },
   card: {
     width: Math.min(SCREEN_W - 56, 380),

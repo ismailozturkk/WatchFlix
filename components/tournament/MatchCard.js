@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
   barFill: { height: "100%", borderRadius: 3 },
   pctText: { color: "#fff", fontSize: 10, fontWeight: "800", marginLeft: 6, width: 34, textAlign: "right" },
   confirmOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
     gap: 2,

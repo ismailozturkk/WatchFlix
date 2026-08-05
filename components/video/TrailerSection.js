@@ -506,13 +506,13 @@ const styles = StyleSheet.create({
   },
   // Yükleme/hata katmanı — kontrol butonlarının (zIndex 20) altında kalır.
   playerOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 10,
     alignItems: "center",
     justifyContent: "center",
   },
   playerOverlayDim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.55)",
   },
   playerErrorBox: { alignItems: "center", gap: 10, paddingHorizontal: 20 },

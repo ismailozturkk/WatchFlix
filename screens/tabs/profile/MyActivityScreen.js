@@ -1194,7 +1194,7 @@ const st = StyleSheet.create({
   storyDraftThumb: { width: "100%", height: "100%" },
   storyDraftEmpty: { flex: 1, alignItems: "center", justifyContent: "center" },
   storyDraftOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: "space-between",
     padding: 6,
   },

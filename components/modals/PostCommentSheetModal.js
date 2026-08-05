@@ -681,7 +681,7 @@ const getStyles = (theme) =>
   StyleSheet.create({
     root: { flex: 1, justifyContent: "flex-end" },
 
-    backdrop: { ...StyleSheet.absoluteFillObject },
+    backdrop: { ...StyleSheet.absoluteFill },
     backdropTouchable: {
       position: "absolute",
       top: 0,

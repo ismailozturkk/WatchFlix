@@ -365,8 +365,8 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: "flex-end" },
-  backdrop: { ...StyleSheet.absoluteFillObject },
-  backdropTouchable: { ...StyleSheet.absoluteFillObject },
+  backdrop: { ...StyleSheet.absoluteFill },
+  backdropTouchable: { ...StyleSheet.absoluteFill },
   sheet: {
     borderTopLeftRadius: 26, borderTopRightRadius: 26, overflow: "hidden",
     paddingBottom: 14,
@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
   // `dugumHalka`nın borderWidth'i seçili olmayan düğümde de 2 (rengi saydam):
   // yalnızca seçilide vermek düğümü 4px kısaltıp rayı eğri gösterirdi.
   rayWrap: { position: "absolute", top: 23.5, height: 3 },
-  ray: { ...StyleSheet.absoluteFillObject, borderRadius: 2 },
+  ray: { ...StyleSheet.absoluteFill, borderRadius: 2 },
   rayDolu: { height: 3, borderRadius: 2 },
   // TAŞMA DÜZELTMESİ. Sabit 58px genişlik, aileler 5 kademeye çıkınca 5×58=290px
   // istiyordu; modalın iç genişliği ise ekran−44, yani 320pt'lik bir cihazda

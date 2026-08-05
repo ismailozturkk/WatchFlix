@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
 
   // Backdrop
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   backdropTouchable: {
     position: "absolute",

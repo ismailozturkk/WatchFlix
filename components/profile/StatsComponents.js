@@ -1071,7 +1071,7 @@ const filterStyles = StyleSheet.create({
 
 const modalStyles = StyleSheet.create({
   root: { flex: 1, justifyContent: "flex-end" },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.55)" },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.55)" },
   sheet: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,

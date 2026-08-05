@@ -1792,7 +1792,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   exploreModalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.64)",
   },
   exploreModalSheet: {

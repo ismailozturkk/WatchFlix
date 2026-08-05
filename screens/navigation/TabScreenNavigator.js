@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   screen: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   languageButton: {
     position: "absolute",
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   iconLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
   },

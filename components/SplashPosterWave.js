@@ -327,7 +327,7 @@ export default React.memo(SplashPosterWave);
 
 const styles = StyleSheet.create({
   posterField: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     opacity: 0.9, // posterlerde çok hafif saydamlık
   },
   tile: {

@@ -1582,7 +1582,7 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   shapeLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     overflow: "hidden",
   },
   colorShape: {
@@ -1667,7 +1667,7 @@ const styles = StyleSheet.create({
 
   // ── Kayan poster ızgarası ──
   marqueeClip: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     overflow: "hidden",
   },
   marqueeInner: {
@@ -1710,7 +1710,7 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
   visualAccent: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   visualAnimation: {
     width: "78%",
@@ -2086,7 +2086,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   progressFill: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 2,
   },
   navRow: {

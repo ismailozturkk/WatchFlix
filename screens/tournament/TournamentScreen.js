@@ -1230,7 +1230,7 @@ const styles = StyleSheet.create({
   gridVotesText: { color: "#fff", fontSize: 9.5, fontWeight: "800" },
   gridTitle: { fontSize: 10, fontWeight: "600", marginTop: 3 },
   gridConfirm: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center", justifyContent: "center", gap: 1,
   },
   gridConfirmText: { color: "#fff", fontSize: 10.5, fontWeight: "900", marginTop: 3, textAlign: "center" },

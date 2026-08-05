@@ -9,6 +9,14 @@ module.exports = {
   transform: {
     "^.+\\.[jt]sx?$": "babel-jest",
   },
+  // SDK 57 ile babel-preset-expo, `process.env.X` okumalarini derleme aninda
+  // `expo/virtual/env` modulunden okunacak sekilde yeniden yaziyor. O dosya ESM
+  // ("export const env = ...") ve jest node_modules'u varsayilan olarak
+  // donusturmedigi icin `process.env` kullanan her saf modul
+  // "SyntaxError: Unexpected token 'export'" ile patliyordu.
+  // Yalniz expo paketi istisna tutuldu; kalan node_modules donusturulmuyor
+  // (bkz. yukaridaki not: burada RN/Firebase bagimli kod test edilmiyor).
+  transformIgnorePatterns: ["node_modules/(?!(expo)/)"],
   // `__DEV__` normalde Metro tarafından tanımlanır; jest'te yok. Test edilen
   // saf modüller bile artık (analytics/crash raporlama sarmalayıcıları
   // üzerinden) bu bayrağı okuyabiliyor — tanımsız kalırsa ReferenceError.
