@@ -915,6 +915,7 @@ export default function ListsScreen({ route, navigation }) {
               error={globalError}
               existingKeys={existingKeys}
               addingKey={addingKey}
+              genreMap={genreMap}
               onAdd={handleAddMedia}
               onOpen={openMediaDetails}
             />

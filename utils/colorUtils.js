@@ -100,3 +100,74 @@ export function luminance(hex) {
 export function readableTextOn(hex) {
   return luminance(hex) > 0.5 ? "#000000" : "#FFFFFF";
 }
+
+/** Iki rengin WCAG kontrast orani (1 ile 21 arasi). */
+export function contrastRatio(a, b) {
+  const la = luminance(toHex(a));
+  const lb = luminance(toHex(b));
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+// WCAG AA (normal metin). Rozet/cip metinleri kucuk sayildigi icin buyuk metin
+// esigi (3.0) degil bu hedeflenir.
+const DEFAULT_TARGET_CONTRAST = 4.5;
+
+// (renk|zemin|hedef) -> sonuc. Girdi kumesi tema basina birkac cift oldugundan
+// sinirsiz buyume riski yok; liste kaydirmada satir basina yeniden hesaplanmasin.
+const readableCache = new Map();
+
+/**
+ * Bir MARKA/ANLAM rengini, verilen zemin uzerinde okunur hale getirir.
+ *
+ * NEDEN VAR: uygulamada 7 yerlesik tema var, ikisi ACIK zeminli (light, green),
+ * ustune kullanici kendi temasini uretebiliyor. Sabit renkler bazi zeminlerde
+ * kayboluyor — olculen ornekler: notesColor.green (#64FF64) light temada
+ * 1.24:1, green temada 1.03:1; ters yonde #e33 gray temada 3.39:1.
+ *
+ * "Acik tema karsiligi" tablosu tutmak yerine HESAPLANIR: renk zeminden
+ * UZAKLASACAK yonde (acik zeminde koyulasarak, koyu zeminde acilarak) adim adim
+ * kaydirilir ve hedef kontrasta ilk ulasan ton secilir. Boylece ozel temalar da
+ * kapsanir. TON (hue) korunur: renk kimligi bozulmaz, yalniz okunurluk kazanilir.
+ * Hedefe hic ulasilamazsa en iyi aday dondurulur (renksiz birakmaktan iyidir).
+ *
+ * @param {string} color   anlam rengi ("#RRGGBB", "rgb(...)", "rgba(...)")
+ * @param {string} surface uzerine cizilecegi zemin
+ * @param {{target?: number}} [opts]
+ * @returns {string} "#RRGGBB"
+ */
+export function readableOn(color, surface, opts = {}) {
+  const target = opts.target ?? DEFAULT_TARGET_CONTRAST;
+  const cacheKey = `${color}|${surface}|${target}`;
+  const cached = readableCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const result = computeReadableOn(color, surface, target);
+  readableCache.set(cacheKey, result);
+  return result;
+}
+
+function computeReadableOn(color, surface, target) {
+  const bg = toHex(surface);
+  const base = toHex(color);
+  if (contrastRatio(base, bg) >= target) return base;
+
+  const { h, s, l } = hexToHsl(base);
+  // Cok soluk renkler koyulasinca griye dusuyor; doygunlugu tabanla.
+  const sat = Math.max(s, 45);
+  const darken = luminance(bg) > 0.5;
+  let best = base;
+  let bestRatio = contrastRatio(base, bg);
+
+  for (let step = 1; step <= 24; step += 1) {
+    const nextL = darken ? Math.max(6, l - step * 4) : Math.min(96, l + step * 4);
+    const candidate = hslToHex(h, sat, nextL);
+    const ratio = contrastRatio(candidate, bg);
+    if (ratio > bestRatio) {
+      best = candidate;
+      bestRatio = ratio;
+    }
+    if (ratio >= target) return candidate;
+    if (nextL === 6 || nextL === 96) break;
+  }
+  return best;
+}
