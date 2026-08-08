@@ -216,7 +216,19 @@
 
 **Kabul:** başka kullanıcının yorumunda/mesajında/profilinde şikâyet + engelle erişilebilir; engellenen kullanıcının gönderi/yorum/mesajı görünmez ve yenisi başlatılamaz; engel listesi ekrandan yönetilebilir; `ContentReports` create-only; testler yeşil.
 
-### [ ] GÖREV B5 — Yasal bağlantılar: paywall + kayıt ekranları (~2 saat)
+### [x] GÖREV B5 — Yasal bağlantılar: paywall + kayıt ekranları (2026-08-08)
+
+> **Sonuç:** `bdc8922`. `utils/legalLinks.js` tek kaynak; paywall'da ve iki kayıt ekranında
+> çalışan linkler; `AboutAppScreen` de URL'yi oradan okuyor (panoya kopyalayan yedeği kaldı).
+> `delete-account.html` sabiti de eklendi ama henüz bir ekrandan açılmıyor.
+>
+> **i18n notu:** onay metni üç parçaya bölündü (`kayit_onay_bas/orta/son`) ve **boşluklar
+> çeviri metninin İÇİNDE**. Türkçede bağlantı adına ek geliyor ("Koşulları'nı"), yani araya
+> boşluk konmamalı; İngilizcede gerekiyor (" and "). Çeviri düzenlerken baştaki/sondaki
+> boşlukları silme — bileşende de not var.
+>
+> **Adım 4 (RevenueCat paneli) FAZ C'de:** paneldeki hazır paywall'un footer linkleri C2'de
+> ayrıca doğrulanacak; buradaki kod ayağı o panelin yerine geçmez.
 
 **Bağlam:** Yasal URL'ler uygulamada tek yerde: `screens/tabs/settings/AboutAppScreen.js` (~42). Apple 3.1.2: abonelik satın alma noktasında Kullanım Koşulları (EULA) + Gizlilik linki zorunlu. Kayıtta ne link ne onay ifadesi var; gizlilik politikası KVKK/GDPR metni olarak yazılmış ama kayıtta hiç görünmüyor.
 
