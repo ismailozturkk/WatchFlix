@@ -35,7 +35,6 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import LottieView from "lottie-react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import Reanimated, { FadeInUp } from "react-native-reanimated";
 import { useNavigation } from "@react-navigation/native";
 
@@ -207,6 +206,30 @@ export default function AIChatScreen({
     active: rendered,
     bottomInset: insets.bottom,
     onChange: scrollToEndSoon,
+  });
+
+  // ── Composer odak animasyonu ────────────────────────────────────────────────
+  // Arkadaş sohbetiyle (screens/chat/ChatScreen.js) aynı davranış: odakta
+  // kenarlık vurgu rengine geçer.
+  // Renk animasyonu native driver ile yapılamaz.
+  const inputBorderAnim = useRef(new Animated.Value(0)).current;
+  const handleInputFocus = useCallback(() => {
+    Animated.timing(inputBorderAnim, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [inputBorderAnim]);
+  const handleInputBlur = useCallback(() => {
+    Animated.timing(inputBorderAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [inputBorderAnim]);
+  const inputBorderColor = inputBorderAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [theme.border, theme.accent],
   });
 
   // Kayıtlı sohbetleri yükle (bir kez)
@@ -737,16 +760,22 @@ export default function AIChatScreen({
                 {loading && <TypingBubble theme={theme} label={t?.AICineChat?.typing || "Düşünüyor…"} />}
               </ScrollView>
 
-              {/* Giriş çubuğu */}
+              {/* Giriş çubuğu — arkadaş sohbetindeki hap ile aynı yapı:
+                  [rozet][input][gönder] tek parça, odakta kenarlık vurguya döner.
+                  Sarmalayıcı saydam ve ayırıcı çizgisiz: ekranda yalnız hap görünür. */}
               <Reanimated.View
-                style={[
-                  styles.inputWrap,
-                  { backgroundColor: theme.primary, borderTopColor: theme.border },
-                  composerKeyboardStyle,
-                ]}
+                style={[styles.inputWrap, composerKeyboardStyle]}
               >
-                <View style={[styles.inputBar, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-                  <Ionicons name="sparkles" size={16} color={theme.bold} style={{ marginLeft: 2 }} />
+                <Animated.View
+                  style={[
+                    styles.composerPill,
+                    { backgroundColor: theme.secondary, borderColor: inputBorderColor },
+                  ]}
+                >
+                  <View style={[styles.composerBadge, { backgroundColor: alpha(theme.accent, 0.16) }]}>
+                    <Ionicons name="sparkles" size={19} color={theme.bold} />
+                  </View>
+
                   <TextInput
                     style={[styles.input, { color: theme.text.primary }]}
                     placeholder={t?.AICineChat?.placeholder || "öner iste, karşılaştır, planla, listele…"}
@@ -755,38 +784,38 @@ export default function AIChatScreen({
                     onChangeText={setMessage}
                     maxLength={1000}
                     multiline
+                    numberOfLines={6}
+                    selectionColor={theme.accent}
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
                     onSubmitEditing={() => handleSend()}
                   />
+
                   {message.length > 0 && !loading && (
                     <TouchableOpacity onPress={() => setMessage("")} hitSlop={8} style={styles.clearBtn}>
                       <Ionicons name="close-circle" size={18} color={theme.text.muted} />
                     </TouchableOpacity>
                   )}
-                </View>
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => handleSend()}
-                  disabled={loading || !message.trim()}
-                >
-                  {message.trim() && !loading ? (
-                    <LinearGradient
-                      colors={[theme.accent, theme.bold]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.sendBtn}
-                    >
-                      <Ionicons name="arrow-up" size={22} color="#fff" />
-                    </LinearGradient>
-                  ) : (
-                    <View style={[styles.sendBtn, { backgroundColor: theme.between }]}>
-                      {loading ? (
-                        <ActivityIndicator color={theme.bold} size="small" />
-                      ) : (
-                        <Ionicons name="arrow-up" size={22} color={theme.text.muted} />
-                      )}
-                    </View>
-                  )}
-                </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.72}
+                    onPress={() => handleSend()}
+                    disabled={loading || !message.trim()}
+                    style={[
+                      styles.composerSend,
+                      {
+                        backgroundColor: theme.accent,
+                        opacity: message.trim() && !loading ? 1 : 0.32,
+                      },
+                    ]}
+                  >
+                    {loading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Ionicons name="arrow-up" size={20} color="#fff" />
+                    )}
+                  </TouchableOpacity>
+                </Animated.View>
               </Reanimated.View>
             </Reanimated.View>
           )}
@@ -837,36 +866,56 @@ const styles = StyleSheet.create({
   convRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: 14, borderWidth: 1 },
   convIcon: { width: 36, height: 36, borderRadius: 18, justifyContent: "center", alignItems: "center" },
 
+  // Composer ölçüleri arkadaş sohbetindekiyle (screens/chat/ChatScreen.js)
+  // birebir aynı; oradaki hap sabit koyu renkler, buradaki tema renkleri
+  // kullanıyor. Sarmalayıcı yalnız boşluk veriyor — arka plan ve üst ayırıcı
+  // çizgi yok, gölge de yalnız hapta.
   inputWrap: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === "ios" ? 8 : 12,
+  },
+  composerPill: {
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingTop: 8,
-    paddingBottom: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1.5,
+    borderRadius: 28,
+    padding: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 14,
+    elevation: 10,
   },
-  inputBar: {
-    flex: 1,
-    flexDirection: "row",
+  composerBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: "center",
     alignItems: "center",
-    gap: 6,
-    minHeight: 44,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 24,
-    borderWidth: StyleSheet.hairlineWidth,
   },
+  composerSend: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  // Tek satırlık yükseklik rozet/gönder ile aynı (42) olmalı: hap flex-end
+  // hizaladığı için kısa kalan input metni ikon merkezlerinden aşağı kayıyordu.
+  // Android'de çok satırlı input metni tepeye yapışır, ortalamayı açıkça
+  // istiyoruz; iOS textAlignVertical desteklemiyor, simetrik padding yetiyor.
   input: {
     flex: 1,
-    maxHeight: 120,
+    minHeight: 42,
+    paddingHorizontal: 12,
+    paddingTop: Platform.OS === "ios" ? 11 : 8,
+    paddingBottom: Platform.OS === "ios" ? 11 : 8,
     fontSize: 15,
-    lineHeight: 20,
-    paddingVertical: Platform.OS === "ios" ? 6 : 2,
-    paddingTop: Platform.OS === "ios" ? 6 : 2,
+    maxHeight: 130,
+    ...(Platform.OS === "android" ? { textAlignVertical: "center" } : null),
   },
-  clearBtn: { padding: 2 },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, justifyContent: "center", alignItems: "center" },
+  clearBtn: { height: 42, justifyContent: "center", paddingHorizontal: 4 },
 
   // Liste ayarları paneli
   settings: {

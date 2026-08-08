@@ -3159,14 +3159,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  // Tek satırlık yükseklik FAB/gönder ile aynı (42) olmalı: hap flex-end
+  // hizaladığı için kısa kalan input metni ikon merkezlerinden aşağı kayıyordu.
+  // Android'de çok satırlı input metni tepeye yapışır, ortalamayı açıkça
+  // istiyoruz; iOS textAlignVertical desteklemiyor, simetrik padding yetiyor.
   input: {
     flex: 1,
+    minHeight: 42,
     paddingHorizontal: 12,
     paddingTop: Platform.OS === "ios" ? 11 : 8,
     paddingBottom: Platform.OS === "ios" ? 11 : 8,
     fontSize: 15,
     maxHeight: 130,
     color: "#fff",
+    ...(Platform.OS === "android" ? { textAlignVertical: "center" } : null),
   },
   linkHint: {
     height: 42,
