@@ -30,7 +30,10 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { useUserProfile } from "../context/UserProfileContext";
+import { useFriends } from "../context/FriendsContext";
 import { getUserProfile } from "../services/userService";
+import { reportComment } from "../services/reportService";
+import ReportReasonSheet from "./moderation/ReportReasonSheet";
 import { clampAvatarIndex, getAvatarSource } from "../utils/avatars";
 import { alpha } from "../theme/colors";
 import AdaptiveBlurView from "./common/AdaptiveBlurView";
@@ -192,6 +195,10 @@ const CommentItem = memo(
     scopeEnabled = false,
     showSourceBadge = true,
     onScopePress,
+    // Başkasının yorumundaki moderasyon eylemleri (mağaza şartı: her UGC
+    // yüzeyinde şikâyet + engelleme erişilebilir olmalı).
+    onReport,
+    onBlock,
   }) => {
     const styles = getStyles(theme);
     const [showSpoiler, setShowSpoiler] = useState(false);
@@ -259,6 +266,28 @@ const CommentItem = memo(
               isReply
                 ? handleDeleteReply(item.parentId, item.id)
                 : handleDeleteComment(item.id),
+          },
+          { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
+        ],
+      );
+    };
+
+    // Başkasının yorumu: şikâyet + engelle. Apple 1.2 / Play UGC şartı —
+    // kullanıcı üretimi her içerikte şikâyet yolu ve kullanıcıyı engelleme
+    // erişilebilir olmalı; menü eskiden yalnız kendi yorumunda açılıyordu.
+    const openOtherMenu = () => {
+      appAlert(
+        i18nText("autoI18n.yorum_secenekleri", "Yorum seçenekleri"),
+        undefined,
+        [
+          {
+            text: i18nText("autoI18n.sikayet_et", "Şikayet et"),
+            onPress: () => onReport?.(item, isReply),
+          },
+          {
+            text: i18nText("autoI18n.kullaniciyi_engelle", "Kullanıcıyı engelle"),
+            style: "destructive",
+            onPress: () => onBlock?.(item),
           },
           { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
         ],
@@ -357,9 +386,12 @@ const CommentItem = memo(
               </Text>
             </View>
 
-            {isOwn && (
+            {/* Menü artık HER yorumda: kendi yorumunda düzenle/sil,
+                başkasınınkinde şikâyet/engelle. Oturumsuz kullanıcıda ikisi de
+                anlamsız, o yüzden hiç çizilmiyor. */}
+            {!!currentUser?.uid && (
               <TouchableOpacity
-                onPress={openOwnMenu}
+                onPress={isOwn ? openOwnMenu : openOtherMenu}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Feather
@@ -499,12 +531,15 @@ const Comment = ({
   const styles = getStyles(theme);
   const { user: currentUser } = useAuth();
   const { avatarIndex: myAvatarIndex } = useUserProfile();
+  const { isBlocked, block } = useFriends();
   const [comments, setComments] = useState([]);
   const [isSending, setIsSending] = useState(false);
   const [sourceFilter, setSourceFilter] = useState("all");
   const [repliesMap, setRepliesMap] = useState({});
   const [replyVisibility, setReplyVisibility] = useState({});
   const [commentInputState, setCommentInputState] = useState({ ...EMPTY_INPUT });
+  // Şikâyet sayfasının hedefi; null ise sayfa kapalı.
+  const [reportTarget, setReportTarget] = useState(null);
 
   const isTv = collectionName === "TvComment";
   const scopeEnabled = isTv;
@@ -626,12 +661,21 @@ const Comment = ({
   // TMDB incelemeleri dizinin GENELİNE aittir; sezon/bölüm süzgecinde gösterilmez.
   const tmdbVisible = !scopeEnabled || filterAllowsShowLevelSources(scopeFilter);
 
+  // ENGEL SÜZGECİ — kapsam süzgecinden ÖNCE: engellenen kullanıcının yorumu
+  // hiçbir görünümde, hiçbir sayaçta yer almasın. Sunucu tarafı kural şart
+  // değil (mağaza şartı "kullanıcı görmesin"), ama süzme tek yerde olmalı
+  // yoksa bir görünümde sızar.
+  const unblockedComments = useMemo(
+    () => comments.filter((comment) => !isBlocked(comment.userId)),
+    [comments, isBlocked],
+  );
+
   const scopedComments = useMemo(
     () =>
       scopeEnabled && !isAllFilter(scopeFilter)
-        ? comments.filter((comment) => scopeMatchesFilter(comment, scopeFilter))
-        : comments,
-    [scopeEnabled, comments, scopeFilter],
+        ? unblockedComments.filter((comment) => scopeMatchesFilter(comment, scopeFilter))
+        : unblockedComments,
+    [scopeEnabled, unblockedComments, scopeFilter],
   );
 
   const visibleTmdbReviews = tmdbVisible ? normalizedTmdbReviews : [];
@@ -732,6 +776,83 @@ const Comment = ({
     });
     return () => unsub();
   }, [contextId, collectionName]);
+
+  // ── Moderasyon: şikâyet + engelle ────────────────────────
+  // Yanıt ile üst yorum farklı yollarda duruyor; moderatör kaydı yalnız tam
+  // yolla bulabildiği için hangi olduğunu burada ayırıyoruz.
+  const openReport = useCallback(
+    (item, isReply) => {
+      if (!currentUser?.uid) {
+        Toast.show({
+          type: "error",
+          text1: i18nText("autoI18n.sikayet_icin_giris_yap", "Şikayet için giriş yap"),
+        });
+        return;
+      }
+      const cid = contextId.toString();
+      const targetPath = isReply
+        ? `${collectionName}/${cid}/comments/${item.parentId}/replies/${item.id}`
+        : `${collectionName}/${cid}/comments/${item.id}`;
+      setReportTarget({
+        targetPath,
+        targetUserId: item.userId,
+        text: item.text,
+        username: item.username,
+      });
+    },
+    [collectionName, contextId, currentUser?.uid],
+  );
+
+  const submitReport = useCallback(
+    async (reason) => {
+      const target = reportTarget;
+      // Sayfayı ÖNCE kapat: ağ yavaşsa kullanıcı şikâyet ettiği metne bakmaya
+      // devam etmesin.
+      setReportTarget(null);
+      if (!target || !currentUser?.uid) return;
+      try {
+        await reportComment({
+          targetPath: target.targetPath,
+          targetUserId: target.targetUserId,
+          reporterId: currentUser.uid,
+          text: target.text,
+          reason,
+        });
+        Toast.show({
+          type: "success",
+          text1: i18nText("autoI18n.sikayetin_alindi", "Şikayetin alındı"),
+        });
+      } catch {
+        Toast.show({
+          type: "error",
+          text1: i18nText("autoI18n.sikayet_gonderilemedi", "Şikayet gönderilemedi"),
+        });
+      }
+    },
+    [reportTarget, currentUser?.uid],
+  );
+
+  const confirmBlock = useCallback(
+    (item) => {
+      if (!currentUser?.uid || !item?.userId) return;
+      appAlert(
+        i18nText("autoI18n.kullaniciyi_engelle", "Kullanıcıyı engelle"),
+        i18nText(
+          "autoI18n.engelle_onay_metni",
+          "Gönderilerini, yorumlarını ve mesajlarını görmezsin. Arkadaşsanız arkadaşlık da kalkar.",
+        ),
+        [
+          { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
+          {
+            text: i18nText("autoI18n.engelle", "Engelle"),
+            style: "destructive",
+            onPress: () => block(item.userId),
+          },
+        ],
+      );
+    },
+    [block, currentUser?.uid],
+  );
 
   // ── Cleanup all reply subscriptions on unmount ───────────
   useEffect(() => {
@@ -1061,9 +1182,15 @@ const Comment = ({
               setCommentInputState={setCommentInputState}
               handleDeleteComment={(id) => handleDelete(id)}
               handleDeleteReply={(pid, id) => handleDelete(id, pid)}
+              onReport={openReport}
+              onBlock={confirmBlock}
             />
             {replyVisibility[item.id] &&
-              repliesMap[item.id]?.map((rep, repIndex, repArr) => (
+              // Yanıtlar ayrı bir listener'dan geliyor; engel süzgeci burada da
+              // uygulanmalı, yoksa engellenen kullanıcı yanıt olarak görünür.
+              repliesMap[item.id]
+                ?.filter((rep) => !isBlocked(rep.userId))
+                .map((rep, repIndex, repArr) => (
                 <CommentItem
                   key={rep.id}
                   item={rep}
@@ -1092,8 +1219,10 @@ const Comment = ({
                       }).catch(() => {});
                     }
                   }}
+                  onReport={openReport}
+                  onBlock={confirmBlock}
                 />
-              ))}
+                ))}
           </View>
           )
         }
@@ -1241,6 +1370,21 @@ const Comment = ({
           onSelect={handleScopeSheetSelect}
         />
       )}
+
+      <ReportReasonSheet
+        visible={!!reportTarget}
+        onClose={() => setReportTarget(null)}
+        onSelect={submitReport}
+        subtitle={
+          reportTarget?.username
+            ? i18nText(
+                "autoI18n.sikayet_hedefi_yorum",
+                "{{name}} kişisinin yorumu bildiriliyor.",
+                { name: reportTarget.username },
+              )
+            : undefined
+        }
+      />
     </KeyboardAvoidingView>
   );
 };
