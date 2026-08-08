@@ -72,3 +72,9 @@ assets/oldicon/
 assets/oldicon1/
 
 .env.local
+
+# Firebase emulator gunlukleri (npm run test:rules her kosuda uretir)
+firestore-debug.log
+firebase-debug.log
+database-debug.log
+ui-debug.log
