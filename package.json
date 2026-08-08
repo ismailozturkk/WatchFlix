@@ -8,7 +8,8 @@
     "ios": "npx expo start --ios",
     "web": "npx expo start --web",
     "test": "jest",
-    "licenses": "node scripts/generate-oss-licenses.js"
+    "licenses": "node scripts/generate-oss-licenses.js",
+    "test:rules": "firebase emulators:exec --only firestore \"jest -c jest.rules.config.js\""
   },
   "dependencies": {
     "@expo-google-fonts/alegreya": "^0.4.2",
@@ -153,6 +154,7 @@
     "@babel/core": "^7.25.2",
     "@babel/plugin-transform-private-methods": "^7.25.9",
     "@bacons/apple-targets": "^5.0.0",
+    "@firebase/rules-unit-testing": "^5.0.1",
     "babel-jest": "^29.7.0",
     "babel-plugin-module-resolver": "^5.0.3",
     "babel-plugin-transform-remove-console": "^6.9.4",

@@ -7,7 +7,13 @@ module.exports = {
   testEnvironment: "node",
   testMatch: ["**/__tests__/**/*.test.js"],
   // __tests__/helpers/* test degil, yardimci modul.
-  testPathIgnorePatterns: ["/node_modules/", "/__tests__/helpers/"],
+  // __tests__/rules/* calisan bir Firestore emulatoru ister; `npm test`
+  // emulatorsuz kosabilmeli (bkz. jest.rules.config.js + `npm run test:rules`).
+  testPathIgnorePatterns: [
+    "/node_modules/",
+    "/__tests__/helpers/",
+    "/__tests__/rules/",
+  ],
   transform: {
     "^.+\\.[jt]sx?$": "babel-jest",
   },
