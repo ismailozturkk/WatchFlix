@@ -63,7 +63,7 @@ import RatingSummary from "@components/RatingSummary";
 import { i18nText } from "../../utils/i18nText";
 import { useWatchedShow } from "../../hooks/useWatchedShow";
 import { markShow, removeTvWatchEvent } from "../../services/watchedTvService";
-import AIChatScreen from "../AIChatScreen";
+import AIChatScreen from "@screens/chat/AIChatScreen";
 import {
   getWatchState,
   isAired,

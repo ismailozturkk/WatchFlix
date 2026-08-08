@@ -55,7 +55,7 @@ import { i18nText } from "../../utils/i18nText";
 import { daysUntil, parseAirDate } from "../../utils/airDate";
 import { getCachedValue, setCachedValue, TTL } from "../../utils/apiCache";
 import { getReleaseState, RELEASE_STATE } from "../../utils/watchState";
-import AIChatScreen from "../AIChatScreen";
+import AIChatScreen from "@screens/chat/AIChatScreen";
 
 
 const { width, height } = Dimensions.get("window");

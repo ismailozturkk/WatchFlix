@@ -1,8 +1,14 @@
-// screens/AIChatScreen.js
+// screens/chat/AIChatScreen.js
 //
 // CineMatch Pro — yapılandırılmış (JSON) AI cevap + zengin kart sohbeti.
 // FAB'dan büyüyerek açılan / FAB'a doğru küçülerek kapanan animasyonlu MODAL.
-// ChatModal tarafından { visible, onClose } ile kontrol edilir (ayrı route değil).
+// Ayrı bir route değil; `visible` prop'uyla kontrol edilir.
+//
+// TEK KOPYA: bu ekranın bir zamanlar screens/AIChatScreen.js'te ikinci bir
+// kopyası vardı (film/dizi detayındaki "AI'ya sor" akışı onu kullanıyordu).
+// İkisi ayrışmıştı — kota göstergesi ve i18n yalnız burada, initialPrompt
+// akışı yalnız orada. Kopya silindi, akış buraya taşındı; giriş noktaları
+// için bileşenin başındaki nota bak.
 
 import React, {
   useCallback,
@@ -127,7 +133,24 @@ const ConversationRow = ({ conv, theme, t, isActive, onOpen, onDelete }) => (
   </TouchableOpacity>
 );
 
-export default function AIChatScreen({ visible, onClose, fabOrigin }) {
+/**
+ * İKİ GİRİŞ NOKTASI, TEK BİLEŞEN:
+ *   1. FAB / pet akışı — components/modals/ChatModal.js: boş sohbet açar.
+ *   2. "Bu yapım hakkında sor" — film/dizi detayı: `initialPrompt` ile açılır,
+ *      panel görünür görünmez ilk mesaj kendiliğinden gönderilir.
+ * (Detay ekranları için ayrı bir kopya vardı; kota göstergesi ve i18n yalnız
+ *  buradaki sürümde olduğu için o kopya silinip akış buraya taşındı.)
+ */
+export default function AIChatScreen({
+  visible,
+  onClose,
+  fabOrigin,
+  initialPrompt,
+  // Baloncukta gösterilecek kısa metin (AI'a yine initialPrompt gider)
+  initialDisplay,
+  // Baloncuğa iliştirilecek yapım kartı: { mediaType, id, title, year, posterPath, rating }
+  initialAttachment,
+}) {
   const navigation = useNavigation();
   const { t, language } = useLanguage();
   const { theme } = useTheme();
@@ -155,6 +178,12 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
   const [messages, setMessages] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [conversations, setConversations] = useState([]);
+  // Aynı initialPrompt ile ikinci kez sohbet açılmasın (panel yeniden render
+  // olduğunda efekt tekrar çalışır); panel kapanınca sıfırlanır.
+  const initialPromptRef = useRef(null);
+  // display/attachment referansları her render'da değişebildiği için efekt
+  // bağımlılığı yapılmaz; en güncel değerler bu ref üzerinden okunur.
+  const initialMetaRef = useRef({ display: "", attachment: null });
 
   const quotaPlan = AI_PLAN_LIMITS[premiumPlan] ? premiumPlan : "free";
   const quotaText = useMemo(() => {
@@ -203,6 +232,9 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
     }).start(({ finished }) => {
       if (finished) {
         setRendered(false);
+        // Aynı yapım için "AI'ya sor" ikinci kez basıldığında prop değeri
+        // değişmemiş olabilir; kilidi burada açmazsak sohbet hiç başlamaz.
+        initialPromptRef.current = null;
         onClose?.();
       }
     });
@@ -317,7 +349,11 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
     const firstUser = msgs.find((m) => m.role === "user");
     const conv = {
       id,
-      title: summarizeTitle(firstUser?.display || firstUser?.text || "…"),
+      // Detaydan açılan sohbette ilk mesajın metni uzun bir yönerge olabiliyor;
+      // iliştirilmiş yapımın adı geçmiş listesinde çok daha okunur bir başlık.
+      title: summarizeTitle(
+        firstUser?.attachment?.title || firstUser?.display || firstUser?.text || "…",
+      ),
       messages: msgs,
       createdAt: now,
       updatedAt: now,
@@ -436,6 +472,45 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
     },
     [loading, message, activeId, messages, runAssistant],
   );
+
+  // ── Hazır bir soruyla YENİ sohbet başlat ──
+  // handleSend'den farkı: mevcut sohbetin üstüne eklemez, HER ZAMAN yeni bir
+  // konuşma açar (detay ekranından gelen soru geçmiş bir sohbetin devamı gibi
+  // görünmesin) ve baloncukta ham yönerge yerine kısa `display` metnini gösterir.
+  const startPromptChat = useCallback(
+    (promptText, options) => {
+      if (loading) return;
+      const text = String(promptText || "").trim();
+      if (!text) return;
+      const convId = makeId();
+      const display = String(options?.display || "").trim() || text;
+      const userMsg = { id: makeId(), role: "user", text, display };
+      if (options?.attachment?.title) userMsg.attachment = options.attachment;
+      const msgs = [userMsg];
+      setView("chat");
+      setActiveId(convId);
+      setMessages(msgs);
+      setMessage("");
+      Keyboard.dismiss();
+      runAssistant(msgs, convId, text);
+    },
+    [loading, runAssistant],
+  );
+
+  useEffect(() => {
+    initialMetaRef.current = { display: initialDisplay, attachment: initialAttachment };
+  }, [initialDisplay, initialAttachment]);
+
+  useEffect(() => {
+    if (!visible || !initialPrompt) return;
+    const key = String(initialPrompt);
+    if (initialPromptRef.current === key) return;
+    initialPromptRef.current = key;
+    // Kısa gecikme: açılış animasyonu başlasın, ilk balon boş panele değil
+    // görünen panele düşsün.
+    const timer = setTimeout(() => startPromptChat(key, initialMetaRef.current), 120);
+    return () => clearTimeout(timer);
+  }, [visible, initialPrompt, startPromptChat]);
 
   const handleRetry = useCallback(
     (userText) => {
