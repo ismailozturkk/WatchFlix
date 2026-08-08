@@ -75,7 +75,28 @@
 
 **Kabul:** tek dosya kaldı; iki giriş noktası da çalışıyor; kota göstergesi her iki akışta görünür; EN'de Türkçe metin kalmadı; testler yeşil.
 
-### [ ] GÖREV B2 — Firestore kural düzeltmeleri (4 açık + birthDate kilidi) (~2-3 saat)
+### [~] GÖREV B2 — Firestore kural düzeltmeleri (4 açık + birthDate kilidi) (kod 2026-08-08, deploy bekliyor)
+
+> **Sonuç:** dört açık da kapandı — `226db20` (kurallar + istemci), `ee1980b` (28 emülatör testi).
+> `npm run test:rules` ile koşuyor (Firestore emülatörü + **JDK 21+** ister; JAVA_HOME 17'yi
+> gösteriyorsa firebase-tools 15 başlamaz). `npm test` tabanı değişmedi: 59/908.
+>
+> **Plandan iki sapma:**
+> 1. **DM `delete` gönderene bağlanmadı, üye bazında kaldı.** Planın 3. adımı update+delete'i
+>    `senderId`e bağlıyordu; hesap silme purge'u (`services/accountService.js`) sohbeti
+>    boşaltırken karşı tarafın mesajlarını da siliyor — bağlansaydı silinen hesabın sohbetleri
+>    asla temizlenemez, kişisel veri artığı kalırdı. Gerekçe kurala yazıldı; D7 (sunucu
+>    süpürücüsü) gelince gönderen şartına inecek.
+> 2. **DM `update` "yalnız gönderen" olamazdı.** Üç meşru güncellemenin ikisi karşı tarafın
+>    dokümanına dokunuyor (alıcı "seen" makbuzu yazıyor, anket oyu karşı tarafın mesajına
+>    gidiyor). Alan bazlı ayrım yapıldı — planın naif hâli DM'leri kırardı.
+>
+> **Ratings** planın önerdiği "±1 / 0-10 aralığı" yerine daha sıkı kuruldu: yazım kullanıcının
+> kendi oy dokümanının aynı commit'teki değişimiyle `getAfter` üzerinden birebir doğrulanıyor.
+> Karşılığı: agregatı bozuk kalmış bir doküman olursa o içerik puanlanamaz (konsoldan onarılır).
+>
+> **Bekleyen:** `firebase deploy --only firestore:rules` — B3'ün functions deploy'undan SONRA,
+> tek seferde (B3 adım 4'teki sıra).
 
 **Bağlam:** Kurallar genelde sağlam (varsayılan-red, sayaç ±1 kısıtları, chat üyeliği düzeltilmiş) ama dört yazma açığı var. Hepsi `firestore.rules` içinde; mevcut yardımcılar `counterOk()` (~satır 18) ve `isChatMember()` (~satır 25) desen olarak kullanılabilir.
 
