@@ -269,7 +269,7 @@ export default function CommentScopeSheet({
   });
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View style={[StyleSheet.absoluteFill, styles.overlay]} pointerEvents="box-none">
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
@@ -495,6 +495,10 @@ export default function CommentScopeSheet({
 }
 
 const styles = StyleSheet.create({
+  // Bu sheet ayrı bir Modal değil; yorum ekranının İÇİNDE, girdi alanına kardeş
+  // olarak açılıyor. Katmanı burada sabitliyoruz ki kardeşlerin (ör. yüzen girdi
+  // hapı) katman değerleri onu altta bırakamasın.
+  overlay: { zIndex: 100 },
   backdrop: { backgroundColor: "rgba(0,0,0,0.55)" },
   panel: {
     position: "absolute",

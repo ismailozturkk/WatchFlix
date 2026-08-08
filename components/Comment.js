@@ -1156,7 +1156,15 @@ const Comment = ({
           </TouchableOpacity>
         )}
 
-        <View style={styles.inputRow}>
+        {/* Girdi hapı — AI sohbetindeki (screens/chat/AIChatScreen.js) composer
+            ile aynı yapı: [input][spoiler][gönder] tek parça, üçü de 42px.
+            Sarmalayıcı saydam ve ayırıcı çizgisiz; ekranda yalnız hap görünür. */}
+        <View
+          style={[
+            styles.composerPill,
+            commentInputState.isSpoiler && styles.composerPillSpoiler,
+          ]}
+        >
           {commentInputState.isSpoiler && (
             <Text
               allowFontScaling={false}
@@ -1169,10 +1177,7 @@ const Comment = ({
             </Text>
           )}
           <TextInput
-            style={[
-              styles.input,
-              commentInputState.isSpoiler && styles.spoilerCoverInput,
-            ]}
+            style={styles.input}
             placeholder={i18nText("autoI18n.yorum_yap", "Yorum yap...")}
             placeholderTextColor="rgba(255,255,255,0.3)"
             value={commentInputState.text}
@@ -1183,27 +1188,24 @@ const Comment = ({
             multiline
           />
 
-          <View style={styles.inputFooter}>
-            <TouchableOpacity
-              onPress={() =>
-                setCommentInputState((p) => ({ ...p, isSpoiler: !p.isSpoiler }))
+          <TouchableOpacity
+            onPress={() =>
+              setCommentInputState((p) => ({ ...p, isSpoiler: !p.isSpoiler }))
+            }
+            style={[
+              styles.spoilerButton,
+              commentInputState.isSpoiler && styles.spoilerActive,
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="alert-decagram"
+              size={18}
+              color={
+                commentInputState.isSpoiler ? theme.colors.red : theme.text.muted
               }
-              style={[
-                styles.spoilerButton,
-                commentInputState.isSpoiler && styles.spoilerActive,
-              ]}
-            >
-              <MaterialCommunityIcons
-                name="alert-decagram"
-                size={16}
-                color={
-                  commentInputState.isSpoiler
-                    ? theme.colors.red
-                    : theme.text.muted
-                }
-              />
-            </TouchableOpacity>
-          </View>
+            />
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[
               styles.sendButton,
@@ -1245,8 +1247,13 @@ const Comment = ({
 
 const getStyles = (theme) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.primary },
-    commentList: { flex: 1 },
+    // flex:1 DEĞİL: bu bileşen, yüksekliğini içerikten alan bir sheet'in
+    // içinde yaşıyor (components/modals/CommentSheetModal.js). flex-basis 0
+    // orada alanı sıfıra çökertirdi. flexBasis "auto" kalıyor: içerik kadar
+    // yer kaplıyor, sheet üst sınıra dayanınca kısalıp içeride kaydırılıyor
+    // (shrink), alt sınır bağladığında boşluğu dolduruyor (grow).
+    container: { flexGrow: 1, flexShrink: 1, backgroundColor: theme.primary },
+    commentList: { flexGrow: 1, flexShrink: 1 },
     // gap: üst seviye öğeler (yorum blokları / TMDB incelemeleri) arası boşluk;
     // araya feedSeparator çizgisi girer (gap ayraç öncesi/sonrasına da uygulanır).
     listContent: { padding: 15, paddingBottom: 160, flexGrow: 1, gap: 10 },
@@ -1511,58 +1518,70 @@ const getStyles = (theme) =>
     },
     repliesToggleText: { color: theme.text.muted, fontSize: 12, fontWeight: "700" },
 
+    // Girdi alanı AI sohbetindeki (screens/chat/AIChatScreen.js) composer ile
+    // aynı: sarmalayıcı yalnız boşluk veriyor — arka plan ve üst ayırıcı çizgi
+    // yok, gölge yalnız hapta. Liste kaydırılırken yorumlar hapın çevresindeki
+    // boşluktan görünür; hedeflenen "yüzen hap" görünümü bu.
     inputWrapper: {
       position: "absolute",
       bottom: 0,
       left: 0,
       right: 0,
-      padding: 15,
-      borderTopWidth: 1,
-      borderColor: theme.border,
-      backgroundColor: theme.primary,
+      paddingHorizontal: 12,
+      paddingTop: 10,
+      paddingBottom: Platform.OS === "ios" ? 8 : 12,
+      // zIndex VERME: sezon/bölüm seçici (components/comments/CommentScopeSheet.js)
+      // bu ekranın içinde, kardeş olarak açılıyor. Buraya zIndex konursa seçici
+      // girdi alanının altında kalıyor. Sarmalayıcı listeden sonra render
+      // edildiği için zaten listenin üstünde.
     },
-    inputRow: {
+    composerPill: {
       flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      justifyContent: "space-between",
+      alignItems: "flex-end",
+      borderWidth: 1.5,
+      borderRadius: 28,
+      borderColor: theme.border,
+      backgroundColor: theme.secondary,
+      padding: 5,
+      shadowColor: "#000",
+      shadowOpacity: 0.35,
+      shadowOffset: { width: 0, height: 6 },
+      shadowRadius: 14,
+      elevation: 10,
     },
+    // Spoiler uyarısı hapın kenarlığında: input'a kenarlık eklemek yüksekliğini
+    // 2px büyütüp yanındaki 42px düğmelerle hizasını bozuyordu.
+    composerPillSpoiler: { borderColor: theme.notesColor.redBackground },
+    // Tek satırlık yükseklik spoiler/gönder ile aynı (42): hap flex-end
+    // hizaladığı için kısa kalan input metni ikon merkezlerinden aşağı kayıyordu.
     input: {
       flex: 1,
-      minHeight: 45,
-      maxHeight: 100,
-      backgroundColor: theme.secondary,
-      borderRadius: 22,
-      paddingHorizontal: 16,
-      paddingTop: 12,
-      paddingBottom: 12,
+      minHeight: 42,
+      maxHeight: 130,
+      paddingHorizontal: 12,
+      paddingTop: Platform.OS === "ios" ? 11 : 8,
+      paddingBottom: Platform.OS === "ios" ? 11 : 8,
+      fontSize: 15,
       color: theme.text.primary,
-    },
-    spoilerCoverInput: {
-      borderWidth: 1,
-      borderColor: theme.notesColor.redBackground,
-      overflow: "hidden",
+      ...(Platform.OS === "android" ? { textAlignVertical: "center" } : null),
     },
 
     sendButton: {
-      width: 45,
-      height: 45,
-      borderRadius: 22.5,
+      width: 42,
+      height: 42,
+      borderRadius: 21,
       backgroundColor: theme.accent,
       justifyContent: "center",
       alignItems: "center",
     },
     disabledBtn: { backgroundColor: theme.secondaryt, opacity: 0.5 },
 
-    inputFooter: { flexDirection: "row", justifyContent: "flex-start" },
     spoilerButton: {
-      flexDirection: "row",
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      justifyContent: "center",
       alignItems: "center",
-      gap: 6,
-      paddingVertical: 12,
-      paddingHorizontal: 12,
-      borderRadius: 24,
-      backgroundColor: theme.secondary,
     },
     spoilerActive: { backgroundColor: alpha(theme.colors.red, 0.1) },
     spoilerBtnText: {
@@ -1616,12 +1635,14 @@ const getStyles = (theme) =>
       fontWeight: "700",
     },
 
+    // Boş durum da yüksekliğini kendi içeriğinden alıyor; flex:1 olsaydı
+    // listenin yüksekliği ölçülemez, sheet çökerdi. Alttaki girdi kutusu için
+    // gereken boşluk zaten listContent.paddingBottom'dan geliyor.
     emptyState: {
-      flex: 1,
       alignItems: "center",
       justifyContent: "center",
       paddingHorizontal: 32,
-      paddingBottom: 80,
+      paddingVertical: 26,
     },
     emptyStateTitle: {
       color: theme.text.primary,

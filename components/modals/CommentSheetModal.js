@@ -55,6 +55,15 @@ import { i18nText } from "@utils/i18nText";
 
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get("window");
 
+// Sheet içeriğe göre boyutlanır; bu iki sınır dengeyi kurar. Üst sınır dolu
+// listede ekranın tamamını kaplamasını engeller. Alt sınırın boş listede
+// gerekenden yüksek durmasının bir nedeni daha var: dizi kapsamındaki
+// sezon/bölüm seçici (components/comments/CommentScopeSheet.js) bu sheet'in
+// İÇİNDE açılıyor ve overflow:hidden ile kırpılıyor — sheet kısalırsa seçici
+// de kısalır.
+const SHEET_MAX_H = SCREEN_H * 0.82;
+const SHEET_MIN_H = SCREEN_H * 0.5;
+
 // ── Renk sabitleri ───────────────────────────────────────
 const ACCENT = "#6C63FF";
 const SHEET_BG = "#0E0E1C";
@@ -78,9 +87,13 @@ export default function CommentSheetModal({
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const { theme } = useTheme();
 
-  // Sheet slide-up animasyonu
-  const SHEET_H = SCREEN_H * 0.82;
-  const slideAnim = useRef(new Animated.Value(SHEET_H)).current;
+  // Sheet slide-up animasyonu.
+  // Yükseklik artık sabit değil, içerikten geliyor (bkz. styles.sheet:
+  // minHeight/maxHeight). Bu yüzden kapanışta ne kadar aşağı kaydırılacağı
+  // ölçümden okunuyor; ilk açılışta ölçüm yokken üst sınır kullanılıyor
+  // (sheet'i ekranın altında tutar, tek etkisi biraz uzun yol).
+  const slideAnim = useRef(new Animated.Value(SHEET_MAX_H)).current;
+  const sheetHRef = useRef(SHEET_MAX_H);
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -102,7 +115,7 @@ export default function CommentSheetModal({
     } else {
       Animated.parallel([
         Animated.timing(slideAnim, {
-          toValue: SHEET_H,
+          toValue: sheetHRef.current,
           duration: 260,
           useNativeDriver: true,
         }),
@@ -118,7 +131,7 @@ export default function CommentSheetModal({
   const handleClose = useCallback(() => {
     Animated.parallel([
       Animated.timing(slideAnim, {
-        toValue: SHEET_H,
+        toValue: sheetHRef.current,
         duration: 260,
         useNativeDriver: true,
       }),
@@ -136,7 +149,10 @@ export default function CommentSheetModal({
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       {/* ── Karartma overlay ── */}
-      <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.backdrop, { opacity: backdropOpacity }]}
+      >
         <ModalBlurBackdrop intensity={28} />
         {/* Alt gradient — sheet'e doğru koyulaşır */}
         <LinearGradient
@@ -154,6 +170,9 @@ export default function CommentSheetModal({
 
       {/* ── Bottom Sheet ── */}
       <Animated.View
+        onLayout={(e) => {
+          sheetHRef.current = e.nativeEvent.layout.height;
+        }}
         style={[
           styles.sheet,
           {
@@ -283,18 +302,17 @@ const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFill,
   },
+  // Sheet yüksekliği değişken olduğu için kapatma alanı tüm ekranı kaplıyor;
+  // sheet SONRA render edildiğinden (ve elevation'ı olduğundan) dokunuşları
+  // kendisi yakalar, buraya yalnız dışındaki boşluk kalır.
   backdropTouchable: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    // Sadece sheet'in üzerindeki boşluğu kapla
-    bottom: SCREEN_H * 0.82,
+    ...StyleSheet.absoluteFillObject,
   },
 
   // ── Sheet ──────────────────────────────────────────────
   sheet: {
-    height: SCREEN_H * 0.82,
+    maxHeight: SHEET_MAX_H,
+    minHeight: SHEET_MIN_H,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     overflow: "hidden",
@@ -432,8 +450,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
 
-  // Comment alanı
+  // Comment alanı — flex:1 DEĞİL: sheet'in yüksekliği içerikten geldiği için
+  // flex-basis 0 alanı sıfıra çökertirdi. Bunun yerine flexBasis "auto"
+  // kalıyor: içerik kadar yer kaplıyor, üst sınıra dayanınca kısalıp içeride
+  // kaydırılıyor (shrink), alt sınır bağladığında da boşluğu doldurup girdi
+  // kutusunu sheet'in dibinde tutuyor (grow).
   commentArea: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
   },
 });

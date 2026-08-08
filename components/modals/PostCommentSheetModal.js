@@ -62,6 +62,13 @@ import {
 
 const { height: SCREEN_H } = Dimensions.get("window");
 
+// Sheet içeriğe göre boyutlanır; bu iki sınır dengeyi kurar. Alt sınır boş ya
+// da tek yorumluk listede sheet'in ince bir şeride dönmesini, üst sınır dolu
+// listede ekranı tamamen kaplamasını engeller. (Aynı oranlar dizi/film yorum
+// sayfasında da kullanılıyor — bkz. CommentSheetModal.js)
+const SHEET_MAX_H = SCREEN_H * 0.82;
+const SHEET_MIN_H = SCREEN_H * 0.5;
+
 const EMPTY_INPUT = {
   text: "",
   parentId: null,
@@ -273,9 +280,13 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
   const [replyVisibility, setReplyVisibility] = useState({});
   const [input, setInput] = useState(EMPTY_INPUT);
 
-  // Sheet animasyonu
-  const SHEET_H = SCREEN_H * 0.82;
-  const slideAnim = useRef(new Animated.Value(SHEET_H)).current;
+  // Sheet animasyonu.
+  // Yükseklik sabit değil, içerikten geliyor (bkz. styles.sheet:
+  // minHeight/maxHeight); kapanışta kaydırılacak mesafe ölçümden okunuyor.
+  // İlk açılışta ölçüm yokken üst sınır kullanılıyor — sheet yine ekranın
+  // altında başlar, tek etkisi yolun biraz uzun olması.
+  const slideAnim = useRef(new Animated.Value(SHEET_MAX_H)).current;
+  const sheetHRef = useRef(SHEET_MAX_H);
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -297,7 +308,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
     } else {
       Animated.parallel([
         Animated.timing(slideAnim, {
-          toValue: SHEET_H,
+          toValue: sheetHRef.current,
           duration: 260,
           useNativeDriver: true,
         }),
@@ -332,7 +343,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
   const handleClose = useCallback(() => {
     Animated.parallel([
       Animated.timing(slideAnim, {
-        toValue: SHEET_H,
+        toValue: sheetHRef.current,
         duration: 260,
         useNativeDriver: true,
       }),
@@ -342,7 +353,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
         useNativeDriver: true,
       }),
     ]).start(() => onClose());
-  }, [onClose, SHEET_H]);
+  }, [onClose]);
 
   // ── Gruplama: üst yorumlar + parentId'ye göre yanıtlar ──
   const topLevel = [];
@@ -488,7 +499,10 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       {/* Karartma */}
-      <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.backdrop, { opacity: backdropOpacity }]}
+      >
         <ModalBlurBackdrop intensity={28} />
         <LinearGradient
           colors={["rgba(0,0,0,0.1)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.82)"]}
@@ -504,6 +518,9 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
 
       {/* Sheet */}
       <Animated.View
+        onLayout={(e) => {
+          sheetHRef.current = e.nativeEvent.layout.height;
+        }}
         style={[
           styles.sheet,
           {
@@ -614,6 +631,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
             </View>
           ) : (
             <FlatList
+              style={styles.list}
               data={topLevelSorted}
               keyExtractor={(c) => c.id}
               renderItem={renderItem}
@@ -643,7 +661,10 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
               </View>
             )}
 
-            <View style={styles.inputRow}>
+            {/* Girdi hapı — AI sohbetindeki (screens/chat/AIChatScreen.js)
+                composer ile aynı yapı: [input][gönder] tek parça, ikisi de 42px.
+                Sarmalayıcı saydam ve ayırıcı çizgisiz; yalnız hap görünür. */}
+            <View style={styles.composerPill}>
               <TextInput
                 style={styles.input}
                 placeholder={i18nText("autoI18n.yorum_yap", "Yorum yap...")}
@@ -677,16 +698,16 @@ const getStyles = (theme) =>
     root: { flex: 1, justifyContent: "flex-end" },
 
     backdrop: { ...StyleSheet.absoluteFill },
+    // Sheet yüksekliği değişken olduğu için kapatma alanı tüm ekranı kaplıyor;
+    // sheet SONRA render edildiğinden (ve elevation'ı olduğundan) kendi
+    // dokunuşlarını kendisi yakalar, buraya yalnız dışındaki boşluk kalır.
     backdropTouchable: {
-      position: "absolute",
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: SCREEN_H * 0.82,
+      ...StyleSheet.absoluteFillObject,
     },
 
     sheet: {
-      height: SCREEN_H * 0.82,
+      maxHeight: SHEET_MAX_H,
+      minHeight: SHEET_MIN_H,
       borderTopLeftRadius: 30,
       borderTopRightRadius: 30,
       overflow: "hidden",
@@ -833,7 +854,12 @@ const getStyles = (theme) =>
       backgroundColor: theme.border,
     },
 
-    commentArea: { flex: 1, backgroundColor: theme.primary },
+    // flex:1 DEĞİL: sheet yüksekliğini içerikten aldığı için flex-basis 0
+    // burayı sıfıra çökertirdi. flexBasis "auto" kalıyor; üst sınıra
+    // dayanınca kısalıp içeride kaydırılıyor (shrink), alt sınır bağlarsa
+    // boşluğu doldurup girdi kutusunu dipte tutuyor (grow).
+    commentArea: { flexGrow: 1, flexShrink: 1, backgroundColor: theme.primary },
+    list: { flexGrow: 1, flexShrink: 1 },
     listContent: { padding: 15, paddingBottom: 140, gap: 10 },
     feedSeparator: {
       height: StyleSheet.hairlineWidth,
@@ -841,12 +867,15 @@ const getStyles = (theme) =>
       backgroundColor: alpha(theme.border, 0.9),
     },
 
+    // Yükleniyor / boş durum kutusu. flex:1 yerine sabit dolgu: sheet bu
+    // kutunun yüksekliğini ölçerek boyutlanıyor. paddingBottom, mutlak
+    // konumlu girdi kutusunun altta kaplayacağı yeri boş bırakıyor.
     center: {
-      flex: 1,
       alignItems: "center",
       justifyContent: "center",
       gap: 10,
-      paddingBottom: 120,
+      paddingTop: 34,
+      paddingBottom: 150,
     },
     emptyText: { color: theme.text.muted, fontSize: 13, fontWeight: "600" },
 
@@ -981,33 +1010,50 @@ const getStyles = (theme) =>
       fontWeight: "700",
     },
 
+    // Girdi alanı AI sohbetindeki (screens/chat/AIChatScreen.js) composer ile
+    // aynı: sarmalayıcı yalnız boşluk veriyor — arka plan ve üst ayırıcı çizgi
+    // yok, gölge yalnız hapta. Liste kaydırılırken yorumlar hapın çevresindeki
+    // boşluktan görünür; hedeflenen "yüzen hap" görünümü bu.
     inputWrapper: {
       position: "absolute",
       bottom: 0,
       left: 0,
       right: 0,
-      padding: 15,
-      paddingBottom: Platform.OS === "ios" ? 28 : 15,
-      borderTopWidth: 1,
-      borderColor: theme.border,
-      backgroundColor: theme.primary,
+      paddingHorizontal: 12,
+      paddingTop: 10,
+      paddingBottom: Platform.OS === "ios" ? 28 : 12,
     },
-    inputRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+    composerPill: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      borderWidth: 1.5,
+      borderRadius: 28,
+      borderColor: theme.border,
+      backgroundColor: theme.secondary,
+      padding: 5,
+      shadowColor: "#000",
+      shadowOpacity: 0.35,
+      shadowOffset: { width: 0, height: 6 },
+      shadowRadius: 14,
+      elevation: 10,
+    },
+    // Tek satırlık yükseklik gönder düğmesiyle aynı (42): hap flex-end
+    // hizaladığı için kısa kalan input metni ikon merkezinden aşağı kayıyordu.
     input: {
       flex: 1,
-      minHeight: 45,
-      maxHeight: 100,
-      backgroundColor: theme.secondary,
-      borderRadius: 22,
-      paddingHorizontal: 16,
-      paddingTop: 12,
-      paddingBottom: 12,
+      minHeight: 42,
+      maxHeight: 130,
+      paddingHorizontal: 12,
+      paddingTop: Platform.OS === "ios" ? 11 : 8,
+      paddingBottom: Platform.OS === "ios" ? 11 : 8,
+      fontSize: 15,
       color: theme.text.primary,
+      ...(Platform.OS === "android" ? { textAlignVertical: "center" } : null),
     },
     sendButton: {
-      width: 45,
-      height: 45,
-      borderRadius: 22.5,
+      width: 42,
+      height: 42,
+      borderRadius: 21,
       backgroundColor: theme.accent,
       justifyContent: "center",
       alignItems: "center",
