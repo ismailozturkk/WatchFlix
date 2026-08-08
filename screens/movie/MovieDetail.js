@@ -66,16 +66,19 @@ const VIDEO_WIDTH = Math.min(width - 24, 720);
 const VIDEO_HEIGHT = Math.round((VIDEO_WIDTH * 9) / 16);
 // Fotoğrafı olmayan oyuncu kartındaki ikon: kart genişliğinin (width * 0.2) ~%45'i.
 const CAST_PLACEHOLDER_ICON = Math.round(width * 0.09);
-// Yatay ray kartı: "Benzer/Önerilen" ile "Seri" aynı genişliği paylaşıyor.
+// Yatay ray kartı: "Önerilen" ile "Seri" aynı genişliği paylaşıyor.
 // Seri rayı getItemLayout hesabı için sayıya ihtiyaç duyuyor, bu yüzden ölçü
 // stil içinde gömülü kalmak yerine buradan tek yerden veriliyor.
 const RAIL_ITEM_WIDTH = width * 0.38;
 const RAIL_ITEM_GAP = 10;
 
 /* ─────────────────────────────────────────
-   SimilarMovieItem
+   RecommendedMovieItem
 ───────────────────────────────────────── */
-const SimilarMovieItem = memo(function SimilarMovieItem({ item, navigation }) {
+const RecommendedMovieItem = memo(function RecommendedMovieItem({
+  item,
+  navigation,
+}) {
   const { theme } = useTheme();
   const { getTmdbUrl } = useImageQualitySettings();
   const { posterBadges } = useListLayoutSettings();
@@ -100,7 +103,7 @@ const SimilarMovieItem = memo(function SimilarMovieItem({ item, navigation }) {
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         activeOpacity={0.9}
-        style={styles.similarItem}
+        style={styles.railItem}
         onPress={() => navigation.push("MovieDetails", { id: item.id })}
       >
         <PosterImage
@@ -108,7 +111,7 @@ const SimilarMovieItem = memo(function SimilarMovieItem({ item, navigation }) {
           type="movie"
           size={200}
           iconSize={46}
-          style={[styles.similarPoster, { borderColor: theme.border + "55" }]}
+          style={[styles.railPoster, { borderColor: theme.border + "55" }]}
         />
         {/* Rating pill */}
         {posterBadges?.tmdbRating !== false && (
@@ -160,7 +163,7 @@ const CollectionMovieItem = memo(function CollectionMovieItem({
       activeOpacity={isCurrent ? 1 : 0.9}
       // Açık olan filme basmak aynı ekranı yığına tekrar iterdi.
       disabled={isCurrent}
-      style={styles.similarItem}
+      style={styles.railItem}
       onPress={() => navigation.push("MovieDetails", { id: item.id })}
     >
       <View>
@@ -170,7 +173,7 @@ const CollectionMovieItem = memo(function CollectionMovieItem({
           size={200}
           iconSize={46}
           style={[
-            styles.similarPoster,
+            styles.railPoster,
             {
               borderColor: isCurrent ? theme.accent : theme.border + "55",
               borderWidth: isCurrent ? 2 : 1,
@@ -361,7 +364,7 @@ export default function MovieDetails({ navigation, route }) {
           params: {
             language: language === "tr" ? "tr-TR" : "en-US",
             append_to_response:
-              "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,release_dates,similar,translations,videos,watch/providers",
+              "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,release_dates,translations,videos,watch/providers",
           },
           headers: { accept: "application/json", Authorization: API_KEY },
         });
@@ -378,73 +381,58 @@ export default function MovieDetails({ navigation, route }) {
     };
   }, [id, language]);
 
-  // Önerilen/Benzer rayları: append_to_response yalnız ilk sayfayı getirir.
+  // Önerilen filmler rayı: append_to_response yalnız ilk sayfayı getirir.
   // Ana ekran raylarındaki gibi (PaginatedRail) sona yaklaşınca sonraki TMDB
   // sayfası çekilip mevcut listenin sonuna eklenir.
   const [railState, setRailState] = useState({
-    recommendations: { items: [], page: 1, totalPages: 1, loading: false },
-    similar: { items: [], page: 1, totalPages: 1, loading: false },
+    items: [],
+    page: 1,
+    totalPages: 1,
+    loading: false,
   });
-  const railBusyRef = useRef({ recommendations: false, similar: false });
+  const railBusyRef = useRef(false);
 
   useEffect(() => {
-    const seed = (block) => ({
+    const block = details?.recommendations;
+    railBusyRef.current = false;
+    setRailState({
       items: block?.results || [],
       page: block?.page || 1,
       totalPages: block?.total_pages || 1,
       loading: false,
     });
-    railBusyRef.current = { recommendations: false, similar: false };
-    setRailState({
-      recommendations: seed(details?.recommendations),
-      similar: seed(details?.similar),
-    });
   }, [details]);
 
-  const loadMoreRail = useCallback(
-    async (kind) => {
-      const rail = railState[kind];
-      if (railBusyRef.current[kind] || rail.page >= rail.totalPages) return;
-      railBusyRef.current[kind] = true;
-      setRailState((cur) => ({
-        ...cur,
-        [kind]: { ...cur[kind], loading: true },
-      }));
-      try {
-        const res = await axios.request({
-          method: "GET",
-          url: `https://api.themoviedb.org/3/movie/${id}/${kind}`,
-          params: {
-            language: language === "tr" ? "tr-TR" : "en-US",
-            page: rail.page + 1,
-          },
-          headers: { accept: "application/json", Authorization: API_KEY },
-        });
-        const fresh = res.data?.results || [];
-        setRailState((cur) => {
-          const current = cur[kind];
-          const seen = new Set(current.items.map((it) => it.id));
-          return {
-            ...cur,
-            [kind]: {
-              items: [...current.items, ...fresh.filter((it) => !seen.has(it.id))],
-              page: res.data?.page || rail.page + 1,
-              totalPages: res.data?.total_pages || current.totalPages,
-              loading: false,
-            },
-          };
-        });
-      } catch {
-        setRailState((cur) => ({
-          ...cur,
-          [kind]: { ...cur[kind], loading: false },
-        }));
-      } finally {
-        railBusyRef.current[kind] = false;
-      }
-    },
-    [railState, id, language, API_KEY],
-  );
+  const loadMoreRail = useCallback(async () => {
+    if (railBusyRef.current || railState.page >= railState.totalPages) return;
+    railBusyRef.current = true;
+    setRailState((cur) => ({ ...cur, loading: true }));
+    try {
+      const res = await axios.request({
+        method: "GET",
+        url: `https://api.themoviedb.org/3/movie/${id}/recommendations`,
+        params: {
+          language: language === "tr" ? "tr-TR" : "en-US",
+          page: railState.page + 1,
+        },
+        headers: { accept: "application/json", Authorization: API_KEY },
+      });
+      const fresh = res.data?.results || [];
+      setRailState((cur) => {
+        const seen = new Set(cur.items.map((it) => it.id));
+        return {
+          items: [...cur.items, ...fresh.filter((it) => !seen.has(it.id))],
+          page: res.data?.page || cur.page + 1,
+          totalPages: res.data?.total_pages || cur.totalPages,
+          loading: false,
+        };
+      });
+    } catch {
+      setRailState((cur) => ({ ...cur, loading: false }));
+    } finally {
+      railBusyRef.current = false;
+    }
+  }, [railState, id, language, API_KEY]);
 
   // ── Seri / koleksiyon rayı ──
   // Film detayı yalnız `belongs_to_collection: {id, name, poster_path}` veriyor;
@@ -769,8 +757,8 @@ export default function MovieDetails({ navigation, route }) {
     </TouchableOpacity>
   ), [navigation, theme, getTmdbUrl]);
 
-  const renderSimilarMovie = useCallback(
-    ({ item }) => <SimilarMovieItem item={item} navigation={navigation} />,
+  const renderRecommendedMovie = useCallback(
+    ({ item }) => <RecommendedMovieItem item={item} navigation={navigation} />,
     [navigation],
   );
 
@@ -1505,38 +1493,16 @@ export default function MovieDetails({ navigation, route }) {
           )}
 
           {/* ── ÖNERİLEN FİLMLER ── */}
-          {railState.recommendations.items.length > 0 && (
+          {railState.items.length > 0 && (
             <View style={styles.section}>
               <SectionHeader title={t.recommendedMovies} theme={theme} />
               <PaginatedRail
-                data={railState.recommendations.items}
-                renderItem={renderSimilarMovie}
+                data={railState.items}
+                renderItem={renderRecommendedMovie}
                 keyExtractor={(item) => item.id.toString()}
-                onLoadMore={() => loadMoreRail("recommendations")}
-                loadingMore={railState.recommendations.loading}
-                hasMore={
-                  railState.recommendations.page <
-                  railState.recommendations.totalPages
-                }
-                contentContainerStyle={{ paddingVertical: 4, gap: 10 }}
-                initialNumToRender={5}
-                maxToRenderPerBatch={5}
-                windowSize={5}
-              />
-            </View>
-          )}
-
-          {/* ── BENZER FİLMLER ── */}
-          {railState.similar.items.length > 0 && (
-            <View style={styles.section}>
-              <SectionHeader title={t.similarMovies} theme={theme} />
-              <PaginatedRail
-                data={railState.similar.items}
-                renderItem={renderSimilarMovie}
-                keyExtractor={(item) => item.id.toString()}
-                onLoadMore={() => loadMoreRail("similar")}
-                loadingMore={railState.similar.loading}
-                hasMore={railState.similar.page < railState.similar.totalPages}
+                onLoadMore={loadMoreRail}
+                loadingMore={railState.loading}
+                hasMore={railState.page < railState.totalPages}
                 contentContainerStyle={{ paddingVertical: 4, gap: 10 }}
                 initialNumToRender={5}
                 maxToRenderPerBatch={5}
@@ -1948,9 +1914,9 @@ const styles = StyleSheet.create({
   },
   castCharacter: { fontSize: 10.5, textAlign: "center", lineHeight: 14 },
 
-  /* Similar */
-  similarItem: { width: RAIL_ITEM_WIDTH },
-  similarPoster: {
+  /* Yatay ray kartı */
+  railItem: { width: RAIL_ITEM_WIDTH },
+  railPoster: {
     width: "100%",
     aspectRatio: 2 / 3,
     borderRadius: 14,

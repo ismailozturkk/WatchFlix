@@ -104,10 +104,14 @@ const SectionHeader = ({ title, right, theme }) => (
   </View>
 );
 
-/* ─── Benzer dizi kartı ── */
+/* ─── Önerilen dizi kartı ── */
 // Kart kendi press animasyonunu yönetir; memo sayesinde ekran re-render
 // olduğunda 40 kart yeniden çizilmez.
-const SimilarTvShow = memo(function SimilarTvShow({ item, navigation, theme }) {
+const RecommendedTvShow = memo(function RecommendedTvShow({
+  item,
+  navigation,
+  theme,
+}) {
   const { getTmdbUrl } = useImageQualitySettings();
   const { posterBadges } = useListLayoutSettings();
   const scale = useRef(new Animated.Value(1)).current;
@@ -131,7 +135,7 @@ const SimilarTvShow = memo(function SimilarTvShow({ item, navigation, theme }) {
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         activeOpacity={0.9}
-        style={styles.similarItem}
+        style={styles.railItem}
         onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
       >
         <PosterImage
@@ -139,7 +143,7 @@ const SimilarTvShow = memo(function SimilarTvShow({ item, navigation, theme }) {
           type="tv"
           size={200}
           iconSize={46}
-          style={[styles.similarPoster, { borderColor: theme.border + "55" }]}
+          style={[styles.railPoster, { borderColor: theme.border + "55" }]}
         />
         {posterBadges?.tmdbRating !== false && (
           <View
@@ -286,7 +290,7 @@ export default function TvShowsDetails({ route, navigation }) {
           params: {
             language: language === "tr" ? "tr-TR" : "en-US",
             append_to_response:
-              "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,release_dates,similar,translations,videos,watch/providers",
+              "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,release_dates,translations,videos,watch/providers",
           },
           headers: { accept: "application/json", Authorization: API_KEY },
         });
@@ -303,76 +307,58 @@ export default function TvShowsDetails({ route, navigation }) {
     };
   }, [id, language]);
 
-  // Önerilen/Benzer rayları: append_to_response yalnız ilk sayfayı getirir.
+  // Önerilen diziler rayı: append_to_response yalnız ilk sayfayı getirir.
   // Ana ekran raylarındaki gibi (PaginatedRail) sona yaklaşınca sonraki TMDB
   // sayfası çekilip mevcut listenin sonuna eklenir.
   const [railState, setRailState] = useState({
-    recommendations: { items: [], page: 1, totalPages: 1, loading: false },
-    similar: { items: [], page: 1, totalPages: 1, loading: false },
+    items: [],
+    page: 1,
+    totalPages: 1,
+    loading: false,
   });
-  const railBusyRef = useRef({ recommendations: false, similar: false });
+  const railBusyRef = useRef(false);
 
   useEffect(() => {
-    const seed = (block) => ({
+    const block = details?.recommendations;
+    railBusyRef.current = false;
+    setRailState({
       items: block?.results || [],
       page: block?.page || 1,
       totalPages: block?.total_pages || 1,
       loading: false,
     });
-    railBusyRef.current = { recommendations: false, similar: false };
-    setRailState({
-      recommendations: seed(details?.recommendations),
-      similar: seed(details?.similar),
-    });
   }, [details]);
 
-  const loadMoreRail = useCallback(
-    async (kind) => {
-      const rail = railState[kind];
-      if (railBusyRef.current[kind] || rail.page >= rail.totalPages) return;
-      railBusyRef.current[kind] = true;
-      setRailState((cur) => ({
-        ...cur,
-        [kind]: { ...cur[kind], loading: true },
-      }));
-      try {
-        const res = await axios.request({
-          method: "GET",
-          url: `https://api.themoviedb.org/3/tv/${id}/${kind}`,
-          params: {
-            language: language === "tr" ? "tr-TR" : "en-US",
-            page: rail.page + 1,
-          },
-          headers: { accept: "application/json", Authorization: API_KEY },
-        });
-        const fresh = res.data?.results || [];
-        setRailState((cur) => {
-          const current = cur[kind];
-          const seen = new Set(current.items.map((it) => it.id));
-          return {
-            ...cur,
-            [kind]: {
-              items: [
-                ...current.items,
-                ...fresh.filter((it) => !seen.has(it.id)),
-              ],
-              page: res.data?.page || rail.page + 1,
-              totalPages: res.data?.total_pages || current.totalPages,
-              loading: false,
-            },
-          };
-        });
-      } catch {
-        setRailState((cur) => ({
-          ...cur,
-          [kind]: { ...cur[kind], loading: false },
-        }));
-      } finally {
-        railBusyRef.current[kind] = false;
-      }
-    },
-    [railState, id, language, API_KEY]
-  );
+  const loadMoreRail = useCallback(async () => {
+    if (railBusyRef.current || railState.page >= railState.totalPages) return;
+    railBusyRef.current = true;
+    setRailState((cur) => ({ ...cur, loading: true }));
+    try {
+      const res = await axios.request({
+        method: "GET",
+        url: `https://api.themoviedb.org/3/tv/${id}/recommendations`,
+        params: {
+          language: language === "tr" ? "tr-TR" : "en-US",
+          page: railState.page + 1,
+        },
+        headers: { accept: "application/json", Authorization: API_KEY },
+      });
+      const fresh = res.data?.results || [];
+      setRailState((cur) => {
+        const seen = new Set(cur.items.map((it) => it.id));
+        return {
+          items: [...cur.items, ...fresh.filter((it) => !seen.has(it.id))],
+          page: res.data?.page || cur.page + 1,
+          totalPages: res.data?.total_pages || cur.totalPages,
+          loading: false,
+        };
+      });
+    } catch {
+      setRailState((cur) => ({ ...cur, loading: false }));
+    } finally {
+      railBusyRef.current = false;
+    }
+  }, [railState, id, language, API_KEY]);
 
   /* ── İzlenme durumu — useWatchedShow'dan TÜRETİLİR (subcollection) ── */
   const watchedEpisodeCount = watched.aggregates.watchedEpisodeCount;
@@ -584,9 +570,9 @@ export default function TvShowsDetails({ route, navigation }) {
 
   /* ── renderVideo ── */
 
-  const renderSimilarTvShow = useCallback(
+  const renderRecommendedTvShow = useCallback(
     ({ item }) => (
-      <SimilarTvShow item={item} navigation={navigation} theme={theme} />
+      <RecommendedTvShow item={item} navigation={navigation} theme={theme} />
     ),
     [navigation, theme]
   );
@@ -1613,38 +1599,16 @@ export default function TvShowsDetails({ route, navigation }) {
           </View>
 
           {/* ── ÖNERİLEN DİZİLER ── */}
-          {railState.recommendations.items.length > 0 && (
+          {railState.items.length > 0 && (
             <View style={styles.section}>
               <SectionHeader title={t.recommendedTvShows} theme={theme} />
               <PaginatedRail
-                data={railState.recommendations.items}
-                renderItem={renderSimilarTvShow}
+                data={railState.items}
+                renderItem={renderRecommendedTvShow}
                 keyExtractor={(item) => item.id.toString()}
-                onLoadMore={() => loadMoreRail("recommendations")}
-                loadingMore={railState.recommendations.loading}
-                hasMore={
-                  railState.recommendations.page <
-                  railState.recommendations.totalPages
-                }
-                contentContainerStyle={{ paddingVertical: 4, gap: 10 }}
-                initialNumToRender={5}
-                maxToRenderPerBatch={5}
-                windowSize={5}
-              />
-            </View>
-          )}
-
-          {/* ── BENZER DİZİLER ── */}
-          {railState.similar.items.length > 0 && (
-            <View style={styles.section}>
-              <SectionHeader title={t.similarTvShows} theme={theme} />
-              <PaginatedRail
-                data={railState.similar.items}
-                renderItem={renderSimilarTvShow}
-                keyExtractor={(item) => item.id.toString()}
-                onLoadMore={() => loadMoreRail("similar")}
-                loadingMore={railState.similar.loading}
-                hasMore={railState.similar.page < railState.similar.totalPages}
+                onLoadMore={loadMoreRail}
+                loadingMore={railState.loading}
+                hasMore={railState.page < railState.totalPages}
                 contentContainerStyle={{ paddingVertical: 4, gap: 10 }}
                 initialNumToRender={5}
                 maxToRenderPerBatch={5}
@@ -2128,9 +2092,9 @@ const styles = StyleSheet.create({
   },
   emptyText: { fontSize: 14 },
 
-  /* Similar */
-  similarItem: { width: width * 0.38 },
-  similarPoster: {
+  /* Yatay ray kartı */
+  railItem: { width: width * 0.38 },
+  railPoster: {
     width: "100%",
     aspectRatio: 2 / 3,
     borderRadius: 14,
