@@ -1,7 +1,7 @@
 # Proje İlerleme Durumu ve Yol Haritası
 
 > _Son güncelleme: 29 Tem 2026. Güncel yayın planı için tek doğruluk kaynağı:
-> `docs/YAYIN_VE_GELIR_YOL_HARITASI.md`._
+> `docs/planlama/YAYIN_VE_GELIR_YOL_HARITASI.md`._
 
 ## ✅ Tamamlananlar
 

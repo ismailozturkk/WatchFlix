@@ -657,7 +657,7 @@ Bu tek karar, hile yüzeyinin ekonomik değerini sıfırlar: kimseyi geçemeyece
 | 10 | `screens/tabs/ProfileScreen.js` | DEĞİŞİR | `WatchLevelCard`, `StatisticsSection` ile `ProfileLists` **arasına** girer (`width: "90%"`, friendBar hizası). **Avatar halkalarına DOKUNULMAZ** | Kart hizası; scroll performansı; skeleton penceresi |
 | 11 | `context/ProfileStatsContext.js` | DEĞİŞİR | **TEK SATIR**: `rankNameMovie/rankNameTv` → `` `${step} hafta` ``. `getDynamicRankColor`'ın renk üretimi ve halkalar **aynen kalır**. Yeni listener **açılmaz** | `StatisticsSection`, `StatsHeroCard`, `MovieStatisticsScreen`, `TvStatisticsScreen`'de "Rank" kelimesi hiç kalmadı mı (grep) |
 | 12 | `components/AppToast.js` | DEĞİŞİR | `toastConfig`'e `badge` anahtarı + `AppBadge`'li `ToastCard` varyantı. `toastConfig` **modül düzeyinde sabit referans** kalmalı | Rozet toast'u 3 sn'de kapanıyor mu; `<Toast>` yeniden mount olmuyor mu |
-| — | `docs/FIRESTORE_SCHEMA.txt` | DEĞİŞİR | Not: *"İzleme puanı v1'de hiçbir Firestore alanı yazmaz; tamamen `Lists/{uid}` alt koleksiyonlarından türetilir"* + §8.4 geçiş planı | — |
+| — | `docs/mimari/FIRESTORE_SCHEMA.txt` | DEĞİŞİR | Not: *"İzleme puanı v1'de hiçbir Firestore alanı yazmaz; tamamen `Lists/{uid}` alt koleksiyonlarından türetilir"* + §8.4 geçiş planı | — |
 | — | `translations/tr.json` + `en.json` | DEĞİŞİR | **~24 autoI18n anahtarı** (yalnız UI dizeleri; rozet ve perde adları katalogda inline). tr/en anahtar sayısı eşitliği (bugün 1174/1174) **elle doğrulanır** | `node -e` ile anahtar sayısı diff'i sıfır mı |
 | — | `ProfileGamesModule.js` + `GameStatsScreen.js` | **İSTEĞE BAĞLI** (en son) | Hiç yazılmayan, hep 0 gösteren `weeklyStreak` göstergesi kaldırılır — iki ayrı alev ikonu olmasın | Oyun kartı düzeni bozulmadı mı |
 

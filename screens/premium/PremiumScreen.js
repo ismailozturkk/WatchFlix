@@ -1450,8 +1450,8 @@ export default function PremiumScreen() {
                 <Text style={[styles.noticeText, { color: C.muted }]}>
                   {configurationError === "missing-api-key"
                     ? tr
-                      ? "RevenueCat API anahtarı bekleniyor. Kurulum adımları docs/REVENUECAT_KURULUM.md dosyasında."
-                      : "RevenueCat API key is missing. See docs/REVENUECAT_KURULUM.md."
+                      ? "RevenueCat API anahtarı bekleniyor. Kurulum adımları docs/kurulum/REVENUECAT_KURULUM.md dosyasında."
+                      : "RevenueCat API key is missing. See docs/kurulum/REVENUECAT_KURULUM.md."
                     : tr
                     ? `${selectedPlanName} mağaza paketleri henüz yayında değil.`
                     : `${selectedPlanName} store packages are not available yet.`}

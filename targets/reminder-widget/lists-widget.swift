@@ -1,6 +1,6 @@
 // Seelogd — iOS "Listelerim" widget'ı.
 //
-// ANDROID'DEN FARKI (bilinçli, bkz. docs/reminder-widget-ios-kurulum.md):
+// ANDROID'DEN FARKI (bilinçli, bkz. docs/kurulum/reminder-widget-ios-kurulum.md):
 //
 // 1) POSTER YOK. WidgetKit uzantısında ağdan görsel indirilemez (AsyncImage
 //    widget'larda çalışmaz); posterlerin App Group konteynerine ÖNCEDEN

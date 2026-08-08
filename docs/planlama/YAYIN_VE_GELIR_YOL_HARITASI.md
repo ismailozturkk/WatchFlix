@@ -104,7 +104,7 @@ ticarileştirme, ölçüm ve uyum eksikliği.**
 
 ### 1.3 Performans
 
-`docs/PERFORMANS_INCELEME_RAPORU.txt` (Opus 4.8, 13 Haz 2026) zaten mükemmel bir
+`docs/performans/PERFORMANS_INCELEME_RAPORU.txt` (Opus 4.8, 13 Haz 2026) zaten mükemmel bir
 envanter çıkarmış. Yayın öncesi **mutlaka** yapılacak alt küme:
 
 - **IconBacground**: her ekranda 45 absolute `<Image>` + 175 PNG statik require.

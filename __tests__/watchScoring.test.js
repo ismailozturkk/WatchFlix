@@ -1,6 +1,6 @@
 // __tests__/watchScoring.test.js
 // Izleme puani (Kare) + Perde merdiveni + tur normalizasyonu.
-// Tasarim gerekcesi: docs/PUANLAMA_ROZET_SISTEMI.md
+// Tasarim gerekcesi: docs/ozellikler/PUANLAMA_ROZET_SISTEMI.md
 
 const {
   K, toDate, gunKey, enUzunArdisik,

@@ -3,7 +3,7 @@
 ## 🔥 Şu Anki Odak
 
 _(29 Tem 2026)_ **Yayın hazırlığı** — tek doğruluk kaynağı
-`docs/YAYIN_VE_GELIR_YOL_HARITASI.md`. Rebrand tamam (Watchify → seelogd,
+`docs/planlama/YAYIN_VE_GELIR_YOL_HARITASI.md`. Rebrand tamam (Watchify → seelogd,
 paket `com.smlztrk.seelogd`). Kodda biten büyük parçalar: premium (RevenueCat
 Pro/Unlimited), ölçüm (Firebase Analytics + Sentry), performans (device tier +
 AdaptiveBlurView), Gemini proxy Cloud Function. Bekleyen işler operasyonel:
@@ -40,7 +40,7 @@ kapalı test kullanıcıları, marka/ad kararı.
 
 ## Immediate Next Steps
 
-- Güncel adımlar `docs/YAYIN_VE_GELIR_YOL_HARITASI.md`'de (Faz 1 Hafta 4 itibarıyla).
+- Güncel adımlar `docs/planlama/YAYIN_VE_GELIR_YOL_HARITASI.md`'de (Faz 1 Hafta 4 itibarıyla).
 - Group Chat ve Media Sharing tamamlandı ve uygulamada canlı.
 
 ## ⚙️ Mevcut Mimari

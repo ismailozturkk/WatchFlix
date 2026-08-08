@@ -1,28 +1,33 @@
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║              SEELOGD — TAM PROJE ANALİZ RAPORU                           ║
-║              Tarih: 2026-05-17  |  Kapsam: Tüm kaynak dosyalar             ║
+║              Tarih: 2026-08-08  |  Kapsam: Tüm kaynak dosyalar             ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
-Bu rapor projenin tamamı (68 ekran, 14 context, 18 bileşen, 5 modül)
-taranarak hazırlanmıştır. Her bölüm somut dosya yolu ve satır numarasıyla
+Bu rapor projenin tamamı (106 ekran, 26 context, 133 bileşen, 67 servis, 485 JS/TS dosyası)
+taranarak güncellenmiştir. Her bölüm somut dosya yolu ve satır numarasıyla
 desteklenmiştir.
 
 ─────────────────────────────────────────────────────────────────────────────
-  PROJE İSTATİSTİKLERİ
+  PROJE İSTATİSTİKLERİ (Son Güncelleme: 08.08.2026)
 ─────────────────────────────────────────────────────────────────────────────
 
-  Toplam ekran dosyası      : 68 dosya  (~26.700 satır)
-  Toplam context dosyası    : 14 dosya  (~2.900 satır)
-  Toplam bileşen dosyası    : 18 dosya
+  Toplam JS/TS kod satırı  : 172.945 satır (485 dosya)
+  Toplam ekran dosyası      : 106 dosya  (76.512 satır)
+  Toplam bileşen dosyası    : 133 dosya  (45.184 satır)
+  Toplam servis dosyası     : 67 dosya   (15.652 satır)
+  Toplam context dosyası    : 26 dosya   (8.352 satır)
+  Toplam test dosyası       : 64 dosya   (11.477 satır)
   En büyük dosyalar         :
-    MovieDetail.js          1.839 satır
-    TvShowsDetails.js       1.837 satır
-    ChatScreen.js           ~2.100 satır
-    MovieSearch.js          1.241 satır
-    TvShowSearch.js         1.232 satır
-    ChatModal.js            ~1.500 satır (43 KB)
-    ProfileScreen.js        964 satır
-    SettingsScreen.js       990 satır
+    ChatScreen.js           3.858 satır
+    ListsScreen.js          3.105 satır
+    OnboardingScreen.js     2.344 satır
+    PremiumScreen.js        2.233 satır
+    StoryShareScreen.js     2.188 satır
+    TvShowsDetails.js       2.179 satır
+    MovieDetail.js          2.043 satır
+    Comment.js              1.823 satır
+    StatsComponents.js      1.724 satır
+    CreatePostModal.js      1.692 satır
   Bağımlılık sayısı         : 46 paket
   Firebase onSnapshot sayısı: 18+ aktif listener (tüm proje)
   console.log olan dosya    : 29 dosya

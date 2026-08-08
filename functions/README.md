@@ -5,7 +5,7 @@
 2. **`callGemini` (callable):** AI sohbet proxy'si — Gemini API anahtarı YALNIZ
    burada durur (Secret Manager), kullanıcı başına günlük kota uygular
    (free 5 / premium 100, `AiUsage/{uid}` sayacı). Yayın blokeri çözümü:
-   `docs/YAYIN_VE_GELIR_YOL_HARITASI.md` §1.2 madde 1.
+   `docs/planlama/YAYIN_VE_GELIR_YOL_HARITASI.md` §1.2 madde 1.
 
 ## Gemini proxy kurulumu (Faz 0 — ZORUNLU)
 

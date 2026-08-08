@@ -1,7 +1,7 @@
 // utils/watchScoring.js
 //
 // Seelogd izleme puanı — "Kare" birimi, "Perde" seviyesi.
-// Tasarım gerekçesi: docs/PUANLAMA_ROZET_SISTEMI.md
+// Tasarım gerekçesi: docs/ozellikler/PUANLAMA_ROZET_SISTEMI.md
 //
 // SAF MODÜL. React, Firestore, `@` alias importu YOKTUR ve eklenmemelidir.
 // Sebep: billing açılıp Cloud Functions deploy edilebildiğinde bu dosya

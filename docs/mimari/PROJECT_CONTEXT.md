@@ -1,5 +1,6 @@
 # Seelogd — Project Context
 
+> **Son Güncelleme Tarihi:** 08.08.2026  
 > Yeni bir geliştirici / AI ajanı için tek dosyalık genel bağlam. Hızlı orijinte oluş için.
 > Detaylı şema: [`FIRESTORE_SCHEMA.txt`](./FIRESTORE_SCHEMA.txt).
 > Güvenlik kuralları: [`firestore.rules`](./firestore.rules).
