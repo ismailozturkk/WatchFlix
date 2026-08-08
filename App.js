@@ -53,6 +53,7 @@ import { SharedListsProvider } from "./context/SharedListsContext";
 import { MediaQuickActionsProvider } from "./context/MediaQuickActionsContext";
 import { auth, db } from "./firebase";
 import Toast from "react-native-toast-message";
+import { i18nText } from "./utils/i18nText";
 import { toastConfig } from "@components/AppToast";
 import { AppAlertHost } from "@components/AppAlert";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -256,9 +257,12 @@ function AppContent() {
             });
           }
         } catch (e) {
+          // Ham hata metni kullanıcıya değil Sentry'ye: ekranda yerelleştirilmiş
+          // genel mesaj kalır, teşhis için gereken ayrıntı raporlamaya gider.
+          captureError(e, { tags: { source: "app_create_user_lists" } });
           Toast.show({
             type: "error",
-            text1: `Error fetching or creating document: ${e?.message || e}`,
+            text1: i18nText("autoI18n.islem_tamamlanamadi", "İşlem tamamlanamadı"),
           });
         }
       };

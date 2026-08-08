@@ -44,6 +44,7 @@ import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "@services/hapticsService";
 import { i18nText } from "@utils/i18nText";
+import { captureError } from "@services/crashReporting";
 import { buildGenreMap } from "@utils/genreLabels";
 import { todayListDate } from "@utils/mediaFacts";
 import {
@@ -415,9 +416,11 @@ export default function ListsScreen({ route, navigation }) {
       Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Error,
       ).catch(() => {});
+      // Ham hata metni kullanıcıya değil Sentry'ye (bkz. captureError).
+      captureError(error, { tags: { source: "lists_reorder" } });
       Toast.show({
         type: "error",
-        text1: `${error.message}`,
+        text1: i18nText("autoI18n.islem_tamamlanamadi", "İşlem tamamlanamadı"),
       });
     } finally {
       setIsReordering(false);

@@ -841,7 +841,9 @@ export default function WidgetSettingsScreen() {
     }));
     const custom = customThemes.map((item) => {
       const id = `custom:${item.id}`;
-      const name = item.name || copy("widget_custom_theme", "Özel Tema");
+      // Rozet metni ("ÖZEL") ile tema ADI ayrı anahtar: tek anahtar
+      // paylaşılınca ikisinden biri kaçınılmaz olarak yanlış görünüyordu.
+      const name = item.name || copy("widget_custom_theme_name", "Özel Tema");
       return {
         id,
         name,

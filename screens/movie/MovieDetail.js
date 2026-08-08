@@ -53,6 +53,7 @@ import ImageGalleryModal from "@components/modals/ImageGalleryModal";
 import TrailerSection from "@components/video/TrailerSection";
 import PaginatedRail from "../../components/PaginatedRail";
 import { i18nText } from "../../utils/i18nText";
+import { captureError } from "../../services/crashReporting";
 import { daysUntil, parseAirDate } from "../../utils/airDate";
 import { getCachedValue, setCachedValue, TTL } from "../../utils/apiCache";
 import { getReleaseState, RELEASE_STATE } from "../../utils/watchState";
@@ -372,7 +373,13 @@ export default function MovieDetails({ navigation, route }) {
         });
         if (!cancelled) setDetails(response.data);
       } catch (error) {
-        if (!cancelled) Toast.show({ type: "error", text1: "error:" + error });
+        // Ham hata metni kullanıcıya değil Sentry'ye (bkz. captureError).
+        captureError(error, { tags: { source: "movie_detail_fetch" } });
+        if (!cancelled)
+          Toast.show({
+            type: "error",
+            text1: i18nText("autoI18n.islem_tamamlanamadi", "İşlem tamamlanamadı"),
+          });
       } finally {
         if (!cancelled) setLoading(false);
       }

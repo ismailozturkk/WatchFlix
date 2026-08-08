@@ -24,6 +24,7 @@ import * as PostsApi from "../services/postsService";
 import { useAuth } from "./AuthContext";
 import { useFriends } from "./FriendsContext";
 import { i18nText } from "../utils/i18nText";
+import { captureError } from "../services/crashReporting";
 import { shouldPersistInternetData } from "../utils/dataCacheSettings";
 import { POST_TYPES } from "../utils/postComposer";
 import useStartupGate from "../hooks/useStartupGate";
@@ -402,7 +403,12 @@ export function PostsProvider({ children }) {
       } catch (e) {
         // Rollback
         if (snapshotBefore) setPosts(snapshotBefore);
-        Toast.show({ type: "error", text1: "Silinemedi: " + e.message });
+        // Ham hata metni kullanıcıya değil Sentry'ye (bkz. captureError).
+        captureError(e, { tags: { source: "posts_delete" } });
+        Toast.show({
+          type: "error",
+          text1: i18nText("autoI18n.islem_tamamlanamadi", "İşlem tamamlanamadı"),
+        });
         return false;
       }
     },

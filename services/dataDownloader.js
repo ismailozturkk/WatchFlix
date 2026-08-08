@@ -558,7 +558,7 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
     }
   }
 
-  onProgress?.(1, "Tamam");
+  onProgress?.(1, i18nText("autoI18n.tamam", "Tamam"));
   return {
     ok: errors.length === 0,
     cachedDocs,

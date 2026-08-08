@@ -549,7 +549,11 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
       const toastAdd = () =>
         Toast.show({
           type: "success",
-          text1: `${kindLabel} ${listLabel(listType)} listesine eklendi!`,
+          text1: i18nText(
+            "autoI18n.media_added_to_list",
+            "{{media}} {{list}} listesine eklendi!",
+            { media: kindLabel, list: listLabel(listType) },
+          ),
         });
 
       const payload = {
