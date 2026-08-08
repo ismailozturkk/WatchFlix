@@ -31,17 +31,13 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
 import { LanguageProvider } from "./context/LanguageContext";
 import { ThemeProvider } from "./context/ThemeContext";
-import TvShowsDetails from "./screens/tv/TvShowsDetails";
-import SeasonDetails from "./screens/tv/SeasonDetails";
-import EpisodeDetails from "./screens/tv/EpisodeDetails";
-import MovieDetails from "./screens/movie/MovieDetail";
-import SeeAllScreen from "./screens/shared/SeeAllScreen";
-import TvGraphDetailScreen from "./screens/tv/TvGraphDetailScreen";
-import StoryShareScreen from "@screens/story/StoryShareScreen";
-import StoryDraftsScreen from "@screens/story/StoryDraftsScreen";
+// EKRAN İMPORTLARI BİLEREK YOK: ekranlar Stack.Screen üzerinde
+// getComponent={() => require("...").default} ile İLK NAVİGASYONDA yüklenir.
+// Üstten import edilen bir ekran, tüm bağımlılık ağacıyla birlikte daha splash
+// ekranındayken çalıştırılır — ~60 ekranda bu, açılışı saniyeler mertebesinde
+// uzatıyordu. Yeni ekran eklerken aynı deseni kullan. Aşağıdaki dördü açık
+// kalıyor çünkü olası İLK rotalar (auth kapısı initialRoute'u bunlardan seçer).
 import LoginScreen from "./screens/auth/LoginScreen";
-import RegisterScreen from "./screens/auth/RegisterScreen";
-import ForgotPasswordScreen from "./screens/auth/ForgotPasswordScreen";
 import GoogleProfileCompletionScreen from "./screens/auth/GoogleProfileCompletionScreen";
 import OnboardingScreen from "./screens/onboarding/OnboardingScreen";
 import LottieView from "lottie-react-native";
@@ -55,19 +51,13 @@ import { ListStatusProvider } from "./context/ListStatusContext";
 import { MediaActivityProvider } from "./context/MediaActivityContext";
 import { SharedListsProvider } from "./context/SharedListsContext";
 import { MediaQuickActionsProvider } from "./context/MediaQuickActionsContext";
-import SharedListScreen from "@screens/lists/SharedListScreen";
 import { auth, db } from "./firebase";
-import ProfileScreen from "./screens/tabs/ProfileScreen";
 import Toast from "react-native-toast-message";
 import { toastConfig } from "@components/AppToast";
 import { AppAlertHost } from "@components/AppAlert";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import ListsScreen from "@screens/lists/ListsScreen";
-import UpNextScreen from "@screens/tabs/UpNextScreen";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import ListsViewScreen from "@screens/lists/ListsViewScreen";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import SwipeView from "@screens/chat/SwipeView";
 import { ProfileStatsProvider }     from "./context/ProfileStatsContext";
 import { WatchProgressProvider }    from "./context/WatchProgressContext";
 import { ProfileNotesProvider }     from "./context/ProfileNotesContext";
@@ -79,61 +69,22 @@ import { NotificationsProvider }    from "./context/NotificationsContext";
 import { DeviceNotificationsProvider } from "./context/DeviceNotificationsContext";
 import { PostsProvider }            from "./context/PostsContext";
 import { TvShowProvider } from "./context/TvShowContex";
-import ActorViewScreen from "./screens/actor/ActorViewScreen";
-import MovieStatisticsScreen from "./screens/tabs/profile/MovieStatisticsScreen";
-import TvStatisticsScreen from "./screens/tabs/profile/TvStatisticsScreen";
-import WrappedScreen from "@screens/wrapped/WrappedScreen";
 import TabScreenNavigator from "@screens/navigation/TabScreenNavigator";
-import FriendsListScreen from "./screens/tabs/profile/FriendsListScreen";
-import FriendProfileScreen from "./screens/tabs/profile/FriendProfileScreen";
-import RemindersScreen from "./screens/tabs/profile/RemindersScreen";
-import NotesScreen from "./screens/tabs/profile/NotesScreen";
-import EditProfileScreen from "./screens/tabs/profile/EditProfileScreen";
-import MyPostsScreen from "./screens/tabs/MyPostsScreen";
-import MyActivityScreen from "./screens/tabs/profile/MyActivityScreen";
-import SearchFriendsScreen from "./screens/search/SearchFriendsScreen";
-import SearchScreen from "./screens/tabs/SearchScreen";
-import FriendRequestsScreen from "./screens/tabs/profile/FriendRequestsScreen";
-import PrivacySettingsScreen from "./screens/tabs/profile/PrivacySettingsScreen";
-import ReminderNotificationsScreen from "./screens/tabs/settings/ReminderNotificationsScreen";
-import SocialNotificationsScreen from "./screens/tabs/settings/SocialNotificationsScreen";
-import PersonalizationScreen from "./screens/tabs/settings/PersonalizationScreen";
-import PosterSettingsScreen from "./screens/tabs/settings/PosterSettingsScreen";
-import PermissionsDataScreen from "./screens/tabs/settings/PermissionsDataScreen";
-import OpenSourceLicensesScreen from "./screens/tabs/settings/OpenSourceLicensesScreen";
-import AccountConnectionsScreen from "./screens/tabs/settings/AccountConnectionsScreen";
-import AboutAppScreen from "./screens/tabs/settings/AboutAppScreen";
-import WidgetSettingsScreen from "./screens/tabs/settings/WidgetSettingsScreen";
-import PremiumScreen from "./screens/premium/PremiumScreen";
 import { PremiumProvider } from "./context/PremiumContext";
-import ChatScreen from "@screens/chat/ChatScreen";
-import CreateGroupScreen from "@screens/chat/CreateGroupScreen";
-import GroupsListScreen from "@screens/chat/GroupsListScreen";
-import MessagesScreen from "@screens/chat/MessagesScreen";
-import PostDetailScreen from "@screens/social/PostDetailScreen";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { enableFreeze } from "react-native-screens";
-import Comment from "./components/Comment";
 import SplashPosterWave from "./components/SplashPosterWave";
-import CalendarScreen from "@screens/calendar/CalendarScreen";
 import { CalendarProvider } from "./context/CalendarContext";
-import SceneGuessGameScreen from "./screens/game/SceneGuessGameScreen";
-import GameHubScreen from "./screens/game/GameHubScreen";
-import TournamentScreen from "./screens/tournament/TournamentScreen";
-import ShareContentScreen from "./screens/tabs/ShareContentScreen";
-import SceneGameDetailScreen from "./screens/game/SceneGameDetailScreen";
-import SceneGameSetupScreen from "./screens/game/SceneGameSetupScreen";
-import SceneGamePlayScreen from "./screens/game/SceneGamePlayScreen";
-import SceneGameResultScreen from "./screens/game/SceneGameResultScreen";
-import GameLeaderboardScreen from "./screens/game/GameLeaderboardScreen";
-import GameStatsScreen from "./screens/game/GameStatsScreen";
-import GameAchievementsScreen from "./screens/game/GameAchievementsScreen";
-import WatchBadgesScreen from "./screens/tabs/profile/WatchBadgesScreen";
-import CustomThemeScreen from "./screens/tabs/setting/CustomThemeScreen";
 import { installAxiosDataCache } from "./utils/axiosDataCache";
 import { isMigrated, runStorageMigration } from "./services/storage";
 import { startPresence, stopPresence } from "./services/presenceService";
-import { initCrashReporting, captureError, setCrashUser, wrapRoot } from "./services/crashReporting";
+import {
+  initCrashReporting,
+  captureError,
+  registerNavigationContainer,
+  setCrashUser,
+  wrapRoot,
+} from "./services/crashReporting";
 import {
   USER_PROPERTIES,
   setAnalyticsUser,
@@ -172,6 +123,9 @@ setAnalyticsUserProperty(USER_PROPERTIES.DEVICE_TIER, deviceTier);
 
 // Bildirime dokunulduğunda yönlendirme için global navigation ref.
 const navigationRef = createNavigationContainerRef();
+// Modül seviyesinde: AppContent her render'da yeni bir navigator bileşeni
+// üretirse React ağacı ekran kimliklerini kaybedip stack'i remount edebilir.
+const Stack = createNativeStackNavigator();
 // Ana ekran widget'larının dokunma hedefleri. Android tarafındaki karşılıkları:
 // ReminderWidgetProvider (reminders), ListsWidgetProvider (lists/…),
 // StatsWidgetProvider (stats/…). Yol adları değişirse widget'lar sessizce
@@ -199,17 +153,28 @@ const preloadIconFont = (IconSet) => {
 
 // Uygulama modülü yüklendiği anda ikon font preload'u başlat.
 //
+// Splash yalnız AÇILIŞ YOLUNUN kullandığı iki seti bekler: sekme çubuğu ve ana
+// ekran rayları sadece Ionicons (AppIcon varsayılanı) + MaterialCommunityIcons
+// çiziyor. Kalan dört set daha derin ekranlarda gerekiyor; preload'ları kısa
+// bir gecikmeyle arka plana atıldı — çok erken bir navigasyonda en kötü
+// ihtimal ikon bir karelik gecikmeyle gelir (loadFont zaten idempotent).
+//
 // MMKV GEÇİŞİ: buradaki iki depolama adımı (`hydrateAutoDataCacheSetting` ve
 // `preloadAllCache`) kalktı. İkisi de "AsyncStorage async olduğu için açılışta
 // belleğe al" işiydi; MMKV senkron okuduğundan ikisinin de karşılığı yok.
 const startupPreloadPromise = Promise.allSettled([
   preloadIconFont(Ionicons),
   preloadIconFont(MaterialCommunityIcons),
-  preloadIconFont(FontAwesome),
-  preloadIconFont(Feather),
-  preloadIconFont(Octicons),
-  preloadIconFont(MaterialIcons),
 ]);
+
+setTimeout(() => {
+  Promise.allSettled([
+    preloadIconFont(FontAwesome),
+    preloadIconFont(Feather),
+    preloadIconFont(Octicons),
+    preloadIconFont(MaterialIcons),
+  ]);
+}, 1200);
 
 // Daha sonra stack/tab navigator'larında otomatik etkili olur
 
@@ -255,8 +220,15 @@ const SplashScreen = () => {
   );
 };
 
+// ChatModal host'u (SwipeView) ancak swipeViewReady=true olunca (açılıştan
+// ~3,8 sn sonra) çizilir; require'ı da o ana erteliyoruz ki ChatModal'ın
+// ~1400 satırlık modül ağacı açılış yürütmesinden tamamen çıksın.
+const SwipeViewHost = () => {
+  const SwipeView = require("@screens/chat/SwipeView").default;
+  return <SwipeView />;
+};
+
 function AppContent() {
-  const Stack = createNativeStackNavigator();
   const [showChatModal, setShowChatModal] = useState(false); // State for modal visibility
   const [swipeViewReady, setSwipeViewReady] = useState(false);
   const { user, initialRoute, loading, needsProfileCompletion } = useAuth();
@@ -327,6 +299,9 @@ function AppContent() {
     <NavigationContainer
       ref={navigationRef}
       linking={linking}
+      // Sentry ekran geçiş/TTID izlemesi container kaydıyla başlar (no-op
+      // eğer Sentry kapalıysa) — bkz. services/crashReporting.js.
+      onReady={() => registerNavigationContainer(navigationRef)}
       onStateChange={(state) => {
         // state resmi tipte undefined olabilir — guard olmadan crash riski.
         const routeName = state?.routes?.[state.index]?.name;
@@ -394,7 +369,7 @@ function AppContent() {
         />
         <Stack.Screen
           name="TournamentScreen"
-          component={TournamentScreen}
+          getComponent={() => require("./screens/tournament/TournamentScreen").default}
           options={{
             headerShown: false,
             animation: "slide_from_right",
@@ -402,7 +377,7 @@ function AppContent() {
         />
         <Stack.Screen
           name="TvShowsDetails"
-          component={TvShowsDetails}
+          getComponent={() => require("./screens/tv/TvShowsDetails").default}
           options={{
             headerShown: false,
             presentation: "transparentModal",
@@ -410,28 +385,28 @@ function AppContent() {
         />
         <Stack.Screen
           name="SeasonDetails"
-          component={SeasonDetails}
+          getComponent={() => require("./screens/tv/SeasonDetails").default}
           options={{
             headerShown: false,
           }}
         />
         <Stack.Screen
           name="EpisodeDetails"
-          component={EpisodeDetails}
+          getComponent={() => require("./screens/tv/EpisodeDetails").default}
           options={{
             headerShown: false,
           }}
         />
         <Stack.Screen
           name="MovieDetails"
-          component={MovieDetails}
+          getComponent={() => require("./screens/movie/MovieDetail").default}
           options={{
             headerShown: false,
           }}
         />
         <Stack.Screen
           name="SeeAllScreen"
-          component={SeeAllScreen}
+          getComponent={() => require("./screens/shared/SeeAllScreen").default}
           options={{
             headerShown: false,
             animation: "slide_from_right",
@@ -439,14 +414,14 @@ function AppContent() {
         />
         <Stack.Screen
           name="TvGraphDetailScreen"
-          component={TvGraphDetailScreen}
+          getComponent={() => require("./screens/tv/TvGraphDetailScreen").default}
           options={{
             headerShown: false,
           }}
         />
         <Stack.Screen
           name="StoryShareScreen"
-          component={StoryShareScreen}
+          getComponent={() => require("@screens/story/StoryShareScreen").default}
           options={{
             headerShown: false,
             presentation: "modal",
@@ -455,7 +430,7 @@ function AppContent() {
         />
         <Stack.Screen
           name="StoryDraftsScreen"
-          component={StoryDraftsScreen}
+          getComponent={() => require("@screens/story/StoryDraftsScreen").default}
           options={{
             headerShown: false,
             animation: "slide_from_right",
@@ -463,7 +438,7 @@ function AppContent() {
         />
         <Stack.Screen
           name="UnifiedSearch"
-          component={SearchScreen}
+          getComponent={() => require("./screens/tabs/SearchScreen").default}
           options={{
             headerShown: false,
             presentation: "transparentModal",
@@ -473,7 +448,7 @@ function AppContent() {
         />
         <Stack.Screen
           name="ActorViewScreen"
-          component={ActorViewScreen}
+          getComponent={() => require("./screens/actor/ActorViewScreen").default}
           options={{
             headerShown: false,
           }}
@@ -481,14 +456,14 @@ function AppContent() {
 
         <Stack.Screen
           name="RegisterScreen"
-          component={RegisterScreen}
+          getComponent={() => require("./screens/auth/RegisterScreen").default}
           options={{
             headerShown: false,
           }}
         />
         <Stack.Screen
           name="ForgotPasswordScreen"
-          component={ForgotPasswordScreen}
+          getComponent={() => require("./screens/auth/ForgotPasswordScreen").default}
           options={{
             headerShown: false,
           }}
@@ -499,22 +474,27 @@ function AppContent() {
             headerShown: false,
           }}
         >
-          {(props) => (
-            <CalendarProvider>
-              <ProfileScreen {...props} />
-            </CalendarProvider>
-          )}
+          {(props) => {
+            // Render anında require: modül sekme navigatörü (TabScreen'in
+            // Profil sekmesi) yüzünden bu noktada zaten yüklüdür.
+            const ProfileScreen = require("./screens/tabs/ProfileScreen").default;
+            return (
+              <CalendarProvider>
+                <ProfileScreen {...props} />
+              </CalendarProvider>
+            );
+          }}
         </Stack.Screen>
         <Stack.Screen
           name="ListsScreen"
-          component={ListsScreen}
+          getComponent={() => require("@screens/lists/ListsScreen").default}
           options={{
             headerShown: false,
           }}
         />
         <Stack.Screen
           name="ListsViewScreen"
-          component={ListsViewScreen}
+          getComponent={() => require("@screens/lists/ListsViewScreen").default}
           options={{
             headerShown: false,
           }}
@@ -523,35 +503,35 @@ function AppContent() {
             "Devam Eden Dizilerim" rayının "Tümü" düğmesinden açılıyor. */}
         <Stack.Screen
           name="UpNextScreen"
-          component={UpNextScreen}
+          getComponent={() => require("@screens/tabs/UpNextScreen").default}
           options={{
             headerShown: false,
           }}
         />
         <Stack.Screen
           name="SharedListScreen"
-          component={SharedListScreen}
+          getComponent={() => require("@screens/lists/SharedListScreen").default}
           options={{
             headerShown: false,
           }}
         />
         <Stack.Screen
           name="MovieStatisticsScreen"
-          component={MovieStatisticsScreen}
+          getComponent={() => require("./screens/tabs/profile/MovieStatisticsScreen").default}
           options={{
             headerShown: false,
           }}
         />
         <Stack.Screen
           name="TvStatisticsScreen"
-          component={TvStatisticsScreen}
+          getComponent={() => require("./screens/tabs/profile/TvStatisticsScreen").default}
           options={{
             headerShown: false,
           }}
         />
         <Stack.Screen
           name="WrappedScreen"
-          component={WrappedScreen}
+          getComponent={() => require("@screens/wrapped/WrappedScreen").default}
           options={{
             headerShown: false,
             presentation: "modal",
@@ -560,144 +540,144 @@ function AppContent() {
         />
         <Stack.Screen
           name="RemindersScreen"
-          component={RemindersScreen}
+          getComponent={() => require("./screens/tabs/profile/RemindersScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="NotesScreen"
-          component={NotesScreen}
+          getComponent={() => require("./screens/tabs/profile/NotesScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="EditProfileScreen"
-          component={EditProfileScreen}
+          getComponent={() => require("./screens/tabs/profile/EditProfileScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="MyPostsScreen"
-          component={MyPostsScreen}
+          getComponent={() => require("./screens/tabs/MyPostsScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="MyActivityScreen"
-          component={MyActivityScreen}
+          getComponent={() => require("./screens/tabs/profile/MyActivityScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="FriendsListScreen"
-          component={FriendsListScreen}
+          getComponent={() => require("./screens/tabs/profile/FriendsListScreen").default}
           options={{
             headerShown: false,
           }}
         />
         <Stack.Screen
           name="FriendProfileScreen"
-          component={FriendProfileScreen}
+          getComponent={() => require("./screens/tabs/profile/FriendProfileScreen").default}
           options={{
             headerShown: false,
           }}
         />
         <Stack.Screen
           name="ChatScreen"
-          component={ChatScreen}
+          getComponent={() => require("@screens/chat/ChatScreen").default}
           options={{
             headerShown: false,
           }}
         />
         <Stack.Screen
           name="MessagesScreen"
-          component={MessagesScreen}
+          getComponent={() => require("@screens/chat/MessagesScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="GroupsListScreen"
-          component={GroupsListScreen}
+          getComponent={() => require("@screens/chat/GroupsListScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="CreateGroupScreen"
-          component={CreateGroupScreen}
+          getComponent={() => require("@screens/chat/CreateGroupScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="SearchFriendsScreen"
-          component={SearchFriendsScreen}
+          getComponent={() => require("./screens/search/SearchFriendsScreen").default}
           options={{
             headerShown: false,
           }}
         />
         <Stack.Screen
           name="FriendRequestsScreen"
-          component={FriendRequestsScreen}
+          getComponent={() => require("./screens/tabs/profile/FriendRequestsScreen").default}
           options={{
             headerShown: false,
           }}
         />
         <Stack.Screen
           name="PrivacySettingsScreen"
-          component={PrivacySettingsScreen}
+          getComponent={() => require("./screens/tabs/profile/PrivacySettingsScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="ReminderNotificationsScreen"
-          component={ReminderNotificationsScreen}
+          getComponent={() => require("./screens/tabs/settings/ReminderNotificationsScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="SocialNotificationsScreen"
-          component={SocialNotificationsScreen}
+          getComponent={() => require("./screens/tabs/settings/SocialNotificationsScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="PersonalizationScreen"
-          component={PersonalizationScreen}
+          getComponent={() => require("./screens/tabs/settings/PersonalizationScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="PosterSettingsScreen"
-          component={PosterSettingsScreen}
+          getComponent={() => require("./screens/tabs/settings/PosterSettingsScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="PermissionsDataScreen"
-          component={PermissionsDataScreen}
+          getComponent={() => require("./screens/tabs/settings/PermissionsDataScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="AccountConnectionsScreen"
-          component={AccountConnectionsScreen}
+          getComponent={() => require("./screens/tabs/settings/AccountConnectionsScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="OpenSourceLicensesScreen"
-          component={OpenSourceLicensesScreen}
+          getComponent={() => require("./screens/tabs/settings/OpenSourceLicensesScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="AboutAppScreen"
-          component={AboutAppScreen}
+          getComponent={() => require("./screens/tabs/settings/AboutAppScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="WidgetSettingsScreen"
-          component={WidgetSettingsScreen}
+          getComponent={() => require("./screens/tabs/settings/WidgetSettingsScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="PremiumScreen"
-          component={PremiumScreen}
+          getComponent={() => require("./screens/premium/PremiumScreen").default}
           options={{ headerShown: false, animation: "slide_from_bottom" }}
         />
         <Stack.Screen
           name="Comment"
-          component={Comment}
+          getComponent={() => require("./components/Comment").default}
           options={{
             headerShown: false,
           }}
         />
         <Stack.Screen
           name="PostDetailScreen"
-          component={PostDetailScreen}
+          getComponent={() => require("@screens/social/PostDetailScreen").default}
           options={{
             headerShown: false,
           }}
@@ -709,15 +689,20 @@ function AppContent() {
             animation: "slide_from_bottom",
           }}
         >
-          {(props) => (
-            <CalendarProvider>
-              <CalendarScreen {...props} />
-            </CalendarProvider>
-          )}
+          {(props) => {
+            // İlk navigasyonda require edilir (getComponent ile aynı desen;
+            // CalendarProvider sarmalayıcısı yüzünden children biçiminde).
+            const CalendarScreen = require("@screens/calendar/CalendarScreen").default;
+            return (
+              <CalendarProvider>
+                <CalendarScreen {...props} />
+              </CalendarProvider>
+            );
+          }}
         </Stack.Screen>
         <Stack.Screen
           name="SceneGuessGameScreen"
-          component={SceneGuessGameScreen}
+          getComponent={() => require("./screens/game/SceneGuessGameScreen").default}
           options={{
             headerShown: false,
             animation: "slide_from_bottom",
@@ -725,62 +710,62 @@ function AppContent() {
         />
         <Stack.Screen
           name="ShareContentScreen"
-          component={ShareContentScreen}
+          getComponent={() => require("./screens/tabs/ShareContentScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="GameHubScreen"
-          component={GameHubScreen}
+          getComponent={() => require("./screens/game/GameHubScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
           name="SceneGameDetailScreen"
-          component={SceneGameDetailScreen}
+          getComponent={() => require("./screens/game/SceneGameDetailScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
           name="SceneGameSetupScreen"
-          component={SceneGameSetupScreen}
+          getComponent={() => require("./screens/game/SceneGameSetupScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
           name="SceneGamePlayScreen"
-          component={SceneGamePlayScreen}
+          getComponent={() => require("./screens/game/SceneGamePlayScreen").default}
           options={{ headerShown: false, animation: "slide_from_bottom", gestureEnabled: false }}
         />
         <Stack.Screen
           name="SceneGameResultScreen"
-          component={SceneGameResultScreen}
+          getComponent={() => require("./screens/game/SceneGameResultScreen").default}
           options={{ headerShown: false, animation: "fade" }}
         />
         <Stack.Screen
           name="GameLeaderboardScreen"
-          component={GameLeaderboardScreen}
+          getComponent={() => require("./screens/game/GameLeaderboardScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
           name="GameStatsScreen"
-          component={GameStatsScreen}
+          getComponent={() => require("./screens/game/GameStatsScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
           name="GameAchievementsScreen"
-          component={GameAchievementsScreen}
+          getComponent={() => require("./screens/game/GameAchievementsScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
           name="WatchBadgesScreen"
-          component={WatchBadgesScreen}
+          getComponent={() => require("./screens/tabs/profile/WatchBadgesScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
           name="CustomThemeScreen"
-          component={CustomThemeScreen}
+          getComponent={() => require("./screens/tabs/setting/CustomThemeScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
       </Stack.Navigator>
 
-      {showChatModal && swipeViewReady && <SwipeView />}
+      {showChatModal && swipeViewReady && <SwipeViewHost />}
       <Toast
         config={toastConfig}
         position="top"
@@ -824,8 +809,11 @@ export default wrapRoot(function App() {
     ExpoSplashScreen.hideAsync().catch(() => {});
 
     // Preload zaten modül yüklenirken başladı (yukarıda).
-    // Minimum 600 ms göster; preload bitince (genellikle < 50 ms) kapat.
-    const MIN_MS = 600;
+    // Minimum 250 ms göster; preload bitince (genellikle < 50 ms) kapat.
+    // (600 ms'ti; 350 ms'lik fade ile birlikte her açılışa ~1 sn yapay bekleme
+    // ekliyordu. Veri geç geliyorsa splash zaten APP_READY'ye kadar kalır —
+    // bu sabit yalnız "her şey hazırken" ödenen tabandır.)
+    const MIN_MS = 250;
     const startedAt = Date.now();
     let preloadDone = false;
     let dataReady = false;
@@ -841,7 +829,7 @@ export default wrapRoot(function App() {
     const hideSplash = () => {
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 350,
+        duration: 200,
         useNativeDriver: true,
       }).start(() => setSplashVisible(false));
     };
