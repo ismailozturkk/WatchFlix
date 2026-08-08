@@ -258,7 +258,22 @@
 
 **Kabul:** bekçi testi var ve yeşil (0 yetim anahtar); EN'de bilinen Türkçe sızıntı ekranları (WidgetSettings/PosterSettings/Personalization/Settings) İngilizce; yeni cihazda ilk açılış dili cihaz dilinden; `version` artırıldı.
 
-### [ ] GÖREV B7 — Asgari kayıt yaşı (~2 saat) — ⚠️ ÖNCE KULLANICI KARARI
+### [x] GÖREV B7 — Asgari kayıt yaşı (2026-08-08) — **KARAR: 13**
+
+> **Sonuç:** `0618587`. `MIN_REGISTER_AGE = 13`, `canRegister()` (saf, 12 sınır testi),
+> iki kayıt yolu da bağlı. `npm test` 61 suite / 928 test.
+>
+> **⚠ BU DEĞER MAĞAZA FORMLARINA DA GİRİYOR** — C5 (IARC + Play hedef kitle beyanı)
+> doldurulurken "13+" olarak beyan edilmeli. Değer değişirse iki yer birden güncellenmeli;
+> not `utils/ageGate.js` içinde de duruyor.
+>
+> **Tasarım kararı:** `canRegister`'da "bilinmiyor" GEÇERSİZ sayılıyor — yetişkin içerik
+> kapısının tersi. Orada bilinmezlik kısıtı açık bırakıyor (kullanıcıyı korumak için),
+> burada kaydı engelliyor (geçersiz tarihle hesap açılmamalı).
+>
+> **Google yolu:** giriş Auth hesabını zaten açmış oluyor; 13 altı reddinde yetim Auth
+> kaydı siliniyor (silinemezse çıkış) — yoksa kullanıcı bu ekrana sürekli düşüp kilitli
+> kalırdı.
 
 **Bağlam:** Doğum tarihi zorunlu ama yaş sınırı yok — `RegisterScreen.js` ~95'te "18 altı kaydı engellemez" bilinçli notu var. DM'li/UGC'li uygulamada asgari yaş olmadan IARC ve Play hedef-kitle beyanı tutarsız kalır (COPPA riski).
 
@@ -345,7 +360,7 @@
 - **[ ] C2 — Play ürünleri + RevenueCat panel:** Play Console'da abonelik IAP'leri (Pro/Unlimited, TR+global fiyat) → RevenueCat panelinde Play service credentials → Integrations→Webhooks'a fonksiyon URL'si + `Authorization` değeri → paneldeki hazır paywall'un footer'ında Koşullar/Gizlilik linklerinin açık olduğunun teyidi (B5'in panel ayağı).
 - **[ ] C3 — Kapalı test kullanıcıları:** 12+ kişi kesinleşsin; 14 gün sayacı 24 Ağustos'ta başlamalı.
 - **[ ] C4 — Mağaza görselleri:** feature graphic 1024×500, telefon ekran görüntüleri (TR ve EN ayrı setler, ilk 3 kritik), 512×512 ikon. *(AI: ekran görüntüsü çerçeve/başlık metinlerini `store/play/` altına taslaklayabilir; ham görüntüler `store/raw-screenshots/`'ta.)*
-- **[ ] C5 — Data Safety + IARC formları:** beyanlar — Firebase (Auth/Firestore/Analytics), Sentry (crash), RevenueCat (satın alma), Advertising ID, **uzak push CANLI**, UGC (sohbet/yorum/gönderi) VAR + şikâyet/engelleme mekanizmaları (B4 tamamlanmış olmalı). *(AI: soru-cevap taslağı çıkarabilir.)*
+- **[ ] C5 — Data Safety + IARC formları:** **asgari yaş 13** (B7 kararı, kodda uygulandı), beyanlar — Firebase (Auth/Firestore/Analytics), Sentry (crash), RevenueCat (satın alma), Advertising ID, **uzak push CANLI**, UGC (sohbet/yorum/gönderi) VAR + şikâyet/engelleme mekanizmaları (B4 tamamlanmış olmalı). *(AI: soru-cevap taslağı çıkarabilir.)*
 - **[ ] C6 — Eski Gemini anahtarının iptal teyidi:** AI Studio'da eski anahtar + komut satırına yanlışlıkla yazılan ara anahtarın silindiğinin teyidi (yol haritası Faz 0 kalıntısı).
 - **[ ] C7 — Website `mark.todo` alanları:** `website/privacy.html` ve `terms.html` içindeki veri sorumlusu kimliği/ülkesi ve yetkili mahkeme alanları — kullanıcıdan bilgi alınıp doldurulacak, sonra `firebase deploy --only hosting` (onaylı).
 - **[ ] C8 — TMDB ticari kullanım yazışması:** *(AI: e-posta taslağı yazabilir; gönderim kullanıcıda.)*
