@@ -147,7 +147,7 @@ function TabScreenNavigator({ navigation, route }) {
   const [mountedTabs, setMountedTabs] = useState(
     () => new Set(["tvshows", requestedInitialTab])
   );
-  const { t, language, toggleLanguage } = useLanguage();
+  const { t } = useLanguage();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   // Ekran içeriği yüzeye bağlanana kadar null; o sürede çubuk düz katman çizer.
@@ -319,20 +319,6 @@ function TabScreenNavigator({ navigation, route }) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
-      {false && activeTab !== "settings" && (
-        <TouchableOpacity
-          style={[styles.languageButton, { backgroundColor: theme.secondary }]}
-          onPress={() => {
-            toggleLanguage(language === "tr" ? "en" : "tr");
-          }}
-        >
-          <Text
-            style={[styles.languageButtonText, { color: theme.text.primary }]}
-          >
-            {language.toUpperCase()}
-          </Text>
-        </TouchableOpacity>
-      )}
       {/* Çubuğun bulanıklaştırdığı yüzey. PetCompanion bilerek DIŞARIDA: zIndex
           40 ile çubuğun (20) ÜSTÜNDE duruyor, yani camın arkasında değil. */}
       <BlurTargetSurface name={BLUR_SCOPES.screen} style={styles.screenSlot}>
@@ -445,19 +431,6 @@ const styles = StyleSheet.create({
   },
   screen: {
     ...StyleSheet.absoluteFill,
-  },
-  languageButton: {
-    position: "absolute",
-    top: 40,
-    right: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-    zIndex: 1,
-  },
-  languageButtonText: {
-    fontSize: 14,
-    fontWeight: "bold",
   },
   bottomTabs: {
     position: "absolute",

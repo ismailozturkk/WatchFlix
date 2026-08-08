@@ -18,6 +18,7 @@ import {
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import Constants from "expo-constants";
 import AppIcon from "@components/AppIcon";
 import TmdbLogo from "@components/TmdbLogo";
 import Toast from "react-native-toast-message";
@@ -35,7 +36,10 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const APP_VERSION = "v1.21.1";
+// Sürüm TEK KAYNAKTAN: app.json → expo.version. Buraya elle yazılan dize
+// ("v1.21.1") gerçek sürümden kopmuştu ve destek e-postasının konusuna da
+// yanlış sürüm giriyordu — kullanıcı hangi build'i kullandığını söyleyemiyordu.
+const APP_VERSION = `v${Constants.expoConfig?.version ?? "?"}`;
 
 export default function AboutAppScreen() {
   const navigation = useNavigation();
