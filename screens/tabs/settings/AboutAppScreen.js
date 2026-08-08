@@ -25,6 +25,7 @@ import { useNavigation } from "@react-navigation/native";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
+import { legalUrl, SUPPORT_EMAIL } from "@utils/legalLinks";
 import { SettingsSubScreen, buildUiColors } from "./settingsUi";
 
 if (
@@ -34,12 +35,7 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const SUPPORT_EMAIL = "support@seelogd.com";
 const APP_VERSION = "v1.21.1";
-
-// Yasal metinler uygulamada değil sitede tutuluyor: mağaza formları da aynı
-// URL'leri istiyor ve metin değiştiğinde yeni sürüm yayınlamak gerekmiyor.
-const LEGAL_SITE = "https://seelogd.com";
 
 export default function AboutAppScreen() {
   const navigation = useNavigation();
@@ -84,7 +80,9 @@ export default function AboutAppScreen() {
      ?lang= ile uygulamanın dilini geçiyoruz; aksi halde Türkçe uygulamayı
      İngilizce cihazda kullanan biri metni İngilizce görürdü. */
   const openLegalPage = async (page) => {
-    const url = `${LEGAL_SITE}/${page}?lang=${isTr ? "tr" : "en"}`;
+    // URL kurulumu utils/legalLinks.js'te; buradaki açma yolu KALIYOR çünkü
+    // panoya kopyalayan yedeği var (tarayıcı açılmazsa bağlantı kaybolmasın).
+    const url = legalUrl(page, isTr ? "tr" : "en");
     try {
       await Linking.openURL(url);
     } catch (e) {

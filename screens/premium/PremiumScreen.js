@@ -40,6 +40,8 @@ import {
   selectPreferredPackage,
 } from "../../utils/premium";
 import { SettingsSubScreen, buildUiColors } from "../tabs/settings/settingsUi";
+import { i18nText } from "../../utils/i18nText";
+import { openLegalPage } from "../../utils/legalLinks";
 
 const FEATURES = {
   premium: [
@@ -1599,6 +1601,30 @@ export default function PremiumScreen() {
           ? "Satın alma mağaza hesabından tahsil edilir. Abonelik, mevcut dönem bitmeden en az 24 saat önce iptal edilmezse otomatik yenilenir. Aboneliğini mağaza hesap ayarlarından yönetebilirsin."
           : "Payment is charged to your store account. The subscription renews automatically unless canceled at least 24 hours before the current period ends. You can manage it in your store account settings."}
       </Text>
+
+      {/* Apple 3.1.2: abonelik SATIN ALMA NOKTASINDA Kullanım Koşulları (EULA)
+          ve Gizlilik Politikası bağlantıları zorunlu. Eksikliği tek başına ret
+          sebebi. RevenueCat panelindeki hazır paywall'un footer linkleri de
+          ayrıca açık olmalı (yol haritası C2). */}
+      <View style={styles.legalLinks}>
+        <Pressable
+          onPress={() => openLegalPage("terms", tr ? "tr" : "en")}
+          hitSlop={8}
+        >
+          <Text style={[styles.legalLink, { color: C.accent }]}>
+            {i18nText("autoI18n.kullanim_kosullari", "Kullanım Koşulları")}
+          </Text>
+        </Pressable>
+        <Text style={[styles.legal, { color: C.muted }]}>·</Text>
+        <Pressable
+          onPress={() => openLegalPage("privacy", tr ? "tr" : "en")}
+          hitSlop={8}
+        >
+          <Text style={[styles.legalLink, { color: C.accent }]}>
+            {i18nText("autoI18n.gizlilik_politikasi", "Gizlilik Politikası")}
+          </Text>
+        </Pressable>
+      </View>
     </SettingsSubScreen>
   );
 }
@@ -2190,5 +2216,17 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 8,
     marginBottom: 8,
+  },
+  legalLinks: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 14,
+  },
+  legalLink: {
+    fontSize: 11,
+    fontWeight: "700",
+    textDecorationLine: "underline",
   },
 });

@@ -2230,7 +2230,12 @@
     "engellenen_kullanici_yok": "No blocked users",
     "engellenen_kullanici_yok_alt": "Anyone you block will be listed here.",
     "engellendi_mesaj_gonderilemez": "You blocked this user",
-    "mesaji_sikayet_et": "Report message"
+    "mesaji_sikayet_et": "Report message",
+    "kullanim_kosullari": "Terms of Use",
+    "gizlilik_politikasi": "Privacy Policy",
+    "kayit_onay_bas": "By signing up you agree to the ",
+    "kayit_onay_orta": " and ",
+    "kayit_onay_son": "."
   },
   "comments": "Comments"
 }

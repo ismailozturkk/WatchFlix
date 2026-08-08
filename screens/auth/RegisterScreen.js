@@ -37,6 +37,7 @@ import {
 import ScreenDecor from "../../components/ScreenDecor";
 import EmailSuffixRow from "../../components/auth/EmailSuffixRow";
 import BirthDateField from "../../components/auth/BirthDateField";
+import LegalConsentNotice from "../../components/auth/LegalConsentNotice";
 import { alpha } from "../../theme/colors";
 import {
   describeGoogleAuthError,
@@ -721,6 +722,10 @@ export default function RegisterScreen({ navigation }) {
                 </Text>
               </View>
             )}
+
+            {/* Yasal bilgilendirme — kayıt butonunun HEMEN üstünde durmalı
+                (mağaza denetiminde "satın alma/kayıt noktasında görünür" şartı). */}
+            <LegalConsentNotice theme={theme} accent={accent} />
 
             {/* Kayıt ol butonu — solid accent */}
             <TouchableOpacity

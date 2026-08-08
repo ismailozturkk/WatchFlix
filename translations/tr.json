@@ -2230,7 +2230,12 @@
     "engellenen_kullanici_yok": "Engellenen kullanıcı yok",
     "engellenen_kullanici_yok_alt": "Birini engellediğinde burada listelenir.",
     "engellendi_mesaj_gonderilemez": "Bu kullanıcıyı engelledin",
-    "mesaji_sikayet_et": "Mesajı şikâyet et"
+    "mesaji_sikayet_et": "Mesajı şikâyet et",
+    "kullanim_kosullari": "Kullanım Koşulları",
+    "gizlilik_politikasi": "Gizlilik Politikası",
+    "kayit_onay_bas": "Kayıt olarak ",
+    "kayit_onay_orta": "'nı ve ",
+    "kayit_onay_son": "'nı kabul etmiş olursun."
   },
   "comments": "Yorumlar"
 }

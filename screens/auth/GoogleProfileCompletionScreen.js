@@ -35,6 +35,7 @@ import { randomAvatarIndex } from "../../utils/avatars";
 import { syncAgeRestriction } from "../../utils/ageGate";
 import ScreenDecor from "../../components/ScreenDecor";
 import BirthDateField from "../../components/auth/BirthDateField";
+import LegalConsentNotice from "../../components/auth/LegalConsentNotice";
 
 export default function GoogleProfileCompletionScreen({ navigation }) {
   const { theme, selectedTheme } = useTheme();
@@ -319,6 +320,10 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
                 ? "3–20 karakter; harf, sayı ve alt çizgi kullanabilirsin."
                 : "3–20 characters; letters, numbers, and underscore."}
             </Text>
+
+            {/* Yasal bilgilendirme — e-posta kaydıyla aynı: bu ekran da bir
+                kayıt tamamlama noktası, bağlantılar burada da görünmeli. */}
+            <LegalConsentNotice theme={theme} accent={theme.accent} />
 
             <TouchableOpacity
               disabled={!canSave}
