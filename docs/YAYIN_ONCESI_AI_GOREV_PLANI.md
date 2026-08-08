@@ -270,7 +270,15 @@
 
 **Kabul:** sınır altı doğum tarihi iki kayıt yolunda da kaydı tamamlayamıyor; testler yeşil; karar değeri bu dosyaya not edildi.
 
-### [ ] GÖREV B8 — Android izin bloğu temizliği (~30 dk)
+### [~] GÖREV B8 — Android izin bloğu temizliği (kod 2026-08-08, prebuild doğrulaması bekliyor)
+
+> **Sonuç:** `9e76871`. `permissions` iki medya iznine indi, `blockedPermissions` aynen kaldı.
+> `app.json version` 1.4.1 → **1.4.2**.
+>
+> **⚠ KALAN — adım 3 yapılmadı:** `npx expo prebuild -p android --clean` sonrası üretilen
+> `AndroidManifest.xml`'de eski izinlerin gerçekten olmadığı Grep'le doğrulanacak. Prebuild
+> çalışma ağacına `android/` klasörü üretir (gitignore'da), bu yüzden kullanıcı onayıyla
+> çalıştırılmalı. Story kaydetme akışı da manuel test listesinde.
 
 **Bağlam:** `app.json` ~29-40 çelişkili: `permissions` içinde `READ_EXTERNAL_STORAGE` + `WRITE_EXTERNAL_STORAGE` istenmiş, `blockedPermissions` içinde `WRITE_EXTERNAL_STORAGE` yeniden engellenmiş. Story kaydetme için gerçek ihtiyaç: `READ_MEDIA_IMAGES` + `READ_MEDIA_VISUAL_USER_SELECTED`.
 
@@ -294,7 +302,20 @@
 
 **Kabul:** sistem izni yalnız kullanıcı "İzin ver" dedikten sonra isteniyor; ret sonrası akış (mevcut notice) bozulmadı.
 
-### [ ] GÖREV B10 — Küçük temizlikler (~1 saat)
+### [x] GÖREV B10 — Küçük temizlikler (2026-08-08)
+
+> **Sonuç:** `3fa783b`. **expo-doctor 20/20**, `npm test` 60 suite / 917 test yeşil.
+> Sürüm tek kaynak (app.json 1.4.2; package.json 1.1.0'dan esitlendi), ölü blok ve artık
+> stiller silindi, `.env` temizlendi, 5 yama uyuşmazlığı kapandı.
+>
+> **Planın üstüne çıkan:** `.env.example` yalnız "eşleşiyor mu" diye bakılacaktı — eşleşmiyordu
+> ve eksikler kodun gerçekten okuduğu değişkenlerdi (TMDB, Firebase, Google client id'leri).
+> Dosya kodun okuduğu tüm değişkenleri listeleyecek şekilde tamamlandı. `.env` değerlerine
+> bakılmadı, yalnız satır yapısı düzeltildi.
+>
+> **Not:** `npx expo install --fix` ilk çalıştırmada son adımda hata verdi ama sürümleri
+> uygulamıştı; `node_modules`'daki kurulu sürümler tek tek doğrulandı, ikinci çalıştırma
+> "Dependencies are up to date" dedi.
 
 1. **Sürüm dizeleri teke insin:** kaynak `app.json` (`1.4.1`). `package.json` `version`'ı `1.4.1` yap. `screens/tabs/settings/AboutAppScreen.js` ~38'deki sabit `"v1.21.1"` → `expo-constants` ile `Constants.expoConfig?.version` okumasına çevir (destek e-postası konusu da düzelecek).
 2. **Ölü blok:** `screens/navigation/TabScreenNavigator.js` ~322 `{false && activeTab !== "settings" && (...)}` bloğunu tamamen sil.
