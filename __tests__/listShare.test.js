@@ -1,4 +1,5 @@
 import {
+  describeRenameTarget,
   describeSaveTarget,
   listItemToMedia,
   MAX_LIST_NAME_LENGTH,
@@ -249,5 +250,44 @@ describe("kaydetme sayfasının durumu", () => {
   test("boş ad ya da boş liste kaydedilemez", () => {
     expect(describeSaveTarget("", [], 3).canSave).toBe(false);
     expect(describeSaveTarget("Yeni", [], 0).canSave).toBe(false);
+  });
+});
+
+describe("liste yeniden adlandırma", () => {
+  test("boştaki ada izin verir, baştaki/sondaki boşluğu atar", () => {
+    expect(describeRenameTarget("Eski", "  Yeni  ", ["Eski", "Başka"])).toEqual({
+      name: "Yeni",
+      status: "ok",
+      canSave: true,
+    });
+  });
+
+  test("çakışan ad kaydedilemez — kaydetmenin aksine '(2)' ile çözülmez", () => {
+    const target = describeRenameTarget("Eski", "Başka", ["Eski", "Başka"]);
+    expect(target.status).toBe("taken");
+    expect(target.canSave).toBe(false);
+    expect(target.name).toBeNull();
+  });
+
+  test("öntanımlı alan adları rezerve", () => {
+    RESERVED_LIST_NAMES.forEach((name) => {
+      expect(describeRenameTarget("Eski", name, []).status).toBe("reserved");
+    });
+  });
+
+  test("aynı ad hata değil, 'unchanged'", () => {
+    expect(describeRenameTarget("Eski", "Eski", ["Eski"]).status).toBe("unchanged");
+    expect(describeRenameTarget("Eski", " Eski ", ["Eski"]).status).toBe("unchanged");
+  });
+
+  test("boş ve çok uzun adlar elenir", () => {
+    expect(describeRenameTarget("Eski", "   ", []).status).toBe("empty");
+    expect(describeRenameTarget("Eski", null, []).status).toBe("empty");
+    expect(
+      describeRenameTarget("Eski", "a".repeat(MAX_LIST_NAME_LENGTH + 1), []).status,
+    ).toBe("tooLong");
+    expect(
+      describeRenameTarget("Eski", "a".repeat(MAX_LIST_NAME_LENGTH), []).status,
+    ).toBe("ok");
   });
 });

@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import Skeleton from "@components/Skeleton";
 import { useAuth } from "@context/AuthContext";
 import { useLanguage } from "@context/LanguageContext";
@@ -382,10 +383,13 @@ function LastGameCard({ stats, hasPlayed, lastSource, lastMode, lastDifficulty, 
 
 function RulesSheet({ visible, onClose, theme }) {
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalRoot}>
-        <Pressable accessibilityRole="button" accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")} onPress={onClose} style={StyleSheet.absoluteFill} />
-        <SafeAreaView edges={["bottom"]} style={[styles.rulesSheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      intensity={35}
+      dimColor="rgba(0,0,0,0.42)"
+    >
+      <SafeAreaView edges={["bottom"]} style={[styles.rulesSheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
           <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
           <View style={styles.sheetHeader}>
             <View>
@@ -424,9 +428,8 @@ function RulesSheet({ visible, onClose, theme }) {
               {i18nText("autoI18n.anladim", "Anladım")}
             </Text>
           </TouchableOpacity>
-        </SafeAreaView>
-      </View>
-    </Modal>
+      </SafeAreaView>
+    </BottomSheetModal>
   );
 }
 

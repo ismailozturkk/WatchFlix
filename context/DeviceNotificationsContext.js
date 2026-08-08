@@ -21,7 +21,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
 import { useAuth } from "./AuthContext";
 import { useLanguage } from "./LanguageContext";
 import {
@@ -35,7 +35,7 @@ import {
   configureNotificationHandler,
   ensureAndroidChannels,
   setChannelNames,
-  getPermissionStatus,
+  getPermissionInfo,
   requestNotificationPermission,
   registerForPushNotificationsAsync,
   presentNow,
@@ -45,15 +45,20 @@ import {
   REMINDER_PREFIX,
 } from "../services/pushNotificationsService";
 import {
-  computeReminderFireMs,
+  computeReminderSchedule,
   syncReminderNotifications,
 } from "../services/reminderNotificationScheduler";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import useStartupGate from "../hooks/useStartupGate";
 
+// iOS'ta bekleyen local bildirim üst sınırı 64; fazlası sessizce düşer. En
+// yakın tarihli 60'ını zamanlıyoruz (kalan pay foreground sosyal bildirimlere).
+const IOS_PENDING_LIMIT = 60;
+
 const DeviceNotificationsContext = createContext({
   permissionStatus: "undetermined",
+  canAskPermission: true,
   requestPermission: async () => false,
 });
 export const useDeviceNotifications = () => useContext(DeviceNotificationsContext);
@@ -140,7 +145,14 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
   const { reminders } = useProfileReminders();
   const { notes } = useProfileNotes();
 
-  const [permissionStatus, setPermissionStatus] = useState("undetermined");
+  // status + canAskAgain birlikte tutulur: Android 13+'ta izin HİÇ istenmemişken
+  // de status 'denied' döner, ikisini ayıran tek şey canAskAgain (bkz.
+  // services/pushNotificationsService.getPermissionInfo).
+  const [permission, setPermission] = useState({
+    status: "undetermined",
+    canAskAgain: true,
+  });
+  const permissionStatus = permission.status;
 
   // Ayar aynalama (Firestore yazması) + reminder senkronu açılışta acil değil;
   // splash sonrası donma penceresinin dışına ertele. Kapı açıldıktan sonra
@@ -150,7 +162,7 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
   // ── 1. Bir kerelik kurulum: handler + mevcut izin durumu ──────────────────
   useEffect(() => {
     configureNotificationHandler();
-    getPermissionStatus().then(setPermissionStatus);
+    getPermissionInfo().then(setPermission);
   }, []);
 
   // ── 1b. Android kanalları — adları dile göre yerelleştir ──────────────────
@@ -169,16 +181,41 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
   // İzin durumunu uygulama öne geldikçe tazele (kullanıcı OS ayarından değiştirebilir).
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") getPermissionStatus().then(setPermissionStatus);
+      if (state === "active") getPermissionInfo().then(setPermission);
     });
     return () => sub.remove();
   }, []);
 
   const requestPermission = useCallback(async () => {
     const granted = await requestNotificationPermission();
-    setPermissionStatus(granted ? "granted" : "denied");
+    // Durumu diyalogdan SONRA sistemden tazele; canAskAgain de değişmiş olabilir
+    // (Android'de ikinci ret kalıcıdır, iOS'ta ilk retten sonra dialog açılmaz).
+    // Ekranlar buna bakıp kullanıcıyı OS ayarlarına yönlendiriyor.
+    setPermission(await getPermissionInfo());
     return granted;
   }, []);
+
+  // ── 1c. İzni bir kez KENDİLİĞİNDEN iste ──────────────────────────────────
+  // Ayarlarda "Tüm bildirimler" varsayılan olarak AÇIK. Eskiden OS izni yalnız
+  // kullanıcı bu anahtarı elle kapatıp tekrar açtığında isteniyordu; hiç
+  // dokunmayan kullanıcıda izin 'denied' kalıyor ve hatırlatmalar HİÇ
+  // zamanlanmıyordu (canSchedule false → tüm reminder_* iptal). Oturum başına
+  // en fazla bir kez sorulur; OS bir daha sormaya izin vermiyorsa hiç sorulmaz.
+  const autoAskedRef = useRef(false);
+  useEffect(() => {
+    if (!startupReady || !uid || autoAskedRef.current) return;
+    if (!settings.enabled) return;
+    if (permission.status === "granted" || !permission.canAskAgain) return;
+    autoAskedRef.current = true;
+    requestPermission();
+  }, [
+    startupReady,
+    uid,
+    settings.enabled,
+    permission.status,
+    permission.canAskAgain,
+    requestPermission,
+  ]);
 
   // ── 2. Push token kaydı (izin verilince) ─────────────────────────────────
   useEffect(() => {
@@ -272,13 +309,15 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
         if (settings.moviesEnabled) {
           movieReminders.forEach((m) => {
             if (!m?.movieId) return;
-            const fireMs = computeReminderFireMs(m.releaseDate, { leadTimeDays: lead });
-            if (!fireMs) return;
+            // leadDays = GERÇEKLEŞEN erken bildirim; seçilen pencere kaçmışsa
+            // scheduler daha yakın bir slota düşer ve metin ona göre kurulur.
+            const slot = computeReminderSchedule(m.releaseDate, { leadTimeDays: lead });
+            if (!slot) return;
             jobs.push({
               identifier: `${REMINDER_PREFIX}movie_${m.movieId}`,
               title: m.movieName || t.movieReminderNotifications,
-              body: buildReminderBody(lead, t),
-              fireMs,
+              body: buildReminderBody(slot.leadDays, t),
+              fireMs: slot.fireMs,
               channelId: CHANNELS.reminders,
               data: { kind: "reminder", type: "movie", movieId: String(m.movieId) },
             });
@@ -288,14 +327,15 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
         if (settings.tvShowsEnabled) {
           tvEpisodes.forEach((ep) => {
             if (!ep?.episodeId) return;
-            const fireMs = computeReminderFireMs(ep.airDate, { leadTimeDays: lead });
-            if (!fireMs) return;
+            const slot = computeReminderSchedule(ep.airDate, { leadTimeDays: lead });
+            if (!slot) return;
+            const fireMs = slot.fireMs;
             const epLabel = (t.notifEpisodeShort || "S{s}·B{e}")
               .replace("{s}", String(ep.seasonNumber ?? "?"))
               .replace("{e}", String(ep.episodeNumber ?? "?"));
             // Zamanlama bilgisi (kaç gün sonra) bölüm etiketinin hemen ardında —
             // bildirim kısalsa bile "kaç gün sonra" görünür, bölüm adı en sonda.
-            const timing = buildReminderBody(lead, t);
+            const timing = buildReminderBody(slot.leadDays, t);
             jobs.push({
               identifier: `${REMINDER_PREFIX}tv_${ep.episodeId}`,
               title: ep.showName || t.tvReminderNotifications,
@@ -316,7 +356,9 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
           (notes || []).forEach((n) => {
             if (!n?.id || !n.scheduledDate) return;
             // Notlarda lead-time uygulanmaz; seçilen tam tarihte tetiklenir.
-            const fireMs = computeReminderFireMs(n.scheduledDate, { leadTimeDays: 0 });
+            const fireMs = computeReminderSchedule(n.scheduledDate, {
+              leadTimeDays: 0,
+            })?.fireMs;
             if (!fireMs) return;
             const label =
               (n.title && n.title.trim()) ||
@@ -335,7 +377,9 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
       }
 
       // canSchedule false ise jobs=[] → tüm reminder_* iptal edilir.
-      syncReminderNotifications(jobs).catch(() => {});
+      syncReminderNotifications(jobs, {
+        limit: Platform.OS === "ios" ? IOS_PENDING_LIMIT : Infinity,
+      }).catch(() => {});
     }, 800);
 
     return () => {
@@ -472,8 +516,12 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
   }, [navigationRef]);
 
   const value = useMemo(
-    () => ({ permissionStatus, requestPermission }),
-    [permissionStatus, requestPermission],
+    () => ({
+      permissionStatus,
+      canAskPermission: permission.canAskAgain,
+      requestPermission,
+    }),
+    [permissionStatus, permission.canAskAgain, requestPermission],
   );
 
   return (

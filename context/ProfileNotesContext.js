@@ -12,9 +12,9 @@ import { useLanguage } from "./LanguageContext";
 import { isAuthTransitionError } from "../utils/firestoreError";
 import Toast from "react-native-toast-message";
 import { i18nText } from "../utils/i18nText";
-import * as cacheStore from "../utils/cacheStore";
 import { cacheKeys } from "../utils/cacheKeys";
-import { shouldPersistInternetData } from "../utils/dataCacheSettings";
+import { publish, seed } from "../services/snapshotCache";
+import { getActiveUser } from "../services/storage";
 
 
 const ProfileNotesContext = createContext();
@@ -26,7 +26,23 @@ export const ProfileNotesProvider = ({ children }) => {
   const { theme } = useTheme();
   const { language } = useLanguage();
 
-  const [notes,               setNotes]               = useState([]);
+  // AÇILIŞ TOHUMU — son oturumun notları diskten SENKRON okunur, yani ilk
+  // karede çizilir. Aşağıdaki listener efekti de aynı tohumu okuyor ama efekt
+  // ilk boyamadan SONRA çalışıyor.
+  const ilkTohum = useMemo(
+    () => {
+      // Firebase oturumu ASENKRON çözülüyor; ilk render'da `uid` genelde
+      // henüz null. Son aktif kullanıcı depodan senkron okunabiliyor.
+      const tohumUid = uid ?? getActiveUser();
+      return tohumUid ? seed(cacheKeys.notes(tohumUid)).data : null;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const [notes,               setNotes]               = useState(
+    Array.isArray(ilkTohum) ? ilkTohum : [],
+  );
   const [loadingNotes,        setLoadingNotes]        = useState(false);
   const [selectedNote,        setSelectedNote]        = useState(null);
   const [noteContent,         setNoteContent]         = useState("");
@@ -76,8 +92,9 @@ export const ProfileNotesProvider = ({ children }) => {
       setLoadingNotes(false);
       return;
     }
-    // Offline-first: önce cache'ten seed.
-    const cached = cacheStore.getJSON(...cacheKeys.notes(uid));
+    // Offline-first: önce cache'ten seed. İlk render için bu iş yukarıdaki
+    // `ilkTohum` ile zaten yapıldı; burası uid DEĞİŞİMİ (hesap geçişi) içindir.
+    const cached = seed(cacheKeys.notes(uid)).data;
     if (Array.isArray(cached)) {
       setNotes(cached);
       setLoadingNotes(false);
@@ -105,18 +122,16 @@ export const ProfileNotesProvider = ({ children }) => {
               console.warn("Error checking old notes:", err?.message);
           }
           setNotes([]);
-          if (shouldPersistInternetData({ category: "notes" })) {
-            cacheStore.setJSON(...cacheKeys.notes(uid), []);
-          }
+          // "Verileri indir" ayarına bilerek TABİ DEĞİL: o ayar TMDB içeriği
+          // içindir, bu kullanıcının kendi notları.
+          publish(cacheKeys.notes(uid), []);
           setLoadingNotes(false);
         } else {
           const fetched = snap.docs
             .map((d) => ({ ...d.data(), id: d.id }))
             .sort((a, b) => b.createdAt - a.createdAt);
           setNotes(fetched);
-          if (shouldPersistInternetData({ category: "notes" })) {
-            cacheStore.setJSON(...cacheKeys.notes(uid), fetched);
-          }
+          publish(cacheKeys.notes(uid), fetched);
           setLoadingNotes(false);
         }
       },

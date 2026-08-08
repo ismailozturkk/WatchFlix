@@ -41,7 +41,15 @@ export default function WatchedAdd({
   const { user } = useAuth();
   const { language } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
-  const showReleaseDateTime = new Date(showReleaseDate);
+  // TMDB henüz yayınlanmamış bölümlerde air_date'i null döner. `new Date(null)`
+  // Invalid Date değil, epoch (1970-01-01) üretir; korumasız bırakılırsa
+  // "Yayın Tarihi" kutusu "1 Ocak 1970" gösterir ve dokunulunca Firestore'a
+  // dateAdded: "1970-01-01" yazılır. undefined ise Intl.format doğrudan atar.
+  const parsedReleaseDate = showReleaseDate ? new Date(showReleaseDate) : null;
+  const showReleaseDateTime =
+    parsedReleaseDate && !isNaN(parsedReleaseDate.getTime())
+      ? parsedReleaseDate
+      : null;
   const [modalVisible, setModalVisible] = useState(false);
   const [watchHistoryVisible, setWatchHistoryVisible] = useState(false);
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
@@ -264,10 +272,15 @@ export default function WatchedAdd({
               </Text>
             </TouchableOpacity>
 
-            {/* Yayın Tarihi */}
+            {/* Yayın Tarihi — air_date bilinmiyorsa seçenek devre dışı */}
             <TouchableOpacity
-              style={[styles.optionCard, { backgroundColor: theme.primary }]}
+              style={[
+                styles.optionCard,
+                { backgroundColor: theme.primary },
+                !showReleaseDateTime && { opacity: 0.45 },
+              ]}
               onPress={() => markEpisodeAsWatched(showReleaseDateTime)}
+              disabled={!showReleaseDateTime}
               activeOpacity={0.75}
             >
               <View
@@ -294,7 +307,9 @@ export default function WatchedAdd({
                   { color: theme.text?.secondary ?? "#aaa" },
                 ]}
               >
-                {formatDate(showReleaseDateTime)}
+                {showReleaseDateTime
+                  ? formatDate(showReleaseDateTime)
+                  : i18nText("autoI18n.bilinmiyor", "Bilinmiyor")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -324,7 +339,7 @@ export default function WatchedAdd({
             title={i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}
             subtitle={i18nText("autoI18n.bu_bolumu_ne_zaman_izlediniz", "Bu bölümü ne zaman izlediniz?")}
             confirmLabel="Tarihi Onayla"
-            minDate={showReleaseDateTime}
+            minDate={showReleaseDateTime || undefined}
             maxDate={new Date()}
           />
         </View>

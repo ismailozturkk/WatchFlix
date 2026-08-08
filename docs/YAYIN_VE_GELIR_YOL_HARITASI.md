@@ -113,10 +113,29 @@ envanter çıkarmış. Yayın öncesi **mutlaka** yapılacak alt küme:
 - **PetCompanion sürekli animasyon + BlurView**: düşük cihazlarda `deviceTier`
   kontrolüyle kapat/durağanlaştır.
   - Sprite kare hızı kısma ✅ (`perfPreset.spriteFpsScale`).
-  - BlurView: `components/common/AdaptiveBlurView.js` eklendi — `low` katmanda
-    blur yerine yarı saydam düz katman çizer, mid/high'da görüntü birebir aynı.
-    **Geçiş TAMAMLANDI (29 Tem):** 28 dosya AdaptiveBlurView kullanıyor;
-    `expo-blur`'ü doğrudan import eden tek dosya sarmalayıcının kendisi.
+  - BlurView: `components/common/AdaptiveBlurView.js` eklendi — blur
+    çizilemeyecek durumlarda yarı saydam düz katman çizer.
+    **Geçiş TAMAMLANDI (29 Tem):** 27 dosyada 37 kullanım; `expo-blur`'ü
+    doğrudan import eden tek dosya sarmalayıcının kendisi.
+  - **SDK 57 kırılması ve onarımı (6 Ağu):** expo-blur 15.0.8 → 57.0.2
+    yükseltmesi, 55.0.0'ın kırıcı değişikliğini beraberinde getirdi —
+    Android'de `dimezisBlurView` artık bir `BlurTargetView` olmadan çalışmıyor,
+    `experimentalBlurMethod` de `blurMethod` olarak yeniden adlandırıldı.
+    Yükseltme commit'i hiçbir blur dosyasına dokunmadığı için Android'deki blur
+    çökme/log olmadan düz karartmaya düştü ve fark edilmedi. Onarım:
+    - Karar `utils/blurSupport.js`'te (saf + test edildi): iOS her zaman blur,
+      Android'de **API 31+ ve hedef varsa** blur, aksi halde düz katman.
+    - Hedef altyapısı `components/common/BlurTarget.js`. **Kural: blur bileşeni
+      hedefin KARDEŞİ olmalı, içinde değil** — Android 12+'ta çalışan
+      `RenderNodeBlurController`'da kendini yakalamadan hariç tutan koruma yok
+      (eski yazılım yolunda var). Bu yüzden bağlama otomatik değil, açık.
+    - Sekme çubuğu bağlandı (`TabScreenNavigator`): ekran içeriği
+      `BlurTargetSurface` ile sarıldı, çubuk onun kardeşi.
+    - İşlevsiz `experimentalBlurMethod` prop'u 19 çağrı yerinden kaldırıldı
+      (her mount'ta iOS'ta da uyarı basıyordu).
+    - Bağlanmamış çağrı yerleri Android'de düz katmana düşüyor — bugünkü
+      davranış, gerileme yok. RN `Modal` içindeki 25 kullanım ayrı pencerede
+      çizildiği için bu API ile bağlanamıyor.
 - **ProfileStatsContext global ağır türetme**: hesaplamayı ekrana girişte lazy yap.
 - **Açılışta toptan provider mount**: ağır context'leri (Posts, Stats) ilk kullanım
   anına ertele.

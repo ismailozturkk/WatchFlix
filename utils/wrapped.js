@@ -7,6 +7,11 @@
 // Tüm fonksiyonlar saftır: aynı girdi → aynı çıktı. Ekran tarafında useMemo
 // ile sarılır, böylece her render'da yeniden hesaplanmaz.
 
+// "YYYY-MM-DD" — uygulamanın dateAdded/episodeWatchTime için ürettiği biçim
+// (bkz. utils/mediaFacts.todayListDate, utils/watchHistory.normalizeWatchDate).
+// Sonu kapalı ($) tutuluyor ki saat içeren tam ISO string'ler bu daldan geçmesin.
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 /**
  * Çeşitli tarih formatlarını Date'e çevirir.
  * Destekler: Date, Firestore Timestamp ({seconds}), "YYYY-MM-DD"/ISO string,
@@ -18,6 +23,13 @@ export const toDate = (value) => {
   if (typeof value === "object" && typeof value.seconds === "number")
     return new Date(value.seconds * 1000);
   if (typeof value === "string") {
+    // KRİTİK: "YYYY-MM-DD" ES spec'e göre UTC gece yarısı çözülür, ama aşağıdaki
+    // yearOf/dayKey/tallyDate YEREL alanları (getFullYear/getMonth/getDate) okur.
+    // Negatif UTC ofsetinde gün bir geri kayar → 1 Ocak'ta izlenen film önceki
+    // yılın Wrapped'ine düşer. Tarih-only değerler YEREL kurulur.
+    // (Aynı koruma: utils/airDate.js ve utils/watchScoring.js)
+    const m = DATE_ONLY.exec(value.trim());
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
     const d = new Date(value);
     return isNaN(d.getTime()) ? null : d;
   }

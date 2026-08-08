@@ -4,9 +4,10 @@
 // et, Oturumu bitir, Ana ekrana don. Saf gosterim; aksiyonlar prop ile gelir.
 
 import React from "react";
-import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import { i18nText } from "@utils/i18nText";
 
 export default function ExitGameSheet({
@@ -17,15 +18,13 @@ export default function ExitGameSheet({
   onQuitToHome,
 }) {
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onResume}>
-      <View style={styles.exitSheetRoot}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onResume}
-          accessibilityRole="button"
-          accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
-        />
-        <SafeAreaView edges={["bottom"]} style={[styles.exitSheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+    <BottomSheetModal
+      visible={visible}
+      onClose={onResume}
+      intensity={30}
+      dimColor="rgba(0,0,0,0.45)"
+    >
+      <SafeAreaView edges={["bottom"]} style={[styles.exitSheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
           <View style={[styles.exitHandle, { backgroundColor: theme.border }]} />
           <Text style={[styles.exitTitle, { color: theme.text.primary }]}>
             {i18nText("autoI18n.oyundan_cik_baslik", "Oyundan çıkmak istiyor musun?")}
@@ -61,14 +60,12 @@ export default function ExitGameSheet({
               {i18nText("autoI18n.ana_ekrana_don", "Ana Ekrana Dön")}
             </Text>
           </TouchableOpacity>
-        </SafeAreaView>
-      </View>
-    </Modal>
+      </SafeAreaView>
+    </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  exitSheetRoot: { flex: 1, backgroundColor: "rgba(0,0,0,0.58)", justifyContent: "flex-end" },
   exitSheet: { borderTopLeftRadius: 26, borderTopRightRadius: 26, borderWidth: 1, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 14 },
   exitHandle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
   exitTitle: { fontSize: 18, fontWeight: "900" },

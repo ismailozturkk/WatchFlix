@@ -41,7 +41,8 @@ import {
   materializeMovieWatchEvents,
   normalizeWatchDate,
 } from "../utils/watchHistory";
-import { resolveListName } from "../utils/listShare";
+import { resolveListName, RESERVED_LIST_NAMES } from "../utils/listShare";
+import { assertWatchable } from "../utils/watchState";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 import { trackFirstContentActivation } from "./activationAnalytics";
 
@@ -94,11 +95,17 @@ export async function removeFromList(uid, listKey, type, id) {
  * Filmin her izlenmesini aynı kanonik belge içinde ayrı olay olarak saklar.
  * İlk yazmada eski liste alanları korunur; sonraki yazmalar üyeliği silmeden
  * geçmişe yeni bir occurrence ekler.
+ *
+ * `item.releaseDate` / `item.status` YAZILMAZ (normalizeItem beyaz listesinde
+ * yok) — yalnız yayın kapısını beslerler. Ekranlar zaten butonu kilitliyor;
+ * buradaki kontrol son savunma hattı: yeni bir çağrı yeri eklendiğinde sessizce
+ * bozuk istatistik yazmak yerine görünür biçimde hata verir.
  */
 export async function markMovieWatch(uid, item, watchDate) {
   if (!uid || item?.id == null) return null;
   const watchedAt = normalizeWatchDate(watchDate);
   if (!watchedAt) return null;
+  assertWatchable(item?.releaseDate, item?.status);
   const ref = doc(db, "Lists", uid, "watchedMovies", itemKey("movie", item.id));
   const event = {
     id: createWatchEventId(`movie_${item.id}`),
@@ -300,6 +307,88 @@ export async function addToCustomRootList(uid, listName, item) {
   });
 
   return added;
+}
+
+/**
+ * Öğeyi ESKİ MODELDEKİ özel listeden (kök doküman alanındaki dizi) çıkarır —
+ * `addToCustomRootList`in tersi ve onunla aynı iki inceliğe tabi:
+ *
+ *  • Transaction: kök doküman TÜM özel listeleri taşıyor; oku-değiştir-yaz'ı
+ *    istemcide yapmak başka bir cihazdaki eşzamanlı eklemeyi sessizce siler.
+ *  • `tx.set(..., { merge: true })` — `updateDoc` DEĞİL: updateDoc string
+ *    anahtardaki noktaları alan yolu ayracı sayar ve "S.W.A.T. Favorilerim"
+ *    gibi bir liste adı iç içe map'e dönüşüp liste tamamen kaybolur.
+ *
+ * @returns {Promise<boolean>} çıkarıldıysa true, öğe listede değilse false
+ */
+export async function removeFromCustomRootList(uid, listName, type, id) {
+  if (!uid || !listName || id == null || !type) return false;
+  const ref = doc(db, "Lists", uid);
+  let removed = false;
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.exists() ? snap.data() : {};
+    const current = Array.isArray(data[listName]) ? data[listName] : [];
+    const next = current.filter(
+      (it) =>
+        !(
+          it &&
+          String(it.id) === String(id) &&
+          (it.type || "movie") === type
+        ),
+    );
+    if (next.length === current.length) return;
+    tx.set(ref, { [listName]: next }, { merge: true });
+    removed = true;
+  });
+
+  return removed;
+}
+
+/**
+ * ESKİ MODELDEKİ özel listenin ADINI değiştirir (kök dokümandaki dizi alanı):
+ * öğeler aynı diziyle yeni anahtara taşınır, eski anahtar silinir.
+ *
+ * Öntanımlı dört liste (favorites/watchList/watchedMovies/watchedTv) buradan
+ * geçmez — onlar alan adı DEĞİL, şemanın parçası; adları çevirilerden gelir.
+ * Defter modeline (`customLists`) geçildiğinde yerini `renameCustomList` alır.
+ *
+ * `addToCustomRootList` ile aynı iki incelik geçerli:
+ *  • Transaction: kök doküman TÜM özel listeleri taşıyor; oku-değiştir-yaz'ı
+ *    istemcide yapmak başka cihazdaki eşzamanlı eklemeyi sessizce siler.
+ *  • `tx.set(..., { merge: true })` — `updateDoc` DEĞİL: updateDoc string
+ *    anahtardaki noktaları alan yolu ayracı sayar, "S.W.A.T." iç içe map olur.
+ *
+ * Çakışma kararı İŞLEM İÇİNDE, sunucudaki güncel duruma göre verilir:
+ * kullanıcı ekrandaki adları gördüğünden beri başka cihazda liste açmış
+ * olabilir; arayüzdeki listeye bakarak yazmak var olanı sessizce ezerdi.
+ *
+ * @returns {Promise<"ok"|"missing"|"taken">}
+ */
+export async function renameCustomRootList(uid, oldName, newName) {
+  const from = String(oldName ?? "").trim();
+  const to = String(newName ?? "").trim();
+  if (!uid || !from || !to) return "missing";
+  if (from === to) return "ok";
+
+  const ref = doc(db, "Lists", uid);
+  let result = "ok";
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.exists() ? snap.data() : {};
+    if (!Array.isArray(data[from])) {
+      result = "missing";
+      return;
+    }
+    if (RESERVED_LIST_NAMES.includes(to) || data[to] !== undefined) {
+      result = "taken";
+      return;
+    }
+    tx.set(ref, { [to]: data[from], [from]: deleteField() }, { merge: true });
+    result = "ok";
+  });
+  return result;
 }
 
 // ── Paylaşılan listeyi profile kopyalama ─────────────────────────────────────

@@ -9,10 +9,8 @@ import {
   Animated,
   Easing,
   Pressable,
-  Dimensions,
-} from "react-native";
+  } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
 import LottieView from "lottie-react-native";
@@ -20,7 +18,7 @@ import { useListStatusContext } from "../context/ListStatusContext";
 import { useSharedLists } from "../context/SharedListsContext";
 import SharedListsSection from "./SharedListsSection";
 import { useHapticsSettings } from "../context/AppSettingsContext";
-import AdaptiveBlurView from "./common/AdaptiveBlurView";
+import ModalBlurBackdrop from "./common/ModalBlurBackdrop";
 import ListActionIcon from "./common/ListActionIcon";
 import * as Haptics from "@services/hapticsService";
 import { i18nText } from "../utils/i18nText";
@@ -421,12 +419,7 @@ const ListViewTv = ({
       >
         <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} />
-          <AdaptiveBlurView
-            tint="dark"
-            intensity={50}
-            experimentalBlurMethod="dimezisBlurView"
-            style={StyleSheet.absoluteFill}
-          />
+          <ModalBlurBackdrop intensity={50} />
 
           <Animated.View
             style={[

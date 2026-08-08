@@ -13,7 +13,6 @@ import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { SeasonSkeleton } from "../../components/Skeleton";
-import RatingStars from "../../components/RatingStars";
 import BackButton from "../../components/BackButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -21,7 +20,6 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import LottieView from "lottie-react-native";
 import WatchedAdd from "./WatchedAdd";
 import { useWatchedShow } from "../../hooks/useWatchedShow";
-import AntDesign from "@expo/vector-icons/AntDesign";
 import {
   useApiSettings,
   useImageQualitySettings,
@@ -31,6 +29,7 @@ import ScreenSnow from "../../components/ScreenSnow";
 import { daysUntil, parseAirDate } from "../../utils/airDate";
 import ScopedCommentButton from "../../components/comments/ScopedCommentButton";
 import { COMMENT_SCOPE } from "../../utils/commentScope";
+import { alpha } from "../../theme/colors";
 
 const { width } = Dimensions.get("window");
 
@@ -62,7 +61,6 @@ const EpisodeCard = memo(
     isPlaying,
     dateDiff,
     onPress,
-    adjustOpacity,
     isWatched,
     watchEvents,
   }) => {
@@ -136,7 +134,7 @@ const EpisodeCard = memo(
             <View
               style={[
                 styles.runtimeBadge,
-                { backgroundColor: adjustOpacity(theme.secondary, 0.82) },
+                { backgroundColor: alpha(theme.secondary, 0.82) },
               ]}
             >
               <Ionicons
@@ -366,12 +364,6 @@ export default function SeasonDetails({ route, navigation }) {
     },
     [language],
   );
-
-  const adjustOpacity = useCallback((rgbColor, opacity) => {
-    const rgb = rgbColor.match(/\d+/g);
-    if (!rgb) return rgbColor;
-    return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${opacity})`;
-  }, []);
 
   // Takvim günü farkı (bkz. utils/airDate.js) — "geçen süre" ile hesaplanırsa
   // yarın yayınlanacak bölüm için "Bugün" yazıyordu.
@@ -713,7 +705,6 @@ export default function SeasonDetails({ route, navigation }) {
                 t={t}
                 isPlaying={episode.id === play}
                 dateDiff={dateDiff}
-                adjustOpacity={adjustOpacity}
                 isWatched={watched.isEpisodeWatched(seasonNumber, episode.episode_number)}
                 watchEvents={watched.episodeWatchEvents(
                   seasonNumber,

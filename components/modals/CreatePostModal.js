@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -28,7 +28,7 @@ import { useLanguage } from "@context/LanguageContext";
 import { useApiSettings, useContentSettings, useImageQualitySettings } from "@context/AppSettingsContext";
 import axios from "axios";
 import { SafeAreaView } from "react-native-safe-area-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getPostDrafts, setPostDrafts } from "../../services/postDraftService";
 import Toast from "react-native-toast-message";
 import { Octicons } from "@expo/vector-icons";
 import { useAuth } from "@context/AuthContext";
@@ -276,12 +276,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     postTypeAnim.setValue(TYPE_INDEX[type] ?? 0);
   }, [visible, editingPost, initialPost]);
 
-  const loadDrafts = async () => {
-    try {
-      const stored = await AsyncStorage.getItem("post_drafts");
-      if (stored) setDrafts(JSON.parse(stored));
-    } catch (e) { console.log(e); }
-  };
+  const loadDrafts = async () => setDrafts(getPostDrafts());
 
   const isSavedDraft = useMemo(() => {
     if (!currentDraftId) return false;
@@ -322,10 +317,9 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
       setCurrentDraftId(draftData.id);
     }
     setDrafts(updatedDrafts);
-    try {
-      await AsyncStorage.setItem("post_drafts", JSON.stringify(updatedDrafts));
+    if (setPostDrafts(updatedDrafts)) {
       Toast.show({ type: "success", text1: i18nText("autoI18n.kaydedildi", "Kaydedildi"), text2: i18nText("autoI18n.taslaginiz_basariyla_kaydedildi", "Taslağınız başarıyla kaydedildi.") });
-    } catch (e) {
+    } else {
       Toast.show({ type: "error", text1: i18nText("autoI18n.hata", "Hata"), text2: i18nText("autoI18n.taslak_kaydedilemedi", "Taslak kaydedilemedi.") });
     }
   };
@@ -344,7 +338,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
   const deleteDraft = async (id) => {
     const updated = drafts.filter((d) => d.id !== id);
     setDrafts(updated);
-    await AsyncStorage.setItem("post_drafts", JSON.stringify(updated));
+    setPostDrafts(updated);
   };
 
   // Debounced search

@@ -20,9 +20,9 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 import { isAuthTransitionError } from "../utils/firestoreError";
-import * as cacheStore from "../utils/cacheStore";
 import { cacheKeys } from "../utils/cacheKeys";
-import { shouldPersistInternetData } from "../utils/dataCacheSettings";
+import { publish, seed } from "../services/snapshotCache";
+import { getActiveUser } from "../services/storage";
 import {
   migrateUserIfNeeded,
   updateUserProfile,
@@ -39,8 +39,28 @@ export function UserProfileProvider({ children }) {
   const { user } = useAuth();
   const uid = user?.uid;
 
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // AÇILIŞ TOHUMU — son oturumun profili diskten SENKRON okunur, yani ilk
+  // karede çizilir. Aşağıdaki listener efekti de aynı tohumu okuyordu ama
+  // efekt ilk boyamadan SONRA çalıştığı için önbellek dolu olsa bile bir kare
+  // "yükleniyor" görünüyordu.
+  //
+  // `useMemo(..., [])`: yalnız ilk render. uid sonradan değişirse (giriş) o
+  // geçişi listener efekti kendi tohumuyla karşılıyor.
+  const ilkTohum = useMemo(
+    () => {
+      // Firebase oturumu ASENKRON çözülüyor; ilk render'da `uid` çoğu zaman
+      // henüz null olur ve tohum hiç okunmazdı. Depodaki son aktif kullanıcı
+      // senkron okunabildiği için tohumu ondan alıyoruz (aynı desen:
+      // ListStatusContext).
+      const tohumUid = uid ?? getActiveUser();
+      return tohumUid ? seed(cacheKeys.profile(tohumUid)) : null;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const [profile, setProfile] = useState(ilkTohum?.data ?? null);
+  const [loading, setLoading] = useState(!ilkTohum?.hasCache);
   const [migrating, setMigrating] = useState(false);
 
   const migrationDoneRef = useRef(new Set());
@@ -72,9 +92,11 @@ export function UserProfileProvider({ children }) {
   useEffect(() => {
     if (!uid) return;
     // Offline-first: önce cache'ten anında seed et (internet yoksa da gösterir).
-    const cached = cacheStore.getJSON(...cacheKeys.profile(uid));
-    if (cached) {
-      setProfile(cached);
+    // İlk render için bu iş yukarıdaki `ilkTohum` ile zaten yapıldı; burası
+    // uid DEĞİŞİMİ (hesap geçişi) içindir.
+    const cached = seed(cacheKeys.profile(uid));
+    if (cached.hasCache) {
+      setProfile(cached.data);
       setLoading(false);
     } else {
       setLoading(true);
@@ -85,9 +107,10 @@ export function UserProfileProvider({ children }) {
         if (snap.exists()) {
           const p = { uid: snap.id, ...snap.data() };
           setProfile(p);
-          if (shouldPersistInternetData({ category: "profile" })) {
-            cacheStore.setJSON(...cacheKeys.profile(uid), p);
-          }
+          // "Verileri indir" ayarına bilerek TABİ DEĞİL: o ayar TMDB içeriğini
+          // indirmekle ilgili, bu kullanıcının kendi profili. Tutmamak veri
+          // tasarrufu sağlamıyor, yalnızca her açılışı yavaşlatıyordu.
+          publish(cacheKeys.profile(uid), p);
         } else {
           setProfile(null);
         }

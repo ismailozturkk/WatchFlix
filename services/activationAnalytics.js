@@ -1,7 +1,6 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, get, set } from "./storage";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 
-const FIRST_CONTENT_PREFIX = "analytics/first-content/";
 const pendingByUser = new Map();
 
 /**
@@ -10,23 +9,23 @@ const pendingByUser = new Map();
  * Firestore yazımı başarıyla bittikten sonra çağrılır; ölçüm hiçbir zaman asıl
  * izleme akışını bekletmez veya bozmaz. UID anahtarı hesap değişimlerinde
  * kullanıcıların birbirinin aktivasyon bayrağını paylaşmasını engeller.
+ *
+ * Damga çıkışta SİLİNMEZ (registry: firstContentAt → keepOnLogout): silinseydi
+ * geri dönen kullanıcı aynı olayı ikinci kez üretir ve metrik şişerdi.
  */
 export function trackFirstContentActivation(uid, params = {}) {
   if (!uid) return Promise.resolve(false);
   if (pendingByUser.has(uid)) return pendingByUser.get(uid);
 
   const task = (async () => {
-    const key = `${FIRST_CONTENT_PREFIX}${uid}`;
-    try {
-      if (await AsyncStorage.getItem(key)) return false;
-      await AsyncStorage.setItem(key, new Date().toISOString());
-      trackEvent(ANALYTICS_EVENTS.FIRST_CONTENT_TRACKED, params);
-      return true;
-    } catch {
-      // AsyncStorage kullanılamıyorsa ürün akışını etkileme. Bu oturumda aynı
-      // olayı art arda üretmemek için in-flight guard yine de yeterlidir.
+    if (get(Keys.firstContentAt, { uid })) return false;
+    if (!set(Keys.firstContentAt, new Date().toISOString(), { uid })) {
+      // Depolama kullanılamıyorsa ürün akışını etkileme. Bu oturumda aynı olayı
+      // art arda üretmemek için in-flight guard yine de yeterli.
       return false;
     }
+    trackEvent(ANALYTICS_EVENTS.FIRST_CONTENT_TRACKED, params);
+    return true;
   })().finally(() => pendingByUser.delete(uid));
 
   pendingByUser.set(uid, task);

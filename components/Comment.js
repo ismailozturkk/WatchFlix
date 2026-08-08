@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
-  ActivityIndicator,
   StyleSheet,
   Dimensions
 } from "react-native";

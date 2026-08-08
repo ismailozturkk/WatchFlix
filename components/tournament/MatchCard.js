@@ -1,9 +1,15 @@
 // components/tournament/MatchCard.js
 //
-// Tek bir eleme maçı: yan yana iki poster. OYLAMA = POSTERE 2 KEZ BASMA:
-//   1. basış → o posterin üzerinde "Seçimi onayla" katmanı belirir (hafif büyür)
-//   2. basış → oy kaydedilir (onVote)
-// Diğer postere basmak beklemeyi oraya taşır; 2.6 sn dokunulmazsa iptal olur.
+// Tek bir eleme maçı: yan yana iki poster. OYLAMA = POSTERE BASIP SEÇENEK SEÇME:
+//   1. basış → o posterin üzerinde onay katmanı açılır (hafif büyür)
+//   2. adım  → katmandaki İKİ seçenekten biri:
+//        • Onayla → oy kaydedilir (onVote), değiştirilemez
+//        • Bilgi  → yapımın detay sayfasına gider (onInfo)
+//      Katmanın BOŞLUĞUNA basmak vazgeçer. Diğer postere basmak beklemeyi oraya
+//      taşır; hiç dokunulmazsa PENDING_TIMEOUT sonunda kendiliğinden kapanır.
+//
+// Onay bilerek "tekrar bas" değil AÇIK SEÇİM: oy geri alınamıyor, kullanıcı
+// karar vermeden önce yapımın detayına gidebilmeli.
 //
 // Ayrıca: canlı oy yüzdesi barları, "senin oyun" rozeti, tur bittiğinde kazanan
 // kupası + kaybedenin solması, henüz belli olmayan rakip için "?" yer tutucu.
@@ -14,8 +20,8 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
-  withTiming,
-  FadeIn,
+  FadeInDown,
+  FadeInUp,
 } from "react-native-reanimated";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -25,24 +31,32 @@ import { i18nText } from "@utils/i18nText";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const PRESS_SPRING = { mass: 0.5, damping: 13, stiffness: 200 };
-const PENDING_TIMEOUT = 2600;
+// Basış geri bildirimi: parmak inince poster küçülür, kalkınca yayla döner.
+const PRESS_SCALE = 0.95;
+// Uygulamanın onay/başarı yeşili — finalist rozeti ve "Hype verildi" çipiyle
+// AYNI değer (temada `success` belirteci yok, turnuva ekranı bunu sabit kullanır).
+const CONFIRM_GREEN = "#22C55E";
+// Katmanda artık okunacak iki seçenek var; eski 2.6 sn karar vermeye yetmiyordu.
+const PENDING_TIMEOUT = 6000;
 
 // ─── Tek poster hücresi ───────────────────────────────────────────────────────
 function Cell({
   side, contestant, votes, total, pct,
   isMyPick, isWinner, isLoser, isPending, locked,
-  onPress, theme, getTmdbUrl, lang,
+  onPress, onConfirm, onInfo, theme, getTmdbUrl, lang,
 }) {
-  const scale = useSharedValue(1);
-  const lift = useSharedValue(0);
+  // İki ölçek AYRI tutulup çarpılır: biri parmak basılıyken küçültür, diğeri
+  // onay katmanı açıkken kartı hafifçe öne çıkarır. Tek değere yazsalardı
+  // basış bırakıldığında pending büyümesi de sıfırlanırdı.
+  const press = useSharedValue(1);
+  const lift = useSharedValue(1);
 
   useEffect(() => {
-    scale.value = withSpring(isPending ? 1.045 : 1, PRESS_SPRING);
-    lift.value = withTiming(isPending ? 1 : 0, { duration: 160 });
+    lift.value = withSpring(isPending ? 1.045 : 1, PRESS_SPRING);
   }, [isPending]);
 
   const aStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+    transform: [{ scale: press.value * lift.value }],
   }));
 
   const empty = !contestant;
@@ -53,6 +67,8 @@ function Cell({
     <AnimatedPressable
       disabled={empty || locked}
       onPress={() => onPress(side)}
+      onPressIn={() => { press.value = withSpring(PRESS_SCALE, PRESS_SPRING); }}
+      onPressOut={() => { press.value = withSpring(1, PRESS_SPRING); }}
       style={[styles.cell, aStyle]}
     >
       <View
@@ -119,21 +135,64 @@ function Cell({
           )}
         </LinearGradient>
 
-        {/* "Seçimi onayla" katmanı (1. basıştan sonra) */}
+        {/* Onay katmanı: posteri TAM kaplayan iki yarım buton.
+            Üst yarı Onayla (beyaz), alt yarı Bilgi (accent). İkisi de dairesel
+            ikon rozeti + etiket taşır; üzerlerindeki şeffaf→koyu gradyan düz
+            dolguya derinlik verir (accent'in tonunu bilmeye gerek kalmadan).
+            Yarımlar zıt yönlerden girer: katman "ortadan açılıyor" hissi verir.
+            Poster tamamen kapandığı için vazgeçme kartın boşluğundan (VS
+            dairesi/kenarlar) ya da PENDING_TIMEOUT ile olur. */}
         {isPending && (
-          <Animated.View
-            entering={FadeIn.duration(140)}
-            style={[styles.confirmOverlay, { backgroundColor: theme.accent + "E6" }]}
-            pointerEvents="none"
-          >
-            <AppIcon family="Ionicons" name="checkmark-circle" size={30} color="#fff" />
-            <Text style={styles.confirmText}>
-              {i18nText("autoI18n.tournament_confirm", "Seçimi onayla")}
-            </Text>
-            <Text style={styles.confirmSub}>
-              {i18nText("autoI18n.tournament_confirm_final_sub", "tekrar bas — değiştirilemez")}
-            </Text>
-          </Animated.View>
+          <View style={styles.confirmOverlay}>
+            <Animated.View entering={FadeInDown.duration(170)} style={styles.confirmHalf}>
+              <Pressable
+                onPress={() => onConfirm(side)}
+                style={({ pressed }) => [
+                  styles.confirmHalfInner,
+                  styles.confirmHalfPrimary,
+                  pressed && styles.confirmHalfPressed,
+                ]}
+                accessibilityRole="button"
+              >
+                <LinearGradient
+                  colors={["rgba(255,255,255,0.16)", "rgba(0,0,0,0.22)"]}
+                  style={StyleSheet.absoluteFill}
+                  pointerEvents="none"
+                />
+                <View style={styles.confirmBadgeLight}>
+                  <AppIcon family="Ionicons" name="checkmark-sharp" size={19} color="#fff" />
+                </View>
+                <Text numberOfLines={1} style={[styles.confirmHalfText, { color: "#fff" }]}>
+                  {i18nText("autoI18n.tournament_confirm_short", "Onayla")}
+                </Text>
+              </Pressable>
+            </Animated.View>
+
+            <Animated.View entering={FadeInUp.duration(170)} style={styles.confirmHalf}>
+              <Pressable
+                onPress={() => onInfo(side)}
+                style={({ pressed }) => [
+                  styles.confirmHalfInner,
+                  styles.confirmHalfInfo,
+                  { backgroundColor: theme.accent },
+                  pressed && styles.confirmHalfPressed,
+                ]}
+                accessibilityRole="button"
+              >
+                <LinearGradient
+                  colors={["rgba(255,255,255,0.16)", "rgba(0,0,0,0.22)"]}
+                  style={StyleSheet.absoluteFill}
+                  pointerEvents="none"
+                />
+                <View style={styles.confirmBadgeLight}>
+                  <AppIcon family="Ionicons" name="information" size={19} color="#fff" />
+                </View>
+                <Text numberOfLines={1} style={[styles.confirmHalfText, { color: "#fff" }]}>
+                  {i18nText("autoI18n.tournament_info", "Bilgi")}
+                </Text>
+              </Pressable>
+            </Animated.View>
+          </View>
         )}
       </View>
     </AnimatedPressable>
@@ -142,7 +201,7 @@ function Cell({
 
 // ─── Maç ──────────────────────────────────────────────────────────────────────
 export default function MatchCard({
-  match, mySide, votable, onVote,
+  match, mySide, votable, onVote, onInfo,
   theme, getTmdbUrl, lang = "tr", hapticsEnabled = true,
 }) {
   const [pending, setPending] = useState(null); // "a" | "b" | null
@@ -155,26 +214,38 @@ export default function MatchCard({
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
+  // Postere basış: onay katmanını açar (veya beklemeyi diğer tarafa taşır).
+  // Onay artık "aynı yere tekrar basmak" değil, katmandaki açık seçim.
   const handlePress = useCallback(
     (side) => {
       if (!votable) return;
       const contestant = side === "a" ? match.a : match.b;
       if (!contestant) return;
-
-      if (pending === side) {
-        // 2. basış → onayla
-        clearPending();
-        if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        onVote?.(match.matchId, side);
-      } else {
-        // 1. basış (veya diğer tarafa geçiş) → beklet
-        if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-        setPending(side);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => setPending(null), PENDING_TIMEOUT);
-      }
+      if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      setPending(side);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setPending(null), PENDING_TIMEOUT);
     },
-    [votable, pending, match, onVote, hapticsEnabled, clearPending],
+    [votable, match, hapticsEnabled],
+  );
+
+  const handleConfirm = useCallback(
+    (side) => {
+      clearPending();
+      if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      onVote?.(match.matchId, side);
+    },
+    [clearPending, hapticsEnabled, onVote, match.matchId],
+  );
+
+  // Detaya giderken katman kapanmalı: geri dönüldüğünde açık kalmasın.
+  const handleInfo = useCallback(
+    (side) => {
+      const contestant = side === "a" ? match.a : match.b;
+      clearPending();
+      if (contestant) onInfo?.(contestant);
+    },
+    [clearPending, onInfo, match],
   );
 
   const total = match.total || 0;
@@ -183,7 +254,12 @@ export default function MatchCard({
   const showWinner = match.decided && !!match.winnerSide;
 
   return (
-    <View style={[styles.match, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+    // Butonlar posteri tam kapladığı için vazgeçme alanı posterin DIŞINDA:
+    // kartın boşluğuna (VS dairesi / kenarlar) basmak katmanı kapatır.
+    <Pressable
+      onPress={pending ? clearPending : undefined}
+      style={[styles.match, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+    >
       <Cell
         side="a"
         contestant={match.a}
@@ -196,6 +272,8 @@ export default function MatchCard({
         isPending={pending === "a"}
         locked={!votable}
         onPress={handlePress}
+        onConfirm={handleConfirm}
+        onInfo={handleInfo}
         theme={theme}
         getTmdbUrl={getTmdbUrl}
         lang={lang}
@@ -219,11 +297,13 @@ export default function MatchCard({
         isPending={pending === "b"}
         locked={!votable}
         onPress={handlePress}
+        onConfirm={handleConfirm}
+        onInfo={handleInfo}
         theme={theme}
         getTmdbUrl={getTmdbUrl}
         lang={lang}
       />
-    </View>
+    </Pressable>
   );
 }
 
@@ -289,14 +369,30 @@ const styles = StyleSheet.create({
   },
   barFill: { height: "100%", borderRadius: 3 },
   pctText: { color: "#fff", fontSize: 10, fontWeight: "800", marginLeft: 6, width: 34, textAlign: "right" },
-  confirmOverlay: {
-    ...StyleSheet.absoluteFill,
+  // Posteri tam kaplayan iki yarım buton (üst: Onayla, alt: Bilgi).
+  confirmOverlay: { ...StyleSheet.absoluteFill, flexDirection: "column" },
+  confirmHalf: { flex: 1 },
+  confirmHalfInner: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
+    gap: 6,
+    paddingHorizontal: 6,
+    overflow: "hidden",
   },
-  confirmText: { color: "#fff", fontSize: 13, fontWeight: "900", marginTop: 4 },
-  confirmSub: { color: "rgba(255,255,255,0.85)", fontSize: 10, fontWeight: "700" },
+  // Yeşil = onay, accent = bilgi. İki yarım yapı olarak AYNI (yarı saydam beyaz
+  // rozet + beyaz etiket), yalnız rengiyle ayrışır.
+  confirmHalfPrimary: { backgroundColor: CONFIRM_GREEN },
+  // Ayırıcı çizgi: iki yarım aynı renge yakınsa bile sınır okunur kalsın.
+  confirmHalfInfo: { borderTopWidth: 1.5, borderTopColor: "rgba(255,255,255,0.55)" },
+  confirmHalfPressed: { opacity: 0.82 },
+  confirmBadgeLight: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.45)",
+    alignItems: "center", justifyContent: "center",
+  },
+  confirmHalfText: { fontSize: 13, fontWeight: "900", letterSpacing: 0.2 },
   vsWrap: { width: 34, alignItems: "center", justifyContent: "center" },
   vsCircle: {
     width: 30,

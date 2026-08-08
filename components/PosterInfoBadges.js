@@ -195,6 +195,43 @@ export function ReleaseDateBadge({ date, variant = "day", corner, style, scale, 
   );
 }
 
+// ── PosterBadgeSkeleton ───────────────────────────────────────────────────────
+// Poster iskeletinin üzerinde gerçek rozetin YERİNİ tutar. Hap kutusu, köşe
+// konumu ve içerideki satır yüksekliği gerçek rozetle AYNI matematikten
+// (usePillMetrics + cornerStyle) gelir; veri düşünce rozet yerinden oynamaz.
+// Rozet ayarlardan kapatılmışsa gerçek rozet gibi bu da hiç çizilmez.
+export function PosterBadgeSkeleton({ variant = "rating", corner, style, scale, posterWidth }) {
+  const { posterBadges } = useListLayoutSettings();
+  const { s, r, box } = usePillMetrics(scale, posterWidth);
+
+  if (variant === "rating" && posterBadges?.tmdbRating === false) return null;
+  if (variant === "date" && posterBadges?.releaseDate === false) return null;
+
+  // Gerçek hapta yükseklik ikondan değil yazı satırından gelir (≈ 1.25 × font).
+  const line = Math.round(r(10.5) * 1.25);
+  const bar = (w, key) => (
+    <View
+      key={key}
+      style={{
+        width: w,
+        height: line,
+        borderRadius: line / 2,
+        backgroundColor: "rgba(255,255,255,0.32)",
+      }}
+    />
+  );
+  const withVotes =
+    variant === "rating" && s >= 0.8 && posterBadges?.voteCount !== false;
+
+  return (
+    <View style={[styles.pill, box, cornerStyle(corner, s), style]}>
+      {bar(line, "icon")}
+      {bar(Math.round(line * (variant === "date" ? 2 : 1.5)), "label")}
+      {withVotes ? bar(Math.round(line * 1.8), "votes") : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   pill: {
     flexDirection: "row",

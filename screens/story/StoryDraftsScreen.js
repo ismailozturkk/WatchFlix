@@ -8,8 +8,7 @@ import {
   FlatList,
   StatusBar,
   Platform,
-  Alert,
-  Dimensions,
+    Dimensions,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";

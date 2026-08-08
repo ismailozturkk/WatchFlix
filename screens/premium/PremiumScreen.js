@@ -4,7 +4,6 @@ import {
   Animated,
   Easing,
   LayoutAnimation,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +14,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import axios from "axios";
 import Toast from "react-native-toast-message";
 import AppIcon from "../../components/AppIcon";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import AppBadge from "../../components/badges/AppBadge";
 import {
   IDENTITY_BADGES,
@@ -749,26 +749,16 @@ export default function PremiumScreen() {
         </View>
       </Pressable>
 
-      <Modal
+      <BottomSheetModal
         visible={exploreVisible}
-        transparent
-        statusBarTranslucent
-        animationType="slide"
-        onRequestClose={() => setExploreVisible(false)}
+        onClose={() => setExploreVisible(false)}
+        intensity={35}
+        dimColor="rgba(0,0,0,0.42)"
+        sheetStyle={[
+          styles.exploreModalSheet,
+          { backgroundColor: C.bg, borderColor: C.border },
+        ]}
       >
-        <View style={styles.exploreModalRoot}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={tr ? "Kapat" : "Close"}
-            style={styles.exploreModalBackdrop}
-            onPress={() => setExploreVisible(false)}
-          />
-          <View
-            style={[
-              styles.exploreModalSheet,
-              { backgroundColor: C.bg, borderColor: C.border },
-            ]}
-          >
             <View
               style={[styles.exploreModalHandle, { backgroundColor: C.border }]}
             />
@@ -1091,9 +1081,7 @@ export default function PremiumScreen() {
                 })}
               </View>
             </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      </BottomSheetModal>
 
       <>
         <View style={styles.sectionHeadingCompact}>

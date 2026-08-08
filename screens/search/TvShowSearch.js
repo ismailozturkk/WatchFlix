@@ -20,9 +20,6 @@ import { SearchSkeleton } from "../../components/Skeleton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import LottieView from "lottie-react-native";
 import Toast from "react-native-toast-message";
-import { useAuth } from "../../context/AuthContext";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import { db } from "../../firebase";
 import { useAppSettings, useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 import ListBadges from "../../components/ListBadges";
 import { useFocusEffect } from "@react-navigation/native";
@@ -604,24 +601,6 @@ export default function TvShowSearch({ navigation, route, isUnified, unifiedQuer
     }
   }, [routeName]);
 
-  const handleSearch = useCallback((text) => {
-    searchRequestRef.current += 1;
-    setSearch(text);
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    if (text.trim().length >= 2) {
-      setError(null);
-      setLoading(true);
-      searchTimeout.current = setTimeout(() => fetchResults(text), 500);
-    } else {
-      // Boş veya 1 karakter: bekleyen istek iptal edildi. loading/error'ı
-      // burada sıfırlamazsak ekran skeleton'da ya da eski hatada takılı kalır
-      // (2+ karakterden geri silme senaryosu).
-      setResults([]);
-      setLoading(false);
-      setError(null);
-    }
-  }, []);
-
   // ── TV'ye özgü fetch fonksiyonu — dokunulmadı ────────────────────────────
   const fetchResults = useCallback(
     async (searchText) => {
@@ -668,6 +647,30 @@ export default function TvShowSearch({ navigation, route, isUnified, unifiedQuer
     [language, adultContent, API_KEY],
   );
 
+  // NOT: handleSearch, fetchResults'tan SONRA tanımlı olmalı — bağımlılık dizisi
+  // render sırasında değerlendiği için yukarıda tanımlanırsa fetchResults
+  // okunamaz ve boş deps ilk render'ın closure'ını kalıcı hapsediyordu (dil /
+  // yetişkin içerik değişimi debounce'lu aramaya yansımıyordu).
+  const handleSearch = useCallback(
+    (text) => {
+      searchRequestRef.current += 1;
+      setSearch(text);
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+      if (text.trim().length >= 2) {
+        setError(null);
+        setLoading(true);
+        searchTimeout.current = setTimeout(() => fetchResults(text), 500);
+      } else {
+        // Boş veya 1 karakter: bekleyen istek iptal edildi. loading/error'ı
+        // burada sıfırlamazsak ekran skeleton'da ya da eski hatada takılı kalır
+        // (2+ karakterden geri silme senaryosu).
+        setResults([]);
+        setLoading(false);
+        setError(null);
+      }
+    },
+    [fetchResults],
+  );
 
 
   // Arama sonuçları renderlar

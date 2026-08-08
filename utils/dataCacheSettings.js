@@ -12,12 +12,18 @@
 //
 // React'e bağımlı değildir: cache yazan katmanlar (apiCache, cachedRead,
 // axiosDataCache, context'ler, dataDownloader) senkron olarak buradan okur.
-// AppSettingsContext ayarı değiştirdiğinde buradaki aynayı da günceller.
+//
+// MMKV GEÇİŞİ — kaldırılan yarış: eskiden modül seviyesinde bir ayna vardı ve
+// `hydrateAutoDataCacheSetting()` ile AÇILIŞTA ASENKRON dolduruluyordu. Hidrasyon
+// bitmeden yapılan her cache yazması ayarı `false` görüyordu; yani "Verileri
+// indir" açık olan kullanıcıda bile açılıştaki ilk istekler diske yazılmıyordu.
+// MMKV senkron okuduğu için ayna artık ilk erişimde anında doluyor ve anahtar
+// değiştiğinde aboneliğle tazeleniyor — hidrasyon adımı tamamen kalktı.
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, get, set as write, subscribe } from "../services/storage";
 
-export const AUTO_DATA_CACHE_KEY = "autoDownloadData";
-export const DATA_TYPES_KEY = "autoDownloadDataTypes";
+export const AUTO_DATA_CACHE_KEY = Keys.autoDataCache.key;
+export const DATA_TYPES_KEY = Keys.dataCacheTypes.key;
 
 /**
  * İndirilebilir veri türleri. `services/cacheInspector.js` kategorileriyle
@@ -48,43 +54,49 @@ export const normalizeDataTypes = (raw) => {
   return out;
 };
 
-let autoDataCacheEnabled = false;
-let dataTypes = { ...DEFAULT_DATA_TYPES };
+// Okuma aynası. `null` = henüz okunmadı; ilk erişimde MMKV'den SENKRON dolar.
+// Anahtar herhangi bir yerden değişirse abonelik aynayı düşürür.
+let mirror = null;
+let wired = false;
 
-export const getAutoDataCacheEnabled = () => autoDataCacheEnabled;
-
-export const setAutoDataCacheEnabled = (enabled) => {
-  autoDataCacheEnabled = !!enabled;
+const refresh = () => {
+  mirror = {
+    enabled: get(Keys.autoDataCache),
+    types: normalizeDataTypes(get(Keys.dataCacheTypes)),
+  };
+  return mirror;
 };
 
-export const getDataTypes = () => dataTypes;
+const current = () => {
+  if (!wired) {
+    wired = true;
+    const invalidate = () => {
+      mirror = null;
+    };
+    subscribe(Keys.autoDataCache, invalidate);
+    subscribe(Keys.dataCacheTypes, invalidate);
+  }
+  return mirror || refresh();
+};
+
+export const getAutoDataCacheEnabled = () => current().enabled;
+
+export const setAutoDataCacheEnabled = (enabled) => {
+  write(Keys.autoDataCache, !!enabled);
+  mirror = null;
+};
+
+export const getDataTypes = () => current().types;
 
 export const setDataTypes = (next) => {
-  dataTypes = normalizeDataTypes(next);
+  write(Keys.dataCacheTypes, next === null || next === undefined ? null : normalizeDataTypes(next));
+  mirror = null;
 };
 
 /** Ana anahtar + tür birlikte açık mı? Tür verilmezse sadece ana anahtar. */
-export const isDataTypeEnabled = (category) =>
-  autoDataCacheEnabled && (!category || dataTypes[category] !== false);
-
-export const hydrateAutoDataCacheSetting = async () => {
-  try {
-    const [[, rawEnabled], [, rawTypes]] = await AsyncStorage.multiGet([
-      AUTO_DATA_CACHE_KEY,
-      DATA_TYPES_KEY,
-    ]);
-    setAutoDataCacheEnabled(rawEnabled === "true");
-    try {
-      setDataTypes(rawTypes ? JSON.parse(rawTypes) : null);
-    } catch {
-      setDataTypes(null); // bozuk kayıt → varsayılan (hepsi açık)
-    }
-    return autoDataCacheEnabled;
-  } catch {
-    setAutoDataCacheEnabled(false);
-    setDataTypes(null);
-    return false;
-  }
+export const isDataTypeEnabled = (category) => {
+  const { enabled, types } = current();
+  return enabled && (!category || types[category] !== false);
 };
 
 /**
@@ -94,9 +106,10 @@ export const hydrateAutoDataCacheSetting = async () => {
  * @param {string}  [opts.category] DATA_CACHE_CATEGORIES üyesi
  */
 export const shouldPersistInternetData = ({ force = false, category } = {}) => {
-  if (!autoDataCacheEnabled) return false;
+  const { enabled, types } = current();
+  if (!enabled) return false;
   if (force) return true;
-  return !category || dataTypes[category] !== false;
+  return !category || types[category] !== false;
 };
 
 // ── Genel cache katmanlarını kategoriye eşleyen yardımcılar ─────────────────

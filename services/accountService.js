@@ -413,7 +413,13 @@ export async function purgeUserData(uid) {
     const snap = await getDocs(collection(db, "Users", uid, "conversations"));
     for (const d of snap.docs) {
       const otherUid = d.id;
-      conversationChatIds.add([uid, otherUid].sort().join("_"));
+      // ChatScreen (screens/chat/ChatScreen.js:751-757) chatId'yi HER ZAMAN
+      // "büyük_küçük" sırasıyla kurar. .sort() artan sıra verdiği için buradaki
+      // türetim hiçbir zaman gerçek dokümana isabet etmiyor, dolayısıyla
+      // participants alanı olmayan eski chat'leri yakalayan yedek yol ölüydü.
+      conversationChatIds.add(
+        uid > otherUid ? `${uid}_${otherUid}` : `${otherUid}_${uid}`,
+      );
       await safe(`conversation ${otherUid}`, () =>
         deleteDoc(doc(db, "Users", otherUid, "conversations", uid)),
       );

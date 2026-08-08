@@ -29,13 +29,10 @@ import WatchHistorySheet from "@components/modals/WatchHistorySheet";
 import ListView from "../../components/ListView";
 import PosterImage from "../../components/PosterImage";
 import { useAppSettings, useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
-import RatingStars from "../../components/RatingStars";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import Comment from "../../components/Comment";
 import SwipeCard from "@components/SwipeCard";
 import ListBadges from "../../components/ListBadges";
-import YoutubePlayer from "react-native-youtube-iframe";
 import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
 import { useListStatusContext } from "../../context/ListStatusContext";
 import {
@@ -56,6 +53,8 @@ import TrailerSection from "@components/video/TrailerSection";
 import PaginatedRail from "../../components/PaginatedRail";
 import { i18nText } from "../../utils/i18nText";
 import { daysUntil, parseAirDate } from "../../utils/airDate";
+import { getCachedValue, setCachedValue, TTL } from "../../utils/apiCache";
+import { getReleaseState, RELEASE_STATE } from "../../utils/watchState";
 import AIChatScreen from "../AIChatScreen";
 
 
@@ -67,6 +66,11 @@ const VIDEO_WIDTH = Math.min(width - 24, 720);
 const VIDEO_HEIGHT = Math.round((VIDEO_WIDTH * 9) / 16);
 // Fotoğrafı olmayan oyuncu kartındaki ikon: kart genişliğinin (width * 0.2) ~%45'i.
 const CAST_PLACEHOLDER_ICON = Math.round(width * 0.09);
+// Yatay ray kartı: "Benzer/Önerilen" ile "Seri" aynı genişliği paylaşıyor.
+// Seri rayı getItemLayout hesabı için sayıya ihtiyaç duyuyor, bu yüzden ölçü
+// stil içinde gömülü kalmak yerine buradan tek yerden veriliyor.
+const RAIL_ITEM_WIDTH = width * 0.38;
+const RAIL_ITEM_GAP = 10;
 
 /* ─────────────────────────────────────────
    SimilarMovieItem
@@ -134,6 +138,100 @@ const SimilarMovieItem = memo(function SimilarMovieItem({ item, navigation }) {
         </View>
       </TouchableOpacity>
     </Animated.View>
+  );
+});
+
+/* ─────────────────────────────────────────
+   CollectionMovieItem — serinin (koleksiyonun) filmleri
+───────────────────────────────────────── */
+const CollectionMovieItem = memo(function CollectionMovieItem({
+  item,
+  order,
+  isCurrent,
+  navigation,
+}) {
+  const { theme } = useTheme();
+  const { t } = useLanguage();
+  const { posterBadges } = useListLayoutSettings();
+  const year = item.release_date ? String(item.release_date).slice(0, 4) : "";
+
+  return (
+    <TouchableOpacity
+      activeOpacity={isCurrent ? 1 : 0.9}
+      // Açık olan filme basmak aynı ekranı yığına tekrar iterdi.
+      disabled={isCurrent}
+      style={styles.similarItem}
+      onPress={() => navigation.push("MovieDetails", { id: item.id })}
+    >
+      <View>
+        <PosterImage
+          path={item.poster_path}
+          type="movie"
+          size={200}
+          iconSize={46}
+          style={[
+            styles.similarPoster,
+            {
+              borderColor: isCurrent ? theme.accent : theme.border + "55",
+              borderWidth: isCurrent ? 2 : 1,
+            },
+          ]}
+        />
+        {/* Seri sırası (kronolojik) */}
+        <View
+          style={[
+            styles.collectionOrderBadge,
+            { backgroundColor: isCurrent ? theme.accent : "rgba(0,0,0,0.72)" },
+          ]}
+        >
+          <Text allowFontScaling={false} style={styles.collectionOrderText}>
+            {order}
+          </Text>
+        </View>
+        {isCurrent ? (
+          <View
+            style={[styles.collectionCurrentPill, { backgroundColor: theme.accent }]}
+          >
+            <Text allowFontScaling={false} style={styles.collectionCurrentText}>
+              {t.collectionCurrent || "Bu film"}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.stats}>
+            <ListBadges
+              mediaId={item.id}
+              mediaType="movie"
+              theme={theme}
+              style={{
+                gap: 3,
+                paddingVertical: 4,
+                paddingHorizontal: 2,
+                borderRadius: 10,
+                backgroundColor: "rgba(0,0,0,0.72)",
+              }}
+            />
+          </View>
+        )}
+      </View>
+      <Text
+        allowFontScaling={false}
+        numberOfLines={1}
+        style={[
+          styles.collectionTitle,
+          { color: isCurrent ? theme.accent : theme.text.primary },
+        ]}
+      >
+        {item.title}
+      </Text>
+      {posterBadges?.releaseDate !== false && year ? (
+        <Text
+          allowFontScaling={false}
+          style={[styles.collectionYear, { color: theme.text.muted }]}
+        >
+          {year}
+        </Text>
+      ) : null}
+    </TouchableOpacity>
   );
 });
 
@@ -348,6 +446,101 @@ export default function MovieDetails({ navigation, route }) {
     [railState, id, language, API_KEY],
   );
 
+  // ── Seri / koleksiyon rayı ──
+  // Film detayı yalnız `belongs_to_collection: {id, name, poster_path}` veriyor;
+  // serinin filmleri için ayrı bir /collection/{id} isteği gerekiyor. Film
+  // sekmesindeki küratörlü ray (screens/movie/MovieCollection.js) ile aynı
+  // önbellek ailesi ve TTL kullanılıyor — anahtar öneki "movie_" olmalı, yoksa
+  // "Verileri indir" ayarındaki film kategorisiyle bağı kopar.
+  const [collection, setCollection] = useState(null);
+  const collectionId = details?.belongs_to_collection?.id;
+
+  useEffect(() => {
+    let cancelled = false;
+    setCollection(null);
+    if (!collectionId) return;
+
+    const lang = language === "tr" ? "tr-TR" : "en-US";
+    const cacheKey = `movie_collection_detail_${collectionId}_${lang}`;
+
+    const loadCollection = async () => {
+      const cached = await getCachedValue(cacheKey, TTL.COLLECTION);
+      if (cached) {
+        if (!cancelled) setCollection(cached);
+        return;
+      }
+      try {
+        const res = await axios.request({
+          method: "GET",
+          url: `https://api.themoviedb.org/3/collection/${collectionId}`,
+          params: { language: lang },
+          headers: { accept: "application/json", Authorization: API_KEY },
+        });
+        const data = res.data;
+        if (!Array.isArray(data?.parts) || !data.parts.length) return;
+        if (!cancelled) setCollection(data);
+        setCachedValue(cacheKey, data);
+      } catch {
+        // Seri rayı ikincil içerik: istek düşerse ray sessizce gizlenir,
+        // detay ekranının kalanı etkilenmez.
+      }
+    };
+    loadCollection();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [collectionId, language, API_KEY]);
+
+  // Kronolojik sıra (tarihsiz/bozuk tarihli filmler sona).
+  const collectionParts = useMemo(() => {
+    const parts = collection?.parts;
+    if (!Array.isArray(parts)) return [];
+    const releaseTime = (m) => {
+      const ts = m?.release_date ? new Date(m.release_date).getTime() : NaN;
+      return Number.isFinite(ts) ? ts : Infinity;
+    };
+    const list = parts
+      .filter((p) => p && p.id)
+      .slice()
+      .sort((a, b) => {
+        const da = releaseTime(a);
+        const db = releaseTime(b);
+        if (da === db) return 0;
+        return da < db ? -1 : 1;
+      });
+    // Tek filmlik "seri" ray açmayı hak etmiyor (yalnız açık olan film kalır).
+    return list.length > 1 ? list : [];
+  }, [collection]);
+
+  // Açık olan filmin seri içindeki yeri: hem işaretleme hem de uzun serilerde
+  // (örn. James Bond) rayı doğru yerden başlatmak için gerekli.
+  const currentPartIndex = useMemo(
+    () => collectionParts.findIndex((p) => String(p.id) === String(id)),
+    [collectionParts, id],
+  );
+
+  const renderCollectionMovie = useCallback(
+    ({ item, index }) => (
+      <CollectionMovieItem
+        item={item}
+        order={index + 1}
+        isCurrent={String(item.id) === String(id)}
+        navigation={navigation}
+      />
+    ),
+    [id, navigation],
+  );
+
+  const collectionItemLayout = useCallback(
+    (_data, index) => ({
+      length: RAIL_ITEM_WIDTH,
+      offset: (RAIL_ITEM_WIDTH + RAIL_ITEM_GAP) * index,
+      index,
+    }),
+    [],
+  );
+
   // Yeni model: hatırlatmalar subcollection'da → Reminders/{uid}/movies/{movieId}
   // (Eski kök-array `Reminders/{uid}.movieReminders[]` BIRAKILDI; okuyucular
   // ProfileRemindersContext/CalendarContext yalnız subcollection'ı dinliyor.)
@@ -444,6 +637,9 @@ export default function MovieDetails({ navigation, route }) {
             dateAdded: date,
             minutes: details.runtime,
             genres: details.genres?.map((g) => g.name) || [],
+            // Yayın kapısı için — Firestore'a yazılmaz (normalizeItem beyaz liste).
+            releaseDate: details.release_date,
+            status: details.status,
           }, date);
           Toast.show({
             type: "success",
@@ -652,6 +848,12 @@ export default function MovieDetails({ navigation, route }) {
     );
 
   const dateInfo = calculateDateDifference(details.release_date);
+  // Yayın tarihi yok/geçersiz VE TMDB durumu da "yayınlandı" demiyorsa göz
+  // butonu kilitlenir. `dateInfo` tam bu durumda null dönüyordu ve isRemaining
+  // undefined kalıp içerik izlenebilir sanılıyordu (bkz. utils/watchState.js).
+  const watchLocked =
+    getReleaseState(details.release_date, details.status) ===
+    RELEASE_STATE.UNKNOWN;
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
@@ -798,6 +1000,7 @@ export default function MovieDetails({ navigation, route }) {
           {/* ListView */}
           <ListView
             isRemaining={dateInfo?.isRemaining}
+            watchLocked={watchLocked}
             isReminderSet={isReminderSet}
             updateList={updateMovieList}
             updateWatchedList={openModal}
@@ -1263,6 +1466,44 @@ export default function MovieDetails({ navigation, route }) {
             </View>
           )}
 
+          {/* ── SERİ / KOLEKSİYON ── */}
+          {collectionParts.length > 0 && (
+            <View style={styles.section}>
+              <SectionHeader
+                title={collection?.name || t.collectionSection || "Film Serisi"}
+                theme={theme}
+                right={
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.seeAllText, { color: theme.text.muted }]}
+                  >
+                    {(t.movieScreens?.collectionFilmCount || "{count}").replace(
+                      "{count}",
+                      collectionParts.length,
+                    )}
+                  </Text>
+                }
+              />
+              <FlatList
+                data={collectionParts}
+                renderItem={renderCollectionMovie}
+                keyExtractor={(item) => item.id.toString()}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingVertical: 4, gap: RAIL_ITEM_GAP }}
+                // Açık olan film ilk karelerin dışındaysa ray onun bir öncesinden
+                // başlar; aksi hâlde uzun serilerde işaretli kart hiç görünmez.
+                initialScrollIndex={
+                  currentPartIndex > 1 ? currentPartIndex - 1 : 0
+                }
+                getItemLayout={collectionItemLayout}
+                initialNumToRender={5}
+                maxToRenderPerBatch={5}
+                windowSize={5}
+              />
+            </View>
+          )}
+
           {/* ── ÖNERİLEN FİLMLER ── */}
           {railState.recommendations.items.length > 0 && (
             <View style={styles.section}>
@@ -1708,7 +1949,7 @@ const styles = StyleSheet.create({
   castCharacter: { fontSize: 10.5, textAlign: "center", lineHeight: 14 },
 
   /* Similar */
-  similarItem: { width: width * 0.38 },
+  similarItem: { width: RAIL_ITEM_WIDTH },
   similarPoster: {
     width: "100%",
     aspectRatio: 2 / 3,
@@ -1740,6 +1981,35 @@ const styles = StyleSheet.create({
     left: 6,
     zIndex: 10,
   },
+  /* Collection */
+  collectionOrderBadge: {
+    position: "absolute",
+    top: 7,
+    left: 7,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 5,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  collectionOrderText: { color: "#fff", fontSize: 11, fontWeight: "800" },
+  collectionCurrentPill: {
+    position: "absolute",
+    bottom: 8,
+    left: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  collectionCurrentText: { color: "#fff", fontSize: 10.5, fontWeight: "700" },
+  collectionTitle: {
+    marginTop: 7,
+    fontSize: 12.5,
+    fontWeight: "700",
+    lineHeight: 17,
+  },
+  collectionYear: { marginTop: 1, fontSize: 11, fontWeight: "600" },
   /* Videos */
   videoItem: { width: width * 0.62 },
   videoThumbnail: {

@@ -15,7 +15,7 @@
 // keystore'un SHA-1'i Firebase Console'a eklenmiş olmalıdır — aksi halde native
 // SDK DEVELOPER_ERROR döner ve buradaki hiçbir kod bunu kurtaramaz.
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, get, set, remove } from "./storage";
 import { Platform } from "react-native";
 import {
   GoogleSignin,
@@ -36,7 +36,7 @@ import { httpsCallable } from "firebase/functions";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db, fns } from "../firebase";
 
-export const GOOGLE_PROFILE_PENDING_KEY = "googleProfilePendingUid";
+export const GOOGLE_PROFILE_PENDING_KEY = Keys.googleProfilePendingUid.key;
 
 // ── Hata kodları ────────────────────────────────────────────────────────────
 
@@ -407,19 +407,13 @@ export async function signInWithGoogle() {
     if (readOk) {
       needsProfileCompletion = !isGoogleProfileComplete(profile);
       // İşaret yazımı best-effort: kararı değiştirmez, yalnızca kalıcılaştırır.
-      await (
-        needsProfileCompletion
-          ? AsyncStorage.setItem(GOOGLE_PROFILE_PENDING_KEY, user.uid)
-          : AsyncStorage.removeItem(GOOGLE_PROFILE_PENDING_KEY)
-      ).catch(() => {});
+      if (needsProfileCompletion) set(Keys.googleProfilePendingUid, user.uid);
+      else remove(Keys.googleProfilePendingUid);
     } else {
       // Profil doğrulanamadı (çevrimdışı / kural). Kararı işarete bırak: onu
       // yazarken profilin eksik olduğunu BİLİYORDUK. AuthContext bir sonraki
       // açılışta Firestore'dan yeniden uzlaştırır.
-      const pending = await AsyncStorage.getItem(GOOGLE_PROFILE_PENDING_KEY).catch(
-        () => null,
-      );
-      needsProfileCompletion = pending === user.uid;
+      needsProfileCompletion = get(Keys.googleProfilePendingUid) === user.uid;
     }
 
     return { user, needsProfileCompletion, cancelled: false };
@@ -529,7 +523,7 @@ export async function unlinkGoogleAccount() {
  */
 export async function cancelGoogleRegistration() {
   const current = auth.currentUser;
-  await AsyncStorage.removeItem(GOOGLE_PROFILE_PENDING_KEY).catch(() => {});
+  remove(Keys.googleProfilePendingUid);
   await GoogleSignin.signOut().catch(() => {});
 
   if (current) {

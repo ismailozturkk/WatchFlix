@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import React, { memo, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { MovieSkeleton } from "../../components/Skeleton";
 import {
@@ -32,6 +33,7 @@ const { width } = Dimensions.get("window");
 const MovieProvidersCard = memo(function MovieProvidersCard({ item, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -45,6 +47,10 @@ const MovieProvidersCard = memo(function MovieProvidersCard({ item, navigation, 
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => navigation.push("MovieDetails", { id: item.id })}
+      onLongPress={() =>
+        openQuickActions({ item, mediaType: "movie", navigation })
+      }
+      delayLongPress={350}
     >
       <Animated.View style={[{ transform: [{ scale }] }]}>
         <PosterImage

@@ -15,48 +15,32 @@
 // `earned` kümesi veriden yeniden hesaplanan küme kadar geri gelir. Kayıp
 // yalnızca "geçmişte kazanıp sonra veriyi sildiğin rozetler"dir; bedeli kozmetik.
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   bosLedger, normalizeLedger, tohumla, birlestir,
   kutlanacaklar, isaretleGorulmus, tohumlandiMi,
   aktifligiGuncelle, rekorYukselt,
 } from "./watchLedgerCore";
 import { bugunAnahtari, GUN_TUT, serileriHesapla } from "./watchActivity";
-
-const PREFIX = "watch_progress:ledger:";
-const MISAFIR = "guest";
-
-const anahtar = (uid) => `${PREFIX}${uid || MISAFIR}`;
+import { Keys, get, set, remove } from "../services/storage";
 
 // Üç ayrı anahtar yerine TEK doküman: baseline/earned/seen aynı anda tutarlı
 // olmalı. Ayrı anahtarlarda kısmi bir yazma (uygulama öldürülmesi, dolu disk)
 // "rozet kazanılmış ama görülmüş sayılmış" gibi onarılamaz bir hal bırakırdı.
+//
+// Defter hesap çıkışında SİLİNMEZ (registry: watchLedger → keepOnLogout).
+// Rozetler yeniden tohumlanabilir ama gün/seri geçmişi geri gelmez.
 export async function loadLedger(uid) {
-  try {
-    const raw = await AsyncStorage.getItem(anahtar(uid));
-    if (!raw) return bosLedger();
-    return normalizeLedger(JSON.parse(raw));
-  } catch {
-    return bosLedger();
-  }
+  const kayit = get(Keys.watchLedger, { uid });
+  return kayit ? normalizeLedger(kayit) : bosLedger();
 }
 
 export async function saveLedger(uid, ledger) {
-  try {
-    await AsyncStorage.setItem(anahtar(uid), JSON.stringify(normalizeLedger(ledger)));
-    return true;
-  } catch {
-    return false;   // disk dolu / kota — puan yine hesaplanır, sadece hafıza yok
-  }
+  // false → disk dolu / kota; puan yine hesaplanır, sadece hafıza yok.
+  return set(Keys.watchLedger, normalizeLedger(ledger), { uid });
 }
 
 export async function clearLedger(uid) {
-  try {
-    await AsyncStorage.removeItem(anahtar(uid));
-    return true;
-  } catch {
-    return false;
-  }
+  return remove(Keys.watchLedger, { uid });
 }
 
 /**

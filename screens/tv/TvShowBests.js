@@ -7,20 +7,19 @@ import {
   TouchableOpacity,
   Animated,
 } from "react-native";
-import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 //import { API_KEY } from "@env";
 const { width, height } = Dimensions.get("window");
-import { MovieUpComingSkeleton } from "../../components/Skeleton";
+import { RailSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
 import { SeeAllButton } from "../../components/SeeAllHeader";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { i18nText } from "../../utils/i18nText";
 import { useTvShow } from "../../context/TvShowContex";
-import { memo, useEffect, useMemo, useRef } from "react";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { memo, useEffect, useRef } from "react";
 
 import ListBadges from "../../components/ListBadges";
 import { RatingBadge, ReleaseDateBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
@@ -33,6 +32,7 @@ import { useImageQualitySettings, useListLayoutSettings } from "../../context/Ap
 const TvBestCard = memo(function TvBestCard({ item, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -46,6 +46,10 @@ const TvBestCard = memo(function TvBestCard({ item, navigation, theme, getTmdbUr
       onPressOut={onPressOut}
       style={[styles.similarItem, { width: rp.itemWidth, height: rp.itemHeight }]}
       onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
+      onLongPress={() =>
+        openQuickActions({ item, mediaType: "tv", navigation })
+      }
+      delayLongPress={350}
     >
       <Animated.View style={[{ transform: [{ scale }] }]}>
         <PosterImage
@@ -133,25 +137,49 @@ export default function TvShowBests({ navigation }) {
       </Text>
     </TouchableOpacity>
   );
-  if (loadingBest) {
-    return (
-      <View style={{ flex: 1, paddingVertical: 10 }}>
+  // Başlık yükleme sırasında da AYNI kurguyla çizilir (kategori sekmeleri +
+  // "tümünü gör" hapı): iskeletten veriye geçerken sekmeler yana kaymasın,
+  // altındaki ray zıplamasın.
+  const bestsHeader = (
+    <View
+      style={{
+        paddingLeft: 15,
+        paddingRight: 12,
+        marginBottom: 8,
+        flexDirection: "row",
+        alignItems: "center",
+      }}
+    >
+      <View style={{ flex: 1, justifyContent: "center" }}>
         <FlatList
           data={categoriesBest}
           renderItem={renderCategory}
           keyExtractor={(item) => item}
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesList}
+          contentContainerStyle={[
+            styles.categoriesList,
+            { backgroundColor: theme.secondary },
+          ]}
         />
+      </View>
+      <SeeAllButton
+        onPress={() =>
+          navigation.navigate("SeeAllScreen", {
+            mediaType: "tv",
+            section: "best",
+            title: i18nText("autoI18n.en_iyi_diziler", "En İyi Diziler"),
+          })
+        }
+      />
+    </View>
+  );
 
-        <FlatList
-          data={[1, 2, 3]}
-          renderItem={() => <MovieUpComingSkeleton />}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 15 }}
-        />
+  if (loadingBest) {
+    return (
+      <View style={styles.container}>
+        {bestsHeader}
+        <RailSkeleton showReleaseDate />
       </View>
     );
   }
@@ -170,38 +198,7 @@ export default function TvShowBests({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View
-        style={{
-          paddingLeft: 15,
-          paddingRight: 12,
-          marginBottom: 8,
-          flexDirection: "row",
-          alignItems: "center",
-        }}
-      >
-        <View style={{ flex: 1, justifyContent: "center" }}>
-          <FlatList
-            data={categoriesBest}
-            renderItem={renderCategory}
-            keyExtractor={(item) => item}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={[
-              styles.categoriesList,
-              { backgroundColor: theme.secondary },
-            ]}
-          />
-        </View>
-        <SeeAllButton
-          onPress={() =>
-            navigation.navigate("SeeAllScreen", {
-              mediaType: "tv",
-              section: "best",
-              title: i18nText("autoI18n.en_iyi_diziler", "En İyi Diziler"),
-            })
-          }
-        />
-      </View>
+      {bestsHeader}
       <PaginatedRail
         data={seriesBest}
         contentContainerStyle={{ paddingHorizontal: 15 }}

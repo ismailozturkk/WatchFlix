@@ -59,7 +59,7 @@ Bu proje modern mobil geliştirme standartlarına uygun olarak inşa edilmiştir
 - **Dil**: `JavaScript (ES6+)`
 - **Backend**: `Firebase (Firestore, Auth)`
 - **Veri Kaynağı**: `The Movie Database (TMDB) API`
-- **Depolama**: `AsyncStorage` (Yerel ayarlar için)
+- **Depolama**: `react-native-mmkv` — tüm kalıcı veri `services/storage` katmanından geçer (senkron okuma, merkezî anahtar kaydı, kullanıcı kapsamı)
 - **Animasyon**: `Lottie`, `React Native Reanimated`
 - **Navigasyon**: `React Navigation 7`
 

@@ -34,7 +34,16 @@ import {
   removeManyEventsFromPhoneCalendar,
 } from "@utils/phoneCalendar";
 
-const TODAY = new Date().toISOString().split("T")[0];
+// Yerel takvim günü. toISOString() UTC gününü verir; UTC+3'te yerel gece yarısı
+// bir önceki güne düşüyordu. Etkinlik anahtarları yerel YYYY-MM-DD biçiminde
+// tutuluyor (bkz. context/CalendarContext.js toDateStr) — iki taraf aynı
+// takvimde konuşmalı.
+function toLocalDateStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 /* ── Tarih formatlama ── */
 function formatDisplayDate(dateStr, lang) {
@@ -295,11 +304,15 @@ export default function CalendarScreen({ navigation }) {
     });
   }, []);
 
+  /* ── Bugün (yerel) ── modül kapsamında hesaplanırsa uygulama gece yarısını
+     açık geçtiğinde bayat kalıyordu; bileşen içinde tutuluyor. */
+  const todayLocal = useMemo(() => toLocalDateStr(new Date()), []);
+
   /* ── Aralık başlangıç/bitiş tarihleri ── */
   const { startDate, endDate } = useMemo(() => {
     const todayD = new Date();
     todayD.setHours(0, 0, 0, 0);
-    const todayStr = todayD.toISOString().split("T")[0];
+    const todayStr = toLocalDateStr(todayD);
 
     if (rangeMonths === "all") {
       return viewMode === "future"
@@ -309,10 +322,10 @@ export default function CalendarScreen({ navigation }) {
     const d = new Date(todayD);
     if (viewMode === "future") {
       d.setMonth(d.getMonth() + rangeMonths);
-      return { startDate: todayStr, endDate: d.toISOString().split("T")[0] };
+      return { startDate: todayStr, endDate: toLocalDateStr(d) };
     }
     d.setMonth(d.getMonth() - rangeMonths);
-    return { startDate: d.toISOString().split("T")[0], endDate: todayStr };
+    return { startDate: toLocalDateStr(d), endDate: todayStr };
   }, [viewMode, rangeMonths]);
 
   /* ── Aralıktaki tüm event'leri tarihe göre grupla ── */
@@ -485,7 +498,7 @@ export default function CalendarScreen({ navigation }) {
   /* ── markedDates + odak gün ── */
   const combinedMarked = useMemo(() => {
     const base = { ...markedDates };
-    const sel = focusDate || TODAY;
+    const sel = focusDate || todayLocal;
     if (base[sel]) {
       base[sel] = {
         ...base[sel],
@@ -496,7 +509,7 @@ export default function CalendarScreen({ navigation }) {
       base[sel] = { selected: true, selectedColor: theme.accent };
     }
     return base;
-  }, [markedDates, focusDate, theme.accent]);
+  }, [markedDates, focusDate, theme.accent, todayLocal]);
 
   const onDayPress = useCallback(
     (day) => {
@@ -585,7 +598,7 @@ export default function CalendarScreen({ navigation }) {
             </View>
           )}
           <Calendar
-            current={focusDate || TODAY}
+            current={focusDate || todayLocal}
             onDayPress={onDayPress}
             markingType="multi-dot"
             markedDates={combinedMarked}

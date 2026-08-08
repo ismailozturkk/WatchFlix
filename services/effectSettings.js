@@ -14,21 +14,22 @@
 // alt ağacı yeniden çizmek yerine yalnız bu üç bileşen abone olur.
 // hapticsService gibi tercihini kendisi hidrate eder (bkz. services/hapticsService.js).
 import { useSyncExternalStore } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   EFFECT_MODES,
   defaultEffectMode,
   getEffectPreset,
 } from "../utils/deviceTier";
 import { deviceTier } from "./deviceTier";
+import { Keys, get, set, subscribe } from "./storage";
 
-export const EFFECT_MODE_STORAGE_KEY = "effectMode";
+export const EFFECT_MODE_STORAGE_KEY = Keys.effectMode.key;
 
-// Tercih okunana kadar cihaz sınıfının kararı geçerli — bugünkü davranış.
+// MMKV GEÇİŞİ: tercih artık AÇILIŞTA SENKRON okunuyor. Eskiden cihaz sınıfının
+// kararıyla başlanıp async okuma sonrası düzeltiliyordu; "efektler kapalı" diyen
+// kullanıcı her açılışta bir kare boyunca tam efektli ekran görüyordu. Bununla
+// birlikte "geç gelen kayıt kullanıcı seçimini ezmesin" koruması da gereksizleşti.
 let mod = defaultEffectMode(deviceTier);
 let preset = getEffectPreset(mod);
-// Kullanıcı hidrasyon tamamlanmadan seçim yaparsa geç gelen kayıt onu EZMESİN.
-let tercihSurumu = 0;
 const dinleyiciler = new Set();
 
 const yayinla = () => {
@@ -44,25 +45,30 @@ const uygula = (yeniMod) => {
   yayinla();
 };
 
-AsyncStorage.getItem(EFFECT_MODE_STORAGE_KEY)
-  .then((kayitli) => {
-    if (tercihSurumu !== 0) return;
-    if (EFFECT_MODES.includes(kayitli)) uygula(kayitli);
-  })
-  .catch(() => {
-    /* kayıt okunamadı → cihaz sınıfının kararıyla devam */
-  });
+// Kayıtlı tercihi uygular. HEM modül yüklenirken HEM de anahtar değiştiğinde
+// çalışır.
+//
+// Aboneliğin sebebi yalnız "ayar ekranından değişince güncelle" değil: bu modül
+// AsyncStorage → MMKV göçünden ÖNCE yüklenebiliyor (App.js'teki göç kapısı
+// provider ağacını tutuyor ama modül seviyesindeki kodu tutmuyor). O durumda ilk
+// okuma boş depoya denk gelir; göç anahtarı yazınca abonelik tetiklenir ve
+// kullanıcının gerçek seçimi aynı oturumda devreye girer. Bu olmadan güncelleme
+// sonrası ilk açılışta seçim bir oturum boyunca yok sayılırdı.
+const kayittanUygula = () => {
+  const kayitli = get(Keys.effectMode);
+  if (EFFECT_MODES.includes(kayitli)) uygula(kayitli);
+};
+
+kayittanUygula();
+subscribe(Keys.effectMode, kayittanUygula);
 
 /** Modu değiştirir ve (istenirse) kalıcılaştırır. Geçersiz mod yok sayılır. */
 export function setEffectMode(yeniMod, { persist = true } = {}) {
   if (!EFFECT_MODES.includes(yeniMod)) return;
-  tercihSurumu += 1;
   uygula(yeniMod);
-  if (persist) {
-    AsyncStorage.setItem(EFFECT_MODE_STORAGE_KEY, yeniMod).catch(() => {
-      /* yazılamadıysa oturum içi seçim yine de geçerli */
-    });
-  }
+  // Yazılamadıysa oturum içi seçim yine de geçerli — depolama katmanı hatayı
+  // kendi raporlar, burada ayrıca ele almaya gerek yok.
+  if (persist) set(Keys.effectMode, yeniMod);
 }
 
 /** React dışı çağıranlar için anlık değerler. */

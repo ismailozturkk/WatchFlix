@@ -1,8 +1,8 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { callWidget } from "./widgetBridge";
+import { Keys, get, set } from "./storage";
 
-export const WIDGET_PREFERENCES_KEY = "widgetPreferences";
+export const WIDGET_PREFERENCES_KEY = Keys.widgetPreferences.key;
 
 const PURPLE_APPEARANCE = Object.freeze({
   themeId: "purple",
@@ -226,14 +226,8 @@ export const normalizeWidgetPreferences = (value) => {
   };
 };
 
-export const loadWidgetPreferences = async () => {
-  try {
-    const raw = await AsyncStorage.getItem(WIDGET_PREFERENCES_KEY);
-    return normalizeWidgetPreferences(raw ? JSON.parse(raw) : null);
-  } catch {
-    return normalizeWidgetPreferences(null);
-  }
-};
+export const loadWidgetPreferences = async () =>
+  normalizeWidgetPreferences(get(Keys.widgetPreferences));
 
 export const syncWidgetPreferences = async (preferences) => {
   const payload = JSON.stringify(normalizeWidgetPreferences(preferences));
@@ -250,10 +244,7 @@ export const syncWidgetPreferences = async (preferences) => {
 
 export const saveWidgetPreferences = async (preferences) => {
   const normalized = normalizeWidgetPreferences(preferences);
-  await AsyncStorage.setItem(
-    WIDGET_PREFERENCES_KEY,
-    JSON.stringify(normalized),
-  );
+  set(Keys.widgetPreferences, normalized);
   await syncWidgetPreferences(normalized);
   return normalized;
 };

@@ -705,6 +705,15 @@ service cloud.firestore {
     //     geçmişe/geleceğe oy enjeksiyonu bracket'i değiştiremez.
     //   NOT: __DEV__ faz önizleme (setDebugNow) gerçek yazımları bu pencerelere
     //   takılır; dev'de oy testi yalnız gerçek takvim penceresinde çalışır.
+    // tournamentWinners/{periodId}: biten ayların podyum arşivi (yıl + ay ile).
+    // YALNIZ Cloud Function yazar (archiveTournamentWinners; Admin SDK kuralları
+    // es geçer). İstemciye yazma AÇILMAZ: burası kalıcı bir kayıt, istemci
+    // yazımı sahte şampiyon enjeksiyonuna açık olurdu.
+    match /tournamentWinners/{periodId} {
+      allow read:  if isSignedIn();
+      allow write: if false;
+    }
+
     match /tournaments/{periodId} {
       allow read:   if isSignedIn();
       allow create: if isSignedIn()
@@ -787,6 +796,55 @@ service cloud.firestore {
               && pickValueOk(request.resource.data.lastKey)
               && pickWindowOk(request.resource.data.lastKey) )
           );
+      }
+
+      // Topluluk havuzu (tournaments/{periodId}/pool/{tmdbId}) — ay başı TMDB
+      // anlık görüntüsü yalnız o türün EN POPÜLER 64 yapımıdır; kullanıcı seçim
+      // fazında arayıp havuzda olmayan bir yapımı ekleyebilir.
+      //
+      // SPAM FRENİ: ekleme, kullanıcının TEK hype'ına bağlıdır — noms'unda
+      // YALNIZ bu id olmalı. noms bir kez yazılıp bir daha değişemediğinden
+      // (yukarıdaki votes kuralları) bu, kişi başına ömür boyu EN FAZLA BİR
+      // öneri demektir. İstemci önce hype'ı yazar, sonra havuz kaydını.
+      //
+      // Doküman id'si TMDB id'sidir (aynı yapım iki kez eklenemez) ve kayıt
+      // DEĞİŞMEZDİR: bracket her istemcide bu listeden türetilir.
+      match /pool/{itemId} {
+        // Ekleme hakkı = kullanıcının TEK hype'ı ve o hype bu yapıma verilmiş
+        // olmalı. size() == 1 şart: hasOnly() BOŞ map'te de true döner, yani
+        // tek başına hiç hype vermemiş kullanıcıya sınırsız ekleme açardı.
+        function myNoms() {
+          return get(/databases/$(database)/documents/tournaments/$(periodId)/votes/$(request.auth.uid))
+                 .data.get('noms', {});
+        }
+        function hypedThis() {
+          return exists(/databases/$(database)/documents/tournaments/$(periodId)/votes/$(request.auth.uid))
+              && myNoms().size() == 1
+              && myNoms().get(itemId, false) == true;
+        }
+        function shapeOk() {
+          return request.resource.data.keys().hasOnly(
+                   ['title','posterPath','mediaType','popularity','voteAverage','year','addedBy','addedAt'])
+              && request.resource.data.addedBy == request.auth.uid
+              && request.resource.data.addedAt == request.time
+              && request.resource.data.title is string
+              && request.resource.data.title.size() > 0
+              && request.resource.data.title.size() <= 120
+              && request.resource.data.posterPath is string
+              && request.resource.data.posterPath.size() <= 120
+              && request.resource.data.popularity is number
+              && request.resource.data.voteAverage is number
+              && request.resource.data.mediaType
+                 == get(/databases/$(database)/documents/tournaments/$(periodId)).data.mediaType;
+        }
+
+        allow read: if isSignedIn();
+        allow update, delete: if false;   // havuz anlık görüntüsü dondurulur
+        allow create: if isSignedIn()
+          && inWindow(0, 7)               // yalnız seçim fazı
+          && itemId.matches('[0-9]+')     // doküman id'si = TMDB id'si
+          && shapeOk()
+          && hypedThis();
       }
 
       // Agregat sayaçlar (tournaments/{periodId}/agg/tallies) — Cloud Function

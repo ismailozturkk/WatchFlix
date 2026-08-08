@@ -1,14 +1,13 @@
 import React, {
   createContext, useContext, useEffect, useState, useMemo, useRef, useCallback,
 } from "react";
-import { doc, collection, onSnapshot, updateDoc, deleteField } from "firebase/firestore";
+import { doc, collection, onSnapshot } from "firebase/firestore";
 import { Animated } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, get, set, getActiveUser } from "../services/storage";
 import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 import { useLanguage } from "./LanguageContext";
 import { useListStatusContext } from "./ListStatusContext";
-import Toast from "react-native-toast-message";
 import { snapshotErrorHandler } from "../utils/firestoreError";
 import { dedupeWatchedTvEntries } from "../services/watchedTvService";
 import {
@@ -20,6 +19,8 @@ import {
   syncStatsWidget,
 } from "../services/statsWidgetService";
 import { i18nText } from "../utils/i18nText";
+import { cacheKeys } from "../utils/cacheKeys";
+import { publish, seed } from "../services/snapshotCache";
 import useStartupGate from "../hooks/useStartupGate";
 import {
   countMovieWatchStats,
@@ -36,7 +37,7 @@ export const useProfileStats = () => useContext(ProfileStatsContext);
 
 // Profil sayaçlarının tekrarlı/tekrarsız kipi. Varsayılan "total": mevcut
 // kullanıcıların alışık olduğu sayı güncellemeyle birlikte değişmesin.
-const STATS_COUNT_MODE_KEY = "statsCountMode";
+// Anahtar registry'de (Keys.statsCountMode).
 const STATS_COUNT_MODE_DEFAULT = "total";
 
 // ─── Pure helpers (stable — defined outside component) ───────────────────────
@@ -157,27 +158,51 @@ export const ProfileStatsProvider = ({ children }) => {
   const { combinedLists } = useListStatusContext();
 
   const [lists,              setLists]             = useState([]);
-  const [selectedList,       setSelectedList]       = useState(null);
-  const [modalDeleteVisible, setModalDeleteVisible] = useState(false);
+  // Liste silme/yeniden adlandırma buradan çıktı: iki ekran da ortak
+  // components/lists/ListManageSheet'i kullanıyor (yazma yolu tek yerde).
 
-  const [watchedMovieCount,   setWatchedMovieCount]   = useState(0);
-  const [totalWatchedTime,    setTotalWatchedTime]     = useState({});
-  const [totalMinutesTime,    setTotalMinutesTime]     = useState(0);
-  const [watchedTvCount,      setWatchedTvCount]       = useState(0);
-  const [totalSeasonsCount,   setTotalSeasonsCount]    = useState(0);
-  const [totalEpisodesCount,  setTotalEpisodesCount]   = useState(0);
-  const [totalWatchedTimeTv,  setTotalWatchedTimeTv]   = useState({});
-  const [totalMinutesTimeTv,  setTotalMinutesTimeTv]   = useState(0);
+  // ── AÇILIŞ TOHUMU ────────────────────────────────────────────────────────
+  //
+  // Sayaçlar üç Firestore listener'ından TÜRETİLİYOR; hepsi ağdan gelene kadar
+  // profil sıfırlarla çiziliyordu. Son oturumda hesaplanan sayaçlar diske
+  // yazılıyor ve burada SENKRON okunuyor — kullanıcı kendisi bir şey izlemediği
+  // sürece bu değerler zaten değişmiyor.
+  //
+  // DİKKAT — `loadingTv`/`loadingMovies` bilerek TOHUMLANMIYOR. O bayraklar
+  // rozet defterinin "veri hazır" kapısı (bkz. aşağıdaki watchedMovies
+  // listener'ının başındaki not); tohumla açıp defteri bayat veriyle
+  // çalıştırmak yanlış rozet kutlamasına yol açardı. Tohum yalnız GÖSTERİLEN
+  // sayaçlar için.
+  const statsSeed = useMemo(
+    () => {
+      // Firebase oturumu ASENKRON çözülüyor; ilk render'da `uid` genelde henüz
+      // null olur ve tohum hiç okunmazdı. Son aktif kullanıcı depodan senkron
+      // okunabiliyor (aynı desen: ListStatusContext).
+      const tohumUid = uid ?? getActiveUser();
+      return tohumUid ? seed(cacheKeys.stats(tohumUid)).data || {} : {};
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const [watchedMovieCount,   setWatchedMovieCount]   = useState(statsSeed.watchedMovieCount ?? 0);
+  const [totalWatchedTime,    setTotalWatchedTime]     = useState(statsSeed.totalWatchedTime ?? {});
+  const [totalMinutesTime,    setTotalMinutesTime]     = useState(statsSeed.totalMinutesTime ?? 0);
+  const [watchedTvCount,      setWatchedTvCount]       = useState(statsSeed.watchedTvCount ?? 0);
+  const [totalSeasonsCount,   setTotalSeasonsCount]    = useState(statsSeed.totalSeasonsCount ?? 0);
+  const [totalEpisodesCount,  setTotalEpisodesCount]   = useState(statsSeed.totalEpisodesCount ?? 0);
+  const [totalWatchedTimeTv,  setTotalWatchedTimeTv]   = useState(statsSeed.totalWatchedTimeTv ?? {});
+  const [totalMinutesTimeTv,  setTotalMinutesTimeTv]   = useState(statsSeed.totalMinutesTimeTv ?? 0);
 
   // ── Tekrarsız (öz) sayaçlar ─────────────────────────────────────────────
   // Yukarıdaki sayaçlar her izleme OLAYINI sayar: 100 filmi 5'er kez izleyen
   // kullanıcı 500 görür. Bunlar ise kaç FARKLI eser izlendiğini söyler. İkisi
   // de doğru; hangisinin gösterileceğini `statsCountMode` seçer. Süre her iki
   // modda da tekrarları içerir — o dakikalar gerçekten harcandı.
-  const [uniqueMovieCount,    setUniqueMovieCount]    = useState(0);
-  const [uniqueTvCount,       setUniqueTvCount]       = useState(0);
-  const [uniqueSeasonsCount,  setUniqueSeasonsCount]  = useState(0);
-  const [uniqueEpisodesCount, setUniqueEpisodesCount] = useState(0);
+  const [uniqueMovieCount,    setUniqueMovieCount]    = useState(statsSeed.uniqueMovieCount ?? 0);
+  const [uniqueTvCount,       setUniqueTvCount]       = useState(statsSeed.uniqueTvCount ?? 0);
+  const [uniqueSeasonsCount,  setUniqueSeasonsCount]  = useState(statsSeed.uniqueSeasonsCount ?? 0);
+  const [uniqueEpisodesCount, setUniqueEpisodesCount] = useState(statsSeed.uniqueEpisodesCount ?? 0);
 
   const [isLoading,          setIsLoading]          = useState(false);
   const [loadingTv,          setLoadingTv]          = useState(true);
@@ -193,7 +218,9 @@ export const ProfileStatsProvider = ({ children }) => {
   const [scaleValues,     setScaleValues]     = useState({});
   // "total" = tekrarlı · "unique" = tekrarsız. Profil kartlarındaki anahtarla
   // seçilir ve cihazda kalıcıdır: her açılışta yeniden seçtirmek gerekmez.
-  const [statsCountMode,  setStatsCountMode]  = useState(STATS_COUNT_MODE_DEFAULT);
+  // Senkron okuma: kip ilk render'da doğru, sayaçlar bir kare "total" gösterip
+  // sonra "unique"e atlamıyor.
+  const [statsCountMode,  setStatsCountMode]  = useState(() => get(Keys.statsCountMode));
 
   // ── Logout/hesap değişimi: önceki hesabın verisi yeni hesaba sızmasın ───
   // Listener effect'leri `!uid` iken sadece return ediyor; state'i burada
@@ -227,9 +254,14 @@ export const ProfileStatsProvider = ({ children }) => {
         // Eski format dizi verisi — subcollection listener tarafından override edilir
         const oldShows = data?.watchedTv || [];
         setListItemsTv((prev) => {
-          const subIds = new Set(prev.filter((s) => s._src === "sub").map((s) => s.id));
-          const legacy = oldShows.filter((s) => !subIds.has(s.id));
           const subItems = prev.filter((s) => s._src === "sub");
+          // String()'e normalize ZORUNLU: subcollection kayıtlarının id'si her
+          // zaman string (Firestore d.id), eski format kök dizide ise sayı
+          // olabiliyor. Normalize edilmezse Set eşleşmesi kaçıyor ve aynı dizi
+          // hem legacy hem sub olarak iki kez sayılıyor (izlenen dizi/bölüm
+          // sayıları ve toplam süre şişiyor). Kardeş listener zaten böyle yapıyor.
+          const subIds = new Set(subItems.map((s) => String(s.id)));
+          const legacy = oldShows.filter((s) => !subIds.has(String(s.id)));
           return [...subItems, ...legacy];
         });
       } else {
@@ -362,21 +394,52 @@ export const ProfileStatsProvider = ({ children }) => {
     setTotalWatchedTimeTv(formatTime(totalMinTv));
   }, [flatEpisodesTv, tvHistoryStates]);
 
-  // ── Tekrarlı/tekrarsız kipi — cihazda kalıcı ────────────────────────────
+  // ── Sayaçları sonraki açılış için sakla ─────────────────────────────────
+  //
+  // KAPI `!loadingMovies && !loadingTv`: iki listener de GERÇEK veriyle
+  // dönmeden yazarsak, tohumla açılıp yarım veri üzerinden hesaplanmış
+  // sayaçları kalıcılaştırır ve hatayı her açılışta pekiştiririz.
   useEffect(() => {
-    let alive = true;
-    AsyncStorage.getItem(STATS_COUNT_MODE_KEY)
-      .then((stored) => {
-        if (alive && (stored === "total" || stored === "unique")) setStatsCountMode(stored);
-      })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, []);
+    if (!uid || loadingMovies || loadingTv) return;
+    publish(cacheKeys.stats(uid), {
+      watchedMovieCount,
+      totalWatchedTime,
+      totalMinutesTime,
+      watchedTvCount,
+      totalSeasonsCount,
+      totalEpisodesCount,
+      totalWatchedTimeTv,
+      totalMinutesTimeTv,
+      uniqueMovieCount,
+      uniqueTvCount,
+      uniqueSeasonsCount,
+      uniqueEpisodesCount,
+    });
+  }, [
+    uid,
+    loadingMovies,
+    loadingTv,
+    watchedMovieCount,
+    totalWatchedTime,
+    totalMinutesTime,
+    watchedTvCount,
+    totalSeasonsCount,
+    totalEpisodesCount,
+    totalWatchedTimeTv,
+    totalMinutesTimeTv,
+    uniqueMovieCount,
+    uniqueTvCount,
+    uniqueSeasonsCount,
+    uniqueEpisodesCount,
+  ]);
 
+  // ── Tekrarlı/tekrarsız kipi — cihazda kalıcı ────────────────────────────
+  // Senkron okunduğu için başlangıç değerinde (yukarıda) hazır; ayrı bir
+  // hidrasyon effect'ine gerek yok.
   const toggleStatsCountMode = useCallback(() => {
     setStatsCountMode((previous) => {
       const next = previous === "unique" ? "total" : "unique";
-      AsyncStorage.setItem(STATS_COUNT_MODE_KEY, next).catch(() => {});
+      set(Keys.statsCountMode, next);
       return next;
     });
   }, []);
@@ -418,13 +481,20 @@ export const ProfileStatsProvider = ({ children }) => {
   const handleTimeClick = () =>
     setTimeDisplayMode((p) => p === "minutes" ? "hours" : p === "hours" ? "days" : "minutes");
 
-  const formatTotalDurationTime = (totalMinutes, mode) => {
+  // `short`: dar alanlarda (profildeki süre şeridi) birim kısaltılır —
+  // "1.234 Dakika" yerine "1.234 dk". Uzun etiketler baştaki boşluğu taşıdığı
+  // için trim'lenir, kısa etiketler zaten temiz gelir.
+  const formatTotalDurationTime = (totalMinutes, mode, { short = false } = {}) => {
     const locale = language === "tr" ? "tr-TR" : "en-US";
+    const label = (key) =>
+      short
+        ? (t.profileScreen[`${key}Short`] || t.profileScreen[key] || "").trim()
+        : (t.profileScreen[key] || "").trim();
     const hours = Math.floor(totalMinutes / 60);
     const days  = Math.floor(hours / 24);
-    if (mode === "hours") return `${hours.toLocaleString(locale)} ${t.profileScreen.hours}`;
-    if (mode === "days")  return `${days.toLocaleString(locale)} ${t.profileScreen.days}`;
-    return `${totalMinutes.toLocaleString(locale)} ${t.profileScreen.minutes}`;
+    if (mode === "hours") return `${hours.toLocaleString(locale)} ${label("hours")}`;
+    if (mode === "days")  return `${days.toLocaleString(locale)} ${label("days")}`;
+    return `${totalMinutes.toLocaleString(locale)} ${label("minutes")}`;
   };
 
   const formatDate = (timestamp) => {
@@ -432,17 +502,6 @@ export const ProfileStatsProvider = ({ children }) => {
     const date = new Date(timestamp);
     if (isNaN(date.getTime())) return typeof timestamp === "string" ? timestamp : "Bilinmeyen Tarih";
     return new Intl.DateTimeFormat(language, { day: "numeric", month: "long", year: "numeric" }).format(date);
-  };
-
-  const deleteList = async () => {
-    if (!selectedList || !uid) return;
-    try {
-      await updateDoc(doc(db, "Lists", uid), { [selectedList]: deleteField() });
-      setModalDeleteVisible(false);
-      Toast.show({ type: "success", text1: i18nText("autoI18n.liste_basariyla_silindi", "Liste başarıyla silindi") });
-    } catch (err) {
-      Toast.show({ type: "error", text1: i18nText("autoI18n.silme_hatasi", "Silme hatası: ") + err.message });
-    }
   };
 
   // ── Talebe bağlı türetmeler (yalnız okununca hesaplanır) ─────────────────
@@ -610,8 +669,8 @@ export const ProfileStatsProvider = ({ children }) => {
 
   const value = useMemo(() => {
     const base = {
-      // Lists / delete
-      lists: displayLists, selectedList, setSelectedList, modalDeleteVisible, setModalDeleteVisible, deleteList, isLoading,
+      // Lists
+      lists: displayLists, isLoading,
       // Movie stats
       watchedMovieCount, totalWatchedTime, totalMinutesTime, listItems, setListItems,
       movieHistoryItems,
@@ -657,7 +716,7 @@ export const ProfileStatsProvider = ({ children }) => {
     return base;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    displayLists, selectedList, modalDeleteVisible, isLoading,
+    displayLists, isLoading,
     watchedMovieCount, totalWatchedTime, totalMinutesTime, listItems,
     movieHistoryItems,
     isloadingMovieInfo, loadingMovies, selectedDate, scaleValues,

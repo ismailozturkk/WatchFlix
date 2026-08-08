@@ -7,7 +7,7 @@ import ListBadges from "./ListBadges";
 import { RatingBadge, POSTER_BADGE_POS } from "./PosterInfoBadges";
 import PaginatedRail from "./PaginatedRail";
 import SeeAllHeader from "./SeeAllHeader";
-import { MovieSkeleton } from "./Skeleton";
+import { RailSkeleton } from "./Skeleton";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
 import {
@@ -17,6 +17,7 @@ import {
   useStreamingProviderSettings,
 } from "../context/AppSettingsContext";
 import useRailPosterStyle from "../hooks/useRailPosterStyle";
+import { useMediaQuickActions } from "../context/MediaQuickActionsContext";
 import { getCachedValue, setCachedValue, TTL } from "../utils/apiCache";
 import {
   mergeProviderResults,
@@ -53,6 +54,7 @@ const DiscoveryCard = memo(function DiscoveryCard({
   const { posterBadges } = useListLayoutSettings();
   const { getTmdbUrl } = useImageQualitySettings();
   const rail = useRailPosterStyle();
+  const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
   const itemProviders = (item._subscriptionProviderIds || [])
     .map((id) => providerCatalog[id])
@@ -73,6 +75,8 @@ const DiscoveryCard = memo(function DiscoveryCard({
           id: item.id,
         })
       }
+      onLongPress={() => openQuickActions({ item, mediaType, navigation })}
+      delayLongPress={350}
     >
       <Animated.View style={{ transform: [{ scale }] }}>
         <PosterImage
@@ -395,9 +399,7 @@ export default function DiscoveryMediaRail({ mediaType, preset, navigation, genr
         </Text>
       )}
       {loading ? (
-        <View style={styles.skeletons}>
-          {[1, 2, 3].map((key) => <MovieSkeleton key={key} />)}
-        </View>
+        <RailSkeleton />
       ) : (
         <PaginatedRail
           data={items}
@@ -421,7 +423,6 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 11, marginTop: -10, paddingHorizontal: 15, marginBottom: 12 },
   attribution: { fontSize: 9, paddingHorizontal: 15, marginTop: -7, marginBottom: 12 },
   rail: { paddingHorizontal: 15 },
-  skeletons: { flexDirection: "row", paddingHorizontal: 15, overflow: "hidden" },
   item: { marginRight: 10, marginBottom: 5 },
   rating: { position: "absolute", right: 5, bottom: 10, minWidth: 30, borderRadius: 10, alignItems: "center" },
   ratingText: { color: "#FFD700", fontSize: 12, paddingHorizontal: 4, paddingBottom: 2 },

@@ -81,6 +81,10 @@ export function extractMediaFacts(details, mediaType) {
     type,
     title: details.title || details.name || "",
     year: String(details.release_date || details.first_air_date || "").slice(0, 4),
+    // Ham yayın tarihi + TMDB durumu: `year` izleme kapısına yetmiyor (aynı yıl
+    // içinde ileri tarihli olabilir) — bkz. utils/watchState.js.
+    releaseDate: details.release_date || details.first_air_date || "",
+    status: typeof details.status === "string" ? details.status : "",
     genres: (Array.isArray(details.genres) ? details.genres : [])
       .map((genre) => genre?.name)
       .filter((name) => typeof name === "string" && name.trim()),

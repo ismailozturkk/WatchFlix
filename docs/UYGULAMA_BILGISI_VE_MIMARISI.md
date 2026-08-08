@@ -13,7 +13,7 @@ Seelogd, kullanıcıların izledikleri film ve dizileri takip etmelerine, listel
 * **Frontend:** React Native (Expo SDK 54, React 19, React Navigation v7)
 * **Backend & Veritabanı:** Firebase Firestore, Firebase Realtime Database, Firebase Authentication, Cloud Functions
 * **Veri Servisleri:** TMDB API (The Movie Database), RevenueCat (Abonelik/Satın Alım)
-* **Yerel Depolama & Cache:** MMKV / AsyncStorage, NetInfo, FileSystem
+* **Yerel Depolama & Cache:** react-native-mmkv (`services/storage`), NetInfo, FileSystem
 
 ---
 

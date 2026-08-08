@@ -11,8 +11,7 @@ import {
   ScrollView,
   Dimensions,
   Animated,
-  PanResponder,
-  ActivityIndicator,
+    ActivityIndicator,
   Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -29,7 +28,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Progress from "react-native-progress";
 import Toast from "react-native-toast-message";
 import SwipeCard from "@components/SwipeCard";
-import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
+import ModalBlurBackdrop from "../../components/common/ModalBlurBackdrop";
+import useSheetTransition from "@hooks/useSheetTransition";
 import {
   useApiSettings,
   useContentSettings,
@@ -99,6 +99,7 @@ export default function ListsScreen({ route, navigation }) {
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   // ── Sıralama & filtreleme ───────────────────────────────────────────────
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const filterSheet = useSheetTransition(filterModalVisible);
   const [sortBy, setSortBy] = useState("default"); // default | dateAdded | name | minutes
   const [sortDir, setSortDir] = useState("desc"); // asc | desc
   const [typeFilter, setTypeFilter] = useState("all"); // all | movie | tv
@@ -143,6 +144,9 @@ export default function ListsScreen({ route, navigation }) {
   const [itemsReady, setItemsReady] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [reorderModalVisible, setReorderModalVisible] = useState(false);
+  // İki alt sayfa: blur yerinde solar, sayfa kayar
+  // (bkz. hooks/useSheetTransition.js). `modalVisible` = izlenen dizi kartı.
+  const watchedSheet = useSheetTransition(modalVisible);
   const [index, setIndex] = useState(0);
   const [reorderItems, setReorderItems] = useState(null);
   const [isReordering, setIsReordering] = useState(false);
@@ -569,7 +573,16 @@ export default function ListsScreen({ route, navigation }) {
   // Eskimiş yanıt taze sonucun üstüne yazmasın (SearchAll deseni).
   const globalReqRef = useRef(0);
   useEffect(() => {
-    if (searchMode !== LIST_SEARCH_MODE.GLOBAL) return undefined;
+    if (searchMode !== LIST_SEARCH_MODE.GLOBAL) {
+      // Kip değişti: debounce timer'ı cleanup ile iptal oluyor ama zaten
+      // set edilmiş globalLoading kimse tarafından kapatılmıyordu (finally
+      // hiç çalışmıyor). Sonuç: ListSearchBar'da temizle (X) düğmesinin
+      // yerinde sonsuz spinner. Uçuştaki isteği de geçersiz kıl.
+      globalReqRef.current += 1;
+      setGlobalLoading(false);
+      setGlobalError(false);
+      return undefined;
+    }
     const q = searchQuery.trim();
     if (q.length < GLOBAL_SEARCH_MIN_CHARS) {
       // Uçuştaki isteği geçersiz kıl: 2 karakterin altına inince ekran
@@ -706,6 +719,25 @@ export default function ListsScreen({ route, navigation }) {
           Toast.show({
             type: "info",
             text1: i18nText("autoI18n.zaten_listede", "Bu içerik zaten listede."),
+          });
+          return;
+        }
+        // Yayınlanmamış / tarihi bilinmeyen içerik izlendi olarak yazılamaz —
+        // istatistik, rozet ve Wrapped hesapları bundan besleniyor.
+        if (status === "unreleased" || status === "unknown-release") {
+          Toast.show({
+            type: "warning",
+            text1:
+              status === "unreleased"
+                ? i18nText("autoI18n.henuz_yayinlanmadi", "Henüz yayınlanmadı")
+                : i18nText(
+                    "autoI18n.yayin_tarihi_bilinmiyor",
+                    "Yayın tarihi bilinmiyor",
+                  ),
+            text2: i18nText(
+              "autoI18n.izlendi_olarak_eklenemez",
+              "İzlendi olarak eklenemez.",
+            ),
           });
           return;
         }
@@ -1433,18 +1465,24 @@ export default function ListsScreen({ route, navigation }) {
         </>
       )}
       <Modal
-        animationType="fade"
+        animationType="none"
         transparent={true}
-        visible={modalVisible}
+        visible={watchedSheet.mounted}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
-          <AdaptiveBlurView
-            tint="dark"
-            intensity={50}
-            experimentalBlurMethod="dimezisBlurView"
-            style={StyleSheet.absoluteFill}
-          />
+        <View
+          style={styles.modalContainer}
+          onLayout={watchedSheet.onOverlayLayout}
+        >
+          {/* Blur YERİNDE solar — sayfayla birlikte kaymaz. */}
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { opacity: watchedSheet.backdropOpacity },
+            ]}
+          >
+            <ModalBlurBackdrop intensity={50} />
+          </Animated.View>
           <TouchableOpacity
             style={{
               position: "absolute",
@@ -1492,8 +1530,13 @@ export default function ListsScreen({ route, navigation }) {
                   : null;
 
                 return (
-                  <View
-                    style={[styles.sheet, { backgroundColor: theme.secondary }]}
+                  <Animated.View
+                    onLayout={watchedSheet.onSheetLayout}
+                    style={[
+                      styles.sheet,
+                      { backgroundColor: theme.secondary },
+                      watchedSheet.sheetStyle,
+                    ]}
                   >
                     {/* ── Hero: bulanık poster zemin üstünde dizi bilgisi ── */}
                     <View style={styles.sheetHero}>
@@ -1786,7 +1829,7 @@ export default function ListsScreen({ route, navigation }) {
                         )}
                       </ScrollView>
                     </View>
-                  </View>
+                  </Animated.View>
                 );
               })()}
         </View>
@@ -1810,12 +1853,7 @@ export default function ListsScreen({ route, navigation }) {
         statusBarTranslucent
         onRequestClose={closeReorderModal}
       >
-        <AdaptiveBlurView
-          tint="dark"
-          intensity={65}
-          experimentalBlurMethod="dimezisBlurView"
-          style={StyleSheet.absoluteFill}
-        />
+        <ModalBlurBackdrop intensity={65} />
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
           activeOpacity={1}
@@ -2075,22 +2113,35 @@ export default function ListsScreen({ route, navigation }) {
 
       {/* ── Sıralama & Filtreleme modalı ── */}
       <Modal
-        animationType="slide"
+        animationType="none"
         transparent
-        visible={filterModalVisible}
+        visible={filterSheet.mounted}
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <View style={{ flex: 1, justifyContent: "flex-end" }}>
-          <AdaptiveBlurView tint="dark" intensity={30} style={StyleSheet.absoluteFill} />
+        <View
+          style={{ flex: 1, justifyContent: "flex-end" }}
+          onLayout={filterSheet.onOverlayLayout}
+        >
+          {/* Blur YERİNDE solar — sayfayla birlikte kaymaz. */}
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { opacity: filterSheet.backdropOpacity },
+            ]}
+          >
+            <ModalBlurBackdrop intensity={30} />
+          </Animated.View>
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
             activeOpacity={1}
             onPress={() => setFilterModalVisible(false)}
           />
-          <View
+          <Animated.View
+            onLayout={filterSheet.onSheetLayout}
             style={[
               fStyles.sheet,
               { backgroundColor: theme.primary, borderColor: theme.border },
+              filterSheet.sheetStyle,
             ]}
           >
             <View style={[fStyles.handle, { backgroundColor: theme.border }]} />
@@ -2387,7 +2438,7 @@ export default function ListsScreen({ route, navigation }) {
                   {filteredItems.length}{i18nText("autoI18n.sonuc_goster", "sonuç göster")}</Text>
               )}
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
 

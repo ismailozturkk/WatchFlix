@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useMemo, useRef } from "react";
+import React, { memo, useEffect, useRef } from "react";
 import {
   Text,
   TouchableOpacity,
@@ -8,25 +8,27 @@ import {
   Dimensions,
   Animated,
 } from "react-native";
-import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { useTvShow } from "../../context/TvShowContex";
-import { MovieSkeleton } from "../../components/Skeleton";
+import { ChipRowSkeleton, RailSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import ListBadges from "../../components/ListBadges";
 import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { SeeAllButton } from "../../components/SeeAllHeader";
 import { i18nText } from "../../utils/i18nText";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 const { width, height } = Dimensions.get("window");
+// Tür çipi: dikey dolgu 10+10, tek satır yazı ≈ 17 → 37.
+const GENRE_CHIP_HEIGHT = 37;
 
 // Stable, module-scope item component → no remount → no flicker.
 const TvGenresCard = memo(function TvGenresCard({ item, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -40,6 +42,10 @@ const TvGenresCard = memo(function TvGenresCard({ item, navigation, theme, getTm
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
+      onLongPress={() =>
+        openQuickActions({ item, mediaType: "tv", navigation })
+      }
+      delayLongPress={350}
     >
       <Animated.View style={[{ transform: [{ scale }] }]}>
         <PosterImage
@@ -99,43 +105,74 @@ export default function TvShowsGenres({ navigation }) {
           : [...prev, genreId], // Seçili değilse ekle
     );
   };
+
+  const genreTitle = selectedGenres.length
+    ? genres
+        .filter((g) => selectedGenres.includes(g.id))
+        .map((g) => g.name)
+        .join(", ")
+    : i18nText("autoI18n.turler", "Türler");
+
+  const renderGenreChip = ({ item }) => (
+    <TouchableOpacity
+      style={[
+        styles.genreButton,
+        {
+          backgroundColor: selectedGenres.includes(item.id)
+            ? theme.accent
+            : theme.secondary,
+        },
+      ]}
+      onPress={() => toggleGenre(item.id)}
+    >
+      <Text
+        allowFontScaling={false}
+        style={[styles.genreText, { color: theme.text.primary }]}
+      >
+        {item.name}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  // Başlık satırı yükleme sırasında da AYNI kurguda: tür çipleri + "tümünü gör"
+  // hapı. Türler henüz gelmediyse yerlerini aynı yükseklikte iskelet çipler
+  // tutar — yoksa satır 0'dan gerçek yüksekliğe sıçrıyor, ray zıplıyordu.
+  const genreHeader = (
+    <View style={styles.genreHeaderRow}>
+      <View style={styles.genreListWrap}>
+        {genres.length > 0 ? (
+          <FlatList
+            data={genres}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.genreListContent}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={renderGenreChip}
+          />
+        ) : (
+          <ChipRowSkeleton chipHeight={GENRE_CHIP_HEIGHT} style={styles.genreListContent} />
+        )}
+      </View>
+      <SeeAllButton
+        style={styles.genreSeeAllButton}
+        onPress={() =>
+          navigation.navigate("SeeAllScreen", {
+            mediaType: "tv",
+            section: "genres",
+            title: genreTitle,
+            genreIds: selectedGenres,
+          })
+        }
+      />
+    </View>
+  );
+
   if (loadingGenres || moviesGenres.length < 1) {
     return (
       <View style={styles.container}>
-        <FlatList
-          data={genres}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 15 }}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[
-                styles.genreButton,
-                {
-                  backgroundColor: selectedGenres.includes(item.id)
-                    ? theme.accent
-                    : theme.secondary,
-                },
-              ]}
-              onPress={() => toggleGenre(item.id)}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {item.name}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
-        <FlatList
-          data={[1, 2, 3]}
-          renderItem={() => <MovieSkeleton />}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 15 }}
-        />
+        {genreHeader}
+        {/* Bu bölümün kartında alt boşluk yok (similarItem) */}
+        <RailSkeleton cellMarginBottom={0} />
       </View>
     );
   }
@@ -151,56 +188,9 @@ export default function TvShowsGenres({ navigation }) {
       />
     );
   };
-  const genreTitle = selectedGenres.length
-    ? genres
-        .filter((g) => selectedGenres.includes(g.id))
-        .map((g) => g.name)
-        .join(", ")
-    : i18nText("autoI18n.turler", "Türler");
   return (
     <View style={styles.container}>
-      <View style={styles.genreHeaderRow}>
-        <View style={styles.genreListWrap}>
-          <FlatList
-            data={genres}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.genreListContent}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.genreButton,
-                  {
-                    backgroundColor: selectedGenres.includes(item.id)
-                      ? theme.accent
-                      : theme.secondary,
-                  },
-                ]}
-                onPress={() => toggleGenre(item.id)}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.genreText, { color: theme.text.primary }]}
-                >
-                  {item.name}
-                </Text>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-        <SeeAllButton
-          style={styles.genreSeeAllButton}
-          onPress={() =>
-            navigation.navigate("SeeAllScreen", {
-              mediaType: "tv",
-              section: "genres",
-              title: genreTitle,
-              genreIds: selectedGenres,
-            })
-          }
-        />
-      </View>
+      {genreHeader}
       <PaginatedRail
         data={moviesGenres}
         contentContainerStyle={{ paddingHorizontal: 15 }}

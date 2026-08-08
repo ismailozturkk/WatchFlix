@@ -210,3 +210,34 @@ export function describeSaveTarget(name, existingNames = [], itemCount = 0) {
     canSave: !!resolved && itemCount > 0,
   };
 }
+
+/**
+ * Yeniden adlandırma girdisinin durumu — `describeSaveTarget`in tersi mantık:
+ * kaydetmede çakışan ad sessizce "(2)" ile çözülür, YENİDEN ADLANDIRMADA ise
+ * çözülmez. Kullanıcı adı bilerek yazıyor; "Filmler" isterken "Filmler (2)"
+ * almak, üstelik eski liste dururken, sürpriz olurdu — çakışma söylenir.
+ *
+ * Yalnız ad doğrular; hangi listelerin yeniden adlandırılabildiği (öntanımlı
+ * dördü hariç) çağıranın kararıdır.
+ *
+ * @returns {{name: string|null, status: "ok"|"empty"|"unchanged"|"tooLong"|"reserved"|"taken", canSave: boolean}}
+ */
+export function describeRenameTarget(currentName, nextName, existingNames = []) {
+  const current = String(currentName ?? "").trim();
+  const typed = String(nextName ?? "").trim();
+  const result = (status) => ({
+    name: status === "ok" ? typed : null,
+    status,
+    canSave: status === "ok",
+  });
+
+  if (!typed) return result("empty");
+  if (typed.length > MAX_LIST_NAME_LENGTH) return result("tooLong");
+  // Aynı ad "hata" değil: çağıran modalı sessizce kapatır.
+  if (typed === current) return result("unchanged");
+  if (RESERVED_LIST_NAMES.includes(typed)) return result("reserved");
+  if ((existingNames || []).some((value) => String(value) === typed)) {
+    return result("taken");
+  }
+  return result("ok");
+}

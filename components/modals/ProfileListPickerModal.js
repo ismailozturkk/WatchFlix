@@ -11,8 +11,6 @@ import React, { useMemo } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
-  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -20,6 +18,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useProfileStats } from "@context/ProfileStatsContext";
@@ -70,21 +69,16 @@ export default function ProfileListPickerModal({ visible, onClose, onSelect }) {
   const hasAnyItem = useMemo(() => lists.some((list) => list.items.length > 0), [lists]);
 
   return (
-    <Modal
+    <BottomSheetModal
       visible={visible}
-      transparent
-      animationType="slide"
-      statusBarTranslucent
-      onRequestClose={onClose}
+      onClose={onClose}
+      intensity={35}
+      dimColor="rgba(0,0,0,0.35)"
+      sheetStyle={[
+        styles.sheet,
+        { backgroundColor: theme.secondary, borderColor: theme.border },
+      ]}
     >
-      <View style={styles.root}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View
-          style={[
-            styles.sheet,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
-        >
           <View style={[styles.handle, { backgroundColor: theme.border }]} />
 
           <View style={styles.header}>
@@ -257,14 +251,11 @@ export default function ProfileListPickerModal({ visible, onClose, onSelect }) {
               );
             }}
           />
-        </View>
-      </View>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.58)" },
   sheet: {
     maxHeight: "80%",
     borderTopLeftRadius: 26,

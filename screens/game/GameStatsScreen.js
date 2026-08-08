@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import AppIcon from "@components/AppIcon";
 import Skeleton from "@components/Skeleton";
 import { useAuth } from "@context/AuthContext";

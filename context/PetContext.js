@@ -7,7 +7,7 @@ import React, {
   useState,
 } from "react";
 import { InteractionManager } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, get, set } from "../services/storage";
 import * as petCache from "../services/petCache";
 import { toast } from "../components/AppToast";
 import { i18nText } from "../utils/i18nText";
@@ -63,25 +63,24 @@ const DEFAULT_SIZE = 124;
 // Pet'e basılı tutunca yayınlanan event — ChatModal bunu dinleyip AI sohbetini açar.
 export const AI_CHAT_EVENT = "pet:openAiChat";
 
-const STORAGE_KEYS = {
-  enabled: "pet_enabled",
-  owned: "pet_owned",
-  selected: "pet_selected",
-  position: "pet_position",
-  size: "pet_size",
-};
+// Anahtar adları artık services/storage/registry.js'de (Keys.pet*).
 
 const PetContext = createContext(undefined);
 
 export const PetProvider = ({ children }) => {
   // Yeni kurulumlarda pet kapalıdır; daha önce seçim yapan kullanıcıların
   // AsyncStorage'daki tercihi açılışta aşağıda geri yüklenir.
-  const [petEnabled, setPetEnabled] = useState(false);
-  const [ownedPets, setOwnedPets] = useState(DEFAULT_OWNED);
-  const [selectedPetId, setSelectedPetId] = useState(DEFAULT_SELECTED);
+  const [petEnabled, setPetEnabled] = useState(() => get(Keys.petEnabled));
+  const [ownedPets, setOwnedPets] = useState(() => ({
+    ...DEFAULT_OWNED,
+    ...(get(Keys.petOwned) || {}),
+  }));
+  const [selectedPetId, setSelectedPetId] = useState(
+    () => get(Keys.petSelected) || DEFAULT_SELECTED,
+  );
   const [petState, setPetState] = useState("idle"); // runtime, kalıcı değil
-  const [position, setPosition] = useState(null); // {x,y} | null = varsayılan konum
-  const [petSize, setPetSize] = useState(DEFAULT_SIZE);
+  const [position, setPosition] = useState(() => get(Keys.petPosition)); // {x,y} | null = varsayılan konum
+  const [petSize, setPetSize] = useState(() => get(Keys.petSize));
 
   // İndirme/önbellek durumu (R2'den indirilen petler cihaz önbelleğinde tutulur).
   const [cachedPets, setCachedPets] = useState({});     // { id: true } — indirilmiş
@@ -100,27 +99,13 @@ export const PetProvider = ({ children }) => {
     let cancelled = false;
     let timer = null;
     const task = InteractionManager.runAfterInteractions(() => {
-      timer = setTimeout(async () => {
-        try {
-          const [[, en], [, owned], [, sel], [, pos], [, sz]] =
-            await AsyncStorage.multiGet([
-              STORAGE_KEYS.enabled,
-              STORAGE_KEYS.owned,
-              STORAGE_KEYS.selected,
-              STORAGE_KEYS.position,
-              STORAGE_KEYS.size,
-            ]);
-          if (cancelled) return;
-          if (en !== null) setPetEnabled(JSON.parse(en));
-          if (owned !== null)
-            setOwnedPets({ ...DEFAULT_OWNED, ...JSON.parse(owned) });
-          if (sel !== null) setSelectedPetId(sel);
-          if (pos !== null) setPosition(JSON.parse(pos));
-          if (sz !== null) setPetSize(JSON.parse(sz));
-        } catch {
-          // sessizce varsayılanlarla devam
-        }
+      timer = setTimeout(() => {
         if (cancelled) return;
+        // MMKV GEÇİŞİ: tercihler artık yukarıdaki useState başlangıç
+        // değerlerinde SENKRON okunuyor — pet, kayıtlı konum ve boyutuyla ilk
+        // render'da görünüyor. Bu ertelenmiş görevde yalnız ÖNBELLEK TARAMASI
+        // kaldı; onun ertelenmesi hâlâ şart (26 pet × senkron dosya sistemi
+        // çağrısı, açılış penceresinde JS thread'ini dondurur).
         const { cached, sizes } = petCache.scanCached(PET_IDS);
         if (cancelled) return;
         setCachedPets(cached);
@@ -212,9 +197,7 @@ export const PetProvider = ({ children }) => {
 
   const changePetEnabled = useCallback((value) => {
     setPetEnabled(value);
-    AsyncStorage.setItem(STORAGE_KEYS.enabled, JSON.stringify(value)).catch(
-      () => {},
-    );
+    set(Keys.petEnabled, !!value);
   }, []);
 
   // Bir peti "aç" (kilidini kaldır).
@@ -222,9 +205,7 @@ export const PetProvider = ({ children }) => {
     setOwnedPets((current) => {
       if (current[id]) return current;
       const next = { ...current, [id]: true };
-      AsyncStorage.setItem(STORAGE_KEYS.owned, JSON.stringify(next)).catch(
-        () => {},
-      );
+      set(Keys.petOwned, next);
       return next;
     });
   }, []);
@@ -232,21 +213,17 @@ export const PetProvider = ({ children }) => {
   // Aktif peti seç (yalnızca açık olanlar seçilebilir).
   const selectPet = useCallback((id) => {
     setSelectedPetId(id);
-    AsyncStorage.setItem(STORAGE_KEYS.selected, id).catch(() => {});
+    set(Keys.petSelected, id);
   }, []);
 
   const setPetPosition = useCallback((pos) => {
     setPosition(pos);
-    AsyncStorage.setItem(STORAGE_KEYS.position, JSON.stringify(pos)).catch(
-      () => {},
-    );
+    set(Keys.petPosition, pos);
   }, []);
 
   const changePetSize = useCallback((size) => {
     setPetSize(size);
-    AsyncStorage.setItem(STORAGE_KEYS.size, JSON.stringify(size)).catch(
-      () => {},
-    );
+    set(Keys.petSize, size);
   }, []);
 
   const value = useMemo(

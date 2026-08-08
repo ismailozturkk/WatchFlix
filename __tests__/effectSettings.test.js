@@ -1,61 +1,54 @@
 // __tests__/effectSettings.test.js
 // Efekt modu store'unun sozlesmesi: cihaz sinifi VARSAYILANI verir, kayitli
-// tercih onu ezer, kullanici secimi gec gelen hidrasyona yenilmez.
+// tercih onu ezer.
+//
+// MMKV GECISI: kayitli tercih ACILISTA SENKRON okunuyor, yani modul yuklenir
+// yuklenmez dogru mod gecerli. "Kullanici secimi gec gelen hidrasyona yenilmez"
+// korumasi (tercihSurumu) ve onu dogrulayan test bu yuzden kalkti — beklenecek
+// bir hidrasyon kalmadi.
+
+const { withSeededStorage } = require("./helpers/storageTestKit");
 
 const loadService = ({ stored = null, tier = "high" } = {}) => {
   jest.resetModules();
-  const storage = {
-    getItem: jest.fn(() => Promise.resolve(stored)),
-    setItem: jest.fn(() => Promise.resolve()),
-  };
-  jest.doMock("@react-native-async-storage/async-storage", () => ({
-    __esModule: true,
-    default: storage,
-  }));
   // services/deviceTier native sabit okur (expo-device); testte katman sabitlenir.
   jest.doMock("../services/deviceTier", () => ({
     __esModule: true,
     deviceTier: tier,
     perfPreset: {},
   }));
-  return { service: require("../services/effectSettings"), storage };
+  const service = withSeededStorage(
+    (Keys) => (stored ? [[Keys.effectMode, stored]] : []),
+    () => require("../services/effectSettings"),
+  );
+  return { service, storage: require("../services/storage") };
 };
-
-// Hidrasyon bir mikro-gorev zinciri; iki tur beklemek yeterli.
-const hidrasyonuBekle = () => new Promise((resolve) => setImmediate(resolve));
 
 afterEach(() => {
   jest.resetModules();
-  jest.dontMock("@react-native-async-storage/async-storage");
   jest.dontMock("../services/deviceTier");
 });
 
 describe("varsayilan mod cihaz sinifindan gelir", () => {
-  test("high/mid cihaz TAM efektle acilir", async () => {
+  test("high/mid cihaz TAM efektle acilir", () => {
     for (const tier of ["high", "mid"]) {
       const { service } = loadService({ tier });
       expect(service.getEffectMode()).toBe("full");
       expect(service.getEffectPresetNow().blurEnabled).toBe(true);
       expect(service.onerilenEffectMode()).toBe("full");
-      await hidrasyonuBekle();
-      // Kayit yoksa hidrasyon sonrasi da degismez.
-      expect(service.getEffectMode()).toBe("full");
     }
   });
 
-  test("low cihaz KAPALI efektle acilir (bugunku davranis korunur)", async () => {
+  test("low cihaz KAPALI efektle acilir (bugunku davranis korunur)", () => {
     const { service } = loadService({ tier: "low" });
     expect(service.getEffectMode()).toBe("off");
     expect(service.getEffectPresetNow().blurEnabled).toBe(false);
-    await hidrasyonuBekle();
-    expect(service.getEffectMode()).toBe("off");
   });
 });
 
 describe("kayitli tercih", () => {
-  test("gecerli kayit cihaz kararini ezer", async () => {
+  test("gecerli kayit cihaz kararini ILK OKUMADA ezer", () => {
     const { service } = loadService({ stored: "balanced", tier: "high" });
-    await hidrasyonuBekle();
     expect(service.getEffectMode()).toBe("balanced");
     // "Orta" gorseli korur: blur ACIK, sureklilik maliyetleri kisilir.
     const p = service.getEffectPresetNow();
@@ -63,45 +56,55 @@ describe("kayitli tercih", () => {
     expect(p.spriteFpsScale).toBeLessThan(1);
   });
 
-  test("low cihazda kullanici TAM secmisse blur geri gelir", async () => {
+  test("low cihazda kullanici TAM secmisse blur geri gelir", () => {
     const { service } = loadService({ stored: "full", tier: "low" });
-    await hidrasyonuBekle();
     expect(service.getEffectMode()).toBe("full");
     expect(service.getEffectPresetNow().blurEnabled).toBe(true);
     // Oneri yine cihazin kararidir; secim onu gizlemez.
     expect(service.onerilenEffectMode()).toBe("off");
   });
 
-  test("bozuk kayit yok sayilir", async () => {
+  test("bozuk kayit yok sayilir", () => {
     const { service } = loadService({ stored: "ultra", tier: "high" });
-    await hidrasyonuBekle();
     expect(service.getEffectMode()).toBe("full");
   });
+});
 
-  test("depolama okunamazsa cihaz karariyla devam eder", async () => {
+describe("goc sirasi", () => {
+  // REGRESYON KILIDI: bu modul App.js'teki goc kapisindan ONCE yuklenebiliyor
+  // (kapi provider agacini tutuyor, modul seviyesindeki kodu tutmuyor). Bir ara
+  // tercih yalnizca modul yuklenirken okunuyordu; guncelleme sonrasi ilk
+  // acilista bos depoya denk gelip kullanicinin secimi bir oturum boyunca yok
+  // sayiliyordu. Artik anahtara ABONE.
+  test("modul goc BITMEDEN yuklenirse, goc yazinca tercih devreye girer", async () => {
     jest.resetModules();
-    jest.doMock("@react-native-async-storage/async-storage", () => ({
-      __esModule: true,
-      default: {
-        getItem: jest.fn(() => Promise.reject(new Error("okunamadi"))),
-        setItem: jest.fn(() => Promise.resolve()),
-      },
-    }));
     jest.doMock("../services/deviceTier", () => ({
       __esModule: true,
-      deviceTier: "low",
+      deviceTier: "high",
       perfPreset: {},
     }));
+
+    const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+    AsyncStorage.__reset();
+    AsyncStorage.__store.set("effectMode", "off");
+
+    // Depo hala bos: modul cihaz kararina duser.
     const service = require("../services/effectSettings");
-    await hidrasyonuBekle();
+    expect(service.getEffectMode()).toBe("full");
+
+    const uyari = jest.fn();
+    service.subscribeEffects(uyari);
+
+    await require("../services/storage").runStorageMigration();
+
     expect(service.getEffectMode()).toBe("off");
+    expect(uyari).toHaveBeenCalled();
   });
 });
 
 describe("setEffectMode", () => {
-  test("modu degistirir, kalicilastirir ve aboneleri uyarir", async () => {
+  test("modu degistirir, kalicilastirir ve aboneleri uyarir", () => {
     const { service, storage } = loadService({ tier: "high" });
-    await hidrasyonuBekle();
     const uyari = jest.fn();
     const birak = service.subscribeEffects(uyari);
 
@@ -109,51 +112,40 @@ describe("setEffectMode", () => {
     expect(service.getEffectMode()).toBe("off");
     expect(service.getEffectPresetNow().blurEnabled).toBe(false);
     expect(uyari).toHaveBeenCalledTimes(1);
-    expect(storage.setItem).toHaveBeenCalledWith("effectMode", "off");
+    expect(storage.get(storage.Keys.effectMode)).toBe("off");
 
     birak();
     service.setEffectMode("balanced");
     expect(uyari).toHaveBeenCalledTimes(1); // abonelikten cikti
   });
 
-  test("ayni mod tekrar secilirse yayin yapilmaz (bos render yok)", async () => {
+  test("ayni mod tekrar secilirse yayin yapilmaz (bos render yok)", () => {
     const { service } = loadService({ tier: "high" });
-    await hidrasyonuBekle();
     const uyari = jest.fn();
     service.subscribeEffects(uyari);
     service.setEffectMode("full"); // zaten "full"
     expect(uyari).not.toHaveBeenCalled();
   });
 
-  test("gecersiz mod yok sayilir", async () => {
+  test("gecersiz mod yok sayilir", () => {
     const { service, storage } = loadService({ tier: "high" });
-    await hidrasyonuBekle();
     service.setEffectMode("turbo");
     expect(service.getEffectMode()).toBe("full");
-    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(storage.has(storage.Keys.effectMode)).toBe(false);
   });
 
-  test("preset REFERANSI yalniz mod degisince degisir (useSyncExternalStore sarti)", async () => {
+  test("preset REFERANSI yalniz mod degisince degisir (useSyncExternalStore sarti)", () => {
     const { service } = loadService({ tier: "high" });
-    await hidrasyonuBekle();
     const a = service.getEffectPresetNow();
     expect(service.getEffectPresetNow()).toBe(a); // her okumada yeni nesne YOK
     service.setEffectMode("off");
     expect(service.getEffectPresetNow()).not.toBe(a);
   });
 
-  test("hidrasyondan ONCE yapilan secim, gec gelen kayitla EZILMEZ", async () => {
-    const { service } = loadService({ stored: "off", tier: "high" });
-    service.setEffectMode("balanced"); // kullanici hidrasyon bitmeden secti
-    await hidrasyonuBekle();
-    expect(service.getEffectMode()).toBe("balanced");
-  });
-
-  test("persist:false ile oturumluk degisiklik yazilmaz", async () => {
+  test("persist:false ile oturumluk degisiklik yazilmaz", () => {
     const { service, storage } = loadService({ tier: "high" });
-    await hidrasyonuBekle();
     service.setEffectMode("off", { persist: false });
     expect(service.getEffectMode()).toBe("off");
-    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(storage.has(storage.Keys.effectMode)).toBe(false);
   });
 });

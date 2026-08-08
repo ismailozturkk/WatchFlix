@@ -22,15 +22,14 @@ import {
   Platform,
   Keyboard,
   ActivityIndicator,
-  Alert,
-  Switch,
+    Switch,
   Modal,
   Animated,
   Easing,
   Dimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, get, set } from "../../services/storage";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -56,8 +55,7 @@ import {
   buildPosterMap,
   responseToHistoryText,
   friendlyError,
-  toStr,
-} from "@services/aiCineService";
+  } from "@services/aiCineService";
 import { buildLibraryContext, applyWatchedFilter } from "@services/aiUserContext";
 import { resolveCards } from "@services/tmdbLookup";
 import {
@@ -79,7 +77,7 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const FAB_ORIGIN = [SCREEN_W - 49, SCREEN_H - 109, 0];
 
 const TABS = ["explore", "plan", "lists"];
-const PREFS_KEY = "@seelogd/ai_cine_prefs";
+const PREFS_KEY = Keys.aiCinePrefs.key;
 const DEFAULT_PREFS = { enabled: false, watchList: true, favorites: true, custom: true, watched: true };
 const AI_PLAN_LIMITS = {
   free: { daily: 5, monthly: 30 },
@@ -233,17 +231,14 @@ export default function AIChatScreen({ visible, onClose, fabOrigin }) {
 
   // Liste tercihlerini yükle (bir kez)
   useEffect(() => {
-    AsyncStorage.getItem(PREFS_KEY)
-      .then((raw) => {
-        if (raw) setPrefs((p) => ({ ...p, ...JSON.parse(raw) }));
-      })
-      .catch(() => {});
+    const saved = get(Keys.aiCinePrefs);
+    if (saved) setPrefs((p) => ({ ...p, ...saved }));
   }, []);
 
   const updatePrefs = useCallback((patch) => {
     setPrefs((prev) => {
       const next = { ...prev, ...patch };
-      AsyncStorage.setItem(PREFS_KEY, JSON.stringify(next)).catch(() => {});
+      set(Keys.aiCinePrefs, next);
       return next;
     });
   }, []);

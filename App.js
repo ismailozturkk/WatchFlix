@@ -10,15 +10,18 @@ if (!__DEV__) {
 }
 import {
   Animated,
-  AppState,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  LogBox,
-  InteractionManager,
+    AppState,
+    StyleSheet,
+      View,
+    InteractionManager,
   DeviceEventEmitter,
 } from "react-native";
+import { flushSnapshotWrites } from "./services/snapshotCache";
+import {
+  BLUR_SCOPES,
+  BlurTargetProvider,
+  BlurTargetSurface,
+} from "./components/common/BlurTarget";
 
 import {
   NavigationContainer,
@@ -28,7 +31,6 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
 import { LanguageProvider } from "./context/LanguageContext";
 import { ThemeProvider } from "./context/ThemeContext";
-import TabScreen from "@screens/navigation/TabScreen";
 import TvShowsDetails from "./screens/tv/TvShowsDetails";
 import SeasonDetails from "./screens/tv/SeasonDetails";
 import EpisodeDetails from "./screens/tv/EpisodeDetails";
@@ -37,8 +39,6 @@ import SeeAllScreen from "./screens/shared/SeeAllScreen";
 import TvGraphDetailScreen from "./screens/tv/TvGraphDetailScreen";
 import StoryShareScreen from "@screens/story/StoryShareScreen";
 import StoryDraftsScreen from "@screens/story/StoryDraftsScreen";
-import MovieSearch from "./screens/search/MovieSearch";
-import TvShowSearch from "./screens/search/TvShowSearch";
 import LoginScreen from "./screens/auth/LoginScreen";
 import RegisterScreen from "./screens/auth/RegisterScreen";
 import ForgotPasswordScreen from "./screens/auth/ForgotPasswordScreen";
@@ -54,13 +54,14 @@ import { PetProvider } from "./context/PetContext";
 import { ListStatusProvider } from "./context/ListStatusContext";
 import { MediaActivityProvider } from "./context/MediaActivityContext";
 import { SharedListsProvider } from "./context/SharedListsContext";
+import { MediaQuickActionsProvider } from "./context/MediaQuickActionsContext";
 import SharedListScreen from "@screens/lists/SharedListScreen";
 import { auth, db } from "./firebase";
 import ProfileScreen from "./screens/tabs/ProfileScreen";
 import Toast from "react-native-toast-message";
 import { toastConfig } from "@components/AppToast";
 import { AppAlertHost } from "@components/AppAlert";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import ListsScreen from "@screens/lists/ListsScreen";
 import UpNextScreen from "@screens/tabs/UpNextScreen";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -78,13 +79,11 @@ import { NotificationsProvider }    from "./context/NotificationsContext";
 import { DeviceNotificationsProvider } from "./context/DeviceNotificationsContext";
 import { PostsProvider }            from "./context/PostsContext";
 import { TvShowProvider } from "./context/TvShowContex";
-import ActorSearch from "./screens/search/ActorSearch";
 import ActorViewScreen from "./screens/actor/ActorViewScreen";
 import MovieStatisticsScreen from "./screens/tabs/profile/MovieStatisticsScreen";
 import TvStatisticsScreen from "./screens/tabs/profile/TvStatisticsScreen";
 import WrappedScreen from "@screens/wrapped/WrappedScreen";
 import TabScreenNavigator from "@screens/navigation/TabScreenNavigator";
-import SearchAll from "./screens/search/SearchAll";
 import FriendsListScreen from "./screens/tabs/profile/FriendsListScreen";
 import FriendProfileScreen from "./screens/tabs/profile/FriendProfileScreen";
 import RemindersScreen from "./screens/tabs/profile/RemindersScreen";
@@ -115,7 +114,6 @@ import PostDetailScreen from "@screens/social/PostDetailScreen";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { enableFreeze } from "react-native-screens";
 import Comment from "./components/Comment";
-import MovieSearchScreen from "./screens/search/MovieSearchScreen";
 import SplashPosterWave from "./components/SplashPosterWave";
 import CalendarScreen from "@screens/calendar/CalendarScreen";
 import { CalendarProvider } from "./context/CalendarContext";
@@ -132,9 +130,8 @@ import GameStatsScreen from "./screens/game/GameStatsScreen";
 import GameAchievementsScreen from "./screens/game/GameAchievementsScreen";
 import WatchBadgesScreen from "./screens/tabs/profile/WatchBadgesScreen";
 import CustomThemeScreen from "./screens/tabs/setting/CustomThemeScreen";
-import { preloadAllCache } from "./utils/apiCache";
 import { installAxiosDataCache } from "./utils/axiosDataCache";
-import { hydrateAutoDataCacheSetting } from "./utils/dataCacheSettings";
+import { isMigrated, runStorageMigration } from "./services/storage";
 import { startPresence, stopPresence } from "./services/presenceService";
 import { initCrashReporting, captureError, setCrashUser, wrapRoot } from "./services/crashReporting";
 import {
@@ -200,12 +197,12 @@ const preloadIconFont = (IconSet) => {
   return Promise.resolve();
 };
 
-// Uygulama modülü yüklendiği anda cache ve ikon font preload'u başlat.
-// Provider'lar mount olmadan önce cache belleğe alınır; tab ikonları da
-// ilk TV ekranı açıldıktan sonra font beklemez.
+// Uygulama modülü yüklendiği anda ikon font preload'u başlat.
+//
+// MMKV GEÇİŞİ: buradaki iki depolama adımı (`hydrateAutoDataCacheSetting` ve
+// `preloadAllCache`) kalktı. İkisi de "AsyncStorage async olduğu için açılışta
+// belleğe al" işiydi; MMKV senkron okuduğundan ikisinin de karşılığı yok.
 const startupPreloadPromise = Promise.allSettled([
-  hydrateAutoDataCacheSetting(),
-  preloadAllCache(),
   preloadIconFont(Ionicons),
   preloadIconFont(MaterialCommunityIcons),
   preloadIconFont(FontAwesome),
@@ -706,15 +703,6 @@ function AppContent() {
           }}
         />
         <Stack.Screen
-          name="MovieSearchScreen"
-          component={MovieSearchScreen}
-          options={{
-            headerShown: false,
-            presentation: "transparentModal",
-            animation: "fade",
-          }}
-        />
-        <Stack.Screen
           name="CalendarScreen"
           options={{
             headerShown: false,
@@ -809,7 +797,29 @@ export default wrapRoot(function App() {
   const [splashVisible, setSplashVisible] = useState(true);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
+  // AsyncStorage → MMKV göç kapısı.
+  //
+  // Provider'lar ayarları SENKRON okuyor; göç bitmeden mount olurlarsa boş
+  // depodan varsayılanları alır ve kullanıcının teması/dili bir kez sıfırlanmış
+  // görünürdü. `isMigrated()` senkron olduğu için bu kapı ilk güncelleme
+  // açılışı DIŞINDA hiçbir maliyet getirmez: sonraki her açılışta başlangıç
+  // değeri zaten `true`, ekstra render bile olmaz.
+  const [storageReady, setStorageReady] = useState(() => isMigrated());
+
   useEffect(() => {
+    if (storageReady) return undefined;
+    let alive = true;
+    runStorageMigration().finally(() => {
+      if (alive) setStorageReady(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [storageReady]);
+
+  useEffect(() => {
+    // Göç sürerken yerel splash açık kalsın — arkasında boş bir ekran görünmesin.
+    if (!storageReady) return;
     // Özel Lottie splash screen'imiz render edildiğinde yerel (beyaz) splash'i kapat.
     ExpoSplashScreen.hideAsync().catch(() => {});
 
@@ -862,6 +872,17 @@ export default wrapRoot(function App() {
       sub.remove();
       clearTimeout(fallbackTimer);
     };
+  }, [storageReady]);
+
+  // Anlık görüntü yazımları erteleniyor (art arda gelen snapshot'lar tek yazıma
+  // birleşsin diye). Uygulama arka plana geçerken süreç dondurulabilir; bekleyen
+  // yazım o pencerede kaybolursa kullanıcı bir sonraki açılışta bir ÖNCEKİ hâli
+  // görür. Burada zorla diske indiriyoruz.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (durum) => {
+      if (durum === "background" || durum === "inactive") flushSnapshotWrites();
+    });
+    return () => sub.remove();
   }, []);
 
   // Presence (RTDB onDisconnect + AppState) — presenceService halleder.
@@ -882,10 +903,23 @@ export default wrapRoot(function App() {
       stopPresence();
     };
   }, []);
+
+  // Göç bitene kadar provider ağacı hiç mount edilmez. Yerel splash hâlâ açık
+  // (hideAsync yukarıda `storageReady` kapısının arkasında), bu yüzden kullanıcı
+  // yalnızca splash görür. Sadece güncelleme sonrası İLK açılışta yaşanır.
+  if (!storageReady) return null;
+
   return (
     <ErrorBoundary>
       <GestureHandlerRootView>
         <SafeAreaProvider>
+          {/* Modal arka planlarının bulanıklaştırdığı yüzey: sekme çubuğu ve
+              üstteki her şey dahil TÜM uygulama. Android'de RN Modal ayrı bir
+              pencereye çizildiği için modal içeriği bu yüzeyin native çocuğu
+              olmaz — hedefleyebilmesinin sebebi bu (bkz. BlurTarget.js).
+              Android 12 altında ve iOS'ta düz bir View'dır, maliyeti yok. */}
+          <BlurTargetProvider>
+          <BlurTargetSurface name={BLUR_SCOPES.root} style={styles.blurRoot}>
           <ConnectivityProvider>
           <TypographyProvider>
             <AppSettingsProvider>
@@ -913,7 +947,13 @@ export default wrapRoot(function App() {
                         <TvShowProvider>
                           <PetProvider>
                             <DeviceNotificationsProvider navigationRef={navigationRef}>
-                              <AppContent />
+                              {/* Postere basılı tutunca açılan hızlı eylem
+                                  sayfası. Listeler + puan + izlenme durumunu
+                                  okuduğu için ListStatus/SharedLists/Auth
+                                  sağlayıcılarının İÇİNDE olmak zorunda. */}
+                              <MediaQuickActionsProvider>
+                                <AppContent />
+                              </MediaQuickActionsProvider>
                             </DeviceNotificationsProvider>
                           </PetProvider>
                             {splashVisible && (
@@ -948,6 +988,8 @@ export default wrapRoot(function App() {
           </AppSettingsProvider>
           </TypographyProvider>
           </ConnectivityProvider>
+          </BlurTargetSurface>
+          </BlurTargetProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>
@@ -955,6 +997,10 @@ export default wrapRoot(function App() {
 });
 
 const styles = StyleSheet.create({
+  // Modal arka planlarının hedefi; sağlayıcı ağacının kapladığı alanın aynısı.
+  blurRoot: {
+    flex: 1,
+  },
   splashContainer: {
     flex: 1,
     justifyContent: "center",

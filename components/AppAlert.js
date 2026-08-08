@@ -25,7 +25,7 @@ import {
   Animated,
   Dimensions,
 } from "react-native";
-import AdaptiveBlurView from "./common/AdaptiveBlurView";
+import ModalBlurBackdrop from "./common/ModalBlurBackdrop";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "@services/hapticsService";
 import { useTheme } from "@context/ThemeContext";
@@ -206,12 +206,7 @@ export function AppAlertHost() {
       statusBarTranslucent
     >
       <Animated.View style={[styles.backdrop, { opacity: backdrop }]}>
-        <AdaptiveBlurView
-          tint="dark"
-          intensity={18}
-          experimentalBlurMethod="dimezisBlurView"
-          style={StyleSheet.absoluteFill}
-        />
+        <ModalBlurBackdrop intensity={18} />
         <Pressable style={StyleSheet.absoluteFill} onPress={onBackdrop} />
       </Animated.View>
 

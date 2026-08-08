@@ -10,15 +10,15 @@ import {
   StatusBar,
 } from "react-native";
 import { Image } from "expo-image";
-import { MovieCardSkeleton } from "../../components/Skeleton";
+import { TrendRailSkeleton } from "../../components/Skeleton";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import { RatingBadge } from "../../components/PosterInfoBadges";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { SeeAllButton } from "../../components/SeeAllHeader";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 const { width, height } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.6;
 // Sarmalayıcı yüksekliği poster yüksekliğinden türetilir (ekran yüksekliğinden
@@ -35,6 +35,15 @@ const FOCUS_EXTRA = FOCUS_PEAK - 1;
 // Büyüyen posterin üstten taşan payı; dikey kırpılmayı önlemek için FlatList
 // içeriğine bu kadar üst boşluk verilir.
 const FOCUS_HEADROOM = Math.ceil((CARD_WIDTH * 1.5 * FOCUS_EXTRA) / 2) + 4;
+// Yükleme iskeleti gerçek kartın ölçülerini birebir kullanır (bkz. TvShowsTrends).
+const TREND_SKELETON_METRICS = {
+  itemSize: ITEM_SIZE,
+  cardWidth: CARD_WIDTH,
+  cardHeight: CARD_HEIHGT,
+  spacing: SPACING,
+  edge: EMPTY_ITEM_SIZE,
+  headroom: FOCUS_HEADROOM,
+};
 
 // Spacer'lar poster verisinin parçası değildir. Fabric'in farklı genişlikteki
 // sahte liste hücrelerini yeniden sıralamasını önlemek için header/footer kullan.
@@ -55,6 +64,7 @@ const MovieTrendCard = memo(function MovieTrendCard({
 }) {
   const pressScale = useRef(new Animated.Value(1)).current;
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const onPressIn = () =>
     Animated.timing(pressScale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
   const onPressOut = () =>
@@ -128,6 +138,10 @@ const MovieTrendCard = memo(function MovieTrendCard({
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         onPress={() => navigation.navigate("MovieDetails", { id: item.id })}
+        onLongPress={() =>
+          openQuickActions({ item, mediaType: "movie", navigation })
+        }
+        delayLongPress={350}
       >
         <Animated.View
           style={[
@@ -292,11 +306,7 @@ export default function MovieTrends({ navigation }) {
       <View style={{ flex: 1, marginTop: 10 }}>
         <StatusBar barStyle="light-content" />
         {trendHeader}
-        <View style={styles.skeletonRow}>
-          {[0, 1, 2].map((index) => (
-            <MovieCardSkeleton key={index} index={{ index }} />
-          ))}
-        </View>
+        <TrendRailSkeleton metrics={TREND_SKELETON_METRICS} />
       </View>
     );
   }
@@ -376,11 +386,6 @@ const styles = StyleSheet.create({
   categoriesList: {
     paddingLeft: 15,
     paddingRight: 4,
-  },
-  skeletonRow: {
-    flexDirection: "row",
-    paddingHorizontal: EMPTY_ITEM_SIZE,
-    overflow: "hidden",
   },
   categoryItem: {
     marginRight: 5,

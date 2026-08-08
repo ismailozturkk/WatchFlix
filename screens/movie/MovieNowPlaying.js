@@ -1,18 +1,16 @@
-import React, { memo, useEffect, useMemo, useRef } from "react";
+import React, { memo, useEffect, useRef } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   FlatList,
   Dimensions,
-  ActivityIndicator,
-  StyleSheet,
+    StyleSheet,
   Animated,
 } from "react-native";
-import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
-import axios from "axios";
 import { useTheme } from "../../context/ThemeContext";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { MovieSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
@@ -22,7 +20,6 @@ import ListBadges from "../../components/ListBadges";
 import PaginatedRail from "../../components/PaginatedRail";
 import SeeAllHeader from "../../components/SeeAllHeader";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 const { width } = Dimensions.get("window");
 
@@ -30,6 +27,7 @@ const { width } = Dimensions.get("window");
 const MovieNowPlayingCard = memo(function MovieNowPlayingCard({ item, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -43,6 +41,10 @@ const MovieNowPlayingCard = memo(function MovieNowPlayingCard({ item, navigation
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => navigation.push("MovieDetails", { id: item.id })}
+      onLongPress={() =>
+        openQuickActions({ item, mediaType: "movie", navigation })
+      }
+      delayLongPress={350}
     >
       <Animated.View style={[{ transform: [{ scale }] }]}>
         <PosterImage

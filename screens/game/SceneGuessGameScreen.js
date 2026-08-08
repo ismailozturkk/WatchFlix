@@ -7,8 +7,7 @@ import {
   Animated,
   Easing,
   Modal,
-  Pressable,
-  ScrollView,
+    ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -17,7 +16,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import AdaptiveBlurView from "@components/common/AdaptiveBlurView";
+import ModalBlurBackdrop from "../../components/common/ModalBlurBackdrop";
 import AppIcon from "@components/AppIcon";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
@@ -659,7 +658,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
         {/* History Modal */}
         <Modal visible={historyModalVisible} transparent animationType="slide" onRequestClose={() => setHistoryModalVisible(false)}>
           <View style={styles.historyModalRoot}>
-            <AdaptiveBlurView tint="dark" intensity={80} experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
+            <ModalBlurBackdrop intensity={80} />
             <SafeAreaView style={styles.flex1}>
               <View style={styles.historyHeader}>
                 <Text style={[styles.historyTitle, { color: "#fff" }]}>{i18nText("autoI18n.oyun_istatistikleri", "Oyun İstatistikleri")}</Text>
@@ -713,7 +712,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
         {/* Leaderboard Modal */}
         <Modal visible={leaderboardModalVisible} transparent animationType="slide" onRequestClose={() => setLeaderboardModalVisible(false)}>
           <View style={styles.historyModalRoot}>
-            <AdaptiveBlurView tint="dark" intensity={80} experimentalBlurMethod="dimezisBlurView" style={StyleSheet.absoluteFill} />
+            <ModalBlurBackdrop intensity={80} />
             <SafeAreaView style={styles.flex1}>
               <View style={styles.historyHeader}>
                 <Text style={[styles.historyTitle, { color: "#FFD700" }]}>🏆 {i18nText("autoI18n.liderlik_tablosu", "Liderlik Tablosu")}</Text>

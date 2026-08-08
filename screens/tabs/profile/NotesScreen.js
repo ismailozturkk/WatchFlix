@@ -9,10 +9,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
-  KeyboardAvoidingView,
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -21,6 +19,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import * as Clipboard from "expo-clipboard";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -452,15 +451,16 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
   const activeTodos = todos.filter((t) => !t.done);
   const doneTodos = todos.filter((t) => t.done);
 
+  // Klavye kaldırması artık BottomSheetModal'ın içinde
+  // (hooks/useSheetTransition.js) — ayrı KeyboardAvoidingView gerekmiyor.
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <KeyboardAvoidingView
-        style={styles.overlay}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-
-        <View style={[styles.editSheet, { backgroundColor: theme.secondary }]}>
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      intensity={35}
+      dimColor="rgba(0,0,0,0.35)"
+      sheetStyle={[styles.editSheet, { backgroundColor: theme.secondary }]}
+    >
           <View style={[styles.handle, { backgroundColor: theme.border }]} />
 
           {/* Tip seçici */}
@@ -611,9 +611,6 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
               {i18nText("autoI18n.kaydet", "Kaydet")}
             </Text>
           </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-
       <DatePickerModal
         visible={showDatePicker}
         value={scheduledDate || todayStr}
@@ -629,7 +626,7 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
         minDate={new Date()}
         minDateErrorMsg={i18nText("autoI18n.gecmis_bir_tarih_secilemez", "Geçmiş bir tarih seçilemez")}
       />
-    </Modal>
+    </BottomSheetModal>
   );
 };
 

@@ -4,8 +4,6 @@ import {
   Alert,
   FlatList,
   Image,
-  Modal,
-  Pressable,
   SectionList,
   StyleSheet,
   Text,
@@ -15,6 +13,7 @@ import {
 import { collection, onSnapshot } from "firebase/firestore";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import { db } from "../../firebase";
 import { useTheme } from "@context/ThemeContext";
 import { useProfileUi } from "@context/ProfileUiContext";
@@ -430,24 +429,20 @@ export default function GroupInfoModal({
       : i18nText("autoI18n.uye_bulunamadi", "Üye bulunamadı");
 
   return (
-    <Modal
+    <BottomSheetModal
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
+      intensity={35}
+      dimColor="rgba(0,0,0,0.42)"
+      sheetStyle={[
+        styles.sheet,
+        {
+          backgroundColor: theme.secondary || "#171727",
+          borderColor: theme.border || "rgba(255,255,255,0.08)",
+          paddingBottom: Math.max(insets.bottom, 18),
+        },
+      ]}
     >
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable
-          onPress={(event) => event.stopPropagation()}
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: theme.secondary || "#171727",
-              borderColor: theme.border || "rgba(255,255,255,0.08)",
-              paddingBottom: Math.max(insets.bottom, 18),
-            },
-          ]}
-        >
           <View
             style={[
               styles.handle,
@@ -703,9 +698,7 @@ export default function GroupInfoModal({
               }
             />
           )}
-        </Pressable>
-      </Pressable>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 

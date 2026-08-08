@@ -3,11 +3,15 @@ import {
   useApiSettings,
   useStreamingProviderSettings,
 } from "./AppSettingsContext";
-import Toast from "react-native-toast-message";
 import { useLanguage } from "./LanguageContext";
 import { useListStatusContext } from "./ListStatusContext";
 import axios from "axios";
-import { getCachedValue, setCachedValue, TTL } from "../utils/apiCache";
+// `getCachedValue` hâlâ kullanılıyor: sağlayıcı/tür listelerinin TTL'i zaten
+// 24 saat ve 7 gün, yani her açılışta ağ beklemeye yol açmıyorlar. Ayrıca
+// sağlayıcı okumasının önbellek isabetinde YAN ETKİSİ var (bir sağlayıcı seçip
+// içeriğini çekiyor); SWR'a çevirmek o isteği ikiye katlardı.
+import { getCachedValue, getSwr, seedList, setCachedValue, TTL } from "../utils/apiCache";
+import { setIfChanged, setListIfChanged } from "../utils/sameData";
 import { i18nText } from "../utils/i18nText";
 import { getWatchedShowActivityTime } from "../utils/watchState";
 
@@ -15,10 +19,9 @@ import { getWatchedShowActivityTime } from "../utils/watchState";
 const TvShowContext = createContext();
 export const useTvShow = () => useContext(TvShowContext);
 
-const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const setIfChanged = (setter, next) => {
-  setter((current) => (sameJson(current, next) ? current : next));
-};
+// `sameJson`/`setIfChanged` buradan utils/sameData.js'e taşındı: aynı iki satır
+// bu dosyada, MovieContex'te, ListStatusContext'te ve MediaActivityContext'te
+// ayrı ayrı yazılıydı.
 
 // id'ye göre tekilleştirerek append eder (sayfalar arası tekrarları eler).
 const mergeUniqueById = (prev, next) => {
@@ -52,27 +55,43 @@ const loadPage = async ({
   setLoadingMore,
   isStale,
 }) => {
-  const apply = (results, totalPages) => {
+  // `arkaPlan`: ekranda zaten (bayat) veri var, tazeleme sessizce yapılıyor.
+  // Böyle durumda listeyi KİMLİK bazında karşılaştırıyoruz — TMDB aynı listeyi
+  // her istekte biraz farklı `popularity` ondalığıyla döndürdüğü için tam
+  // karşılaştırma, kullanıcı için hiçbir fark olmadığı hâlde tüm rayı yeniden
+  // çizdirirdi.
+  const apply = (results, totalPages, { arkaPlan = false } = {}) => {
     if (isStale?.()) return;
     if (setTotal) setTotal(totalPages || 1);
     if (append) setData((prev) => mergeUniqueById(prev, results));
+    else if (arkaPlan) setListIfChanged(setData, results);
     else setIfChanged(setData, results);
   };
-  const cached = await getCachedValue(cacheKey, ttl);
-  if (cached) {
-    apply(cached.results ?? cached, cached.total_pages ?? 1);
+
+  // BAYAT GÖSTER, ARKA PLANDA TAZELE. Eskiden TTL dolunca cache "yok" sayılır,
+  // ray iskelete düşer ve ağ beklenirdi; trend TTL'i 1 saat olduğu için bu
+  // pratikte her açılış demekti. Artık bayat kayıt hemen çiziliyor, tazeleme
+  // arka planda ve "yükleniyor" göstermeden yapılıyor.
+  const cached = getSwr(cacheKey, { maxAge: ttl });
+  const cachedData = cached.data;
+  if (cachedData) {
+    apply(cachedData.results ?? cachedData, cachedData.total_pages ?? 1);
     (append ? setLoadingMore : setLoading)(false);
-    return;
+    if (cached.fresh) return;
+  } else {
+    (append ? setLoadingMore : setLoading)(true);
   }
-  (append ? setLoadingMore : setLoading)(true);
+
   try {
     const { results, total_pages } = await request();
-    apply(results, total_pages);
+    apply(results, total_pages, { arkaPlan: Boolean(cachedData) });
     setCachedValue(cacheKey, { results, total_pages });
   } catch (error) {
     if (__DEV__) console.error("loadPage:", error?.message || error);
   } finally {
-    (append ? setLoadingMore : setLoading)(false);
+    // Bayat veriyle tazeleme yapıldıysa loading zaten false; tekrar false
+    // yazmak zararsız ama gereksiz render üretmesin diye yalnız gerekince.
+    if (!cachedData) (append ? setLoadingMore : setLoading)(false);
   }
 };
 
@@ -95,17 +114,49 @@ export const TvShowProvider = ({ children }) => {
   };
   const currentGen = (key) => requestGenRef.current[key] || 0;
 
-  const [seriesTrend, setSeriesTrend] = useState([]);
-  const [loadingTrend, setLoadingTren] = useState(true);
-  const [loadingMoreTrend, setLoadingMoreTrend] = useState(false);
-  const [pageTrend, setPageTrend] = useState(1);
-  const [totalPagesTrend, setTotalPagesTrend] = useState(1);
-  const [selectedCategoryTrend, setSelectedCategoryTrend] = useState("week");
-  const [selectedCategoryTrendShow, setSelectedCategoryTrendShow] =
-    useState("trending");
   const { API_KEY } = useApiSettings();
   const { streamingProviderIds } = useStreamingProviderSettings();
   const { language } = useLanguage();
+
+  // ── AÇILIŞ TOHUMLARI ──────────────────────────────────────────────────────
+  //
+  // Son oturumda görülen listeler MMKV'den SENKRON okunuyor, yani İLK KAREDE
+  // çiziliyor. Eskiden state `[]` + `loading:true` ile başlıyordu; önbellek
+  // DOLU olsa bile veri ancak efekt çalıştıktan sonra geldiği için kullanıcı
+  // her açılışta bir kare iskelet görüyordu.
+  //
+  // `useMemo(..., [])`: tohum yalnız ilk render için. Kategori/dil değişimini
+  // ilgili efekt zaten yeniden çekiyor.
+  const seedLang = language === "tr" ? "tr-TR" : "en-US";
+  const trendSeed = useMemo(
+    () => seedList(`tv_trends_${seedLang}_week_trending`, { maxAge: TTL.TREND }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const bestSeed = useMemo(
+    () =>
+      seedList(`tv_bests_${seedLang}_discover_vote_count_page_1`, {
+        maxAge: TTL.TREND,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  // Eski cache sürümleri spacer kaydı içerebiliyor; tohumu da normalize et.
+  const [seriesTrend, setSeriesTrend] = useState(() =>
+    mergeTrendItems([], trendSeed.list),
+  );
+  const [loadingTrend, setLoadingTren] = useState(!trendSeed.hasCache);
+  const [loadingMoreTrend, setLoadingMoreTrend] = useState(false);
+  const [pageTrend, setPageTrend] = useState(1);
+  // Tohumla açıldığında "daha fazla yükle" hemen çalışabilsin; gerçek değeri
+  // ilk istek yazacak.
+  const [totalPagesTrend, setTotalPagesTrend] = useState(
+    trendSeed.hasCache ? 1000 : 1,
+  );
+  const [selectedCategoryTrend, setSelectedCategoryTrend] = useState("week");
+  const [selectedCategoryTrendShow, setSelectedCategoryTrendShow] =
+    useState("trending");
   const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
   const tmdbRegion = language === "tr" ? "TR" : "US";
   const { t } = useLanguage();
@@ -150,7 +201,9 @@ export const TvShowProvider = ({ children }) => {
     const baseKey = `tv_trends_${lang}_${selectedCategoryTrend}_${selectedCategoryTrendShow}`;
     const cacheKey = page === 1 ? baseKey : `${baseKey}_p${page}`;
 
-    const cached = await getCachedValue(cacheKey, TTL.TREND);
+    // Bayat göster, arka planda tazele — bkz. loadPage'deki aynı desen.
+    const swr = getSwr(cacheKey, { maxAge: TTL.TREND });
+    const cached = swr.data;
     if (cached) {
       if (isStale()) return;
       if (append) {
@@ -162,10 +215,11 @@ export const TvShowProvider = ({ children }) => {
         setLoadingTren(false);
         setTotalPagesTrend((p) => (p > 1 ? p : 1000));
       }
-      return;
+      if (swr.fresh) return;
+    } else {
+      (append ? setLoadingMoreTrend : setLoadingTren)(true);
     }
 
-    (append ? setLoadingMoreTrend : setLoadingTren)(true);
     try {
       const response = await axios.request({
         method: "GET",
@@ -185,13 +239,17 @@ export const TvShowProvider = ({ children }) => {
       setTotalPagesTrend(response.data.total_pages || 1);
       if (append) {
         setSeriesTrend((prev) => mergeTrendItems(prev, results));
+      } else if (cached) {
+        // Arka plan tazelemesi: yalnız içerik gerçekten değiştiyse rayı
+        // yeniden çiz (bkz. loadPage'deki `arkaPlan` açıklaması).
+        setListIfChanged(setSeriesTrend, mergeTrendItems([], results));
       } else {
-        setIfChanged(setSeriesTrend, results);
+        setIfChanged(setSeriesTrend, mergeTrendItems([], results));
       }
     } catch (error) {
       if (__DEV__) console.error("fetchSeriesTrends:", error?.message || error);
     } finally {
-      (append ? setLoadingMoreTrend : setLoadingTren)(false);
+      if (!cached) (append ? setLoadingMoreTrend : setLoadingTren)(false);
     }
   };
   useEffect(() => {
@@ -207,8 +265,8 @@ export const TvShowProvider = ({ children }) => {
     fetchSeriesTrends(next, true);
   };
 
-  const [seriesBest, setSeriesBest] = useState([]);
-  const [loadingBest, setLoadingBest] = useState(true);
+  const [seriesBest, setSeriesBest] = useState(bestSeed.list);
+  const [loadingBest, setLoadingBest] = useState(!bestSeed.hasCache);
   const [selectedCategoryBestShow, setSelectedCategoryBestShow] =
     useState("discover");
   const [selectedCategoryBest, setSelectedCategoryBest] =

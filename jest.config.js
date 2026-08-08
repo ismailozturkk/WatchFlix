@@ -6,6 +6,8 @@
 module.exports = {
   testEnvironment: "node",
   testMatch: ["**/__tests__/**/*.test.js"],
+  // __tests__/helpers/* test degil, yardimci modul.
+  testPathIgnorePatterns: ["/node_modules/", "/__tests__/helpers/"],
   transform: {
     "^.+\\.[jt]sx?$": "babel-jest",
   },

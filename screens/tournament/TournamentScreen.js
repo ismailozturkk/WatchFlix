@@ -14,10 +14,14 @@ import {
   TouchableOpacity, Pressable, Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import LottieView from "lottie-react-native";
-import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
+import Animated, {
+  FadeInDown, FadeInUp, ZoomIn,
+  useSharedValue, useAnimatedStyle, withSpring,
+} from "react-native-reanimated";
 import * as Haptics from "@services/hapticsService";
 import BackButton from "@components/BackButton";
 import AppIcon from "@components/AppIcon";
@@ -39,12 +43,12 @@ import {
   monthLabel, mediaLabel, roundLabel, getPhaseInfo, buildBracket, tallyVotes,
   getMyPicks, getPrevPeriodId, now, setDebugNow, DAY,
   FINALIST_COUNT, MAX_NOMINATIONS, tallyNominations, getMyNominations,
-  rankPool, selectFinalists, getChampionStats,
+  rankPool, mergePool, selectFinalists, getChampionStats,
 } from "@services/tournamentEngine";
 import {
   ensureTournament, subscribeTournamentDoc, subscribeTournamentVotes,
-  subscribeTournamentAgg, subscribeMyVote,
-  castVote, setNomination,
+  subscribeTournamentAgg, subscribeMyVote, subscribeTournamentPool,
+  castVote, setNomination, addPoolCandidate, fetchTmdbItem,
 } from "@services/tournamentService";
 import StageTimeline from "@components/tournament/StageTimeline";
 import PodiumModal from "@components/tournament/PodiumModal";
@@ -80,34 +84,63 @@ const PHASE_META = {
   },
 };
 
+// Onay katmanında artık okunacak iki seçenek var; eski 2.6 sn karar vermeye
+// yetmiyordu (MatchCard'daki PENDING_TIMEOUT ile aynı).
+const NOM_PENDING_TIMEOUT = 6000;
+
+// Uygulamanın onay/başarı yeşili — finalist rozeti ve "Hype verildi" çipiyle
+// AYNI değer (temada `success` belirteci yok, turnuva ekranı bunu sabit kullanır).
+const CONFIRM_GREEN = "#22C55E";
+
+// Basış geri bildirimi: parmak inince poster hafifçe küçülür, kalkınca yayla
+// eski boyuna döner (MatchCard ile aynı yay ve oran).
+const PRESS_SPRING = { mass: 0.5, damping: 13, stiffness: 200 };
+const PRESS_SCALE = 0.94;
+
 // ─── Aday hücresi (seçim fazı "hype" oylaması) ───────────────────────────────
 // memo: 64 hücrelik gridde tek oy değişince yalnız etkilenen hücreler çizilsin.
 // Görsel dil: sıra rozeti (ilk 32 yeşil, dışı gri+soluk), HYPE (alev) sayacı,
 // benim adayım = accent çerçeve + alev rozeti.
 //
-// OY AKIŞI (eleme maçlarıyla aynı): postere İKİ KEZ bas — ilk basış "Seçimi
-// onayla" uyarı katmanını açar (isPending), ikinci basış hype'ı KESİN olarak
-// kaydeder. Tek hak vardır ve değiştirilemez; iki adımlı onay bu yüzden şart.
+// OY AKIŞI (eleme maçlarıyla — MatchCard — birebir aynı): postere bas, üstünde
+// açılan katmandan İKİ seçenekten birini seç:
+//   • Onayla → hype KESİN kaydedilir (tek hak, geri alınamaz)
+//   • Bilgi  → yapımın detay sayfası açılır
+// Katmanın boşluğuna basmak vazgeçer; dokunulmazsa süre sonunda kapanır.
+// Onay bilerek "tekrar bas" değil AÇIK SEÇİM: hak tek ve geri alınamıyor,
+// kullanıcı karar vermeden önce yapımın detayına bakabilmeli.
 const NomineeCell = React.memo(function NomineeCell({
-  id, title, posterPath, rank, nomVotes, finalist, mine, canVote, isPending,
-  onPress, theme, getTmdbUrl,
+  id, title, posterPath, rank, nomVotes, finalist, mine, isPending,
+  onPress, onConfirm, onInfo, theme, getTmdbUrl,
 }) {
   const uri = posterPath ? getTmdbUrl(posterPath, "poster", 185) : null;
-  const rankColor = finalist ? "#22C55E" : "#9CA3AF";
+  const rankColor = finalist ? CONFIRM_GREEN : "#9CA3AF";
+
+  // Yalnız POSTER ölçeklenir (başlık şeridi yerinde kalsın); dokunma hedefi
+  // hücrenin tamamı olmaya devam eder.
+  const press = useSharedValue(1);
+  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: press.value }] }));
+
   return (
+    // Hiçbir zaman disabled DEĞİL: oy verilebiliyorsa hype akışı, verilemiyorsa
+    // detay sayfası açılır (karar handleNomineePress'te).
     <Pressable
-      disabled={!canVote}
       onPress={() => onPress(id)}
+      onPressIn={() => { press.value = withSpring(PRESS_SCALE, PRESS_SPRING); }}
+      onPressOut={() => { press.value = withSpring(1, PRESS_SPRING); }}
       style={styles.gridItem}
       accessibilityRole="button"
       accessibilityLabel={title}
     >
-      <View
+      <Animated.View
         style={[
           styles.gridPosterWrap,
+          pressStyle,
           {
             backgroundColor: theme.between,
-            borderWidth: mine || isPending ? 2.5 : 0,
+            // Kenarlık HER ZAMAN 2.5: RN kenarlığı kutunun İÇİNDEN yediği için
+            // 0 ↔ 2.5 arası geçiş posteri her basışta 2.5px küçültüp zıplatırdı.
+            // Kalınlık sabit, yalnız rengi değişir.
             borderColor: mine || isPending ? theme.accent : "transparent",
             opacity: finalist ? 1 : 0.55,
           },
@@ -139,23 +172,62 @@ const NomineeCell = React.memo(function NomineeCell({
           <Text style={styles.gridVotesText}>{nomVotes}</Text>
         </View>
 
-        {/* "Seçimi onayla" katmanı (1. basıştan sonra) — MatchCard ile aynı dil */}
+        {/* Onay katmanı: posteri TAM kaplayan iki yarım buton — MatchCard ile
+            AYNI görsel dil (dairesel ikon rozeti + gradyan derinlik + zıt
+            yönlerden giriş), yalnız ölçüler hücre darlığına göre küçültülmüş. */}
         {isPending && (
-          <Animated.View
-            entering={FadeIn.duration(140)}
-            style={[styles.gridConfirm, { backgroundColor: theme.accent + "E6" }]}
-            pointerEvents="none"
-          >
-            <AppIcon family="Ionicons" name="flame" size={22} color="#fff" />
-            <Text style={styles.gridConfirmText}>
-              {i18nText("autoI18n.tournament_confirm", "Seçimi onayla")}
-            </Text>
-            <Text style={styles.gridConfirmSub}>
-              {i18nText("autoI18n.tournament_confirm_final_sub", "tekrar bas — değiştirilemez")}
-            </Text>
-          </Animated.View>
+          <View style={styles.gridConfirm}>
+            <Animated.View entering={FadeInDown.duration(170)} style={styles.gridConfirmHalf}>
+              <Pressable
+                onPress={() => onConfirm(id)}
+                style={({ pressed }) => [
+                  styles.gridConfirmInner,
+                  styles.gridConfirmPrimary,
+                  pressed && styles.gridConfirmPressed,
+                ]}
+                accessibilityRole="button"
+              >
+                <LinearGradient
+                  colors={["rgba(255,255,255,0.16)", "rgba(0,0,0,0.22)"]}
+                  style={StyleSheet.absoluteFill}
+                  pointerEvents="none"
+                />
+                <View style={styles.gridConfirmBadgeLight}>
+                  <AppIcon family="Ionicons" name="checkmark-sharp" size={13} color="#fff" />
+                </View>
+                <Text numberOfLines={1} style={[styles.gridConfirmText, { color: "#fff" }]}>
+                  {i18nText("autoI18n.tournament_confirm_short", "Onayla")}
+                </Text>
+              </Pressable>
+            </Animated.View>
+
+            <Animated.View entering={FadeInUp.duration(170)} style={styles.gridConfirmHalf}>
+              <Pressable
+                onPress={() => onInfo(id)}
+                style={({ pressed }) => [
+                  styles.gridConfirmInner,
+                  styles.gridConfirmInfo,
+                  { backgroundColor: theme.accent },
+                  pressed && styles.gridConfirmPressed,
+                ]}
+                accessibilityRole="button"
+              >
+                <LinearGradient
+                  colors={["rgba(255,255,255,0.16)", "rgba(0,0,0,0.22)"]}
+                  style={StyleSheet.absoluteFill}
+                  pointerEvents="none"
+                />
+                <View style={styles.gridConfirmBadgeLight}>
+                  <AppIcon family="Ionicons" name="information" size={13} color="#fff" />
+                </View>
+                <Text numberOfLines={1} style={[styles.gridConfirmText, { color: "#fff" }]}>
+                  {i18nText("autoI18n.tournament_info", "Bilgi")}
+                </Text>
+              </Pressable>
+            </Animated.View>
+          </View>
         )}
-      </View>
+      </Animated.View>
       <Text numberOfLines={1} style={[styles.gridTitle, { color: theme.text.secondary }]}>{title}</Text>
     </Pressable>
   );
@@ -175,6 +247,7 @@ const DEV_PRESETS = [
 
 export default function TournamentScreen() {
   const { theme } = useTheme();
+  const navigation = useNavigation();
   const { user } = useAuth();
   const { getTmdbUrl } = useImageQualitySettings();
   const { hapticsEnabled } = useHapticsSettings();
@@ -193,6 +266,7 @@ export default function TournamentScreen() {
   const [agg, setAgg] = useState(undefined);
   const [myVote, setMyVote] = useState(null); // yalnız KENDİ oy dokümanım
   const [voteDocs, setVoteDocs] = useState([]); // yalnız fallback modunda dolar
+  const [suggested, setSuggested] = useState([]); // aramayla havuza eklenen adaylar
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [tab, setTab] = useState(null);          // seçili tur indeksi
@@ -223,7 +297,10 @@ export default function TournamentScreen() {
     const unsubDoc = subscribeTournamentDoc(periodId, (d) => { if (d) setDocData(d); });
     const unsubAgg = subscribeTournamentAgg(periodId, (a) => setAgg(a));
     const unsubMine = uid ? subscribeMyVote(periodId, uid, (v) => setMyVote(v)) : () => {};
-    return () => { active = false; unsubDoc(); unsubAgg(); unsubMine(); };
+    // Topluluğun aramayla eklediği adaylar — canlı, çünkü seçim fazında havuz
+    // büyümeye devam eder (ensureTournament ilk okumada zaten birleştirmişti).
+    const unsubPool = subscribeTournamentPool(periodId, (p) => setSuggested(p));
+    return () => { active = false; unsubDoc(); unsubAgg(); unsubMine(); unsubPool(); };
   }, [periodId, uid, lang]);
 
   // Fallback: agg dokümanı YOKSA (null) eski usul tüm oy koleksiyonunu dinle.
@@ -261,16 +338,23 @@ export default function TournamentScreen() {
     }
     return getMyNominations(voteDocs, uid);
   }, [myVote, voteDocs, uid]);
-  const rankedPool = useMemo(
-    () => rankPool(docData?.nominees || [], nomTally),
-    [docData, nomTally],
+  // Havuz = ay başı TMDB anlık görüntüsü + topluluğun aramayla eklediği adaylar.
+  // mergePool idempotent olduğu için ensureTournament'ın zaten birleştirdiği
+  // liste ile canlı öneri akışını tekrar harmanlamak güvenlidir.
+  const pool = useMemo(
+    () => mergePool(docData?.nominees || [], suggested),
+    [docData, suggested],
   );
-  const finalists = useMemo(
-    () => selectFinalists(docData?.nominees || [], nomTally),
-    [docData, nomTally],
-  );
-  const nominationOpen =
-    phaseInfo.phase === "selection" && (docData?.nominees?.length || 0) > FINALIST_COUNT;
+  const rankedPool = useMemo(() => rankPool(pool, nomTally), [pool, nomTally]);
+  const finalists = useMemo(() => selectFinalists(pool, nomTally), [pool, nomTally]);
+  const nominationOpen = phaseInfo.phase === "selection" && pool.length > FINALIST_COUNT;
+  // Aramanın hedefi: ayın ortamı + türü. Doküman anlık görüntüsü esastır
+  // (firestore.rules havuz eklemede mediaType'ı onunla karşılaştırır).
+  const poolMediaType = docData?.mediaType || entry.mediaType;
+  const poolGenreId = docData?.genreId || entry.genreId;
+  // Aramadan aday eklemek TEK hype hakkını harcar; hak bitmişse arama yalnız
+  // inceleme moduna düşer (havuz + TMDB listelenir, buton çıkmaz).
+  const canHype = nominationOpen && !!uid && myNoms.size < MAX_NOMINATIONS;
 
   const bracket = useMemo(
     () => buildBracket({ nominees: finalists, tallies, periodId, ms: nowMs }),
@@ -326,7 +410,7 @@ export default function TournamentScreen() {
       const key = String(nomineeId);
       if (!uid) { toast.error(i18nText("autoI18n.giris_gerekli", "Giriş gerekli")); return; }
       if (myNoms.size >= MAX_NOMINATIONS) {
-        toast.warning(i18nText("autoI18n.tournament_hype_used", "Hype hakkını kullandın — seçim değiştirilemez"));
+        toast.warning(i18nText("autoI18n.tournament_hype_used", "Hype hakkını kullandın"));
         return;
       }
       if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -335,7 +419,7 @@ export default function TournamentScreen() {
         noms: { ...(prev?.noms || {}), [key]: true },
       }));
       setNomination({ periodId, uid, nomineeId })
-        .then(() => toast.success(i18nText("autoI18n.tournament_hype_saved", "Hype'ın kaydedildi — bu seçim kesin")))
+        .then(() => toast.success(i18nText("autoI18n.tournament_hype_saved", "Hype'ın kaydedildi")))
         .catch(() => {
           setMyVote((prev) => {
             if (!prev) return prev;
@@ -349,7 +433,94 @@ export default function TournamentScreen() {
     [uid, periodId, myNoms, hapticsEnabled],
   );
 
-  // Grid'de iki adımlı onay: 1. basış "Seçimi onayla" katmanı, 2. basış kesin.
+  // ── Yarışmacının detay sayfası (onay katmanındaki "Bilgi") ─────────────────
+  // Ağaçtan açılan maç modalı da kapatılır; aksi halde detayın ÜSTÜNDE açık
+  // kalırdı. Ortam yapımın kendi mediaType'ından, yoksa ayın ortamından gelir.
+  const openContestant = useCallback(
+    (contestant) => {
+      if (!contestant?.id) return;
+      setTreeMatchId(null);
+      const media = contestant.mediaType || poolMediaType;
+      navigation.navigate(media === "tv" ? "TvShowsDetails" : "MovieDetails", { id: contestant.id });
+    },
+    [navigation, poolMediaType],
+  );
+
+  // ── Aramadan gelen aday: havuza EKLE + hype ver ────────────────────────────
+  // Ay başı havuzu yalnız türün en popüler 64 yapımıdır; kullanıcı TMDB'de
+  // arayıp eksik bir yapımı buradan ekler ve tek hakkını ona harcar.
+  //
+  // SIRA ÖNEMLİ: önce hype, sonra havuz kaydı. firestore.rules havuz eklemeyi
+  // kullanıcının noms'una bağlar (kişi başına tek öneri freni), yani hype
+  // dokümanda olmadan pool yazımı reddedilir.
+  const commitExternalHype = useCallback(
+    async (candidate) => {
+      const key = String(candidate?.id ?? "");
+      if (!uid) { toast.error(i18nText("autoI18n.giris_gerekli", "Giriş gerekli")); return; }
+      if (!key || key === "undefined") return;
+      if (myNoms.size >= MAX_NOMINATIONS) {
+        toast.warning(i18nText("autoI18n.tournament_hype_used", "Hype hakkını kullandın"));
+        return;
+      }
+      if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+      // İyimser: hype ve yeni havuz satırı anında görünsün.
+      setMyVote((prev) => ({
+        ...(prev || { uid }),
+        noms: { ...(prev?.noms || {}), [key]: true },
+      }));
+      setSuggested((prev) =>
+        prev.some((s) => String(s.id) === key)
+          ? prev
+          : [...prev, { ...candidate, addedBy: uid, addedAtMs: 0 }]);
+
+      try {
+        await setNomination({ periodId, uid, nomineeId: key });
+      } catch {
+        // Hype yazılamadı → her iki iyimser güncellemeyi de geri al.
+        setMyVote((prev) => {
+          if (!prev) return prev;
+          const noms = { ...(prev.noms || {}) };
+          delete noms[key];
+          return { ...prev, noms };
+        });
+        setSuggested((prev) => prev.filter((s) => String(s.id) !== key));
+        toast.error(i18nText("autoI18n.tournament_vote_fail", "Oy kaydedilemedi"));
+        return;
+      }
+
+      try {
+        // false = sessiz no-op (faz kapandı / eksik parametre) — başarı sayma.
+        if (!(await addPoolCandidate({ periodId, uid, candidate }))) throw new Error("pool-noop");
+        setSearchVisible(false);
+        toast.success(i18nText("autoI18n.tournament_added_hyped", "Hype'ın kaydedildi"));
+      } catch {
+        // Hype KAYITLI (geri alınamaz) ama havuz satırı yazılamadı: aday
+        // görünmez kalmasın diye açılışta kendini onarma yolu tekrar dener.
+        toast.warning(i18nText("autoI18n.tournament_pool_add_retry", "Hype'ın kaydedildi, aday birazdan eklenecek"));
+      }
+    },
+    [uid, periodId, myNoms, hapticsEnabled],
+  );
+
+  // ── Kendini onarma: hype var ama havuzda aday yok ───────────────────────────
+  // (Yukarıdaki ikinci yazım ağ hatasıyla düştüyse.) Aday TMDB'den geri kurulur
+  // ve havuz kaydı yeniden denenir; yoksa kullanıcının TEK hakkı boşa giderdi.
+  const healedRef = useRef(new Set());
+  useEffect(() => {
+    if (phaseInfo.phase !== "selection" || !uid) return;
+    if (!docData?.nominees?.length) return; // havuz henüz yüklenmedi
+    const missing = [...myNoms].find(
+      (id) => !pool.some((n) => String(n.id) === id) && !healedRef.current.has(id),
+    );
+    if (!missing) return;
+    healedRef.current.add(missing); // hata olsa da bu oturumda tekrar deneme
+    fetchTmdbItem({ mediaType: poolMediaType, id: missing, language: lang })
+      .then((c) => (c ? addPoolCandidate({ periodId, uid, candidate: c }) : null))
+      .catch(() => {});
+  }, [myNoms, pool, phaseInfo.phase, uid, docData, poolMediaType, lang, periodId]);
+
+  // Grid onayı: 1. basış katmanı açar, sonra katmandaki Onayla / Bilgi seçilir.
   const clearPendingNom = useCallback(() => {
     if (nomTimer.current) { clearTimeout(nomTimer.current); nomTimer.current = null; }
     setPendingNom(null);
@@ -360,25 +531,42 @@ export default function TournamentScreen() {
     (nomineeId) => {
       const key = String(nomineeId);
       if (!uid) { toast.error(i18nText("autoI18n.giris_gerekli", "Giriş gerekli")); return; }
-      if (myNoms.has(key)) {
-        toast.info(i18nText("autoI18n.tournament_already_yours", "Bu zaten senin adayın"));
+      // Verilecek oy kalmadığında (hak bitti veya aday penceresi kapalı) ızgara
+      // bir OY yüzeyi olmaktan çıkıp gezinme yüzeyine döner: hangi postere
+      // basılırsa basılsın (kendi adayın dahil) detayına gider. Yapacak oy
+      // yokken uyarı toast'u da, hiçbir şey olmaması da işe yaramıyordu.
+      if (!nominationOpen || myNoms.size >= MAX_NOMINATIONS) {
+        openContestant(pool.find((n) => String(n.id) === key) || { id: nomineeId });
         return;
       }
-      if (myNoms.size >= MAX_NOMINATIONS) {
-        toast.warning(i18nText("autoI18n.tournament_hype_used", "Hype hakkını kullandın — seçim değiştirilemez"));
-        return;
-      }
-      if (pendingNom === key) {
-        clearPendingNom();
-        commitNomination(nomineeId);
-      } else {
-        if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-        setPendingNom(key);
-        if (nomTimer.current) clearTimeout(nomTimer.current);
-        nomTimer.current = setTimeout(() => setPendingNom(null), 2600);
-      }
+      // Katman posteri TAM kapladığı için bu basış açıkken yalnız posterin
+      // DIŞINDAN (altındaki başlık şeridi) gelebilir → vazgeçme yolu budur.
+      if (pendingNom === key) { clearPendingNom(); return; }
+      // Onay artık "aynı yere tekrar basmak" değil, katmandaki açık seçim.
+      if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      setPendingNom(key);
+      if (nomTimer.current) clearTimeout(nomTimer.current);
+      nomTimer.current = setTimeout(() => setPendingNom(null), NOM_PENDING_TIMEOUT);
     },
-    [uid, myNoms, pendingNom, clearPendingNom, commitNomination, hapticsEnabled],
+    [uid, myNoms, hapticsEnabled, openContestant, pool, nominationOpen, pendingNom, clearPendingNom],
+  );
+
+  const handleNomineeConfirm = useCallback(
+    (nomineeId) => {
+      clearPendingNom();
+      commitNomination(nomineeId);
+    },
+    [clearPendingNom, commitNomination],
+  );
+
+  // Detaya giderken katman kapanmalı: geri dönüldüğünde açık kalmasın.
+  const handleNomineeInfo = useCallback(
+    (nomineeId) => {
+      const key = String(nomineeId);
+      clearPendingNom();
+      openContestant(pool.find((n) => String(n.id) === key) || { id: nomineeId });
+    },
+    [clearPendingNom, openContestant, pool],
   );
 
   const theTheme = lang === "tr" ? entry.tr : entry.en;
@@ -491,7 +679,7 @@ export default function TournamentScreen() {
           {i18nText("autoI18n.tournament_last_winner", "Geçen Ayın Kazananı")}
         </Text>
         <Text style={[styles.podiumBtnSub, { color: theme.text.muted }]}>
-          {i18nText("autoI18n.tournament_podium_sub", "İlk 3 · oy sayıları · katılım")}
+          {i18nText("autoI18n.tournament_podium_sub", "İlk 3 · oy sayıları · geçmiş kazananlar")}
         </Text>
       </View>
       <AppIcon family="Ionicons" name="chevron-forward" size={16} color={theme.text.muted} />
@@ -585,6 +773,7 @@ export default function TournamentScreen() {
           mySide={myPicks[m.matchId] || null}
           votable={m.votable && !!m.a && !!m.b && !myPicks[m.matchId]}
           onVote={handleVote}
+          onInfo={openContestant}
           theme={theme}
           getTmdbUrl={getTmdbUrl}
           lang={lang}
@@ -669,6 +858,7 @@ export default function TournamentScreen() {
                 mySide={myPicks[treeMatch.matchId] || null}
                 votable={treeMatch.votable && !!treeMatch.a && !!treeMatch.b && !myPicks[treeMatch.matchId]}
                 onVote={handleVote}
+                onInfo={openContestant}
                 theme={theme}
                 getTmdbUrl={getTmdbUrl}
                 lang={lang}
@@ -829,9 +1019,10 @@ export default function TournamentScreen() {
           nomVotes={n.nomVotes}
           finalist={n.finalist}
           mine={myNoms.has(String(n.id))}
-          canVote={nominationOpen}
           isPending={pendingNom === String(n.id)}
           onPress={handleNomineePress}
+          onConfirm={handleNomineeConfirm}
+          onInfo={handleNomineeInfo}
           theme={theme}
           getTmdbUrl={getTmdbUrl}
         />
@@ -865,48 +1056,64 @@ export default function TournamentScreen() {
         {Hero}
         {PodiumButton}
 
-        {/* Aday hype başlığı + kişisel hak durumu */}
+        {/* Aday hype başlığı + kişisel hak durumu.
+            Başlık ve çip TEK satırda (dikeyde ortalı), alt metin altlarında tam
+            genişlikte. Çip sol sütunun içinde değil ki alt metin iki satıra
+            çıkınca çip aşağı kaymasın. */}
         <View style={styles.nomHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.sectionTitle, { color: theme.text.muted, marginBottom: 2 }]}>
+          <View style={styles.nomTitleRow}>
+            <Text
+              numberOfLines={1}
+              style={[styles.sectionTitle, { color: theme.text.muted, marginBottom: 0, flex: 1 }]}
+            >
               {nominationOpen
                 ? i18nText("autoI18n.tournament_pick32_title", "İlk 32'yi Sen Seç")
                 : i18nText("autoI18n.tournament_nominees", "Bu Ayın 32 Adayı")}
             </Text>
             {nominationOpen && (
-              <Text style={[styles.nomSubtitle, { color: theme.text.muted }]}>
-                {i18nText(
-                  "autoI18n.tournament_pick32_sub_hype",
-                  "En çok hype alan 32 aday turnuvaya katılır. TEK hakkın var: adayının posterine iki kez bas — seçim kesindir.",
-                )}
-              </Text>
+              <View
+                style={[
+                  styles.nomCounter,
+                  myNoms.size >= MAX_NOMINATIONS
+                    ? { backgroundColor: "#22C55E1A", borderColor: "#22C55E66" }
+                    : { backgroundColor: theme.accent + "1A", borderColor: theme.accent + "55" },
+                ]}
+              >
+                <AppIcon
+                  family="Ionicons"
+                  name={myNoms.size >= MAX_NOMINATIONS ? "checkmark-circle" : "flame"}
+                  size={12}
+                  color={myNoms.size >= MAX_NOMINATIONS ? "#22C55E" : theme.accent}
+                />
+                <Text numberOfLines={1} style={[styles.nomCounterText, { color: theme.text.primary }]}>
+                  {myNoms.size >= MAX_NOMINATIONS
+                    ? i18nText("autoI18n.tournament_hype_done", "Hype verildi")
+                    : i18nText("autoI18n.tournament_hype_left", "1 hype hakkı")}
+                </Text>
+              </View>
             )}
           </View>
+
+          {/* Alt metin hype verilince KISALIR ama KALKMAZ: kalksaydı altındaki
+              her şey (arama çubuğu, ızgara) yukarı zıplardı. Slot iki satıra
+              sabitlenmiştir (nomSubtitle.minHeight), böylece iki durum da aynı
+              yüksekliği kaplar — hiçbir kayma olmaz. */}
           {nominationOpen && (
-            <View
-              style={[
-                styles.nomCounter,
-                myNoms.size >= MAX_NOMINATIONS
-                  ? { backgroundColor: "#22C55E1A", borderColor: "#22C55E66" }
-                  : { backgroundColor: theme.accent + "1A", borderColor: theme.accent + "55" },
-              ]}
-            >
-              <AppIcon
-                family="Ionicons"
-                name={myNoms.size >= MAX_NOMINATIONS ? "checkmark-circle" : "flame"}
-                size={12}
-                color={myNoms.size >= MAX_NOMINATIONS ? "#22C55E" : theme.accent}
-              />
-              <Text style={[styles.nomCounterText, { color: theme.text.primary }]}>
-                {myNoms.size >= MAX_NOMINATIONS
-                  ? i18nText("autoI18n.tournament_hype_done", "Hype verildi")
-                  : i18nText("autoI18n.tournament_hype_left", "1 hype hakkı")}
-              </Text>
-            </View>
+            <Text numberOfLines={2} style={[styles.nomSubtitle, { color: theme.text.muted }]}>
+              {myNoms.size >= MAX_NOMINATIONS
+                ? i18nText(
+                    "autoI18n.tournament_pick32_sub_done",
+                    "En çok hype alan 32 yapım turnuvaya girer.",
+                  )
+                : i18nText(
+                    "autoI18n.tournament_pick32_sub_hype",
+                    "En çok hype alan 32 yapım turnuvaya girer. Tek hakkın var.",
+                  )}
+            </Text>
           )}
         </View>
 
-        {/* Arama çubuğu görünümlü buton → aday arama modalı (oradan da hype verilir) */}
+        {/* Arama çubuğu görünümlü buton → aday arama ekranı (oradan hype verilir) */}
         <Pressable
           onPress={() => setSearchVisible(true)}
           style={[styles.searchBar, { backgroundColor: theme.secondary, borderColor: theme.border }]}
@@ -914,7 +1121,7 @@ export default function TournamentScreen() {
           accessibilityLabel={i18nText("autoI18n.tournament_search_ph", "Aday ara…")}
         >
           <AppIcon family="Ionicons" name="search" size={15} color={theme.text.muted} />
-          <Text style={[styles.searchBarText, { color: theme.text.muted }]}>
+          <Text style={[styles.searchBarText, { color: theme.text.muted }]} numberOfLines={1}>
             {i18nText("autoI18n.tournament_search_ph", "Aday ara…")}
           </Text>
           <View style={[styles.searchBarBadge, { backgroundColor: theme.accent + "1A" }]}>
@@ -958,6 +1165,7 @@ export default function TournamentScreen() {
                 mySide={null}
                 votable={false}
                 onVote={handleVote}
+                onInfo={openContestant}
                 theme={theme}
                 getTmdbUrl={getTmdbUrl}
                 lang={lang}
@@ -1026,14 +1234,18 @@ export default function TournamentScreen() {
         lang={lang}
       />
 
-      {/* Aday arama modalı — havuzda ara + buradan da hype ver */}
+      {/* Aday arama modalı — havuzda + TMDB'de ara, buradan hype ver / havuza ekle */}
       <NomineeSearchModal
         visible={searchVisible}
         onClose={() => setSearchVisible(false)}
         pool={rankedPool}
         myNoms={myNoms}
-        canVote={nominationOpen && !!uid && myNoms.size < MAX_NOMINATIONS}
+        canVote={canHype}
         onHype={commitNomination}
+        onHypeExternal={commitExternalHype}
+        onOpen={(n) => { setSearchVisible(false); openContestant(n); }}
+        mediaType={poolMediaType}
+        genreId={poolGenreId}
         theme={theme}
         getTmdbUrl={getTmdbUrl}
         lang={lang}
@@ -1110,11 +1322,20 @@ const styles = StyleSheet.create({
   podiumBtnTitle: { fontSize: 13.5, fontWeight: "900" },
   podiumBtnSub: { fontSize: 11, fontWeight: "600", marginTop: 1 },
 
-  nomHeader: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginTop: 18 },
-  nomSubtitle: { fontSize: 11.5, fontWeight: "600", lineHeight: 15, marginBottom: 8 },
+  nomHeader: { marginTop: 18 },
+  // Başlık ile çip dikeyde ORTALANIR (flex-start'ta çip başlığa göre kayıyordu).
+  nomTitleRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 },
+  // İki satırlık SABİT slot: metin kısalsa da yükseklik değişmez → kayma yok.
+  nomSubtitle: {
+    fontSize: 11.5, fontWeight: "600", lineHeight: 15,
+    minHeight: 30, marginBottom: 8,
+  },
   nomCounter: {
-    flexDirection: "row", alignItems: "center", gap: 4,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4,
     paddingHorizontal: 9, paddingVertical: 5, borderRadius: 11, borderWidth: 1,
+    // Sabit genişlik: "1 hype hakkı" ↔ "Hype verildi" geçişinde çip büyüyüp
+    // küçülmesin, sol sütun (flex:1) yeniden akmasın.
+    minWidth: 112,
   },
   nomCounterText: { fontSize: 12, fontWeight: "900" },
 
@@ -1215,7 +1436,10 @@ const styles = StyleSheet.create({
 
   grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4, marginBottom: 8 },
   gridItem: { width: "25%", padding: 4 },
-  gridPosterWrap: { width: "100%", aspectRatio: 2 / 3, borderRadius: 9, overflow: "hidden" },
+  gridPosterWrap: {
+    width: "100%", aspectRatio: 2 / 3, borderRadius: 9, overflow: "hidden",
+    borderWidth: 2.5, // rengi duruma göre değişir; kalınlık sabit (bkz. NomineeCell)
+  },
   gridPoster: { width: "100%", height: "100%" },
   gridSeed: { position: "absolute", top: 4, left: 4, minWidth: 18, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 6, alignItems: "center" },
   gridSeedText: { fontSize: 10, fontWeight: "800" },
@@ -1229,12 +1453,24 @@ const styles = StyleSheet.create({
   },
   gridVotesText: { color: "#fff", fontSize: 9.5, fontWeight: "800" },
   gridTitle: { fontSize: 10, fontWeight: "600", marginTop: 3 },
-  gridConfirm: {
-    ...StyleSheet.absoluteFill,
-    alignItems: "center", justifyContent: "center", gap: 1,
+  // Posteri tam kaplayan iki yarım buton (üst: Onayla, alt: Bilgi).
+  gridConfirm: { ...StyleSheet.absoluteFill, flexDirection: "column" },
+  gridConfirmHalf: { flex: 1 },
+  gridConfirmInner: {
+    flex: 1, alignItems: "center", justifyContent: "center", gap: 3,
+    paddingHorizontal: 3, overflow: "hidden",
   },
-  gridConfirmText: { color: "#fff", fontSize: 10.5, fontWeight: "900", marginTop: 3, textAlign: "center" },
-  gridConfirmSub: { color: "rgba(255,255,255,0.85)", fontSize: 8.5, fontWeight: "700", textAlign: "center" },
+  // Yeşil = onay, accent = bilgi (MatchCard ile aynı kural).
+  gridConfirmPrimary: { backgroundColor: CONFIRM_GREEN },
+  gridConfirmInfo: { borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.55)" },
+  gridConfirmPressed: { opacity: 0.82 },
+  gridConfirmBadgeLight: {
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.45)",
+    alignItems: "center", justifyContent: "center",
+  },
+  gridConfirmText: { fontSize: 9.5, fontWeight: "900", letterSpacing: 0.2 },
 
   searchBar: {
     flexDirection: "row", alignItems: "center", gap: 8,

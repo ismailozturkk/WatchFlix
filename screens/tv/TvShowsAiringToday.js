@@ -1,17 +1,15 @@
-import React, { memo, useEffect, useMemo, useRef } from "react";
+import React, { memo, useEffect, useRef } from "react";
 import {
-  Text,
   TouchableOpacity,
   StyleSheet,
-  FlatList,
   View,
   Dimensions,
   Animated,
 } from "react-native";
-import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
-import { MovieUpComingSkeleton } from "../../components/Skeleton";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
+import { RailSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
 import SeeAllHeader from "../../components/SeeAllHeader";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
@@ -20,7 +18,6 @@ import { useTvShow } from "../../context/TvShowContex";
 import { useLanguage } from "../../context/LanguageContext";
 import ListBadges from "../../components/ListBadges";
 import { RatingBadge, ReleaseDateBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 
 const { width } = Dimensions.get("window");
@@ -29,6 +26,7 @@ const { width } = Dimensions.get("window");
 const TvAiringTodayCard = memo(function TvAiringTodayCard({ item, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -42,6 +40,10 @@ const TvAiringTodayCard = memo(function TvAiringTodayCard({ item, navigation, th
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
+      onLongPress={() =>
+        openQuickActions({ item, mediaType: "tv", navigation })
+      }
+      delayLongPress={350}
     >
       <Animated.View style={[{ transform: [{ scale }] }]}>
         <PosterImage
@@ -93,25 +95,27 @@ export default function TvShowsAiringToday({ navigation }) {
   // Film türlerini API'den almak
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
 
+  // Başlık iki durumda da AYNI bileşenden gelir (bkz. TvShowsOnTheAir): düz
+  // Text ile "tümünü gör" haplı satırın yüksekliği farklı, aradaki fark ray'ı
+  // zıplatıyordu.
+  const airingTodayHeader = (
+    <SeeAllHeader
+      title={t.tvShowScreens.airingToday}
+      onPress={() =>
+        navigation.navigate("SeeAllScreen", {
+          mediaType: "tv",
+          section: "airingToday",
+          title: t.tvShowScreens.airingToday,
+        })
+      }
+    />
+  );
+
   if (loadingAiringToday) {
     return (
-      <View style={{ flex: 1, paddingVertical: 10 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <Text
-            allowFontScaling={false}
-            style={[styles.title, { color: theme.text.secondary }]}
-          >
-            {t.tvShowScreens.airingToday}
-          </Text>
-        </View>
-
-        <FlatList
-          data={[1, 2, 3]}
-          renderItem={() => <MovieUpComingSkeleton />}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 15 }}
-        />
+      <View style={styles.container}>
+        {airingTodayHeader}
+        <RailSkeleton showReleaseDate />
       </View>
     );
   }
@@ -128,16 +132,7 @@ export default function TvShowsAiringToday({ navigation }) {
   };
   return (
     <View style={styles.container}>
-      <SeeAllHeader
-        title={t.tvShowScreens.airingToday}
-        onPress={() =>
-          navigation.navigate("SeeAllScreen", {
-            mediaType: "tv",
-            section: "airingToday",
-            title: t.tvShowScreens.airingToday,
-          })
-        }
-      />
+      {airingTodayHeader}
       <PaginatedRail
         data={moviesAiringToday}
         contentContainerStyle={{ paddingHorizontal: 15 }}
@@ -270,12 +265,5 @@ const styles = StyleSheet.create({
     color: "red",
     fontSize: 16,
     fontWeight: "bold",
-  },
-  title: {
-    fontSize: 18,
-    uppercase: true,
-    marginBottom: 15,
-    marginLeft: 15,
-    fontWeight: "700",
   },
 });

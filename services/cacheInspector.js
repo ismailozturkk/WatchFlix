@@ -8,23 +8,37 @@
 //     pets/            → pet sprite'ları
 //     (diğer her şey)  → çoğunlukla expo-image disk cache = posterler/görseller
 //
-//   AsyncStorage:
+//   MMKV `cache` deposu (yalnız yeniden üretilebilir veri):
 //     apicache_movie_* → film içerikleri (TMDB)
 //     apicache_tv_*    → dizi içerikleri (TMDB)
 //     feed_cache_v1    → gönderiler
-//     list_status_cache_*, cache_watchedTvShows → izleme listesi
+//     list_status_cache_*, media_activity_cache_*, cache_watchedTvShows
+//
+// MMKV GEÇİŞİ — iki eski kusur burada kapandı:
+//   1. Önbellek anahtarları eskiden ayarlarla AYNI AsyncStorage kovasındaydı;
+//      "hepsini temizle" elle bakımı yapılan bir anahtar süzgeci demekti ve
+//      süzgece eklenmeyen her yeni önbellek anahtarı sonsuza dek diskte kalırdı.
+//      Örnek: `media_activity_cache_*` ne ölçülüyor ne temizleniyordu.
+//   2. Anahtar önekleri ("apicache_", "feed_cache_v1", ...) bu dosyada ve üç
+//      başka dosyada ayrı ayrı yazılıydı. Artık hepsi registry'den geliyor.
 
 import { File, Directory, Paths } from "expo-file-system";
 import { Image } from "expo-image";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as cacheStore from "../utils/cacheStore";
 import { DATACACHE_DIRNAME } from "../utils/cacheStore";
 import * as petCache from "./petCache";
 import { PETS_DIRNAME } from "./petCache";
-import { clearCachedByPrefix } from "../utils/apiCache";
+import { clearCachedByPrefix, cachedByteSize } from "../utils/apiCache";
+import {
+  Keys,
+  remove as removeKey,
+  clearAllCacheStorage,
+  scopedByteSize,
+  keyByteSize,
+  getActiveUser,
+} from "./storage";
 
 const leaf = (uri) => uri.replace(/\/+$/, "").split("/").pop();
-const WATCHED_TV_CACHE_KEY = "cache_watchedTvShows";
 
 function recurseSize(dir) {
   let total = 0;
@@ -69,32 +83,23 @@ function fsBuckets() {
   return out;
 }
 
-// AsyncStorage kovaları (byte ≈ key+value uzunluğu)
-async function asyncBuckets() {
-  const res = { movie: 0, tv: 0, posts: 0, listStatus: 0 };
-  try {
-    const keys = await AsyncStorage.getAllKeys();
-    const want = keys.filter(
-      (k) =>
-        k.startsWith("apicache_") ||
-        k === "feed_cache_v1" ||
-        k.startsWith("list_status_cache_") ||
-        k === WATCHED_TV_CACHE_KEY,
-    );
-    if (!want.length) return res;
-    const pairs = await AsyncStorage.multiGet(want);
-    for (const [k, v] of pairs) {
-      const size = (k?.length || 0) + (v?.length || 0);
-      if (k.startsWith("apicache_movie_")) res.movie += size;
-      else if (k.startsWith("apicache_tv_") || k === WATCHED_TV_CACHE_KEY) res.tv += size;
-      else if (k.startsWith("apicache_")) res.tv += size; // diğer içerik → diziye say
-      else if (k === "feed_cache_v1") res.posts += size;
-      else if (k.startsWith("list_status_cache_")) res.listStatus += size;
-    }
-  } catch {
-    // yok say
-  }
-  return res;
+// MMKV `cache` deposu kovaları (byte ≈ key+value uzunluğu)
+function keyValueBuckets() {
+  const movie = cachedByteSize("movie_");
+  const tv = cachedByteSize("tv_");
+  // apicache'in geri kalanı (providers_, discovery_v2_ ...) — eski davranışla
+  // aynı: diğer içerik dizi kovasına sayılır.
+  const digerIcerik = cachedByteSize("") - movie - tv;
+
+  return {
+    movie,
+    tv: tv + Math.max(0, digerIcerik) + keyByteSize(Keys.watchedTvShows),
+    posts: keyByteSize(Keys.feed),
+    listStatus: scopedByteSize(Keys.listStatus),
+    // Geçiş öncesinde bu kova HİÇ ölçülmüyordu: kullanıcı "Önbellek" ekranında
+    // gerçekte kapladığından az bir toplam görüyordu.
+    activity: scopedByteSize(Keys.mediaActivity),
+  };
 }
 
 /**
@@ -103,38 +108,29 @@ async function asyncBuckets() {
  */
 export async function getBreakdown() {
   const fs = fsBuckets();
-  const as = await asyncBuckets();
+  const kv = keyValueBuckets();
   const dc = fs.datacache;
 
   const categories = [
     { id: "images", bytes: fs.images },
     { id: "pets", bytes: fs.pets },
-    { id: "tvContent", bytes: as.tv },
-    { id: "movieContent", bytes: as.movie },
-    { id: "posts", bytes: as.posts },
-    { id: "lists", bytes: (dc.lists || 0) + as.listStatus },
+    { id: "tvContent", bytes: kv.tv },
+    { id: "movieContent", bytes: kv.movie },
+    { id: "posts", bytes: kv.posts },
+    { id: "lists", bytes: (dc.lists || 0) + kv.listStatus },
     { id: "reminders", bytes: dc.reminders || 0 },
     { id: "notes", bytes: dc.notes || 0 },
     { id: "profile", bytes: dc.profile || 0 },
-    { id: "activity", bytes: dc.activity || 0 },
+    { id: "activity", bytes: (dc.activity || 0) + kv.activity },
     { id: "networkData", bytes: (dc.network || 0) + (dc.tmdbLookup || 0) },
   ];
   const total = categories.reduce((a, c) => a + c.bytes, 0);
   return { total, categories };
 }
 
-async function removeAsyncKeys(predicate) {
-  try {
-    const keys = await AsyncStorage.getAllKeys();
-    const target = keys.filter(predicate);
-    if (target.length) await AsyncStorage.multiRemove(target);
-  } catch {
-    // yok say
-  }
-}
-
 /** Tek bir kategoriyi temizle. */
 export async function clearCategory(id) {
+  const uid = getActiveUser();
   switch (id) {
     case "images":
       try {
@@ -148,18 +144,18 @@ export async function clearCategory(id) {
       petCache.clearAllPets();
       break;
     case "tvContent":
-      await clearCachedByPrefix("tv_");
-      await removeAsyncKeys((k) => k === WATCHED_TV_CACHE_KEY);
+      clearCachedByPrefix("tv_");
+      removeKey(Keys.watchedTvShows);
       break;
     case "movieContent":
-      await clearCachedByPrefix("movie_");
+      clearCachedByPrefix("movie_");
       break;
     case "posts":
-      await removeAsyncKeys((k) => k === "feed_cache_v1");
+      removeKey(Keys.feed);
       break;
     case "lists":
       cacheStore.clearNamespace("lists");
-      await removeAsyncKeys((k) => k.startsWith("list_status_cache_"));
+      removeKey(Keys.listStatus, { uid });
       break;
     case "reminders":
       cacheStore.clearNamespace("reminders");
@@ -169,9 +165,14 @@ export async function clearCategory(id) {
       break;
     case "profile":
       cacheStore.clearNamespace("profile");
+      // Türetilmiş istatistik anlık görüntüsü de profil verisidir; ayrı bir
+      // "stats" seçeneği yok, burada temizlenmezse ölçüde ve temizlikte
+      // görünmez bir kalıntı olurdu (bkz. utils/cacheKeys.js: stats).
+      cacheStore.clearNamespace("stats");
       break;
     case "activity":
       cacheStore.clearNamespace("activity");
+      removeKey(Keys.mediaActivity, { uid });
       break;
     case "networkData":
       cacheStore.clearNamespace("network");
@@ -182,7 +183,13 @@ export async function clearCategory(id) {
   }
 }
 
-/** Tüm önbelleği temizle (ayarlar/oturum DOKUNULMAZ — sadece cache). */
+/**
+ * Tüm önbelleği temizle (ayarlar/veri/oturum DOKUNULMAZ — sadece cache).
+ *
+ * Anahtar/değer tarafı artık tek çağrı: önbellek AYRI bir MMKV deposunda
+ * olduğu için "hepsini sil" tanım gereği eksiksiz. Eski sürümde burası elle
+ * bakılan bir anahtar listesiydi ve listeye girmeyen her şey diskte kalıyordu.
+ */
 export async function clearAllCaches() {
   try {
     await Image.clearMemoryCache();
@@ -192,11 +199,5 @@ export async function clearAllCaches() {
   } catch {}
   petCache.clearAllPets();
   cacheStore.clearAll();
-  await clearCachedByPrefix(""); // tüm apicache_*
-  await removeAsyncKeys(
-    (k) =>
-      k === "feed_cache_v1" ||
-      k === WATCHED_TV_CACHE_KEY ||
-      k.startsWith("list_status_cache_"),
-  );
+  clearAllCacheStorage();
 }

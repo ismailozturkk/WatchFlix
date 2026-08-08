@@ -5,13 +5,12 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Modal,
   Image,
   Dimensions,
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import AdaptiveBlurView from "@components/common/AdaptiveBlurView";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Feather from "@expo/vector-icons/Feather";
 import Toast from "react-native-toast-message";
@@ -391,25 +390,14 @@ export default function SharedListScreen({ route, navigation }) {
       )}
 
       {/* ── Üyeler modalı ── */}
-      <Modal
-        transparent
+      <BottomSheetModal
         visible={membersVisible}
-        animationType="slide"
-        onRequestClose={() => setMembersVisible(false)}
+        onClose={() => setMembersVisible(false)}
+        sheetStyle={[
+          styles.sheet,
+          { backgroundColor: theme.secondary, borderColor: theme.border },
+        ]}
       >
-        <View style={styles.overlay}>
-          <AdaptiveBlurView tint="dark" intensity={40} style={StyleSheet.absoluteFill} />
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={() => setMembersVisible(false)}
-          />
-          <View
-            style={[
-              styles.sheet,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
-            ]}
-          >
             <View style={[styles.handle, { backgroundColor: theme.border }]} />
 
             <View style={styles.sheetHeaderRow}>
@@ -614,9 +602,7 @@ export default function SharedListScreen({ route, navigation }) {
                 </TouchableOpacity>
               )}
             </View>
-          </View>
-        </View>
-      </Modal>
+      </BottomSheetModal>
 
       {/* ── Üye ekleme (kurucu) ── */}
       <CreateSharedListModal

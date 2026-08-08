@@ -19,10 +19,11 @@ import { useListStatusContext } from "../context/ListStatusContext";
 import { useSharedLists } from "../context/SharedListsContext";
 import SharedListsSection from "./SharedListsSection";
 import { useHapticsSettings } from "../context/AppSettingsContext";
-import AdaptiveBlurView from "./common/AdaptiveBlurView";
+import ModalBlurBackdrop from "./common/ModalBlurBackdrop";
 import ListActionIcon from "./common/ListActionIcon";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as Haptics from "@services/hapticsService";
+import Toast from "react-native-toast-message";
 import { i18nText } from "../utils/i18nText";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -137,6 +138,15 @@ const ListView = ({
   updateWatchedList,
   openWatchedHistory,
   isRemaining,
+  // Yayın tarihi BİLİNMİYOR (TMDB'de boş/geçersiz ve `status` da yayınlandı
+  // demiyor). İleri tarihli içerikte hatırlatmaya dönen göz butonu burada
+  // dönemez — hatırlatılacak bir tarih yok — bu yüzden kilitlenir.
+  // Bkz. utils/watchState.js → getReleaseState.
+  watchLocked = false,
+  // Hatırlatma kurulu mu. Kurulu kaldığı sürece göz butonu zil olarak kalır —
+  // içerik yayına girse bile. O durumda zil "Yayınlandı" görünümüne geçer
+  // (aşağıda `isReleasedReminder`); dokunuş yine hatırlatmayı kaldırır ve
+  // buton normal "İzle" göz butonuna döner.
   isReminderSet,
   addReminder,
   listStates,
@@ -154,7 +164,7 @@ const ListView = ({
 
   React.useEffect(() => {
     setOptimisticStates({});
-  }, [listStates, isReminderSet, isRemaining]);
+  }, [listStates, isReminderSet, isRemaining, watchLocked]);
 
   const getIsActive = (key) => {
     if (optimisticStates[key] !== undefined) return optimisticStates[key];
@@ -297,27 +307,70 @@ const ListView = ({
       {ICONS.map(({ key, activeName, inactiveName, activeColor, inactiveColor, label, onPress, isEye }) => {
         if (isEye) {
           const isReminderMode = isRemaining || isReminderSet;
+          const reminderOn = !!getIsActive("reminder");
+          // Hatırlatma KALICIDIR: içerik yayına girse de kullanıcı silene kadar
+          // durur (hatırlatıcılar ekranı böylece "yokluğumda neler çıkmış"
+          // listesi olarak da işe yarar). Ama bu buton o ayrımı yapmıyordu:
+          // çoktan vizyona girmiş bir filmde bile turuncu zil + "Hatırlat"
+          // yazıyor, içerik hâlâ bekleniyormuş gibi görünüyordu. Yayın tarihi
+          // GEÇMİŞSE buton bunu söylesin — yeşil `bell-check` + "Yayınlandı".
+          // `watchLocked` dışarıda: tarih de TMDB durumu da bilinmiyorsa
+          // "yayınlandı" diyemeyiz (bkz. utils/watchState.js → getReleaseState).
+          // Koşul BİLEREK `reminderOn` yerine `isReminderMode` üzerinden: iyimser
+          // (optimistic) kaldırma anında zil sönerken ikon takımı da turuncuya
+          // atlasın istemiyoruz — çıkış animasyonu aynı ikonla tamamlanmalı.
+          const isReleasedReminder = isReminderMode && !isRemaining && !watchLocked;
+          // Kilit YALNIZ henüz işaretlenmemişken uygulanır: eski kayıtları
+          // (veya tarihi sonradan silinen içeriği) kullanıcı geçmişten
+          // kaldırabilmeli, aksi hâlde kayıt ekranda kilitli kalırdı.
+          const isWatchBlocked =
+            !isReminderMode && watchLocked && !getIsActive("watchedMovies");
           return (
             <View key={key} style={styles.iconCol}>
               <ActionButton
                 scale={scaleValuesRef.current[key]}
                 opacity={opacityValuesRef.current[key]}
                 onPress={
-                  isReminderMode
-                    ? () => handleOptimisticPress("reminder", addReminder)
-                    : () =>
-                        getIsActive("watchedMovies")
-                          ? handleOptimisticPress("watchedMovies", openWatchedHistory, false)
-                          : handleOptimisticPress("watchedMovies", updateWatchedList, false)
+                  isWatchBlocked
+                    ? () =>
+                        Toast.show({
+                          type: "warning",
+                          text1: i18nText(
+                            "autoI18n.yayin_tarihi_bilinmiyor",
+                            "Yayın tarihi bilinmiyor",
+                          ),
+                          text2: i18nText(
+                            "autoI18n.yayin_tarihi_bilinmiyor_izlendi",
+                            "Tarihi belli olmayan içerik izlendi olarak eklenemez.",
+                          ),
+                        })
+                    : isReminderMode
+                      ? () => handleOptimisticPress("reminder", addReminder)
+                      : () =>
+                          getIsActive("watchedMovies")
+                            ? handleOptimisticPress("watchedMovies", openWatchedHistory, false)
+                            : handleOptimisticPress("watchedMovies", updateWatchedList, false)
                 }
               >
-                {isReminderMode ? (
+                {isWatchBlocked ? (
                   <ListActionIcon
-                    active={!!getIsActive("reminder")}
+                    active={false}
+                    activeName="lock-closed"
+                    inactiveName="lock-closed-outline"
+                    activeColor={theme.text.muted}
+                    inactiveColor={theme.text.muted}
+                  />
+                ) : isReminderMode ? (
+                  <ListActionIcon
+                    active={reminderOn}
                     IconSet={MaterialCommunityIcons}
-                    activeName="bell-ring"
-                    inactiveName="bell-ring-outline"
-                    activeColor={theme.colors.orange}
+                    activeName={isReleasedReminder ? "bell-check" : "bell-ring"}
+                    inactiveName={
+                      isReleasedReminder ? "bell-check-outline" : "bell-ring-outline"
+                    }
+                    activeColor={
+                      isReleasedReminder ? theme.colors.green : theme.colors.orange
+                    }
                     inactiveColor={theme.text.secondary}
                   />
                 ) : /* Yükleme göstergesi YALNIZ henüz işaretlenmemişken çıkar.
@@ -345,7 +398,9 @@ const ListView = ({
               </ActionButton>
               <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>
                 {isReminderMode
-                  ? (t.remind || i18nText("autoI18n.hatirlat", "Hatırlat"))
+                  ? isReleasedReminder
+                    ? i18nText("autoI18n.yayinlandi", "Yayınlandı")
+                    : (t.remind || i18nText("autoI18n.hatirlat", "Hatırlat"))
                   : getIsActive("watchedMovies")
                     ? (t.watched || i18nText("autoI18n.izlendi", "İzlendi"))
                     : (t.watch || i18nText("autoI18n.izle", "İzle"))}
@@ -429,12 +484,7 @@ const ListView = ({
       >
         <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeModal} />
-          <AdaptiveBlurView
-            tint="dark"
-            intensity={50}
-            experimentalBlurMethod="dimezisBlurView"
-            style={StyleSheet.absoluteFill}
-          />
+          <ModalBlurBackdrop intensity={50} />
 
           <Animated.View
             style={[

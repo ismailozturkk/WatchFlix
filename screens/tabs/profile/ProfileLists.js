@@ -1,28 +1,28 @@
 import {
-  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
   FlatList,
-  Modal,
   Animated,
-  ScrollView,
-} from "react-native";
-import React, { useEffect, useState } from "react";
+  } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useTheme } from "../../../context/ThemeContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { ListsSkeleton } from "../../../components/Skeleton";
-import { LinearGradient } from "expo-linear-gradient";
 import { useProfileStats } from "../../../context/ProfileStatsContext";
 import { useProfileUi }    from "../../../context/ProfileUiContext";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 import { useSharedLists } from "../../../context/SharedListsContext";
 import SwitchToggle from "../../../components/SwitchToggle";
 import { i18nText } from "../../../utils/i18nText";
 import { sortItemsByListOrder } from "../../../utils/listOrder";
+import ListCovers from "../../../components/lists/ListCovers";
+import ListManageSheet from "../../../components/lists/ListManageSheet";
+import { useAuth } from "../../../context/AuthContext";
 import {
   getListAccent,
   getListIcon,
@@ -33,6 +33,9 @@ import { db } from "../../../firebase";
 
 // Kart yüksekliği tüm düzenlerde sabit (poster bloğu 112 + ayırıcı/alt bilgi).
 const CARD_H = 171;
+// Kapak bloğunun yüksekliği ve kart iç dolgusu — genişlikler bunlardan türer.
+const COVER_H = 112;
+const CARD_PADDING = 10;
 
 // Kart genişliği aktif poster düzenine orantılı: poster alanı + 2×10 dolgu.
 // Aynı anda tek düzen aktif olduğundan raydaki tüm kartlar yine eşit kalır.
@@ -55,17 +58,23 @@ const SHARED_KEY_PREFIX = "shared:";
 export default function ProfileLists({ navigation }) {
   const { t } = useLanguage();
   const { theme } = useTheme();
-  const {
-    lists, isLoading: isLoadingLists,
-    selectedList, setSelectedList,
-    modalDeleteVisible, setModalDeleteVisible, deleteList,
-  } = useProfileStats();
+  const { lists, isLoading: isLoadingLists } = useProfileStats();
+  const { user } = useAuth();
   const { gridStyle, setGridStyle, saveListGridStyle, allCornersRounded, saveAllCornersRounded } = useProfileUi();
   const cardW = getCardWidth(gridStyle);
   const [layoutModalVisible, setLayoutModalVisible] = useState(false);
+  // Uzun basılan özel liste — yönetim sayfası (ad değiştir / sil) buna bakar.
+  // Sayfa Listelerim ekranıyla ORTAK; iki yüzeyde aynı akış, aynı yazma yolu.
+  const [manageList, setManageList] = useState(null);
+  const existingListNames = useMemo(
+    () => (lists || []).map(([name]) => name),
+    [lists],
+  );
+  const manageListCount =
+    (lists || []).find(([name]) => name === manageList)?.[1]?.length ?? 0;
   // ...existing code...
   const [scaleValues, setScaleValues] = useState({});
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
 
   // ── Ortak listeler — ListsViewScreen ile aynı önizleme deseni ────────────
   // listId → ilk 8 öğe (küçük kapaklar düzeni 8 poster gösterir).
@@ -230,9 +239,9 @@ export default function ProfileLists({ navigation }) {
                     }
                   }}
                   onLongPress={() => {
+                    // Öntanımlı dörtte ve ortak listelerde ad/silme yok.
                     if (!shared && !protectedLists.includes(listName)) {
-                      setSelectedList(listName);
-                      setModalDeleteVisible(true);
+                      setManageList(listName);
                     }
                   }}
                 >
@@ -250,252 +259,15 @@ export default function ProfileLists({ navigation }) {
                       ]}
                     />
                     <View style={[styles.card, { width: cardW }]}>
-                    {gridStyle === 1 ? (
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          gap: 2,
-                        }}
-                      >
-                        {[0, 1, 2].map((index) => {
-                          const item = orderedItems[index];
-                          if (item && item.imagePath) {
-                            return (
-                              <Image
-                                key={index}
-                                source={{
-                                  uri: getTmdbUrl(item.imagePath, 'poster', 200),
-                                }}
-                                style={[
-                                  styles.image,
-                                  { width: 60, height: 112 },
-                                  allCornersRounded ? { borderRadius: 10 } : index === 0 ? { borderTopLeftRadius: 10,
-                                        borderBottomLeftRadius: 10,
-                                      }
-                                    : index === 1
-                                      ? {}
-                                      : {
-                                          borderTopRightRadius: 10,
-                                          borderBottomRightRadius: 10,
-                                        },
-                                ]}
-                              />
-                            );
-                          } else {
-                            return (
-                              <View
-                                key={index}
-                                style={[
-                                  styles.placeholder,
-                                  { width: 60, height: 112 },
-
-                                  allCornersRounded ? { borderRadius: 10 } : index === 0 ? { borderTopLeftRadius: 10,
-                                        borderBottomLeftRadius: 10,
-                                      }
-                                    : index === 1
-                                      ? {}
-                                      : {
-                                          borderTopRightRadius: 10,
-                                          borderBottomRightRadius: 10,
-                                        },
-                                  { backgroundColor: theme.primary },
-                                ]}
-                              />
-                            );
-                          }
-                        })}
-                      </View>
-                    ) : gridStyle === 2 ? (
-                      <>
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            gap: 2,
-                          }}
-                        >
-                          {[0, 1, 2, 3].map((index) => {
-                            const item = orderedItems[index];
-                            if (item && item.imagePath) {
-                              return (
-                                <Image
-                                  key={index}
-                                  source={{
-                                    uri: getTmdbUrl(item.imagePath, 'poster', 200),
-                                  }}
-                                  style={[
-                                    styles.image,
-                                    allCornersRounded ? { borderRadius: 10 } : index === 0 ? { borderTopLeftRadius: 10,
-                                          borderBottomLeftRadius: gridStyle
-                                            ? 10
-                                            : 0,
-                                        }
-                                      : index === 3
-                                        ? {
-                                            borderTopRightRadius: 10,
-                                            borderBottomRightRadius: gridStyle
-                                              ? 10
-                                              : 0,
-                                          }
-                                        : {},
-                                  ]}
-                                />
-                              );
-                            } else {
-                              return (
-                                <View
-                                  key={index}
-                                  style={[
-                                    styles.placeholder,
-                                    allCornersRounded ? { borderRadius: 10 } : index === 0 ? { borderTopLeftRadius: 10,
-                                          borderBottomLeftRadius: gridStyle
-                                            ? 10
-                                            : 0,
-                                        }
-                                      : index === 3
-                                        ? {
-                                            borderTopRightRadius: 10,
-                                            borderBottomRightRadius: gridStyle
-                                              ? 10
-                                              : 0,
-                                          }
-                                        : {},
-                                    { backgroundColor: theme.primary },
-                                  ]}
-                                />
-                              );
-                            }
-                          })}
-                        </View>
-
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            gap: 2,
-                          }}
-                        >
-                          {[4, 5, 6, 7].map((index) => {
-                            const item = orderedItems[index];
-                            if (item && item.imagePath) {
-                              return (
-                                <Image
-                                  key={index}
-                                  source={{
-                                    uri: getTmdbUrl(item.imagePath, 'poster', 200),
-                                  }}
-                                  style={[
-                                    styles.image,
-                                    allCornersRounded ? { borderRadius: 10 } : index === 4 ? { borderTopLeftRadius: gridStyle ? 10 : 0,
-                                          borderBottomLeftRadius: 10,
-                                        }
-                                      : index === 7
-                                        ? {
-                                            borderTopRightRadius: gridStyle
-                                              ? 10
-                                              : 0,
-                                            borderBottomRightRadius: 10,
-                                          }
-                                        : {},
-                                  ]}
-                                />
-                              );
-                            } else {
-                              return (
-                                <View
-                                  key={index}
-                                  style={[
-                                    styles.placeholder,
-                                    allCornersRounded ? { borderRadius: 10 } : index === 4 ? { borderTopLeftRadius: gridStyle ? 10 : 0,
-                                          borderBottomLeftRadius: 10,
-                                        }
-                                      : index === 7
-                                        ? {
-                                            borderTopRightRadius: gridStyle
-                                              ? 10
-                                              : 0,
-                                            borderBottomRightRadius: 10,
-                                          }
-                                        : {},
-                                    { backgroundColor: theme.primary },
-                                  ]}
-                                />
-                              );
-                            }
-                          })}
-                        </View>
-                      </>
-                    ) : gridStyle === 3 ? (
-                      <View style={{ flexDirection: "row", gap: 2 }}>
-                        <View style={{ width: 75, height: 112 }}>
-                          {orderedItems[0]?.imagePath ? (
-                            <Image
-                              source={{ uri: getTmdbUrl(orderedItems[0].imagePath, 'poster', 200) }}
-                              style={[styles.image, { width: 75, height: 112 }, allCornersRounded ? { borderRadius: 10 } : { borderTopLeftRadius: 10, borderBottomLeftRadius: 10 }]}
-                            />
-                          ) : (
-                            <View style={[styles.placeholder, { width: 75, height: 112 }, allCornersRounded ? { borderRadius: 10 } : { borderTopLeftRadius: 10, borderBottomLeftRadius: 10 }, { backgroundColor: theme.primary }]} />
-                          )}
-                        </View>
-                        <View style={{ gap: 2 }}>
-                          <View style={{ width: 37.5, height: 55 }}>
-                            {orderedItems[1]?.imagePath ? (
-                              <Image
-                                source={{ uri: getTmdbUrl(orderedItems[1].imagePath, 'poster', 200) }}
-                                style={[styles.image, { width: 37.5, height: 55 }, allCornersRounded ? { borderRadius: 10 } : { borderTopRightRadius: 10 }]}
-                              />
-                            ) : (
-                              <View style={[styles.placeholder, { width: 37.5, height: 55 }, allCornersRounded ? { borderRadius: 10 } : { borderTopRightRadius: 10 }, { backgroundColor: theme.primary }]} />
-                            )}
-                          </View>
-                          <View style={{ width: 37.5, height: 55 }}>
-                            {orderedItems[2]?.imagePath ? (
-                              <Image
-                                source={{ uri: getTmdbUrl(orderedItems[2].imagePath, 'poster', 200) }}
-                                style={[styles.image, { width: 37.5, height: 55 }, allCornersRounded ? { borderRadius: 10 } : { borderBottomRightRadius: 10 }]}
-                              />
-                            ) : (
-                              <View style={[styles.placeholder, { width: 37.5, height: 55 }, allCornersRounded ? { borderRadius: 10 } : { borderBottomRightRadius: 10 }, { backgroundColor: theme.primary }]} />
-                            )}
-                          </View>
-                        </View>
-                      </View>
-                    ) : (
-                      <View style={{ width: 138, height: 112, alignItems: "center", justifyContent: "center" }}>
-                        {[2, 1, 0].map((i) => {
-                          const item = orderedItems[i];
-                          const angles = [0, -6, 6];
-                          const offsets = [0, -22, 22];
-                          const zIndexes = [3, 2, 1];
-                          return (
-                            <View
-                              key={i}
-                              style={{
-                                position: "absolute",
-                                transform: [
-                                  { rotate: `${angles[i]}deg` },
-                                  { translateX: offsets[i] },
-                                ],
-                                zIndex: zIndexes[i],
-                                width: 75,
-                                height: 112,
-                                borderRadius: 10,
-                                overflow: "hidden",
-                                borderWidth: 1,
-                                borderColor: "rgba(255,255,255,0.1)",
-                              }}
-                            >
-                              {item && item.imagePath ? (
-                                <Image
-                                  source={{ uri: getTmdbUrl(item.imagePath, 'poster', 200) }}
-                                  style={{ width: "100%", height: "100%" }}
-                                />
-                              ) : (
-                                <View style={[styles.placeholder, { width: "100%", height: "100%", backgroundColor: theme.primary }]} />
-                              )}
-                            </View>
-                          );
-                        })}
-                      </View>
-                    )}
+                    <ListCovers
+                      items={orderedItems}
+                      gridStyle={gridStyle}
+                      allCornersRounded={allCornersRounded}
+                      width={cardW - CARD_PADDING * 2}
+                      height={COVER_H}
+                      getTmdbUrl={getTmdbUrl}
+                      theme={theme}
+                    />
 
                     {/* Ayırıcı + alt bilgi — ListsViewScreen kart yapısıyla aynı */}
                     <View
@@ -548,71 +320,24 @@ export default function ProfileLists({ navigation }) {
           />
         </View>
       )}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={modalDeleteVisible}
-        onRequestClose={() => setModalDeleteVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <LinearGradient
-            colors={["transparent", theme.shadow, "transparent"]}
-            style={{
-              position: "absolute",
-              top: 0,
-              right: 0,
-              left: 0,
-              bottom: 0,
-              zIndex: 0,
-            }}
-          />
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            onPress={() => setModalDeleteVisible(false)}
-          />
-          <View style={[styles.modalView, { backgroundColor: theme.primary }]}>
-            <Text
-              allowFontScaling={false}
-              style={[styles.modalText, { color: theme.text.primary }]}
-            >
-              {i18nText(
-                "autoI18n.liste_silme_onay",
-                '"{{name}}" listesini silmek istiyor musunuz?',
-                { name: selectedList },
-              )}
-            </Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.button, styles.buttonCancel]}
-                onPress={() => setModalDeleteVisible(false)}
-              >
-                <Text allowFontScaling={false} style={styles.textStyle}>
-                  {t.cancel}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.button, styles.buttonConfirm]}
-                onPress={deleteList}
-              >
-                <Text allowFontScaling={false} style={styles.textStyle}>
-                  {t.confirm}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Uzun basış: liste yönetim sayfası (ad değiştir / sil) — Listelerim
+          ekranıyla ORTAK bileşen. */}
+      <ListManageSheet
+        listName={manageList}
+        itemCount={manageListCount}
+        existingNames={existingListNames}
+        uid={user?.uid}
+        onClose={() => setManageList(null)}
+      />
 
       {/* Görünüm Seçimi Modalı */}
-      <Modal
-        animationType="slide"
-        transparent={true}
+      <BottomSheetModal
         visible={layoutModalVisible}
-        onRequestClose={() => setLayoutModalVisible(false)}
+        onClose={() => setLayoutModalVisible(false)}
+        intensity={35}
+        dimColor="rgba(0,0,0,0.38)"
+        sheetStyle={[styles.bottomModalSheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}
       >
-        <View style={styles.bottomModalOverlay}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setLayoutModalVisible(false)} />
-          <View style={[styles.bottomModalSheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
             <View style={[styles.modalDragHandle, { backgroundColor: theme.text.muted }]} />
             <Text style={[styles.bottomModalTitle, { color: theme.text.primary }]}>
               {i18nText("autoI18n.liste_gorunumu_secin", "Liste Görünümü Seçin")}
@@ -848,9 +573,7 @@ export default function ProfileLists({ navigation }) {
                 />
               </View>
             </View>
-          </View>
-        </View>
-      </Modal>
+      </BottomSheetModal>
     </View>
   );
 }
@@ -894,7 +617,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: "hidden",
     backgroundColor: "rgba(255,255,255,0.05)",
-    padding: 10,
+    padding: CARD_PADDING,
     alignItems: "center",
     gap: 2,
   },
@@ -937,7 +660,8 @@ const styles = StyleSheet.create({
     gap: 3,
     marginLeft: "auto",
   },
-  image: { width: 37.5, height: 55 },
+  // Kart kapakları artık ListCovers'ta; bu ölçü yalnız görünüm modalındaki
+  // önizleme kutuları için duruyor.
   placeholder: { width: 37.5, height: 55 },
   sectionView: {
     justifyContent: "center",
@@ -966,28 +690,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
   },
-  modalContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  modalBackdrop: {
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-  },
-  modalView: { padding: 20, borderRadius: 10, alignItems: "center" },
-  modalText: { marginBottom: 15, textAlign: "center", fontSize: 18 },
-  modalButtons: { flexDirection: "row", marginTop: 10 },
-  button: { padding: 10, marginHorizontal: 5, borderRadius: 5 },
-
-  buttonCancel: {
-    backgroundColor: "#f44336",
-  },
-  buttonConfirm: {
-    backgroundColor: "#4CAF50",
-  },
-  textStyle: {
-    color: "white",
-    fontWeight: "bold",
-    textAlign: "center",
-  },
+  // Silme onayı artık ListManageSheet'te (Listelerim ekranıyla ortak sayfa).
 
   // ── Layout Modal Styles ──────────────────────────────────────────────────
   bottomModalOverlay: {

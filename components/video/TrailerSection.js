@@ -27,6 +27,7 @@ import {
 import axios from "axios";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AdaptiveBlurView from "../common/AdaptiveBlurView";
+import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import { Image } from "expo-image";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { useTheme } from "../../context/ThemeContext";
@@ -118,12 +119,7 @@ function TrailerPlayerModal({ visible, video, onClose, theme }) {
       supportedOrientations={["portrait", "landscape"]}
     >
       <View style={styles.playerRoot}>
-        <AdaptiveBlurView
-          tint="dark"
-          intensity={60}
-          experimentalBlurMethod="dimezisBlurView"
-          style={StyleSheet.absoluteFill}
-        />
+        <ModalBlurBackdrop intensity={60} />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
         <Animated.View

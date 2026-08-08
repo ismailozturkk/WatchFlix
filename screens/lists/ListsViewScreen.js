@@ -1,4 +1,3 @@
-import { Image } from "expo-image";
 import {
   StyleSheet,
   Text,
@@ -6,7 +5,6 @@ import {
   View,
   FlatList,
   TextInput,
-  Modal,
   ActivityIndicator,
   Keyboard,
   Animated,
@@ -14,28 +12,24 @@ import {
   StatusBar
 } from "react-native";
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import {
-  deleteField,
-  doc,
-  FieldPath,
-  getDoc,
-  onSnapshot,
-  setDoc,
-  updateDoc,
-} from "firebase/firestore";
-import { useLanguage } from "@context/LanguageContext";
+import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
+import { useProfileUi } from "@context/ProfileUiContext";
 import Toast from "react-native-toast-message";
 import { db } from "../../firebase";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../components/BackButton";
 import StaggerItem from "../../components/StaggerItem";
-import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { useListStatusContext } from "../../context/ListStatusContext";
 import { PREDEFINED_MOVIE_LISTS } from "../../services/listItemsService";
+// Rezerve adlar utils/listShare'den: kopya liste sessizce ayrışırsa kök
+// dokümanda öntanımlı bir alanı ezen liste oluşur ve hiç görünmez.
+import { RESERVED_LIST_NAMES } from "@utils/listShare";
+import ListCovers from "@components/lists/ListCovers";
+import ListManageSheet from "@components/lists/ListManageSheet";
 import { useSharedLists } from "../../context/SharedListsContext";
 import CreateSharedListModal from "../../components/modals/CreateSharedListModal";
 import { collection, getDocs, limit, query } from "firebase/firestore";
@@ -52,6 +46,11 @@ import {
 const { width } = Dimensions.get("window");
 const CARD_W = (width - 48) / 2;
 const CARD_H = CARD_W * 1.05;
+// Kapak bloğu: kart genişliğinden iç dolgu düşülür, yükseklik karttan pay alır.
+// Düzeni (yığın/büyük/küçük/karışık) ListCovers seçer — profil rayıyla ORTAK.
+const CARD_PADDING = 10;
+const COVER_W = CARD_W - CARD_PADDING * 2;
+const COVER_H = CARD_H * 0.58;
 
 // ── Korunan liste adlarını Türkçe'ye çevir ──────────────────────────────────
 const getDisplayName = (listName) => {
@@ -69,85 +68,17 @@ const getDisplayName = (listName) => {
   }
 };
 
-// ── Kart destesi poster bileşeni ─────────────────────────────────────────────
-const PosterStack = ({ items, accent, imageQuality, getTmdbUrl, theme }) => {
-  const angles = [0, -6, 6];
-  const offsets = [0, -22, 22];
-  const zIndexes = [3, 2, 1];
-
-  return (
-    <View style={stackStyles.container}>
-      {[2, 1, 0].map((i) => {
-        const item = items && items[i];
-        return (
-          <View
-            key={i}
-            style={[
-              stackStyles.poster,
-              {
-                transform: [
-                  { rotate: `${angles[i]}deg` },
-                  { translateX: offsets[i] },
-                ],
-                zIndex: zIndexes[i],
-                shadowColor: accent,
-              },
-            ]}
-          >
-            {item?.imagePath ? (
-              <Image
-                source={{
-                  uri: getTmdbUrl(item.imagePath, "poster", 200),
-                }}
-                style={stackStyles.posterImage}
-              />
-            ) : (
-              <View
-                style={[
-                  stackStyles.posterEmpty,
-                  { borderColor: accent + "40", backgroundColor: theme?.primary || '#1c1c1e' },
-                ]}
-              >
-                <Ionicons name="film-outline" size={20} color={accent + "80"} />
-              </View>
-            )}
-          </View>
-        );
-      })}
-    </View>
-  );
-};
-
-const stackStyles = StyleSheet.create({
-  container: {
-    width: "100%",
-    height: CARD_H * 0.58,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 10,
-  },
-  poster: {
-    position: "absolute",
-    width: CARD_W * 0.44,
-    height: CARD_H * 0.54,
-    borderRadius: 10,
-    overflow: "hidden",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  posterImage: { width: "100%", height: "100%", contentFit: "cover" },
-  posterEmpty: {
-    width: "100%",
-    height: "100%",
-    borderWidth: 1,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.04)",
-  },
-});
+// ── Kart kapağı ──────────────────────────────────────────────────────────────
+// Düzen artık burada değil, ORTAK ListCovers'ta: kullanıcının profil rayından
+// seçtiği görünüm (Büyük/Küçük/Karışık/Yığın) bu ekranda da uygulanır.
+const CardCovers = (props) => (
+  <ListCovers
+    {...props}
+    width={COVER_W}
+    height={COVER_H}
+    style={styles.coverBlock}
+  />
+);
 
 // ── Liste kartı ──────────────────────────────────────────────────────────────
 const ListCard = ({
@@ -157,10 +88,11 @@ const ListCard = ({
   onPress,
   onLongPress,
   onVisibilityToggle,
-  imageQuality,
   getTmdbUrl,
   index,
   theme,
+  gridStyle,
+  allCornersRounded,
 }) => {
   const accent = getListAccent(listName);
   const icon = getListIcon(listName);
@@ -228,11 +160,11 @@ const ListCard = ({
         />
 
         <View style={styles.card}>
-          {/* Üst alan: poster destesi */}
-          <PosterStack
+          {/* Üst alan: seçili görünüme göre kapaklar */}
+          <CardCovers
             items={items}
-            accent={accent}
-            imageQuality={imageQuality}
+            gridStyle={gridStyle}
+            allCornersRounded={allCornersRounded}
             getTmdbUrl={getTmdbUrl}
             theme={theme}
           />
@@ -278,7 +210,16 @@ const ListCard = ({
 // ListCard ile aynı çerçeve; isim yerine üye sayısı çipi ve "people" ikonu.
 const SHARED_ACCENT = SHARED_LIST_ACCENT;
 
-const SharedListCard = ({ list, previewItems, onPress, imageQuality, getTmdbUrl, theme, index }) => {
+const SharedListCard = ({
+  list,
+  previewItems,
+  onPress,
+  getTmdbUrl,
+  theme,
+  index,
+  gridStyle,
+  allCornersRounded,
+}) => {
   const enterAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.spring(enterAnim, {
@@ -319,10 +260,10 @@ const SharedListCard = ({ list, previewItems, onPress, imageQuality, getTmdbUrl,
           ]}
         />
         <View style={styles.card}>
-          <PosterStack
+          <CardCovers
             items={previewItems}
-            accent={SHARED_ACCENT}
-            imageQuality={imageQuality}
+            gridStyle={gridStyle}
+            allCornersRounded={allCornersRounded}
             getTmdbUrl={getTmdbUrl}
             theme={theme}
           />
@@ -362,11 +303,13 @@ const SharedListCard = ({ list, previewItems, onPress, imageQuality, getTmdbUrl,
 
 // ── Ana Bileşen ──────────────────────────────────────────────────────────────
 export default function ListsViewScreen({ navigation }) {
-  const { t } = useLanguage();
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
   const { watchedTvMap, combinedLists } = useListStatusContext();
+  // Kapak düzeni profil rayıyla ORTAK ayar: kullanıcı orada ne seçtiyse burada
+  // da o çizilir (ProfileUiContext, cihazda kalıcı).
+  const { gridStyle, allCornersRounded } = useProfileUi();
   const [isLoading, setIsLoading] = useState(false);
 
   // Kök doc'tan gelen ham listeler (watchedTv burada artık boş — subcollection'a taşındı).
@@ -397,7 +340,7 @@ export default function ListsViewScreen({ navigation }) {
     });
     return result;
   }, [rootLists, watchedTvMap, combinedLists]);
-  const [modalVisible, setModalVisible] = useState(false);
+  // Uzun basılan liste — yönetim sayfası (ad değiştir / sil) buna bakar.
   const [selectedList, setSelectedList] = useState(null);
   const [listVisible, setListVisible] = useState({});
   const [newListName, setNewListName] = useState("");
@@ -497,17 +440,6 @@ export default function ListsViewScreen({ navigation }) {
     return () => unsubscribe();
   }, [user?.uid]);
 
-  // Öntanımlı liste alanlarıyla çakışan adlar: aynı ada izin verilirse liste
-  // kök dokümanda oluşur ama UI filtresi onu "öntanımlı" sayıp gizler.
-  const RESERVED_LIST_NAMES = [
-    "watchedTv",
-    "favorites",
-    "watchList",
-    "watchedMovies",
-    "customLists",
-    "listOrder",
-  ];
-
   const addNewList = async () => {
     const name = newListName.trim();
     if (!name) return;
@@ -544,26 +476,40 @@ export default function ListsViewScreen({ navigation }) {
     }
   };
 
-  const deleteList = async () => {
-    if (!selectedList) return;
-    const docRef = doc(db, "Lists", user.uid);
-    try {
-      // FieldPath: liste adında nokta varsa updateDoc'un string anahtarı
-      // nested path'e çözmesini engeller (ad literal tek segment kalır).
-      await updateDoc(docRef, new FieldPath(selectedList), deleteField());
-      setModalVisible(false);
-      Toast.show({ type: "success", text1: i18nText("autoI18n.liste_silindi", "Liste silindi") });
-    } catch (error) {
-      Toast.show({ type: "error", text1: i18nText("autoI18n.silme_hatasi", "Silme hatası: ") + error });
-    }
-  };
-
   const protectedLists = [
     "watchedTv",
     "favorites",
     "watchList",
     "watchedMovies",
   ];
+
+  // Ad çakışmasını yönetim sayfası CANLI gösterebilsin diye: görünen listeler +
+  // kök dokümandaki diğer alanlar (ör. `customLists`) birlikte.
+  const existingListNames = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...lists.map(([name]) => name),
+          ...rootLists.map(([key]) => key),
+        ]),
+      ),
+    [lists, rootLists],
+  );
+  // Yönetim sayfasının başlığındaki "N içerik" sayacı.
+  const selectedListCount =
+    lists.find(([name]) => name === selectedList)?.[1]?.length ?? 0;
+
+  // Ad değişince görünürlük bayrağı da yeni ada taşınır (yazmayı sayfa yapar,
+  // burada yalnız ekrandaki göz ikonlarının haritası güncellenir).
+  const handleRenamed = (from, to) => {
+    setListVisible((prev) => {
+      const next = { ...prev };
+      const wasVisible = prev[from] === true;
+      delete next[from];
+      next[to] = wasVisible;
+      return next;
+    });
+  };
 
   const isListVisible = (listName) => listVisible[listName] === true;
 
@@ -577,17 +523,19 @@ export default function ListsViewScreen({ navigation }) {
             items={items}
             isVisible={isListVisible(listName)}
             index={index}
-            imageQuality={imageQuality}
             getTmdbUrl={getTmdbUrl}
             theme={theme}
+            gridStyle={gridStyle}
+            allCornersRounded={allCornersRounded}
             onPress={() => {
               Keyboard.dismiss();
               navigation.navigate("ListsScreen", { listName });
             }}
             onLongPress={() => {
+              // Öntanımlı dörtte ne ad değişir ne silme var — sayfa da açılmaz.
               if (!protectedLists.includes(listName)) {
+                Keyboard.dismiss();
                 setSelectedList(listName);
-                setModalVisible(true);
               }
             }}
             onVisibilityToggle={() => addToListVisible(listName)}
@@ -595,7 +543,7 @@ export default function ListsViewScreen({ navigation }) {
         </StaggerItem>
       );
     },
-    [listVisible, imageQuality, getTmdbUrl],
+    [listVisible, getTmdbUrl, gridStyle, allCornersRounded, theme],
   );
 
   return (
@@ -623,21 +571,28 @@ export default function ListsViewScreen({ navigation }) {
           },
         ]}
       >
-        <View>
-          <Text
-            style={[
-              styles.headerSub,
-              { color: theme.text?.secondary ?? "#888" },
-            ]}
-          >{i18nText("autoI18n.koleksiyonum", "KOLEKSİYONUM")}</Text>
-          <Text
-            style={[
-              styles.headerTitle,
-              { color: theme.text?.primary ?? "#fff" },
-            ]}
-          >
-            {i18nText("autoI18n.listelerim", "Listelerim")}
-          </Text>
+        {/* Geri tuşu satır İÇİNDE: absolute hâli (insets.top + 8) başlığın
+            aynı yüksekliğine düşüp "KOLEKSİYONUM" yazısının üstüne biniyordu. */}
+        <View style={styles.headerLeft}>
+          <BackButton absolute={false} />
+          <View style={styles.headerTitles}>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.headerSub,
+                { color: theme.text?.secondary ?? "#888" },
+              ]}
+            >{i18nText("autoI18n.koleksiyonum", "KOLEKSİYONUM")}</Text>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.headerTitle,
+                { color: theme.text?.primary ?? "#fff" },
+              ]}
+            >
+              {i18nText("autoI18n.listelerim", "Listelerim")}
+            </Text>
+          </View>
         </View>
         <View style={[styles.countChip, { backgroundColor: theme.secondary }]}>
           <Text
@@ -780,9 +735,10 @@ export default function ListsViewScreen({ navigation }) {
                       list={l}
                       index={i}
                       previewItems={sharedPreviews[l.id] || []}
-                      imageQuality={imageQuality}
                       getTmdbUrl={getTmdbUrl}
                       theme={theme}
+                      gridStyle={gridStyle}
+                      allCornersRounded={allCornersRounded}
                       onPress={() => {
                         Keyboard.dismiss();
                         navigation.navigate("SharedListScreen", {
@@ -810,77 +766,15 @@ export default function ListsViewScreen({ navigation }) {
         />
       )}
 
-      {/* ── Silme Modalı ─────────────────────────────────────────────────── */}
-      <Modal
-        animationType="fade"
-        transparent
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            onPress={() => setModalVisible(false)}
-          />
-          <Animated.View
-            style={[styles.modalBox, { backgroundColor: theme.secondary }]}
-          >
-            {/* İkon */}
-            <View style={styles.modalIconWrap}>
-              <LinearGradient
-                colors={["#f87171", "#ef4444"]}
-                style={styles.modalIconGrad}
-              >
-                <Ionicons name="trash-outline" size={24} color="#fff" />
-              </LinearGradient>
-            </View>
-            <Text
-              style={[
-                styles.modalTitle,
-                { color: theme.text?.primary ?? "#fff" },
-              ]}
-            >{i18nText("autoI18n.listeyi_sil", "Listeyi Sil")}</Text>
-            <Text
-              style={[
-                styles.modalDesc,
-                { color: theme.text?.secondary ?? "#aaa" },
-              ]}
-            >
-              <Text style={{ color: "#f87171", fontWeight: "700" }}>
-                "{selectedList && getDisplayName(selectedList)}"
-              </Text>{" "}{i18nText("autoI18n.listesini_silmek_istediginize_emin_misiniz", "listesini silmek istediğinize emin misiniz?")}</Text>
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: theme.primary }]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text
-                  style={[
-                    styles.modalBtnText,
-                    { color: theme.text?.secondary ?? "#aaa" },
-                  ]}
-                >
-                  {t.cancel}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalBtnDanger]}
-                onPress={deleteList}
-              >
-                <Ionicons
-                  name="trash-outline"
-                  size={14}
-                  color="#fff"
-                  style={{ marginRight: 6 }}
-                />
-                <Text style={[styles.modalBtnText, { color: "#fff" }]}>
-                  {t.confirm}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </View>
-      </Modal>
+      {/* ── Uzun basış: liste yönetim sayfası (ad değiştir / sil) ───────── */}
+      <ListManageSheet
+        listName={selectedList}
+        itemCount={selectedListCount}
+        existingNames={existingListNames}
+        uid={user?.uid}
+        onClose={() => setSelectedList(null)}
+        onRenamed={handleRenamed}
+      />
 
       {/* ── Ortak liste oluşturma ── */}
       <CreateSharedListModal
@@ -890,7 +784,6 @@ export default function ListsViewScreen({ navigation }) {
           navigation.navigate("SharedListScreen", { listId })
         }
       />
-      <BackButton />
     </SafeAreaView>
   );
 }
@@ -902,11 +795,19 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-end",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 18,
+    gap: 12,
   },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flexShrink: 1,
+  },
+  headerTitles: { flexShrink: 1 },
   headerSub: {
     fontSize: 11,
     fontWeight: "700",
@@ -998,10 +899,11 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "rgba(255,255,255,0.05)",
     paddingTop: 16,
-    paddingHorizontal: 10,
+    paddingHorizontal: CARD_PADDING,
     paddingBottom: 12,
     justifyContent: "space-between",
   },
+  coverBlock: { marginBottom: 10 },
   divider: { height: 1, marginHorizontal: 4, marginBottom: 10 },
   cardFooter: {
     flexDirection: "row",
@@ -1051,55 +953,6 @@ const styles = StyleSheet.create({
   },
   emptyText: { fontSize: 16, fontWeight: "700" },
   emptyHint: { fontSize: 13 },
-
-  // ── Modal ─────────────────────────────────────────────────────────────────
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.65)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  modalBox: {
-    width: "100%",
-    borderRadius: 24,
-    padding: 24,
-    alignItems: "center",
-    gap: 10,
-  },
-  modalIconWrap: { marginBottom: 4 },
-  modalIconGrad: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    letterSpacing: -0.3,
-  },
-  modalDesc: {
-    fontSize: 14,
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  modalActions: {
-    flexDirection: "row",
-    gap: 10,
-    width: "100%",
-    marginTop: 4,
-  },
-  modalBtn: {
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 14,
-    borderRadius: 14,
-  },
-  modalBtnDanger: { backgroundColor: "#ef4444" },
-  modalBtnText: { fontSize: 14, fontWeight: "700" },
+  // Uzun basış menüsü / yeniden adlandırma / silme stilleri artık
+  // components/lists/ListManageSheet.js'te (profil rayıyla ORTAK).
 });

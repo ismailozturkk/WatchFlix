@@ -1,9 +1,9 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+// services/sceneGamePreferences.js
+//
+// Sahne tahmin oyununun son ayarları (mod / zorluk / kaynak). Kullanıcı
+// kapsamlı; anahtar adı geçişte korundu (bkz. registry: sceneGamePreferences).
 
-const STORAGE_PREFIX = "scene_game:last_settings:";
-const FALLBACK_USER_KEY = "guest";
-
-const storageKey = (uid) => `${STORAGE_PREFIX}${uid || FALLBACK_USER_KEY}`;
+import { Keys, get, set } from "./storage";
 
 const normalizeId = (value, fallback) => {
   const normalized = String(value || "").trim();
@@ -11,19 +11,14 @@ const normalizeId = (value, fallback) => {
 };
 
 export async function loadSceneGamePreferences(uid) {
-  try {
-    const raw = await AsyncStorage.getItem(storageKey(uid));
-    if (!raw) return null;
-    const value = JSON.parse(raw);
-    return {
-      modeId: normalizeId(value?.modeId, "classic"),
-      difficultyId: normalizeId(value?.difficultyId, "normal"),
-      sourceId: normalizeId(value?.sourceId, "popular"),
-      updatedAt: value?.updatedAt || null,
-    };
-  } catch {
-    return null;
-  }
+  const value = get(Keys.sceneGamePreferences, { uid });
+  if (!value) return null;
+  return {
+    modeId: normalizeId(value?.modeId, "classic"),
+    difficultyId: normalizeId(value?.difficultyId, "normal"),
+    sourceId: normalizeId(value?.sourceId, "popular"),
+    updatedAt: value?.updatedAt || null,
+  };
 }
 
 export async function saveSceneGamePreferences(uid, preferences) {
@@ -33,11 +28,5 @@ export async function saveSceneGamePreferences(uid, preferences) {
     sourceId: normalizeId(preferences?.sourceId, "popular"),
     updatedAt: new Date().toISOString(),
   };
-
-  try {
-    await AsyncStorage.setItem(storageKey(uid), JSON.stringify(value));
-    return value;
-  } catch {
-    return null;
-  }
+  return set(Keys.sceneGamePreferences, value, { uid }) ? value : null;
 }

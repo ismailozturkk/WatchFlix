@@ -7,7 +7,16 @@ import React, {
 } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase"; // Firebase bağlantını ekle
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  Keys,
+  get,
+  set,
+  remove,
+  setActiveUser,
+  getActiveUser,
+  clearUserScope,
+} from "../services/storage";
+import { resetSnapshotCache } from "../services/snapshotCache";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import {
@@ -30,9 +39,7 @@ async function resolveInitialRoute(user) {
   const isGoogleUser = user.providerData.some(
     (provider) => provider.providerId === "google.com",
   );
-  const pendingUid = await AsyncStorage.getItem(GOOGLE_PROFILE_PENDING_KEY).catch(
-    () => null,
-  );
+  const pendingUid = get(Keys.googleProfilePendingUid);
 
   if (!isGoogleUser) return "TabScreen";
 
@@ -42,13 +49,11 @@ async function resolveInitialRoute(user) {
 
     if (isGoogleProfileComplete(profile)) {
       // Profil tamam: bayat işareti temizle, yoksa her açılışta geri düşer.
-      if (pendingUid === user.uid) {
-        await AsyncStorage.removeItem(GOOGLE_PROFILE_PENDING_KEY).catch(() => {});
-      }
+      if (pendingUid === user.uid) remove(Keys.googleProfilePendingUid);
       return "TabScreen";
     }
 
-    await AsyncStorage.setItem(GOOGLE_PROFILE_PENDING_KEY, user.uid).catch(() => {});
+    set(Keys.googleProfilePendingUid, user.uid);
     return "GoogleProfileCompletionScreen";
   } catch {
     // Profil okunamadı (çevrimdışı / kural). İşaret varsa ona uy: onu yazarken
@@ -80,6 +85,10 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        // Kullanıcı kapsamlı anahtarların (taslaklar, AI sohbetleri, avatar)
+        // hangi kovaya yazılacağını bu belirler — resolveInitialRoute'tan da
+        // ÖNCE kurulmalı, o yol depolamayı okuyor.
+        setActiveUser(user.uid);
         let route = "TabScreen";
         try {
           route = await resolveInitialRoute(user);
@@ -90,16 +99,11 @@ export const AuthProvider = ({ children }) => {
         setNeedsProfileCompletion(route === "GoogleProfileCompletionScreen");
         setUser(user);
         setLoading(false);
-        AsyncStorage.setItem("cachedUserId", user.uid).catch(() => {});
+        set(Keys.cachedUserId, user.uid);
       } else {
         // İlk açılışta (onboarding görülmediyse) tanıtım akışına, sonrasında
         // doğrudan giriş ekranına yönlendir.
-        let seenOnboarding = null;
-        try {
-          seenOnboarding = await AsyncStorage.getItem("hasSeenOnboarding");
-        } catch (e) {
-          // okunamazsa güvenli varsayılan: giriş ekranı
-        }
+        const seenOnboarding = get(Keys.hasSeenOnboarding);
         // ⚠️ GELİŞTİRME MODU: onboarding'i her açılışta göster.
         // __DEV__ kapısı sayesinde release build'de normal akış çalışır:
         // onboarding yalnızca ilk açılışta görünür.
@@ -112,7 +116,22 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setNeedsProfileCompletion(false);
         setLoading(false);
-        AsyncStorage.removeItem("cachedUserId").catch(() => {});
+
+        // ÇIKIŞ TEMİZLİĞİ. Eskiden yalnız `cachedUserId` siliniyordu; avatar,
+        // liste durumu, aktivite önbelleği, taslaklar ve AI sohbet geçmişi
+        // cihazda kalıyordu — sonraki hesap aynı cihazda öncekinin verisini
+        // görüyordu. clearUserScope registry'deki kapsam bilgisini kullanır ve
+        // `keepOnLogout` işaretlilere (izleme defteri serileri, aktivasyon
+        // damgası, oyun tercihleri) DOKUNMAZ; oturum deposunu komple boşaltır,
+        // yani `cachedUserId` de orada silinir.
+        const previousUid = getActiveUser();
+        setActiveUser(null);
+        clearUserScope(previousUid);
+        // Anlık görüntü katmanının SÜREÇ İÇİ belleği de sıfırlanmalı: disk
+        // temizlense bile "en son şunu yazmıştım" kaydı kalırsa aynı oturumda
+        // geri giren kullanıcının ilk snapshot'ı diske hiç inmez, üstelik
+        // okuma önbelleği önceki hesabın verisini döndürürdü.
+        resetSnapshotCache();
       }
     });
 

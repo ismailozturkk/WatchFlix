@@ -90,7 +90,8 @@
           "organization": "seelogd"
         }
       ],
-      "./plugins/withAndroidWidgets.js"
+      "./plugins/withAndroidWidgets.js",
+      "expo-secure-store"
     ],
     "owner": "smlztrk",
     "updates": {

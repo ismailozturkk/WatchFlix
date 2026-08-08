@@ -1,14 +1,8 @@
 import React, { useCallback } from "react";
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
 import GroupAvatarGrid, {
@@ -34,24 +28,20 @@ export default function GroupAvatarPickerModal({
   );
 
   return (
-    <Modal
+    <BottomSheetModal
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
+      intensity={35}
+      dimColor="rgba(0,0,0,0.44)"
+      sheetStyle={[
+        styles.sheet,
+        {
+          backgroundColor: theme.secondary || "#171727",
+          borderColor: theme.border || "rgba(255,255,255,0.08)",
+          paddingBottom: Math.max(insets.bottom, 16),
+        },
+      ]}
     >
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable
-          onPress={(event) => event.stopPropagation()}
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: theme.secondary || "#171727",
-              borderColor: theme.border || "rgba(255,255,255,0.08)",
-              paddingBottom: Math.max(insets.bottom, 16),
-            },
-          ]}
-        >
           <View
             style={[
               styles.handle,
@@ -101,18 +91,11 @@ export default function GroupAvatarPickerModal({
             color={color}
             onSelect={selectAvatar}
           />
-        </Pressable>
-      </Pressable>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.7)",
-  },
   sheet: {
     height: "76%",
     borderTopLeftRadius: 28,

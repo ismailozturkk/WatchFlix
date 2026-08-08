@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Modal,
   ScrollView,
   Animated,
 } from "react-native";
@@ -19,21 +18,20 @@ import { db } from "../../firebase";
 import ProfileLists from "./profile/ProfileLists";
 import { useAuth } from "../../context/AuthContext";
 import { useFriends } from "../../context/FriendsContext";
-import { AvatarSkeleton, WatchedInfoSkeleton } from "../../components/Skeleton";
+import { AvatarSkeleton } from "../../components/Skeleton";
 import { useProfileStats } from "../../context/ProfileStatsContext";
 import { useProfileUi } from "../../context/ProfileUiContext";
 import NotesCard from "./profile/NotesCard";
 import RemindersPreviewButton from "./profile/RemindersPreviewButton";
 import MyActivityButton from "./profile/MyActivityButton";
-import CircularProgress, {
+import {
   CircularProgressBase,
 } from "react-native-circular-progress-indicator";
-import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
+import ConfirmSheet from "../../components/common/ConfirmSheet";
 import ScreenDecor from "../../components/ScreenDecor";
 // BackButton bilinçli olarak yok: profil sekme kökü olarak render edilir
 // (TabScreenNavigator), stack'e push edilmez — buton yalnızca üstteki ekrandan
 // dönerken "hayalet" olarak belirip kalıyordu.
-import CalendarWidget from "../../components/profile/CalendarWidget";
 import StatisticsSection from "./profile/StatisticsSection";
 import { useUserProfile } from "../../context/UserProfileContext";
 import { propagateProfileChange } from "../../services/profilePropagation";
@@ -709,7 +707,9 @@ const ProfileScreen = ({ navigation }) => {
           <ProfileLists navigation={navigation} />
           <MyActivityButton navigation={navigation} />
           {/* Takvim widget'ı şimdilik gizli — takvime giriş RemindersPreviewButton
-              başlığındaki takvim butonundan. Geri açmak için yorumu kaldır. */}
+              başlığındaki takvim butonundan. Geri açmak için aşağıdaki satırın
+              yorumunu kaldır VE dosyanın başına şu import'u geri ekle:
+              import CalendarWidget from "../../components/profile/CalendarWidget"; */}
           {/* <CalendarWidget navigation={navigation} /> */}
           <RemindersPreviewButton navigation={navigation} />
           <NotesCard navigation={navigation} />
@@ -752,57 +752,22 @@ const ProfileScreen = ({ navigation }) => {
             onSelect={handleAvatarSelect}
             onClose={() => setModalVisible(false)}
           />
-          <Modal
-            animationType="fade"
-            transparent={true}
+          {/* Çıkış onayı — uygulamadaki yıkıcı onaylarla aynı alt sayfa dili
+              (bkz. components/common/ConfirmSheet.js). */}
+          <ConfirmSheet
             visible={modalVisibleLogout}
-            onRequestClose={() => setModalVisibleLogout(false)}
-          >
-            <View style={styles.modalContainer}>
-              <TouchableOpacity
-                style={styles.positionStyle}
-                onPress={() => setModalVisibleLogout(false)}
-              />
-              <AdaptiveBlurView
-                tint="dark"
-                intensity={50}
-                experimentalBlurMethod="dimezisBlurView"
-                style={StyleSheet.absoluteFill}
-              />
-
-              <View
-                style={[styles.modalView, { backgroundColor: theme.primary }]}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.modalText, { color: theme.text.primary }]}
-                >
-                  {t.profileScreen.logoutMessage}
-                </Text>
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity
-                    style={[styles.button, styles.buttonCancel]}
-                    onPress={() => setModalVisibleLogout(false)}
-                  >
-                    <Text allowFontScaling={false} style={styles.textStyle}>
-                      {t.profileScreen.cancel}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.button, styles.buttonConfirm]}
-                    onPress={() => {
-                      SingOut();
-                      setModalVisibleLogout(false);
-                    }}
-                  >
-                    <Text allowFontScaling={false} style={styles.textStyle}>
-                      {t.profileScreen.confirm}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </Modal>
+            onClose={() => setModalVisibleLogout(false)}
+            onConfirm={() => {
+              setModalVisibleLogout(false);
+              SingOut();
+            }}
+            icon="log-out-outline"
+            tone="danger"
+            title={t.logout}
+            message={t.profileScreen.logoutMessage}
+            confirmLabel={t.logout}
+            cancelLabel={t.profileScreen.cancel}
+          />
         </SafeAreaView>
       </ScrollView>
 
@@ -894,7 +859,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#000",
   },
-  positionStyle: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
   circularProgress: {
     position: "absolute",
     top: 0,
@@ -1090,53 +1054,7 @@ const styles = StyleSheet.create({
   settingText: {
     fontSize: 16,
   },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalView: {
-    margin: 20,
-    borderRadius: 20,
-    padding: 35,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  modalText: {
-    marginBottom: 15,
-    textAlign: "center",
-    fontSize: 18,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
-  },
-  button: {
-    borderRadius: 20,
-    padding: 10,
-    elevation: 2,
-    width: "45%",
-    alignItems: "center",
-  },
-  buttonCancel: {
-    backgroundColor: "#f44336",
-  },
-  buttonConfirm: {
-    backgroundColor: "#4CAF50",
-  },
-  textStyle: {
-    color: "white",
-    fontWeight: "bold",
-    textAlign: "center",
-  },
+  // Çıkış onayı artık ConfirmSheet'te; eski merkez modal stilleri kalktı.
   totalDurationContainer: {
     flexDirection: "row",
     justifyContent: "space-around",

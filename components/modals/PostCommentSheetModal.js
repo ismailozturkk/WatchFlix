@@ -37,7 +37,7 @@ import {
   FlatList,
   ActivityIndicator,
 } from "react-native";
-import AdaptiveBlurView from "../common/AdaptiveBlurView";
+import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   Ionicons,
@@ -489,12 +489,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
     >
       {/* Karartma */}
       <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
-        <AdaptiveBlurView
-          tint="dark"
-          intensity={28}
-          experimentalBlurMethod="dimezisBlurView"
-          style={StyleSheet.absoluteFill}
-        />
+        <ModalBlurBackdrop intensity={28} />
         <LinearGradient
           colors={["rgba(0,0,0,0.1)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.82)"]}
           style={StyleSheet.absoluteFill}

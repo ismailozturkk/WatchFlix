@@ -35,10 +35,9 @@ import {
 import { useDeviceNotifications } from "../../context/DeviceNotificationsContext";
 import SwitchToggle from "@components/SwitchToggle";
 import SwipeCard from "@components/SwipeCard";
-import PetSettingsSection from "@components/pet/PetSettingsSection";
-import PermissionsSection from "@components/PermissionsSection";
-import BatteryOptimizationNotice from "@components/BatteryOptimizationNotice";
-import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
+import ModalBlurBackdrop from "../../components/common/ModalBlurBackdrop";
+import BottomSheetModal from "@components/common/BottomSheetModal";
+import useSheetTransition from "@hooks/useSheetTransition";
 import { LinearGradient } from "expo-linear-gradient";
 import CountryFlag from "react-native-country-flag";
 import ScreenDecor from "../../components/ScreenDecor";
@@ -47,6 +46,7 @@ import { i18nText } from "../../utils/i18nText";
 import { appAlert } from "@components/AppAlert";
 import { Image } from "expo-image";
 import TmdbLogo from "../../components/TmdbLogo";
+import JustWatchLogo from "../../components/JustWatchLogo";
 import { getCachedValue, setCachedValue, TTL } from "../../utils/apiCache";
 import { usePremium } from "../../context/PremiumContext";
 import {
@@ -388,6 +388,10 @@ export default function SettingsScreen() {
   const navigation = useNavigation();
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [langSearch, setLangSearch] = useState("");
+
+  // Dil sayfası: blur yerinde solar, sayfa kayar
+  // (bkz. hooks/useSheetTransition.js).
+  const langSheet = useSheetTransition(langModalVisible);
   const [providerModalVisible, setProviderModalVisible] = useState(false);
   const [providerSearch, setProviderSearch] = useState("");
   const [providerCatalog, setProviderCatalog] = useState(
@@ -1116,9 +1120,14 @@ export default function SettingsScreen() {
               <Text allowFontScaling={false} style={[s.aboutMeta, { color: C.muted }]}>
                 {i18nText("autoI18n.created_by", "Oluşturan: İsmail Öztürk · © 2025")}
               </Text>
-              {/* TMDB koşulları: zorunlu atıf cümlesi + resmi logo birlikte */}
-              <TmdbLogo width={72} style={{ marginTop: 8 }} />
-
+              {/* Veri kaynaklarının resmî logoları: içerik TMDB'den, izleme
+                  sağlayıcısı (watch provider) verisi JustWatch'tan geliyor;
+                  ikisinin de koşulları kaynağın görünür olmasını istiyor.
+                  Dar ekranda ikinci logo alt satıra iner (flexWrap). */}
+              <View style={s.attributionRow}>
+                <TmdbLogo width={72} />
+                <JustWatchLogo width={64} />
+              </View>
             </View>
             <View style={{ alignItems: "flex-end", gap: 6 }}>
               <View style={[s.versionBadge, { backgroundColor: C.borderMuted }]}>
@@ -1134,37 +1143,18 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </SwipeCard>
 
-        <Modal
-          animationType="slide"
-          transparent
+        <BottomSheetModal
           visible={providerModalVisible}
-          onRequestClose={() => {
+          onClose={() => {
             setProviderModalVisible(false);
             setProviderSearch("");
           }}
+          sheetStyle={[
+            s.sheet,
+            s.providerSheet,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
         >
-          <View style={s.sheetOverlay}>
-            <TouchableOpacity
-              style={StyleSheet.absoluteFill}
-              activeOpacity={1}
-              onPress={() => {
-                setProviderModalVisible(false);
-                setProviderSearch("");
-              }}
-            />
-            <AdaptiveBlurView
-              tint="dark"
-              intensity={40}
-              experimentalBlurMethod="dimezisBlurView"
-              style={StyleSheet.absoluteFill}
-            />
-            <View
-              style={[
-                s.sheet,
-                s.providerSheet,
-                { backgroundColor: C.card, borderColor: C.border },
-              ]}
-            >
               <View style={[s.sheetHandle, { backgroundColor: C.handle }]} />
               <View style={s.sheetHeader}>
                 <View style={s.sheetTitleRow}>
@@ -1310,14 +1300,12 @@ export default function SettingsScreen() {
               <Text allowFontScaling={false} style={[s.providerAttribution, { color: C.muted }]}>
                 Watch provider data by JustWatch
               </Text>
-            </View>
-          </View>
-        </Modal>
+        </BottomSheetModal>
 
         <Modal
-          animationType="slide"
+          animationType="none"
           transparent
-          visible={langModalVisible}
+          visible={langSheet.mounted}
           onRequestClose={() => {
             setLangModalVisible(false);
             setLangSearch("");
@@ -1327,7 +1315,9 @@ export default function SettingsScreen() {
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={{ flex: 1 }}
           >
-            <View style={s.sheetOverlay}>
+            {/* onLayout: KeyboardAvoidingView pencereyi daralttığında sayfa
+                zaten yükselmiş olur; ölçüm çift kaymayı engeller. */}
+            <View style={s.sheetOverlay} onLayout={langSheet.onOverlayLayout}>
               <TouchableOpacity
                 style={StyleSheet.absoluteFill}
                 activeOpacity={1}
@@ -1336,16 +1326,21 @@ export default function SettingsScreen() {
                   setLangSearch("");
                 }}
               />
-              <AdaptiveBlurView
-                tint="dark"
-                intensity={40}
-                experimentalBlurMethod="dimezisBlurView"
-                style={StyleSheet.absoluteFill}
-              />
-              <View
+              {/* Blur YERİNDE solar — sayfayla birlikte kaymaz. */}
+              <Animated.View
+                style={[
+                  StyleSheet.absoluteFill,
+                  { opacity: langSheet.backdropOpacity },
+                ]}
+              >
+                <ModalBlurBackdrop intensity={40} />
+              </Animated.View>
+              <Animated.View
+                onLayout={langSheet.onSheetLayout}
                 style={[
                   s.sheet,
                   { backgroundColor: C.card, borderColor: C.border },
+                  langSheet.sheetStyle,
                 ]}
               >
                 <View style={[s.sheetHandle, { backgroundColor: C.handle }]} />
@@ -1459,7 +1454,7 @@ export default function SettingsScreen() {
                     );
                   }}
                 />
-              </View>
+              </Animated.View>
             </View>
           </KeyboardAvoidingView>
         </Modal>
@@ -1796,6 +1791,15 @@ const s = StyleSheet.create({
   aboutMeta: {
     fontSize: 11.5,
     marginTop: 3,
+  },
+  // TMDB + JustWatch logoları yan yana; sığmazsa alt satıra sarar.
+  attributionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    columnGap: 10,
+    rowGap: 6,
+    marginTop: 8,
   },
   versionBadge: {
     paddingHorizontal: 10,

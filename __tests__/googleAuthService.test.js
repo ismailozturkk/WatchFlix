@@ -32,14 +32,9 @@ jest.mock("@react-native-google-signin/google-signin", () => ({
   },
 }));
 
-const mockStore = new Map();
-const mockSetItem = jest.fn(async (k, v) => void mockStore.set(k, v));
-const mockRemoveItem = jest.fn(async (k) => void mockStore.delete(k));
-jest.mock("@react-native-async-storage/async-storage", () => ({
-  getItem: jest.fn(async (k) => (mockStore.has(k) ? mockStore.get(k) : null)),
-  setItem: (...a) => mockSetItem(...a),
-  removeItem: (...a) => mockRemoveItem(...a),
-}));
+// Depolama artik MMKV: kok __mocks__/react-native-mmkv.js otomatik devrede.
+// "Disk dolu" senaryolari icin alttaki breakStore, MMKV ornegini gecici olarak
+// bozuyor — depolama katmani hatayi yakalayip false donmeli.
 
 const mockSignInWithCredential = jest.fn();
 const mockLinkWithCredential = jest.fn();
@@ -84,12 +79,35 @@ const {
 
 const snapshot = (data) => ({ exists: () => data !== null, data: () => data });
 
+const storage = require("../services/storage");
+// Isaretin fiziksel yeri (session deposu) — testin dogrudan mudahale ettigi yer.
+const pendingStore = () => storage.getStore(storage.Keys.googleProfilePendingUid.store);
+const readPending = () => storage.get(storage.Keys.googleProfilePendingUid);
+const seedPending = (uid) => storage.set(storage.Keys.googleProfilePendingUid, uid);
+
+/** Depoyu gecici olarak "disk dolu" yapar; geri alan fonksiyonu doner. */
+const breakStore = (method) => {
+  const store = pendingStore();
+  const original = store[method];
+  store[method] = () => {
+    throw new Error("database or disk is full");
+  };
+  return () => {
+    store[method] = original;
+  };
+};
+
+let restoreStore = null;
+
+afterEach(() => {
+  restoreStore?.();
+  restoreStore = null;
+});
+
 beforeEach(() => {
   jest.clearAllMocks();
-  mockStore.clear();
+  pendingStore().clearAll();
   mockAuth.currentUser = null;
-  mockSetItem.mockImplementation(async (k, v) => void mockStore.set(k, v));
-  mockRemoveItem.mockImplementation(async (k) => void mockStore.delete(k));
   mockGoogleSignOut.mockResolvedValue(null);
   mockFirebaseSignOut.mockResolvedValue(undefined);
   mockEligibilityCheck.mockResolvedValue({ data: { allowed: true } });
@@ -151,7 +169,7 @@ describe("signInWithGoogle", () => {
     mockGetDoc.mockResolvedValue(snapshot(null));
     const result = await signInWithGoogle();
     expect(result.needsProfileCompletion).toBe(true);
-    expect(mockStore.get(GOOGLE_PROFILE_PENDING_KEY)).toBe("u1");
+    expect(readPending()).toBe("u1");
   });
 
   it("ayni e-postali sifre hesabi varsa Firebase credential'i gondermez", async () => {
@@ -177,11 +195,11 @@ describe("signInWithGoogle", () => {
   });
 
   it("profil tamsa bayat pending isaretini temizler", async () => {
-    mockStore.set(GOOGLE_PROFILE_PENDING_KEY, "u1");
+    seedPending("u1");
     mockGetDoc.mockResolvedValue(snapshot({ username: "ali" }));
     const result = await signInWithGoogle();
     expect(result.needsProfileCompletion).toBe(false);
-    expect(mockStore.has(GOOGLE_PROFILE_PENDING_KEY)).toBe(false);
+    expect(readPending()).toBe(null);
   });
 
   // Asagidaki iki test, ilk duzeltmede GERCEKTEN olusan bir hatayi kilitler:
@@ -189,19 +207,19 @@ describe("signInWithGoogle", () => {
   // AsyncStorage yazimi duserse catch, dogru hesaplanan cevabi atip yazamadigi
   // isaretten YANLIS cevap turetiyordu. (Android'de AsyncStorage SQLite
   // tabanli: disk doluyken okumalar calisir, yazimlar duser.)
-  it("setItem duserse profilsiz kullaniciyi 'tam' gostermez", async () => {
+  it("yazma duserse profilsiz kullaniciyi 'tam' gostermez", async () => {
     mockGetDoc.mockResolvedValue(snapshot(null)); // profil GERCEKTEN yok
-    mockSetItem.mockRejectedValue(new Error("database or disk is full"));
+    restoreStore = breakStore("set");
 
     const result = await signInWithGoogle();
 
     expect(result.needsProfileCompletion).toBe(true);
   });
 
-  it("removeItem duserse profili tam olan kullaniciyi tamamlama ekranina atmaz", async () => {
-    mockStore.set(GOOGLE_PROFILE_PENDING_KEY, "u1"); // bayat isaret
+  it("silme duserse profili tam olan kullaniciyi tamamlama ekranina atmaz", async () => {
+    seedPending("u1"); // bayat isaret
     mockGetDoc.mockResolvedValue(snapshot({ username: "ali" })); // profil TAM
-    mockRemoveItem.mockRejectedValue(new Error("database or disk is full"));
+    restoreStore = breakStore("remove");
 
     const result = await signInWithGoogle();
 
@@ -271,10 +289,10 @@ describe("cancelGoogleRegistration", () => {
   });
 
   it("pending isaretini her halukarda temizler", async () => {
-    mockStore.set(GOOGLE_PROFILE_PENDING_KEY, "u1");
+    seedPending("u1");
     mockAuth.currentUser = null;
     await cancelGoogleRegistration();
-    expect(mockStore.has(GOOGLE_PROFILE_PENDING_KEY)).toBe(false);
+    expect(readPending()).toBe(null);
   });
 });
 

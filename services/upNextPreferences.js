@@ -1,9 +1,10 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+// services/upNextPreferences.js
+//
+// "Sıradaki" rayının kullanıcı tercihleri (gizlenen diziler). Anahtar zaten
+// uid ile kapsanmıştı; MMKV geçişinde fiziksel ad korundu (bkz. registry:
+// upNextPreferences), böylece göç düz kopya oldu.
 
-const STORAGE_PREFIX = "up-next:preferences:";
-const FALLBACK_USER_KEY = "guest";
-
-const storageKey = (uid) => `${STORAGE_PREFIX}${uid || FALLBACK_USER_KEY}`;
+import { Keys, get, set } from "./storage";
 
 export function normalizeUpNextPreferences(value) {
   const hiddenShowIds = Array.isArray(value?.hiddenShowIds)
@@ -22,12 +23,7 @@ export function normalizeUpNextPreferences(value) {
 }
 
 export async function loadUpNextPreferences(uid) {
-  try {
-    const raw = await AsyncStorage.getItem(storageKey(uid));
-    return normalizeUpNextPreferences(raw ? JSON.parse(raw) : null);
-  } catch {
-    return normalizeUpNextPreferences(null);
-  }
+  return normalizeUpNextPreferences(get(Keys.upNextPreferences, { uid }));
 }
 
 export async function saveUpNextPreferences(uid, preferences) {
@@ -35,10 +31,5 @@ export async function saveUpNextPreferences(uid, preferences) {
     ...normalizeUpNextPreferences(preferences),
     updatedAt: new Date().toISOString(),
   };
-  try {
-    await AsyncStorage.setItem(storageKey(uid), JSON.stringify(normalized));
-    return normalized;
-  } catch {
-    return null;
-  }
+  return set(Keys.upNextPreferences, normalized, { uid }) ? normalized : null;
 }

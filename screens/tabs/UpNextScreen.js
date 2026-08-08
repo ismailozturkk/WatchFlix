@@ -12,7 +12,6 @@ import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -23,6 +22,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BackButton from "@components/BackButton";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
 import PosterImage from "@components/PosterImage";
 import ScreenDecor from "@components/ScreenDecor";
@@ -288,21 +288,16 @@ function ManageShowsModal({
   onClose,
 }) {
   return (
-    <Modal
+    <BottomSheetModal
       visible={visible}
-      transparent
-      animationType="slide"
-      statusBarTranslucent
-      onRequestClose={onClose}
+      onClose={onClose}
+      intensity={35}
+      dimColor="rgba(0,0,0,0.35)"
+      sheetStyle={[
+        styles.manageSheet,
+        { backgroundColor: theme.secondary, borderColor: theme.border },
+      ]}
     >
-      <View style={styles.modalRoot}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View
-          style={[
-            styles.manageSheet,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
-        >
           <View
             style={[styles.sheetHandle, { backgroundColor: theme.border }]}
           />
@@ -416,9 +411,7 @@ function ManageShowsModal({
           >
             <Text style={styles.doneText}>{labels.done}</Text>
           </Pressable>
-        </View>
-      </View>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 

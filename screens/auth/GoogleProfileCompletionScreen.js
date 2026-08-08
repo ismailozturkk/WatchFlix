@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, remove } from "../../services/storage";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { updateProfile } from "firebase/auth";
 import Toast from "react-native-toast-message";
@@ -102,7 +102,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
       // Profil yazıldı → kapıyı HEMEN aç. Bunu updateProfile'dan sonraya
       // bırakmak, o ağ çağrısı hata aldığında kullanıcıyı tamamlanmış bir
       // profille bu ekrana kalıcı olarak kilitliyordu.
-      await AsyncStorage.removeItem(GOOGLE_PROFILE_PENDING_KEY).catch(() => {});
+      remove(Keys.googleProfilePendingUid);
       // onAuthStateChanged bu noktada yeniden tetiklenmez; AuthContext'e
       // profilin hazır olduğunu biz söylüyoruz (Lists/{uid} kapısını da açar).
       markProfileCompleted();

@@ -18,15 +18,13 @@ import {
   Modal,
   Animated,
   Platform,
-  Pressable,
-  Linking,
+    Linking,
   FlatList,
 } from "react-native";
 import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { DetailsSkeleton } from "../../components/Skeleton";
-import RatingStars from "../../components/RatingStars";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import TVShowItem from "../../components/TVShowItem";
 import { LinearGradient } from "expo-linear-gradient";
@@ -37,7 +35,6 @@ import { useAuth } from "../../context/AuthContext";
 import Toast from "react-native-toast-message";
 import SeasonItem from "./SeasonItem";
 import SeasonDeck from "./SeasonDeck";
-import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import {
   useAppSettings,
@@ -50,7 +47,6 @@ import ListViewTv from "../../components/ListViewTv";
 import PosterImage from "../../components/PosterImage";
 import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
 import ListBadges from "../../components/ListBadges";
-import YoutubePlayer from "react-native-youtube-iframe";
 import { useListStatusContext } from "../../context/ListStatusContext";
 import {
   addToList,
@@ -78,6 +74,18 @@ import Reminder from "../../components/Reminder";
 
 const { height, width } = Dimensions.get("window");
 const BACKDROP_HEIGHT = width * (9 / 16);
+
+// İlerleme çubuğundaki etiketler tek renk (beyaz) + hafif koyu bir hap zemini
+// kullanıyor. Renk seçimi ÖLÇÜME bağlı değil: eskiden yazı, altındaki gradyanın
+// rengine göre siyah/beyaz seçiliyordu ve ölçüm ilk karede gelmediği için ekrana
+// girerken renk gözle görülür şekilde atlıyordu. Hap zemini o kararı gereksiz
+// kılıyor — kontrastı arka plan sağlıyor, yazı sabit kalıyor.
+// rgba(0,0,0,0.5): 7 temanın hepsinde, gradyanın her noktasında ve boş kanalda
+// beyaz yazıyla en kötü 4.92:1 (AA >= 4.5). Daha şeffafı yetmiyor: 0.45'te en
+// parlak dolguda (izlendi yeşili #64FF64) 4.23:1'e düşüyor.
+const PROGRESS_CHIP_BG = "rgba(0, 0, 0, 0.5)";
+const PROGRESS_CHIP_TEXT = "#FFFFFF";
+
 // Fragman oynatıcısı: 16:9 oranını koruyarak cihaza göre boyutlanır
 // (tablette aşırı genişlememesi için üst sınır var).
 const VIDEO_WIDTH = Math.min(width - 24, 720);
@@ -509,7 +517,7 @@ export default function TvShowsDetails({ route, navigation }) {
           seasonNumber: seasonObj.season_number,
           seasonPosterPath: seasonObj.poster_path || null,
           seasonEpisodes: seasonObj.episode_count,
-          episodes: res.data.episodes.map((ep) => ({
+          episodes: (res.data?.episodes || []).map((ep) => ({
             episodeNumber: ep.episode_number,
             episodePosterPath: ep.still_path || null,
             episodeName: ep.name || "Unknown",
@@ -527,6 +535,9 @@ export default function TvShowsDetails({ route, navigation }) {
           showSeasonCount: details.number_of_seasons,
           imagePath: details.poster_path,
           genres: details.genres?.map((g) => g.name) || [],
+          // Yayın kapısı için — belgeye yazılmaz (buildShowMeta beyaz liste).
+          firstAirDate: details.first_air_date,
+          status: details.status,
         },
         seasonsWithEpisodes,
         eDate
@@ -540,6 +551,12 @@ export default function TvShowsDetails({ route, navigation }) {
       });
     } catch (e) {
       console.error(e);
+      // Tek bir sezon isteği patlarsa markShow hiç çalışmaz — hiçbir bölüm
+      // yazılmaz. Sessiz kalınırsa kullanıcı işlemi başarılı sanıyor.
+      Toast.show({
+        type: "error",
+        text1: i18nText("autoI18n.hata_2", "Hata: ") + (e?.message || ""),
+      });
     } finally {
       setIsLoading(false);
     }
@@ -882,75 +899,11 @@ export default function TvShowsDetails({ route, navigation }) {
             {showTotalEpisodes > 0 && (
               <View
                 style={[
-                  styles.showProgressCard,
-                  {
-                    backgroundColor: theme.secondary,
-                    borderColor: theme.border,
-                  },
+                  styles.showProgressTrack,
+                  { backgroundColor: theme.border },
                 ]}
               >
-                <View style={styles.showProgressHeader}>
-                  <View
-                    style={[
-                      styles.showProgressIcon,
-                      { backgroundColor: watchedColor + "20" },
-                    ]}
-                  >
-                    <Ionicons
-                      name={
-                        showWatchState === WATCH_STATE.FULL
-                          ? "checkmark-circle"
-                          : "analytics-outline"
-                      }
-                      size={17}
-                      color={watchedColor}
-                    />
-                  </View>
-                  <View style={styles.showProgressCopy}>
-                    <Text
-                      allowFontScaling={false}
-                      style={[
-                        styles.showProgressTitle,
-                        { color: theme.text.primary },
-                      ]}
-                    >
-                      {i18nText("autoI18n.dizi_ilerlemesi", "Dizi ilerlemesi")}
-                    </Text>
-                    <Text
-                      allowFontScaling={false}
-                      style={[
-                        styles.showProgressSubtitle,
-                        { color: theme.text.muted },
-                      ]}
-                    >
-                      {watchedEpisodeCount}/{showTotalEpisodes}{" "}
-                      {i18nText("autoI18n.bolum_izlendi", "bölüm izlendi")}
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.showProgressPercent,
-                      { backgroundColor: watchedColor + "18" },
-                    ]}
-                  >
-                    <Text
-                      allowFontScaling={false}
-                      style={[
-                        styles.showProgressPercentText,
-                        { color: watchedColor },
-                      ]}
-                    >
-                      {showProgressPercent}%
-                    </Text>
-                  </View>
-                </View>
-
-                <View
-                  style={[
-                    styles.showProgressTrack,
-                    { backgroundColor: theme.border },
-                  ]}
-                >
+                {showProgressPercent > 0 && (
                   <View
                     style={[
                       styles.showProgressFill,
@@ -963,6 +916,30 @@ export default function TvShowsDetails({ route, navigation }) {
                       end={{ x: 1, y: 0 }}
                       style={StyleSheet.absoluteFill}
                     />
+                  </View>
+                )}
+
+                <View pointerEvents="none" style={styles.showProgressLabelRow}>
+                  <View style={styles.showProgressChip}>
+                    <Text
+                      allowFontScaling={false}
+                      style={styles.showProgressCount}
+                    >
+                      <Text style={styles.showProgressCountValue}>
+                        {watchedEpisodeCount}
+                      </Text>
+                      {" / "}
+                      {showTotalEpisodes}{" "}
+                      {i18nText("autoI18n.bolum_birim", "bölüm")}
+                    </Text>
+                  </View>
+                  <View style={styles.showProgressChip}>
+                    <Text
+                      allowFontScaling={false}
+                      style={styles.showProgressPercentText}
+                    >
+                      {showProgressPercent}%
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -1533,6 +1510,7 @@ export default function TvShowsDetails({ route, navigation }) {
                     details={details}
                     navigation={navigation}
                     getWatchedCount={(sn) => watched.seasonWatchedCount(sn)}
+                    getWatchEvents={(sn) => watched.seasonWatchEvents(sn)}
                     theme={theme}
                   />
                   <TouchableOpacity
@@ -1934,47 +1912,46 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: 15 },
 
   listActionsBlock: { marginBottom: 10 },
-  showProgressCard: {
-    marginTop: -10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 15,
-    borderWidth: 1,
-  },
-  showProgressHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-  },
-  showProgressIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  showProgressCopy: { flex: 1, minWidth: 0 },
-  showProgressTitle: { fontSize: 12.5, fontWeight: "800" },
-  showProgressSubtitle: { fontSize: 10.5, fontWeight: "600", marginTop: 2 },
-  showProgressPercent: {
-    minWidth: 43,
-    height: 25,
-    borderRadius: 9,
-    paddingHorizontal: 7,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  showProgressPercentText: { fontSize: 11, fontWeight: "900" },
   showProgressTrack: {
-    height: 6,
-    borderRadius: 3,
+    marginTop: -4,
+    height: 24,
+    borderRadius: 12,
     overflow: "hidden",
-    marginTop: 9,
   },
   showProgressFill: {
-    height: "100%",
-    borderRadius: 3,
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 12,
     overflow: "hidden",
+  },
+  showProgressLabelRow: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 5,
+  },
+  // Hap zemini: kontrastı bu sağlıyor, yazı rengi bu yüzden sabit kalabiliyor.
+  showProgressChip: {
+    backgroundColor: PROGRESS_CHIP_BG,
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    borderRadius: 9,
+  },
+  showProgressCount: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "700",
+    color: PROGRESS_CHIP_TEXT,
+  },
+  showProgressCountValue: { fontSize: 12.5, fontWeight: "900" },
+  showProgressPercentText: {
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: "900",
+    color: PROGRESS_CHIP_TEXT,
   },
 
   /* Stat row */

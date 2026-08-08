@@ -1,39 +1,61 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+// services/hapticsService.js
+//
+// Titreşim tercihinin TEK SAHİBİ.
+//
+// GEÇİŞ ÖNCESİ SORUN: bu anahtarı (`hapticsEnabled`) hem burası hem
+// AppSettingsContext ayrı ayrı okuyup yazıyordu. İki ayrı hidrasyon, iki ayrı
+// ayna, aralarında senkron tutmak için AppSettingsContext'ten buraya bir
+// `setHapticsEnabled(...)` itmesi vardı. Artık tek sahip burası: değer MMKV'den
+// SENKRON okunuyor ve anahtar değişince abonelik tazeliyor.
+//
+// Ayrıca kalkan yarış: eski kodda tercih async okunana kadar `runIfEnabled`
+// bir promise bekliyordu; açılışta hızlı bir dokunuşta titreşim gecikmeli
+// geliyordu. Senkron okumada bekleme yok.
+
 import * as ExpoHaptics from "expo-haptics";
+import { Keys, get, set, subscribe } from "./storage";
 
-const HAPTICS_STORAGE_KEY = "hapticsEnabled";
+// Ayna: ilk erişimde MMKV'den dolar, anahtar değişince düşer.
+let mirror = null;
+let wired = false;
 
-// Tercih okunana kadar titreşimi kapalı tutmak, daha önce kapatmış bir
-// kullanıcının uygulama açılışında kısa süreli titreşim almasını engeller.
-let enabled = false;
-let preferenceVersion = 0;
-
-const hydrationPromise = AsyncStorage.getItem(HAPTICS_STORAGE_KEY)
-  .then((storedValue) => {
-    if (preferenceVersion !== 0) return;
-    // Kayıt yoksa varsayılan: kapalı.
-    enabled = storedValue === null ? false : JSON.parse(storedValue) !== false;
-  })
-  .catch(() => {
-    if (preferenceVersion === 0) enabled = false;
-  });
+function enabled() {
+  if (!wired) {
+    wired = true;
+    subscribe(Keys.haptics, () => {
+      mirror = null;
+    });
+  }
+  if (mirror === null) mirror = get(Keys.haptics);
+  return mirror;
+}
 
 export const ImpactFeedbackStyle = ExpoHaptics.ImpactFeedbackStyle;
 export const NotificationFeedbackType = ExpoHaptics.NotificationFeedbackType;
 export const AndroidHaptics = ExpoHaptics.AndroidHaptics;
 
+/** Tercihi kalıcılaştırır. Ayarlar ekranı dışında çağrılmamalı. */
 export function setHapticsEnabled(nextValue) {
-  preferenceVersion += 1;
-  enabled = !!nextValue;
+  set(Keys.haptics, !!nextValue);
+  mirror = null;
 }
 
 export function isHapticsEnabled() {
-  return enabled;
+  return enabled();
 }
 
+// DİKKAT — BU FONKSİYON `async` KALMALI.
+//
+// Aşağıdaki dört sarmalayıcı 16 dosyada ~40 yerden `Haptics.selectionAsync()
+// .catch(() => {})` biçiminde çağrılıyor. MMKV geçişinde bekleme kalkınca bu
+// `async` bir ara sade fonksiyona çevrilmişti; titreşim KAPALIYKEN `undefined`
+// dönüyor ve her çağrı yeri "Cannot read property 'catch' of undefined" ile
+// patlıyordu (ör. tema seçimi).
+//
+// `async` olması sözleşmeyi korur: her durumda bir Promise döner ve
+// expo-haptics senkron fırlatsa bile bu bir reddedilmeye dönüşür.
 async function runIfEnabled(callback) {
-  await hydrationPromise;
-  if (!enabled) return;
+  if (!enabled()) return undefined;
   return callback();
 }
 

@@ -55,6 +55,7 @@ function UpNextRailCard({
   onOpen,
   onWatched,
   onChooseDate,
+  onQuickActions,
 }) {
   const { watched, total, progress } = getWatchedShowProgress(show);
   const progressColor = progress > 0 ? "#FF9500" : theme.accent;
@@ -74,6 +75,8 @@ function UpNextRailCard({
       onPressIn={() => onPressIn(show.id)}
       onPressOut={() => onPressOut(show.id)}
       onPress={() => onOpen(show)}
+      onLongPress={onQuickActions ? () => onQuickActions(show) : undefined}
+      delayLongPress={350}
       style={[
         styles.cell,
         { width: poster.posterWidth, height: poster.posterHeight },
@@ -370,8 +373,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.18)",
   },
   waitingText: { color: "#fff", fontSize: 9.5, fontWeight: "800" },
+  // Çubuk ince kalsın ama YERİ bölüm adının satırı kadar olsun: 9 + 2×2.5 = 14,
+  // yani caption'ın lineHeight'i. Aksi hâlde bölüm adı düşünce katman 5px
+  // yukarı sıçrıyor.
   skeletonLine: {
     height: 9,
+    marginVertical: 2.5,
     borderRadius: 5,
     backgroundColor: "rgba(255,255,255,0.22)",
   },

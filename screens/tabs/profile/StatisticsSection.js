@@ -6,11 +6,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
-  Modal,
-  Pressable,
   ScrollView,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useNavigation } from "@react-navigation/native";
 import { WatchedInfoSkeleton } from "../../../components/Skeleton";
@@ -326,26 +325,16 @@ const StatisticsSection = () => {
       )}
 
       {/* YILLIK ARŞİV MODAL SHEET */}
-      <Modal
+      <BottomSheetModal
         visible={archiveModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setArchiveModalVisible(false)}
+        onClose={() => setArchiveModalVisible(false)}
+        intensity={35}
+        dimColor="rgba(0,0,0,0.42)"
+        sheetStyle={[
+          styles.modalContent,
+          { backgroundColor: theme.secondary, borderColor: theme.border },
+        ]}
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setArchiveModalVisible(false)}
-        >
-          <Pressable
-            style={[
-              styles.modalContent,
-              {
-                backgroundColor: theme.secondary,
-                borderColor: theme.border,
-              },
-            ]}
-            onPress={(e) => e.stopPropagation()}
-          >
             {/* Modal Handle */}
             <View style={[styles.modalHandle, { backgroundColor: theme.border }]} />
 
@@ -457,9 +446,7 @@ const StatisticsSection = () => {
                 );
               })}
             </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      </BottomSheetModal>
 
       <View style={styles.section}>
         <View style={styles.sectionHeaderRow}>
@@ -724,6 +711,7 @@ const StatisticsSection = () => {
               {formatTotalDurationTime(
                 (totalMinutesTimeTv || 0) + (totalMinutesTime || 0),
                 timeDisplayMode,
+                { short: true },
               )}
             </Text>
             <Text style={[styles.durationLabel, { color: theme.text.muted }]}>
@@ -739,7 +727,9 @@ const StatisticsSection = () => {
           />
           <View>
             <Text style={[styles.durationValue, { color: borderColorMovie }]}>
-              {formatTotalDurationTime(totalMinutesTime || 0, timeDisplayMode)}
+              {formatTotalDurationTime(totalMinutesTime || 0, timeDisplayMode, {
+                short: true,
+              })}
             </Text>
             <Text style={[styles.durationLabel, { color: theme.text.muted }]}>
               {t.movies} {rankNameMovie}
@@ -753,10 +743,9 @@ const StatisticsSection = () => {
               allowFontScaling={false}
               style={[styles.durationValue, { color: borderColorTv }]}
             >
-              {formatTotalDurationTime(
-                totalMinutesTimeTv || 0,
-                timeDisplayMode,
-              )}
+              {formatTotalDurationTime(totalMinutesTimeTv || 0, timeDisplayMode, {
+                short: true,
+              })}
             </Text>
             <Text style={[styles.durationLabel, { color: theme.text.muted }]}>
               {t.tvShows} {rankNameTv}
@@ -1276,7 +1265,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   launchBtnText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
-  wrappedCtaText: { color: "#16091F", fontSize: 10, fontWeight: "900" },
 
   section: {
     width: "90%",

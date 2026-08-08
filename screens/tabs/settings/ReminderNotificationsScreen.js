@@ -9,6 +9,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import SwitchToggle from "@components/SwitchToggle";
 import AppIcon from "@components/AppIcon";
 import BatteryOptimizationNotice from "@components/BatteryOptimizationNotice";
+import NotificationPermissionNotice from "@components/NotificationPermissionNotice";
 import { appAlert } from "@components/AppAlert";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
@@ -44,13 +45,17 @@ export default function ReminderNotificationsScreen() {
     }
   };
 
+  // OS izni yoksa uygulama içi anahtarlar açık olsa bile hiçbir hatırlatma
+  // zamanlanmaz — bunu 'denied' ile sınırlamak yetmez: Android 13+'ta izin hiç
+  // istenmemişken durum 'undetermined' de olabiliyor.
   const masterSubtitle =
-    notificationsEnabled && permissionStatus === "denied"
+    notificationsEnabled && permissionStatus !== "granted"
       ? t.notifPermissionDenied
       : t.allNotificationsSubtitle;
 
   return (
     <SettingsSubScreen title={t.reminderNotificationGroup}>
+      <NotificationPermissionNotice colors={C} />
       <View
         style={[
           ns.card,

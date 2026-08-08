@@ -3,20 +3,30 @@ import {
   useApiSettings,
   useStreamingProviderSettings,
 } from "./AppSettingsContext";
-import Toast from "react-native-toast-message";
 import { useLanguage } from "./LanguageContext";
 import axios from "axios";
-import { getCachedValue, setCachedValue, TTL } from "../utils/apiCache";
+// `getCachedValue` hâlâ kullanılıyor: sağlayıcı/tür/oscar/koleksiyon
+// listelerinin TTL'i 24 saat ile 7 gün arası, yani her açılışta ağ beklemeye
+// yol açmıyorlar. Sağlayıcı okumasının önbellek isabetinde ayrıca YAN ETKİSİ
+// var (bir sağlayıcı seçip içeriğini çekiyor); SWR'a çevirmek o isteği
+// ikiye katlardı.
+import {
+  getCachedValue,
+  getSwr,
+  seedList,
+  setCachedValue,
+  TTL,
+} from "../utils/apiCache";
+import { setIfChanged, setListIfChanged } from "../utils/sameData";
 import { i18nText } from "../utils/i18nText";
 
 
 const MovieContext = createContext();
 export const useMovie = () => useContext(MovieContext);
 
-const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const setIfChanged = (setter, next) => {
-  setter((current) => (sameJson(current, next) ? current : next));
-};
+// `sameJson`/`setIfChanged` buradan utils/sameData.js'e taşındı: aynı iki satır
+// bu dosyada, TvShowContex'te, ListStatusContext'te ve MediaActivityContext'te
+// ayrı ayrı yazılıydı.
 
 // id'ye göre tekilleştirerek append eder (sayfalar arası tekrarları eler).
 const mergeUniqueById = (prev, next) => {
@@ -51,27 +61,39 @@ const loadPage = async ({
   setLoadingMore,
   isStale,
 }) => {
-  const apply = (results, totalPages) => {
+  // `arkaPlan`: ekranda zaten (bayat) veri var, tazeleme sessizce yapılıyor.
+  // TMDB aynı listeyi her istekte biraz farklı `popularity` ondalığıyla
+  // döndürdüğü için tam karşılaştırma, kullanıcı için hiçbir fark olmadığı
+  // hâlde tüm rayı yeniden çizdirirdi — kimlik bazında karşılaştırıyoruz.
+  const apply = (results, totalPages, { arkaPlan = false } = {}) => {
     if (isStale?.()) return;
     if (setTotal) setTotal(totalPages || 1);
     if (append) setData((prev) => mergeUniqueById(prev, results));
+    else if (arkaPlan) setListIfChanged(setData, results);
     else setIfChanged(setData, results);
   };
-  const cached = await getCachedValue(cacheKey, ttl);
-  if (cached) {
-    apply(cached.results ?? cached, cached.total_pages ?? 1);
+
+  // BAYAT GÖSTER, ARKA PLANDA TAZELE. Eskiden TTL dolunca cache "yok" sayılır,
+  // ray iskelete düşer ve ağ beklenirdi; trend TTL'i 1 saat olduğu için bu
+  // pratikte her açılış demekti.
+  const cached = getSwr(cacheKey, { maxAge: ttl });
+  const cachedData = cached.data;
+  if (cachedData) {
+    apply(cachedData.results ?? cachedData, cachedData.total_pages ?? 1);
     (append ? setLoadingMore : setLoading)(false);
-    return;
+    if (cached.fresh) return;
+  } else {
+    (append ? setLoadingMore : setLoading)(true);
   }
-  (append ? setLoadingMore : setLoading)(true);
+
   try {
     const { results, total_pages } = await request();
-    apply(results, total_pages);
+    apply(results, total_pages, { arkaPlan: Boolean(cachedData) });
     setCachedValue(cacheKey, { results, total_pages });
   } catch (error) {
     if (__DEV__) console.error("loadPage:", error?.message || error);
   } finally {
-    (append ? setLoadingMore : setLoading)(false);
+    if (!cachedData) (append ? setLoadingMore : setLoading)(false);
   }
 };
 
@@ -82,6 +104,32 @@ export const MovieProvider = ({ children }) => {
   const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
   const tmdbRegion = language === "tr" ? "TR" : "US";
   const [activeSections, setActiveSections] = useState({});
+
+  // ── AÇILIŞ TOHUMLARI ──────────────────────────────────────────────────────
+  //
+  // Son oturumda görülen listeler MMKV'den SENKRON okunuyor, yani İLK KAREDE
+  // çiziliyor. Eskiden state `[]` + `loading:true` ile başlıyordu; önbellek
+  // DOLU olsa bile veri ancak efekt çalıştıktan sonra geldiği için kullanıcı
+  // her açılışta bir kare iskelet görüyordu.
+  //
+  // `useMemo(..., [])`: tohum yalnız ilk render için. Kategori/dil değişimini
+  // ilgili efekt zaten yeniden çekiyor.
+  const trendsSeed = useMemo(
+    () =>
+      seedList(`movie_trends_${tmdbLanguage}_week_trending`, {
+        maxAge: TTL.TREND,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const bestsSeed = useMemo(
+    () =>
+      seedList(`movie_bests_${tmdbLanguage}_vote_count.desc_page_1`, {
+        maxAge: TTL.TREND,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   // Bölüm başına istek jenerasyonu: fresh (sayfa 1) fetch jenerasyonu artırır,
   // append aynı jenerasyonda kalır. Kategori/dil değişince eski in-flight
@@ -102,9 +150,9 @@ export const MovieProvider = ({ children }) => {
 
   const [totalPagesBest, setTotalPagesBest] = useState(1);
   const [pageBest, setPageBest] = useState(1);
-  const [loadingBests, setLoadingBests] = useState(true);
+  const [loadingBests, setLoadingBests] = useState(!bestsSeed.hasCache);
   const [loadingMoreBests, setLoadingMoreBests] = useState(false);
-  const [movieBests, setMoviesBests] = useState([]);
+  const [movieBests, setMoviesBests] = useState(bestsSeed.list);
   const [selectedCategoryBests, setSelectedCategoryBests] =
     useState("vote_count.desc");
   const categorieBests = ["vote_count.desc", "popularity.desc"];
@@ -179,11 +227,18 @@ export const MovieProvider = ({ children }) => {
     }
   };
 
-  const [movieTrends, setMovieTrends] = useState([]);
-  const [loadingTrends, setLoadingTrends] = useState(true);
+  // Eski cache sürümleri spacer kaydı içerebiliyor; tohumu da normalize et.
+  const [movieTrends, setMovieTrends] = useState(() =>
+    mergeTrendItems([], trendsSeed.list),
+  );
+  const [loadingTrends, setLoadingTrends] = useState(!trendsSeed.hasCache);
   const [loadingMoreTrends, setLoadingMoreTrends] = useState(false);
   const [pageTrends, setPageTrends] = useState(1);
-  const [totalPagesTrends, setTotalPagesTrends] = useState(1);
+  // Tohumla açıldığında "daha fazla yükle" hemen çalışabilsin; gerçek değeri
+  // ilk istek yazacak.
+  const [totalPagesTrends, setTotalPagesTrends] = useState(
+    trendsSeed.hasCache ? 1000 : 1,
+  );
   const [selectedCategoryTrends, setSelectedCategoryTrends] = useState("week");
   const [selectedCategoryTrendsMovie, setSelectedCategoryTrendsMovie] =
     useState("trending");
@@ -195,7 +250,9 @@ export const MovieProvider = ({ children }) => {
     const baseKey = `movie_trends_${lang}_${selectedCategoryTrends}_${selectedCategoryTrendsMovie}`;
     const cacheKey = page === 1 ? baseKey : `${baseKey}_p${page}`;
 
-    const cached = await getCachedValue(cacheKey, TTL.TREND);
+    // Bayat göster, arka planda tazele — bkz. loadPage'deki aynı desen.
+    const swr = getSwr(cacheKey, { maxAge: TTL.TREND });
+    const cached = swr.data;
     if (cached) {
       if (isStale()) return;
       if (append) {
@@ -208,10 +265,11 @@ export const MovieProvider = ({ children }) => {
         // toplam sayfa önbellekte yok → loadMore'a izin vermek için üst sınır
         setTotalPagesTrends((p) => (p > 1 ? p : 1000));
       }
-      return;
+      if (swr.fresh) return;
+    } else {
+      (append ? setLoadingMoreTrends : setLoadingTrends)(true);
     }
 
-    (append ? setLoadingMoreTrends : setLoadingTrends)(true);
     try {
       const response = await axios.request({
         method: "GET",
@@ -231,13 +289,17 @@ export const MovieProvider = ({ children }) => {
       setTotalPagesTrends(response.data.total_pages || 1);
       if (append) {
         setMovieTrends((prev) => mergeTrendItems(prev, results));
+      } else if (cached) {
+        // Arka plan tazelemesi: yalnız içerik gerçekten değiştiyse rayı
+        // yeniden çiz (bkz. loadPage'deki `arkaPlan` açıklaması).
+        setListIfChanged(setMovieTrends, mergeTrendItems([], results));
       } else {
-        setIfChanged(setMovieTrends, results);
+        setIfChanged(setMovieTrends, mergeTrendItems([], results));
       }
     } catch (error) {
       if (__DEV__) console.error("fetchSeriesTrends:", error?.message || error);
     } finally {
-      (append ? setLoadingMoreTrends : setLoadingTrends)(false);
+      if (!cached) (append ? setLoadingMoreTrends : setLoadingTrends)(false);
     }
   };
   useEffect(() => {

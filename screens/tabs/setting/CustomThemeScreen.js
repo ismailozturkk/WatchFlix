@@ -6,7 +6,7 @@
 // isteyenler için gruplu token listesi katlanabilir "İnce Ayar" bölümünde
 // durur (düzenleme modunda varsayılan açık). Önizleme altındaki kontrast
 // rozeti okunabilirliği anlık puanlar.
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   LayoutAnimation,
   ScrollView,
@@ -168,11 +168,30 @@ export default function CustomThemeScreen({ navigation, route }) {
     setDraft(generateTokensFromSeeds(bg, accent));
   };
 
+  // Cross-fade bitene kadar ekran etkileşimli kaldığından ikinci bir dokunuş
+  // yeni bir tema kaydı daha üretebilirdi; ilk dokunuşta kilitlenir.
+  const savingRef = useRef(false);
+
   const save = () => {
-    const id = saveCustomTheme({ id: editingId, name, tokens: draft });
-    changeTheme(`custom:${id}`);
-    toast.success(i18nText("autoI18n.ct_kaydedildi", "Özel tema uygulandı"));
-    navigation.goBack();
+    if (savingRef.current) return;
+    savingRef.current = true;
+    // Aktif temanın kendisi düzenleniyorsa token yazımı geçişin apply adımına
+    // bırakılır: erken yazılırsa ekran görüntü alınmadan yeni renklere boyanır
+    // ve solma "yeniden yeniye" olduğu için görünmez olur.
+    const isActiveEdit = editingId && selectedTheme === `custom:${editingId}`;
+    const done = isActiveEdit
+      ? changeTheme(`custom:${editingId}`, {
+          onApply: () => saveCustomTheme({ id: editingId, name, tokens: draft }),
+        })
+      : changeTheme(`custom:${saveCustomTheme({ id: editingId, name, tokens: draft })}`);
+    // Toast ve geri dönüş cross-fade bitince: erken çağrılırlarsa toast
+    // ekran görüntüsünün altında gizli kalıyor, pop animasyonu da görüntünün
+    // alınmasıyla yarışıp yarım kalmış kare donduruyor.
+    done.then(() => {
+      toast.success(i18nText("autoI18n.ct_kaydedildi", "Özel tema uygulandı"));
+      navigation.goBack();
+      savingRef.current = false;
+    });
   };
 
   const remove = () => {
@@ -185,8 +204,13 @@ export default function CustomThemeScreen({ navigation, route }) {
           text: i18nText("autoI18n.sil", "Sil"),
           style: "destructive",
           onPress: () => {
+            const wasActive = selectedTheme === `custom:${editingId}`;
             deleteCustomTheme(editingId);
-            if (selectedTheme === `custom:${editingId}`) changeTheme("dark");
+            // animated:false — onay alert'i (RN Modal) daha kapanırken görüntü
+            // alınırsa iOS'ta alert'in hayaleti solmaya karışıyor; silme
+            // yıkıcı bir eylem olduğundan dark'a anında dönülür. Aynı handler
+            // içinde batch'lendiği için ara gri kare de oluşmaz.
+            if (wasActive) changeTheme("dark", { animated: false });
             toast.success(i18nText("autoI18n.ct_silindi", "Tema silindi"));
             navigation.goBack();
           },

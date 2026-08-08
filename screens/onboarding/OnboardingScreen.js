@@ -17,7 +17,7 @@ import { Image as ExpoImage } from "expo-image";
 import LottieView from "lottie-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, set } from "../../services/storage";
 import axios from "axios";
 import * as Haptics from "@services/hapticsService";
 import { ANALYTICS_EVENTS, trackEvent } from "@services/analytics";
@@ -40,7 +40,7 @@ const AnimatedScrollView = Animated.ScrollView;
 
 // Onboarding'i bir kez gösterdiğimizi işaretleyen bayrak. AuthContext bu değere
 // bakarak ilk açılışta OnboardingScreen'e, sonrasında LoginScreen'e yönlendirir.
-export const ONBOARDING_SEEN_KEY = "hasSeenOnboarding";
+export const ONBOARDING_SEEN_KEY = Keys.hasSeenOnboarding.key;
 
 // Kayan poster ızgarasının ölçüleri
 const POSTER_W = 96;
@@ -306,11 +306,7 @@ export default function OnboardingScreen({ navigation }) {
   }, [API_KEY, getTmdbUrl, language]);
 
   const markSeen = useCallback(async () => {
-    try {
-      await AsyncStorage.setItem(ONBOARDING_SEEN_KEY, "true");
-    } catch (e) {
-      // sessizce geç
-    }
+    set(Keys.hasSeenOnboarding, true);
   }, []);
 
   const goTo = useCallback(

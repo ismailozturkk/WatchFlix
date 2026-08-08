@@ -8,10 +8,11 @@
 // Kendi UI'si aktif uygulama temasını kullanır; düzenlenen renk bundan bağımsızdır.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import { useTheme } from "@context/ThemeContext";
 import { clamp, hexToHsl, hslToHex, normalizeHex, readableTextOn } from "@utils/colorUtils";
 
@@ -116,10 +117,13 @@ export default function ColorPickerSheet({ visible, initialValue, title, isEn = 
   const offsetLabel = (v) => `${v > 0 ? "+" : ""}${Math.round(v)}`;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.root}>
-        <Pressable accessibilityRole="button" accessibilityLabel={t("Kapat", "Close")} onPress={onClose} style={StyleSheet.absoluteFill} />
-        <SafeAreaView edges={["bottom"]} style={[styles.sheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      intensity={35}
+      dimColor="rgba(0,0,0,0.38)"
+    >
+      <SafeAreaView edges={["bottom"]} style={[styles.sheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
           <View style={[styles.handle, { backgroundColor: theme.border }]} />
 
           {/* Büyük önizleme */}
@@ -225,9 +229,8 @@ export default function ColorPickerSheet({ visible, initialValue, title, isEn = 
               <Text style={styles.confirmText}>{t("Seç", "Apply")}</Text>
             </Pressable>
           </View>
-        </SafeAreaView>
-      </View>
-    </Modal>
+      </SafeAreaView>
+    </BottomSheetModal>
   );
 }
 
@@ -250,7 +253,6 @@ function Channel({ label, theme, children }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   sheet: { borderTopLeftRadius: 26, borderTopRightRadius: 26, borderWidth: 1, paddingHorizontal: 18, paddingTop: 9, paddingBottom: 14 },
   handle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 14 },
   preview: { height: 72, borderRadius: 16, borderWidth: 1, alignItems: "center", justifyContent: "center", gap: 3 },

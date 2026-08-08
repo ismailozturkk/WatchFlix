@@ -113,14 +113,25 @@ export async function ensureAndroidChannels() {
 }
 
 /**
- * Mevcut izin durumunu döner ('granted' | 'denied' | 'undetermined').
+ * Mevcut izin durumu ('granted' | 'denied' | 'undetermined') + tekrar sorulabilirlik.
+ *
+ * `canAskAgain` KRİTİK: Android 13+ (targetSdk 33+) cihazlarda POST_NOTIFICATIONS
+ * hiç istenmemişken bile durum 'denied' döner (bildirimler sistemce kapalıdır).
+ * Yani "izin hiç istenmedi" ile "kullanıcı reddetti" durumu YALNIZ canAskAgain
+ * ile ayrılabilir; sadece 'undetermined'a bakan bir akış izni hiç istemez.
+ *
+ * @returns {Promise<{status:string, canAskAgain:boolean, granted:boolean}>}
  */
-export async function getPermissionStatus() {
+export async function getPermissionInfo() {
   try {
-    const { status } = await Notifications.getPermissionsAsync();
-    return status;
+    const res = await Notifications.getPermissionsAsync();
+    return {
+      status: res.status,
+      canAskAgain: res.canAskAgain !== false,
+      granted: res.status === "granted",
+    };
   } catch {
-    return "undetermined";
+    return { status: "undetermined", canAskAgain: true, granted: false };
   }
 }
 
@@ -216,16 +227,12 @@ export async function scheduleLocalNotification({
 
     await Notifications.scheduleNotificationAsync({
       identifier,
-      content: {
-        title,
-        body,
-        data,
-        sound: true,
-        ...(Platform.OS === "android" ? { channelId } : {}),
-      },
+      content: { title, body, data, sound: true },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
         date: when,
+        // Android kanalı YALNIZ trigger'dan okunur (BaseNotificationBuilder);
+        // content.channelId yok sayılır ve bildirim "Diğer" kanalına düşerdi.
         ...(Platform.OS === "android" ? { channelId } : {}),
       },
     });
@@ -254,9 +261,12 @@ export async function presentNow({
         // foreground kopyasını bastırırken bunu gösterir (çift bildirim önlenir).
         data: { ...data, local: true },
         sound: true,
-        ...(Platform.OS === "android" ? { channelId } : {}),
       },
-      trigger: null, // null = hemen göster
+      // Android'de kanal trigger'dan gelir; trigger null verilirse bildirim
+      // "social" kanalına değil fallback kanala düşer (sessiz + yanlış ayar
+      // grubu). `{ channelId }` biçimi kanal trigger'ıdır: yine ANINDA gösterir.
+      // iOS'ta kanal kavramı yok → null (hemen göster).
+      trigger: Platform.OS === "android" ? { channelId } : null,
     });
   } catch (e) {
     if (__DEV__) console.warn("presentNow error:", e?.message);

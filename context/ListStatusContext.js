@@ -7,7 +7,7 @@ import React, {
   useRef,
 } from "react";
 import { doc, collection, onSnapshot, updateDoc } from "firebase/firestore";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, get, set, getActiveUser } from "../services/storage";
 import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 import {
@@ -24,9 +24,9 @@ import {
   isAuthTransitionError,
   snapshotErrorHandler,
 } from "../utils/firestoreError";
-import { shouldPersistInternetData } from "../utils/dataCacheSettings";
 import * as cacheStore from "../utils/cacheStore";
 import { cacheKeys } from "../utils/cacheKeys";
+import { sameJson } from "../utils/sameData";
 
 const PREDEFINED = new Set([
   "watchedTv",
@@ -34,14 +34,14 @@ const PREDEFINED = new Set([
   "watchList",
   "watchedMovies",
 ]);
-const CACHE_PREFIX = "list_status_cache_";
+// Anahtar öneki artık registry'de (Keys.listStatus, cache deposu).
 const EMPTY_INDEX = Object.freeze({ movie: {}, tv: {} });
 
 const ListStatusContext = createContext();
 
 export const useListStatusContext = () => useContext(ListStatusContext);
 
-const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+// `sameJson` utils/sameData.js'te (bkz. oradaki not); burada yalnız import var.
 
 const buildStatusIndex = ({
   allLists,
@@ -104,14 +104,76 @@ const buildStatusIndex = ({
   return index;
 };
 
+/**
+ * Kayıtlı liste durumunu SENKRON okur. İki kaynak var ve sırası önemli:
+ *   1. `Keys.listStatus` — bu context'in kendi yazdığı, hazır türetilmiş index.
+ *   2. `cacheStore` liste dosyaları — "Verileri indir" ile inen ham listeler;
+ *      index buradan hesaplanır.
+ *
+ * Kayıt yoksa `null` döner.
+ */
+const tohumOku = (uid) => {
+  if (!uid) return null;
+
+  // Depolama katmanı bozuk kayıtta varsayılana düşüyor ve asla throw etmiyor.
+  const parsed = get(Keys.listStatus, { uid });
+  if (parsed?.statusIndex) {
+    return { statusIndex: parsed.statusIndex, allLists: parsed.allLists ?? null };
+  }
+
+  try {
+    const root = cacheStore.getJSON(...cacheKeys.lists(uid, "root"));
+    const favorites = cacheStore.getJSON(...cacheKeys.lists(uid, "favorites")) || {};
+    const watchList = cacheStore.getJSON(...cacheKeys.lists(uid, "watchList")) || {};
+    const watchedMovies = cacheStore.getJSON(...cacheKeys.lists(uid, "watchedMovies")) || {};
+    const watchedTv = cacheStore.getJSON(...cacheKeys.lists(uid, "watchedTv")) || {};
+
+    if (
+      root ||
+      Object.keys(favorites).length ||
+      Object.keys(watchList).length ||
+      Object.keys(watchedMovies).length ||
+      Object.keys(watchedTv).length
+    ) {
+      return {
+        statusIndex: buildStatusIndex({
+          allLists: root,
+          favoritesMap: favorites,
+          watchListMap: watchList,
+          watchedMoviesMap: watchedMovies,
+          watchedTvMap: watchedTv,
+        }),
+        allLists: root ?? null,
+      };
+    }
+  } catch {}
+  return null;
+};
+
 export const ListStatusProvider = ({ children }) => {
   const { user } = useAuth();
-  const [allLists, setAllLists] = useState(null);
-  const [loading, setLoading] = useState(true);
+
+  // AÇILIŞ TOHUMU — eskiden bu okuma bir `useEffect` içindeki async fonksiyonda
+  // yapılıyordu, yani önbellek DOLU olsa bile ilk kare `loading:true` çiziliyordu.
+  // Okumanın tamamı senkron (MMKV + expo-file-system'in sync API'si), bu yüzden
+  // doğrudan başlangıç değeri olabiliyor.
+  //
+  // `uid` ilk render'da genelde null (Firebase oturumu asenkron çözülüyor);
+  // son aktif kullanıcı depodan senkron okunabiliyor.
+  const ilkTohum = useMemo(
+    () => tohumOku(user?.uid ?? getActiveUser()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const [allLists, setAllLists] = useState(ilkTohum?.allLists ?? null);
+  const [loading, setLoading] = useState(!ilkTohum);
   const [rootLoaded, setRootLoaded] = useState(false);
-  const [cachedStatusIndex, setCachedStatusIndex] = useState(EMPTY_INDEX);
+  const [cachedStatusIndex, setCachedStatusIndex] = useState(
+    ilkTohum?.statusIndex ?? EMPTY_INDEX,
+  );
   const cacheHydratedForUid = useRef(null);
-  const hasHydratedStatusCache = useRef(false);
+  const hasHydratedStatusCache = useRef(Boolean(ilkTohum));
 
   const [favoritesMap, setFavoritesMap] = useState({});
   const [watchListMap, setWatchListMap] = useState({});
@@ -121,60 +183,17 @@ export const ListStatusProvider = ({ children }) => {
   const [watchedTvLoaded, setWatchedTvLoaded] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
+    const uid = user?.uid ?? getActiveUser();
+    if (!uid || cacheHydratedForUid.current === uid) return;
+    cacheHydratedForUid.current = uid;
 
-    const hydrate = async () => {
-      const uid = user?.uid ?? (await AsyncStorage.getItem("cachedUserId"));
-      if (!uid || cacheHydratedForUid.current === uid) return;
-      cacheHydratedForUid.current = uid;
+    const tohum = tohumOku(uid);
+    if (!tohum) return;
 
-      try {
-        const raw = await AsyncStorage.getItem(`${CACHE_PREFIX}${uid}`);
-        if (!raw || cancelled) return;
-        const parsed = JSON.parse(raw);
-        if (parsed?.statusIndex) {
-          hasHydratedStatusCache.current = true;
-          setCachedStatusIndex(parsed.statusIndex);
-          setAllLists(parsed.allLists ?? null);
-          setLoading(false);
-          return;
-        }
-      } catch {}
-
-      try {
-        const root = cacheStore.getJSON(...cacheKeys.lists(uid, "root"));
-        const favorites = cacheStore.getJSON(...cacheKeys.lists(uid, "favorites")) || {};
-        const watchList = cacheStore.getJSON(...cacheKeys.lists(uid, "watchList")) || {};
-        const watchedMovies = cacheStore.getJSON(...cacheKeys.lists(uid, "watchedMovies")) || {};
-        const watchedTv = cacheStore.getJSON(...cacheKeys.lists(uid, "watchedTv")) || {};
-
-        if (
-          root ||
-          Object.keys(favorites).length ||
-          Object.keys(watchList).length ||
-          Object.keys(watchedMovies).length ||
-          Object.keys(watchedTv).length
-        ) {
-          const statusIndex = buildStatusIndex({
-            allLists: root,
-            favoritesMap: favorites,
-            watchListMap: watchList,
-            watchedMoviesMap: watchedMovies,
-            watchedTvMap: watchedTv,
-          });
-          hasHydratedStatusCache.current = true;
-          setCachedStatusIndex(statusIndex);
-          setAllLists(root ?? null);
-          setLoading(false);
-        }
-      } catch {}
-    };
-
-    hydrate();
-
-    return () => {
-      cancelled = true;
-    };
+    hasHydratedStatusCache.current = true;
+    setCachedStatusIndex(tohum.statusIndex);
+    setAllLists(tohum.allLists);
+    setLoading(false);
   }, [user?.uid]);
 
   useEffect(() => {
@@ -210,12 +229,23 @@ export const ListStatusProvider = ({ children }) => {
   }, [user?.uid]);
 
   useEffect(() => {
+    // Çıkışta / hesap değişiminde DÖRT map de sıfırlanmalı. Sadece watchedTv
+    // sıfırlanınca önceki hesabın favori/izleme-listesi/izlenen-film verisi
+    // bellekte kalıyor; firestoreStatusIndex bu map'lerden üretildiği için
+    // hasFirestoreIndex hâlâ true dönüyor ve poster rozetlerinde eski hesabın
+    // işaretleri görünmeye devam ediyordu.
     if (!user?.uid) {
+      setFavoritesMap({});
+      setWatchListMap({});
+      setWatchedMoviesMap({});
       setWatchedTvMap({});
       setWatchedTvLoaded(true);
       return undefined;
     }
 
+    setFavoritesMap({});
+    setWatchListMap({});
+    setWatchedMoviesMap({});
     setWatchedTvMap({});
     setWatchedTvLoaded(false);
     const uid = user.uid;
@@ -444,24 +474,23 @@ export const ListStatusProvider = ({ children }) => {
     : cachedStatusIndex;
 
   // Debounce'lu cache yazımı: açılışta 5 listener'ın snapshot'ları art arda
-  // gelirken her birinde büyük JSON.stringify + AsyncStorage yazmak JS thread'i
+  // gelirken her birinde büyük JSON.stringify + disk yazmak JS thread'i
   // kilitliyordu. Yazma yalnız veri duraklayınca (2,5 sn) bir kez yapılır;
   // içerik/davranış aynı, sadece ara yazımlar birleştirilir.
   useEffect(() => {
     if (!user?.uid || !hasFirestoreIndex) return undefined;
 
-    if (!shouldPersistInternetData({ category: "lists" })) return undefined;
-
+    // "Verileri indir" ayarına bilerek TABİ DEĞİL: o ayar TMDB içeriğini
+    // indirmekle ilgili (bkz. utils/dataCacheSettings.js), buradaki veri
+    // kullanıcının kendi listeleri. Tutmamak veri tasarrufu sağlamıyordu,
+    // yalnızca ayarı kapatan herkesin her açılışını yavaşlatıyordu.
     const uid = user.uid;
     const timer = setTimeout(() => {
-      AsyncStorage.setItem(
-        `${CACHE_PREFIX}${uid}`,
-        JSON.stringify({
-          allLists,
-          statusIndex: firestoreStatusIndex,
-          ts: Date.now(),
-        }),
-      ).catch(() => {});
+      set(
+        Keys.listStatus,
+        { allLists, statusIndex: firestoreStatusIndex, ts: Date.now() },
+        { uid },
+      );
     }, 2500);
     return () => clearTimeout(timer);
   }, [allLists, firestoreStatusIndex, hasFirestoreIndex, user?.uid]);

@@ -2,8 +2,7 @@ import {
   StyleSheet,
   Text,
   View,
-  ScrollView,
-  Image,
+    Image,
   TouchableOpacity,
   Dimensions,
   Animated,
@@ -227,7 +226,10 @@ function EpisodeCard({
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const { posterBadges } = useListLayoutSettings();
   const diff = calculateDateDifference(episode.airDate);
-  const countdown = getCountdownStyle(diff, theme.colors);
+  // MovieCard ile aynı palet: getCountdownStyle `*Background` anahtarlarını
+  // okuyor ve bunlar yalnız notesColor'da var (theme.colors'ta yok) — yanlış
+  // palet verilince dizi kartlarında geri sayım dolgusu undefined kalıyordu.
+  const countdown = getCountdownStyle(diff, theme.notesColor);
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
 
   const pressIn = useCallback(

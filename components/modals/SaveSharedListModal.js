@@ -11,8 +11,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Modal,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -22,6 +20,7 @@ import {
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useLanguage } from "@context/LanguageContext";
@@ -161,21 +160,16 @@ export default function SaveSharedListModal({ visible, post, onClose, onSaved })
   const dropped = (post?.mediaList?.length || 0) - items.length;
 
   return (
-    <Modal
+    <BottomSheetModal
       visible={visible}
-      transparent
-      animationType="slide"
-      statusBarTranslucent
-      onRequestClose={onClose}
+      onClose={onClose}
+      intensity={35}
+      dimColor="rgba(0,0,0,0.35)"
+      sheetStyle={[
+        styles.sheet,
+        { backgroundColor: theme.secondary, borderColor: theme.border },
+      ]}
     >
-      <View style={styles.root}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View
-          style={[
-            styles.sheet,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
-        >
           <View style={[styles.handle, { backgroundColor: theme.border }]} />
 
           <View style={styles.header}>
@@ -322,14 +316,11 @@ export default function SaveSharedListModal({ visible, post, onClose, onSaved })
               {i18nText("autoI18n.profilime_ekle", "Profilime ekle")}
             </Text>
           </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.58)" },
   sheet: {
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,

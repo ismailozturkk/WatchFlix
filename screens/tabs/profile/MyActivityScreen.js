@@ -5,7 +5,7 @@
 // Her satırda mümkünse tarih bilgisi gösterilir.
 
 import { Image } from "expo-image";
-import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,6 @@ import {
   FlatList,
   ActivityIndicator,
   ScrollView,
-  Animated,
   Dimensions,
   Modal,
   TextInput,
@@ -23,7 +22,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getPostDrafts } from "../../../services/postDraftService";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
@@ -191,14 +190,9 @@ export default function MyActivityScreen({ navigation, route }) {
     return () => clearTimeout(id);
   }, [uid, loading, ratings, comments, likes, bookmarks, posts]);
 
-  // Yerel (AsyncStorage) kaynaklar — sayfa odaklandığında tazele
+  // Yerel (cihaz) kaynaklar — sayfa odaklandığında tazele
   const loadLocal = useCallback(async () => {
-    try {
-      const raw = await AsyncStorage.getItem("post_drafts");
-      setDrafts(raw ? JSON.parse(raw) : []);
-    } catch {
-      setDrafts([]);
-    }
+    setDrafts(getPostDrafts());
     try {
       setStoryDrafts(await StoryDraftService.getDrafts());
     } catch {

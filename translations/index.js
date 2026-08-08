@@ -1,25 +1,17 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, get } from "../services/storage";
 import en from "./en.json";
 import tr from "./tr.json";
 
-const STORE_LANGUAGE_KEY = "selectedLanguage";
+const STORE_LANGUAGE_KEY = Keys.language.key;
 
 const languageDetector = {
   type: "languageDetector",
-  async: true,
-  detect: async (callback) => {
-    try {
-      const savedLanguage = await AsyncStorage.getItem(STORE_LANGUAGE_KEY);
-      if (savedLanguage) {
-        return callback(savedLanguage);
-      }
-      return callback("tr"); // Varsayılan dil
-    } catch (error) {
-      return callback("tr");
-    }
-  },
+  // MMKV senkron okuduğu için dil ilk denemede biliniyor: i18next artık
+  // "tr" ile başlayıp sonra İngilizce'ye geçmiyor (açılıştaki dil flash'ı).
+  async: false,
+  detect: () => get(Keys.language),
   init: () => {},
   // Write is owned by AppSettingsContext — no-op here to avoid double writes.
   cacheUserLanguage: () => {},

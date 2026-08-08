@@ -75,9 +75,16 @@ const EpisodeCell = React.memo(
       ? episode.vote_average.toFixed(1)
       : "N/A";
 
+    // Koordinatlar hücrenin kendi içinde bağlanır — böylece ızgara `onPress`e
+    // her render'da yeni bir arrow geçirmek zorunda kalmaz ve memo tutar.
+    const handlePress = useCallback(
+      () => onPress(seasonNumber, episodeIndex),
+      [onPress, seasonNumber, episodeIndex],
+    );
+
     return (
       <TouchableOpacity
-        onPress={onPress}
+        onPress={handlePress}
         activeOpacity={0.75}
         style={[
           styles.cell,
@@ -208,7 +215,16 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   // ── Veri Çekme ────────────────────────────────────────────────────────────
+  // Bu ekran N+1 istek yapıyor (dizi + her sezon + OMDb). fetchAllSeasons hem
+  // effect'ten hem "tekrar dene" düğmesinden çağrıldığı için düz bir `cancelled`
+  // bayrağı yetmiyor; çalışma jetonu ile eski zincirler bayatlatılıyor. Aksi
+  // hâlde dil değişince geciken eski yanıt yeni veriyi eziyor ve unmount
+  // sonrası setState yapılıyordu.
+  const runIdRef = useRef(0);
+
   const fetchAllSeasons = useCallback(async () => {
+    const runId = ++runIdRef.current;
+    const isStale = () => runId !== runIdRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -249,6 +265,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
         }
       }
 
+      if (isStale()) return;
       setShowDetail({
         ...tvShowResponse.data,
         vote_average: imdbMainInfo.rating,
@@ -297,27 +314,29 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
       });
 
       const seasonsData = await Promise.all(seasonPromises);
+      if (isStale()) return;
       setTVShows(seasonsData);
     } catch (err) {
-      setError(err.message);
+      if (!isStale()) setError(err.message);
       console.error(i18nText("autoI18n.genel_hata", "Genel Hata:"), err);
     } finally {
-      setLoading(false);
+      if (!isStale()) setLoading(false);
     }
   }, [id, language, API_KEY]);
 
   useEffect(() => {
     fetchAllSeasons();
+    // Dil/id değişince ya da ekran kapanınca süren zinciri bayatlat.
+    return () => {
+      runIdRef.current++;
+    };
   }, [fetchAllSeasons]);
 
   // ── Bölüm Seçimi ─────────────────────────────────────────────────────────
+  // selectedEpisode'a bağımlı kalırsa her seçimde kimlik değişir ve ızgaradaki
+  // yüzlerce EpisodeCell yeniden render edilir; functional updater ile sabit.
   const handleEpisodePress = useCallback(
     (seasonNum, epIndex) => {
-      const key = `${seasonNum}-${epIndex}`;
-      const currentKey = selectedEpisode
-        ? `${selectedEpisode.season}-${selectedEpisode.index}`
-        : null;
-
       Animated.sequence([
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -331,13 +350,13 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
         }),
       ]).start();
 
-      if (currentKey === key) {
-        setSelectedEpisode(null);
-      } else {
-        setSelectedEpisode({ season: seasonNum, index: epIndex });
-      }
+      setSelectedEpisode((prev) =>
+        prev && prev.season === seasonNum && prev.index === epIndex
+          ? null
+          : { season: seasonNum, index: epIndex },
+      );
     },
-    [selectedEpisode, fadeAnim],
+    [fadeAnim],
   );
 
   // ── Seçili Bölüm Verisi ───────────────────────────────────────────────────
@@ -622,9 +641,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                         selectedEpisode?.season === season.season_number &&
                         selectedEpisode?.index === epIndex
                       }
-                      onPress={() =>
-                        handleEpisodePress(season.season_number, epIndex)
-                      }
+                      onPress={handleEpisodePress}
                       borderColor={theme.primary}
                     />
                   ) : (

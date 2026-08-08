@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import React, { memo, useEffect, useRef } from "react";
 import {
   Text,
   TouchableOpacity,
@@ -8,11 +8,10 @@ import {
   Dimensions,
   Animated,
 } from "react-native";
-import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
-import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { Dropdown } from "react-native-element-dropdown";
 import { useFontFamilyForRole } from "../../components/typography/AppText";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -32,6 +31,7 @@ const { width } = Dimensions.get("window");
 const MovieUpcomingCard = memo(function MovieUpcomingCard({ item, navigation, theme, getTmdbUrl, RelaseCount }) {
   const rp = useRailPosterStyle();
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -45,6 +45,10 @@ const MovieUpcomingCard = memo(function MovieUpcomingCard({ item, navigation, th
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => navigation.push("MovieDetails", { id: item.id })}
+      onLongPress={() =>
+        openQuickActions({ item, mediaType: "movie", navigation })
+      }
+      delayLongPress={350}
     >
       <Animated.View style={[{ transform: [{ scale }] }]}>
         <PosterImage

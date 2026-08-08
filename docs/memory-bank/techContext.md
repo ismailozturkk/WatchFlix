@@ -11,7 +11,8 @@
 ### Backend & Database
 - Firebase 11.7.3 (Auth, Firestore)
 - TMDB API (Film/Dizi veritabanı)
-- AsyncStorage (@react-native-async-storage/async-storage 1.24.0)
+- react-native-mmkv 4.3.2 + react-native-nitro-modules 0.36.5 (senkron anahtar/değer deposu)
+- @react-native-async-storage/async-storage 2.2.0 — YALNIZ tek seferlik göç ve Firebase Auth köprüsü için tutuluyor
 
 ### UI & Animation
 - Lottie React Native ~7.3.1
@@ -50,5 +51,5 @@
 
 - TMDB API istek limiti (40/saniye)
 - Firestore gerçek zamanlı dinleme maliyetleri (onSnapshot kullanımı dikkatli olmalı)
-- AsyncStorage veri boyutu limitleri (~6MB)
+- MMKV senkron ve hızlı; ancak BÜYÜK JSON değerlerinde `JSON.parse` maliyeti JS thread'ini bloklar (apiCache bu yüzden oturum içi bir bellek katmanı tutar)
 - Reanimated 4 adaptasyon sürecinde (bazı deprecated API'lar temizleniyor)

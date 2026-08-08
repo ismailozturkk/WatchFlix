@@ -1,9 +1,9 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   categoryForCacheKey,
   shouldPersistInternetData,
 } from "./dataCacheSettings";
 import { getIsOnline } from "../context/ConnectivityContext";
+import { Namespaces, createNamespace } from "../services/storage";
 
 /** TTL constants (milliseconds) */
 export const TTL = {
@@ -16,22 +16,28 @@ export const TTL = {
   CALENDAR:    1 * 60 * 60 * 1000,       // 1 hour
 };
 
-const PREFIX = "apicache_";
+// Fiziksel anahtar öneki ("apicache_") artık burada DEĞİL, registry'de tanımlı.
+// Eskiden aynı önek bu dosyada, SplashPosterWave'de ve cacheInspector'da ayrı
+// ayrı yazılıydı; biri değişse diğerleri sessizce ıskalardı.
+const store = createNamespace(Namespaces.apiCache);
 
-// In-memory layer — avoids AsyncStorage round-trips within the same session.
+// Oturum içi ayrıştırma önbelleği. MMKV okuması ucuz ama büyük TMDB listelerinde
+// JSON.parse değil — aynı anahtar bir oturumda onlarca kez okunuyor.
 const mem = new Map();
-
-const storageKey = (key) => `${PREFIX}${key}`;
 
 /**
  * Returns cached data if the entry exists and is within ttlMs.
- * Checks memory first, then AsyncStorage.
+ * Checks memory first, then MMKV.
  *
  * ÇEVRİMDIŞI: TTL yok sayılır ve bayat kayıt silinmez — "Verileri indir" ile
  * indirilen film/dizi içeriği internet yokken TTL dolmuş olsa da kullanılabilsin.
- * @returns {Promise<any|null>}
+ *
+ * MMKV GEÇİŞİ: senkron olduğu için artık Promise dönmesi şart değil; ancak
+ * çağrı yerlerinin tamamı `await` ile kullanıyor ve `await` senkron değeri de
+ * kabul ediyor. İmza korunarak çağrı yerleri olduğu gibi bırakıldı.
+ * @returns {any|null}
  */
-export const getCachedValue = async (key, ttlMs) => {
+export const getCachedValue = (key, ttlMs) => {
   const now = Date.now();
   const offline = !getIsOnline();
 
@@ -41,32 +47,92 @@ export const getCachedValue = async (key, ttlMs) => {
     mem.delete(key);
   }
 
-  try {
-    const raw = await AsyncStorage.getItem(storageKey(key));
-    if (!raw) return null;
-    const entry = JSON.parse(raw);
-    if (offline || now - entry.ts < ttlMs) {
-      mem.set(key, entry);
-      return entry.data;
-    }
-    AsyncStorage.removeItem(storageKey(key)).catch(() => {});
-    return null;
-  } catch {
-    return null;
+  const entry = store.getJSON(key);
+  if (!entry || entry.ts === undefined) return null;
+  if (offline || now - entry.ts < ttlMs) {
+    mem.set(key, entry);
+    return entry.data;
   }
+  store.remove(key);
+  return null;
+};
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * BAYAT GÖSTER, ARKA PLANDA TAZELE (stale-while-revalidate)
+ *
+ * `getCachedValue` TTL dolunca null döner ve kaydı SİLER — çağıran iskelet
+ * gösterip ağı beklemek zorunda kalır. Trend TTL'i 1 saat olduğu için bu
+ * pratikte her açılış demekti; oysa dünkü trend listesi bir kare boyunca
+ * göstermek için fazlasıyla iyi.
+ *
+ * Bu yol kaydı SİLMEZ ve TTL dolmuş olsa da veriyi döner; "taze mi?" bilgisini
+ * çağırana bırakır. Çağıran veriyi hemen çizer, tazelemeyi arka planda yapar ve
+ * yalnız içerik gerçekten değiştiyse state'i günceller (bkz. utils/sameData.js).
+ *
+ * `getCachedValue` bilerek olduğu gibi bırakıldı: 17 çağrı yeri ona dayanıyor.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const EMPTY_SWR = Object.freeze({ data: null, fresh: false, ts: 0, age: Infinity });
+
+/**
+ * @param {string} key
+ * @param {{maxAge?: number}} [options] Bu yaştan eskiyse `fresh:false` döner.
+ * @returns {{data: any, fresh: boolean, ts: number, age: number}}
+ */
+export const getSwr = (key, { maxAge = 0 } = {}) => {
+  const entry = mem.get(key) ?? store.getJSON(key);
+  if (!entry || entry.ts === undefined) return EMPTY_SWR;
+
+  mem.set(key, entry);
+  const age = Date.now() - entry.ts;
+  // Çevrimdışıyken tazeleme zaten başarısız olur; bayat kaydı taze sayıp
+  // gereksiz istek denemesini ve "yükleniyor" durumunu engelliyoruz.
+  const fresh = !getIsOnline() || age < maxAge;
+  return { data: entry.data, fresh, ts: entry.ts, age };
 };
 
 /**
- * Writes data to memory and AsyncStorage.
+ * Ray tohumlama yardımcısı.
+ *
+ * Aynı önbellek ailesine iki farklı biçimde yazılıyor: `loadPage`
+ * `{results, total_pages}` yazarken `fetchSeriesTrends` düz dizi yazıyor.
+ * Tohumlayan tarafın bunu bilmesi gerekmesin diye normalleştiriyoruz.
+ *
+ * @returns {{list: any[], totalPages: number, fresh: boolean, hasCache: boolean}}
+ */
+export const seedList = (key, { maxAge = 0 } = {}) => {
+  const { data, fresh } = getSwr(key, { maxAge });
+  const list = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.results)
+      ? data.results
+      : null;
+  if (!list) return { list: [], totalPages: 1, fresh: false, hasCache: false };
+  return {
+    list,
+    totalPages: (!Array.isArray(data) && data?.total_pages) || 1,
+    fresh,
+    hasCache: true,
+  };
+};
+
+/**
+ * Writes data to memory and MMKV.
  * Fire-and-forget — never throws.
  */
 export const setCachedValue = (key, data, { force = false } = {}) => {
-  // Kategori anahtar önekinden türetilir (movie_* → film, tv_* → dizi içerikleri).
-  if (!shouldPersistInternetData({ force, category: categoryForCacheKey(key) }))
-    return;
+  // Oturum içi bellek katmanı HER ZAMAN dolar: `mem` bir Map, diske hiçbir şey
+  // yazmıyor ve uygulama kapanınca gidiyor. "Verileri indir" ayarı yalnız KALICI
+  // yazmayı kapatıyor (bkz. utils/dataCacheSettings.js). Eskiden kapı bunun
+  // üstündeydi: getCachedValue mem'i koşulsuz okuduğu hâlde mem hiç dolmuyordu,
+  // ayar kapalı olan her kullanıcıda her ekran TMDB'yi baştan çekiyordu.
   const entry = { data, ts: Date.now() };
   mem.set(key, entry);
-  AsyncStorage.setItem(storageKey(key), JSON.stringify(entry)).catch(() => {});
+
+  // Kalıcı kopya — kategori anahtar önekinden türetilir (movie_* → film, tv_* → dizi).
+  if (!shouldPersistInternetData({ force, category: categoryForCacheKey(key) }))
+    return;
+  store.setJSON(key, entry);
 };
 
 /**
@@ -74,56 +140,25 @@ export const setCachedValue = (key, data, { force = false } = {}) => {
  */
 export const removeCachedValue = (key) => {
   mem.delete(key);
-  AsyncStorage.removeItem(storageKey(key)).catch(() => {});
+  store.remove(key);
 };
 
 /**
- * Belirli bir önekteki tüm apicache girdilerini (bellek + AsyncStorage) siler.
+ * Belirli bir önekteki tüm apicache girdilerini (bellek + MMKV) siler.
  * prefix "" verilirse tüm apicache temizlenir. Örn: clearCachedByPrefix("movie_").
  */
-export const clearCachedByPrefix = async (prefix = "") => {
+export const clearCachedByPrefix = (prefix = "") => {
   for (const k of Array.from(mem.keys())) {
     if (k.startsWith(prefix)) mem.delete(k);
   }
-  try {
-    const all = await AsyncStorage.getAllKeys();
-    const target = all.filter((k) => k.startsWith(storageKey(prefix)));
-    if (target.length) await AsyncStorage.multiRemove(target);
-  } catch {
-    // yok say
-  }
+  store.clear(prefix);
 };
 
-// Singleton: preload sadece bir kez çalışır, sonraki çağrılar aynı Promise'i döner.
-let _preloadPromise = null;
+/** Bu ailedeki anahtarlar — SplashPosterWave gibi tarayıcılar için. */
+export const cachedKeys = (prefix = "") => store.keys(prefix);
 
-const _doPreload = async () => {
-  try {
-    const allKeys = await AsyncStorage.getAllKeys();
-    const cacheKeys = allKeys.filter((k) => k.startsWith(PREFIX));
-    if (!cacheKeys.length) return;
-    const pairs = await AsyncStorage.multiGet(cacheKeys);
-    pairs.forEach(([sKey, raw]) => {
-      if (!raw) return;
-      try {
-        const entry = JSON.parse(raw);
-        if (entry?.ts !== undefined && entry?.data !== undefined) {
-          const internalKey = sKey.slice(PREFIX.length);
-          if (!mem.has(internalKey)) {
-            mem.set(internalKey, entry);
-          }
-        }
-      } catch {}
-    });
-  } catch {}
-};
+/** Ham girdiyi ({ data, ts }) TTL uygulamadan döner. */
+export const rawCachedEntry = (key) => mem.get(key) ?? store.getJSON(key) ?? null;
 
-/**
- * Startup preloader — reads ALL apicache_* keys from AsyncStorage in one
- * multiGet and populates the in-memory map. Subsequent calls return the same
- * Promise (no duplicate AsyncStorage reads). Call as early as possible.
- */
-export const preloadAllCache = () => {
-  if (!_preloadPromise) _preloadPromise = _doPreload();
-  return _preloadPromise;
-};
+/** Önbellek ailesinin yaklaşık disk boyutu (bayt). */
+export const cachedByteSize = (prefix = "") => store.byteSize(prefix);

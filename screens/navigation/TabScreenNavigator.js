@@ -33,6 +33,11 @@ import TvShowScreen from "@screens/tabs/TvShowScreen";
 import { MovieProvider } from "@context/MovieContex";
 import { CalendarProvider } from "@context/CalendarContext";
 import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
+import {
+  BLUR_SCOPES,
+  BlurTargetSurface,
+  useBlurTargetRef,
+} from "../../components/common/BlurTarget";
 import { LinearGradient } from "expo-linear-gradient";
 import { Screen, ScreenContainer } from "react-native-screens";
 import PetCompanion from "@components/pet/PetCompanion";
@@ -126,6 +131,12 @@ const TabItem = memo(({ name, label, icon, isActive, onPress, theme }) => {
   );
 });
 
+// Sekme çubuğunun camı, ARKASINDAKİ ekran içeriğini bulanıklaştırır.
+//
+// Çubuk "root" kapsamını (tüm uygulama) HEDEFLEYEMEZ: kendisi onun içinde ve
+// blur, hedeflediği yüzeyin içinde olamaz (bkz. components/common/BlurTarget.js).
+// Bu yüzden ekran içeriği ayrı bir "screen" yüzeyi olarak yayınlanıyor ve çubuk
+// onun kardeşi oluyor. Sağlayıcı App.js'te; burada yalnız yüzey ve tüketici var.
 function TabScreenNavigator({ navigation, route }) {
   const requestedInitialTab = TAB_NAMES.includes(route?.params?.initialTab)
     ? route.params.initialTab
@@ -139,6 +150,8 @@ function TabScreenNavigator({ navigation, route }) {
   const { t, language, toggleLanguage } = useLanguage();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  // Ekran içeriği yüzeye bağlanana kadar null; o sürede çubuk düz katman çizer.
+  const blurTarget = useBlurTargetRef(BLUR_SCOPES.screen);
   const { width: windowWidth } = useWindowDimensions();
   // Etiketler kalkınca sekmenin genişliğe ihtiyacı kalmadı: çubuk yuvaların
   // toplamı kadar — ortada yüzen bir hap. Kısıt yalnızca çok dar ekranlar için.
@@ -183,7 +196,11 @@ function TabScreenNavigator({ navigation, route }) {
     const nextTab = route.params.initialTab;
     setMountedTabs((current) => new Set(current).add(nextTab));
     setActiveTab(nextTab);
-  }, [route?.params?.initialTab]);
+    // Param TÜKETİLİYOR: navigate() var olan TabScreen route'una AYNI değerle
+    // döndüğünde deps değişmediği için effect bir daha çalışmıyordu — arada
+    // kullanıcı elle başka sekmeye geçtiyse istenen sekme hiç açılmıyordu.
+    navigation.setParams({ initialTab: undefined });
+  }, [route?.params?.initialTab, navigation]);
 
   // Ekranlar sadece navigation değişince yeniden oluşturulsun.
   // theme/t/language burada dependency olmamalı — screen'ler kendi içlerinde context'ten alır.
@@ -316,24 +333,28 @@ function TabScreenNavigator({ navigation, route }) {
           </Text>
         </TouchableOpacity>
       )}
-      <ScreenContainer style={styles.screenSlot} hasTwoStates>
-        {TAB_NAMES.map((name) => {
-          if (!mountedTabs.has(name)) return null;
-          const isActive = activeTab === name;
+      {/* Çubuğun bulanıklaştırdığı yüzey. PetCompanion bilerek DIŞARIDA: zIndex
+          40 ile çubuğun (20) ÜSTÜNDE duruyor, yani camın arkasında değil. */}
+      <BlurTargetSurface name={BLUR_SCOPES.screen} style={styles.screenSlot}>
+        <ScreenContainer style={styles.screenSlot} hasTwoStates>
+          {TAB_NAMES.map((name) => {
+            if (!mountedTabs.has(name)) return null;
+            const isActive = activeTab === name;
 
-          return (
-            <Screen
-              key={name}
-              activityState={isActive ? 2 : 0}
-              freezeOnBlur
-              shouldFreeze={!isActive}
-              style={styles.screen}
-            >
-              {screens[name]}
-            </Screen>
-          );
-        })}
-      </ScreenContainer>
+            return (
+              <Screen
+                key={name}
+                activityState={isActive ? 2 : 0}
+                freezeOnBlur
+                shouldFreeze={!isActive}
+                style={styles.screen}
+              >
+                {screens[name]}
+              </Screen>
+            );
+          })}
+        </ScreenContainer>
+      </BlurTargetSurface>
 
       <PetCompanion />
 
@@ -360,7 +381,7 @@ function TabScreenNavigator({ navigation, route }) {
             <AdaptiveBlurView
               tint="dark"
               intensity={40}
-              experimentalBlurMethod="dimezisBlurView"
+              blurTarget={blurTarget}
               fallbackColor={theme.tab || theme.secondary}
               fallbackAlpha={0.82}
               style={styles.tabContainer}

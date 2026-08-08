@@ -9,6 +9,7 @@ import {
 import PosterImage from "../../components/PosterImage";
 import React, { useEffect, useMemo, useState } from "react";
 import { useTheme } from "../../context/ThemeContext";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { MovieCollectionSkeleton } from "../../components/Skeleton";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
@@ -27,6 +28,7 @@ export default function MovieCollection({ navigation }) {
   const { t } = useLanguage();
   const { theme } = useTheme();
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const {
     moviesCollection,
     loadingCollection,
@@ -144,6 +146,10 @@ export default function MovieCollection({ navigation }) {
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={() => navigation.push("MovieDetails", { id: item.id })}
+      onLongPress={() =>
+        openQuickActions({ item, mediaType: "movie", navigation })
+      }
+      delayLongPress={350}
       style={{ width: rp.itemWidth }}
     >
       <View>

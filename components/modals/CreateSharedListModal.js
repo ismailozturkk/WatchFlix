@@ -2,7 +2,6 @@ import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
-  Modal,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -10,7 +9,7 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
-import AdaptiveBlurView from "../common/AdaptiveBlurView";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
 import { useTheme } from "@context/ThemeContext";
@@ -203,26 +202,14 @@ export default function CreateSharedListModal({
   };
 
   return (
-    <Modal
-      transparent
+    <BottomSheetModal
       visible={visible}
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
+      sheetStyle={[
+        styles.sheet,
+        { backgroundColor: theme.secondary, borderColor: theme.border },
+      ]}
     >
-      <View style={styles.overlay}>
-        <AdaptiveBlurView tint="dark" intensity={40} style={StyleSheet.absoluteFill} />
-        <TouchableOpacity
-          style={StyleSheet.absoluteFill}
-          activeOpacity={1}
-          onPress={onClose}
-        />
-
-        <View
-          style={[
-            styles.sheet,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
-        >
           <View style={[styles.handle, { backgroundColor: theme.border }]} />
 
           {/* Başlık */}
@@ -328,9 +315,7 @@ export default function CreateSharedListModal({
                 : i18nText("autoI18n.listeyi_olustur", "Listeyi Oluştur")}
             </Text>
           </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 

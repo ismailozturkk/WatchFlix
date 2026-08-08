@@ -1,7 +1,7 @@
 // context/PostsContext.js
 //
 // Feed state yönetimi:
-//  - Cold start: AsyncStorage cache → fetchFeed (ilk sayfa) → realtime listener
+//  - Cold start: yerel önbellek → fetchFeed (ilk sayfa) → realtime listener
 //  - Filter değişimi: fetchFeed yeni filtreyle çekilir, realtime devre dışı kalır
 //    (yine de "all" filtresine dönüldüğünde tekrar açılır)
 //  - Pagination: onEndReached → loadMore (startAfter ile sayfa sonrası)
@@ -18,7 +18,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, get, set } from "../services/storage";
 import Toast from "react-native-toast-message";
 import * as PostsApi from "../services/postsService";
 import { useAuth } from "./AuthContext";
@@ -31,7 +31,7 @@ import useStartupGate from "../hooks/useStartupGate";
 const PostsContext = createContext();
 export const usePosts = () => useContext(PostsContext);
 
-const FEED_CACHE_KEY = "feed_cache_v1";
+// Akış önbellek anahtarı registry'de (Keys.feed, cache deposu).
 // Tip filtreleri composer'ın desteklediği paylaşım tiplerinden türetilir —
 // yeni bir tip eklendiğinde feed filtresi de kendiliğinden gelir.
 const FILTERS = ["all", ...POST_TYPES, "following"];
@@ -94,13 +94,8 @@ export function PostsProvider({ children }) {
     if (!startupReady) return undefined;
     let cancelled = false;
     (async () => {
-      try {
-        const cached = await AsyncStorage.getItem(FEED_CACHE_KEY);
-        if (cached && !cancelled) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed)) setPosts(parsed);
-        }
-      } catch {}
+      const cached = get(Keys.feed);
+      if (Array.isArray(cached) && !cancelled) setPosts(cached);
 
       try {
         const { posts: fresh, lastDoc } = await PostsApi.fetchFeed({
@@ -118,11 +113,7 @@ export function PostsProvider({ children }) {
         setPosts((prev) => (sameIds(prev, fresh) ? prev : fresh));
         lastDocRef.current = lastDoc;
         setHasMore(fresh.length > 0);
-        if (shouldPersistInternetData({ category: "posts" })) {
-          AsyncStorage.setItem(FEED_CACHE_KEY, JSON.stringify(fresh)).catch(
-            () => {},
-          );
-        }
+        if (shouldPersistInternetData({ category: "posts" })) set(Keys.feed, fresh);
       } catch (e) {
         if (__DEV__) console.warn("Initial feed fetch failed:", e.message);
       } finally {
@@ -158,11 +149,7 @@ export function PostsProvider({ children }) {
         const extra = prev.slice(15);
         return [...live, ...extra];
       });
-      if (shouldPersistInternetData({ category: "posts" })) {
-        AsyncStorage.setItem(FEED_CACHE_KEY, JSON.stringify(live)).catch(
-          () => {},
-        );
-      }
+      if (shouldPersistInternetData({ category: "posts" })) set(Keys.feed, live);
     });
     return () => {
       unsubRef.current?.();
@@ -264,9 +251,7 @@ export function PostsProvider({ children }) {
         lastDocRef.current = lastDoc;
         setHasMore(p.length > 0);
         if (filter === "all" && sort === "recent" && shouldPersistInternetData({ category: "posts" })) {
-          AsyncStorage.setItem(FEED_CACHE_KEY, JSON.stringify(p)).catch(
-            () => {},
-          );
+          set(Keys.feed, p);
         }
       }
     } catch (e) {

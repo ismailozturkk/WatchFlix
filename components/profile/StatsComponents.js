@@ -16,7 +16,6 @@ import {
   ScrollView,
   FlatList,
   SectionList,
-  Modal,
   Dimensions,
 } from "react-native";
 
@@ -24,6 +23,7 @@ const { height: SCREEN_H } = Dimensions.get("window");
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import AdaptiveBlurView from "../common/AdaptiveBlurView";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import { i18nText } from "../../utils/i18nText";
 
 import {
@@ -872,22 +872,16 @@ export const StatsFilterModal = memo(function StatsFilterModal({
   ];
 
   return (
-    <Modal
+    <BottomSheetModal
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-      statusBarTranslucent
+      onClose={onClose}
+      intensity={35}
+      dimColor="rgba(0,0,0,0.35)"
+      sheetStyle={[
+        modalStyles.sheet,
+        { backgroundColor: theme.secondary, borderColor: theme.border },
+      ]}
     >
-      <View style={modalStyles.root}>
-        <Pressable style={modalStyles.backdrop} onPress={onClose} />
-
-        <View
-          style={[
-            modalStyles.sheet,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
-        >
           <View style={[modalStyles.handle, { backgroundColor: theme.border }]} />
 
           <View style={modalStyles.header}>
@@ -952,9 +946,7 @@ export const StatsFilterModal = memo(function StatsFilterModal({
               <Text style={modalStyles.doneText}>{doneLabel}</Text>
             </Pressable>
           </View>
-        </View>
-      </View>
-    </Modal>
+    </BottomSheetModal>
   );
 });
 

@@ -12,4 +12,9 @@ export const cacheKeys = {
   reminders: (uid, kind) => ["reminders", `${uid}:${kind}`], // kind: 'movies'|'episodes' → dizi
   lists: (uid, name) => ["lists", `${uid}:${name}`],   // name: root|favorites|watchList|watchedMovies|watchedTv
   activity: (uid) => ["activity", uid],                // obje: { ratings, comments, likes, bookmarks, posts }
+  // TÜRETİLMİŞ istatistikler. Diğerlerinin aksine `dataDownloader` bunu
+  // doldurmaz — kaynağı (lists/*) zaten indiriliyor, burada saklanan o kaynaktan
+  // hesaplanmış SONUÇ. Amaç açılışta ağır türetmeyi tekrarlamamak; kayıt yoksa
+  // ekran eskisi gibi listener'dan hesaplar.
+  stats: (uid) => ["stats", uid],                      // obje: { ...sayaçlar }
 };

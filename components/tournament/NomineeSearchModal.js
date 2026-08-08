@@ -1,35 +1,52 @@
 // components/tournament/NomineeSearchModal.js
 //
-// Seçim (aday belirleme) fazı için ARAMA modalı. TournamentScreen'deki arama
-// çubuğu butonuna basınca açılır; 64 adaylık havuzda isimle arar ve buradan da
-// hype (aday oyu) verilebilir.
+// Seçim (aday belirleme) fazının ARAMA ekranı — SIRADAN bir arama gibi davranır:
+// yazarsın, eşleşen yapımlar tek listede çıkar, hype verirsin.
 //
-// Oy kuralı gridle AYNI: tek hak + iki adımlı onay + kesin (değiştirilemez).
-// Satırdaki "Hype" butonuna ilk basış onay durumuna geçirir ("Onayla — kesin"),
-// ikinci basış parent'ın onHype(id)'ini çağırır. 2.6 sn dokunulmazsa iptal.
-// Kaydetme/geri alma/toast mantığı parent'tadır (tek doğruluk kaynağı).
+// Arka planda iki kaynak var ama bu kullanıcıya ANLATILMAZ (ayrı bölüm başlığı,
+// "TMDB'de ara", "havuzda yok" gibi etiketler bilerek YOK):
+//   1) Havuz — ay başı listesi + topluluğun eklediği adaylar (yerel süzme).
+//   2) TMDB  — havuzda olmayanlar için global arama; ayın türüne uymayanlar
+//              serviste sessizce elenir, yani listede yalnız hype verilebilecek
+//              yapımlar görünür.
+// Tek fark görünmez: TMDB satırına hype verilince aday önce havuza yazılır
+// (onHypeExternal), havuz satırı doğrudan hype alır (onHype).
+//
+// Oy kuralı her iki kaynakta da AYNI: tek hak + iki adımlı onay + kesin
+// (değiştirilemez). İlk basış onay durumuna geçirir, ikinci basış parent'a
+// bildirir; PENDING_TIMEOUT boyunca dokunulmazsa iptal. Kaydetme/geri alma/
+// toast mantığı parent'tadır (tek doğruluk kaynağı).
 
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  View, Text, StyleSheet, Modal, Pressable, TextInput, FlatList,
+  View, Text, StyleSheet, Modal, Pressable, TextInput, FlatList, ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import AppIcon from "@components/AppIcon";
 import { i18nText } from "@utils/i18nText";
+import { searchCandidates } from "@services/tournamentService";
 
 const PENDING_TIMEOUT = 2600;
+const SEARCH_DEBOUNCE = 380;
+const MIN_QUERY = 2;
 
 // Türkçe uyumlu, aksan bağışlayıcı küçük harf karşılaştırma.
 const norm = (s, lang) =>
   String(s || "").toLocaleLowerCase(lang === "tr" ? "tr-TR" : "en-US");
 
+// ─── Aday satırı ──────────────────────────────────────────────────────────────
+// Havuzdaki satır sıra rozeti + hype sayacı taşır; havuzda olmayan (external)
+// satır yalnız yılını gösterir. Buton her ikisinde de aynı: "Hype".
 const Row = memo(function Row({
-  item, mine, canVote, isPending, onPress, theme, getTmdbUrl,
+  item, mine, canVote, isPending, external, onPress, onOpen, theme, getTmdbUrl, lang,
 }) {
   const uri = item.posterPath ? getTmdbUrl(item.posterPath, "poster", 92) : null;
   const rankColor = item.finalist ? "#22C55E" : "#9CA3AF";
 
+  // Satırın GÖVDESİ her zaman detaya gider; hype butonu iç içe Pressable olduğu
+  // için kendi dokunuşunu ayrıca yakalar. Böylece ızgaradaki "Bilgi" seçeneğinin
+  // karşılığı burada da var: hype vermeden önce yapımı inceleyebilirsin.
   let action = null;
   if (mine) {
     action = (
@@ -38,12 +55,13 @@ const Row = memo(function Row({
         <Text style={styles.actionChipTextOn}>
           {i18nText("autoI18n.tournament_your_pick", "Senin adayın")}
         </Text>
+        <AppIcon family="Ionicons" name="chevron-forward" size={11} color="#fff" />
       </View>
     );
   } else if (canVote) {
     action = (
       <Pressable
-        onPress={() => onPress(item.id)}
+        onPress={() => onPress(item)}
         style={[
           styles.actionChip,
           isPending
@@ -62,7 +80,11 @@ const Row = memo(function Row({
   }
 
   return (
-    <View style={[styles.row, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+    <Pressable
+      onPress={() => onOpen?.(item)}
+      style={[styles.row, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+      accessibilityRole="button"
+    >
       <View style={[styles.rowPosterWrap, { backgroundColor: theme.between }]}>
         {uri ? (
           <Image source={{ uri }} style={styles.rowPoster} contentFit="cover" transition={120} />
@@ -78,32 +100,43 @@ const Row = memo(function Row({
           {item.title}
         </Text>
         <View style={styles.rowMeta}>
-          <View style={[styles.rankPill, { backgroundColor: rankColor + "22", borderColor: rankColor + "66" }]}>
-            <Text style={[styles.rankPillText, { color: rankColor }]}>#{item.rank}</Text>
-          </View>
-          <View style={styles.hypePill}>
-            <AppIcon family="Ionicons" name="flame" size={10} color="#F59E0B" />
-            <Text style={styles.hypePillText}>{item.nomVotes}</Text>
-          </View>
-          {item.finalist && (
-            <Text style={[styles.finalistText, { color: "#22C55E" }]}>
-              {i18nText("autoI18n.tournament_in_top32", "İlk 32'de")}
-            </Text>
+          {external ? (
+            !!item.year && (
+              <Text style={[styles.yearText, { color: theme.text.muted }]}>{item.year}</Text>
+            )
+          ) : (
+            <>
+              <View style={[styles.rankPill, { backgroundColor: rankColor + "22", borderColor: rankColor + "66" }]}>
+                <Text style={[styles.rankPillText, { color: rankColor }]}>#{item.rank}</Text>
+              </View>
+              <View style={styles.hypePill}>
+                <AppIcon family="Ionicons" name="flame" size={10} color="#F59E0B" />
+                <Text style={styles.hypePillText}>{item.nomVotes}</Text>
+              </View>
+              {item.finalist && (
+                <Text style={[styles.finalistText, { color: "#22C55E" }]}>
+                  {i18nText("autoI18n.tournament_in_top32", "İlk 32'de")}
+                </Text>
+              )}
+            </>
           )}
         </View>
       </View>
 
       {action}
-    </View>
+    </Pressable>
   );
 });
 
 export default function NomineeSearchModal({
-  visible, onClose, pool = [], myNoms, canVote, onHype,
-  theme, getTmdbUrl, lang = "tr",
+  visible, onClose, pool = [], myNoms, canVote, onHype, onHypeExternal, onOpen,
+  mediaType, genreId, theme, getTmdbUrl, lang = "tr",
 }) {
   const [q, setQ] = useState("");
   const [pendingId, setPendingId] = useState(null);
+  const [remote, setRemote] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [remoteError, setRemoteError] = useState(false);
   const timer = useRef(null);
 
   const clearPending = useCallback(() => {
@@ -113,46 +146,100 @@ export default function NomineeSearchModal({
 
   // Modal her açılışta temiz başlasın.
   useEffect(() => {
-    if (visible) { setQ(""); clearPending(); }
+    if (visible) { setQ(""); setRemote([]); setRemoteError(false); clearPending(); }
   }, [visible, clearPending]);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
+  const trimmed = q.trim();
+
   const filtered = useMemo(() => {
-    const needle = norm(q.trim(), lang);
+    const needle = norm(trimmed, lang);
     if (!needle) return pool;
     return pool.filter((n) => norm(n.title, lang).includes(needle));
-  }, [pool, q, lang]);
+  }, [pool, trimmed, lang]);
+
+  // ── Global TMDB araması (gecikmeli + iptal edilebilir) ──────────────────────
+  // Havuzda ZATEN olanlar elenir: onlar yukarıdaki havuz bölümünde normal
+  // (sıra + hype sayaçlı) satır olarak çıkıyor, iki kez göstermenin anlamı yok.
+  const poolIds = useMemo(() => new Set(pool.map((n) => String(n.id))), [pool]);
+
+  useEffect(() => {
+    if (!visible || trimmed.length < MIN_QUERY) {
+      setRemote([]); setSearching(false); setRemoteError(false);
+      return undefined;
+    }
+    const controller = new AbortController();
+    let active = true;
+    setSearching(true);
+    setRemoteError(false);
+    const id = setTimeout(() => {
+      searchCandidates({ query: trimmed, mediaType, genreId, language: lang, signal: controller.signal })
+        .then((res) => { if (active) { setRemote(res); setSearching(false); } })
+        .catch(() => {
+          // İptal (yeni tuş) hata değildir; yalnız gerçek başarısızlığı göster.
+          if (active && !controller.signal.aborted) { setRemoteError(true); setSearching(false); }
+        });
+    }, SEARCH_DEBOUNCE);
+    return () => { active = false; clearTimeout(id); controller.abort(); };
+  }, [visible, trimmed, mediaType, genreId, lang]);
+
+  const external = useMemo(
+    () => remote.filter((r) => !poolIds.has(String(r.id))),
+    [remote, poolIds],
+  );
+
+  // Tek düz liste: önce havuz eşleşmeleri, sonra havuzda olmayanlar. Kaynak
+  // ayrımı kullanıcıya gösterilmez — hepsi aynı görünen arama sonucudur.
+  const data = useMemo(
+    () => [
+      ...filtered.map((n) => ({ _type: "pool", key: `p-${n.id}`, item: n })),
+      ...external.map((n) => ({ _type: "ext", key: `e-${n.id}`, item: n })),
+    ],
+    [filtered, external],
+  );
 
   // İki adımlı onay: 1. basış beklet, 2. basış parent'a bildir.
   const handlePress = useCallback(
-    (id) => {
-      const key = String(id);
+    (item, isExternal) => {
+      const key = String(item.id);
       if (pendingId === key) {
         clearPending();
-        onHype?.(id);
+        if (isExternal) onHypeExternal?.(item);
+        else onHype?.(item.id);
       } else {
         setPendingId(key);
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => setPendingId(null), PENDING_TIMEOUT);
       }
     },
-    [pendingId, clearPending, onHype],
+    [pendingId, clearPending, onHype, onHypeExternal],
   );
 
+  const pressPool = useCallback((item) => handlePress(item, false), [handlePress]);
+  const pressExt = useCallback((item) => handlePress(item, true), [handlePress]);
+
   const renderItem = useCallback(
-    ({ item }) => (
-      <Row
-        item={item}
-        mine={myNoms?.has(String(item.id))}
-        canVote={canVote}
-        isPending={pendingId === String(item.id)}
-        onPress={handlePress}
-        theme={theme}
-        getTmdbUrl={getTmdbUrl}
-      />
-    ),
-    [myNoms, canVote, pendingId, handlePress, theme, getTmdbUrl],
+    ({ item }) => {
+      const isExt = item._type === "ext";
+      return (
+        <Row
+          item={item.item}
+          external={isExt}
+          mine={myNoms?.has(String(item.item.id))}
+          canVote={canVote}
+          isPending={pendingId === String(item.item.id)}
+          onPress={isExt ? pressExt : pressPool}
+          onOpen={onOpen}
+          theme={theme}
+          getTmdbUrl={getTmdbUrl}
+          lang={lang}
+        />
+      );
+    },
+    [myNoms, canVote, pendingId, pressExt, pressPool, onOpen, theme, getTmdbUrl, lang],
   );
+
+  const searchMode = trimmed.length >= MIN_QUERY;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -171,12 +258,15 @@ export default function NomineeSearchModal({
               style={[styles.searchInput, { color: theme.text.primary }]}
               autoCorrect={false}
               autoCapitalize="none"
+              returnKeyType="search"
             />
-            {q.length > 0 && (
+            {searching ? (
+              <ActivityIndicator size="small" color={theme.accent} />
+            ) : q.length > 0 ? (
               <Pressable onPress={() => setQ("")}>
                 <AppIcon family="Ionicons" name="close-circle" size={16} color={theme.text.muted} />
               </Pressable>
-            )}
+            ) : null}
           </View>
           <Pressable
             onPress={onClose}
@@ -186,36 +276,35 @@ export default function NomineeSearchModal({
           </Pressable>
         </View>
 
-        {/* Kural hatırlatması */}
-        <Text style={[styles.hint, { color: theme.text.muted }]}>
-          {canVote
-            ? i18nText(
-                "autoI18n.tournament_search_hint",
-                "Tek hype hakkın var — butona iki kez bas, seçim kesindir.",
-              )
-            : i18nText(
-                "autoI18n.tournament_search_hint_locked",
-                "Hype dönemi kapalı veya hakkını kullandın — sıralamayı inceleyebilirsin.",
-              )}
-        </Text>
-
         <FlatList
-          data={filtered}
-          keyExtractor={(n) => String(n.id)}
+          data={data}
+          keyExtractor={(row) => row.key}
           renderItem={renderItem}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={styles.listContent}
           initialNumToRender={12}
           maxToRenderPerBatch={12}
           windowSize={7}
           removeClippedSubviews
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <AppIcon family="Ionicons" name="search-outline" size={28} color={theme.text.muted} />
-              <Text style={[styles.emptyText, { color: theme.text.muted }]}>
-                {i18nText("autoI18n.tournament_search_empty", "Havuzda eşleşen aday yok")}
-              </Text>
-            </View>
+            // Arama sürerken boş durum gösterme — sonuç gelmeden "bulunamadı"
+            // yazmak yanlış olurdu.
+            searchMode && searching ? null : (
+              <View style={styles.empty}>
+                <AppIcon
+                  family="Ionicons"
+                  name={remoteError ? "cloud-offline-outline" : "search-outline"}
+                  size={28}
+                  color={theme.text.muted}
+                />
+                <Text style={[styles.emptyText, { color: theme.text.muted }]}>
+                  {remoteError
+                    ? i18nText("autoI18n.tournament_search_net_error", "Arama yapılamadı — bağlantını kontrol et.")
+                    : i18nText("autoI18n.tournament_search_empty", "Eşleşen yapım bulunamadı")}
+                </Text>
+              </View>
+            )
           }
         />
       </SafeAreaView>
@@ -238,11 +327,7 @@ const styles = StyleSheet.create({
     width: 38, height: 38, borderRadius: 13, borderWidth: 1,
     alignItems: "center", justifyContent: "center",
   },
-  hint: {
-    fontSize: 11, fontWeight: "600", lineHeight: 15,
-    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4,
-  },
-  listContent: { paddingHorizontal: 14, paddingTop: 6, paddingBottom: 30 },
+  listContent: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 30 },
 
   row: {
     flexDirection: "row", alignItems: "center", gap: 10,
@@ -264,6 +349,8 @@ const styles = StyleSheet.create({
   },
   hypePillText: { color: "#F59E0B", fontSize: 10, fontWeight: "800" },
   finalistText: { fontSize: 10, fontWeight: "800" },
+
+  yearText: { fontSize: 10.5, fontWeight: "800" },
 
   actionChip: {
     flexDirection: "row", alignItems: "center", gap: 4,

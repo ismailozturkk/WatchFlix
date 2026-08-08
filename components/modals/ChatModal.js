@@ -22,8 +22,7 @@ import {
   Keyboard,
   LayoutAnimation,
   UIManager,
-  Alert,
-  Dimensions,
+    Dimensions,
   DeviceEventEmitter,
 } from "react-native";
 
@@ -33,7 +32,6 @@ if (Platform.OS === "android") {
   }
 }
 import { Image } from "expo-image";
-import Toast from "react-native-toast-message";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import {
@@ -55,7 +53,7 @@ import Reanimated, {
 import LottieView from "lottie-react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useProfileStats } from "@context/ProfileStatsContext";
-import AdaptiveBlurView from "../common/AdaptiveBlurView";
+import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import { useFontResolver } from "../typography/AppText";
 
 import {
@@ -924,12 +922,7 @@ export const ChatModal = () => {
               { backgroundColor: "transparent", zIndex: 11, shadowColor: theme.shadow, overflow: "hidden" },
             ]}
           >
-            <AdaptiveBlurView
-              tint="dark"
-              intensity={50}
-              experimentalBlurMethod="dimezisBlurView"
-              style={StyleSheet.absoluteFill}
-            />
+            <ModalBlurBackdrop intensity={50} />
 
             {view === "chat" ? (
               <View style={{ zIndex: 15, width: "100%" }}>
@@ -1012,7 +1005,9 @@ export const ChatModal = () => {
                           return (
                             <TouchableOpacity
                               key={th.key}
-                              onPress={() => changeTheme(th.key)}
+                              // animated:false — RN Modal ayrı native pencerede
+                              // çizilir; cross-fade overlay'i onu örtemez.
+                              onPress={() => changeTheme(th.key, { animated: false })}
                               hitSlop={6}
                               activeOpacity={0.7}
                             >

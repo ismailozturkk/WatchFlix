@@ -1,8 +1,5 @@
-jest.mock("@react-native-async-storage/async-storage", () => ({
-  getItem: jest.fn(),
-  setItem: jest.fn(() => Promise.resolve()),
-}));
-
+// MMKV taklidi kok __mocks__ klasorunden otomatik gelir; tercih artik
+// depolama servisi uzerinden tohumlanip okunuyor.
 jest.mock("react-native", () => ({
   Platform: { OS: "android" },
 }));
@@ -11,7 +8,7 @@ jest.mock("../services/widgetBridge", () => ({
   callWidget: jest.fn(() => Promise.resolve()),
 }));
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, get, set } from "../services/storage";
 import {
   DEFAULT_WIDGET_PREFERENCES,
   loadWidgetPreferences,
@@ -23,6 +20,7 @@ import { callWidget } from "../services/widgetBridge";
 describe("widgetPreferencesService", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    set(Keys.widgetPreferences, null);
   });
 
   it("bozuk tercihleri güvenli varsayılanlara normalize eder", () => {
@@ -71,15 +69,13 @@ describe("widgetPreferencesService", () => {
   });
 
   it("kaydı yükler ve normalize eder", async () => {
-    AsyncStorage.getItem.mockResolvedValueOnce(
-      JSON.stringify({
-        density: "compact",
-        lists: {
-          maxPosters: 18,
-          appearance: { themeId: "custom:test", accent: "#123456" },
-        },
-      }),
-    );
+    set(Keys.widgetPreferences, {
+      density: "compact",
+      lists: {
+        maxPosters: 18,
+        appearance: { themeId: "custom:test", accent: "#123456" },
+      },
+    });
     const result = await loadWidgetPreferences();
     expect(result.reminders.density).toBe("compact");
     expect(result.lists.maxPosters).toBe(18);
@@ -98,7 +94,7 @@ describe("widgetPreferencesService", () => {
         },
       },
     });
-    expect(AsyncStorage.setItem).toHaveBeenCalled();
+    expect(get(Keys.widgetPreferences).reminders.appearance.accent).toBe("#EC4899");
     expect(callWidget).toHaveBeenCalled();
   });
 });

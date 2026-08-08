@@ -8,8 +8,7 @@ import {
   TouchableOpacity,
   Animated,
   StyleSheet,
-  ActivityIndicator,
-  Dimensions,
+    Dimensions,
   StatusBar,
   Platform
 } from "react-native";

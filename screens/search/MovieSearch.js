@@ -20,9 +20,6 @@ import { SearchSkeleton } from "../../components/Skeleton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import LottieView from "lottie-react-native";
 import Toast from "react-native-toast-message";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import { db } from "../../firebase";
-import { useAuth } from "../../context/AuthContext";
 import { useAppSettings, useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 import { useFocusEffect } from "@react-navigation/native";
 import ListBadges from "../../components/ListBadges";
@@ -611,24 +608,6 @@ export default function MovieSearch({ navigation, route, isUnified, unifiedQuery
     }
   }, [routeName]);
 
-  const handleSearch = useCallback((text) => {
-    searchRequestRef.current += 1;
-    setSearch(text);
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    if (text.trim().length >= 2) {
-      setError(null);
-      setLoading(true);
-      searchTimeout.current = setTimeout(() => fetchResults(text), 500);
-    } else {
-      // Boş veya 1 karakter: bekleyen istek iptal edildi. loading/error'ı
-      // burada sıfırlamazsak ekran skeleton'da ya da eski hatada takılı kalır
-      // (2+ karakterden geri silme senaryosu).
-      setResults([]);
-      setLoading(false);
-      setError(null);
-    }
-  }, []);
-
   const fetchResults = useCallback(
     async (searchText) => {
       if (!searchText) {
@@ -674,7 +653,31 @@ export default function MovieSearch({ navigation, route, isUnified, unifiedQuery
     [language, adultContent, API_KEY],
   );
 
-
+  // NOT: handleSearch, fetchResults'tan SONRA tanımlı olmalı — bağımlılık dizisi
+  // render sırasında değerlendiği için yukarıda tanımlanırsa fetchResults
+  // okunamaz. Boş deps ile bırakılırsa ilk render'ın fetchResults'ı kalıcı
+  // olarak kapanıyor ve dil / yetişkin içerik ayarı değişse bile debounce'lu
+  // yazma yolu eski değerlerle istek atmaya devam ediyordu.
+  const handleSearch = useCallback(
+    (text) => {
+      searchRequestRef.current += 1;
+      setSearch(text);
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+      if (text.trim().length >= 2) {
+        setError(null);
+        setLoading(true);
+        searchTimeout.current = setTimeout(() => fetchResults(text), 500);
+      } else {
+        // Boş veya 1 karakter: bekleyen istek iptal edildi. loading/error'ı
+        // burada sıfırlamazsak ekran skeleton'da ya da eski hatada takılı kalır
+        // (2+ karakterden geri silme senaryosu).
+        setResults([]);
+        setLoading(false);
+        setError(null);
+      }
+    },
+    [fetchResults],
+  );
 
   // Arama sonuçları renderlar
   const renderRowResult = useCallback(

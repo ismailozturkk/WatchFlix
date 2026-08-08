@@ -4,13 +4,12 @@
 // Uygulama hakkında kapsamlı bilgi, akordiyon tipi SSS (Sıkça Sorulan Sorular)
 // ve doğrudan e-posta/destek erişim butonları sunar.
 
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
-  StyleSheet,
+    StyleSheet,
   Linking,
   LayoutAnimation,
   Platform,

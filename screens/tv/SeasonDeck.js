@@ -16,6 +16,9 @@ import { i18nText } from "../../utils/i18nText";
  *  - details         : dizi detayı (SeasonItem'a geçer)
  *  - navigation
  *  - getWatchedCount : (seasonNumber) => izlenen bölüm sayısı
+ *  - getWatchEvents  : (seasonNumber) => izleme kayıtları (SeasonItem'daki
+ *                      izleme geçmişi sayfası bunlarla dolar; geçilmezse
+ *                      kullanıcı kaydını göremez ve silemez)
  *  - theme
  */
 // Komşu sayfalar arasındaki görünür boşluk = 2×GUTTER. Kapsayıcı kenarlara
@@ -28,6 +31,7 @@ export default function SeasonDeck({
   details,
   navigation,
   getWatchedCount,
+  getWatchEvents,
   theme,
 }) {
   const [index, setIndex] = useState(0);
@@ -76,6 +80,7 @@ export default function SeasonDeck({
                   details={details}
                   navigation={navigation}
                   watchedCount={getWatchedCount(item.season_number)}
+                  watchEvents={getWatchEvents?.(item.season_number)}
                 />
               </View>
             )}

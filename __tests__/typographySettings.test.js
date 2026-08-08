@@ -1,33 +1,39 @@
 // __tests__/typographySettings.test.js
 // Rol bazli font tercihi store'unun sozlesmesi: uc rol bagimsiz, eski tek
-// anahtarli kayit uc role birden tasinir, kullanici secimi gec gelen
-// hidrasyona yenilmez.
+// anahtarli kayit uc role birden tasinir.
+//
+// MMKV GECISI: tercih artik ACILISTA SENKRON okunuyor. "Kullanici secimi gec
+// gelen hidrasyona yenilmez" korumasi (kullaniciSecti) bu yuzden kaldirildi —
+// gec gelen bir hidrasyon artik yok. Ilgili test de kalkti; yerine tohumlanmis
+// depodan ILK OKUMADA dogru deger geldigi dogrulaniyor.
 
-const loadService = ({ roles = null, legacy = null } = {}) => {
+const { withSeededStorage } = require("./helpers/storageTestKit");
+
+const loadService = ({ roles = null } = {}) => {
   jest.resetModules();
-  const storage = {
-    getItem: jest.fn((key) =>
-      Promise.resolve(key === "appFontRoles" ? roles : legacy),
-    ),
-    setItem: jest.fn(() => Promise.resolve()),
-  };
-  jest.doMock("@react-native-async-storage/async-storage", () => ({
-    __esModule: true,
-    default: storage,
-  }));
-  return { service: require("../services/typographySettings"), storage };
+  const service = withSeededStorage(
+    (Keys) => (roles ? [[Keys.fontRoles, roles]] : []),
+    () => require("../services/typographySettings"),
+  );
+  return { service, storage: require("../services/storage") };
 };
 
-// Hidrasyon bir mikro-gorev zinciri; bir tur beklemek yeterli.
-const hidrasyonuBekle = () => new Promise((resolve) => setImmediate(resolve));
+// Eski tek anahtarli kaydin tasinmasi artik gocun isi (registry: fontRoles.legacy).
+const loadServiceWithLegacyKey = async (legacyPresetId) => {
+  jest.resetModules();
+  const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+  AsyncStorage.__reset();
+  AsyncStorage.__store.set("appFontFamily", legacyPresetId);
+  await require("../services/storage").runStorageMigration();
+  return require("../services/typographySettings");
+};
 
 afterEach(() => {
   jest.resetModules();
-  jest.dontMock("@react-native-async-storage/async-storage");
 });
 
 describe("varsayilan durum", () => {
-  test("kayit yokken uc rol de sistem fontunda", async () => {
+  test("kayit yokken uc rol de sistem fontunda", () => {
     const { service } = loadService();
     expect(service.getTypographyState()).toMatchObject({
       heading: "system",
@@ -35,36 +41,31 @@ describe("varsayilan durum", () => {
       numeric: "system",
       fontsLoaded: false,
     });
-    await hidrasyonuBekle();
+  });
+
+  test("bozuk JSON kaydi varsayilana duser", () => {
+    jest.resetModules();
+    const storage = require("../services/storage");
+    // Registry disindan bozuk veri enjekte et.
+    storage.getStore("settings").set(storage.Keys.fontRoles.key, "{bozuk");
+    const service = require("../services/typographySettings");
     expect(service.getTypographyState().heading).toBe("system");
   });
 
-  test("bozuk JSON kaydi varsayilana duser", async () => {
-    const { service } = loadService({ roles: "{bozuk" });
-    await hidrasyonuBekle();
-    expect(service.getTypographyState().heading).toBe("system");
-  });
-
-  test("tanimsiz preset id'si yok sayilir", async () => {
+  test("tanimsiz preset id'si yok sayilir", () => {
     const { service } = loadService({
-      roles: JSON.stringify({ heading: "yokBoyleFont", body: "inter" }),
+      roles: { heading: "yokBoyleFont", body: "inter" },
     });
-    await hidrasyonuBekle();
     expect(service.getTypographyState().heading).toBe("system");
     expect(service.getTypographyState().body).toBe("inter");
   });
 });
 
 describe("kayitli tercih", () => {
-  test("uc rol bagimsiz olarak geri yuklenir", async () => {
+  test("uc rol bagimsiz olarak ILK OKUMADA geri yuklenir", () => {
     const { service } = loadService({
-      roles: JSON.stringify({
-        heading: "bebasNeue",
-        body: "inter",
-        numeric: "spaceMono",
-      }),
+      roles: { heading: "bebasNeue", body: "inter", numeric: "spaceMono" },
     });
-    await hidrasyonuBekle();
     expect(service.getTypographyState()).toMatchObject({
       heading: "bebasNeue",
       body: "inter",
@@ -72,19 +73,17 @@ describe("kayitli tercih", () => {
     });
   });
 
-  test("ESKI tek anahtarli kayit yalniz uygun rollere tasinir", async () => {
-    // Dekoratif font, uygun olmadığı gövde ve rakam rollerine taşınmamalı.
-    const { service } = loadService({ legacy: "oswald" });
-    await hidrasyonuBekle();
+  test("ESKI tek anahtarli kayit gocte yalniz uygun rollere tasinir", async () => {
+    const service = await loadServiceWithLegacyKey("oswald");
     expect(service.getTypographyState()).toMatchObject({
       heading: "oswald",
       body: "oswald",
       numeric: "oswald",
     });
 
-    const { service: dekoratifService } = loadService({ legacy: "monoton" });
-    await hidrasyonuBekle();
-    expect(dekoratifService.getTypographyState()).toMatchObject({
+    // Dekoratif font, uygun olmadigi govde rolune tasinmamali.
+    const dekoratif = await loadServiceWithLegacyKey("monoton");
+    expect(dekoratif.getTypographyState()).toMatchObject({
       heading: "monoton",
       body: "system",
       numeric: "monoton",
@@ -92,12 +91,43 @@ describe("kayitli tercih", () => {
   });
 
   test("yeni anahtar varsa eski anahtar yok sayilir", async () => {
-    const { service } = loadService({
-      roles: JSON.stringify({ heading: "inter", body: "inter", numeric: "inter" }),
-      legacy: "monoton",
-    });
-    await hidrasyonuBekle();
+    jest.resetModules();
+    const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+    AsyncStorage.__reset();
+    AsyncStorage.__store.set("appFontFamily", "monoton");
+    AsyncStorage.__store.set(
+      "appFontRoles",
+      JSON.stringify({ heading: "inter", body: "inter", numeric: "inter" }),
+    );
+    await require("../services/storage").runStorageMigration();
+    const service = require("../services/typographySettings");
     expect(service.getTypographyState().heading).toBe("inter");
+  });
+});
+
+describe("goc sirasi", () => {
+  // REGRESYON KILIDI — bkz. __tests__/effectSettings.test.js'deki ayni desen:
+  // modul goc kapisindan once yuklenebiliyor, bu yuzden anahtara abone.
+  test("modul goc BITMEDEN yuklenirse, goc yazinca fontlar devreye girer", async () => {
+    jest.resetModules();
+    const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+    AsyncStorage.__reset();
+    AsyncStorage.__store.set(
+      "appFontRoles",
+      JSON.stringify({ heading: "bebasNeue", body: "inter", numeric: "spaceMono" }),
+    );
+
+    // Depo hala bos: sistem fontuyla baslar.
+    const service = require("../services/typographySettings");
+    expect(service.getTypographyState().heading).toBe("system");
+
+    await require("../services/storage").runStorageMigration();
+
+    expect(service.getTypographyState()).toMatchObject({
+      heading: "bebasNeue",
+      body: "inter",
+      numeric: "spaceMono",
+    });
   });
 });
 
@@ -110,10 +140,11 @@ describe("secim", () => {
       body: "system",
       numeric: "system",
     });
-    expect(storage.setItem).toHaveBeenCalledWith(
-      "appFontRoles",
-      JSON.stringify({ heading: "bebasNeue", body: "system", numeric: "system" }),
-    );
+    expect(storage.get(storage.Keys.fontRoles)).toEqual({
+      heading: "bebasNeue",
+      body: "system",
+      numeric: "system",
+    });
   });
 
   test("gecersiz rol veya preset yok sayilir", () => {
@@ -121,14 +152,14 @@ describe("secim", () => {
     service.setFontRole("baslik", "inter");
     service.setFontRole("heading", "yokBoyleFont");
     expect(service.getTypographyState().heading).toBe("system");
-    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(storage.has(storage.Keys.fontRoles)).toBe(false);
   });
 
   test("role uygun olmayan preset yok sayilir", () => {
     const { service, storage } = loadService();
     service.setFontRole("body", "monoton");
     expect(service.getTypographyState().body).toBe("system");
-    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(storage.has(storage.Keys.fontRoles)).toBe(false);
   });
 
   test("tumune uygula uc rolu birden ayarlar", () => {
@@ -149,26 +180,14 @@ describe("secim", () => {
       body: "system",
       numeric: "system",
     });
-    expect(storage.setItem).not.toHaveBeenCalled();
-  });
-
-  test("kullanici secimi gec gelen hidrasyonu ezer AMA sadece o rolde", async () => {
-    const { service } = loadService({ legacy: "monoton" });
-    service.setFontRole("body", "inter");
-    await hidrasyonuBekle();
-    // Secilen rol korunur...
-    expect(service.getTypographyState().body).toBe("inter");
-    // ...dokunulmayan uygun rol diskteki tercihle yüklenmeye devam eder.
-    // Monoton yeni katalogda rakama da açıkça uygun kabul edilir.
-    expect(service.getTypographyState().heading).toBe("monoton");
-    expect(service.getTypographyState().numeric).toBe("monoton");
+    expect(storage.has(storage.Keys.fontRoles)).toBe(false);
   });
 
   test("persist:false kaydetmez ama oturum ici gecerlidir", () => {
     const { service, storage } = loadService();
     service.setFontRole("numeric", "spaceMono", { persist: false });
     expect(service.getTypographyState().numeric).toBe("spaceMono");
-    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(storage.has(storage.Keys.fontRoles)).toBe(false);
   });
 });
 
@@ -202,7 +221,7 @@ describe("abonelik", () => {
     expect(service.getTypographyState().fontsLoaded).toBe(true);
     expect(dinleyici).toHaveBeenCalledTimes(1);
     // Font yuklenmesi bir KULLANICI tercihi degil; diske yazilmamali.
-    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(storage.has(storage.Keys.fontRoles)).toBe(false);
 
     service.setFontsLoaded(true);
     expect(dinleyici).toHaveBeenCalledTimes(1);

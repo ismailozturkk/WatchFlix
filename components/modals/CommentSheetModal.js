@@ -43,7 +43,7 @@ import {
   Platform,
   KeyboardAvoidingView
 } from "react-native";
-import AdaptiveBlurView from "../common/AdaptiveBlurView";
+import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -137,12 +137,7 @@ export default function CommentSheetModal({
     >
       {/* ── Karartma overlay ── */}
       <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
-        <AdaptiveBlurView
-          tint="dark"
-          intensity={28}
-          experimentalBlurMethod="dimezisBlurView"
-          style={StyleSheet.absoluteFill}
-        />
+        <ModalBlurBackdrop intensity={28} />
         {/* Alt gradient — sheet'e doğru koyulaşır */}
         <LinearGradient
           colors={["rgba(0,0,0,0.1)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.82)"]}

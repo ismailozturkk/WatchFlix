@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import LottieView from "lottie-react-native";

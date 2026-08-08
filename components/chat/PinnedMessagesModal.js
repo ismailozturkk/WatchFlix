@@ -1,7 +1,6 @@
 import React from "react";
 import {
   FlatList,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -10,6 +9,7 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import { i18nText } from "@utils/i18nText";
 
 const formatPinnedTime = (value, locale) => {
@@ -30,12 +30,13 @@ export default function PinnedMessagesModal({
   const insets = useSafeAreaInsets();
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable
-          onPress={(event) => event.stopPropagation()}
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 18) }]}
-        >
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      intensity={35}
+      dimColor="rgba(0,0,0,0.42)"
+      sheetStyle={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 18) }]}
+    >
           <View style={styles.handle} />
           <View style={styles.header}>
             <View style={styles.titleIcon}>
@@ -95,14 +96,11 @@ export default function PinnedMessagesModal({
               </View>
             }
           />
-        </Pressable>
-      </Pressable>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.68)" },
   sheet: {
     maxHeight: "72%",
     minHeight: 360,

@@ -12,7 +12,6 @@
 // bkz. context/TypographyContext.js); provider yükleme bitince buraya
 // `setFontsLoaded(true)` der. Böylece metin bileşeni tek bir kaynağa abone olur.
 import { useSyncExternalStore } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   DEFAULT_FONT_ROLES,
   TEXT_ROLES,
@@ -20,16 +19,18 @@ import {
   isValidPresetId,
   normalizeFontRoles,
 } from "../utils/typographyRoles";
+import { Keys, get, set, subscribe } from "./storage";
 
-export const FONT_ROLES_STORAGE_KEY = "appFontRoles";
-/** Rol ayrımından önceki tek anahtar; ilk açılışta üç role birden taşınır. */
+export const FONT_ROLES_STORAGE_KEY = Keys.fontRoles.key;
+/** Rol ayrımından önceki tek anahtar; göçte üç role birden taşınır. */
 export const LEGACY_FONT_STORAGE_KEY = "appFontFamily";
 
+// MMKV GEÇİŞİ: roller AÇILIŞTA SENKRON okunuyor. Eskiden sistem fontuyla
+// başlanıp async okuma sonrası düzeltiliyordu — seçtiği fontu her açılışta bir
+// kare boyunca göremeyen kullanıcı deneyimi buradan geliyordu. Hidrasyon
+// asenkron olmadığı için "kullanıcı seçimi geç gelen kayıtla ezilmesin"
+// koruması (kullaniciSecti) da gereksizleşti.
 let durum = Object.freeze({ ...DEFAULT_FONT_ROLES, fontsLoaded: false });
-// Kullanıcı hidrasyon tamamlanmadan seçim yaparsa geç gelen kayıt onu EZMESİN.
-// Koruma ROL BAZINDA: tek bir rolü değiştirmek, diskteki DİĞER iki rolün geri
-// yüklenmesini engellememeli (yoksa dokunulmayan roller sessizce sıfırlanırdı).
-const kullaniciSecti = new Set();
 const dinleyiciler = new Set();
 
 const yayinla = () => {
@@ -52,47 +53,35 @@ const uygula = (yama) => {
   yayinla();
 };
 
-const kayittanOku = async () => {
-  const [ham, eski] = await Promise.all([
-    AsyncStorage.getItem(FONT_ROLES_STORAGE_KEY),
-    AsyncStorage.getItem(LEGACY_FONT_STORAGE_KEY),
-  ]);
-  if (ham) {
-    try {
-      return normalizeFontRoles(JSON.parse(ham));
-    } catch {
-      /* bozuk kayıt → eski anahtara, oradan da varsayılana düş */
-    }
-  }
-  // GERİYE DÖNÜK TAŞIMA: tek fontlu sürümden gelen kullanıcı seçimini
-  // kaybetmesin. Font yalnız uygun olduğu rollere taşınır; diğerleri sistemde
-  // kalır (ör. Monoton gövde metnine uygulanmaz).
-  if (isValidPresetId(eski)) {
-    return normalizeFontRoles({ heading: eski, body: eski, numeric: eski });
-  }
-  return null;
+// Kayıtlı rolleri uygular. HEM modül yüklenirken HEM de anahtar değiştiğinde
+// çalışır.
+//
+// Aboneliğin sebebi (bkz. services/effectSettings.js'deki aynı desen): bu modül
+// AsyncStorage → MMKV göçünden ÖNCE yüklenebiliyor. İlk okuma boş depoya denk
+// gelirse göç anahtarı yazınca abonelik tetiklenir ve kullanıcının fontları
+// aynı oturumda gelir. Bu olmadan güncelleme sonrası ilk açılışta sistem
+// fontuyla kalınırdı.
+//
+// Tek fontlu sürümden gelen `appFontFamily` kaydını üç role yayma işi burada
+// DEĞİL, tek seferlik göçte (registry: fontRoles.legacy).
+const kayittanUygula = () => {
+  const kayitli = get(Keys.fontRoles);
+  if (!kayitli) return;
+  const roller = normalizeFontRoles(kayitli);
+  if (!roller) return;
+  const yama = {};
+  for (const rol of TEXT_ROLES) yama[rol] = roller[rol];
+  uygula(yama);
 };
 
-kayittanOku()
-  .then((roller) => {
-    if (!roller) return;
-    const yama = {};
-    for (const rol of TEXT_ROLES) {
-      if (!kullaniciSecti.has(rol)) yama[rol] = roller[rol];
-    }
-    uygula(yama);
-  })
-  .catch(() => {
-    /* kayıt okunamadı → sistem fontuyla devam */
-  });
+kayittanUygula();
+subscribe(Keys.fontRoles, kayittanUygula);
 
 const kalicilastir = () => {
   const { fontsLoaded, ...roller } = durum;
-  AsyncStorage.setItem(FONT_ROLES_STORAGE_KEY, JSON.stringify(roller)).catch(
-    () => {
-      /* yazılamadıysa oturum içi seçim yine de geçerli */
-    },
-  );
+  // Yazılamadıysa oturum içi seçim yine de geçerli — hata depolama katmanında
+  // raporlanır.
+  set(Keys.fontRoles, roller);
 };
 
 /** Tek bir rolün fontunu değiştirir. Geçersiz rol/preset yok sayılır. */
@@ -102,7 +91,6 @@ export function setFontRole(role, presetId, { persist = true } = {}) {
     !isValidPresetId(presetId) ||
     !isPresetRecommendedFor(presetId, role)
   ) return;
-  kullaniciSecti.add(role);
   uygula({ [role]: presetId });
   if (persist) kalicilastir();
 }
@@ -113,7 +101,6 @@ export function setAllFontRoles(presetId, { persist = true } = {}) {
     !isValidPresetId(presetId) ||
     !TEXT_ROLES.every((role) => isPresetRecommendedFor(presetId, role))
   ) return;
-  for (const role of TEXT_ROLES) kullaniciSecti.add(role);
   uygula({ heading: presetId, body: presetId, numeric: presetId });
   if (persist) kalicilastir();
 }

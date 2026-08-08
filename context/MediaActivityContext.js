@@ -7,11 +7,11 @@ import React, {
   useRef,
 } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, get, set, getActiveUser } from "../services/storage";
 import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 import { snapshotErrorHandler } from "../utils/firestoreError";
-import { shouldPersistInternetData } from "../utils/dataCacheSettings";
+import { sameJson } from "../utils/sameData";
 
 // Kullanıcının içerik-bazlı ETKİNLİK durumu (puan verdi mi / yorum yaptı mı).
 // ListStatusContext'in kardeşi: o "hangi listede" sorusuna, bu "ne yaptı"
@@ -27,14 +27,15 @@ import { shouldPersistInternetData } from "../utils/dataCacheSettings";
 // Index şekli statusIndex ile aynı desen:
 //   { movie: { [id]: { hasRating, hasComment } }, tv: { ... } }
 
-const CACHE_PREFIX = "media_activity_cache_";
+// Anahtar öneki artık registry'de (Keys.mediaActivity, cache deposu).
 const EMPTY_INDEX = Object.freeze({ movie: {}, tv: {} });
 
 const MediaActivityContext = createContext();
 
 export const useMediaActivityContext = () => useContext(MediaActivityContext);
 
-const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+// `sameJson` utils/sameData.js'e taşındı: aynı satır bu dosyada, TvShowContex,
+// MovieContex ve ListStatusContext'te ayrı ayrı yazılıydı.
 
 const buildActivityIndex = ({ ratingsMap, commentsMap }) => {
   const index = { movie: {}, tv: {} };
@@ -67,31 +68,32 @@ export const MediaActivityProvider = ({ children }) => {
   const [commentsMap, setCommentsMap] = useState({});
   const [ratingsLoaded, setRatingsLoaded] = useState(false);
   const [commentsLoaded, setCommentsLoaded] = useState(false);
-  const [cachedIndex, setCachedIndex] = useState(EMPTY_INDEX);
+  // AÇILIŞ TOHUMU — rozetler auth/snapshot beklemeden görünsün.
+  //
+  // Eskiden bu okuma bir `useEffect` içindeydi, yani önbellek DOLU olsa bile
+  // ilk kare rozetsiz çiziliyordu. MMKV senkron olduğu için okuma doğrudan
+  // başlangıç değeri olabiliyor. `uid` ilk render'da genelde null (Firebase
+  // oturumu asenkron çözülüyor); son aktif kullanıcı depodan senkron okunuyor.
+  const ilkTohum = useMemo(
+    () => {
+      const uid = user?.uid ?? getActiveUser();
+      return uid ? get(Keys.mediaActivity, { uid })?.activityIndex ?? null : null;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const [cachedIndex, setCachedIndex] = useState(ilkTohum ?? EMPTY_INDEX);
   const cacheHydratedForUid = useRef(null);
 
-  // Açılışta cache'ten hızlı hidrasyon (rozetler auth/snapshot beklemeden görünsün).
+  // uid DEĞİŞİMİ (hesap geçişi) için; ilk render'ı yukarıdaki tohum karşılıyor.
   useEffect(() => {
-    let cancelled = false;
+    const uid = user?.uid ?? getActiveUser();
+    if (!uid || cacheHydratedForUid.current === uid) return;
+    cacheHydratedForUid.current = uid;
 
-    const hydrate = async () => {
-      const uid = user?.uid ?? (await AsyncStorage.getItem("cachedUserId"));
-      if (!uid || cacheHydratedForUid.current === uid) return;
-      cacheHydratedForUid.current = uid;
-
-      try {
-        const raw = await AsyncStorage.getItem(`${CACHE_PREFIX}${uid}`);
-        if (!raw || cancelled) return;
-        const parsed = JSON.parse(raw);
-        if (parsed?.activityIndex) setCachedIndex(parsed.activityIndex);
-      } catch {}
-    };
-
-    hydrate();
-
-    return () => {
-      cancelled = true;
-    };
+    const parsed = get(Keys.mediaActivity, { uid });
+    if (parsed?.activityIndex) setCachedIndex(parsed.activityIndex);
   }, [user?.uid]);
 
   useEffect(() => {
@@ -148,14 +150,12 @@ export const MediaActivityProvider = ({ children }) => {
   // Debounce'lu cache yazımı — iki listener art arda tetiklenince tek yazım.
   useEffect(() => {
     if (!user?.uid || !loaded) return undefined;
-    if (!shouldPersistInternetData({ category: "activity" })) return undefined;
 
+    // "Verileri indir" ayarına bilerek TABİ DEĞİL: o ayar TMDB içeriği içindir,
+    // buradaki veri kullanıcının kendi puan/yorum etkinliği.
     const uid = user.uid;
     const timer = setTimeout(() => {
-      AsyncStorage.setItem(
-        `${CACHE_PREFIX}${uid}`,
-        JSON.stringify({ activityIndex: firestoreIndex, ts: Date.now() }),
-      ).catch(() => {});
+      set(Keys.mediaActivity, { activityIndex: firestoreIndex, ts: Date.now() }, { uid });
     }, 2500);
     return () => clearTimeout(timer);
   }, [firestoreIndex, loaded, user?.uid]);

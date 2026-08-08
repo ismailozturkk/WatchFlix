@@ -25,6 +25,11 @@ export function useWatchedShow(showId) {
       setLoading(false);
       return undefined;
     }
+    // Dizi değiştiğinde ÖNCEKİ dizinin belgesini hemen bırak. Aksi hâlde ilk
+    // snapshot gelene kadar eski dizinin izlenme durumu (ilerleme, "İzlendi"
+    // rozeti) yeni dizininmiş gibi çizilirdi — aynı bileşen örneği farklı bir
+    // showId ile yeniden kullanıldığında görünür oluyordu.
+    setShowDoc(null);
     setLoading(true);
     const ref = doc(db, "Lists", user.uid, "watchedTv", `tv_${showId}`);
     const unsub = onSnapshot(

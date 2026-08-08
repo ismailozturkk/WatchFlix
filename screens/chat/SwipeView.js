@@ -1,9 +1,8 @@
 import React, { useRef } from "react";
-import { View, StyleSheet, Animated, Alert } from "react-native";
+import { Animated } from "react-native";
 import LottieView from "lottie-react-native";
 import { PanGestureHandler, State } from "react-native-gesture-handler";
 import { ChatModal } from "@components/modals/ChatModal";
-import Toast from "react-native-toast-message";
 import { useNavigation } from "@react-navigation/native";
 const AnimatedLottieView = Animated.createAnimatedComponent(LottieView);
 

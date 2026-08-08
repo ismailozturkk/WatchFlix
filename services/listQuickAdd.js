@@ -37,6 +37,7 @@ import { markShow } from "./watchedTvService";
 import { cachedTmdb } from "../utils/cachedRead";
 import { resolveGenreIds } from "../utils/discoveryPersonalization";
 import { applyFacts, langOf, todayListDate } from "../utils/mediaFacts";
+import { getReleaseState, RELEASE_STATE } from "../utils/watchState";
 import { mediaToListItem } from "../utils/listShare";
 import {
   listAcceptedTypes,
@@ -49,6 +50,18 @@ const SUGGESTION_TTL = 6 * 60 * 60 * 1000; // popüler listesi gün içinde oyna
 const GENRE_CATALOG_TTL = 30 * 24 * 60 * 60 * 1000; // TMDB tür tablosu neredeyse hiç değişmez
 
 const categoryOf = (type) => (type === "tv" ? "tvContent" : "movieContent");
+
+/**
+ * İzlenenler listesi kapısı: engel varsa `addMediaToList` durum değeri, yoksa
+ * null. Ekrandaki buton kilidi yalnız DETAY sayfasında; buraya arama sonucundan
+ * gelinir ve tarih hiç sorgulanmadan izlendi yazılabiliyordu.
+ * (Karar mantığı: utils/watchState.js)
+ */
+function blockedStatus(date, status) {
+  const state = getReleaseState(date, status);
+  if (state === RELEASE_STATE.RELEASED) return null;
+  return state === RELEASE_STATE.SCHEDULED ? "unreleased" : "unknown-release";
+}
 
 /**
  * Açık listeye eklenebilecek eserleri TMDB'de arar.
@@ -288,7 +301,7 @@ async function fetchSeasonsForShow({ showId, details, apiKey, language }) {
  * @param {string}   p.language
  * @param {object}   [p.genreMap] tür id → ad (utils/genreLabels.buildGenreMap)
  * @param {string}   [p.watchDate] "YYYY-MM-DD" — izlenenler listelerinde ZORUNLU
- * @returns {Promise<{status:"added"|"duplicate"|"empty-show", item:object|null}>}
+ * @returns {Promise<{status:"added"|"duplicate"|"empty-show"|"unreleased"|"unknown-release", item:object|null}>}
  * @throws Firestore/ağ hatasında (çağıran ekran toast gösterir)
  */
 export async function addMediaToList({
@@ -313,6 +326,10 @@ export async function addMediaToList({
       params: { language: langOf(language) },
       headers: { accept: "application/json", Authorization: apiKey },
     });
+    // Yayın kapısı: arama sonucundan değil TMDB detayından karar verilir.
+    const blocked = blockedStatus(details?.first_air_date, details?.status);
+    if (blocked) return { status: blocked, item: null };
+
     const seasons = await fetchSeasonsForShow({
       showId: media.id,
       details,
@@ -330,11 +347,32 @@ export async function addMediaToList({
         showSeasonCount: details.number_of_seasons || 0,
         imagePath: details.poster_path || media.poster_path || null,
         genres: (details.genres || []).map((genre) => genre?.name).filter(Boolean),
+        firstAirDate: details.first_air_date,
+        status: details.status,
       },
       seasons,
       dateAdded,
     );
     return { status: "added", item: null };
+  }
+
+  // ── İzlenen filmler: yayın kapısı, öğe kurulmadan ÖNCE ────────────────────
+  // Olgular zaten çekiliyor (buildListItem); burada tekrar çağırmak yeni istek
+  // doğurmuyor — tmdbFacts oturum içi memo + 7 günlük önbellek tutuyor.
+  let movieRelease = null;
+  if (listName === "watchedMovies") {
+    const facts = await fetchMediaFacts({
+      apiKey,
+      id: media.id,
+      mediaType: "movie",
+      language,
+    });
+    // Olgu çözülemedi: "tarihi yok" demek DEĞİL. Sessizce engellemek yerine
+    // hata verilir, çağıran ekran "Eklenemedi" gösterir.
+    if (!facts) throw new Error("addMediaToList: yayın bilgisi alınamadı");
+    const blocked = blockedStatus(facts.releaseDate, facts.status);
+    if (blocked) return { status: blocked, item: null };
+    movieRelease = { releaseDate: facts.releaseDate, status: facts.status };
   }
 
   const item = await buildListItem({
@@ -348,7 +386,7 @@ export async function addMediaToList({
 
   // ── İzlenen filmler: her ekleme bir izleme olayı (tekrar izleme desteklenir) ─
   if (listName === "watchedMovies") {
-    await markMovieWatch(uid, { ...item, type: "movie" }, dateAdded);
+    await markMovieWatch(uid, { ...item, type: "movie", ...movieRelease }, dateAdded);
     return { status: "added", item };
   }
 

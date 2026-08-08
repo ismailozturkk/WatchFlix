@@ -19,7 +19,7 @@
 //   Notes/{uid}/items                 (ProfileNotesContext)
 //   Reminders/{uid}/movies|tvShows    (ProfileRemindersContext)
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, set as writeStorage } from "./storage";
 import axios from "axios";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { auth, db } from "../firebase";
@@ -41,9 +41,9 @@ export const CACHE = cacheKeys;
 
 const LIST_SUBCOLLECTIONS = ["favorites", "watchList", "watchedMovies", "watchedTv"];
 const POSTER_KEY_RE = /poster|still|backdrop/i;
-const FEED_CACHE_KEY = "feed_cache_v1";
-const WATCHED_TV_CACHE_KEY = "cache_watchedTvShows";
-const LIST_STATUS_PREFIX = "list_status_cache_";
+// Önbellek anahtarları registry'de (Keys.feed / Keys.watchedTvShows /
+// Keys.listStatus). Bu üç ad eskiden burada, PostsContext'te, ListStatusContext'te
+// ve cacheInspector'da ayrı ayrı elle yazılıydı.
 const RAW_KEY = process.env.EXPO_PUBLIC_API_KEY || "";
 const API_KEY = RAW_KEY && !RAW_KEY.startsWith("Bearer ") ? `Bearer ${RAW_KEY}` : RAW_KEY;
 
@@ -243,18 +243,16 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
           collectPosterPaths(map, posterPaths);
           cachedDocs += snap.size;
         }
-        await AsyncStorage.setItem(
-          `${LIST_STATUS_PREFIX}${uid}`,
-          JSON.stringify({
+        writeStorage(
+          Keys.listStatus,
+          {
             allLists: root,
             statusIndex: buildStatusIndex(root, maps),
             ts: Date.now(),
-          }),
+          },
+          { uid },
         );
-        await AsyncStorage.setItem(
-          WATCHED_TV_CACHE_KEY,
-          JSON.stringify(watchedTvFromMaps(root, maps.watchedTv)),
-        );
+        writeStorage(Keys.watchedTvShows, watchedTvFromMaps(root, maps.watchedTv));
       },
     },
     {
@@ -302,7 +300,7 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
       label: i18nText("autoI18n.gonderiler", "Gönderiler"),
       run: async () => {
         const { posts } = await PostsApi.fetchFeed({ filter: "all" });
-        await AsyncStorage.setItem(FEED_CACHE_KEY, JSON.stringify(posts));
+        writeStorage(Keys.feed, posts);
         collectPosterPaths(posts, posterPaths);
         cachedDocs += posts.length;
       },

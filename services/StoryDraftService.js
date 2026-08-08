@@ -1,41 +1,34 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+// services/StoryDraftService.js
+//
+// Story taslakları. GİZLİLİK DÜZELTMESİ: kayıt eskiden uid'siz global bir
+// anahtardaydı (`story_drafts_v1`), yani aynı cihazda hesap değiştiren kullanıcı
+// öncekinin yayınlanmamış taslaklarını görüyordu. Artık kullanıcı kapsamlı;
+// aktif uid'i depolama katmanı çözüyor, bu yüzden imzalar değişmedi.
+//
+// Fonksiyonlar async kaldı: çağrı yerlerinin tamamı `await` ile kullanıyor ve
+// MMKV senkron olduğu için bu yalnızca bir mikro-görev maliyeti.
 
-const KEY = "story_drafts_v1";
+import { Keys, get, set } from "./storage";
 
-const readAll = async () => {
-  try {
-    const raw = await AsyncStorage.getItem(KEY);
-    const list = raw ? JSON.parse(raw) : [];
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return [];
-  }
+const readAll = () => {
+  const list = get(Keys.storyDrafts);
+  return Array.isArray(list) ? list : [];
 };
 
-const writeAll = async (list) => {
-  // Çağrı yerleri (ör. StoryDraftsScreen onPress) await'i try/catch'siz
-  // kullanıyor — depolama hatası unhandled promise rejection olmasın.
-  try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(list));
-  } catch (e) {
-    if (__DEV__) console.warn("StoryDraftService write failed:", e?.message);
-  }
-};
+const writeAll = (list) => set(Keys.storyDrafts, list);
 
 export const StoryDraftService = {
   /* En yeni üstte */
   async getDrafts() {
-    const list = await readAll();
-    return list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    return readAll().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   },
 
   async getDraftById(id) {
-    const list = await readAll();
-    return list.find((d) => d.id === id) || null;
+    return readAll().find((d) => d.id === id) || null;
   },
 
   async saveDraft(data) {
-    const list = await readAll();
+    const list = readAll();
     const now = Date.now();
     const draft = {
       id: `draft_${now}_${Math.random().toString(36).slice(2, 7)}`,
@@ -44,21 +37,20 @@ export const StoryDraftService = {
       ...data,
     };
     list.push(draft);
-    await writeAll(list);
+    writeAll(list);
     return draft;
   },
 
   async updateDraft(id, data) {
-    const list = await readAll();
+    const list = readAll();
     const idx = list.findIndex((d) => d.id === id);
     if (idx === -1) return null;
     list[idx] = { ...list[idx], ...data, updatedAt: Date.now() };
-    await writeAll(list);
+    writeAll(list);
     return list[idx];
   },
 
   async deleteDraft(id) {
-    const list = await readAll();
-    await writeAll(list.filter((d) => d.id !== id));
+    writeAll(readAll().filter((d) => d.id !== id));
   },
 };

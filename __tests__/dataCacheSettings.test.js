@@ -1,22 +1,20 @@
 // "Verileri indir" ana anahtarı + veri türü seçiminin saf mantığı.
-// AsyncStorage mock'lanır (RN modülü); geri kalan her şey saf JS.
+//
+// MMKV GEÇİŞİ: modül artık ayarı SENKRON okuyor. Eskiden açılışta asenkron bir
+// `hydrateAutoDataCacheSetting()` adımı vardı ve hidrasyon bitmeden yapılan her
+// cache yazması ayarı `false` görüyordu — "Verileri indir" açık olan kullanıcıda
+// bile açılıştaki ilk istekler diske yazılmıyordu. O adım ve testleri kalktı;
+// yerine "depodan doğrudan okur" testleri geldi.
 
-jest.mock("@react-native-async-storage/async-storage", () => ({
-  multiGet: jest.fn(),
-}));
-
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, get, getStore } from "../services/storage";
 import {
-  AUTO_DATA_CACHE_KEY,
   DATA_CACHE_CATEGORIES,
-  DATA_TYPES_KEY,
   DEFAULT_DATA_TYPES,
   categoryForCacheKey,
   categoryForNamespace,
   categoryForTmdbUrl,
   getAutoDataCacheEnabled,
   getDataTypes,
-  hydrateAutoDataCacheSetting,
   isDataTypeEnabled,
   normalizeDataTypes,
   setAutoDataCacheEnabled,
@@ -24,14 +22,8 @@ import {
   shouldPersistInternetData,
 } from "../utils/dataCacheSettings";
 
-const mockStorage = (enabled, types) =>
-  AsyncStorage.multiGet.mockResolvedValueOnce([
-    [AUTO_DATA_CACHE_KEY, enabled],
-    [DATA_TYPES_KEY, types],
-  ]);
-
 beforeEach(() => {
-  AsyncStorage.multiGet.mockReset();
+  getStore("settings").clearAll();
   setAutoDataCacheEnabled(false);
   setDataTypes(null);
 });
@@ -99,38 +91,38 @@ describe("veri türü seçimi", () => {
   });
 });
 
-describe("hydrate", () => {
-  test("kayıtlı değerleri okur", async () => {
-    mockStorage("true", JSON.stringify({ images: false }));
-    await hydrateAutoDataCacheSetting();
+describe("kalıcılık", () => {
+  test("yazılan değer diske iner ve senkron geri okunur", () => {
+    setAutoDataCacheEnabled(true);
+    setDataTypes({ ...DEFAULT_DATA_TYPES, images: false });
 
+    expect(get(Keys.autoDataCache)).toBe(true);
     expect(getAutoDataCacheEnabled()).toBe(true);
     expect(getDataTypes().images).toBe(false);
     expect(getDataTypes().lists).toBe(true);
   });
 
-  test("kayıt yoksa: ana anahtar kapalı, türler açık", async () => {
-    mockStorage(null, null);
-    await hydrateAutoDataCacheSetting();
-
+  test("kayıt yoksa: ana anahtar kapalı, türler açık", () => {
+    getStore("settings").clearAll();
     expect(getAutoDataCacheEnabled()).toBe(false);
     expect(getDataTypes()).toEqual({ ...DEFAULT_DATA_TYPES });
   });
 
-  test("bozuk tür kaydı varsayılana düşer, ana anahtarı bozmaz", async () => {
-    mockStorage("true", "{bozuk-json");
-    await hydrateAutoDataCacheSetting();
+  test("bozuk tür kaydı varsayılana düşer, ana anahtarı bozmaz", () => {
+    setAutoDataCacheEnabled(true);
+    // Registry dışından bozuk veri enjekte et.
+    getStore("settings").set(Keys.dataCacheTypes.key, "{bozuk-json");
 
     expect(getAutoDataCacheEnabled()).toBe(true);
     expect(getDataTypes()).toEqual({ ...DEFAULT_DATA_TYPES });
   });
 
-  test("storage hatası güvenli tarafa düşer (kapalı)", async () => {
-    AsyncStorage.multiGet.mockRejectedValueOnce(new Error("bozuk depo"));
-    setAutoDataCacheEnabled(true);
-    await hydrateAutoDataCacheSetting();
-
+  test("anahtar BAŞKA bir yerden değişirse ayna tazelenir", () => {
+    // AppSettingsContext ayarı değiştirince bu modülün senkron aynası da
+    // güncel olmalı; abonelik bunu sağlıyor.
     expect(getAutoDataCacheEnabled()).toBe(false);
+    require("../services/storage").set(Keys.autoDataCache, true);
+    expect(getAutoDataCacheEnabled()).toBe(true);
   });
 });
 

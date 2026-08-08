@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, get, set, has } from "../services/storage";
 import Toast from "react-native-toast-message";
 import { useAuth } from "./AuthContext";
 import { useUserProfile } from "./UserProfileContext";
@@ -26,35 +26,19 @@ export const ProfileUiProvider = ({ children }) => {
   const [avatarHydrating, setAvatarHydrating] = useState(false);
   const [avatarSaving, setAvatarSaving] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [gridStyle, setGridStyle] = useState(1);
-  const [allCornersRounded, setAllCornersRounded] = useState(false);
+  const [gridStyle, setGridStyle] = useState(() => get(Keys.listGridStyle));
+  const [allCornersRounded, setAllCornersRounded] = useState(() =>
+    get(Keys.allCornersRounded),
+  );
   const firestoreAvatarUidRef = useRef(null);
   const avatarSavingRef = useRef(false);
 
-  // Load grid style preference
-  useEffect(() => {
-    AsyncStorage.getItem("listGridStyle")
-      .then((val) => {
-        if (val === "true" || val === "1") setGridStyle(1);
-        else if (val === "false" || val === "2") setGridStyle(2);
-        else if (val === "3") setGridStyle(3);
-        else if (val === "4") setGridStyle(4);
-        else if (val !== null) setGridStyle(1);
-      })
-      .catch(() => {});
-
-    AsyncStorage.getItem("allCornersRounded")
-      .then((val) => {
-        if (val !== null) setAllCornersRounded(val === "true");
-      })
-      .catch(() => {});
-  }, [uid]);
+  // Görünüm tercihleri yukarıdaki useState başlangıç değerlerinde SENKRON
+  // okunuyor; eski iki ayrı hidrasyon effect'i kalktı. "true"/"false" biçimli
+  // eski kayıtların sayıya çevrilmesi göçün işi (registry: listGridStyle).
 
   const saveListGridStyle = async (styleId) => {
-    try {
-      await AsyncStorage.setItem("listGridStyle", String(styleId));
-      setGridStyle(styleId);
-    } catch (err) {
+    if (!set(Keys.listGridStyle, styleId)) {
       Toast.show({
         type: "error",
         text1: i18nText(
@@ -62,57 +46,38 @@ export const ProfileUiProvider = ({ children }) => {
           "Görünüm ayarı kaydedilemedi"
         ),
       });
+      return;
     }
+    setGridStyle(styleId);
   };
 
   const saveAllCornersRounded = async (isRounded) => {
-    try {
-      await AsyncStorage.setItem(
-        "allCornersRounded",
-        isRounded ? "true" : "false"
-      );
-      setAllCornersRounded(isRounded);
-    } catch (err) {
+    if (!set(Keys.allCornersRounded, !!isRounded)) {
       Toast.show({
         type: "error",
         text1: i18nText("autoI18n.ayarlar_kaydedilemedi", "Ayar kaydedilemedi"),
       });
+      return;
     }
+    setAllCornersRounded(isRounded);
   };
 
-  // AsyncStorage yalnız hızlı başlangıç önbelleğidir. Firestore profili geldiyse
-  // geç gelen local okuma güncel server index'inin üzerine yazamaz.
+  // Yerel kayıt yalnız hızlı başlangıç önbelleğidir; gerçek kaynak Firestore.
+  //
+  // MMKV GEÇİŞİ: okuma senkron olduğu için "geç gelen local okuma güncel server
+  // index'ini ezmesin" koruması (cancelled bayrağı + firestoreAvatarUidRef
+  // kontrolü) gereksizleşti — local okuma Firestore snapshot'ından ÖNCE bitiyor.
+  // Kullanıcı ayrıca avatarını bir kare gecikmeyle değil, ilk render'da görüyor.
   useEffect(() => {
-    let cancelled = false;
     firestoreAvatarUidRef.current = null;
     if (!uid) {
       setSelectAvatarIndex(0);
-      return undefined;
+      return;
     }
-    setAvatarHydrating(true);
-    AsyncStorage.getItem(`avatar_${uid}`)
-      .then((stored) => {
-        if (
-          !cancelled &&
-          stored !== null &&
-          firestoreAvatarUidRef.current !== uid
-        ) {
-          const index = clampAvatarIndex(parseInt(stored, 10));
-          setSelectAvatarIndex(index);
-        }
-      })
-      .catch(() =>
-        Toast.show({
-          type: "error",
-          text1: i18nText("autoI18n.avatar_yuklenemedi", "Avatar yüklenemedi"),
-        })
-      )
-      .finally(() => {
-        if (!cancelled) setAvatarHydrating(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    if (has(Keys.avatarIndex, { uid })) {
+      setSelectAvatarIndex(clampAvatarIndex(get(Keys.avatarIndex, { uid })));
+    }
+    setAvatarHydrating(false);
   }, [uid]);
 
   // Firestore gerçek kaynak: profil snapshot'ı geldiğinde hem UI hem local cache
@@ -129,7 +94,7 @@ export const ProfileUiProvider = ({ children }) => {
     firestoreAvatarUidRef.current = uid;
     setSelectAvatarIndex(index);
     setAvatarHydrating(false);
-    AsyncStorage.setItem(`avatar_${uid}`, String(index)).catch(() => {});
+    set(Keys.avatarIndex, index, { uid });
   }, [uid, profile?.uid, profile?.avatarIndex]);
 
   // Tek kalıcı seçim yolu. UI optimistic güncellenir; Firestore yazısı başarısız
@@ -149,12 +114,12 @@ export const ProfileUiProvider = ({ children }) => {
       setSelectAvatarIndex(index);
       try {
         await changeAvatarIndex(index);
-        AsyncStorage.setItem(`avatar_${uid}`, String(index)).catch(() => {});
+        set(Keys.avatarIndex, index, { uid });
         setModalVisible(false);
         return true;
       } catch (error) {
         setSelectAvatarIndex(previous);
-        AsyncStorage.setItem(`avatar_${uid}`, String(previous)).catch(() => {});
+        set(Keys.avatarIndex, previous, { uid });
         Toast.show({
           type: "error",
           text1: i18nText(

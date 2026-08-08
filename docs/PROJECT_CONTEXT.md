@@ -23,7 +23,8 @@
 | Auth | Firebase Auth + Google Sign-in |
 | DB | Firebase Firestore (Modular SDK v11.7) |
 | External API | TMDB (The Movie Database) |
-| Local cache | AsyncStorage (memory+disk TTL cache `utils/apiCache.js`) |
+| Yerel depolama | react-native-mmkv, `services/storage` katmanı üzerinden (registry + senkron erişim + kapsam) |
+| Local cache | MMKV `cache` deposu (memory+disk TTL cache `utils/apiCache.js`) |
 | i18n | i18next + react-i18next (`translations/tr.json`, `translations/en.json`) |
 | Test | Manuel (otomasyon yok) |
 
@@ -82,7 +83,7 @@ Seelogd/
 │   ├── Skeleton.js, ErrorBoundary.js …
 │
 ├── utils/
-│   ├── apiCache.js             # AsyncStorage TTL cache (TMDB için)
+│   ├── apiCache.js             # MMKV TTL cache (TMDB için)
 │   ├── avatars.js              # 56 avatar require() + getAvatarSource + clampAvatarIndex
 │   └── tmdbImageUtils.js
 │
@@ -366,7 +367,7 @@ useEffect(() => {
 | Friend req gönder | Her iki tarafta doc + counter ±1 + alıcıda notification |
 | Accept | `/friends/{}` her iki tarafta, request silinir, sender'a `friend_accepted` notif |
 | Block | Arkadaşlık silinir, requestler temizlenir |
-| Avatar değiştir | AsyncStorage + Firestore senkron, sonraki post'larda yeni avatar |
+| Avatar değiştir | MMKV + Firestore senkron, sonraki post'larda yeni avatar |
 | Post oluştur | `Posts/{}` + `Users/{uid}.postsCount++` |
 | Like | Optimistic UI + `Posts/{id}/likes/{uid}` + count |
 | Presence | App background → `isOnline: false`, 60sn'de bir foreground'da heartbeat |

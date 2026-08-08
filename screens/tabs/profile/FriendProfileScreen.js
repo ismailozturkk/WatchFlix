@@ -30,6 +30,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { doc, collection, onSnapshot, getDocs } from "firebase/firestore";
 import { SafeAreaView } from "react-native-safe-area-context";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import Feather from "@expo/vector-icons/Feather";
@@ -923,31 +924,26 @@ export default function FriendProfileScreen({ route, navigation }) {
         )}
       </ScrollView>
 
-      <Modal
+      <BottomSheetModal
         visible={!!selectedSharedList}
-        transparent
-        animationType="slide"
-        statusBarTranslucent
-        onRequestClose={() => setSelectedSharedList(null)}
+        onClose={() => setSelectedSharedList(null)}
+        intensity={35}
+        dimColor="rgba(0,0,0,0.4)"
+        sheetStyle={[
+          styles.listModalSheet,
+          {
+            backgroundColor: theme.secondary,
+            borderColor: theme.border ?? "rgba(255,255,255,0.08)",
+            borderTopLeftRadius: 32,
+            borderTopRightRadius: 32,
+            borderBottomLeftRadius: 0,
+            borderBottomRightRadius: 0,
+            padding: 15,
+            paddingBottom: 0,
+            borderBottomWidth: 0,
+          },
+        ]}
       >
-        <View style={[styles.modalOverlay, { justifyContent: "flex-end", paddingHorizontal: 0 }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setSelectedSharedList(null)} />
-          <View
-            style={[
-              styles.listModalSheet,
-              {
-                backgroundColor: theme.secondary,
-                borderColor: theme.border ?? "rgba(255,255,255,0.08)",
-                borderTopLeftRadius: 32,
-                borderTopRightRadius: 32,
-                borderBottomLeftRadius: 0,
-                borderBottomRightRadius: 0,
-                padding: 15,
-                paddingBottom: 0,
-                borderBottomWidth: 0,
-              },
-            ]}
-          >
             <View style={{ width: 44, height: 5, borderRadius: 3, backgroundColor: theme.text?.muted ?? "#666", alignSelf: "center", marginBottom: 20 }} />
             <View style={[styles.modalHeaderRow, { marginBottom: 20 }]}>
               <View style={styles.modalTitleGroup}>
@@ -1001,9 +997,7 @@ export default function FriendProfileScreen({ route, navigation }) {
                 )}
               />
             )}
-          </View>
-        </View>
-      </Modal>
+      </BottomSheetModal>
 
       <Modal
         visible={unfriendModalVisible}

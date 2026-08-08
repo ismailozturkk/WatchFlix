@@ -39,6 +39,7 @@ import {
 } from "../utils/watchHistory";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 import { trackFirstContentActivation } from "./activationAnalytics";
+import { assertWatchable } from "../utils/watchState";
 
 // Doküman id şeması: `tv_${showId}` — TÜM liste öğesi koleksiyonlarıyla aynı
 // (`${type}_${id}`). favorites/watchList film+dizi karışık tuttuğu için type
@@ -433,9 +434,14 @@ export async function unmarkSeason(uid, showId, seasonNumber) {
 /**
  * Diziyi komple işaretler (tüm sezonların bölümleriyle — üzerine yazar).
  * seasonsWithEpisodes: [{ seasonNumber, seasonPosterPath, seasonEpisodes, episodes:[...] }]
+ *
+ * `showMeta.firstAirDate` / `showMeta.status` yalnız yayın kapısını besler,
+ * belgeye yazılmaz. Ekranlar zaten yayınlanmamış diziyi "Hatırlat"a çeviriyor;
+ * bu kontrol son savunma hattı (bkz. utils/watchState.js).
  */
 export async function markShow(uid, showMeta, seasonsWithEpisodes, watchDate) {
   if (!uid || showMeta?.id == null || !Array.isArray(seasonsWithEpisodes)) return;
+  assertWatchable(showMeta?.firstAirDate, showMeta?.status);
   const targets = seasonsWithEpisodes
     .filter((season) => season?.seasonNumber != null && (season.episodes || []).length)
     .map((season) => ({ seasonMeta: season, episodes: season.episodes }));

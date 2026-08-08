@@ -2,13 +2,13 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import React from "react";
 import {
   ActivityIndicator,
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import { i18nText } from "@utils/i18nText";
 
 export const CALENDAR_RANGE_PRESETS = [
@@ -396,27 +396,16 @@ export function CalendarRangePicker({
   onClose,
 }) {
   return (
-    <Modal
+    <BottomSheetModal
       visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      statusBarTranslucent
+      onClose={onClose}
+      intensity={35}
+      dimColor="rgba(0,0,0,0.35)"
+      sheetStyle={[
+        styles.sheet,
+        { backgroundColor: theme.secondary, borderColor: theme.border },
+      ]}
     >
-      <View style={styles.sheetRoot}>
-        <TouchableOpacity
-          style={StyleSheet.absoluteFill}
-          activeOpacity={1}
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
-        />
-        <View
-          style={[
-            styles.sheet,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
-        >
           <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
           <View style={styles.sheetHeader}>
             <View style={[styles.sheetHeaderIcon, { backgroundColor: theme.accent + "1A" }]}>
@@ -489,9 +478,7 @@ export function CalendarRangePicker({
               );
             })}
           </View>
-        </View>
-      </View>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 

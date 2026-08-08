@@ -1,25 +1,20 @@
 import * as Calendar from "expo-calendar";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import Toast from "react-native-toast-message";
 import { Platform } from "react-native";
 import { i18nText } from "./i18nText";
+import { Keys, get, set } from "../services/storage";
 
-const STORAGE_KEY = "phone_calendar_saved_events_v1";
 const CALENDAR_NAME = "Seelogd";
 
+// Kayıt bilerek uid'siz: burada cihazın takvimine YAZILMIŞ etkinliklerin
+// kimlikleri duruyor. Kullanıcıya göre kapsansaydı, hesap değişiminde eski
+// kayıtlar erişilemez olur ve takvimde sahipsiz etkinlikler kalırdı.
 async function getSavedMap() {
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
+  return get(Keys.phoneCalendarEvents) || {};
 }
 
 async function setSavedMap(map) {
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(map));
-  } catch {}
+  set(Keys.phoneCalendarEvents, map);
 }
 
 export function buildEventKey(item) {

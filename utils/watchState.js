@@ -7,6 +7,8 @@
 //   partial → kısmen izlendi (İzleniyor)   [bölümde kullanılmaz]
 //   full    → tamamı izlendi (İzlendi)
 
+import { parseAirDate } from "./airDate";
+
 export const WATCH_STATE = {
   UNAIRED: "unaired",
   NONE: "none",
@@ -14,11 +16,15 @@ export const WATCH_STATE = {
   FULL: "full",
 };
 
+// NOT: Tarih ayrıştırması parseAirDate'e devredildi. Düz `new Date("2026-07-26")`
+// tarih-only değeri UTC gece yarısı çözüyor; UTC+3'te bölüm yayın gününde saat
+// 03:00'a kadar "yayınlanmadı", UTC-5'te ise bir gün erken "yayınlandı"
+// görünüyordu — "İzle/Hatırlat" butonu ve puanlama kilidi yanlış anda değişiyordu.
+
 // Bir yayın tarihi geçmiş mi? Tarih yoksa/geçersizse "henüz yayınlanmadı" sayılır.
 export function isAired(dateStr) {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return false;
+  const d = parseAirDate(dateStr);
+  if (!d) return false;
   return d.getTime() <= Date.now();
 }
 
@@ -27,10 +33,85 @@ export function isAired(dateStr) {
 // isAired false (unaired) döner ama burada false (kilitsiz) döneriz; böylece
 // yayın tarihi bilinmeyen eski içerikler yanlışlıkla kilitlenmez.
 export function isUnreleased(dateStr) {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return false;
+  const d = parseAirDate(dateStr);
+  if (!d) return false;
   return d.getTime() > Date.now();
+}
+
+/* ── "İzlendi" işaretlenebilir mi? ──────────────────────────────────────────
+ *
+ * İzleme kaydı yazan TÜM yolların (film detayı, dizi detayı, listeye hızlı
+ * ekleme, servis katmanı) paylaştığı tek karar noktası. Üç durum var:
+ *
+ *   released  → tarih geçmiş  → izlendi işaretlenebilir
+ *   scheduled → tarih İLERİDE → izlendi kapalı, yerine hatırlatma
+ *   unknown   → tarih YOK ya da geçersiz → izlendi de kapalı
+ *
+ * `unknown` neden ayrı: boş tarih eskiden hiçbir yerde "ileri tarih" sayılmıyor,
+ * sessizce "sorun yok" tarafına düşüyordu. TMDB'de tarihi henüz girilmemiş
+ * yapımların çoğu duyurulmuş ama takvime girmemiş işlerdir; bunlar izlendi
+ * olarak eklenince izleme süresi, rozetler ve Wrapped hesapları bozuluyordu.
+ *
+ * Tarihi TMDB'ye hiç girilmemiş ESKİ yapımlar mağdur olmasın diye `status`
+ * alanına ikinci bir şans veriliyor: "Released"/"Ended"/"Returning Series"
+ * tarih olmadan da yayınlandı sayılır. "Canceled" BİLEREK dışarıda — hiç
+ * yayınlanmadan iptal edilen yapımlar da o değeri alıyor.
+ */
+export const RELEASE_STATE = {
+  RELEASED: "released",
+  SCHEDULED: "scheduled",
+  UNKNOWN: "unknown",
+};
+
+const RELEASED_STATUSES = new Set(["released", "ended", "returning series"]);
+
+/**
+ * @param {any} date   release_date / first_air_date / air_date
+ * @param {string} [status] TMDB `status` alanı (varsa)
+ * @returns {"released"|"scheduled"|"unknown"}
+ */
+export function getReleaseState(date, status) {
+  const parsed = parseAirDate(date);
+  if (parsed) {
+    return parsed.getTime() > Date.now()
+      ? RELEASE_STATE.SCHEDULED
+      : RELEASE_STATE.RELEASED;
+  }
+  return RELEASED_STATUSES.has(String(status || "").trim().toLowerCase())
+    ? RELEASE_STATE.RELEASED
+    : RELEASE_STATE.UNKNOWN;
+}
+
+/** Kısayol: yalnız `released` iken izleme kaydı yazılabilir. */
+export function canMarkWatched(date, status) {
+  return getReleaseState(date, status) === RELEASE_STATE.RELEASED;
+}
+
+/** Engel gerekçesi — çağıran taraf metni kendi diliyle seçebilsin diye. */
+export const WATCH_BLOCKED = {
+  UNRELEASED: "unreleased",       // yayın tarihi ileride
+  UNKNOWN_DATE: "unknown-release", // yayın tarihi yok/geçersiz
+};
+
+/**
+ * Servis katmanı kapısı: izleme kaydı yazmadan önce çağrılır, uygun değilse
+ * `error.code` (WATCH_BLOCKED) taşıyan bir Error fırlatır.
+ *
+ * Bu dosya BİLEREK i18n'siz: saf bir yardımcı olarak kalsın diye mesaj Türkçe
+ * öntanımlı; kullanıcıya gösteren ekranlar `error.code` üzerinden kendi çevirili
+ * metnini seçiyor (bkz. screens/lists/ListsScreen.js).
+ */
+export function assertWatchable(date, status) {
+  const state = getReleaseState(date, status);
+  if (state === RELEASE_STATE.RELEASED) return;
+  const scheduled = state === RELEASE_STATE.SCHEDULED;
+  const error = new Error(
+    scheduled
+      ? "Bu içerik henüz yayınlanmadı."
+      : "Bu içeriğin yayın tarihi bilinmiyor.",
+  );
+  error.code = scheduled ? WATCH_BLOCKED.UNRELEASED : WATCH_BLOCKED.UNKNOWN_DATE;
+  throw error;
 }
 
 /**

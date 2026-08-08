@@ -2,9 +2,7 @@ import React, { memo, useCallback } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -13,6 +11,7 @@ import {
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import { useTheme } from "@context/ThemeContext";
 import { AVATARS } from "@utils/avatars";
 import { i18nText } from "@utils/i18nText";
@@ -64,7 +63,6 @@ export default function ProfileAvatarPickerModal({
 }) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-
   const chooseAvatar = useCallback(
     (index) => {
       Promise.resolve(onSelect(index)).catch(() => {});
@@ -85,24 +83,22 @@ export default function ProfileAvatarPickerModal({
   );
 
   return (
-    <Modal
+    <BottomSheetModal
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      // Kaydederken dışarı dokunuşla kapanmasın; kapatma düğmesi de pasif.
+      onClose={saving ? () => {} : onClose}
+      dismissOnBackdropPress={!saving}
+      intensity={35}
+      dimColor="rgba(0,0,0,0.45)"
+      sheetStyle={[
+        styles.sheet,
+        {
+          backgroundColor: theme.secondary,
+          borderColor: theme.border,
+          paddingBottom: Math.max(insets.bottom, 18),
+        },
+      ]}
     >
-      <Pressable style={styles.overlay} onPress={saving ? undefined : onClose}>
-        <Pressable
-          onPress={(event) => event.stopPropagation()}
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: theme.secondary,
-              borderColor: theme.border,
-              paddingBottom: Math.max(insets.bottom, 18),
-            },
-          ]}
-        >
           <View style={[styles.handle, { backgroundColor: theme.border }]} />
           <View style={styles.header}>
             <View
@@ -160,18 +156,11 @@ export default function ProfileAvatarPickerModal({
               </Text>
             </View>
           )}
-        </Pressable>
-      </Pressable>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.72)",
-  },
   sheet: {
     height: "72%",
     borderTopLeftRadius: 28,

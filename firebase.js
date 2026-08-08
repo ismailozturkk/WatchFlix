@@ -2,9 +2,8 @@ import { initializeApp } from "firebase/app";
 import {
   initializeAuth,
   getReactNativePersistence,
-  getAuth,
-} from "firebase/auth";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+  } from "firebase/auth";
+import { mmkvAuthPersistence } from "./services/storage/authPersistence";
 import { getFirestore } from "firebase/firestore";
 import { getDatabase } from "firebase/database";
 import { getFunctions } from "firebase/functions";
@@ -29,9 +28,11 @@ const app = initializeApp(firebaseConfig);
 // eslint-disable-next-line global-require
 require("./services/appCheck").initAppCheck(app);
 
-// Firebase Auth'un zaten başlatılıp başlatılmadığını kontrol edin
+// Oturum kalıcılığı MMKV'de. Köprü, MMKV'de bulamadığı anahtarı AsyncStorage'da
+// arayıp oraya taşıyor — bu sayede güncellemeyi alan mevcut kullanıcılar
+// çıkışa düşmüyor (bkz. services/storage/authPersistence.js).
 const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage),
+  persistence: getReactNativePersistence(mmkvAuthPersistence),
 });
 
 const db = getFirestore(app);

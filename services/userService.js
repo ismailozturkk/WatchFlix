@@ -19,11 +19,12 @@
 
 import {
   doc,
+  deleteField,
+  FieldPath,
   getDoc,
   setDoc,
   updateDoc,
-  deleteDoc,
-  collection,
+    collection,
   query,
   where,
   limit,
@@ -305,6 +306,21 @@ export async function changeUsername(uid, newUsername) {
 
     const oldLower = userSnap.data().usernameLower;
 
+    // Eski rezervasyonu SİLMEDEN ÖNCE OKU. Rules `allow delete: resource.data.uid
+    // == request.auth.uid` diyor; doküman yoksa (migrasyonu hiç çalışmamış eski
+    // hesap, ya da migrasyonun rezervasyon adımı ağ hatasıyla düşmüş hesap)
+    // resource null olduğu için delete reddedilir ve transaction atomik olduğundan
+    // kullanıcı adı değişimi tümüyle iptal olur — kullanıcı adını bir daha
+    // değiştiremez. Tüm okumalar yazımlardan ÖNCE bitmeli, bu yüzden burada.
+    let staleUsernameRef = null;
+    if (oldLower && oldLower !== newLower) {
+      const ref = doc(db, "Usernames", oldLower);
+      const snap = await tx.get(ref);
+      if (snap.exists() && snap.data()?.uid === uid) staleUsernameRef = ref;
+    }
+
+    // ── Buradan sonrası yazım ────────────────────────────────────────────────
+
     // Rules yalnız create/delete'e izin veriyor ("Update yok") — doküman
     // zaten kendi uid'imizle varsa tx.set bir update sayılır ve
     // PERMISSION_DENIED tüm transaction'ı düşürür. createUserProfile'daki
@@ -312,8 +328,8 @@ export async function changeUsername(uid, newUsername) {
     if (!newUsernameSnap.exists()) {
       tx.set(newUsernameRef, { uid, reservedAt: serverTimestamp() });
     }
-    if (oldLower && oldLower !== newLower) {
-      tx.delete(doc(db, "Usernames", oldLower));
+    if (staleUsernameRef) {
+      tx.delete(staleUsernameRef);
     }
     tx.update(userRef, {
       username: newUsername.trim(),
@@ -331,6 +347,31 @@ export async function setAvatarIndex(uid, avatarIndex) {
   await updateUserProfile(uid, {
     avatarIndex: clampAvatarIndex(avatarIndex),
   });
+}
+
+/**
+ * Liste paylaşım bayrağını yeni ada taşır (`listVisible` haritası ADA bağlı).
+ *
+ * Liste yeniden adlandırıldığında çağrılır: taşınmazsa bayrak eski adda kalır,
+ * liste de arkadaş profilinden sessizce düşerdi (FriendProfileScreen görünür
+ * listeleri bu haritadan süzüyor).
+ *
+ * FieldPath: ad noktalıysa ("S.W.A.T.") string anahtar iç içe map'e çözülürdü.
+ */
+export async function moveListVisibility(uid, fromName, toName) {
+  if (!uid || !fromName || !toName || fromName === toName) return;
+  const snap = await getDoc(doc(db, "Users", uid));
+  const raw = snap.exists() ? snap.data().listVisible : null;
+  // Eski array formatı burada dönüştürülmez (migrateUserIfNeeded'ın işi);
+  // yalnız map biçiminde güvenle taşınabilir.
+  const wasVisible = !Array.isArray(raw) && raw?.[fromName] === true;
+  await updateDoc(
+    doc(db, "Users", uid),
+    new FieldPath("listVisible", toName),
+    wasVisible,
+    new FieldPath("listVisible", fromName),
+    deleteField(),
+  );
 }
 
 /**
@@ -433,15 +474,22 @@ export async function migrateUserIfNeeded(uid) {
     }
   }
 
-  // 8) Schema version
-  updates._schemaVersion = SCHEMA_VERSION;
+  // 8) Alan güncellemeleri — _schemaVersion HARİÇ. Versiyon damgası en sona
+  //    bırakılıyor: aşağıdaki friends kopyalaması ağ hatasıyla yarıda kalırsa
+  //    versiyon eski kalmalı ki bir sonraki açılışta migrasyon baştan denensin.
+  //    (Adımların hepsi idempotent.) Eskiden versiyon burada yazıldığı için
+  //    yarım migrasyon "tamam" işaretleniyor ve arkadaş listesi kalıcı olarak
+  //    boş kalıyordu.
   updates.updatedAt = serverTimestamp();
 
   await updateDoc(userRef, updates);
 
   // 9) friends[] → /friends subcollection (lazy, sadece eksikse)
   if (Array.isArray(data.friends) && data.friends.length > 0) {
-    const batch = writeBatch(db);
+    // Firestore batch limiti 500 — 400'de chunk'ı yazıp yeni batch açıyoruz.
+    // Eskiden burada `break` vardı; 400'den fazla arkadaşı olan kullanıcının
+    // kalanı hiç taşınmıyordu.
+    let batch = writeBatch(db);
     let writesQueued = 0;
     for (const f of data.friends) {
       if (!f?.uid) continue;
@@ -457,12 +505,23 @@ export async function migrateUserIfNeeded(uid) {
         });
         writesQueued++;
       }
-      // Firestore batch max 500 yazma — büyük listede chunk lazım,
-      // şimdilik 100'lük arkadaş listesi varsayımıyla tek batch.
-      if (writesQueued >= 400) break;
+      if (writesQueued >= 400) {
+        await batch.commit();
+        batch = writeBatch(db);
+        writesQueued = 0;
+      }
     }
     if (writesQueued > 0) await batch.commit();
   }
 
-  return { migrated: true, fieldsAdded: Object.keys(updates) };
+  // 10) Her şey bittikten SONRA versiyonu yükselt.
+  await updateDoc(userRef, {
+    _schemaVersion: SCHEMA_VERSION,
+    updatedAt: serverTimestamp(),
+  });
+
+  return {
+    migrated: true,
+    fieldsAdded: [...Object.keys(updates), "_schemaVersion"],
+  };
 }

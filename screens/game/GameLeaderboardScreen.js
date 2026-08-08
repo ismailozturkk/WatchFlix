@@ -1,8 +1,9 @@
 import { Image } from "expo-image";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import { useAuth } from "@context/AuthContext";
 import { useFriends } from "@context/FriendsContext";
 import { useLanguage } from "@context/LanguageContext";
@@ -203,10 +204,13 @@ function RulesModal({ visible, onClose, theme, tr }) {
     ? ["Önce daha yüksek skor sıralanır.", "Skor eşitse daha çok doğru cevap öne geçer.", "Sonra daha uzun en iyi seri.", "Kalan eşitlikler daha az joker ve skora daha erken ulaşma ile çözülür."]
     : ["Higher score ranks first.", "If scores tie, more correct answers win.", "Then the longer best streak.", "Remaining ties break on fewer jokers and reaching the score earlier."];
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalRoot}>
-        <Pressable accessibilityRole="button" accessibilityLabel={tr ? "Kapat" : "Close"} onPress={onClose} style={StyleSheet.absoluteFill} />
-        <SafeAreaView edges={["bottom"]} style={[styles.sheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      intensity={35}
+      dimColor="rgba(0,0,0,0.4)"
+    >
+      <SafeAreaView edges={["bottom"]} style={[styles.sheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
           <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
           <Text style={[styles.sheetTitle, { color: theme.text.primary }]}>{tr ? "Sıralama Nasıl Belirlenir?" : "How Ranking Works"}</Text>
           <Text style={[styles.sheetSubtitle, { color: theme.text.muted }]}>{tr ? "Eşit skorlarda kullanılan sıra (tie-break) kuralları" : "Tie-break rules used for equal scores"}</Text>
@@ -220,9 +224,8 @@ function RulesModal({ visible, onClose, theme, tr }) {
           </View>
           <Text style={[styles.sheetNote, { color: theme.text.muted }]}>{tr ? "Global tablo Klasik + Normal sonuçlarından beslenir; kişisel liste oyunları tabloyu etkilemez." : "The global board uses Classic + Normal results; personal-list games don't affect it."}</Text>
           <TouchableOpacity onPress={onClose} style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent }]}><Text style={gameSharedStyles.primaryButtonText}>{tr ? "Anladım" : "Got it"}</Text></TouchableOpacity>
-        </SafeAreaView>
-      </View>
-    </Modal>
+      </SafeAreaView>
+    </BottomSheetModal>
   );
 }
 

@@ -27,7 +27,8 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
 import { useLanguage } from "../../context/LanguageContext";
 import Checkbox from "expo-checkbox";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, get, set } from "../../services/storage";
+import * as SecureStore from "expo-secure-store";
 import ScreenDecor from "../../components/ScreenDecor";
 import EmailSuffixRow from "../../components/auth/EmailSuffixRow";
 import { alpha } from "../../theme/colors";
@@ -46,6 +47,49 @@ const buzz = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
 const { width: SCREEN_W } = Dimensions.get("window");
 const CHIP_GAP = 10;
 const CHIP_W = Math.min(SCREEN_W - 68, 400);
+
+// ── "Beni Hatırla" parolası ───────────────────────────────────────────────────
+// Parola AsyncStorage'da DÜZ METİN tutuluyordu; Android'de bu, uygulamanın
+// SQLite dosyasında okunabilir hâlde durur (adb yedeği / root'lu cihaz). Artık
+// Keychain (iOS) / Keystore (Android) üstünden SecureStore'a yazılıyor.
+//
+// SecureStore anahtarları yalnız [A-Za-z0-9._-] kabul ediyor; e-postadaki "@"
+// ve diğer karakterler geçmediği için anahtar kodlanıyor.
+const LEGACY_PASSWORD_PREFIX = "password_";
+const secureKeyFor = (email) =>
+  `pw_${String(email).replace(/[^A-Za-z0-9._-]/g, "_")}`;
+
+const readSavedPassword = async (email) => {
+  try {
+    return await SecureStore.getItemAsync(secureKeyFor(email));
+  } catch {
+    return null;
+  }
+};
+
+const writeSavedPassword = async (email, value) => {
+  try {
+    await SecureStore.setItemAsync(secureKeyFor(email), value, {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
+  } catch (e) {
+    // Cihazda güvenli depo yoksa parola SAKLANMAZ — düz metne geri düşmüyoruz.
+    if (__DEV__) console.warn("SecureStore yazılamadı:", e?.message);
+  }
+};
+
+const deleteSavedPassword = async (email) => {
+  try {
+    await SecureStore.deleteItemAsync(secureKeyFor(email));
+  } catch {
+    // sessizce geç
+  }
+};
+
+// NOT: diskte duran düz metin parolaların (`password_*`) temizliği artık
+// AsyncStorage → MMKV göçünün parçası (services/storage/migration.js). Eskiden
+// yalnız BU EKRAN açıldığında koşuyordu; oturumu açık olup giriş ekranını hiç
+// görmeyen kullanıcılarda sızıntı yerinde kalıyordu.
 
 export default function LoginScreen({ navigation }) {
   const { theme, selectedTheme } = useTheme();
@@ -70,10 +114,8 @@ export default function LoginScreen({ navigation }) {
   useEffect(() => {
     const loadUsers = async () => {
       try {
-        const stored = await AsyncStorage.getItem("recentUsers");
-        if (!stored) return;
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) setRecentUsers(parsed);
+        const parsed = get(Keys.recentUsers);
+        if (Array.isArray(parsed) && parsed.length) setRecentUsers(parsed);
       } catch (e) {
         // Bozuk kayıt: hızlı giriş çipleri yüklenmesin ama ekran çalışsın.
         if (__DEV__) console.warn("recentUsers okunamadı:", e?.message);
@@ -93,7 +135,7 @@ export default function LoginScreen({ navigation }) {
         (u, i, arr) => arr.findIndex((x) => x.email === u.email) === i,
       );
       if (updatedUsers.length > 3) updatedUsers.pop();
-      await AsyncStorage.setItem("recentUsers", JSON.stringify(updatedUsers));
+      set(Keys.recentUsers, updatedUsers);
       setRecentUsers(updatedUsers);
     } catch (e) {
       console.error(i18nText("autoI18n.kullanici_kaydedilemedi", "Kullanıcı kaydedilemedi"), e);
@@ -116,7 +158,7 @@ export default function LoginScreen({ navigation }) {
 
       if (isChecked) {
         await storeUser(userEmail);
-        await AsyncStorage.setItem(`password_${userEmail}`, userPassword);
+        await writeSavedPassword(userEmail, userPassword);
       } else if (recentUsers.some((u) => u.email === userEmail)) {
         // Zaten kayıtlı bir hesapla girildi: en son giriş listenin başına geçsin
         await storeUser(userEmail);
@@ -139,12 +181,17 @@ export default function LoginScreen({ navigation }) {
   };
 
   const handleUserPress = async (user) => {
-    const savedPass = await AsyncStorage.getItem(`password_${user.email}`);
+    const savedPass = await readSavedPassword(user.email);
     if (savedPass) {
       setEmail(user.email);
       setPassword(savedPass);
       signIn({ email: user.email, password: savedPass });
     } else {
+      // Düz metin kayıtları silindiği için eski kurulumlarda bir kez buraya
+      // düşülür: e-posta doldurulur, kullanıcı parolasını bir kez daha yazar.
+      setEmail(user.email);
+      setPassword("");
+      passwordRef.current?.focus();
       Toast.show({
         type: "info",
         text1: i18nText("autoI18n.bu_kullanici_icin_parola_kayitli_degil", "Bu kullanıcı için parola kayıtlı değil."),
@@ -161,8 +208,8 @@ export default function LoginScreen({ navigation }) {
     try {
       const updated = recentUsers.filter((u) => u.email !== user.email);
       setRecentUsers(updated);
-      await AsyncStorage.setItem("recentUsers", JSON.stringify(updated));
-      await AsyncStorage.removeItem(`password_${user.email}`);
+      set(Keys.recentUsers, updated);
+      await deleteSavedPassword(user.email);
     } catch (e) {
       // sessizce geç
     }

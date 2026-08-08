@@ -1,17 +1,15 @@
-import React, { memo, useEffect, useMemo, useRef } from "react";
+import React, { memo, useEffect, useRef } from "react";
 import {
-  Text,
   TouchableOpacity,
   StyleSheet,
-  FlatList,
   View,
   Dimensions,
   Animated,
 } from "react-native";
-import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
-import { MovieUpComingSkeleton } from "../../components/Skeleton";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
+import { RailSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
 import SeeAllHeader from "../../components/SeeAllHeader";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
@@ -20,7 +18,6 @@ import { useTvShow } from "../../context/TvShowContex";
 import { useLanguage } from "../../context/LanguageContext";
 import ListBadges from "../../components/ListBadges";
 import { RatingBadge, ReleaseDateBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 const { width } = Dimensions.get("window");
 
@@ -28,6 +25,7 @@ const { width } = Dimensions.get("window");
 const TvOnTheAirCard = memo(function TvOnTheAirCard({ item, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -41,6 +39,10 @@ const TvOnTheAirCard = memo(function TvOnTheAirCard({ item, navigation, theme, g
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
+      onLongPress={() =>
+        openQuickActions({ item, mediaType: "tv", navigation })
+      }
+      delayLongPress={350}
     >
       <Animated.View style={[{ transform: [{ scale }] }]}>
         <PosterImage
@@ -92,25 +94,27 @@ export default function TvShowsOnTheAir({ navigation }) {
   }, [activateTvSection]);
 
 
+  // Başlık iki durumda da AYNI bileşenden gelir: yükleme sırasında düz bir
+  // Text, sonrasında "tümünü gör" hapı olan bir satır çizilirse başlık yüksekliği
+  // değişir ve ray aşağı zıplar.
+  const onTheAirHeader = (
+    <SeeAllHeader
+      title={t.tvShowScreens.onTheAir}
+      onPress={() =>
+        navigation.navigate("SeeAllScreen", {
+          mediaType: "tv",
+          section: "onTheAir",
+          title: t.tvShowScreens.onTheAir,
+        })
+      }
+    />
+  );
+
   if (loadingOnTheAir) {
     return (
-      <View style={{ flex: 1, paddingVertical: 10 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <Text
-            allowFontScaling={false}
-            style={[styles.title, { color: theme.text.secondary }]}
-          >
-            {t.tvShowScreens.onTheAir}
-          </Text>
-        </View>
-
-        <FlatList
-          data={[1, 2, 3]}
-          renderItem={() => <MovieUpComingSkeleton />}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 15 }}
-        />
+      <View style={styles.container}>
+        {onTheAirHeader}
+        <RailSkeleton showReleaseDate />
       </View>
     );
   }
@@ -127,16 +131,7 @@ export default function TvShowsOnTheAir({ navigation }) {
   };
   return (
     <View style={styles.container}>
-      <SeeAllHeader
-        title={t.tvShowScreens.onTheAir}
-        onPress={() =>
-          navigation.navigate("SeeAllScreen", {
-            mediaType: "tv",
-            section: "onTheAir",
-            title: t.tvShowScreens.onTheAir,
-          })
-        }
-      />
+      {onTheAirHeader}
       <PaginatedRail
         data={moviesOnTheAir}
         contentContainerStyle={{ paddingHorizontal: 15 }}
@@ -269,12 +264,5 @@ const styles = StyleSheet.create({
     color: "red",
     fontSize: 16,
     fontWeight: "bold",
-  },
-  title: {
-    fontSize: 18,
-    uppercase: true,
-    marginBottom: 15,
-    marginLeft: 15,
-    fontWeight: "700",
   },
 });

@@ -167,6 +167,41 @@ export function getMyNominations(voteDocs = [], uid) {
   return new Set(Object.keys(noms).filter((k) => noms[k]));
 }
 
+// ─── Havuz = ay başı TMDB anlık görüntüsü + topluluğun aramayla eklediği adaylar ─
+// Ay başında çekilen 64'lük liste yalnız o türün EN POPÜLER yapımlarıdır; daha
+// niş/eski yapımlar orada olmaz. Kullanıcı seçim fazında TMDB'de arayıp havuza
+// aday ekleyebilir (tournaments/{periodId}/pool). Bu adaylar havuzun SONUNA
+// eklenir (seed devam eder), yani hype almadan ilk 32'ye giremezler — sıraya
+// yalnız topluluk oyuyla tırmanırlar.
+//
+// Sıra TÜM istemcilerde aynı olmalı (bracket deterministik): eklenme zamanına,
+// eşitlikte id'ye göre sıralanır. Zaten havuzda olan id'ler atlanır → aynı
+// listeyle ikinci kez çağırmak sonucu DEĞİŞTİRMEZ (idempotent; servis okurken
+// birleştiriyor, ekran canlı dinlemeyle tekrar birleştiriyor).
+export function mergePool(nominees = [], suggested = []) {
+  const base = Array.isArray(nominees) ? nominees : [];
+  if (!Array.isArray(suggested) || suggested.length === 0) return base;
+
+  const have = new Set(base.map((n) => String(n?.id)));
+  const extras = [];
+  for (const s of suggested) {
+    const key = String(s?.id ?? "");
+    if (!key || key === "undefined" || have.has(key)) continue;
+    have.add(key);
+    extras.push(s);
+  }
+  if (extras.length === 0) return base;
+
+  extras.sort(
+    (a, b) =>
+      (a.addedAtMs || 0) - (b.addedAtMs || 0) || String(a.id).localeCompare(String(b.id)),
+  );
+  return [
+    ...base,
+    ...extras.map((s, i) => ({ ...s, seed: base.length + i + 1, suggested: true })),
+  ];
+}
+
 // Havuzu oy sayısına göre sırala (oy desc → havuz seed asc) ve her adaya
 // { nomVotes, rank, finalist } ekle. Seçim ekranındaki canlı sıralama bundan çizilir.
 export function rankPool(nominees = [], nomTally = {}) {

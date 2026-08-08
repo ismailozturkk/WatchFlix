@@ -23,11 +23,8 @@ import {
   orderBy,
   limit,
   onSnapshot,
-  updateDoc,
-  deleteDoc,
-  writeBatch,
-  serverTimestamp,
-  increment,
+      writeBatch,
+    increment,
   where,
   getDocs,
 } from "firebase/firestore";

@@ -7,7 +7,9 @@ import {
   ScrollView,
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
-const { width, height } = Dimensions.get("window");
+import useRailPosterStyle from "../hooks/useRailPosterStyle";
+import { PosterBadgeSkeleton, POSTER_BADGE_POS } from "./PosterInfoBadges";
+const { width } = Dimensions.get("window");
 
 export default function Skeleton({
   width: skeletonWidth,
@@ -19,7 +21,10 @@ export default function Skeleton({
   const animatedValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    // Sonsuz döngü unmount'ta durdurulmazsa iskelet kaybolduktan sonra da
+    // çalışmaya devam ediyor; iskeletler her liste/ekran yüklemesinde monte
+    // edildiği için oturum boyunca birikiyorlar.
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(animatedValue, {
           toValue: 1,
@@ -32,8 +37,10 @@ export default function Skeleton({
           useNativeDriver: true,
         }),
       ]),
-    ).start();
-  }, []);
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [animatedValue]);
 
   const opacity = animatedValue.interpolate({
     inputRange: [0, 1],
@@ -58,31 +65,141 @@ export default function Skeleton({
   );
 }
 // Ready skeleton components
-export const MovieCardSkeleton = ({ index }) => {
-  const { theme } = useTheme();
+
+// ── Ana ekran "Trendler" rayı (TvShowsTrends / MovieTrends) ──────────────────
+// Ölçüler prop olarak GERÇEK kartın sabitlerinden gelir (ITEM_SIZE, CARD_WIDTH,
+// CARD_HEIHGT, SPACING, EMPTY_ITEM_SIZE, FOCUS_HEADROOM); iskelet burada kendi
+// sayılarını uydurmaz, kart ölçüsü değişirse kendiliğinden takip eder.
+//   • edge     → gerçek listedeki kenar spacer'ı (ilk kart ortalanır)
+//   • headroom → büyüyen odak posteri için contentContainerStyle'daki üst pay
+//   • ölçek    → odaktaki kart 1.0, diğerleri 0.7: listenin durgun hâli
+export const TrendRailSkeleton = ({ metrics, count = 3 }) => {
+  const { itemSize, cardWidth, cardHeight, spacing, edge, headroom } = metrics;
   return (
-    <View style={styles.cardContainer}>
-      <Skeleton
-        width={width * 0.6}
-        height={width * 0.6 * 1.5}
-        style={{
-          borderRadius: 25,
-          transform: [{ scale: index.index === 0 ? 1 : 0.7 }],
-        }}
-      />
-      <Skeleton
-        width={80}
-        height={15}
-        style={{
-          position: "absolute",
-          right: 15,
-          bottom: 25,
-          borderRadius: 10,
-        }}
-      />
+    <View
+      style={{
+        flexDirection: "row",
+        paddingLeft: edge,
+        paddingTop: headroom,
+        overflow: "hidden",
+      }}
+    >
+      {Array.from({ length: count }).map((_, index) => (
+        <View key={index} style={{ width: itemSize, height: cardHeight }}>
+          <View
+            style={{
+              width: cardWidth,
+              height: cardWidth * 1.5,
+              marginHorizontal: spacing,
+              transform: [{ scale: index === 0 ? 1 : 0.7 }],
+            }}
+          >
+            <Skeleton
+              width={cardWidth}
+              height={cardWidth * 1.5}
+              style={{ borderRadius: 25 }}
+            />
+            {/* Gerçek kartın puan rozetiyle aynı köşe (trendRating: 8/8) */}
+            <PosterBadgeSkeleton
+              variant="rating"
+              scale={1}
+              style={{ position: "absolute", right: 8, bottom: 8 }}
+            />
+          </View>
+        </View>
+      ))}
     </View>
   );
 };
+
+// ── Ana ekran yatay rayları (Bests, Genres, Providers, OnTheAir, Discovery…) ──
+// Tek kart. Ölçü/köşe useRailPosterStyle'dan gelir — yani ayarlardaki poster
+// boyutu (normal/small) ve köşe yarıçapı iskelette de geçerlidir. Hücre
+// boşlukları gerçek kartla aynı (similarItem: marginRight 10 / marginBottom 5).
+// Rozetler posterin İÇİNE konumlanır (gerçek kartta da poster sarmalayıcısına
+// göre konumlanıyorlar), bu yüzden ayrı bir poster kutusu var.
+export const RailPosterSkeleton = ({
+  showRating = true,
+  showReleaseDate = false,
+  // TvShowsGenres'in kartında alt boşluk yok; iskelet de ray yüksekliğini
+  // 5px şişirmesin diye ayarlanabilir.
+  cellMarginBottom = 5,
+}) => {
+  const rp = useRailPosterStyle();
+  return (
+    <View
+      style={{
+        width: rp.itemWidth,
+        height: rp.itemHeight,
+        marginRight: 10,
+        marginBottom: cellMarginBottom,
+      }}
+    >
+      <View style={{ width: rp.posterWidth, height: rp.posterHeight }}>
+        <Skeleton
+          width={rp.posterWidth}
+          height={rp.posterHeight}
+          style={{ borderRadius: rp.radius }}
+        />
+        {showReleaseDate && (
+          <PosterBadgeSkeleton variant="date" style={POSTER_BADGE_POS.topRight} />
+        )}
+        {showRating && (
+          <PosterBadgeSkeleton variant="rating" style={POSTER_BADGE_POS.bottomRight} />
+        )}
+      </View>
+    </View>
+  );
+};
+
+// Rayın tamamı: rail'in contentContainerStyle'ı ile aynı yatay dolgu (15) ve
+// ekranı dolduracak kadar kart. Yükleme sırasında kaydırma olmadığından düz
+// View yeter; FlatList kurulum maliyeti boşuna ödenmez.
+export const RailSkeleton = ({
+  count,
+  showRating = true,
+  showReleaseDate = false,
+  cellMarginBottom = 5,
+  style,
+}) => {
+  const rp = useRailPosterStyle();
+  const total = count ?? Math.ceil((width - 30) / (rp.itemWidth + 10)) + 1;
+  return (
+    <View style={[styles.railSkeleton, style]}>
+      {Array.from({ length: total }).map((_, index) => (
+        <RailPosterSkeleton
+          key={index}
+          showRating={showRating}
+          showReleaseDate={showReleaseDate}
+          cellMarginBottom={cellMarginBottom}
+        />
+      ))}
+    </View>
+  );
+};
+
+// Kategori / tür / sağlayıcı çipleri veri gelmeden çizilemez; yerlerini aynı
+// yükseklikteki iskelet haplar tutar. Olmasa başlık satırı 0 yükseklikten
+// gerçek yüksekliğe sıçrar ve altındaki ray zıplar.
+const CHIP_SKELETON_WIDTHS = [78, 96, 66, 104, 84, 90];
+export const ChipRowSkeleton = ({
+  count = 5,
+  chipHeight = 38,
+  radius = 20,
+  gap = 5,
+  style,
+}) => (
+  <View style={[styles.chipRow, style]}>
+    {Array.from({ length: count }).map((_, index) => (
+      <Skeleton
+        key={index}
+        width={CHIP_SKELETON_WIDTHS[index % CHIP_SKELETON_WIDTHS.length]}
+        height={chipHeight}
+        style={{ borderRadius: radius, marginRight: gap }}
+      />
+    ))}
+  </View>
+);
 export const MovieBestsSkeleton = () => {
   const { theme } = useTheme();
   return (
@@ -756,10 +873,15 @@ const styles = StyleSheet.create({
   skeleton: {
     borderRadius: 4,
   },
-  cardContainer: {
-    alignItems: "center",
-    width: width * 0.6,
-    height: height * 0.45,
+  // Ray iskeleti: gerçek rail'in contentContainerStyle'ı ile aynı yatay dolgu.
+  railSkeleton: {
+    flexDirection: "row",
+    paddingHorizontal: 15,
+    overflow: "hidden",
+  },
+  chipRow: {
+    flexDirection: "row",
+    overflow: "hidden",
   },
   poster: {
     borderRadius: 25,

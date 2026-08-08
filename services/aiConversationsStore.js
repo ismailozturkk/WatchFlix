@@ -21,9 +21,11 @@
 //
 // Saklama: tüm sohbetler tek anahtarda. Veri küçük olduğundan basit ve hızlı.
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Keys, get, set } from "./storage";
 
-const STORAGE_KEY = "@seelogd/ai_conversations";
+// GİZLİLİK: sohbet geçmişi geçiş öncesinde uid'siz global bir anahtardaydı —
+// aynı cihazda hesap değiştiren kullanıcı öncekinin AI sohbetlerini okuyordu.
+// Artık kullanıcı kapsamlı; aktif uid'i depolama katmanı çözüyor.
 const MAX_CONVERSATIONS = 50; // sınırsız büyümesini engelle
 let mutationQueue = Promise.resolve();
 
@@ -41,28 +43,17 @@ export function summarizeTitle(text = "") {
 
 /** Tüm sohbetleri yükler (en yeni en üstte). */
 export async function loadConversations() {
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-  } catch {
-    return [];
-  }
+  const parsed = get(Keys.aiConversations);
+  if (!Array.isArray(parsed)) return [];
+  return [...parsed].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 }
 
 /** Tüm listeyi diske yazar (en yeni en üstte, MAX ile sınırlı). */
 export async function persistConversations(list) {
-  try {
-    const trimmed = [...list]
-      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-      .slice(0, MAX_CONVERSATIONS);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
-    return trimmed;
-  } catch {
-    return list;
-  }
+  const trimmed = [...list]
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+    .slice(0, MAX_CONVERSATIONS);
+  return set(Keys.aiConversations, trimmed) ? trimmed : list;
 }
 
 /**

@@ -1,25 +1,23 @@
+// useEffect artık gerekmiyor: ayarlar açılışta senkron okunduğu için hidrasyon
+// effect'i kalktı (aşağıdaki useState başlangıç değerlerine bakın).
 import React, {
   createContext,
   useState,
-  useEffect,
   useContext,
   useMemo,
   useCallback,
   useRef,
 } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import Toast from "react-native-toast-message";
 import { buildTmdbUrl } from "../utils/tmdbImageUtils";
 import { i18nText } from "../utils/i18nText";
+import { Keys, get, set } from "../services/storage";
 import {
-  AUTO_DATA_CACHE_KEY,
-  DATA_TYPES_KEY,
   DEFAULT_DATA_TYPES,
   normalizeDataTypes,
   setAutoDataCacheEnabled,
   setDataTypes,
 } from "../utils/dataCacheSettings";
-import { setHapticsEnabled as setGlobalHapticsEnabled } from "../services/hapticsService";
 
 
 const AppSettingsContext = createContext();
@@ -154,246 +152,102 @@ const normalizePosterBadges = (settings) => {
   }, {});
 };
 
+// Tek yazma yolu. MMKV senkron ve throw etmiyor; `set` yalnız tip/doğrulama
+// reddinde ya da disk hatasında false döner — kullanıcıya ancak o zaman haber verilir.
+const persist = (key, value, errorText) => {
+  if (!set(key, value)) Toast.show({ type: "error", text1: errorText });
+};
+
+const TEMA_HATASI = i18nText("autoI18n.tema_kaydedilemedi", "Tema kaydedilemedi: ");
+const IKON_HATASI = i18nText(
+  "autoI18n.ikon_arka_plan_ayari_kaydedilemedi",
+  "İkon arka plan ayarı kaydedilemedi: ",
+);
+const GORUNUM_HATASI = i18nText(
+  "autoI18n.gorunum_ayari_kaydedilemedi",
+  "Görünüm ayarı kaydedilemedi",
+);
+
 export const AppSettingsProvider = ({ children }) => {
-  const [showSnow, setShowSnow] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState("tr");
-  const [selectedTheme, setSelectedTheme] = useState("blue");
-  const [customThemes, setCustomThemes] = useState([]);
-  const [adultContent, setAdultContent] = useState(false);
-  const [showOngoingTvShows, setShowOngoingTvShows] = useState(true);
-  const [showIconBackground, setShowIconBackground] = useState(false);
+  // MMKV GEÇİŞİ — açılışta ayar okuma artık SENKRON.
+  //
+  // Eskiden her state varsayılanla başlıyor, tek bir `AsyncStorage.multiGet`
+  // effect'i onları ikinci render'da gerçek değerlerle eziyordu. Sonuç: her
+  // açılışta mavi temanın ve Türkçe'nin bir kare görünüp kullanıcının gerçek
+  // seçimine atlaması. MMKV senkron okuduğu için ilk render zaten doğru
+  // değerlerle çiziliyor — o effect tamamen kalktı.
+  const [showSnow, setShowSnow] = useState(() => get(Keys.showSnow));
+  const [selectedLanguage, setSelectedLanguage] = useState(() => get(Keys.language));
+  const [selectedTheme, setSelectedTheme] = useState(() => get(Keys.theme));
+  const [customThemes, setCustomThemes] = useState(() => get(Keys.customThemes));
+  const [adultContent, setAdultContent] = useState(() => get(Keys.adultContent));
+  const [showOngoingTvShows, setShowOngoingTvShows] = useState(() =>
+    get(Keys.showOngoingTvShows),
+  );
+  const [showIconBackground, setShowIconBackground] = useState(() =>
+    get(Keys.showIconBackground),
+  );
   // İkon arka plan düzeni: "shared" (sabit, her ekranda aynı, performanslı) | "random" (her ekran farklı)
-  const [iconBackgroundMode, setIconBackgroundMode] = useState("shared");
+  const [iconBackgroundMode, setIconBackgroundMode] = useState(() =>
+    get(Keys.iconBackgroundMode),
+  );
   // İkon saydamlık çarpanı (0.1–1). Ekranların kendi opaklık değerini ölçekler; 1 = değişiklik yok.
-  const [iconBackgroundOpacity, setIconBackgroundOpacity] = useState(1);
-  const [imageQualityLevel, setImageQualityLevel] = useState("good");
-  const [selectedAvatar, setSelectedAvatar] = useState(null);
-  const [hapticsEnabled, setHapticsEnabled] = useState(false);
-  const [autoDataCacheEnabled, setAutoDataCacheEnabledState] = useState(false);
+  const [iconBackgroundOpacity, setIconBackgroundOpacity] = useState(() =>
+    get(Keys.iconBackgroundOpacity),
+  );
+  const [imageQualityLevel, setImageQualityLevel] = useState(() => {
+    const level = get(Keys.imageQualityLevel);
+    return IMAGE_QUALITY_PRESETS[level] ? level : "good";
+  });
+  const [selectedAvatar, setSelectedAvatar] = useState(() => get(Keys.selectedAvatar));
+  const [hapticsEnabled, setHapticsEnabled] = useState(() => get(Keys.haptics));
+  const [autoDataCacheEnabled, setAutoDataCacheEnabledState] = useState(() =>
+    get(Keys.autoDataCache),
+  );
   // "Verileri indir" açıkken hangi türlerin indirileceği (hepsi varsayılan açık).
   // Kapalı tür ne otomatik cache'lenir ne de manuel indirmeye dahil edilir.
-  const [dataCacheTypes, setDataCacheTypesState] = useState(DEFAULT_DATA_TYPES);
-  const [notificationSettings, setNotificationSettings] =
-    useState(DEFAULT_NOTIFICATION_SETTINGS);
+  const [dataCacheTypes, setDataCacheTypesState] = useState(() =>
+    normalizeDataTypes(get(Keys.dataCacheTypes)),
+  );
+  const [notificationSettings, setNotificationSettings] = useState(() =>
+    normalizeNotificationSettings(get(Keys.notificationSettings)),
+  );
   // Liste görünümü: sütun sayısı (3 varsayılan | 4) ve afiş köşe yuvarlaklığı (2 | 10 varsayılan | 20)
-  const [listsGridColumns, setListsGridColumns] = useState(3);
-  const [listsPosterRadius, setListsPosterRadius] = useState(10);
+  const [listsGridColumns, setListsGridColumns] = useState(() => get(Keys.listsGridColumns));
+  const [listsPosterRadius, setListsPosterRadius] = useState(() =>
+    get(Keys.listsPosterRadius),
+  );
   // "Tümünü Gör" (poster grid) görünümü — listelerden bağımsız kendi ayarı
-  const [seeAllGridColumns, setSeeAllGridColumns] = useState(3);
-  const [seeAllPosterRadius, setSeeAllPosterRadius] = useState(10);
+  const [seeAllGridColumns, setSeeAllGridColumns] = useState(() =>
+    get(Keys.seeAllGridColumns),
+  );
+  const [seeAllPosterRadius, setSeeAllPosterRadius] = useState(() =>
+    get(Keys.seeAllPosterRadius),
+  );
   // TV/Film ana ekran yatay rail posterleri: boyut ("normal" | "small") ve köşe (4 | 15 varsayılan | 24)
-  const [railPosterSize, setRailPosterSize] = useState("normal");
-  const [railPosterRadius, setRailPosterRadius] = useState(15);
+  const [railPosterSize, setRailPosterSize] = useState(() => get(Keys.railPosterSize));
+  const [railPosterRadius, setRailPosterRadius] = useState(() => get(Keys.railPosterRadius));
   // Paylaşım akışındaki liste postları: "spaced" (varsayılan aralıklı) | "joined" (bitişik şerit)
-  const [postListPosterLayout, setPostListPosterLayout] = useState("spaced");
+  const [postListPosterLayout, setPostListPosterLayout] = useState(() =>
+    get(Keys.postListPosterLayout),
+  );
   // Poster üzerindeki rozetlerin (ListBadges) TÜR BAZINDA görünürlüğü —
   // her rozet ayrı açılıp kapatılabilir; kapalı olan posterde çizilmez.
-  const [posterBadges, setPosterBadges] = useState(DEFAULT_POSTER_BADGES);
-  const [streamingProviderIds, setStreamingProviderIds] = useState([]);
+  const [posterBadges, setPosterBadges] = useState(() =>
+    normalizePosterBadges(get(Keys.posterBadges)),
+  );
+  const [streamingProviderIds, setStreamingProviderIds] = useState(() =>
+    [...new Set((get(Keys.streamingProviderIds) || []).map(Number))].filter(
+      (id) => Number.isInteger(id) && id > 0,
+    ),
+  );
 
-  // Single multiGet reads all persisted settings in one AsyncStorage round-trip.
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const [
-          [, savedShowSnow],
-          [, savedLanguage],
-          [, savedTheme],
-          [, savedAvatar],
-          [, savedAdultContent],
-          [, savedOngoingTvShows],
-          [, savedIconBackground],
-          [, savedIconBackgroundMode],
-          [, savedIconBackgroundOpacity],
-          [, savedLevel],
-          [, savedLegacy],
-          [, savedHapticsEnabled],
-          [, savedNotificationSettings],
-          [, savedReminderNotificationSettings],
-          [, savedAutoDataCache],
-          [, savedDataCacheTypes],
-          [, savedCustomTheme],
-          [, savedCustomThemes],
-          [, savedListsGridColumns],
-          [, savedListsPosterRadius],
-          [, savedSeeAllGridColumns],
-          [, savedSeeAllPosterRadius],
-          [, savedRailPosterSize],
-          [, savedRailPosterRadius],
-          [, savedPostListPosterLayout],
-          [, savedShowPosterBadges],
-          [, savedStreamingProviderIds],
-        ] = await AsyncStorage.multiGet([
-          "showSnow",
-          "selectedLanguage",
-          "selectedTheme",
-          "selectedAvatar",
-          "adultContent",
-          "showOngoingTvShows",
-          "showIconBackground",
-          "iconBackgroundMode",
-          "iconBackgroundOpacity",
-          "imageQualityLevel",
-          "imageQuality", // legacy key — migrated on first read
-          "hapticsEnabled",
-          "notificationSettings",
-          "reminderNotificationSettings",
-          AUTO_DATA_CACHE_KEY,
-          DATA_TYPES_KEY,
-          "customThemeTokens", // legacy tek özel tema — çoklu yapıya migrate edilir
-          "customThemes",
-          "listsGridColumns",
-          "listsPosterRadius",
-          "seeAllGridColumns",
-          "seeAllPosterRadius",
-          "railPosterSize",
-          "railPosterRadius",
-          "postListPosterLayout",
-          "showPosterBadges",
-          "streamingProviderIds",
-        ]);
-
-        if (savedAdultContent !== null)
-          setAdultContent(JSON.parse(savedAdultContent));
-
-        if (savedOngoingTvShows !== null)
-          setShowOngoingTvShows(JSON.parse(savedOngoingTvShows));
-
-        if (savedIconBackground !== null)
-          setShowIconBackground(JSON.parse(savedIconBackground));
-
-        if (savedIconBackgroundMode === "shared" || savedIconBackgroundMode === "random")
-          setIconBackgroundMode(savedIconBackgroundMode);
-
-        if (savedIconBackgroundOpacity !== null) {
-          const v = parseFloat(savedIconBackgroundOpacity);
-          if (!Number.isNaN(v)) setIconBackgroundOpacity(Math.min(1, Math.max(0.1, v)));
-        }
-
-        if (savedLevel !== null && IMAGE_QUALITY_PRESETS[savedLevel]) {
-          setImageQualityLevel(savedLevel);
-        } else if (savedLegacy !== null) {
-          const level = LEGACY_TO_LEVEL[savedLegacy] || "good";
-          setImageQualityLevel(level);
-          await AsyncStorage.setItem("imageQualityLevel", level);
-          await AsyncStorage.removeItem("imageQuality");
-        }
-
-        if (savedShowSnow !== null) setShowSnow(JSON.parse(savedShowSnow));
-        if (savedLanguage !== null) setSelectedLanguage(savedLanguage);
-        if (savedTheme !== null) setSelectedTheme(savedTheme);
-
-        // Özel temalar (çoklu). Eski tek "customThemeTokens" kaydı varsa adlandırılmış
-        // bir temaya migrate edilir ve seçili tema "custom" ise "custom:<id>" olur.
-        let themesArr = [];
-        if (savedCustomThemes !== null) {
-          try {
-            const parsed = JSON.parse(savedCustomThemes);
-            if (Array.isArray(parsed)) themesArr = parsed.filter((x) => x && x.id && x.tokens);
-          } catch { /* gecersiz kayit yok sayilir */ }
-        }
-        if (themesArr.length === 0 && savedCustomTheme !== null) {
-          try {
-            const legacyTokens = JSON.parse(savedCustomTheme);
-            if (legacyTokens && typeof legacyTokens === "object") {
-              const migratedId = genThemeId();
-              themesArr = [{
-                id: migratedId,
-                name: i18nText("autoI18n.ozel_tema", "Özel Tema"),
-                tokens: legacyTokens,
-              }];
-              AsyncStorage.setItem("customThemes", JSON.stringify(themesArr)).catch(() => {});
-              if (savedTheme === "custom") {
-                setSelectedTheme(`custom:${migratedId}`);
-                AsyncStorage.setItem("selectedTheme", `custom:${migratedId}`).catch(() => {});
-              }
-              AsyncStorage.removeItem("customThemeTokens").catch(() => {});
-            }
-          } catch { /* gecersiz legacy kayit yok sayilir */ }
-        }
-        if (themesArr.length > 0) setCustomThemes(themesArr);
-        if (savedAvatar !== null) setSelectedAvatar(JSON.parse(savedAvatar));
-        if (savedListsGridColumns !== null) {
-          const n = parseInt(savedListsGridColumns, 10);
-          if (n === 3 || n === 4) setListsGridColumns(n);
-        }
-        if (savedListsPosterRadius !== null) {
-          const n = parseInt(savedListsPosterRadius, 10);
-          if (n === 2 || n === 10 || n === 20) setListsPosterRadius(n);
-        }
-        if (savedSeeAllGridColumns !== null) {
-          const n = parseInt(savedSeeAllGridColumns, 10);
-          if (n === 3 || n === 4) setSeeAllGridColumns(n);
-        }
-        if (savedSeeAllPosterRadius !== null) {
-          const n = parseInt(savedSeeAllPosterRadius, 10);
-          if (n === 2 || n === 10 || n === 20) setSeeAllPosterRadius(n);
-        }
-        if (savedRailPosterSize === "normal" || savedRailPosterSize === "small") {
-          setRailPosterSize(savedRailPosterSize);
-        }
-        if (savedRailPosterRadius !== null) {
-          const n = parseInt(savedRailPosterRadius, 10);
-          if (n === 4 || n === 15 || n === 24) setRailPosterRadius(n);
-        }
-        if (savedPostListPosterLayout === "spaced" || savedPostListPosterLayout === "joined") {
-          setPostListPosterLayout(savedPostListPosterLayout);
-        }
-        if (savedShowPosterBadges !== null) {
-          const parsed = JSON.parse(savedShowPosterBadges);
-          setPosterBadges(normalizePosterBadges(parsed));
-        }
-        if (savedStreamingProviderIds !== null) {
-          const parsed = JSON.parse(savedStreamingProviderIds);
-          if (Array.isArray(parsed)) {
-            setStreamingProviderIds(
-              [...new Set(parsed.map(Number))].filter(
-                (id) => Number.isInteger(id) && id > 0,
-              ),
-            );
-          }
-        }
-        if (savedHapticsEnabled !== null) {
-          const nextHapticsEnabled = JSON.parse(savedHapticsEnabled) !== false;
-          setHapticsEnabled(nextHapticsEnabled);
-          setGlobalHapticsEnabled(nextHapticsEnabled);
-        } else {
-          // Varsayılan: titreşim kapalı (kullanıcı ayarlardan açabilir).
-          setGlobalHapticsEnabled(false);
-        }
-        const autoCache = savedAutoDataCache === "true";
-        setAutoDataCacheEnabledState(autoCache);
-        setAutoDataCacheEnabled(autoCache);
-
-        // Tür seçimi — bozuk/eksik kayıt normalize edilir (eksikler açık sayılır).
-        let types = DEFAULT_DATA_TYPES;
-        if (savedDataCacheTypes !== null) {
-          try {
-            types = normalizeDataTypes(JSON.parse(savedDataCacheTypes));
-          } catch {
-            types = DEFAULT_DATA_TYPES;
-          }
-        }
-        setDataCacheTypesState(types);
-        setDataTypes(types);
-        if (savedNotificationSettings !== null || savedReminderNotificationSettings !== null) {
-          const loadedSettings = JSON.parse(
-            savedNotificationSettings ?? savedReminderNotificationSettings,
-          );
-          const normalized = normalizeNotificationSettings(loadedSettings);
-          setNotificationSettings(normalized);
-
-          if (savedNotificationSettings === null) {
-            await AsyncStorage.setItem("notificationSettings", JSON.stringify(normalized));
-            await AsyncStorage.removeItem("reminderNotificationSettings");
-          }
-        }
-      } catch (error) {
-        Toast.show({ type: "error", text1: i18nText("autoI18n.ayarlar_yuklenemedi", "Ayarlar yüklenemedi: ") + error });
-      }
-    };
-    loadSettings();
-  }, []);
+  // NOT: burada eskiden 200 satırlık bir `AsyncStorage.multiGet` hidrasyon
+  // effect'i vardı. Okuma senkron olduğu için tamamı yukarıdaki useState
+  // başlangıç değerlerine taşındı. Eski anahtar dönüşümleri (imageQuality →
+  // imageQualityLevel, reminderNotificationSettings → notificationSettings,
+  // customThemeTokens → customThemes) artık tek seferlik göçün parçası:
+  // services/storage/migration.js.
 
   const imageQuality = useMemo(
     () => IMAGE_QUALITY_PRESETS[imageQualityLevel] ?? IMAGE_QUALITY_PRESETS.good,
@@ -403,23 +257,17 @@ export const AppSettingsProvider = ({ children }) => {
   // Stable setters — only close over React's stable setState refs.
   const changeShowSnow = useCallback((newVal) => {
     setShowSnow(newVal);
-    AsyncStorage.setItem("showSnow", JSON.stringify(newVal)).catch((e) =>
-      Toast.show({ type: "error", text1: "ShowSnow kaydedilmedi: " + e }),
-    );
+    persist(Keys.showSnow, newVal, "ShowSnow kaydedilmedi");
   }, []);
 
   const changeLanguage = useCallback((newVal) => {
     setSelectedLanguage(newVal);
-    AsyncStorage.setItem("selectedLanguage", newVal).catch((e) =>
-      Toast.show({ type: "error", text1: i18nText("autoI18n.dil_kaydedilemedi", "Dil kaydedilemedi: ") + e }),
-    );
+    persist(Keys.language, newVal, i18nText("autoI18n.dil_kaydedilemedi", "Dil kaydedilemedi: "));
   }, []);
 
   const changeTheme = useCallback((newVal) => {
     setSelectedTheme(newVal);
-    AsyncStorage.setItem("selectedTheme", newVal).catch((e) =>
-      Toast.show({ type: "error", text1: i18nText("autoI18n.tema_kaydedilemedi", "Tema kaydedilemedi: ") + e }),
-    );
+    persist(Keys.theme, newVal, TEMA_HATASI);
   }, []);
 
   // Özel tema (ad + token seti) ekler veya günceller. id verilmezse yeni üretilir.
@@ -435,9 +283,7 @@ export const AppSettingsProvider = ({ children }) => {
     setCustomThemes((prev) => {
       const idx = prev.findIndex((x) => x.id === id);
       const next = idx >= 0 ? prev.map((x, i) => (i === idx ? entry : x)) : [...prev, entry];
-      AsyncStorage.setItem("customThemes", JSON.stringify(next)).catch((e) =>
-        Toast.show({ type: "error", text1: i18nText("autoI18n.tema_kaydedilemedi", "Tema kaydedilemedi: ") + e }),
-      );
+      persist(Keys.customThemes, next, TEMA_HATASI);
       return next;
     });
     return id;
@@ -446,54 +292,43 @@ export const AppSettingsProvider = ({ children }) => {
   const deleteCustomTheme = useCallback((id) => {
     setCustomThemes((prev) => {
       const next = prev.filter((x) => x.id !== id);
-      AsyncStorage.setItem("customThemes", JSON.stringify(next)).catch((e) =>
-        Toast.show({ type: "error", text1: i18nText("autoI18n.tema_kaydedilemedi", "Tema kaydedilemedi: ") + e }),
-      );
+      persist(Keys.customThemes, next, TEMA_HATASI);
       return next;
     });
   }, []);
 
   const changeAvatar = useCallback((userId, newAvatar) => {
     setSelectedAvatar(newAvatar);
-    AsyncStorage.setItem(
-      `avatar_${userId}`,
-      JSON.stringify(newAvatar),
-    ).catch((e) =>
-      Toast.show({ type: "error", text1: "Avatar kaydedilemedi: " + e }),
-    );
+    // ESKİ HATA: burası `avatar_${uid}` anahtarına JSON yazıyordu, oysa
+    // ProfileUiContext AYNI anahtara düz bir sayı (avatar index) yazıyor. İki
+    // modül tek anahtarı iki farklı biçimde kullanıyordu; hangisi son yazarsa
+    // diğerinin okuması bozuluyordu. Artık ayrı anahtar (bkz. registry).
+    persist(Keys.selectedAvatar, newAvatar, "Avatar kaydedilemedi");
   }, []);
 
   const chaneAdultContent = useCallback((newVal) => {
     setAdultContent(newVal);
-    AsyncStorage.setItem("adultContent", JSON.stringify(newVal)).catch((e) =>
-      Toast.show({ type: "error", text1: "Content kaydedilemedi: " + e }),
-    );
+    persist(Keys.adultContent, newVal, "Content kaydedilemedi");
   }, []);
 
   const changeShowOngoingTvShows = useCallback((newVal) => {
     setShowOngoingTvShows(newVal);
-    AsyncStorage.setItem("showOngoingTvShows", JSON.stringify(newVal)).catch((e) =>
-      Toast.show({ type: "error", text1: i18nText("autoI18n.devam_eden_diziler_ayari_kaydedilemedi", "Devam eden diziler ayarı kaydedilemedi: ") + e }),
-    );
+    persist(Keys.showOngoingTvShows, newVal, i18nText("autoI18n.devam_eden_diziler_ayari_kaydedilemedi", "Devam eden diziler ayarı kaydedilemedi: "));
   }, []);
 
   const changeShowIconBackground = useCallback((newVal) => {
     setShowIconBackground(newVal);
-    AsyncStorage.setItem("showIconBackground", JSON.stringify(newVal)).catch((e) =>
-      Toast.show({ type: "error", text1: i18nText("autoI18n.ikon_arka_plan_ayari_kaydedilemedi", "İkon arka plan ayarı kaydedilemedi: ") + e }),
-    );
+    persist(Keys.showIconBackground, newVal, IKON_HATASI);
   }, []);
 
   const changeIconBackgroundMode = useCallback((mode) => {
     if (mode !== "shared" && mode !== "random") return;
     setIconBackgroundMode(mode);
-    AsyncStorage.setItem("iconBackgroundMode", mode).catch((e) =>
-      Toast.show({ type: "error", text1: i18nText("autoI18n.ikon_arka_plan_ayari_kaydedilemedi", "İkon arka plan ayarı kaydedilemedi: ") + e }),
-    );
+    persist(Keys.iconBackgroundMode, mode, IKON_HATASI);
   }, []);
 
   // Saydamlık kaydırıcısı her harekette tetiklenir → state'i anında günceller (canlı
-  // önizleme), ama AsyncStorage yazımını debounce eder (sürükleme sırasında yüzlerce
+  // önizleme), ama disk yazımını debounce eder (sürükleme sırasında yüzlerce
   // gereksiz yazımdan kaçınır; yalnız durunca/bırakınca kalıcılaştırır).
   const opacityPersistTimer = useRef(null);
   const changeIconBackgroundOpacity = useCallback((val) => {
@@ -501,27 +336,22 @@ export const AppSettingsProvider = ({ children }) => {
     setIconBackgroundOpacity(v);
     if (opacityPersistTimer.current) clearTimeout(opacityPersistTimer.current);
     opacityPersistTimer.current = setTimeout(() => {
-      AsyncStorage.setItem("iconBackgroundOpacity", String(v)).catch((e) =>
-        Toast.show({ type: "error", text1: i18nText("autoI18n.ikon_arka_plan_ayari_kaydedilemedi", "İkon arka plan ayarı kaydedilemedi: ") + e }),
-      );
+      persist(Keys.iconBackgroundOpacity, v, IKON_HATASI);
     }, 250);
   }, []);
 
   const changeImageQuality = useCallback((level) => {
     if (!IMAGE_QUALITY_PRESETS[level]) return;
     setImageQualityLevel(level);
-    AsyncStorage.setItem("imageQualityLevel", level).catch((e) =>
-      Toast.show({ type: "error", text1: "Kalite kaydedilemedi: " + e }),
-    );
+    persist(Keys.imageQualityLevel, level, "Kalite kaydedilemedi");
   }, []);
 
   const changeHapticsEnabled = useCallback((newVal) => {
     const nextValue = !!newVal;
     setHapticsEnabled(nextValue);
-    setGlobalHapticsEnabled(nextValue);
-    AsyncStorage.setItem("hapticsEnabled", JSON.stringify(nextValue)).catch((e) =>
-      Toast.show({ type: "error", text1: i18nText("autoI18n.titresim_ayari_kaydedilemedi", "Titreşim ayarı kaydedilemedi: ") + e }),
-    );
+    // hapticsService bu anahtara ABONE — ayrıca itmeye gerek yok. Eskiden iki
+    // modül aynı anahtarı ayrı ayrı sahipleniyordu (bkz. services/hapticsService.js).
+    persist(Keys.haptics, nextValue, i18nText("autoI18n.titresim_ayari_kaydedilemedi", "Titreşim ayarı kaydedilemedi: "));
   }, []);
 
   const changeNotificationSettings = useCallback((patch) => {
@@ -530,74 +360,49 @@ export const AppSettingsProvider = ({ children }) => {
       ...patch,
     });
     setNotificationSettings(next);
-    AsyncStorage.setItem(
-      "notificationSettings",
-      JSON.stringify(next),
-    ).catch((e) =>
-      Toast.show({
-        type: "error",
-        text1: i18nText("autoI18n.bildirim_ayari_kaydedilemedi", "Bildirim ayarı kaydedilemedi: ") + e,
-      }),
-    );
+    persist(Keys.notificationSettings, next, i18nText("autoI18n.bildirim_ayari_kaydedilemedi", "Bildirim ayarı kaydedilemedi: "));
   }, [notificationSettings]);
 
   const changeListsGridColumns = useCallback((n) => {
     if (n !== 3 && n !== 4) return;
     setListsGridColumns(n);
-    AsyncStorage.setItem("listsGridColumns", String(n)).catch((e) =>
-      Toast.show({ type: "error", text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi") }),
-    );
+    persist(Keys.listsGridColumns, n, GORUNUM_HATASI);
   }, []);
 
   const changeListsPosterRadius = useCallback((n) => {
     if (n !== 2 && n !== 10 && n !== 20) return;
     setListsPosterRadius(n);
-    AsyncStorage.setItem("listsPosterRadius", String(n)).catch((e) =>
-      Toast.show({ type: "error", text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi") }),
-    );
+    persist(Keys.listsPosterRadius, n, GORUNUM_HATASI);
   }, []);
 
   const changeSeeAllGridColumns = useCallback((n) => {
     if (n !== 3 && n !== 4) return;
     setSeeAllGridColumns(n);
-    AsyncStorage.setItem("seeAllGridColumns", String(n)).catch((e) =>
-      Toast.show({ type: "error", text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi") }),
-    );
+    persist(Keys.seeAllGridColumns, n, GORUNUM_HATASI);
   }, []);
 
   const changeSeeAllPosterRadius = useCallback((n) => {
     if (n !== 2 && n !== 10 && n !== 20) return;
     setSeeAllPosterRadius(n);
-    AsyncStorage.setItem("seeAllPosterRadius", String(n)).catch((e) =>
-      Toast.show({ type: "error", text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi") }),
-    );
+    persist(Keys.seeAllPosterRadius, n, GORUNUM_HATASI);
   }, []);
 
   const changeRailPosterSize = useCallback((size) => {
     if (size !== "normal" && size !== "small") return;
     setRailPosterSize(size);
-    AsyncStorage.setItem("railPosterSize", size).catch((e) =>
-      Toast.show({ type: "error", text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi") }),
-    );
+    persist(Keys.railPosterSize, size, GORUNUM_HATASI);
   }, []);
 
   const changeRailPosterRadius = useCallback((n) => {
     if (n !== 4 && n !== 15 && n !== 24) return;
     setRailPosterRadius(n);
-    AsyncStorage.setItem("railPosterRadius", String(n)).catch((e) =>
-      Toast.show({ type: "error", text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi") }),
-    );
+    persist(Keys.railPosterRadius, n, GORUNUM_HATASI);
   }, []);
 
   const changePostListPosterLayout = useCallback((layout) => {
     if (layout !== "spaced" && layout !== "joined") return;
     setPostListPosterLayout(layout);
-    AsyncStorage.setItem("postListPosterLayout", layout).catch(() =>
-      Toast.show({
-        type: "error",
-        text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi"),
-      }),
-    );
+    persist(Keys.postListPosterLayout, layout, GORUNUM_HATASI);
   }, []);
 
   const showPosterBadges = useMemo(
@@ -606,10 +411,7 @@ export const AppSettingsProvider = ({ children }) => {
   );
 
   const persistPosterBadges = useCallback((next) => {
-    AsyncStorage.setItem("showPosterBadges", JSON.stringify(next)).catch(
-      (e) =>
-        Toast.show({ type: "error", text1: i18nText("autoI18n.gorunum_ayari_kaydedilemedi", "Görünüm ayarı kaydedilemedi") }),
-    );
+    persist(Keys.posterBadges, next, GORUNUM_HATASI);
   }, []);
 
   const changePosterBadges = useCallback((nextValue) => {
@@ -632,13 +434,9 @@ export const AppSettingsProvider = ({ children }) => {
   const changeAutoDataCacheEnabled = useCallback((newVal) => {
     const enabled = !!newVal;
     setAutoDataCacheEnabledState(enabled);
+    // dataCacheSettings hem kalıcılaştırır hem senkron aynasını tazeler —
+    // anahtarın TEK sahibi orası, burada ayrıca yazılmaz.
     setAutoDataCacheEnabled(enabled);
-    AsyncStorage.setItem(AUTO_DATA_CACHE_KEY, JSON.stringify(enabled)).catch((e) =>
-      Toast.show({
-        type: "error",
-        text1: i18nText("autoI18n.veri_indirme_ayari_kaydedilemedi", "Veri indirme ayarı kaydedilemedi: ") + e,
-      }),
-    );
   }, []);
 
   // Tür seçimi — React state + senkron ayna (cache katmanları) + kalıcı kayıt.
@@ -646,16 +444,6 @@ export const AppSettingsProvider = ({ children }) => {
     const normalized = normalizeDataTypes(next);
     setDataCacheTypesState(normalized);
     setDataTypes(normalized);
-    AsyncStorage.setItem(DATA_TYPES_KEY, JSON.stringify(normalized)).catch((e) =>
-      Toast.show({
-        type: "error",
-        text1:
-          i18nText(
-            "autoI18n.veri_turleri_kaydedilemedi",
-            "Veri türleri kaydedilemedi: ",
-          ) + e,
-      }),
-    );
   }, []);
 
   const changeDataCacheType = useCallback(
@@ -677,15 +465,7 @@ export const AppSettingsProvider = ({ children }) => {
       (id) => Number.isInteger(id) && id > 0,
     );
     setStreamingProviderIds(next);
-    AsyncStorage.setItem("streamingProviderIds", JSON.stringify(next)).catch((e) =>
-      Toast.show({
-        type: "error",
-        text1: i18nText(
-          "autoI18n.platform_uyelikleri_kaydedilemedi",
-          "Platform üyelikleri kaydedilemedi: ",
-        ) + e,
-      }),
-    );
+    persist(Keys.streamingProviderIds, next, i18nText("autoI18n.platform_uyelikleri_kaydedilemedi", "Platform üyelikleri kaydedilemedi: "));
   }, []);
 
   const value = useMemo(

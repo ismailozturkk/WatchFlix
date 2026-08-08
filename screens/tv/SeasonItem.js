@@ -307,17 +307,6 @@ const SeasonItem = ({
   const showDatePicker = useCallback(() => setDatePickerVisibility(true), []);
   const hideDatePicker = useCallback(() => setDatePickerVisibility(false), []);
 
-  const handleConfirm = useCallback(
-    (date) => {
-      // date artık ISO string ("YYYY-MM-DD") veya Date objesi olabilir
-      const isoDate = typeof date === "string" ? date : formatDateSave(date);
-      setSelectedDate(isoDate);
-      addSeasonToFirestore(false, isoDate);
-      hideDatePicker();
-    },
-    [hideDatePicker, formatDateSave]
-  );
-
   // ── Tarih yardımcıları ────────────────────────────────────────────────────
   const formatDate = useCallback(
     (timestamp) =>
@@ -404,11 +393,31 @@ const SeasonItem = ({
             ),
             e
           );
+        // Sessiz kalınırsa kullanıcı sezonu işaretlediğini sanıp ekrandan
+        // çıkıyor; aynı dosyadaki onDeleteEvent ile aynı geri bildirim.
+        Toast.show({
+          type: "error",
+          text1: i18nText("autoI18n.hata_2", "Hata: ") + (e?.message || ""),
+        });
       } finally {
         setIsLoading(false);
       }
     },
     [user, details, season, language, API_KEY, formatDateSave]
+  );
+
+  // NOT: handleConfirm, addSeasonToFirestore'dan SONRA tanımlı olmalı —
+  // bağımlılık dizisi render sırasında değerlendiği için yukarıda tanımlanırsa
+  // deps'teki fonksiyonlar okunamaz ve callback ilk render'ın closure'ında donar.
+  const handleConfirm = useCallback(
+    (date) => {
+      // date artık ISO string ("YYYY-MM-DD") veya Date objesi olabilir
+      const isoDate = typeof date === "string" ? date : formatDateSave(date);
+      setSelectedDate(isoDate);
+      addSeasonToFirestore(false, isoDate);
+      hideDatePicker();
+    },
+    [hideDatePicker, formatDateSave, addSeasonToFirestore]
   );
 
   // ── İzlenme buton rengi & ilerleme ────────────────────────────────────────

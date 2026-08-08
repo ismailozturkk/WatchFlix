@@ -17,12 +17,9 @@ import {
   StyleSheet,
   Platform,
   Linking,
-  Alert,
-  Modal,
   Animated,
   Dimensions,
   StatusBar,
-  Pressable,
   ScrollView,
   LayoutAnimation,
   UIManager,
@@ -90,13 +87,12 @@ import {
 import axios from "axios";
 import {
   AntDesign,
-  Entypo,
-  Feather,
+    Feather,
   FontAwesome,
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
 import IconBacground from "@components/IconBacground"; // Arka plan dekor
-import { Octicons } from "@expo/vector-icons";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import { i18nText } from "@utils/i18nText";
 import { appAlert } from "@components/AppAlert";
 import { toast } from "@components/AppToast";
@@ -597,9 +593,28 @@ export default function ChatScreen({ route, navigation }) {
   const keyboard = useAnimatedKeyboard({
     isNavigationBarTranslucentAndroid: true,
   });
+  // Kaldırma kapısı: useAnimatedKeyboard bazı kapanış yollarını (sistem geri
+  // tuşu, navigasyonla ekrandan ayrılma) kaçırıp yüksekliği klavye değerinde
+  // TAKILI bırakabiliyor; değere doğrudan 0 yazmak da işe yaramıyor çünkü
+  // hook takılı native durumdan geri yüklüyor. Padding bu yüzden
+  // yükseklik × kapı olarak hesaplanır: kapı yalnızca mesaj inputu
+  // odaklanınca 1 olur, kapanış event'lerinde ve ekran odak değişiminde 0'a
+  // iner. Kapı 0'dan başladığı için ekran her açılışta input ALTTA başlar —
+  // bayat yükseklik hiçbir zaman görünmez.
+  const kbGate = useSharedValue(0);
   const inputAreaStyle = useAnimatedStyle(() => ({
-    paddingBottom: Math.max(insets.bottom, keyboard.height.value),
+    paddingBottom: Math.max(insets.bottom, keyboard.height.value * kbGate.value),
   }));
+
+  const openKbGate = useCallback(() => {
+    if (keyboard.height.value > 0 && !Keyboard.isVisible()) {
+      // Takılı yükseklik varken klavye yeni açılıyor: ani sıçrama yerine
+      // klavye animasyonuna kabaca eşlik et.
+      kbGate.value = withTiming(1, { duration: 220 });
+    } else {
+      kbGate.value = 1;
+    }
+  }, [keyboard, kbGate]);
 
   const flatListRef = useRef();
   const typingTimerRef   = useRef(null);   // debounce typing writes
@@ -666,9 +681,9 @@ export default function ChatScreen({ route, navigation }) {
   // aynı tamamlayıcıyı çalıştırmak, modalın ancak görsel yerleşim sıfırlandıktan
   // sonra açılmasını garanti eder.
   useAnimatedReaction(
-    () => keyboard.height.value,
-    (height, previousHeight) => {
-      if (height <= 0 && previousHeight > 0) {
+    () => keyboard.height.value * kbGate.value,
+    (padding, previousPadding) => {
+      if (padding <= 0 && previousPadding > 0) {
         runOnJS(commitPendingComposer)();
       }
     },
@@ -701,6 +716,37 @@ export default function ChatScreen({ route, navigation }) {
     [commitPendingComposer],
   );
 
+  // ── FAB menüsü (anket / arama) ─────────────────────────────────────────────
+  // Haptaki + butonu iki kısayolu açar; seçimler mevcut composer akışına
+  // (openComposer) devreder. İkon menü açıkken 45° dönerek ×'e dönüşür.
+  const [attachMenuVisible, setAttachMenuVisible] = useState(false);
+  const attachSpin = useSharedValue(0);
+  const fabIconStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${attachSpin.value * 45}deg` }],
+  }));
+
+  const closeAttachMenu = useCallback(() => {
+    easeLayout();
+    attachSpin.value = withTiming(0, { duration: 180 });
+    setAttachMenuVisible(false);
+  }, [attachSpin]);
+
+  const toggleAttachMenu = useCallback(() => {
+    if (hapticsEnabled) Haptics.selectionAsync().catch(() => {});
+    easeLayout();
+    const next = !attachMenuVisible;
+    attachSpin.value = withTiming(next ? 1 : 0, { duration: 200 });
+    setAttachMenuVisible(next);
+  }, [attachMenuVisible, attachSpin, hapticsEnabled]);
+
+  const handleAttachOption = useCallback(
+    (target) => {
+      closeAttachMenu();
+      openComposer(target);
+    },
+    [closeAttachMenu, openComposer],
+  );
+
   const closeSearchModal = useCallback((clearHashText = false) => {
     if (searchFocusTimerRef.current) {
       clearTimeout(searchFocusTimerRef.current);
@@ -723,9 +769,19 @@ export default function ChatScreen({ route, navigation }) {
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () => {
       keyboardVisibleRef.current = true;
+      // Klavye event'i globaldir; modal penceresindeki bir input da
+      // tetikleyebilir. Kapı yalnızca ana ekrandaki mesaj inputu gerçekten
+      // odaklıysa açılır (modal klavyesinde ana input yerinde kalmalı).
+      if (messageInputRef.current?.isFocused?.()) {
+        kbGate.value = 1;
+      }
     });
     const hideSub = Keyboard.addListener("keyboardDidHide", () => {
       keyboardVisibleRef.current = false;
+      // Kapanış kesinleşti: reanimated yüksekliği takılı kalmış olsa bile
+      // kapı kapanınca padding sıfıra iner (normal kapanışta yükseklik zaten
+      // kendi animasyonuyla indiğinden görsel fark yaratmaz).
+      kbGate.value = withTiming(0, { duration: 160 });
       commitPendingComposer();
     });
 
@@ -740,7 +796,27 @@ export default function ChatScreen({ route, navigation }) {
       // kalıcı hayalet "yazıyor…" göstergesi kalıyordu.
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     };
-  }, [commitPendingComposer]);
+  }, [commitPendingComposer, kbGate]);
+
+  // Klavye açıkken navigasyonla ekrandan ayrılınca (başlıktaki geri butonu
+  // veya profil ekranına geçiş) klavye kapanışı blur olmuş ekrana
+  // işlenmiyor. Odaktan çıkarken klavyeyi kapat ve kapıyı ANINDA sıfırla;
+  // dönüşte de klavye kapalıysa kapıyı kapalı tut — input her koşulda altta.
+  useEffect(() => {
+    const unsubBlur = navigation.addListener("blur", () => {
+      Keyboard.dismiss();
+      kbGate.value = 0;
+    });
+    const unsubFocus = navigation.addListener("focus", () => {
+      if (!Keyboard.isVisible()) {
+        kbGate.value = 0;
+      }
+    });
+    return () => {
+      unsubBlur();
+      unsubFocus();
+    };
+  }, [navigation, kbGate]);
 
   const [chatData, setChatData] = useState({
     messages: [],
@@ -958,6 +1034,8 @@ export default function ChatScreen({ route, navigation }) {
 
   // Input odaklanma animasyonu
   const handleInputFocus = () => {
+    if (attachMenuVisible) closeAttachMenu();
+    openKbGate();
     Animated.timing(inputBorderAnim, {
       toValue: 1,
       duration: 200,
@@ -2016,11 +2094,17 @@ export default function ChatScreen({ route, navigation }) {
             }
           />
 
+          {/* FAB menüsü açıkken listeyi karartan / menüyü kapatan katman */}
+          {attachMenuVisible && (
+            <TouchableOpacity
+              style={styles.attachBackdrop}
+              activeOpacity={1}
+              onPress={closeAttachMenu}
+            />
+          )}
+
           {/* ── INPUT ALANI ── */}
           <View style={styles.inputContainer}>
-              {/* Arka plan blur katmanı */}
-              <View style={styles.inputBlurBg} />
-
               {/* Düzenleme banner */}
               {replyingTo && (
                 <View style={styles.replyingBanner}>
@@ -2058,100 +2142,140 @@ export default function ChatScreen({ route, navigation }) {
                 </View>
               )}
 
-              <View style={styles.inputRow}>
-                {/* Anket oluştur (metin) */}
+              {/* FAB menüsü — anket & arama kısayolları */}
+              {attachMenuVisible && (
+                <View style={styles.attachMenuRow}>
+                  <TouchableOpacity
+                    style={styles.attachAction}
+                    onPress={() => handleAttachOption("poll")}
+                    disabled={composerTransitioning}
+                    activeOpacity={0.75}
+                  >
+                    <View
+                      style={[
+                        styles.attachActionIcon,
+                        { backgroundColor: ACCENT_SOFT },
+                      ]}
+                    >
+                      <Ionicons name="stats-chart" size={15} color={ACCENT} />
+                    </View>
+                    <Text style={styles.attachActionText} numberOfLines={1}>
+                      {i18nText("autoI18n.metin_anketi", "Metin Anketi")}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.attachAction}
+                    onPress={() => handleAttachOption("search")}
+                    disabled={composerTransitioning}
+                    activeOpacity={0.75}
+                  >
+                    <View
+                      style={[
+                        styles.attachActionIcon,
+                        { backgroundColor: "rgba(94,232,160,0.14)" },
+                      ]}
+                    >
+                      <Feather name="search" size={14} color={SEEN_COLOR} />
+                    </View>
+                    <Text style={styles.attachActionText} numberOfLines={1}>
+                      {i18nText("autoI18n.film_dizi_ara", "Film & Dizi Ara")}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Tek parça hap: [+ FAB][input][gönder] */}
+              <Animated.View
+                style={[
+                  styles.composerPill,
+                  { borderColor: searchOption ? ACCENT : inputBorderColor },
+                ]}
+              >
+                {/* Üst glow şeridi */}
+                <View
+                  style={[
+                    styles.inputInnerGlow,
+                    { opacity: searchOption ? 1 : 0 },
+                  ]}
+                />
+
+                {/* FAB — menüyü açar/kapatır */}
                 <TouchableOpacity
-                  style={styles.pollBtn}
-                  onPress={() => openComposer("poll")}
-                  disabled={composerTransitioning}
-                  activeOpacity={0.75}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={styles.composerFab}
+                  onPress={toggleAttachMenu}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={i18nText(
+                    "autoI18n.anket_veya_arama_ac",
+                    "Anket veya arama aç",
+                  )}
                 >
-                  <Ionicons name="stats-chart" size={20} color={ACCENT} />
+                  <Reanimated.View style={fabIconStyle}>
+                    <Ionicons name="add" size={24} color="#fff" />
+                  </Reanimated.View>
                 </TouchableOpacity>
 
-                {/* Input balonu — içinde ikon + input + sağ aksiyon */}
-                <Animated.View
-                  style={[
-                    styles.inputWrapper,
-                    { borderColor: searchOption ? ACCENT : inputBorderColor },
-                  ]}
-                >
-                  {/* Üst glow şeridi */}
-                  <View
-                    style={[
-                      styles.inputInnerGlow,
-                      { opacity: searchOption ? 1 : 0 },
-                    ]}
-                  />
+                <TextInput
+                  ref={messageInputRef}
+                  style={styles.input}
+                  value={text}
+                  multiline
+                  numberOfLines={6}
+                  onChangeText={handleTyping}
+                  maxLength={2000}
+                  placeholder={i18nText("autoI18n.mesaj_yazin", "Mesaj yazın...")}
+                  placeholderTextColor="rgba(255,255,255,0.2)"
+                  onFocus={handleInputFocus}
+                  onBlur={handleInputBlur}
+                  selectionColor={ACCENT}
+                />
 
-                  <View style={styles.inputInnerRow}>
-                    {/* Sol durum ikonu */}
-                    <TouchableOpacity
-                      style={styles.inputLeftIcon}
-                      onPress={() => openComposer("search")}
-                      disabled={composerTransitioning}
-                      activeOpacity={0.7}
-                    >
-                      {searchOption ? (
-                        <Feather name="search" size={16} color={ACCENT} />
-                      ) : textLink ? (
-                        <AntDesign name="link" size={15} color={SEEN_COLOR} />
-                      ) : (
-                        <Feather
-                          name="search"
-                          size={16}
-                          color="rgba(255,255,255,0.4)"
-                        />
-                      )}
-                    </TouchableOpacity>
-
-                    <TextInput
-                      ref={messageInputRef}
-                      style={styles.input}
-                      value={text}
-                      multiline
-                      numberOfLines={6}
-                      onChangeText={handleTyping}
-                      maxLength={2000}
-                      placeholder={i18nText("autoI18n.mesaj_yazin", "Mesaj yazın...")}
-                      placeholderTextColor="rgba(255,255,255,0.2)"
-                      onFocus={handleInputFocus}
-                      onBlur={handleInputBlur}
-                      selectionColor={ACCENT}
-                    />
+                {/* Bağlantı algılandı göstergesi */}
+                {textLink && !searchOption && (
+                  <View style={styles.linkHint} pointerEvents="none">
+                    <AntDesign name="link" size={14} color={SEEN_COLOR} />
                   </View>
-                </Animated.View>
+                )}
 
                 {/* Gönder butonu */}
                 <TouchableOpacity
-                  onPress={sendMessage}
+                  onPress={() => {
+                    if (attachMenuVisible) closeAttachMenu();
+                    sendMessage();
+                  }}
                   activeOpacity={0.72}
                   disabled={!text.trim()}
-                  style={[styles.sendBtn, { opacity: text.trim() ? 1 : 0.32 }]}
+                  style={[
+                    styles.composerSend,
+                    { opacity: text.trim() ? 1 : 0.32 },
+                  ]}
                 >
                   {editingMessage ? (
                     <Ionicons name="checkmark" size={20} color="#fff" />
                   ) : (
                     <Ionicons
                       name="send"
-                      size={18}
+                      size={16}
                       color="#fff"
-                      style={{ marginLeft: 2 }}
+                      style={{ marginLeft: 1 }}
                     />
                   )}
                 </TouchableOpacity>
-              </View>
+              </Animated.View>
             </View>
 
         {/* ── # ARAMA MODALİ ── */}
-        <Modal
-          animationType="slide"
+        <BottomSheetModal
           visible={searchModalVisible}
-          transparent
-          // autoFocus yerine: slide animasyonu BİTTİKTEN sonra odakla.
-          // Aksi halde modal-slide + klavye + KAV aynı anda çakışıp açılışta
-          // "bug"/zıplama yapıyordu.
+          onClose={() => closeSearchModal(true)}
+          intensity={35}
+          dimColor="rgba(0,0,0,0.4)"
+          // Bu sayfanın KENDİ klavye kaldırması var (modalKeyboardStyle →
+          // paddingBottom). Kabuğunki de çalışsaydı ikisi toplanırdı.
+          liftWithKeyboard={false}
+          // autoFocus yerine: açılış animasyonu BİTTİKTEN sonra odakla.
+          // Aksi halde açılış + klavye aynı anda çakışıp zıplama yapıyordu.
           onShow={() => {
             if (searchFocusTimerRef.current) {
               clearTimeout(searchFocusTimerRef.current);
@@ -2161,14 +2285,8 @@ export default function ChatScreen({ route, navigation }) {
               searchFocusTimerRef.current = null;
             }, 260);
           }}
-          onRequestClose={() => closeSearchModal(true)}
         >
-          <Pressable
-            style={styles.searchModalOverlay}
-            onPress={() => closeSearchModal()}
-          >
             <Reanimated.View style={modalKeyboardStyle}>
-              <Pressable onPress={(e) => e.stopPropagation()}>
                 <View style={styles.searchModal}>
                   {/* Tutamaç */}
                   <View style={styles.dragHandle} />
@@ -2447,25 +2565,18 @@ export default function ChatScreen({ route, navigation }) {
                     </View>
                   )}
                 </View>
-              </Pressable>
             </Reanimated.View>
-          </Pressable>
-        </Modal>
+        </BottomSheetModal>
 
         {/* ── UZUN BASIN MODAL ── */}
         {optionsVisible && selectedMessage && (
-          <Modal
-            animationType="slide"
+          <BottomSheetModal
             visible={optionsVisible}
-            transparent
-            onRequestClose={() => setOptionsVisible(false)}
+            onClose={() => setOptionsVisible(false)}
+            intensity={35}
+            dimColor="rgba(0,0,0,0.4)"
+            sheetStyle={styles.modalSheet}
           >
-            <View style={styles.modalOverlay}>
-              <TouchableOpacity
-                style={StyleSheet.absoluteFill}
-                onPress={() => setOptionsVisible(false)}
-              />
-              <View style={styles.modalSheet}>
                 {/* Tutamaç */}
                 <View style={styles.dragHandle} />
 
@@ -2640,9 +2751,7 @@ export default function ChatScreen({ route, navigation }) {
                 >
                   <Text style={styles.cancelBtnText}>{i18nText("autoI18n.iptal", "İptal")}</Text>
                 </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
+          </BottomSheetModal>
         )}
 
         <PinnedMessagesModal
@@ -2991,16 +3100,14 @@ const styles = StyleSheet.create({
   },
 
   // ── Input alanı ────────────────────────────────────────
+  // Şeridin kendisi tamamen saydam; gölge yalnızca composerPill üzerinde.
+  // (Android'de saydam bg + elevation kombinasyonu tüm şeride dikdörtgen
+  // gölge düşürdüğünden elevation burada kullanılmıyor.)
   inputContainer: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(255,255,255,0.07)",
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: Platform.OS === "ios" ? 8 : 12,
-    backgroundColor: "rgba(13,13,22,0.97)",
-    overflow: "hidden",
     zIndex: 20,
-    elevation: 20,
   },
   replyingBanner: {
     flexDirection: "row",
@@ -3014,21 +3121,18 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     marginBottom: 9,
   },
-  inputBlurBg: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(108,99,255,0.03)",
-  },
-  inputRow: {
+  composerPill: {
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: 10,
-  },
-  inputWrapper: {
-    flex: 1,
     borderWidth: 1.5,
-    borderRadius: 26,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    overflow: "hidden",
+    borderRadius: 28,
+    backgroundColor: "rgba(26,26,42,0.97)",
+    padding: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 14,
+    elevation: 10,
   },
   inputInnerGlow: {
     position: "absolute",
@@ -3039,43 +3143,70 @@ const styles = StyleSheet.create({
     backgroundColor: ACCENT,
     borderRadius: 1,
   },
-  inputInnerRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
+  composerFab: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: ACCENT,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  inputLeftIcon: {
-    width: 38,
-    paddingLeft: 12,
-    paddingBottom: Platform.OS === "ios" ? 13 : 11,
-    justifyContent: "flex-end",
+  composerSend: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: ACCENT,
+    justifyContent: "center",
+    alignItems: "center",
   },
   input: {
     flex: 1,
-    paddingRight: 14,
-    paddingTop: Platform.OS === "ios" ? 12 : 10,
-    paddingBottom: Platform.OS === "ios" ? 12 : 10,
+    paddingHorizontal: 12,
+    paddingTop: Platform.OS === "ios" ? 11 : 8,
+    paddingBottom: Platform.OS === "ios" ? 11 : 8,
     fontSize: 15,
     maxHeight: 130,
     color: "#fff",
   },
-  sendBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: ACCENT,
+  linkHint: {
+    height: 42,
     justifyContent: "center",
-    alignItems: "center",
-    shadowColor: ACCENT,
-    shadowOpacity: 0.55,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 8,
+    paddingRight: 8,
   },
-  pollBtn: {
-    width: 42,
-    height: 48,
+  attachBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    zIndex: 15,
+  },
+  attachMenuRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 10,
+  },
+  attachAction: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    backgroundColor: "rgba(26,26,42,0.97)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  attachActionIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
+  },
+  attachActionText: {
+    flex: 1,
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 13.5,
+    fontWeight: "600",
   },
 
   // ── Düzenleme banner ───────────────────────────────────
@@ -3550,12 +3681,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "rgba(255,255,255,0.6)",
   },
-
-  // ── Eski uyumluluk (kullanılmayan ama referans) ────────
-  messageText: { fontSize: 15, lineHeight: 22, color: "#fff" },
-  previewBubble: {},
-  modalActions: {},
-  actionBtn: {},
-  actionText: { fontSize: 14, fontWeight: "600" },
-  iconPill: {},
 });

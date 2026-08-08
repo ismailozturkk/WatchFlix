@@ -24,11 +24,10 @@ import { useTheme } from "../../../context/ThemeContext";
 import Toast from "react-native-toast-message";
 import { appAlert } from "@components/AppAlert";
 import { useLanguage } from "../../../context/LanguageContext";
-import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import ScreenDecor from "../../../components/ScreenDecor";
 import BackButton from "../../../components/BackButton";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
 
 export default function FriendsListScreen({ navigation }) {
@@ -86,10 +85,6 @@ export default function FriendsListScreen({ navigation }) {
 
   const handleDelete = async (friend) => {
     try {
-      Toast.show({
-        type: "success",
-        text1: i18nText("autoI18n.friend_removed_named", "{{name}} arkadaş listenizden silindi", { name: friend.displayName }),
-      });
       // Subcollection sil
       await Promise.all([
         deleteDoc(doc(db, "Users", user.uid,   "friends", friend.uid)),
@@ -108,6 +103,13 @@ export default function FriendsListScreen({ navigation }) {
       if (userEntry)   updates.push(updateDoc(doc(db, "Users", user.uid),   { friends: arrayRemove(userEntry) }));
       if (friendEntry) updates.push(updateDoc(doc(db, "Users", friend.uid), { friends: arrayRemove(friendEntry) }));
       if (updates.length) await Promise.all(updates);
+      // Başarı toast'ı silme GERÇEKTEN bittikten sonra. Eskiden en başta
+      // gösteriliyordu; izin/ağ hatasında kullanıcı hem "silindi" hem
+      // "başarısız" bildirimini arka arkaya görüyordu.
+      Toast.show({
+        type: "success",
+        text1: i18nText("autoI18n.friend_removed_named", "{{name}} arkadaş listenizden silindi", { name: friend.displayName }),
+      });
     } catch (error) {
       console.error(i18nText("autoI18n.arkadas_silme_hatasi", "Arkadaş silme hatası:"), error);
       Toast.show({ type: "error", text1: i18nText("autoI18n.silme_islemi_basarisiz", "Silme işlemi başarısız"), text2: error.message });

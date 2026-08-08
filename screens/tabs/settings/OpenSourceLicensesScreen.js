@@ -16,7 +16,6 @@ import {
   TouchableOpacity,
   ScrollView,
   FlatList,
-  Modal,
   ActivityIndicator,
   InteractionManager,
   Linking,
@@ -24,6 +23,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
+import BottomSheetModal from "@components/common/BottomSheetModal";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
@@ -285,15 +285,16 @@ function LicenseDetailModal({ C, isTr, db, item, onClose }) {
   const repo = item.repository;
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={s.overlay}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
-        <View
-          style={[
-            s.sheet,
-            { backgroundColor: C.card, borderColor: C.border, paddingBottom: insets.bottom + 12 },
-          ]}
-        >
+    <BottomSheetModal
+      visible
+      onClose={onClose}
+      intensity={35}
+      dimColor="rgba(0,0,0,0.32)"
+      sheetStyle={[
+        s.sheet,
+        { backgroundColor: C.card, borderColor: C.border, paddingBottom: insets.bottom + 12 },
+      ]}
+    >
           <View style={[s.handle, { backgroundColor: C.handle }]} />
           <View style={s.sheetHead}>
             <View style={{ flex: 1 }}>
@@ -365,9 +366,7 @@ function LicenseDetailModal({ C, isTr, db, item, onClose }) {
               </Text>
             )}
           </ScrollView>
-        </View>
-      </View>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 

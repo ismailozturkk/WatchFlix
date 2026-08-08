@@ -11,8 +11,9 @@ import {
 import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { useLanguage } from "../../context/LanguageContext";
-import { MovieSkeleton } from "../../components/Skeleton";
+import { ChipRowSkeleton, RailSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
 import { useTvShow } from "../../context/TvShowContex";
 import ListBadges from "../../components/ListBadges";
@@ -28,11 +29,14 @@ import {
   useStreamingProviderSettings,
 } from "../../context/AppSettingsContext";
 const { width } = Dimensions.get("window");
+// Sağlayıcı çipi: içindeki logo/ad sütunu 40 yüksekliğinde sabit.
+const PROVIDER_CHIP_HEIGHT = 40;
 
 // Stable, module-scope item component → no remount → no flicker.
 const TvProvidersCard = memo(function TvProvidersCard({ item, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -46,6 +50,10 @@ const TvProvidersCard = memo(function TvProvidersCard({ item, navigation, theme,
       onPressOut={onPressOut}
       style={[styles.similarItem, { width: rp.itemWidth, height: rp.itemHeight }]}
       onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
+      onLongPress={() =>
+        openQuickActions({ item, mediaType: "tv", navigation })
+      }
+      delayLongPress={350}
     >
       <Animated.View style={[{ transform: [{ scale }] }]}>
         <PosterImage
@@ -177,53 +185,33 @@ export default function TvShowsProvders({ navigation }) {
       />
     );
   };
-  if (loadingMoviesByProvider || loadingProvider) {
-    return (
-      <View style={{ flex: 1, paddingVertical: 10 }}>
-        <FlatList
-          data={displayedProviders}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => item.provider_id.toString()}
-          renderItem={renderProvider}
-          contentContainerStyle={{
-            paddingHorizontal: 15,
-            marginRight: 10,
-            marginBottom: 20,
-          }}
-        />
-        <FlatList
-          data={[1, 2, 3]}
-          renderItem={() => <MovieSkeleton />}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 15 }}
-          initialNumToRender={3}
-          maxToRenderPerBatch={3}
-          windowSize={3}
-          removeClippedSubviews
-        />
-      </View>
-    );
-  }
-
   const providerName =
     providers.find((p) => p.provider_id === selectedProvider)?.provider_name ||
     i18nText("autoI18n.saglayicilar", "Sağlayıcılar");
-  return (
-    <View style={{ flex: 1, paddingVertical: 10 }}>
-      {/* İzleme sağlayıcıları */}
 
+  // Sağlayıcı satırı + JustWatch atfı yükleme sırasında da AYNI kurguda çizilir;
+  // sağlayıcılar henüz gelmediyse yerlerini aynı yükseklikte (40) iskelet çipler
+  // tutar. Aksi hâlde ray, çipler düştükçe aşağı kayıyordu.
+  const providerHeader = (
+    <>
       <View style={{ flexDirection: "row", alignItems: "center", paddingRight: 12 }}>
         <View style={{ flex: 1 }}>
-          <FlatList
-            data={displayedProviders}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(item) => item.provider_id.toString()}
-            renderItem={renderProvider}
-            contentContainerStyle={{ paddingHorizontal: 15 }}
-          />
+          {displayedProviders.length > 0 ? (
+            <FlatList
+              data={displayedProviders}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item) => item.provider_id.toString()}
+              renderItem={renderProvider}
+              contentContainerStyle={{ paddingHorizontal: 15 }}
+            />
+          ) : (
+            <ChipRowSkeleton
+              chipHeight={PROVIDER_CHIP_HEIGHT}
+              radius={15}
+              style={{ paddingHorizontal: 15 }}
+            />
+          )}
         </View>
         <SeeAllButton
           onPress={() =>
@@ -249,6 +237,23 @@ export default function TvShowsProvders({ navigation }) {
       >
         {t.justwatchAttribution}
       </Text>
+    </>
+  );
+
+  if (loadingMoviesByProvider || loadingProvider) {
+    return (
+      <View style={styles.container}>
+        {providerHeader}
+        {/* marginTop 20: gerçek rayın contentContainerStyle'ındaki üst boşluk */}
+        <RailSkeleton style={{ marginTop: 20 }} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* İzleme sağlayıcıları */}
+      {providerHeader}
 
       <PaginatedRail
         data={moviesProviders}

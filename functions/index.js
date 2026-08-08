@@ -38,6 +38,7 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { Expo } = require("expo-server-sdk");
 const { createHash, timingSafeEqual } = require("node:crypto");
 const { extractRegionProviders, computeNewlyAvailable } = require("./streamingDiff");
+const tournamentBracket = require("./tournamentBracket");
 const {
   getTransferChanges,
   parseRevenueCatPremiumState,
@@ -1227,6 +1228,166 @@ exports.dailyStreamingAvailability = onSchedule(
 
     console.log(
       `[streaming] tamam — kullanıcı: ${usersSnap.size}, bildirilen başlık: ${totalTitles}, benzersiz TMDB sorgusu: ${providerCache.size}`,
+    );
+  },
+);
+
+// ───────────────────────────────────────────────────────────────────────────
+// AYLIK TURNUVA — KAZANAN ARŞİVİ
+//
+// Biten her ayın podyumunu tournamentWinners/{YYYY-MM} altına yazar; uygulama
+// "Geçen Ayın Kazananı" sayfasındaki GEÇMİŞ KAZANANLAR listesini buradan okur
+// (aksi halde her geçmiş ay için doküman + agg + havuz okuması gerekirdi).
+//
+// Neden sunucu? Şampiyon istemcide de türetilebilir ama arşiv KALICI bir kayıt:
+// istemciye yazdırmak sahte şampiyon enjeksiyonuna açık olurdu. Admin SDK
+// kuralları es geçer, rules tarafında koleksiyon salt-okunurdur.
+//
+// Determinizm: hesap functions/tournamentBracket.js'te (motorun birebir
+// kopyası, __tests__/tournamentWinnerArchive.test.js ile kilitli). Zaman
+// duyarlılığı yok — yalnız BİTMİŞ aylar işlenir ve bracket "ay başı + 40 gün"
+// anına göre çözülür, yani sunucunun UTC olması sonucu değiştirmez.
+//
+// Idempotent: var olan kayıt bir daha yazılmaz (create-if-absent). Yeniden
+// hesaplatmak istersen ilgili tournamentWinners dokümanını silmek yeterli.
+// ───────────────────────────────────────────────────────────────────────────
+
+const ARCHIVE_MAX_PERIODS_PER_RUN = 24; // ilk çalışmada geçmişi toparlar
+
+// Bir yarışmacıyı arşiv kaydına uygun sade şekle indirger.
+function archiveEntry(c, totalVotes) {
+  if (!c) return null;
+  return {
+    id: c.id,
+    title: c.title || "—",
+    posterPath: c.posterPath || null,
+    mediaType: c.mediaType || null,
+    seed: c.seed || null,
+    totalVotes: totalVotes || 0,
+  };
+}
+
+// Bir dönemin oy sayımları: önce agg dokümanı, yoksa votes koleksiyonu.
+async function readPeriodTallies(periodId) {
+  const aggSnap = await db.doc(`tournaments/${periodId}/agg/tallies`).get();
+  if (aggSnap.exists) {
+    const a = aggSnap.data() || {};
+    return { nomTally: a.noms || {}, tallies: a.picks || {}, voters: a.voters || 0 };
+  }
+  const votesSnap = await db.collection(`tournaments/${periodId}/votes`).get();
+  const votes = votesSnap.docs.map((d) => d.data());
+  return {
+    nomTally: tournamentBracket.tallyNominations(votes),
+    tallies: tournamentBracket.tallyVotes(votes),
+    voters: votesSnap.size,
+  };
+}
+
+// Topluluğun aramayla eklediği adaylar — istemcideki havuzla AYNI olmalı,
+// yoksa arşivdeki şampiyon ekranda görünenden farklı çıkabilir.
+async function readPeriodPool(periodId) {
+  const snap = await db.collection(`tournaments/${periodId}/pool`).get();
+  return snap.docs.map((d) => {
+    const v = d.data() || {};
+    const num = Number(d.id);
+    return {
+      id: Number.isFinite(num) ? num : d.id,
+      title: v.title || "—",
+      posterPath: v.posterPath || null,
+      mediaType: v.mediaType || null,
+      popularity: v.popularity || 0,
+      voteAverage: v.voteAverage || 0,
+      year: v.year || null,
+      addedAtMs: v.addedAt && v.addedAt.toMillis ? v.addedAt.toMillis() : 0,
+    };
+  });
+}
+
+async function archivePeriod(periodId, tournament) {
+  const [{ nomTally, tallies, voters }, suggested] = await Promise.all([
+    readPeriodTallies(periodId),
+    readPeriodPool(periodId),
+  ]);
+
+  const podium = tournamentBracket.resolvePodium({
+    periodId,
+    nominees: tournament.nominees || [],
+    suggested,
+    nomTally,
+    tallies,
+  });
+  if (!podium) {
+    console.log(`[turnuva-arşiv] ${periodId}: şampiyon türetilemedi (aday yok) — atlandı.`);
+    return false;
+  }
+
+  const parsed = tournamentBracket.parsePeriodId(periodId);
+  await db.doc(`tournamentWinners/${periodId}`).create({
+    periodId,
+    // İstek: kazananlar YIL ve AY olarak kayıtlı olsun.
+    year: parsed.year,
+    monthIndex: parsed.monthIndex,
+    theme: tournament.theme || null,
+    themeEn: tournament.themeEn || null,
+    mediaType: tournament.mediaType || null,
+    genreId: tournament.genreId || null,
+    champion: archiveEntry(podium.champion, podium.championTotalVotes),
+    runnerUp: archiveEntry(podium.runnerUp, podium.runnerUpTotalVotes),
+    third: archiveEntry(podium.third, podium.thirdTotalVotes),
+    finalVotes: podium.finalVotes,
+    finalTotal: podium.finalTotal,
+    totalVotes: podium.totalVotes,
+    voters,
+    poolSize: (tournament.nominees || []).length + suggested.length,
+    archivedAt: FieldValue.serverTimestamp(),
+  });
+  console.log(
+    `[turnuva-arşiv] ${periodId}: ${podium.champion.title} (toplam oy ${podium.totalVotes}, katılımcı ${voters}).`,
+  );
+  return true;
+}
+
+exports.archiveTournamentWinners = onSchedule(
+  {
+    schedule: "30 3 * * *", // her gün 03:30 — ay dönümünü ertesi gün yakalar
+    timeZone: "Europe/Istanbul",
+    timeoutSeconds: 300,
+    memory: "512MiB",
+  },
+  async () => {
+    // Yalnız BİTMİŞ dönemler arşivlenir: periodId'ler sıfır dolgulu olduğu için
+    // ("2026-03") dizgi karşılaştırması kronolojik sırayla aynıdır.
+    const nowIst = new Date(
+      new Date().toLocaleString("en-US", { timeZone: "Europe/Istanbul" }),
+    );
+    const currentPeriod = `${nowIst.getFullYear()}-${String(nowIst.getMonth() + 1).padStart(2, "0")}`;
+
+    // Arşivlenmiş dönemler ÖNCE elenir, kota SONRA uygulanır. Tersi olsaydı
+    // (önce kes, sonra ele) kota kadar yeni dönem her çalışmada slotları
+    // doldurur, geçmişteki eski aylara HİÇ sıra gelmezdi.
+    const [tournSnap, winnersSnap] = await Promise.all([
+      db.collection("tournaments").get(),
+      db.collection("tournamentWinners").get(),
+    ]);
+    const archived = new Set(winnersSnap.docs.map((d) => d.id));
+    const pending = tournSnap.docs
+      .filter((d) => d.id < currentPeriod && !archived.has(d.id))
+      .sort((a, b) => (a.id < b.id ? 1 : -1)) // yeniden eskiye
+      .slice(0, ARCHIVE_MAX_PERIODS_PER_RUN);
+
+    let written = 0;
+    for (const d of pending) {
+      try {
+        if (await archivePeriod(d.id, d.data() || {})) written += 1;
+      } catch (e) {
+        // ALREADY_EXISTS: iki çalışma yarıştı — sorun değil, kayıt zaten var.
+        if (e && e.code === 6) continue;
+        console.error(`[turnuva-arşiv] ${d.id}:`, e);
+      }
+    }
+
+    console.log(
+      `[turnuva-arşiv] tamam — bekleyen dönem: ${pending.length}, yeni kayıt: ${written}, arşivde: ${archived.size}.`,
     );
   },
 );

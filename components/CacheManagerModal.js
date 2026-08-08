@@ -13,8 +13,7 @@ import {
   ScrollView,
   ActivityIndicator,
   StyleSheet,
-  Alert,
-} from "react-native";
+  } from "react-native";
 import AppIcon from "./AppIcon";
 import { i18nText } from "../utils/i18nText";
 import { appAlert } from "./AppAlert";

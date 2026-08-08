@@ -19,17 +19,66 @@ Bu doküman, Seelogd uygulamasında kullanılan ve hedeflenen temel yazılım ta
 - **Avantaj:** Her context bağımsız yönetilebilir
 - **⚠️ Sorun:** Bazı context'ler çok büyüdü ve God Object anti-desenine dönüştü
 
-### 2. AsyncStorage Persistence
+### 2. Merkezî Depolama Katmanı (`services/storage`, MMKV)
 
-- **Açıklama:** Kullanıcı tercihlerini (avatar, tema, dil) AsyncStorage'de saklama
-- **Avantaj:** Uygulama kapatılıp açıldığında ayarlar korunur
-- **⚠️ Kısıt:** 6MB limit, büyük veri setleri için uygun değil
+- **Açıklama:** TÜM kalıcı veri tek kapıdan geçer. Her anahtar
+  `services/storage/registry.js`de bir kez tanımlanır (depo, tip, varsayılan,
+  doğrulama, kapsam); çağrı yerleri fiziksel anahtar adı yazmaz.
+- **Dört depo, silme davranışına göre ayrılmış:** `settings` (tercihler) ·
+  `data` (kullanıcı içeriği) · `cache` (yeniden üretilebilir) · `session`
+  (oturum durumu). "Önbelleği temizle" = `cache` deposunu boşaltmak, yani tanım
+  gereği eksiksiz — elle bakılan anahtar süzgeci yok.
+- **Senkron:** okuma `await` gerektirmez. Ayarlar ilk render'da doğru; açılıştaki
+  tema/dil/font flash'ı bu sayede bitti.
+- **Kapsam:** `scope: "user"` anahtarlar uid ile kovalanır; çıkışta
+  `clearUserScope` registry'ye bakarak temizler ve `keepOnLogout` işaretlilere
+  (izleme defteri serileri, aktivasyon damgası) dokunmaz.
+- **Göç:** AsyncStorage → MMKV tek seferlik, fikirdeş, açılışta kapılı
+  (`services/storage/migration.js`). Firebase Auth token'ları tembel köprüyle
+  taşınır — kimse çıkışa düşmez.
+- **⚠️ Kısıt:** MMKV'nin boyut limiti yok ama büyük JSON değerlerinde `JSON.parse`
+  senkron çalışır; sıcak yollarda bellek katmanı gerekir.
 
 ### 3. Firestore Real-time Listeners (onSnapshot)
 
 - **Açıklama:** İzleme listeleri, notlar ve hatırlatıcılar için gerçek zamanlı senkronizasyon
 - **Avantaj:** Kullanıcı verileri anlık güncellenir
 - **✅ Optimize Edildi:** Eskiden her bileşen kendi dinleyicisini açıyordu, şimdi `ListStatusContext` veya `ProfileScreenContext` üzerinden tek bir global dinleyici kullanılıyor.
+
+### 3.1. Son Oturum Tohumu (`services/snapshotCache`) — 6 Ağu 2026
+
+- **Sorun:** Firebase JS SDK'sının kalıcı önbelleği IndexedDB'ye dayanıyor,
+  React Native'de IndexedDB yok. Bu yüzden her açılışta profil, istatistik ve
+  listeler `onSnapshot`'ın **ağdan** dönmesini bekliyordu.
+- **Çözüm:** Gelen son snapshot diske yazılıyor, sonraki açılışta **senkron**
+  okunup `useState` başlangıç değeri yapılıyor. Listener geldiğinde yalnız veri
+  gerçekten değiştiyse güncelleniyor.
+- **Kritik:** Yeni bir depo AÇILMADI. `utils/cacheStore` + `utils/cacheKeys`
+  üstünde ince bir katman — "Verileri indir" (`services/dataDownloader`) tam
+  olarak o anahtarları dolduruyor, başka yere yazan bir ekran indirilen veriyi
+  hiç göremezdi.
+- **Kapsam:** UserProfile, ProfileNotes, ProfileReminders, ProfileStats,
+  ListStatus, MediaActivity.
+- **Tuzak:** Sağlayıcı mount olurken Firebase oturumu henüz çözülmemiş olur ve
+  `user?.uid` null gelir; tohum bu yüzden her yerde
+  `user?.uid ?? getActiveUser()` ile okunuyor.
+- **"Verileri indir" ayarı** bu katmanı bağlamaz: o ayar TMDB içeriği içindir,
+  buradaki veri kullanıcının kendisinindir.
+
+### 3.2. Bayat Göster, Arka Planda Tazele (TMDB rayları) — 6 Ağu 2026
+
+- **Sorun:** `getCachedValue` TTL dolunca `null` dönüp kaydı siliyordu; trend
+  TTL'i 1 saat olduğu için ray pratikte her açılışta iskelete düşüp ağı
+  bekliyordu. Üstelik önbellek İSABET etse bile state `[]` + `loading:true` ile
+  başladığı için ilk kare boştu.
+- **Çözüm:** `apiCache.getSwr` bayat kaydı silmeden, "taze mi?" bilgisiyle
+  döner. Ray state'i `useState` başlangıcında `seedList()` ile senkron
+  tohumlanır; tazeleme arka planda, "yükleniyor" göstermeden yapılır.
+- **Yeniden çizim koruması:** TMDB aynı listeyi her istekte biraz farklı
+  `popularity` ondalığıyla döndürüyor. Arka plan tazelemesi bu yüzden
+  `utils/sameData.js`'teki **kimlik** karşılaştırmasını kullanır.
+- **Dokunulmayanlar:** sağlayıcı/tür listeleri (TTL 24 saat–7 gün, ayrıca
+  sağlayıcı okumasının önbellek isabetinde yan etkisi var).
 
 ### 4. Provider Composition Pattern
 
@@ -144,7 +193,7 @@ Bu doküman, Seelogd uygulamasında kullanılan ve hedeflenen temel yazılım ta
 ### 3. Offline-First Cache Stratejisi
 
 - **Çözüm:**
-  - Cache layer: AsyncStorage (küçük) veya MMKV (hızlı, büyük)
+  - Cache layer: MMKV `cache` deposu (`services/storage`)
   - Stale-while-revalidate pattern
   - TTL (Time To Live) stratejisi
 - **Fayda:**

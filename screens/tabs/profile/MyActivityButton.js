@@ -8,7 +8,7 @@ import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "@services/hapticsService";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { countPostDrafts } from "../../../services/postDraftService";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { useTheme } from "@context/ThemeContext";
@@ -98,13 +98,7 @@ export default function MyActivityButton({ navigation }) {
   }, [uid]);
 
   const loadLocal = useCallback(async () => {
-    try {
-      const raw = await AsyncStorage.getItem("post_drafts");
-      const drafts = raw ? JSON.parse(raw) : [];
-      setDraftCount(Array.isArray(drafts) ? drafts.length : 0);
-    } catch {
-      setDraftCount(0);
-    }
+    setDraftCount(countPostDrafts());
 
     try {
       const storyDrafts = await StoryDraftService.getDrafts();

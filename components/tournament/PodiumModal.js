@@ -20,7 +20,9 @@ import {
   monthLabel, mediaLabel, getScheduleEntry, themeLabel, now,
   computeContestantTotals, computeThirdPlace,
 } from "@services/tournamentEngine";
-import { getTournamentDoc, fetchVotesOnce, fetchAggOnce } from "@services/tournamentService";
+import {
+  getTournamentDoc, fetchVotesOnce, fetchAggOnce, fetchWinnerArchive,
+} from "@services/tournamentService";
 
 const MEDAL = [
   { color: "#F5C518", icon: "trophy" },   // 1 — altın
@@ -114,11 +116,69 @@ const PodiumColumn = memo(({ item, big, theme, getTmdbUrl, lang }) => {
   );
 });
 
+// ─── Geçmiş kazanan satırı (yıl-ay şeridi) ────────────────────────────────────
+// Kaynak: tournamentWinners/{YYYY-MM} — Cloud Function (archiveTournamentWinners)
+// biten her ay için yazar. Burada bracket YENİDEN HESAPLANMAZ; arşiv kaydı
+// olduğu gibi gösterilir, böylece 12+ ay listelemek tek koleksiyon okuması olur.
+const WinnerRow = memo(({ w, theme, getTmdbUrl, lang }) => {
+  const c = w.champion;
+  const uri = c?.posterPath ? getTmdbUrl(c.posterPath, "poster", 92) : null;
+  const entry = getScheduleEntry(w.monthIndex);
+  const genreText = (lang === "tr" ? w.theme : w.themeEn) || themeLabel(entry, lang);
+  return (
+    <View style={[styles.wRow, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+      <View style={[styles.wPosterWrap, { backgroundColor: theme.between }]}>
+        {uri ? (
+          <Image source={{ uri }} style={styles.wPoster} contentFit="cover" transition={120} />
+        ) : (
+          <View style={[styles.wPoster, styles.wPosterEmpty]}>
+            <AppIcon family="Ionicons" name="image-outline" size={14} color={theme.text.muted} />
+          </View>
+        )}
+        <View style={styles.wCrown}>
+          <AppIcon family="Ionicons" name="trophy" size={9} color="#3b3b3b" />
+        </View>
+      </View>
+
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.wDate, { color: theme.text.muted }]} numberOfLines={1}>
+          {monthLabel(w.monthIndex, lang)} {w.year}
+        </Text>
+        <Text style={[styles.wTitle, { color: theme.text.primary }]} numberOfLines={1}>
+          {c?.title || "—"}
+        </Text>
+        <Text style={[styles.wMeta, { color: theme.text.muted }]} numberOfLines={1}>
+          {genreText} · {mediaLabel(w.mediaType, lang)}
+        </Text>
+      </View>
+
+      <View style={styles.wVotes}>
+        <AppIcon family="Ionicons" name="flame" size={10} color="#F5C518" />
+        <Text style={[styles.wVotesText, { color: theme.text.secondary }]}>
+          {c?.totalVotes || 0}
+        </Text>
+      </View>
+    </View>
+  );
+});
+
 function PodiumModal({ visible, onClose, periodId, theme, getTmdbUrl, lang = "tr" }) {
   const [loading, setLoading] = useState(false);
   const [podium, setPodium] = useState(null);
   const [meta, setMeta] = useState(null);
   const [loadedFor, setLoadedFor] = useState(null);
+  const [archive, setArchive] = useState(null);   // null = henüz yüklenmedi
+
+  // Geçmiş kazananlar — tek koleksiyon okuması, ilk açılışta bir kez.
+  // Üstteki podyumdan BAĞIMSIZ yüklenir: o ay çekilemese bile arşiv görünsün.
+  useEffect(() => {
+    if (!visible || archive !== null) return;
+    let active = true;
+    fetchWinnerArchive()
+      .then((rows) => { if (active) setArchive(rows); })
+      .catch(() => { if (active) setArchive([]); });
+    return () => { active = false; };
+  }, [visible, archive]);
 
   useEffect(() => {
     if (!visible || !periodId || loadedFor === periodId) return;
@@ -162,6 +222,8 @@ function PodiumModal({ visible, onClose, periodId, theme, getTmdbUrl, lang = "tr
   }, [visible, periodId, loadedFor]);
 
   const entry = meta ? getScheduleEntry(meta.monthIndex) : null;
+  // Üstte zaten podyumu gösterilen ay listede tekrar etmesin.
+  const pastWinners = (archive || []).filter((w) => w.periodId !== periodId);
   // Podyum görsel sırası: 2 — 1 — 3 (orta yüksek).
   const ordered = podium
     ? [podium.items.find((i) => i.place === 2), podium.items.find((i) => i.place === 1), podium.items.find((i) => i.place === 3)].filter(Boolean)
@@ -240,6 +302,36 @@ function PodiumModal({ visible, onClose, periodId, theme, getTmdbUrl, lang = "tr
               </View>
             </>
           )}
+
+          {/* ── Geçmiş kazananlar (yıl-ay şeridi) ─────────────────────────── */}
+          {archive !== null && (
+            <View style={styles.archive}>
+              <View style={styles.archiveHeader}>
+                <AppIcon family="Ionicons" name="albums" size={13} color={theme.text.muted} />
+                <Text style={[styles.archiveTitle, { color: theme.text.muted }]}>
+                  {i18nText("autoI18n.tournament_past_winners", "Geçmiş Kazananlar")}
+                </Text>
+                {pastWinners.length > 0 && (
+                  <Text style={[styles.archiveCount, { color: theme.text.muted }]}>
+                    {pastWinners.length}
+                  </Text>
+                )}
+              </View>
+
+              {pastWinners.length === 0 ? (
+                <Text style={[styles.archiveEmpty, { color: theme.text.muted }]}>
+                  {i18nText(
+                    "autoI18n.tournament_past_winners_empty",
+                    "Henüz arşivlenmiş bir ay yok — turnuvalar tamamlandıkça buraya eklenecek.",
+                  )}
+                </Text>
+              ) : (
+                pastWinners.map((w) => (
+                  <WinnerRow key={w.periodId} w={w} theme={theme} getTmdbUrl={getTmdbUrl} lang={lang} />
+                ))
+              )}
+            </View>
+          )}
         </ScrollView>
       </View>
     </Modal>
@@ -294,6 +386,34 @@ const styles = StyleSheet.create({
   summaryItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   summaryDivider: { width: 1, height: 16 },
   summaryText: { fontSize: 12, fontWeight: "700" },
+
+  archive: { marginTop: 22 },
+  archiveHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 9 },
+  archiveTitle: { fontSize: 11.5, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.4 },
+  archiveCount: { fontSize: 11, fontWeight: "800", opacity: 0.75 },
+  archiveEmpty: { fontSize: 11.5, fontWeight: "600", lineHeight: 16, paddingVertical: 6 },
+
+  wRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    borderRadius: 13, borderWidth: 1, padding: 8, marginBottom: 7,
+  },
+  wPosterWrap: { borderRadius: 7, overflow: "visible" },
+  wPoster: { width: 34, height: 51, borderRadius: 7 },
+  wPosterEmpty: { alignItems: "center", justifyContent: "center" },
+  wCrown: {
+    position: "absolute", top: -5, right: -5,
+    width: 17, height: 17, borderRadius: 9, backgroundColor: "#F5C518",
+    alignItems: "center", justifyContent: "center",
+  },
+  wDate: { fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.3 },
+  wTitle: { fontSize: 13, fontWeight: "800", marginTop: 1 },
+  wMeta: { fontSize: 10.5, fontWeight: "600", marginTop: 1 },
+  wVotes: {
+    flexDirection: "row", alignItems: "center", gap: 3,
+    backgroundColor: "rgba(245,197,24,0.14)",
+    paddingHorizontal: 7, paddingVertical: 4, borderRadius: 9,
+  },
+  wVotesText: { fontSize: 11, fontWeight: "800" },
 
   center: { paddingVertical: 46, alignItems: "center", gap: 12 },
   emptyText: { fontSize: 13, fontWeight: "600", textAlign: "center", paddingHorizontal: 30 },

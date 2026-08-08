@@ -124,6 +124,9 @@ export default function useSceneGame({
   const questionJokerRef = useRef({ fifty: false, image: false });
   const sessionJokerCountRef = useRef(0);
   const pausedRef = useRef(false);
+  // Cikis onay sayfasi acikken sahne gorseli yuklenirse sayac baslatilmaz;
+  // "devam et" denince baslatilmak uzere burada bekletilir.
+  const pendingTimerStartRef = useRef(false);
 
   const statsRef = useRef({
     score: 0,
@@ -202,6 +205,7 @@ export default function useSceneGame({
   //   - per_question: zorluk suresine doner.
   //   - session: paused durumda kalan oturum suresini gosterir.
   const resetQuestionTimer = useCallback(() => {
+    pendingTimerStartRef.current = false;
     timerDeadlineRef.current = null;
     setTimerRunning(false);
     const mode = modeConfigRef.current;
@@ -222,6 +226,13 @@ export default function useSceneGame({
   // baslatir, sonraki sorularda kalan sureden devam ettirir (resume).
   const startQuestionTimer = useCallback(() => {
     if (phaseRef.current !== "playing" || timerDeadlineRef.current) return;
+    if (pausedRef.current) {
+      // Cikis onay sayfasi acikken gorsel yuklendi: sayaci simdi baslatma,
+      // yoksa geri sayim sayfanin arkasinda isler ve soru kendiliginden
+      // yanlis cevaplanir. Devam edilince baslatilacak.
+      pendingTimerStartRef.current = true;
+      return;
+    }
     // Cevap suresi olcumu icin sahnenin gorunur oldugu ani isaretle (Part 13.2).
     questionStartedAtRef.current = Date.now();
     const mode = modeConfigRef.current;
@@ -897,6 +908,7 @@ export default function useSceneGame({
     generationRef.current += 1;
     setTimerRunning(false);
     timerDeadlineRef.current = null;
+    pendingTimerStartRef.current = false;
     outcomeRef.current = "quit";
     setOutcome("quit");
     const saved = await saveStatsToFirebase();
@@ -904,35 +916,47 @@ export default function useSceneGame({
     return saved;
   }, [saveStatsToFirebase, setPhase]);
 
-  // Cikis onay sayfasi acilinca sureyi duraklatir (yalnizca aktif timer varsa).
+  // Cikis onay sayfasi acilinca sureyi duraklatir. Sayac HENUZ baslamamis olsa
+  // bile (sahne gorseli yukleniyor) duraklatma niyeti kaydedilmeli — aksi halde
+  // gorsel arka planda yuklenince startQuestionTimer sayaci baslatiyor, sure
+  // doluyor ve soru kullaniciya sorulmadan yanlis cevaplaniyordu.
   const pauseGame = useCallback(() => {
-    if (phaseRef.current !== "playing" || !timerDeadlineRef.current) return;
+    if (phaseRef.current !== "playing" || pausedRef.current) return;
+    pausedRef.current = true;
+    setTimerRunning(false);
+    // Sayac henuz baslamadiysa saklanacak kalan sure yok.
+    if (!timerDeadlineRef.current) return;
     const mode = modeConfigRef.current;
     const remaining = Math.max(
       0,
-      Math.ceil(((timerDeadlineRef.current || 0) - Date.now()) / 1000),
+      Math.ceil((timerDeadlineRef.current - Date.now()) / 1000),
     );
     timeLeftRef.current = remaining;
     setTimeLeft(remaining);
     if (mode.timerType === "session") sessionRemainingRef.current = remaining;
     timerDeadlineRef.current = null;
-    pausedRef.current = true;
-    setTimerRunning(false);
   }, []);
 
   // "Oyuna devam et": duraklatilan sureden devam ettirir.
   const resumeGame = useCallback(() => {
     if (!pausedRef.current || phaseRef.current !== "playing") return;
     pausedRef.current = false;
+    if (pendingTimerStartRef.current) {
+      // Duraklatma sirasinda gorsel yuklendi; sayaci simdi bastan baslat.
+      pendingTimerStartRef.current = false;
+      startQuestionTimer();
+      return;
+    }
     const remaining = timeLeftRef.current;
     if (remaining <= 0) return;
     timerDeadlineRef.current = Date.now() + remaining * 1000;
     setTimerRunning(true);
-  }, []);
+  }, [startQuestionTimer]);
 
   // "Oturumu bitir": mevcut skorla oyunu bitirip sonuc ekranina goturur.
   const endSession = useCallback(async () => {
     pausedRef.current = false;
+    pendingTimerStartRef.current = false;
     await finalizeAndEnd("quit");
   }, [finalizeAndEnd]);
 

@@ -4,6 +4,7 @@ const {
   tallyNominations,
   getMyNominations,
   rankPool,
+  mergePool,
   selectFinalists,
   resolveFinalists,
   FINALIST_COUNT,
@@ -88,6 +89,62 @@ describe("selectFinalists", () => {
     const out = selectFinalists(pool, tally);
     expect(out[0].id).toBe(1010);
     expect(out[1].id).toBe(1050);
+  });
+});
+
+describe("mergePool", () => {
+  const sug = (id, addedAtMs) => ({
+    id, addedAtMs, title: `Onerilen ${id}`, posterPath: "/y.jpg", mediaType: "movie",
+  });
+
+  test("oneri yoksa taban havuzu AYNI referansla dondurur", () => {
+    const pool = makePool(64);
+    expect(mergePool(pool, [])).toBe(pool);
+    expect(mergePool(pool)).toBe(pool);
+  });
+
+  test("onerilen adaylari havuzun SONUNA ekler, seed devam eder", () => {
+    const pool = makePool(64);
+    const out = mergePool(pool, [sug(9002, 200), sug(9001, 100)]);
+    expect(out).toHaveLength(66);
+    // Eklenme zamanina gore siralanir — 9001 once eklenmis.
+    expect(out[64]).toMatchObject({ id: 9001, seed: 65, suggested: true });
+    expect(out[65]).toMatchObject({ id: 9002, seed: 66, suggested: true });
+    expect(out.slice(0, 64)).toEqual(pool); // taban havuz dokunulmaz
+  });
+
+  test("zaten havuzda olan id'yi tekrar eklemez (idempotent — cift birlestirme guvenli)", () => {
+    const pool = makePool(64);
+    const once = mergePool(pool, [sug(1005, 100), sug(9001, 200)]);
+    expect(once).toHaveLength(65); // 1005 zaten havuzda
+    expect(mergePool(once, [sug(1005, 100), sug(9001, 200)])).toEqual(once);
+  });
+
+  test("esit zamanda id'ye gore sirali — tum istemcilerde ayni seed", () => {
+    const pool = makePool(2);
+    const a = mergePool(pool, [sug(9009, 0), sug(9001, 0)]);
+    const b = mergePool(pool, [sug(9001, 0), sug(9009, 0)]);
+    expect(a.map((n) => n.id)).toEqual(b.map((n) => n.id));
+    expect(a[2].id).toBe(9001);
+  });
+
+  test("id'siz kayitlari atlar", () => {
+    const pool = makePool(2);
+    expect(mergePool(pool, [{ title: "bozuk" }, sug(9001, 1)])).toHaveLength(3);
+  });
+
+  test("hype alan onerilen aday ilk 32'ye girebilir", () => {
+    const pool = mergePool(makePool(64), [sug(9001, 1)]);
+    const finalists = selectFinalists(pool, { 9001: 7 });
+    expect(finalists[0].id).toBe(9001);
+    expect(finalists[0].seed).toBe(1);
+    expect(finalists[0].poolSeed).toBe(65);
+  });
+
+  test("hype almayan onerilen aday ilk 32'ye giremez", () => {
+    const pool = mergePool(makePool(64), [sug(9001, 1)]);
+    const finalists = selectFinalists(pool, {});
+    expect(finalists.some((n) => n.id === 9001)).toBe(false);
   });
 });
 

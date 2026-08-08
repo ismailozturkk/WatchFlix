@@ -3,18 +3,16 @@ import {
   Text,
   View,
   FlatList,
-  ActivityIndicator,
-  Dimensions,
+    Dimensions,
   TouchableOpacity,
   Animated,
 } from "react-native";
 import { i18nText } from "../../utils/i18nText";
 import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
-import React, { memo, useEffect, useMemo, useRef } from "react";
-import axios from "axios";
+import React, { memo, useEffect, useRef } from "react";
 import { useTheme } from "../../context/ThemeContext";
-import RatingStars from "../../components/RatingStars";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { MovieOscarSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
@@ -23,7 +21,6 @@ import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
-import Ionicons from "@expo/vector-icons/Ionicons";
 
 const { width } = Dimensions.get("window");
 
@@ -44,6 +41,7 @@ const DikeyMetin = memo(function DikeyMetin({ metin }) {
 const MovieOscarCard = memo(function MovieOscarCard({ item, index, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -57,6 +55,10 @@ const MovieOscarCard = memo(function MovieOscarCard({ item, index, navigation, t
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => navigation.push("MovieDetails", { id: item.id })}
+      onLongPress={() =>
+        openQuickActions({ item, mediaType: "movie", navigation })
+      }
+      delayLongPress={350}
     >
       <Animated.View style={[{ transform: [{ scale }] }]}>
         <View style={{ flexDirection: "row" }}>

@@ -11,9 +11,9 @@ import {
   isAuthTransitionError,
   snapshotErrorHandler,
 } from "../utils/firestoreError";
-import * as cacheStore from "../utils/cacheStore";
 import { cacheKeys } from "../utils/cacheKeys";
-import { shouldPersistInternetData } from "../utils/dataCacheSettings";
+import { publish, seed } from "../services/snapshotCache";
+import { getActiveUser } from "../services/storage";
 import {
   clearReminderWidget,
   syncReminderWidget,
@@ -110,9 +110,35 @@ export const ProfileRemindersProvider = ({ children }) => {
   const uid = user?.uid;
   const { t, language } = useLanguage();
 
-  const [movieReminders, setMovieReminders] = useState([]);
-  const [allTvEpisodes,  setAllTvEpisodes]  = useState([]);
-  const [loading,        setLoading]        = useState(true);
+  // AÇILIŞ TOHUMU — son oturumun hatırlatıcıları diskten SENKRON okunur, yani
+  // ilk karede çizilir. Aşağıdaki listener efekti de aynı tohumu okuyor ama
+  // efekt ilk boyamadan SONRA çalıştığı için önbellek dolu olsa bile bir kare
+  // "yükleniyor" görünüyordu.
+  const ilkTohum = useMemo(
+    () => {
+      // Firebase oturumu ASENKRON çözülüyor; ilk render'da `uid` genelde henüz
+      // null olur ve tohum hiç okunmazdı. Son aktif kullanıcı depodan senkron
+      // okunabiliyor (aynı desen: ListStatusContext).
+      const tohumUid = uid ?? getActiveUser();
+      if (!tohumUid) return { movies: null, episodes: null };
+      return {
+        movies: seed(cacheKeys.reminders(tohumUid, "movies")).data,
+        episodes: seed(cacheKeys.reminders(tohumUid, "episodes")).data,
+      };
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const [movieReminders, setMovieReminders] = useState(
+    Array.isArray(ilkTohum.movies) ? ilkTohum.movies : [],
+  );
+  const [allTvEpisodes,  setAllTvEpisodes]  = useState(
+    Array.isArray(ilkTohum.episodes) ? ilkTohum.episodes : [],
+  );
+  const [loading,        setLoading]        = useState(
+    !Array.isArray(ilkTohum.movies) && !Array.isArray(ilkTohum.episodes),
+  );
   const [activeTab,      setActiveTab]      = useState("movie");
 
   // Refs to manage per-show episode subscriptions
@@ -129,8 +155,8 @@ export const ProfileRemindersProvider = ({ children }) => {
     }
 
     // Offline-first: önce cache'ten seed.
-    const cachedMovies = cacheStore.getJSON(...cacheKeys.reminders(uid, "movies"));
-    const cachedEpisodes = cacheStore.getJSON(...cacheKeys.reminders(uid, "episodes"));
+    const cachedMovies = seed(cacheKeys.reminders(uid, "movies")).data;
+    const cachedEpisodes = seed(cacheKeys.reminders(uid, "episodes")).data;
     if (Array.isArray(cachedMovies)) setMovieReminders(cachedMovies);
     if (Array.isArray(cachedEpisodes)) setAllTvEpisodes(cachedEpisodes);
     if (Array.isArray(cachedMovies) || Array.isArray(cachedEpisodes)) {
@@ -159,15 +185,11 @@ export const ProfileRemindersProvider = ({ children }) => {
               console.warn("Error checking old reminders:", err?.message);
           }
           setMovieReminders([]);
-          if (shouldPersistInternetData({ category: "reminders" })) {
-            cacheStore.setJSON(...cacheKeys.reminders(uid, "movies"), []);
-          }
+          publish(cacheKeys.reminders(uid, "movies"), []);
         } else {
           const movies = snap.docs.map((d) => d.data());
           setMovieReminders(movies);
-          if (shouldPersistInternetData({ category: "reminders" })) {
-            cacheStore.setJSON(...cacheKeys.reminders(uid, "movies"), movies);
-          }
+          publish(cacheKeys.reminders(uid, "movies"), movies);
         }
         setLoading(false);
       },
@@ -195,9 +217,7 @@ export const ProfileRemindersProvider = ({ children }) => {
 
         if (showsSnap.empty) {
           setAllTvEpisodes([]);
-          if (shouldPersistInternetData({ category: "reminders" })) {
-            cacheStore.setJSON(...cacheKeys.reminders(uid, "episodes"), []);
-          }
+          publish(cacheKeys.reminders(uid, "episodes"), []);
           return;
         }
 
@@ -211,9 +231,7 @@ export const ProfileRemindersProvider = ({ children }) => {
               epDataRef.current[sid] = epSnap.docs.map((d) => d.data());
               const all = Object.values(epDataRef.current).flat();
               setAllTvEpisodes(all);
-              if (shouldPersistInternetData({ category: "reminders" })) {
-                cacheStore.setJSON(...cacheKeys.reminders(uid, "episodes"), all);
-              }
+              publish(cacheKeys.reminders(uid, "episodes"), all);
             },
             snapshotErrorHandler("Reminders/episodes"),
           );

@@ -30,6 +30,18 @@ const ALLOWED = new Set([
   "MIT AND OFL-1.1",
   // Syncopate paket kodu MIT, font dosyası dağıtıma izin veren Apache 2.0.
   "MIT AND Apache-2.0",
+  // fb-dotslash — iki izinli lisanstan biri secilebiliyor; ikisi de zaten
+  // tek tek ALLOWED'da.
+  "(MIT OR Apache-2.0)",
+  // @sentry/cli + @sentry/cli-win32-x64 — FSL 1.1 ACIK KAYNAK DEGIL, kaynagi
+  // gorunur bir lisans: 2 yil boyunca Sentry ile REKABET EDEN bir urun
+  // sunmayi yasaklar, sonra MIT'ye doner. Bu paketler yalnizca DERLEME
+  // ZAMANINDA calisir (source map yukleme, @sentry/react-native uzerinden
+  // gelir) ve uygulama paketiyle son kullaniciya DAGITILMAZ; Seelogd bir
+  // hata izleme urunu de degil. Bu iki gerekce FSL'in kisitladigi kullanimin
+  // disinda kaldigimizi gosteriyor. Sentry bagimliligi kaldirilirsa bu satir
+  // da kaldirilmali.
+  "FSL-1.1-MIT",
   "(MIT OR CC0-1.0)",
   "(MIT OR GPL-2.0)",
   "(BSD-3-Clause OR GPL-2.0)",

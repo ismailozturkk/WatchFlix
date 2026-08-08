@@ -538,24 +538,6 @@ export default function ActorSearch({ navigation, route, isUnified, unifiedQuery
     }
   }, [unifiedQuery, isUnified]);
 
-  const handleSearch = useCallback((text) => {
-    searchRequestRef.current += 1;
-    setSearch(text);
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    if (text.trim().length >= 2) {
-      setError(null);
-      setLoading(true);
-      searchTimeout.current = setTimeout(() => fetchResults(text), 500);
-    } else {
-      // Boş veya 1 karakter: bekleyen istek iptal edildi. loading/error'ı
-      // burada sıfırlamazsak ekran skeleton'da ya da eski hatada takılı kalır
-      // (2+ karakterden geri silme senaryosu).
-      setResults([]);
-      setLoading(false);
-      setError(null);
-    }
-  }, []);
-
   const fetchResults = useCallback(
     async (searchText) => {
       if (!searchText) {
@@ -603,6 +585,30 @@ export default function ActorSearch({ navigation, route, isUnified, unifiedQuery
     [language, adultContent, API_KEY],
   );
 
+  // NOT: handleSearch, fetchResults'tan SONRA tanımlı olmalı — bağımlılık dizisi
+  // render sırasında değerlendiği için yukarıda tanımlanırsa fetchResults
+  // okunamaz ve boş deps ilk render'ın closure'ını kalıcı hapsediyordu (dil /
+  // yetişkin içerik değişimi debounce'lu aramaya yansımıyordu).
+  const handleSearch = useCallback(
+    (text) => {
+      searchRequestRef.current += 1;
+      setSearch(text);
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+      if (text.trim().length >= 2) {
+        setError(null);
+        setLoading(true);
+        searchTimeout.current = setTimeout(() => fetchResults(text), 500);
+      } else {
+        // Boş veya 1 karakter: bekleyen istek iptal edildi. loading/error'ı
+        // burada sıfırlamazsak ekran skeleton'da ya da eski hatada takılı kalır
+        // (2+ karakterden geri silme senaryosu).
+        setResults([]);
+        setLoading(false);
+        setError(null);
+      }
+    },
+    [fetchResults],
+  );
 
 
   const renderRowResult = useCallback(

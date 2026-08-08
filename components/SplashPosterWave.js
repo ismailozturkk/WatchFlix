@@ -13,7 +13,7 @@
 // Poster kaynağı: önce apiCache'in AsyncStorage'a yazdığı trend/keşfet
 // kayıtları; önbellek boşsa/yetersizse landing sayfasıyla aynı sabit TMDB
 // poster listesi devreye girer — kutucuklar hiçbir durumda boş kalmaz.
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { cachedKeys, rawCachedEntry } from "../utils/apiCache";
 import { Image } from "expo-image";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Dimensions, Easing, StyleSheet, View } from "react-native";
@@ -87,7 +87,8 @@ const FALLBACK_POSTER_PATHS = [
 ];
 
 const POSTER_LIMIT = 40;
-const CACHE_PREFIX = "apicache_";
+// Önek artık burada DEĞİL: apiCache kendi anahtar alanını açıyor (registry'deki
+// Namespaces.apiCache). Eskiden "apicache_" üç dosyada elle yazılıydı.
 // Poster barındırdığı bilinen önbellek anahtarı önekleri, tazelik önceliğiyle.
 const KEY_PRIORITY = [
   "movie_trends",
@@ -106,37 +107,31 @@ const keyPriorityIndex = (key) => {
 // toplar. Hata durumunda boş liste döner; splash asla bunu beklemeye düşmez.
 async function collectCachedPosterPaths() {
   try {
-    const allKeys = await AsyncStorage.getAllKeys();
-    const candidates = allKeys
-      .filter((k) => k.startsWith(CACHE_PREFIX))
-      .map((k) => k.slice(CACHE_PREFIX.length))
+    const candidates = cachedKeys()
       .filter((k) => keyPriorityIndex(k) < KEY_PRIORITY.length)
       .sort((a, b) => keyPriorityIndex(a) - keyPriorityIndex(b))
-      .slice(0, 8)
-      .map((k) => `${CACHE_PREFIX}${k}`);
+      .slice(0, 8);
     if (!candidates.length) return [];
 
-    const pairs = await AsyncStorage.multiGet(candidates);
     const seen = new Set();
     const paths = [];
-    for (const [, raw] of pairs) {
-      if (!raw) continue;
-      try {
-        const entry = JSON.parse(raw);
-        // Kayıt şekli { data: { results: [...] } } ya da eski { data: [...] }.
-        const data = entry?.data;
-        const results = Array.isArray(data) ? data : data?.results;
-        if (!Array.isArray(results)) continue;
-        for (const item of results) {
-          const path = item?.poster_path;
-          if (typeof path === "string" && path && !seen.has(path)) {
-            seen.add(path);
-            paths.push(path);
-            if (paths.length >= POSTER_LIMIT) return paths;
-          }
+    for (const key of candidates) {
+      // apiCache bozuk JSON'u kendi ayıklıyor (kaydı silip undefined dönüyor),
+      // bu yüzden buradaki eski per-kayıt try/catch'e gerek kalmadı.
+      const entry = rawCachedEntry(key);
+      if (!entry) continue;
+
+      // Kayıt şekli { data: { results: [...] } } ya da eski { data: [...] }.
+      const data = entry?.data;
+      const results = Array.isArray(data) ? data : data?.results;
+      if (!Array.isArray(results)) continue;
+      for (const item of results) {
+        const path = item?.poster_path;
+        if (typeof path === "string" && path && !seen.has(path)) {
+          seen.add(path);
+          paths.push(path);
+          if (paths.length >= POSTER_LIMIT) return paths;
         }
-      } catch {
-        // bozuk kayıt — atla
       }
     }
     return paths;

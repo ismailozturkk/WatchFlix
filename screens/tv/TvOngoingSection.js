@@ -29,6 +29,7 @@ import UpNextRailCard from "../../components/tv/UpNextRailCard";
 import WatchedDateSheet from "../../components/detail/WatchedDateSheet";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import useUpNextQueue from "../../hooks/useUpNextQueue";
 import { i18nText } from "../../utils/i18nText";
@@ -43,6 +44,7 @@ export default function TvOngoingSection({ navigation }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const poster = useRailPosterStyle();
+  const { openQuickActions } = useMediaQuickActions();
   const [dateItem, setDateItem] = useState(null);
   const [resolveReady, setResolveReady] = useState(false);
 
@@ -101,6 +103,13 @@ export default function TvOngoingSection({ navigation }) {
     [markWatched]
   );
 
+  // Basılı tutma: diğer raylardaki gibi hızlı eylem sayfası. Buradaki `show`
+  // izlenen-dizi kaydı (name/imagePath); sayfa kalan alanları TMDB'den çeker.
+  const handleQuickActions = useCallback(
+    (show) => openQuickActions({ item: show, mediaType: "tv", navigation }),
+    [openQuickActions, navigation]
+  );
+
   const renderItem = useCallback(
     ({ item: show }) => {
       const key = String(show.id);
@@ -118,11 +127,13 @@ export default function TvOngoingSection({ navigation }) {
           onOpen={handleOpen}
           onWatched={handleWatched}
           onChooseDate={setDateItem}
+          onQuickActions={handleQuickActions}
         />
       );
     },
     [
       handleOpen,
+      handleQuickActions,
       handleWatched,
       itemsByShow,
       language,

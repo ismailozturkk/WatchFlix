@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import React, { memo, useEffect, useRef } from "react";
 import {
   Text,
   TouchableOpacity,
@@ -8,9 +8,9 @@ import {
   Dimensions,
   Animated,
 } from "react-native";
-import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { MovieSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
 import { useMovie } from "../../context/MovieContex";
@@ -18,7 +18,6 @@ import ListBadges from "../../components/ListBadges";
 import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import PaginatedRail from "../../components/PaginatedRail";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { SeeAllButton } from "../../components/SeeAllHeader";
 import { i18nText } from "../../utils/i18nText";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
@@ -28,6 +27,7 @@ const { width, height } = Dimensions.get("window");
 const MovieGenresCard = memo(function MovieGenresCard({ item, navigation, theme, getTmdbUrl }) {
   const rp = useRailPosterStyle();
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -41,6 +41,10 @@ const MovieGenresCard = memo(function MovieGenresCard({ item, navigation, theme,
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => navigation.push("MovieDetails", { id: item.id })}
+      onLongPress={() =>
+        openQuickActions({ item, mediaType: "movie", navigation })
+      }
+      delayLongPress={350}
     >
       <Animated.View style={[{ transform: [{ scale }] }]}>
         <PosterImage
