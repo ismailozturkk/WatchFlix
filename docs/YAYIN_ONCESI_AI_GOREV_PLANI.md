@@ -75,7 +75,7 @@
 
 **Kabul:** tek dosya kaldı; iki giriş noktası da çalışıyor; kota göstergesi her iki akışta görünür; EN'de Türkçe metin kalmadı; testler yeşil.
 
-### [~] GÖREV B2 — Firestore kural düzeltmeleri (4 açık + birthDate kilidi) (kod 2026-08-08, deploy bekliyor)
+### [x] GÖREV B2 — Firestore kural düzeltmeleri (4 açık + birthDate kilidi) (2026-08-08, DEPLOY EDİLDİ)
 
 > **Sonuç:** dört açık da kapandı — `226db20` (kurallar + istemci), `ee1980b` (28 emülatör testi).
 > `npm run test:rules` ile koşuyor (Firestore emülatörü + **JDK 21+** ister; JAVA_HOME 17'yi
@@ -95,8 +95,8 @@
 > kendi oy dokümanının aynı commit'teki değişimiyle `getAfter` üzerinden birebir doğrulanıyor.
 > Karşılığı: agregatı bozuk kalmış bir doküman olursa o içerik puanlanamaz (konsoldan onarılır).
 >
-> **Bekleyen:** `firebase deploy --only firestore:rules` — B3'ün functions deploy'undan SONRA,
-> tek seferde (B3 adım 4'teki sıra).
+> **Deploy:** B3 ile birlikte yapıldı (2026-08-08) — önce functions, sonra `firestore:rules`.
+> Kurallar hatasız derlendi ve yayına alındı.
 
 **Bağlam:** Kurallar genelde sağlam (varsayılan-red, sayaç ±1 kısıtları, chat üyeliği düzeltilmiş) ama dört yazma açığı var. Hepsi `firestore.rules` içinde; mevcut yardımcılar `counterOk()` (~satır 18) ve `isChatMember()` (~satır 25) desen olarak kullanılabilir.
 
@@ -110,7 +110,7 @@
 
 **Kabul:** dört açık kapandı; mevcut meşru akışlar (yorum yazma, puanlama, DM) bozulmadı; kurallar deploy edildi (onay sonrası).
 
-### [~] GÖREV B3 — Expo push token'larını gizli alt koleksiyona taşı (kod 2026-08-08, deploy bekliyor)
+### [x] GÖREV B3 — Expo push token'larını gizli alt koleksiyona taşı (2026-08-08, DEPLOY EDİLDİ)
 
 > **Sonuç:** `48c281a`. Token'lar `Users/{uid}/private/push`'ta; kural + istemci göçü +
 > iki sunucu tüketicisi fallback'li. 5 kural testi daha eklendi (toplam 33 yeşil).
@@ -129,10 +129,15 @@
 > `functions/index.js` içinde "GEÇİŞ" olarak işaretli bloklar + kök dokümana yazan ölü token
 > temizliği silinecek.
 >
-> **Bekleyen — DEPLOY SIRASI KRİTİK:**
-> 1. `firebase deploy --only functions` (fallback'li sunucu; eski istemciler çalışmaya devam eder)
-> 2. `firebase deploy --only firestore:rules` (B2 + B3 kuralları birlikte)
-> 3. İstemci sürümü / OTA
+> **Deploy (2026-08-08, sırasıyla yapıldı):**
+> 1. ✅ `firebase deploy --only functions` — 8 fonksiyon güncellendi (fallback'li sunucu önce
+>    gitti, sahadaki eski istemciler bozulmadı).
+> 2. ✅ `firebase deploy --only firestore:rules` — B2 + B3 kuralları birlikte.
+> 3. ⏳ İstemci sürümü / OTA — sürüm build'i kesildiğinde.
+>
+> **Kalan uyarı:** deploy çıktısı `firebase-functions` sürümünün eskidiğini bildirdi
+> (`npm install --save firebase-functions@latest`). Bu görevin kapsamında değil, B10'un
+> bağımlılık eşitleme adımına bakılabilir.
 
 **Bağlam:** `services/pushNotificationsService.js` (~193-202) token'ı `Users/{uid}.expoPushToken` + `expoPushTokens`'a yazıyor; `Users` ise tüm oturumlulara okunur → herhangi bir kullanıcı tüm token'ları dökebilir ve Expo push ucu üzerinden herkese sahte bildirim atabilir.
 
