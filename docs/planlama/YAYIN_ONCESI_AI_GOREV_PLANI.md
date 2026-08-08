@@ -241,7 +241,58 @@
 
 **Kabul:** paywall'da ve iki kayıt ekranında çalışan linkler; EN+TR; testler yeşil.
 
-### [ ] GÖREV B6 — EN yerelleştirme onarımı: 87 yetim anahtar + cihaz dili + ham metinler (~1-2 gün)
+### [x] GÖREV B6 — EN yerelleştirme onarımı: 87 yetim anahtar + cihaz dili + ham metinler (2026-08-08)
+
+> **Sonuç:** `npm test` 64 suite / 953 test yeşil (önce 62/938), `expo-doctor` 20/20.
+> Bekçi testi (`__tests__/i18nKeys.test.js`) 7 iddiayla yeşil; 0 yetim anahtar.
+> `app.json version` 1.4.2 → **1.4.3** (expo-localization config plugin = native değişiklik).
+>
+> **Yetim anahtar sayısı 87 değil 101 çıktı.** Plandaki 87, statik `"autoI18n.x"`
+> dizgelerini sayıyordu; bekçi testi anahtarı ÇALIŞMA ANINDA kuran çağrı yerlerini de
+> çözünce 14 anahtar daha göründü:
+> - **`cache_*` (11)** — `CacheManagerModal` `` `autoI18n.cache_${cat.id}` `` diyor ve bu
+>   ailenin **hiçbir üyesi iki pakette de yoktu**: önbellek yöneticisinin tüm kategori
+>   adları (Posterler, Pet'ler, Gönderiler…) EN'de Türkçe basıyordu. Planın taramasında
+>   görünmemesinin sebebi tam olarak dinamik olmaları.
+> - **`widget_upcoming` / `widget_lists` / `widget_stats` (3)** — `WIDGETS` tablosundaki
+>   `titleKey`'ler. Fallback'leri ham id ("reminders"/"lists"/"stats") olduğu için EN'de
+>   değil, **iki dilde birden** bozuktu.
+>
+> **Bekçi testi dinamik çağrıları da koruyor.** Naif regex bu sınıfı hiç görmediği için
+> `DINAMIK_YERLER` kaydı eklendi: dört dosya (WidgetSettings `copy()`, ReportReasonSheet,
+> NotificationPrimingSheet, CacheManagerModal) anahtar tablosuyla kayıtlı ve **kayıtsız yeni
+> bir `autoI18n.${...}` çağrısı testi kırıyor**. Ayrıca TR↔EN anahtar kümesi eşitliği, boş EN
+> değeri ve "tarama gerçekten çalışıyor mu" (desen bozulunca test sessizce yeşile dönmesin)
+> iddiaları da var.
+>
+> **Bulunan ek hata — tek anahtar iki iş yapıyordu:** `widget_custom_theme` hem rozet metni
+> ("ÖZEL") hem tema adı ("Özel Tema") için çağrılıyordu; tek değer verilince biri kaçınılmaz
+> olarak yanlış görünecekti. `widget_custom_theme_name` ayrıldı.
+>
+> **Planın "taslak_sil_onay fallback'i bozuk (`\\`)" tespiti yanlıştı** — kaçış dizisi
+> geçerli, metin doğru üretiliyordu. Gerçek sorun yalnız anahtarın eksikliğiydi; eklendi.
+>
+> **Cihaz dili — ilk seçim BİLEREK depoya yazılmıyor** (plan adım 4 "MMKV'ye yazılsın"
+> diyordu). Sebep: `AppSettingsContext` dosyasında hiç `useEffect` yok (başlıktaki not bunu
+> açıkça bir tasarım kararı olarak anlatıyor) ve ilk açılışta yazmak oraya mount effect'i
+> eklemeyi gerektiriyordu. Yazmayınca davranış daha da iyi: kullanıcı dili ELLE seçene dek
+> uygulama cihaz dilini izler, seçtiği an `changeLanguage` kaydı oluşur ve cihaz dili artık
+> onu ezemez. Yazan taraf hâlâ tek (`AppSettingsContext`), detector yalnız okuyor.
+>
+> **Kritik ayrıntı:** `get(Keys.language)` kayıt yokken registry varsayılanı "tr" döndürüyor,
+> yani "hiç seçilmemiş" ile "Türkçe seçilmiş" ayrılamıyordu — ayrım `has()` ile yapıldı.
+> `AppSettingsContext` ile detector **aynı** `cozumlenmisDil()` fonksiyonunu kullanıyor;
+> ayrışsalardı `LanguageContext` depodaki "tr"yi i18n'e geri yazıp cihaz dilini anında ezerdi.
+> Bilinmeyen dilde yedek **"en"** (Türkçe cihazlar dilini zaten bildiriyor; yanlış tahminin
+> bedeli asimetrik — İngilizce açılan Türk kullanıcı ayarı bulur, Türkçe açılan yabancı bulamaz).
+>
+> **`npm run licenses` çalıştırıldı:** yeni bağımlılık `ossLicenses.test.js`'i kırdı
+> (mevcut bekçi doğru çalıştı), liste yeniden üretildi.
+>
+> **⚠ MANUEL DOĞRULAMA (dev build):** ① cihaz dili İngilizce olan TEMİZ kurulumda uygulama
+> İngilizce açılıyor mu, ② Ayarlar'dan Türkçe seçilince kalıcı mı, ③ Ayarlar → önbellek
+> yöneticisinde kategori adları EN'de İngilizce mi, ④ Widget ayarlarında üç widget başlığı
+> ("Yaklaşanlar/Listeler/İstatistikler") doğru mu.
 
 **Bağlam:** Çeviri dosyaları eşit (2102/2102) ama koddan çağrılan **87 anahtar iki pakette de yok**; `fallbackLng: "tr"` + `i18nText(key, türkçeFallback)` deseni yüzünden bunlar EN kullanıcıya sessizce Türkçe basıyor. En kötüler: `WidgetSettingsScreen` (36 — `copy()` sarmalayıcısı `` `autoI18n.${key}` `` şablonuyla çağırıyor), `PosterSettingsScreen` (14), `PersonalizationScreen` (8). Ayrıca cihaz dili hiç algılanmıyor (varsayılan `tr`, `services/storage/registry.js` ~59) — her yabancı kullanıcı uygulamayı Türkçe açıyor.
 
