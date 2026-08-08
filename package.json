@@ -1,6 +1,6 @@
 {
   "name": "seelogd",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "main": "index.js",
   "scripts": {
     "start": "npx expo start",
@@ -104,6 +104,7 @@
     "expo-image": "~57.0.2",
     "expo-image-picker": "~57.0.8",
     "expo-linear-gradient": "~57.0.1",
+    "expo-localization": "~57.0.1",
     "expo-media-library": "~57.0.3",
     "expo-notifications": "~57.0.9",
     "expo-secure-store": "~57.0.1",

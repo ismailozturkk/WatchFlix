@@ -11,7 +11,8 @@ import React, {
 import Toast from "react-native-toast-message";
 import { buildTmdbUrl } from "../utils/tmdbImageUtils";
 import { i18nText } from "../utils/i18nText";
-import { Keys, get, set, useStored } from "../services/storage";
+import { Keys, get, has, set, useStored } from "../services/storage";
+import { cozumlenmisDil } from "../translations";
 import {
   DEFAULT_DATA_TYPES,
   normalizeDataTypes,
@@ -177,7 +178,10 @@ export const AppSettingsProvider = ({ children }) => {
   // seçimine atlaması. MMKV senkron okuduğu için ilk render zaten doğru
   // değerlerle çiziliyor — o effect tamamen kalktı.
   const [showSnow, setShowSnow] = useState(() => get(Keys.showSnow));
-  const [selectedLanguage, setSelectedLanguage] = useState(() => get(Keys.language));
+  // i18next detector'ı ile AYNI çözümleme: ilk açılışta kayıt yoksa cihaz dili.
+  // İkisi ayrışırsa LanguageContext bu değeri i18n'e geri yazar ve cihaz dili
+  // anında Türkçe'ye ezilirdi — bu yüzden tek kaynak.
+  const [selectedLanguage, setSelectedLanguage] = useState(cozumlenmisDil);
   const [selectedTheme, setSelectedTheme] = useState(() => get(Keys.theme));
   const [customThemes, setCustomThemes] = useState(() => get(Keys.customThemes));
   const [storedAdultContent, setAdultContent] = useState(() => get(Keys.adultContent));
