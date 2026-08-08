@@ -104,6 +104,9 @@ import GroupInfoModal from "@components/chat/GroupInfoModal";
 import GroupAvatar from "@components/chat/GroupAvatar";
 import MessageReplyPreview from "@components/chat/MessageReplyPreview";
 import PinnedMessagesModal from "@components/chat/PinnedMessagesModal";
+import ReportReasonSheet from "@components/moderation/ReportReasonSheet";
+import { useFriends } from "@context/FriendsContext";
+import { reportMessage } from "@services/reportService";
 import SwipeReplyContainer from "@components/chat/SwipeReplyContainer";
 import {
   canManageGroup,
@@ -545,6 +548,7 @@ export default function ChatScreen({ route, navigation }) {
   const { hapticsEnabled } = useHapticsSettings();
   const [trailerMedia, setTrailerMedia] = useState(null);
   const { adultContent } = useContentSettings();
+  const { block, isBlocked } = useFriends();
   const { selectAvatarIndex, avatars } = useProfileUi();
   const [groupData, setGroupData] = useState(null); // grup modunda doc
   const { getTmdbUrl } = useImageQualitySettings();
@@ -552,6 +556,8 @@ export default function ChatScreen({ route, navigation }) {
   const [text, setText] = useState("");
   const [searchText, setSearchText] = useState("");
   const [optionsVisible, setOptionsVisible] = useState(false);
+  // Şikâyet sayfasının hedefi (mesaj nesnesi); null ise sayfa kapalı.
+  const [reportTarget, setReportTarget] = useState(null);
   const [textLink, setTextLink] = useState(false);
   const [messageLimit, setMessageLimit] = useState(20);
 
@@ -1634,6 +1640,61 @@ export default function ChatScreen({ route, navigation }) {
   const canDeleteSelected = Boolean(
     selectedMessage &&
       (selectedMessage.senderId === currentUser.uid || (isGroup && currentUserIsCreator)),
+  );
+  // Moderasyon eylemleri YALNIZ karşı tarafın mesajında: kendi mesajını
+  // şikâyet etmek anlamsız, kendini engellemek zaten kural düzeyinde reddedilir.
+  const canModerateSelected = Boolean(
+    selectedMessage?.senderId && selectedMessage.senderId !== currentUser.uid,
+  );
+
+  // ── Moderasyon: şikâyet + engelle ────────────────────────────────────────
+  const submitMessageReport = useCallback(
+    async (reason) => {
+      const target = reportTarget;
+      setReportTarget(null);
+      if (!target?.id || !target?.senderId) return;
+      // Grup ve 1-1 mesajları farklı köklerde; moderatör kaydı tam yolla bulur.
+      const targetPath = isGroup
+        ? `groups/${chatId}/messages/${target.id}`
+        : `chats/${chatId}/messages/${target.id}`;
+      try {
+        await reportMessage({
+          targetPath,
+          targetUserId: target.senderId,
+          reporterId: currentUser.uid,
+          text: target.text,
+          reason,
+        });
+        toast.success(i18nText("autoI18n.sikayetin_alindi", "Şikayetin alındı"));
+      } catch {
+        toast.error(
+          i18nText("autoI18n.sikayet_gonderilemedi", "Şikayet gönderilemedi"),
+        );
+      }
+    },
+    [reportTarget, isGroup, chatId, currentUser.uid],
+  );
+
+  const confirmBlockUser = useCallback(
+    (targetUid) => {
+      if (!targetUid || targetUid === currentUser.uid) return;
+      appAlert(
+        i18nText("autoI18n.kullaniciyi_engelle", "Kullanıcıyı engelle"),
+        i18nText(
+          "autoI18n.engelle_onay_metni",
+          "Gönderilerini, yorumlarını ve mesajlarını görmezsin. Arkadaşsanız arkadaşlık da kalkar.",
+        ),
+        [
+          { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
+          {
+            text: i18nText("autoI18n.engelle", "Engelle"),
+            style: "destructive",
+            onPress: () => block(targetUid),
+          },
+        ],
+      );
+    },
+    [block, currentUser.uid],
   );
 
   const renderItem = useCallback(
@@ -2741,6 +2802,68 @@ export default function ChatScreen({ route, navigation }) {
                       </View>
                     </TouchableOpacity>
                   )}
+
+                  {/* Şikâyet + engelle (yalnız karşı tarafın mesajında).
+                      Mağaza şartı: her UGC yüzeyinde bildirme yolu olmalı. */}
+                  {canModerateSelected && (
+                    <TouchableOpacity
+                      style={styles.actionRowL}
+                      onPress={() => {
+                        setOptionsVisible(false);
+                        setReportTarget(selectedMessage);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View
+                        style={[
+                          styles.actionIconBox,
+                          { backgroundColor: "rgba(255,167,38,0.15)" },
+                        ]}
+                      >
+                        <Feather name="flag" size={20} color="#FFA726" />
+                      </View>
+                      <View style={styles.actionRowText}>
+                        <Text style={[styles.actionRowTitle, { color: "#fff" }]}>
+                          {i18nText("autoI18n.sikayet_et", "Şikayet et")}
+                        </Text>
+                        <Text style={styles.actionRowSub}>
+                          {i18nText("autoI18n.mesaji_sikayet_et", "Mesajı şikâyet et")}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+
+                  {canModerateSelected && (
+                    <TouchableOpacity
+                      style={styles.actionRowR}
+                      onPress={() => {
+                        setOptionsVisible(false);
+                        confirmBlockUser(selectedMessage.senderId);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View
+                        style={[
+                          styles.actionIconBox,
+                          { backgroundColor: "rgba(255,107,107,0.15)" },
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name="account-cancel-outline"
+                          size={20}
+                          color={DANGER}
+                        />
+                      </View>
+                      <View style={styles.actionRowText}>
+                        <Text style={[styles.actionRowTitle, { color: DANGER }]}>
+                          {i18nText("autoI18n.kullaniciyi_engelle", "Kullanıcıyı engelle")}
+                        </Text>
+                        <Text style={styles.actionRowSub}>
+                          {i18nText("autoI18n.engelle", "Engelle")}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {/* İptal butonu */}
@@ -2753,6 +2876,17 @@ export default function ChatScreen({ route, navigation }) {
                 </TouchableOpacity>
           </BottomSheetModal>
         )}
+
+        <ReportReasonSheet
+          visible={!!reportTarget}
+          onClose={() => setReportTarget(null)}
+          onSelect={submitMessageReport}
+          subtitle={i18nText(
+            "autoI18n.sikayet_hedefi_mesaj",
+            "{{name}} kişisinin mesajı bildiriliyor.",
+            { name: resolveSenderName(reportTarget) },
+          )}
+        />
 
         <PinnedMessagesModal
           visible={pinnedModalVisible}
