@@ -18,9 +18,9 @@
 //    />
 //
 //  Tasarım notları:
-//   • Üç sütun tek bir native-driver scroll değerinden beslenir;
-//     kaydırma sırasında JS tarafında hiçbir satır yeniden render
-//     olmaz (seçili renk, iki metnin opaklık geçişiyle yapılır).
+//   • Üç sütunun görsel hareketi native-driver scroll değerinden beslenir.
+//     JS yalnız merkez satır değiştiğinde (her pikselde değil) ISO seçimini ve
+//     önizlemeyi günceller; kullanıcı bırakmayı beklemek zorunda kalmaz.
 //   • Yıl listesi min/max sınırlarından türetilir. Sınır yoksa
 //     bugünden 100 yıl geri, 10 yıl ileri açılır — hatırlatıcılar
 //     gelecek yıla da kurulabilsin diye.
@@ -49,10 +49,12 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
 import { alpha } from "@theme/colors";
 import { i18nText } from "@utils/i18nText";
+import { buildEnabledOptions } from "@utils/datePickerWheel";
 import { selectionAsync } from "@services/hapticsService";
 import { deviceTier } from "@services/deviceTier";
 
@@ -65,8 +67,14 @@ const VISIBLE_COUNT = 5;
 const PAD_COUNT = Math.floor(VISIBLE_COUNT / 2); // 2
 const WHEEL_H = ITEM_H * VISIBLE_COUNT;
 const WHEEL_PAD = 8;
+const COLUMN_LABEL_H = 20;
 // Hızlı kaydırmada her satır için titreşim tetiklemek cihazı boğar.
 const HAPTIC_MIN_GAP_MS = 45;
+const getWheelItemLayout = (_, index) => ({
+  length: ITEM_H,
+  offset: ITEM_H * index,
+  index,
+});
 
 export const DAYS_LIST = Array.from({ length: 31 }, (_, i) =>
   String(i + 1).padStart(2, "0"),
@@ -216,7 +224,10 @@ const WheelRow = memo(function WheelRow({
   disabledColor,
   flat,
 }) {
-  const center = (index - PAD_COUNT) * ITEM_H;
+  // `index` veri listesindeki gerçek indekstir. ScrollView başındaki görsel
+  // padding satırları bu değere dahil edilmez; aksi halde bir satıra dokunmak
+  // iki sıra aşağıdaki tarihi seçiyordu.
+  const center = index * ITEM_H;
   const range = [
     center - 2 * ITEM_H,
     center - ITEM_H,
@@ -311,15 +322,67 @@ const WheelColumn = memo(function WheelColumn({
   const lastTick = useRef(selectedIndex);
   const lastHaptic = useRef(0);
   const momentum = useRef(false);
+  const dragEndTimer = useRef(null);
+  const programmaticTimer = useRef(null);
+  const liveFrame = useRef(null);
+  const pendingLiveIndex = useRef(null);
+  const programmaticScroll = useRef(false);
   const didLayout = useRef(false);
+  const initialContentOffset = useRef({
+    x: 0,
+    y: selectedIndex * ITEM_H,
+  }).current;
   const lenRef = useRef(items.length);
+  const disabledRef = useRef(disabledFlags);
   const onSelectRef = useRef(onSelect);
 
   lenRef.current = items.length;
+  disabledRef.current = disabledFlags;
   onSelectRef.current = onSelect;
 
-  // Native driver ile beslenen scroll değeri + JS tarafında yalnızca titreşim
-  // için çalışan hafif bir dinleyici. Bir kez kurulur, bağımlılığı yoktur.
+  const clearPendingLive = useCallback(() => {
+    if (liveFrame.current !== null) {
+      cancelAnimationFrame(liveFrame.current);
+      liveFrame.current = null;
+    }
+    pendingLiveIndex.current = null;
+  }, []);
+
+  const scrollToIndex = useCallback((idx, animated) => {
+    clearPendingLive();
+    if (programmaticTimer.current) clearTimeout(programmaticTimer.current);
+    programmaticScroll.current = true;
+    scrollRef.current?.scrollToOffset({
+      offset: idx * ITEM_H,
+      animated,
+    });
+    // `scrollToOffset` kullanıcı kaydırmasıyla aynı onScroll yolunu üretir.
+    // Kısa süre işaretleyerek canlı seçim dinleyicisinin bu düzeltmeyi yeni bir
+    // kullanıcı seçimi sanmasını engelliyoruz.
+    programmaticTimer.current = setTimeout(() => {
+      programmaticScroll.current = false;
+      programmaticTimer.current = null;
+    }, animated ? 700 : 32);
+  }, [clearPendingLive]);
+
+  const commitLiveIndex = useCallback((idx) => {
+    if (idx < 0 || idx >= lenRef.current) return;
+    if (disabledRef.current?.[idx]) return;
+    pendingLiveIndex.current = idx;
+    if (liveFrame.current !== null) return;
+    liveFrame.current = requestAnimationFrame(() => {
+      liveFrame.current = null;
+      const next = pendingLiveIndex.current;
+      pendingLiveIndex.current = null;
+      if (programmaticScroll.current || next === null) return;
+      if (next === committed.current) return;
+      committed.current = next;
+      onSelectRef.current?.(next);
+    });
+  }, []);
+
+  // Native driver ile beslenen scroll değeri + yalnız merkez satır değiştiğinde
+  // canlı seçimi/haptic'i çalıştıran hafif JS dinleyicisi.
   const handleScroll = useMemo(
     () =>
       Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
@@ -330,48 +393,62 @@ const WheelColumn = memo(function WheelColumn({
           if (idx === lastTick.current) return;
           if (idx < 0 || idx >= lenRef.current) return;
           lastTick.current = idx;
+          if (!programmaticScroll.current) commitLiveIndex(idx);
+          if (programmaticScroll.current) return;
           const now = Date.now();
           if (now - lastHaptic.current < HAPTIC_MIN_GAP_MS) return;
           lastHaptic.current = now;
           selectionAsync().catch(() => {});
         },
       }),
-    [scrollY],
+    [commitLiveIndex, scrollY],
   );
 
   // Kaydırma durduğunda seçimi kesinleştir. snapToInterval sayesinde offset
   // zaten hizalı geldiği için ek bir scrollTo çağrısı (ve titreme) yapılmaz.
   const settle = useCallback((offsetY) => {
+    // Hızlı momentumda son onScroll RAF'i, momentum-end olayından sonra
+    // çalışıp seçimi bir önceki satıra geri alabiliyordu. Son fiziksel offset
+    // tek otoritedir; kuyruktaki canlı seçim önce iptal edilir.
+    clearPendingLive();
     const len = lenRef.current;
     if (!len) return;
     const idx = Math.max(0, Math.min(len - 1, Math.round(offsetY / ITEM_H)));
     if (Math.abs(offsetY - idx * ITEM_H) > 0.5) {
-      scrollRef.current?.scrollTo({ y: idx * ITEM_H, animated: true });
+      scrollToIndex(idx, true);
     }
+    const changed = committed.current !== idx;
     committed.current = idx;
     lastTick.current = idx;
-    onSelectRef.current?.(idx);
-  }, []);
+    if (changed) onSelectRef.current?.(idx);
+  }, [clearPendingLive, scrollToIndex]);
 
   const handlePress = useCallback((idx) => {
     if (idx < 0 || idx >= lenRef.current) return;
+    if (idx === committed.current) return;
     committed.current = idx;
     lastTick.current = idx;
-    scrollRef.current?.scrollTo({ y: idx * ITEM_H, animated: true });
+    scrollToIndex(idx, true);
     onSelectRef.current?.(idx);
     selectionAsync().catch(() => {});
-  }, []);
+  }, [scrollToIndex]);
+
+  useEffect(
+    () => () => {
+      if (dragEndTimer.current) clearTimeout(dragEndTimer.current);
+      if (programmaticTimer.current) clearTimeout(programmaticTimer.current);
+      clearPendingLive();
+    },
+    [clearPendingLive],
+  );
 
   // Dışarıdan gelen düzeltmeler (sınır clamp'i, ay kısalınca gün düşmesi…)
   useEffect(() => {
     if (selectedIndex === committed.current) return;
     committed.current = selectedIndex;
     lastTick.current = selectedIndex;
-    scrollRef.current?.scrollTo({
-      y: selectedIndex * ITEM_H,
-      animated: didLayout.current,
-    });
-  }, [selectedIndex]);
+    scrollToIndex(selectedIndex, didLayout.current);
+  }, [selectedIndex, scrollToIndex]);
 
   const data = useMemo(
     () => [
@@ -382,13 +459,49 @@ const WheelColumn = memo(function WheelColumn({
     [items],
   );
 
+  const renderRow = useCallback(
+    ({ item: label, index: i }) =>
+      label === null ? (
+        <View style={wheelStyles.hit} />
+      ) : (
+        <WheelRow
+          label={String(label)}
+          index={i - PAD_COUNT}
+          scrollY={scrollY}
+          disabled={!!disabledFlags?.[i - PAD_COUNT]}
+          onPress={handlePress}
+          baseColor={baseColor}
+          activeColor={activeColor}
+          disabledColor={disabledColor}
+          flat={flat}
+        />
+      ),
+    [
+      activeColor,
+      baseColor,
+      disabledColor,
+      disabledFlags,
+      flat,
+      handlePress,
+      scrollY,
+    ],
+  );
+
   return (
     <View
       style={{ flex: flexBasis, height: WHEEL_H }}
       accessibilityLabel={accessibilityLabel}
     >
-      <Animated.ScrollView
+      <Animated.FlatList
         ref={scrollRef}
+        data={data}
+        renderItem={renderRow}
+        keyExtractor={(_, index) => String(index)}
+        getItemLayout={getWheelItemLayout}
+        initialNumToRender={9}
+        maxToRenderPerBatch={12}
+        windowSize={5}
+        contentOffset={initialContentOffset}
         showsVerticalScrollIndicator={false}
         snapToInterval={ITEM_H}
         snapToAlignment="start"
@@ -398,49 +511,50 @@ const WheelColumn = memo(function WheelColumn({
         scrollEventThrottle={16}
         onScroll={handleScroll}
         onLayout={() => {
-          scrollRef.current?.scrollTo({
-            y: committed.current * ITEM_H,
-            animated: false,
-          });
+          scrollToIndex(committed.current, false);
           didLayout.current = true;
         }}
         onScrollBeginDrag={() => {
+          clearPendingLive();
+          if (dragEndTimer.current) clearTimeout(dragEndTimer.current);
+          if (programmaticTimer.current) {
+            clearTimeout(programmaticTimer.current);
+            programmaticTimer.current = null;
+          }
+          // Kullanıcı devam eden bir otomatik hizalamayı parmağıyla devraldı.
+          programmaticScroll.current = false;
           momentum.current = false;
         }}
         onScrollEndDrag={(e) => {
           const y = e.nativeEvent.contentOffset.y;
           // Parmak kalkınca momentum başlayabilir; başlamazsa burada oturt.
-          setTimeout(() => {
+          if (dragEndTimer.current) clearTimeout(dragEndTimer.current);
+          dragEndTimer.current = setTimeout(() => {
+            dragEndTimer.current = null;
             if (!momentum.current) settle(y);
           }, 60);
         }}
         onMomentumScrollBegin={() => {
+          if (dragEndTimer.current) {
+            clearTimeout(dragEndTimer.current);
+            dragEndTimer.current = null;
+          }
           momentum.current = true;
         }}
         onMomentumScrollEnd={(e) => {
+          if (dragEndTimer.current) {
+            clearTimeout(dragEndTimer.current);
+            dragEndTimer.current = null;
+          }
+          if (programmaticTimer.current) {
+            clearTimeout(programmaticTimer.current);
+            programmaticTimer.current = null;
+          }
+          programmaticScroll.current = false;
           momentum.current = false;
           settle(e.nativeEvent.contentOffset.y);
         }}
-      >
-        {data.map((label, i) =>
-          label === null ? (
-            <View key={`pad-${i}`} style={wheelStyles.hit} />
-          ) : (
-            <WheelRow
-              key={`${label}-${i}`}
-              label={String(label)}
-              index={i}
-              scrollY={scrollY}
-              disabled={!!disabledFlags?.[i - PAD_COUNT]}
-              onPress={handlePress}
-              baseColor={baseColor}
-              activeColor={activeColor}
-              disabledColor={disabledColor}
-              flat={flat}
-            />
-          ),
-        )}
-      </Animated.ScrollView>
+      />
     </View>
   );
 });
@@ -529,6 +643,7 @@ export default function DatePickerModal({
   const partsRef = useRef(parts);
   const [hint, setHint] = useState(null);
   const hintTimer = useRef(null);
+  const lastConfirmAt = useRef(0);
 
   const showHint = useCallback((kind) => {
     setHint(kind);
@@ -604,11 +719,68 @@ export default function DatePickerModal({
 
   const yearLabels = useMemo(() => years.map(String), [years]);
 
-  const onSelectDay = useCallback((i) => apply({ d: i + 1 }), [apply]);
-  const onSelectMonth = useCallback((i) => apply({ m: i }), [apply]);
+  // Geçersiz tarihler yalnız pasif çizilmez; FlatList verisinden çıkarıldığı
+  // için momentum o satırı merkeze getiremez. sourceIndex gerçek gün/ay/yıl
+  // değerine dönüşü korur.
+  const dayOptions = useMemo(
+    () => buildEnabledOptions(days, dayDisabled, 0),
+    [days, dayDisabled],
+  );
+  const monthOptions = useMemo(
+    () => buildEnabledOptions(months, monthDisabled, 0),
+    [months, monthDisabled],
+  );
+  const yearOptions = useMemo(
+    () => buildEnabledOptions(yearLabels, yearDisabled, 0),
+    [yearLabels, yearDisabled],
+  );
+  const dayWheelItems = useMemo(
+    () => dayOptions.map((item) => item.label),
+    [dayOptions],
+  );
+  const monthWheelItems = useMemo(
+    () => monthOptions.map((item) => item.label),
+    [monthOptions],
+  );
+  const yearWheelItems = useMemo(
+    () => yearOptions.map((item) => item.label),
+    [yearOptions],
+  );
+
+  const dayWheelIndex = Math.max(
+    0,
+    dayOptions.findIndex((item) => item.sourceIndex === dayIndex),
+  );
+  const monthWheelIndex = Math.max(
+    0,
+    monthOptions.findIndex((item) => item.sourceIndex === monthIndex),
+  );
+  const yearWheelIndex = Math.max(
+    0,
+    yearOptions.findIndex((item) => item.sourceIndex === yearIndex),
+  );
+
+  const onSelectDay = useCallback(
+    (i) => {
+      const sourceIndex = dayOptions[i]?.sourceIndex;
+      if (sourceIndex !== undefined) apply({ d: sourceIndex + 1 });
+    },
+    [apply, dayOptions],
+  );
+  const onSelectMonth = useCallback(
+    (i) => {
+      const sourceIndex = monthOptions[i]?.sourceIndex;
+      if (sourceIndex !== undefined) apply({ m: sourceIndex });
+    },
+    [apply, monthOptions],
+  );
   const onSelectYear = useCallback(
-    (i) => apply({ y: years[i] ?? years[0] }),
-    [apply, years],
+    (i) => {
+      const sourceIndex = yearOptions[i]?.sourceIndex;
+      const year = years[sourceIndex];
+      if (year !== undefined) apply({ y: year });
+    },
+    [apply, yearOptions, years],
   );
 
   // ─── Hızlı seçimler ────────────────────────────────────────────────────────
@@ -638,6 +810,19 @@ export default function DatePickerModal({
     [apply],
   );
 
+  const canPickPrevious = !minIso || selectedIso > minIso;
+  const canPickNext = !maxIso || selectedIso < maxIso;
+  const pickAdjacent = useCallback(
+    (delta) => {
+      const next = shiftIso(partsToIso(partsRef.current), delta);
+      if (!next) return;
+      if ((minIso && next < minIso) || (maxIso && next > maxIso)) return;
+      selectionAsync().catch(() => {});
+      apply(isoToParts(next));
+    },
+    [apply, minIso, maxIso],
+  );
+
   // ─── Hareket tercihleri ────────────────────────────────────────────────────
 
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -660,6 +845,25 @@ export default function DatePickerModal({
 
   // Düşük katman cihazlarda 3B çevirme kapalı: aynı his, daha ucuz transform.
   const flatWheel = reduceMotion || deviceTier === "low";
+  const previewScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (reduceMotion) {
+      previewScale.setValue(1);
+      return undefined;
+    }
+    previewScale.stopAnimation();
+    previewScale.setValue(0.985);
+    const animation = Animated.spring(previewScale, {
+      toValue: 1,
+      damping: 16,
+      stiffness: 260,
+      mass: 0.45,
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [selectedIso, reduceMotion, previewScale]);
 
   // ─── Açılış / kapanış animasyonu ───────────────────────────────────────────
 
@@ -717,6 +921,9 @@ export default function DatePickerModal({
     hint === "min" ? minDateErrorMsg : hint === "max" ? maxDateErrorMsg : "";
 
   const handleConfirm = useCallback(() => {
+    const now = Date.now();
+    if (now - lastConfirmAt.current < 500) return;
+    lastConfirmAt.current = now;
     onConfirm?.(partsToIso(partsRef.current));
   }, [onConfirm]);
 
@@ -757,6 +964,14 @@ export default function DatePickerModal({
 
         {/* Header */}
         <View style={styles.header}>
+          <View
+            style={[
+              styles.headerIcon,
+              { backgroundColor: alpha(theme.accent, 0.13) },
+            ]}
+          >
+            <Ionicons name="calendar-outline" size={20} color={theme.accent} />
+          </View>
           <View style={styles.headerCopy}>
             <Text
               allowFontScaling={false}
@@ -795,38 +1010,77 @@ export default function DatePickerModal({
               },
             ]}
           >
-            <Text
-              allowFontScaling={false}
-              style={[styles.closeGlyph, { color: theme.text.muted }]}
-            >
-              ✕
-            </Text>
+            <Ionicons name="close" size={18} color={theme.text.muted} />
           </Pressable>
         </View>
 
         {/* Seçili tarih önizlemesi */}
-        <View
+        <Animated.View
           style={[
-            styles.previewPill,
+            styles.previewCard,
             {
               backgroundColor: alpha(theme.accent, 0.12),
               borderColor: alpha(theme.accent, 0.32),
+              transform: [{ scale: previewScale }],
             },
           ]}
         >
-          <Text
-            allowFontScaling={false}
-            style={[styles.previewText, { color: theme.accent }]}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={i18nText("autoI18n.onceki_gun", "Önceki gün")}
+            accessibilityState={{ disabled: !canPickPrevious }}
+            disabled={!canPickPrevious}
+            hitSlop={6}
+            onPress={() => pickAdjacent(-1)}
+            style={({ pressed }) => [
+              styles.dayStepButton,
+              {
+                backgroundColor: alpha(theme.accent, pressed ? 0.2 : 0.1),
+                opacity: canPickPrevious ? 1 : 0.35,
+              },
+            ]}
           >
-            {previewText}
-          </Text>
-          <Text
-            allowFontScaling={false}
-            style={[styles.previewWeekday, { color: alpha(theme.accent, 0.75) }]}
+            <Ionicons name="chevron-back" size={17} color={theme.accent} />
+          </Pressable>
+          <View
+            style={styles.previewCopy}
+            accessibilityLabel={`${previewText}, ${previewWeekday}`}
           >
-            {previewWeekday}
-          </Text>
-        </View>
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[styles.previewText, { color: theme.accent }]}
+            >
+              {previewText}
+            </Text>
+            <Text
+              allowFontScaling={false}
+              style={[
+                styles.previewWeekday,
+                { color: alpha(theme.accent, 0.75) },
+              ]}
+            >
+              {previewWeekday}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={i18nText("autoI18n.sonraki_gun", "Sonraki gün")}
+            accessibilityState={{ disabled: !canPickNext }}
+            disabled={!canPickNext}
+            hitSlop={6}
+            onPress={() => pickAdjacent(1)}
+            style={({ pressed }) => [
+              styles.dayStepButton,
+              {
+                backgroundColor: alpha(theme.accent, pressed ? 0.2 : 0.1),
+                opacity: canPickNext ? 1 : 0.35,
+              },
+            ]}
+          >
+            <Ionicons name="chevron-forward" size={17} color={theme.accent} />
+          </Pressable>
+        </Animated.View>
 
         {/* Hızlı seçimler */}
         {quickItems.length > 0 && (
@@ -872,13 +1126,41 @@ export default function DatePickerModal({
             { backgroundColor: theme.between, borderColor: theme.border },
           ]}
         >
+          <View style={styles.columnLabels} pointerEvents="none">
+            <Text
+              allowFontScaling={false}
+              style={[styles.columnLabel, { color: theme.text.muted }]}
+            >
+              {i18nText("autoI18n.gun", "Gün")}
+            </Text>
+            <Text
+              allowFontScaling={false}
+              style={[
+                styles.columnLabel,
+                styles.monthColumnLabel,
+                { color: theme.text.muted },
+              ]}
+            >
+              {i18nText("autoI18n.ay", "Ay")}
+            </Text>
+            <Text
+              allowFontScaling={false}
+              style={[
+                styles.columnLabel,
+                styles.yearColumnLabel,
+                { color: theme.text.muted },
+              ]}
+            >
+              {i18nText("autoI18n.yil_kucuk", "Yıl")}
+            </Text>
+          </View>
           {/* Seçili satır bandı */}
           <View
             pointerEvents="none"
             style={[
               styles.highlight,
               {
-                top: WHEEL_PAD + PAD_COUNT * ITEM_H,
+                top: WHEEL_PAD + COLUMN_LABEL_H + PAD_COUNT * ITEM_H,
                 backgroundColor: alpha(theme.accent, 0.1),
                 borderColor: alpha(theme.accent, 0.34),
               },
@@ -887,9 +1169,8 @@ export default function DatePickerModal({
 
           <View style={styles.columnsRow}>
             <WheelColumn
-              items={days}
-              disabledFlags={dayDisabled}
-              selectedIndex={dayIndex}
+              items={dayWheelItems}
+              selectedIndex={dayWheelIndex}
               onSelect={onSelectDay}
               flexBasis={1}
               baseColor={theme.text.muted}
@@ -899,9 +1180,8 @@ export default function DatePickerModal({
               accessibilityLabel={i18nText("autoI18n.gun_seciniz", "Gün seçiniz")}
             />
             <WheelColumn
-              items={months}
-              disabledFlags={monthDisabled}
-              selectedIndex={monthIndex}
+              items={monthWheelItems}
+              selectedIndex={monthWheelIndex}
               onSelect={onSelectMonth}
               flexBasis={1.9}
               baseColor={theme.text.muted}
@@ -911,9 +1191,8 @@ export default function DatePickerModal({
               accessibilityLabel={i18nText("autoI18n.ay", "Ay")}
             />
             <WheelColumn
-              items={yearLabels}
-              disabledFlags={yearDisabled}
-              selectedIndex={yearIndex}
+              items={yearWheelItems}
+              selectedIndex={yearWheelIndex}
               onSelect={onSelectYear}
               flexBasis={1.3}
               baseColor={theme.text.muted}
@@ -994,6 +1273,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   headerCopy: { flex: 1, minWidth: 0 },
+  headerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   title: {
     fontSize: 17,
     fontWeight: "800",
@@ -1011,20 +1297,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  closeGlyph: { fontSize: 15, fontWeight: "700", lineHeight: 18 },
-  previewPill: {
+  previewCard: {
     alignSelf: "center",
+    width: "auto",
+    minWidth: 250,
+    maxWidth: "92%",
     flexDirection: "row",
-    alignItems: "baseline",
-    gap: 7,
+    alignItems: "center",
+    gap: 10,
     marginTop: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 16,
     borderWidth: 1,
   },
+  dayStepButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  previewCopy: { flex: 1, minWidth: 0, alignItems: "center" },
   previewText: { fontSize: 14.5, fontWeight: "800", letterSpacing: -0.2 },
-  previewWeekday: { fontSize: 11.5, fontWeight: "600" },
+  previewWeekday: { fontSize: 11.5, fontWeight: "600", marginTop: 1 },
   quickRow: {
     flexDirection: "row",
     justifyContent: "center",
@@ -1047,6 +1343,22 @@ const styles = StyleSheet.create({
     padding: WHEEL_PAD,
     overflow: "hidden",
   },
+  columnLabels: {
+    height: COLUMN_LABEL_H,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 2,
+  },
+  columnLabel: {
+    flex: 1,
+    fontSize: 9.5,
+    fontWeight: "800",
+    letterSpacing: 0.7,
+    textAlign: "center",
+    textTransform: "uppercase",
+  },
+  monthColumnLabel: { flex: 1.9 },
+  yearColumnLabel: { flex: 1.3 },
   highlight: {
     position: "absolute",
     left: 10,
@@ -1063,7 +1375,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    height: WHEEL_PAD + PAD_COUNT * ITEM_H - 4,
+    height: WHEEL_PAD + COLUMN_LABEL_H + PAD_COUNT * ITEM_H - 4,
   },
   confirmBtn: {
     marginHorizontal: 16,

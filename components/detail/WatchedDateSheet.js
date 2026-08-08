@@ -1,19 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Modal,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import DatePickerModal, { normalizeDate } from "../modals/DatePickerModal";
+import BottomSheetModal from "../common/BottomSheetModal";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
+import { selectionAsync } from "../../services/hapticsService";
 
 const todayIso = () => normalizeDate(new Date());
 
@@ -41,6 +41,7 @@ export default function WatchedDateSheet({
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const submitLock = useRef(false);
+  const resetTimer = useRef(null);
 
   const today = todayIso();
   const releaseIso = normalizeDate(releaseDate);
@@ -51,10 +52,22 @@ export default function WatchedDateSheet({
 
   useEffect(() => {
     if (visible) return;
-    setSelectedDate(null);
     setDatePickerVisibility(false);
-    setSubmitting(false);
-    submitLock.current = false;
+    // BottomSheetModal kapanış animasyonu sırasında son seçim görünür kalsın.
+    // Temizlik panel ekrandan çıktıktan sonra yapılır; hızlı yeniden açılışta
+    // eski zamanlayıcı iptal edilir.
+    resetTimer.current = setTimeout(() => {
+      setSelectedDate(null);
+      setSubmitting(false);
+      submitLock.current = false;
+      resetTimer.current = null;
+    }, 300);
+    return () => {
+      if (resetTimer.current) {
+        clearTimeout(resetTimer.current);
+        resetTimer.current = null;
+      }
+    };
   }, [visible]);
 
   const formatter = useMemo(
@@ -74,7 +87,10 @@ export default function WatchedDateSheet({
 
   const selectDate = (date) => {
     if (isBusy || !date) return;
-    setSelectedDate(normalizeDate(date));
+    const next = normalizeDate(date);
+    if (!next || next === selectedDate) return;
+    setSelectedDate(next);
+    selectionAsync().catch(() => {});
   };
 
   const handlePickerConfirm = (date) => {
@@ -104,208 +120,208 @@ export default function WatchedDateSheet({
   };
 
   return (
-    <>
-      <Modal
-        visible={visible}
-        onRequestClose={closeSheet}
-        animationType="slide"
-        transparent
-        statusBarTranslucent
-      >
-        <View style={styles.modalWrap}>
-          <LinearGradient
-            colors={["rgba(0,0,0,0.08)", "rgba(0,0,0,0.82)"]}
-            style={StyleSheet.absoluteFill}
-          />
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            disabled={isBusy}
-            onPress={closeSheet}
-          />
+    <BottomSheetModal
+      visible={visible}
+      onClose={closeSheet}
+      intensity={38}
+      dimColor="rgba(0,0,0,0.42)"
+      dismissOnBackdropPress={!isBusy}
+      liftWithKeyboard={false}
+      sheetStyle={[
+        styles.sheet,
+        { backgroundColor: theme.secondary, borderColor: theme.border },
+      ]}
+    >
+      <View style={[styles.handle, { backgroundColor: theme.border }]} />
 
-          <View
-            style={[
-              styles.sheet,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
-            ]}
-          >
-            <View style={[styles.handle, { backgroundColor: theme.border }]} />
-
-            <View style={styles.header}>
-              <View
-                style={[
-                  styles.headerIcon,
-                  { backgroundColor: alpha(theme.accent, 0.14) },
-                ]}
-              >
-                <Ionicons name="checkmark-done" size={21} color={theme.accent} />
-              </View>
-              <View style={styles.headerText}>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.title, { color: theme.text.primary }]}
-                >
-                  {i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}
-                </Text>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.subtitle, { color: theme.text.muted }]}
-                >
-                  {subtitle}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={[styles.closeButton, { backgroundColor: theme.between }]}
-                disabled={isBusy}
-                onPress={closeSheet}
-              >
-                <Ionicons name="close" size={18} color={theme.text.muted} />
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              disabled={!hasValidRange || isBusy}
-              onPress={() => setDatePickerVisibility(true)}
-              style={[
-                styles.customDate,
-                {
-                  backgroundColor: selectedDate
-                    ? alpha(theme.accent, 0.12)
-                    : theme.between,
-                  borderColor: selectedDate ? theme.accent : theme.border,
-                  opacity: hasValidRange ? 1 : 0.55,
-                },
-              ]}
-            >
-              <View style={[styles.optionIcon, { backgroundColor: alpha(theme.accent, 0.16) }]}>
-                <Ionicons name="calendar-outline" size={21} color={theme.accent} />
-              </View>
-              <View style={styles.optionText}>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.optionTitle, { color: theme.text.primary }]}
-                >
-                  {selectedDate
-                    ? formatDate(selectedDate)
-                    : i18nText("autoI18n.tarih_sec", "Tarih Seç")}
-                </Text>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.optionSubtitle, { color: theme.text.muted }]}
-                >
-                  {hasValidRange
-                    ? i18nText(
-                        "autoI18n.takvimden_izleme_tarihi_sec",
-                        "Takvimden izleme tarihini belirle",
-                      )
-                    : i18nText(
-                        "autoI18n.henuz_yayinlanmadi",
-                        "Bu içerik henüz yayınlanmadı",
-                      )}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={19} color={theme.text.muted} />
-            </TouchableOpacity>
-
-            <View style={styles.quickRow}>
-              <QuickDateOption
-                icon="time-outline"
-                title={i18nText("autoI18n.bugun", "Bugün")}
-                subtitle={formatDate(today)}
-                selected={selectedDate === today}
-                disabled={!hasValidRange || isBusy}
-                onPress={() => selectDate(today)}
-              />
-              <QuickDateOption
-                icon={mediaType === "tv" ? "tv-outline" : "film-outline"}
-                title={i18nText("autoI18n.yayin_tarihi", "Yayın Tarihi")}
-                subtitle={
-                  canUseReleaseDate
-                    ? formatDate(releaseIso)
-                    : i18nText("autoI18n.kullanilamaz", "Kullanılamaz")
-                }
-                selected={selectedDate === releaseIso}
-                disabled={!canUseReleaseDate || isBusy}
-                onPress={() => selectDate(releaseIso)}
-              />
-            </View>
-
-            <View
-              style={[
-                styles.selectionSummary,
-                { backgroundColor: theme.primary, borderColor: theme.border },
-              ]}
-            >
-              <Ionicons
-                name={selectedDate ? "checkmark-circle" : "information-circle-outline"}
-                size={19}
-                color={selectedDate ? theme.accent : theme.text.muted}
-              />
-              <Text
-                allowFontScaling={false}
-                numberOfLines={2}
-                style={[
-                  styles.selectionText,
-                  { color: selectedDate ? theme.text.primary : theme.text.muted },
-                ]}
-              >
-                {selectedDate
-                  ? i18nText(
-                      "autoI18n.secilen_izleme_tarihi",
-                      "Seçilen tarih: {{date}}",
-                      { date: formatDate(selectedDate) },
-                    )
-                  : i18nText(
-                      "autoI18n.kaydetmeden_once_tarih_sec",
-                      "Kaydetmeden önce bir izleme tarihi seçin",
-                    )}
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              activeOpacity={0.82}
-              disabled={!selectedDate || isBusy}
-              onPress={handleSubmit}
-              style={[
-                styles.confirmButton,
-                {
-                  backgroundColor:
-                    selectedDate && !isBusy ? theme.accent : theme.border,
-                },
-              ]}
-            >
-              {isBusy ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Ionicons name="checkmark-done" size={20} color="#FFFFFF" />
-              )}
-              <Text allowFontScaling={false} style={styles.confirmText}>
-                {isBusy
-                  ? i18nText("autoI18n.kaydediliyor", "Kaydediliyor...")
-                  : i18nText(
-                      "autoI18n.izlendi_olarak_isaretle",
-                      "İzlendi olarak işaretle",
-                    )}
-              </Text>
-            </TouchableOpacity>
-
-            <DatePickerModal
-              visible={isDatePickerVisible}
-              value={selectedDate || today}
-              onConfirm={handlePickerConfirm}
-              onClose={() => setDatePickerVisibility(false)}
-              title={i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}
-              subtitle={pickerSubtitle}
-              confirmLabel={i18nText("autoI18n.tarihi_onayla", "Tarihi Onayla")}
-              minDate={minIso || undefined}
-              maxDate={today}
-            />
-          </View>
+      <View style={styles.header}>
+        <View
+          style={[
+            styles.headerIcon,
+            { backgroundColor: alpha(theme.accent, 0.14) },
+          ]}
+        >
+          <Ionicons name="checkmark-done" size={21} color={theme.accent} />
         </View>
-      </Modal>
-    </>
+        <View style={styles.headerText}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.title, { color: theme.text.primary }]}
+          >
+            {i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}
+          </Text>
+          {!!subtitle && (
+            <Text
+              allowFontScaling={false}
+              numberOfLines={2}
+              style={[styles.subtitle, { color: theme.text.muted }]}
+            >
+              {subtitle}
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
+          style={[styles.closeButton, { backgroundColor: theme.between }]}
+          disabled={isBusy}
+          onPress={closeSheet}
+        >
+          <Ionicons name="close" size={18} color={theme.text.muted} />
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityState={{
+          selected: !!selectedDate,
+          disabled: !hasValidRange || isBusy,
+        }}
+        activeOpacity={0.8}
+        disabled={!hasValidRange || isBusy}
+        onPress={() => setDatePickerVisibility(true)}
+        style={[
+          styles.customDate,
+          {
+            backgroundColor: selectedDate
+              ? alpha(theme.accent, 0.12)
+              : theme.between,
+            borderColor: selectedDate ? theme.accent : theme.border,
+            opacity: hasValidRange ? 1 : 0.55,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.optionIcon,
+            { backgroundColor: alpha(theme.accent, 0.16) },
+          ]}
+        >
+          <Ionicons name="calendar-outline" size={21} color={theme.accent} />
+        </View>
+        <View style={styles.optionText}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.optionTitle, { color: theme.text.primary }]}
+          >
+            {selectedDate
+              ? formatDate(selectedDate)
+              : i18nText("autoI18n.tarih_sec", "Tarih Seç")}
+          </Text>
+          <Text
+            allowFontScaling={false}
+            style={[styles.optionSubtitle, { color: theme.text.muted }]}
+          >
+            {hasValidRange
+              ? i18nText(
+                  "autoI18n.takvimden_izleme_tarihi_sec",
+                  "Takvimden izleme tarihini belirle",
+                )
+              : i18nText(
+                  "autoI18n.henuz_yayinlanmadi",
+                  "Bu içerik henüz yayınlanmadı",
+                )}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={19} color={theme.text.muted} />
+      </TouchableOpacity>
+
+      <View style={styles.quickRow}>
+        <QuickDateOption
+          icon="time-outline"
+          title={i18nText("autoI18n.bugun", "Bugün")}
+          subtitle={formatDate(today)}
+          selected={selectedDate === today}
+          disabled={!hasValidRange || isBusy}
+          onPress={() => selectDate(today)}
+        />
+        <QuickDateOption
+          icon={mediaType === "tv" ? "tv-outline" : "film-outline"}
+          title={i18nText("autoI18n.yayin_tarihi", "Yayın Tarihi")}
+          subtitle={
+            canUseReleaseDate
+              ? formatDate(releaseIso)
+              : i18nText("autoI18n.kullanilamaz", "Kullanılamaz")
+          }
+          selected={selectedDate === releaseIso}
+          disabled={!canUseReleaseDate || isBusy}
+          onPress={() => selectDate(releaseIso)}
+        />
+      </View>
+
+      <View
+        style={[
+          styles.selectionSummary,
+          { backgroundColor: theme.primary, borderColor: theme.border },
+        ]}
+      >
+        <Ionicons
+          name={selectedDate ? "checkmark-circle" : "information-circle-outline"}
+          size={19}
+          color={selectedDate ? theme.accent : theme.text.muted}
+        />
+        <Text
+          allowFontScaling={false}
+          numberOfLines={2}
+          style={[
+            styles.selectionText,
+            { color: selectedDate ? theme.text.primary : theme.text.muted },
+          ]}
+        >
+          {selectedDate
+            ? i18nText(
+                "autoI18n.secilen_izleme_tarihi",
+                "Seçilen tarih: {{date}}",
+                { date: formatDate(selectedDate) },
+              )
+            : i18nText(
+                "autoI18n.kaydetmeden_once_tarih_sec",
+                "Kaydetmeden önce bir izleme tarihi seçin",
+              )}
+        </Text>
+      </View>
+
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !selectedDate || isBusy, busy: isBusy }}
+        activeOpacity={0.82}
+        disabled={!selectedDate || isBusy}
+        onPress={handleSubmit}
+        style={[
+          styles.confirmButton,
+          {
+            backgroundColor:
+              selectedDate && !isBusy ? theme.accent : theme.border,
+          },
+        ]}
+      >
+        {isBusy ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <Ionicons name="checkmark-done" size={20} color="#FFFFFF" />
+        )}
+        <Text allowFontScaling={false} style={styles.confirmText}>
+          {isBusy
+            ? i18nText("autoI18n.kaydediliyor", "Kaydediliyor...")
+            : i18nText(
+                "autoI18n.izlendi_olarak_isaretle",
+                "İzlendi olarak işaretle",
+              )}
+        </Text>
+      </TouchableOpacity>
+
+      <DatePickerModal
+        visible={isDatePickerVisible}
+        value={selectedDate || today}
+        onConfirm={handlePickerConfirm}
+        onClose={() => setDatePickerVisibility(false)}
+        title={i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}
+        subtitle={pickerSubtitle}
+        confirmLabel={i18nText("autoI18n.tarihi_onayla", "Tarihi Onayla")}
+        minDate={minIso || undefined}
+        maxDate={today}
+      />
+    </BottomSheetModal>
   );
 }
 
@@ -320,6 +336,8 @@ function QuickDateOption({
   const { theme } = useTheme();
   return (
     <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityState={{ selected, disabled }}
       activeOpacity={0.82}
       disabled={disabled}
       onPress={onPress}
@@ -362,7 +380,6 @@ function QuickDateOption({
 }
 
 const styles = StyleSheet.create({
-  modalWrap: { flex: 1, justifyContent: "flex-end" },
   sheet: {
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
