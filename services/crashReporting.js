@@ -29,6 +29,7 @@ const DSN =
 let sentry = null;      // yüklenmiş modül
 let resolved = false;   // yükleme denendi mi
 let initialized = false;
+let navigationIntegration = null; // ekran geçiş izleme (React Navigation)
 
 function loadSentry() {
   if (resolved) return sentry;
@@ -65,13 +66,26 @@ export function initCrashReporting() {
   if (!Sentry?.init) return false;
 
   try {
+    // Ekran geçişlerini transaction'a çevirir; App.js, NavigationContainer
+    // hazır olunca registerNavigationContainer ile container'ı kaydeder.
+    // TTID: ekrana ilk kare çizim süresi (lazy getComponent maliyeti dahil).
+    navigationIntegration = Sentry.reactNavigationIntegration
+      ? Sentry.reactNavigationIntegration({ enableTimeToInitialDisplay: true })
+      : null;
+
     Sentry.init({
       dsn: DSN,
       // Geliştirmede kendi hatalarımızı üretim panosuna karıştırmayalım.
       environment: __DEV__ ? "development" : "production",
       enabled: !__DEV__ || process.env.EXPO_PUBLIC_SENTRY_DEV === "1",
-      // Performans izleme yayın sonrası açılacak; şimdilik yalnız crash/hata.
-      tracesSampleRate: 0,
+      // Performans izleme: uygulama açılışı (app start), yavaş/donmuş kare ve
+      // ekran geçiş süreleri. %15 örnekleme dağılımı görmeye yetiyor, kotayı
+      // yakmıyor — açılış iyileştirmelerinin gerçek cihaz etkisi buradan
+      // (Sentry > Insights > Mobile Vitals) izlenir. Ölçülen süreler PII değil;
+      // sendDefaultPii kararı aynen geçerli.
+      tracesSampleRate: 0.15,
+      // Dizi biçimi varsayılan entegrasyonlara EKLER (değiştirmez).
+      integrations: navigationIntegration ? [navigationIntegration] : [],
       // Kişisel veri gönderme (IP, kullanıcı adı vb.) — KVKK/GDPR beyanını
       // dar tutmak için kapalı. Kullanıcıyı yalnız uid ile etiketliyoruz.
       sendDefaultPii: false,
@@ -129,6 +143,18 @@ export function wrapRoot(Component) {
   } catch {
     return Component;
   }
+}
+
+/**
+ * NavigationContainer hazır olunca çağrılır (App.js onReady). Ekran geçiş
+ * transaction'ları ancak container kaydedilince akmaya başlar; Sentry
+ * kapalıysa/yüklenemediyse sessiz no-op.
+ */
+export function registerNavigationContainer(ref) {
+  if (!initialized) return;
+  try {
+    navigationIntegration?.registerNavigationContainer?.(ref);
+  } catch {}
 }
 
 export function isCrashReportingActive() {
