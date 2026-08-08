@@ -37,9 +37,18 @@ import ScreenSnow from "../../components/ScreenSnow";
 // ─── Izgara Boyutları ─────────────────────────────────────────────────────────
 // default: mevcut boyutlar; compact: panel sağ üstündeki düğmeyle açılan
 // küçük görünüm. Hücre, yazı ve etiket konumları birlikte ölçeklenir —
-// yapı bozulmadan küçülür. Sütun genişliği = cell + 2×2 yatay margin.
+// yapı bozulmadan küçülür. Sütun genişliği = cell + 2×margin.
+//
+// BOŞLUK ORANA BAĞLI: `margin` sabit 2 dp yazılıydı, yani kompakt görünümde
+// kareler %28 küçülürken aralarındaki boşluk aynı kalıyor ve ızgara
+// seyrekleşmiş görünüyordu. Artık boşluk da hücreyle aynı oranda küçülür —
+// görünüm yalnızca ÖLÇEKLENİR.
+const GAP_RATIO = 2 / 50;
+const withGap = (size) =>
+  Object.freeze({ ...size, margin: +(size.cell * GAP_RATIO).toFixed(2) });
+
 const GRID_SIZES = {
-  default: {
+  default: withGap({
     cell: 50,
     radius: 8,
     rating: 14,
@@ -47,8 +56,8 @@ const GRID_SIZES = {
     labelOffset: 3,
     headerFont: 10,
     dot: 24,
-  },
-  compact: {
+  }),
+  compact: withGap({
     cell: 36,
     radius: 6,
     rating: 11,
@@ -56,7 +65,7 @@ const GRID_SIZES = {
     labelOffset: 2,
     headerFont: 9,
     dot: 18,
-  },
+  }),
 };
 
 // ─── Bölüm Hücresi (Memoize) ──────────────────────────────────────────────────
@@ -91,6 +100,8 @@ const EpisodeCell = React.memo(
           {
             width: grid.cell,
             height: grid.cell,
+            marginVertical: grid.margin,
+            marginHorizontal: grid.margin,
             borderRadius: grid.radius,
             backgroundColor: bg,
             borderWidth: 1.5,
@@ -204,7 +215,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
   // Kompakt ızgara — varsayılan mevcut boyutlar; düğmeyle küçük görünüme geçilir.
   const [compactGrid, setCompactGrid] = useState(false);
   const grid = compactGrid ? GRID_SIZES.compact : GRID_SIZES.default;
-  const colWidth = grid.cell + 4; // hücre + 2×2 yatay margin
+  const colWidth = grid.cell + grid.margin * 2; // hücre + iki yandaki boşluk
 
   const { t, language } = useLanguage();
   const { theme } = useTheme();
@@ -608,7 +619,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
         >
           <View style={{ minWidth: tvShows.length * colWidth }}>
             {/* Sezon Başlık Satırı */}
-            <View style={[styles.row, { marginBottom: 4 }]}>
+            <View style={[styles.row, { marginBottom: grid.margin * 2 }]}>
               {tvShows.map((season) => (
                 <View
                   key={season.season_number}
@@ -649,7 +660,12 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                       key={season.season_number}
                       style={[
                         styles.emptyCell,
-                        { width: grid.cell, height: grid.cell },
+                        {
+                          width: grid.cell,
+                          height: grid.cell,
+                          marginVertical: grid.margin,
+                          marginHorizontal: grid.margin,
+                        },
                       ]}
                     >
                       <Text
@@ -839,6 +855,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.5,
   },
+  // Buradaki ölçüler YALNIZ SkeletonLoading için geçerli (default boyutlar);
+  // gerçek ızgarada hepsi `grid`ten gelen satır içi stille eziliyor.
   cell: {
     width: 50,
     height: 50,
