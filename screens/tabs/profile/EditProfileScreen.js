@@ -163,7 +163,11 @@ export default function EditProfileScreen({ navigation }) {
       const patch = {};
       if (dn !== (profile?.displayName || "")) patch.displayName = dn;
       if (bo !== (profile?.bio || "")) patch.bio = bo;
-      const birthChanged = !!birthDate && birthDate !== (profile?.birthDate || null);
+      // Kayıtlı tarihi DEĞİŞTİRMEYE çalışma: kural reddeder ve tüm patch
+      // (isim/bio dahil) tek yazımda düşerdi. Alan zaten salt-okunur; bu
+      // kontrol bayat yerel duruma karşı ikinci kapı.
+      const birthChanged =
+        !profile?.birthDate && !!birthDate && birthDate !== (profile?.birthDate || null);
       if (birthChanged) patch.birthDate = birthDate;
       if (Object.keys(patch).length) await updateField(patch);
 
@@ -302,6 +306,8 @@ export default function EditProfileScreen({ navigation }) {
   };
   const hint = usernameHint();
   const birthAge = calculateAge(birthDate);
+  // Kayıtlı tarih varsa alan kilitli — kural ikinci yazımı zaten reddediyor.
+  const birthLocked = !!profile?.birthDate;
 
   if (loading && !profile) {
     return (
@@ -484,7 +490,9 @@ export default function EditProfileScreen({ navigation }) {
               )}
             </View>
 
-            {/* Doğum tarihi — yetişkin içerik ayarının kapısı buna bakıyor */}
+            {/* Doğum tarihi — yetişkin içerik ayarının kapısı buna bakıyor.
+                Kaydedilmişse salt-okunur: kural da tek yazıma izin veriyor
+                (firestore.rules → birthDateKept). */}
             <View style={styles.field}>
               <Text style={[styles.label, { color: theme.text.secondary }]}>
                 {i18nText("autoI18n.dogum_tarihi", "Doğum tarihi")}
@@ -496,22 +504,28 @@ export default function EditProfileScreen({ navigation }) {
                 accent={theme.accent}
                 fieldSurface={theme.secondary}
                 showHint={false}
+                disabled={birthLocked}
               />
               <Text style={[styles.hint, { color: theme.text.muted }]}>
-                {birthAge === null
+                {birthLocked
                   ? i18nText(
-                      "autoI18n.dogum_tarihi_profil_alt",
-                      "Profilinde gösterilmez; yalnızca yetişkin içerik ayarı için kullanılır.",
+                      "autoI18n.dogum_tarihi_kilitli",
+                      "Doğum tarihi bir kez kaydedilir. Yanlışsa Ayarlar → Uygulama Hakkında'dan destekle iletişime geç.",
                     )
-                  : birthAge < MIN_ADULT_AGE
+                  : birthAge === null
                     ? i18nText(
-                        "autoI18n.yas_alti_yetiskin_kapali",
-                        "{{age}} yaşındasın — yetişkin içerik kapalı kalacak.",
-                        { age: birthAge },
+                        "autoI18n.dogum_tarihi_profil_alt",
+                        "Profilinde gösterilmez; yalnızca yetişkin içerik ayarı için kullanılır.",
                       )
-                    : i18nText("autoI18n.yas_bilgisi", "{{age}} yaşındasın.", {
-                        age: birthAge,
-                      })}
+                    : birthAge < MIN_ADULT_AGE
+                      ? i18nText(
+                          "autoI18n.yas_alti_yetiskin_kapali",
+                          "{{age}} yaşındasın — yetişkin içerik kapalı kalacak.",
+                          { age: birthAge },
+                        )
+                      : i18nText("autoI18n.yas_bilgisi", "{{age}} yaşındasın.", {
+                          age: birthAge,
+                        })}
               </Text>
             </View>
 

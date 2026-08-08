@@ -51,6 +51,13 @@ export default function BirthDateField({
   fieldSurface,
   /** Alanın kendi başlığı ekranda ayrıca yazılıyorsa ipucu satırı gizlenebilir. */
   showHint = true,
+  /**
+   * Salt-okunur mod: tarih görünür ama seçici açılmaz. Profil düzenlemede
+   * kullanılıyor — doğum tarihi Firestore kuralında bir kez yazılabiliyor
+   * (bkz. firestore.rules → birthDateKept), açılabilir bir seçici göstermek
+   * kullanıcıyı baştan reddedilecek bir kayda sürüklerdi.
+   */
+  disabled = false,
 }) {
   const { language } = useLanguage();
   const isEn = language === "en";
@@ -81,24 +88,27 @@ export default function BirthDateField({
     <View style={styles.wrap}>
       <Pressable
         accessibilityRole="button"
+        accessibilityState={{ disabled }}
         accessibilityLabel={
           secili
             ? `${i18nText("autoI18n.dogum_tarihi", "Doğum tarihi")}: ${etiket}`
             : i18nText("autoI18n.dogum_tarihini_sec", "Doğum tarihini seç")
         }
+        disabled={disabled}
         onPress={() => setAcik(true)}
         style={({ pressed }) => [
           styles.shell,
           {
-            backgroundColor: pressed ? alpha(accent, 0.08) : fieldSurface,
-            borderColor: secili ? alpha(accent, 0.55) : theme.border,
+            backgroundColor: pressed && !disabled ? alpha(accent, 0.08) : fieldSurface,
+            borderColor: secili && !disabled ? alpha(accent, 0.55) : theme.border,
           },
+          disabled && styles.shellDisabled,
         ]}
       >
         <Ionicons
-          name="calendar-outline"
+          name={disabled ? "lock-closed-outline" : "calendar-outline"}
           size={18}
-          color={secili ? accent : theme.text.muted}
+          color={secili && !disabled ? accent : theme.text.muted}
         />
         <Text
           allowFontScaling={false}
@@ -110,7 +120,10 @@ export default function BirthDateField({
         >
           {etiket || i18nText("autoI18n.dogum_tarihi", "Doğum tarihi")}
         </Text>
-        <Ionicons name="chevron-down" size={16} color={theme.text.muted} />
+        {/* Kilitliyken ok yok: dokunulabilir izlenimi vermesin. */}
+        {!disabled && (
+          <Ionicons name="chevron-down" size={16} color={theme.text.muted} />
+        )}
       </Pressable>
 
       {showHint && (
@@ -162,6 +175,7 @@ export default function BirthDateField({
 
 const styles = StyleSheet.create({
   wrap: { gap: 6 },
+  shellDisabled: { opacity: 0.7 },
   shell: {
     minHeight: 52,
     borderWidth: 1,

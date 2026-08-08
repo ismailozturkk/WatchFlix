@@ -171,6 +171,19 @@ service cloud.firestore {
     }
 
     // ─── Kullanıcı profili ──────────────────────────────────────────────
+    // Doğum tarihi BİR KEZ yazılır. Yetişkin içerik kapısı (utils/ageGate.js)
+    // yaşı bu alandan türettiği için, 18 altı çıkan kullanıcı tarihi
+    // düzeltip kapıyı açamamalı. Alanı hiç olmayan (bu özellikten önceki)
+    // hesaplar bir kez yazabilir; alanı SİLMEK de değişiklik sayılır.
+    // Profil ekranındaki alan da dolu geldiğinde salt-okunur
+    // (screens/tabs/profile/EditProfileScreen.js).
+    // Her iki taraf da .get() ile okunuyor: alan yokken `resource.data.birthDate`
+    // değerlendirme HATASI fırlatıyor ve hata, kuralın geri kalanını da
+    // düşürebiliyor (hata = red). Varsayılanlı okuma temiz `false` üretir.
+    function birthDateKept() {
+      return !('birthDate' in resource.data)
+          || request.resource.data.get('birthDate', '') == resource.data.get('birthDate', '');
+    }
     match /Users/{uid} {
       allow read: if isSignedIn();
       // RevenueCat entitlement alanını yalnız Admin SDK webhook'u yazar.
@@ -184,7 +197,8 @@ service cloud.firestore {
       // (troll'ün sayaç şişirmesi) kural düzeyinde engellenir.
       allow update: if (isOwner(uid)
                         && !request.resource.data.diff(resource.data)
-                          .affectedKeys().hasAny(['entitlements']))
+                          .affectedKeys().hasAny(['entitlements'])
+                        && birthDateKept())
                     || (isSignedIn()
                         && onlyUpdating([
                              'friendsCount','followersCount','followingCount',
@@ -370,9 +384,16 @@ service cloud.firestore {
                .diff(resource.data.get('likedBy', {}))
                .affectedKeys().hasOnly([request.auth.uid]);
     }
+    // Yorumu yazan, dokümandaki userId olmak ZORUNDA. Aksi halde herkes
+    // başkasının adına yorum açabilirdi — üstelik düzenleme/silme kuralları da
+    // bu alana baktığı için sahte yorum kurbanın üstüne kilitlenir, kurban onu
+    // silemezdi. (Posts create'teki authorId kuralının aynısı.)
+    function ownMediaComment() {
+      return request.resource.data.userId == request.auth.uid;
+    }
     match /MovieComment/{movieId}/comments/{commentId} {
       allow read:   if isSignedIn();
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && ownMediaComment();
       allow update: if isSignedIn()
                     && (request.auth.uid == resource.data.userId
                         || mediaCommentCounterOk());
@@ -380,7 +401,7 @@ service cloud.firestore {
     }
     match /MovieComment/{movieId}/comments/{commentId}/replies/{replyId} {
       allow read:   if isSignedIn();
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && ownMediaComment();
       allow update: if isSignedIn()
                     && (request.auth.uid == resource.data.userId
                         || mediaCommentCounterOk());
@@ -390,7 +411,7 @@ service cloud.firestore {
     // ─── Dizi yorumları (film ile birebir aynı yapı) ────────────────────
     match /TvComment/{tvId}/comments/{commentId} {
       allow read:   if isSignedIn();
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && ownMediaComment();
       allow update: if isSignedIn()
                     && (request.auth.uid == resource.data.userId
                         || mediaCommentCounterOk());
@@ -398,7 +419,7 @@ service cloud.firestore {
     }
     match /TvComment/{tvId}/comments/{commentId}/replies/{replyId} {
       allow read:   if isSignedIn();
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && ownMediaComment();
       allow update: if isSignedIn()
                     && (request.auth.uid == resource.data.userId
                         || mediaCommentCounterOk());
@@ -406,13 +427,57 @@ service cloud.firestore {
     }
 
     // ─── Derecelendirmeler (film + dizi, TMDB ile hybrid) ───────────────
-    // Ratings/{mediaKey}  → agregat sayaçlar (count / sum). Tüm signed-in
-    // kullanıcılar transaction içinde günceller; tutarlılık client-side
-    // transaction ile sağlanır (MovieComment beğenisiyle aynı güven modeli).
-    // Ratings/{mediaKey}/userRatings/{uid} → yalnız sahibinin oyu.
+    // Ratings/{mediaKey}  → agregat sayaçlar (count / sum). Tek doküman
+    // olduğu için HERKESE yazılabilir olmak zorunda; kısıt "kim" değil "ne
+    // kadar" tarafında: yazım, kullanıcının KENDİ oyunun aynı yazımdaki
+    // değişimiyle birebir uyuşmalı. services/ratingsService.js iki dokümanı
+    // tek runTransaction içinde yazdığı için kural commit SONRASI durumu
+    // (getAfter) okuyup farkı doğrulayabiliyor. Böylece oy vermeden sayaç
+    // oynatmak ya da sum'ı şişirmek (skor manipülasyonu) mümkün değil.
+    //
+    // TAM EŞİTLİK aranıyor. Agregatı gerçek oylarla uyumsuz kalmış bir
+    // doküman olursa ratingsService'teki Math.max(0, …) kırpması eşitliği
+    // bozar ve o içerik puanlanamaz hâle gelir — çözüm konsoldan o tek
+    // dokümanı onarmak.
+    function myRatingPath(key) {
+      return /databases/$(database)/documents/Ratings/$(key)/userRatings/$(request.auth.uid);
+    }
+    // Kendi oyumun bu yazımdaki değişimi; oy yoksa 0 sayılır.
+    function myRatingDelta(key) {
+      return (existsAfter(myRatingPath(key)) ? getAfter(myRatingPath(key)).data.rating : 0)
+           - (exists(myRatingPath(key)) ? get(myRatingPath(key)).data.rating : 0);
+    }
+    // Oy sayısının değişimi: yeni oy +1, kaldırma -1, oyu değiştirme 0.
+    function myRatingCountDelta(key) {
+      return (existsAfter(myRatingPath(key)) ? 1 : 0)
+           - (exists(myRatingPath(key)) ? 1 : 0);
+    }
     match /Ratings/{mediaKey} {
-      allow read:           if true;
-      allow create, update: if isSignedIn();
+      allow read: if true;
+
+      // İlk oy: doküman yokken açılıyor, dolayısıyla count 1 ve sum verilen oy.
+      // Alanlar .get() ile okunuyor — eksik alan hata değil temiz `false` versin.
+      allow create: if isSignedIn()
+                    && request.resource.data.keys()
+                         .hasOnly(['mediaType', 'mediaId', 'count', 'sum', 'updatedAt'])
+                    && request.resource.data.get('count', 0) == 1
+                    && myRatingCountDelta(mediaKey) == 1
+                    && request.resource.data.get('sum', -1) == myRatingDelta(mediaKey);
+
+      allow update: if isSignedIn()
+                    && onlyUpdating(['mediaType', 'mediaId', 'count', 'sum', 'updatedAt'])
+                    && request.resource.data.get('count', -1) is int
+                    && request.resource.data.get('count', -1) >= 0
+                    && request.resource.data.get('sum', -1) is number
+                    && request.resource.data.get('sum', -1) >= 0
+                    && request.resource.data.get('count', -1) - resource.data.get('count', 0)
+                         == myRatingCountDelta(mediaKey)
+                    && request.resource.data.get('sum', -1) - resource.data.get('sum', 0)
+                         == myRatingDelta(mediaKey);
+
+      // Agregat silme yok: bir kullanıcının silinmesi diğerlerinin oylarını
+      // götürmemeli (hesap silme purge'u removeMyRating ile düşüm yapar).
+      allow delete: if false;
 
       match /userRatings/{uid} {
         allow read:                 if true;
@@ -529,7 +594,44 @@ service cloud.firestore {
       allow write: if isChatMember(chatId);
     }
     match /chats/{chatId}/messages/{msgId} {
-      allow read, write: if isChatMember(chatId);
+      allow read: if isChatMember(chatId);
+      // Mesajı yazan kendi uid'ini koymak ZORUNDA; aksi halde sohbetteki taraf
+      // karşısındakinin ağzından mesaj uydurabilirdi. Grup mesajlarında kural
+      // zaten böyle (groups/{groupId}/messages).
+      allow create: if isChatMember(chatId)
+                    && request.resource.data.senderId == request.auth.uid;
+      // "Yalnız gönderen günceller" DEĞİL: üç meşru güncellemenin ikisi karşı
+      // tarafın dokümanına dokunuyor (bkz. screens/chat/ChatScreen.js).
+      //   • gönderen kendi mesajının metnini düzenler,
+      //   • makbuz: gönderen kendi mesajına "delivered", ALICI "seen" yazar,
+      //   • ankette herkes yalnız KENDİ oy anahtarını değiştirir.
+      // Alan okumaları .get()/`in` ile korunuyor: eksik alan değerlendirme
+      // HATASI fırlatırsa hata kuralın tamamını düşürebiliyor, yani meşru bir
+      // dal hiç denenmeden yazma reddedilebiliyor.
+      allow update: if isChatMember(chatId)
+                    && (
+                      (resource.data.get('senderId', '') == request.auth.uid
+                       && onlyUpdating(['text', 'edited']))
+                      || (resource.data.get('senderId', '') == request.auth.uid
+                          && onlyUpdating(['status', 'deliveredAt'])
+                          && request.resource.data.get('status', '') == 'delivered')
+                      || (resource.data.get('senderId', '') != request.auth.uid
+                          && onlyUpdating(['status'])
+                          && request.resource.data.get('status', '') == 'seen')
+                      || ('poll' in resource.data
+                          && onlyUpdating(['poll'])
+                          && request.resource.data.poll.diff(resource.data.poll)
+                               .affectedKeys().hasOnly(['votes'])
+                          && request.resource.data.poll.get('votes', {})
+                               .diff(resource.data.poll.get('votes', {}))
+                               .affectedKeys().hasOnly([request.auth.uid]))
+                    );
+      // Silme GÖNDERENE değil ÜYEYE bağlı: hesap silme purge'u sohbeti
+      // kapatırken karşı tarafın mesajlarını da temizlemek zorunda
+      // (services/accountService.js), yoksa silinen hesabın sohbetleri asla
+      // boşaltılamaz ve kişisel veri artığı kalır. Sunucu tarafı süpürücü
+      // (yol haritası D7) geldiğinde burası senderId şartına inecek.
+      allow delete: if isChatMember(chatId);
     }
     match /chats/{chatId}/pins/{pinId} {
       allow read: if isChatMember(chatId);

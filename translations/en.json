@@ -2206,7 +2206,8 @@
     "tarihi_sec": "Select Date",
     "yas_bilgisi": "You are {{age}}.",
     "yas_alti_yetiskin_kapali": "You are {{age}} — adult content will stay off.",
-    "dogum_tarihi_neden": "Your date of birth is required for the adult content setting; it is not shown on your profile."
+    "dogum_tarihi_neden": "Your date of birth is required for the adult content setting; it is not shown on your profile.",
+    "dogum_tarihi_kilitli": "Your date of birth is saved once. If it is wrong, contact support from Settings → About the App."
   },
   "comments": "Comments"
 }
