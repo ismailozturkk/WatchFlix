@@ -195,8 +195,13 @@ export async function registerForPushNotificationsAsync(uid) {
       return null;
     }
 
-    const granted = await requestNotificationPermission();
-    if (!granted) return null;
+    // İZİN BURADA İSTENMEZ. Sistem diyaloğu yalnız kullanıcı ön-açıklama
+    // sayfasında "İzin ver" dedikten sonra açılabilir (bkz.
+    // utils/notificationPriming.js) — burası yalnız token kaydı. Eskiden bu
+    // satır requestNotificationPermission() çağırıyordu; çağıran taraf zaten
+    // izni kontrol ettiği için hiç diyalog açmıyordu ama kapı açıktı.
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== "granted") return null;
 
     const projectId = resolveProjectId();
     if (!projectId) {

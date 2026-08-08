@@ -8,6 +8,7 @@ import {
 import Toast from "react-native-toast-message";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
+import { useDeviceNotifications } from "../context/DeviceNotificationsContext";
 import { i18nText } from "../utils/i18nText";
 
 
@@ -32,6 +33,7 @@ export default function Reminder({
 }) {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { primeNotificationPermission } = useDeviceNotifications();
   const [isReminderSet, setIsReminderSet] = useState(false);
   const uid = user?.uid;
 
@@ -166,11 +168,15 @@ export default function Reminder({
         }
       }
 
-      setIsReminderSet(!isReminderSet);
+      const eklendi = !isReminderSet;
+      setIsReminderSet(eklendi);
       Toast.show({
         type:  isReminderSet ? "error" : "success",
         text1: isReminderSet ? i18nText("autoI18n.hatirlatma_kaldirildi", "Hatırlatma kaldırıldı") : i18nText("autoI18n.hatirlatma_basariyla_eklendi", "Hatırlatma başarıyla eklendi"),
       });
+      // Hatırlatma kuruldu ama OS izni yoksa bildirim ASLA düşmez. İzin
+      // sayfasını tam da burada açıyoruz: kullanıcı ne istediğini yeni söyledi.
+      if (eklendi) primeNotificationPermission();
     } catch (error) {
       console.error("Error adding reminder:", error);
       Toast.show({ type: "error", text1: i18nText("autoI18n.hatirlatma_eklenirken_bir_hata_olustu", "Hatırlatma eklenirken bir hata oluştu") });

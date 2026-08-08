@@ -51,6 +51,12 @@ import {
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import useStartupGate from "../hooks/useStartupGate";
+import NotificationPrimingSheet from "../components/notifications/NotificationPrimingSheet";
+import {
+  PRIME_HANDOFF_MS,
+  shouldPrimeNotifications,
+} from "../utils/notificationPriming";
+import { Keys, get, set } from "../services/storage";
 
 // iOS'ta bekleyen local bildirim üst sınırı 64; fazlası sessizce düşer. En
 // yakın tarihli 60'ını zamanlıyoruz (kalan pay foreground sosyal bildirimlere).
@@ -60,6 +66,8 @@ const DeviceNotificationsContext = createContext({
   permissionStatus: "undetermined",
   canAskPermission: true,
   requestPermission: async () => false,
+  needsPermissionPriming: false,
+  primeNotificationPermission: () => false,
 });
 export const useDeviceNotifications = () => useContext(DeviceNotificationsContext);
 
@@ -195,27 +203,63 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
     return granted;
   }, []);
 
-  // ── 1c. İzni bir kez KENDİLİĞİNDEN iste ──────────────────────────────────
-  // Ayarlarda "Tüm bildirimler" varsayılan olarak AÇIK. Eskiden OS izni yalnız
-  // kullanıcı bu anahtarı elle kapatıp tekrar açtığında isteniyordu; hiç
-  // dokunmayan kullanıcıda izin 'denied' kalıyor ve hatırlatmalar HİÇ
-  // zamanlanmıyordu (canSchedule false → tüm reminder_* iptal). Oturum başına
-  // en fazla bir kez sorulur; OS bir daha sormaya izin vermiyorsa hiç sorulmaz.
-  const autoAskedRef = useRef(false);
-  useEffect(() => {
-    if (!startupReady || !uid || autoAskedRef.current) return;
-    if (!settings.enabled) return;
-    if (permission.status === "granted" || !permission.canAskAgain) return;
-    autoAskedRef.current = true;
-    requestPermission();
-  }, [
-    startupReady,
-    uid,
-    settings.enabled,
-    permission.status,
-    permission.canAskAgain,
-    requestPermission,
-  ]);
+  // ── 1c. İzin ön-açıklaması (priming) ─────────────────────────────────────
+  //
+  // Ayarlarda "Tüm bildirimler" varsayılan olarak AÇIK; OS izni yoksa hiçbir
+  // hatırlatma zamanlanmaz (canSchedule false → tüm reminder_* iptal) ve
+  // kullanıcı bunu hiç fark etmez. İzni sormak şart, ama SORULMA ANI kritik:
+  //
+  //   ESKİDEN: açılıştan ~4.2 sn sonra sistem diyaloğu habersiz açılıyordu.
+  //   Kullanıcı neyin sorulduğunu görmeden "İzin verme" diyor, iOS'ta o hak
+  //   ömürlük yanıyordu. App Review'da da yorum konusu.
+  //
+  //   ŞİMDİ: önce KENDİ sayfamız açılıyor ve yalnız kullanıcı "İzin ver"
+  //   dedikten sonra sistem diyaloğu geliyor. Sayfayı çağıran taraf belirliyor
+  //   (ilk hatırlatıcı kurulduğunda) — açılışta değil, anlamlı bağlamda.
+  //
+  // Sayfa TEK SEFERLİK: iki düğme de bayrağı yakıyor. "Şimdi değil" diyen
+  // kullanıcı bir daha rahatsız edilmez, Ayarlar'daki uyarı satırı
+  // (components/NotificationPermissionNotice.js) her zaman açık kapı.
+  const [primeVisible, setPrimeVisible] = useState(false);
+  const [primeShown, setPrimeShown] = useState(
+    () => get(Keys.notificationPrimeShown) === true,
+  );
+
+  const needsPermissionPriming = shouldPrimeNotifications({
+    status: permission.status,
+    canAskAgain: permission.canAskAgain,
+    alreadyPrimed: primeShown,
+    notificationsEnabled: settings.enabled,
+  });
+
+  // Karar çağrı anında okunmalı (kullanıcı arada izin vermiş olabilir), ama
+  // fonksiyon kimliği sabit kalmalı — çağrı yerleri bunu useCallback bağımlılığı
+  // olarak taşıyor.
+  const needsPrimingRef = useRef(needsPermissionPriming);
+  needsPrimingRef.current = needsPermissionPriming;
+
+  /** Ön-açıklama sayfasını açar. Gerek yoksa sessizce hiçbir şey yapmaz. */
+  const primeNotificationPermission = useCallback(() => {
+    if (!needsPrimingRef.current) return false;
+    setPrimeVisible(true);
+    return true;
+  }, []);
+
+  const closePrime = useCallback(() => {
+    set(Keys.notificationPrimeShown, true);
+    setPrimeShown(true);
+    setPrimeVisible(false);
+  }, []);
+
+  const onPrimeAllow = useCallback(() => {
+    closePrime();
+    // Sistem diyaloğunu sayfanın kapanış animasyonu bittikten sonra aç: iOS'ta
+    // kapanmakta olan Modal'ın üstüne gelen native uyarı kaybolabiliyor
+    // (aynı gerekçe MediaQuickActionsSheet'teki HANDOFF_MS'te de var).
+    setTimeout(() => {
+      requestPermission();
+    }, PRIME_HANDOFF_MS);
+  }, [closePrime, requestPermission]);
 
   // ── 2. Push token kaydı (izin verilince) ─────────────────────────────────
   useEffect(() => {
@@ -520,13 +564,28 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
       permissionStatus,
       canAskPermission: permission.canAskAgain,
       requestPermission,
+      needsPermissionPriming,
+      primeNotificationPermission,
     }),
-    [permissionStatus, permission.canAskAgain, requestPermission],
+    [
+      permissionStatus,
+      permission.canAskAgain,
+      requestPermission,
+      needsPermissionPriming,
+      primeNotificationPermission,
+    ],
   );
 
   return (
     <DeviceNotificationsContext.Provider value={value}>
       {children}
+      {/* Sayfa burada, çağrı yerlerinde değil: tek örnek olsun ve hangi ekrandan
+          tetiklenirse tetiklensin aynı yerde çizilsin. */}
+      <NotificationPrimingSheet
+        visible={primeVisible}
+        onAllow={onPrimeAllow}
+        onDismiss={closePrime}
+      />
     </DeviceNotificationsContext.Provider>
   );
 }

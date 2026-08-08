@@ -56,6 +56,7 @@ import { db } from "../../firebase";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
+import { useDeviceNotifications } from "../../context/DeviceNotificationsContext";
 import {
   useApiSettings,
   useImageQualitySettings,
@@ -139,6 +140,8 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
   const { theme } = useTheme();
   const { t, language } = useLanguage();
   const { user } = useAuth();
+  const { needsPermissionPriming, primeNotificationPermission } =
+    useDeviceNotifications();
   const { API_KEY } = useApiSettings();
   const { getTmdbUrl } = useImageQualitySettings();
   const { allLists, statusIndex, watchedMoviesItems } = useListStatusContext();
@@ -781,13 +784,28 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
           ? i18nText("autoI18n.hatirlatma_kaldirildi", "Hatırlatma kaldırıldı")
           : i18nText("autoI18n.hatirlatma_eklendi", "Hatırlatma eklendi"),
       });
+      // Hatırlatma kuruldu ama OS izni yoksa bildirim ASLA düşmez. İzin sayfası
+      // bir alt sayfa; bunu KENDİMİZ KAPANMADAN açmak iç içe modal olurdu — o
+      // yüzden closeThen (diğer alt sayfa geçişlerindeki desenin aynısı).
+      // Sayfayı yalnız gerçekten gösterilecekse kapatıyoruz; aksi hâlde
+      // hatırlatma kurmak sırf bunun için sayfayı kapatan bir düğmeye dönerdi.
+      if (!isReminderSet && needsPermissionPriming) {
+        closeThen(primeNotificationPermission);
+      }
     } catch (error) {
       Toast.show({
         type: "error",
         text1: i18nText("autoI18n.hata_2", "Hata: ") + (error?.message || ""),
       });
     }
-  }, [user?.uid, details, isReminderSet]);
+  }, [
+    user?.uid,
+    details,
+    isReminderSet,
+    needsPermissionPriming,
+    primeNotificationPermission,
+    closeThen,
+  ]);
 
   /* ── Yönlendirmeler ─────────────────────────────────────────────────────── */
   const openDetailScreen = useCallback(() => {

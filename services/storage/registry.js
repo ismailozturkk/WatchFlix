@@ -166,6 +166,15 @@ const settingsKeys = {
   // baştan görür, hızlı giriş çipleri de silinirdi. İkisi de kullanıcıya değil
   // CİHAZA ait.
   hasSeenOnboarding: { key: "hasSeenOnboarding", type: TYPES.boolean, default: false },
+  // Bildirim izni ön-açıklama sayfası gösterildi mi (bkz.
+  // utils/notificationPriming.js). OS izni CİHAZA ait, hesaba değil — bayrak da
+  // öyle: aynı cihazda başka hesaba geçen kullanıcıya aynı sayfa tekrar
+  // gösterilmez, izin durumu zaten ortak.
+  notificationPrimeShown: {
+    key: "notificationPrimeShown",
+    type: TYPES.boolean,
+    default: false,
+  },
   recentUsers: {
     key: "recentUsers",
     type: TYPES.json,

@@ -45,6 +45,7 @@ import {
 import { movieWatchEvents } from "../../utils/watchHistory";
 import ScreenDecor from "../../components/ScreenDecor";
 import { useAuth } from "../../context/AuthContext";
+import { useDeviceNotifications } from "../../context/DeviceNotificationsContext";
 import CommentSheetModal from "@components/modals/CommentSheetModal";
 import RatingSheetModal from "@components/modals/RatingSheetModal";
 import RatingSummary from "@components/RatingSummary";
@@ -259,6 +260,7 @@ export default function MovieDetails({ navigation, route }) {
   // sayfası doğrudan açılır (dizi tarafındaki davranışın filmdeki karşılığı).
   const { id, openComments = false } = route.params;
   const { user } = useAuth();
+  const { primeNotificationPermission } = useDeviceNotifications();
   const { language, t } = useLanguage();
   const providerRegion = language === "tr" ? "TR" : "US";
   const { theme } = useTheme();
@@ -565,6 +567,9 @@ export default function MovieDetails({ navigation, route }) {
         type: isReminderSet ? "warning" : "success",
         text1: isReminderSet ? i18nText("autoI18n.hatirlatma_kaldirildi", "Hatırlatma kaldırıldı") : i18nText("autoI18n.hatirlatma_eklendi", "Hatırlatma eklendi"),
       });
+      // Hatırlatma kuruldu ama OS izni yoksa bildirim ASLA düşmez — izin
+      // sayfasını burada aç (gerek yoksa kendisi sessizce çıkıyor).
+      if (!isReminderSet) primeNotificationPermission();
     } catch (error) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.hata_2", "Hata: ") + error.message });
     }

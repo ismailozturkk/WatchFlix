@@ -26,10 +26,12 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useProfileNotes } from "../../../context/ProfileNotesContext";
+import { useDeviceNotifications } from "../../../context/DeviceNotificationsContext";
 import ScreenDecor from "../../../components/ScreenDecor";
 import DatePickerModal from "@components/modals/DatePickerModal";
 import { toast } from "@components/AppToast";
 import { i18nText } from "../../../utils/i18nText";
+import { PRIME_HANDOFF_MS } from "../../../utils/notificationPriming";
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
@@ -635,6 +637,7 @@ export default function NotesScreen({ navigation }) {
   const { theme } = useTheme();
   const { t, language } = useLanguage();
   const { notes, loadingNotes, saveNote, handleDeleteNote } = useProfileNotes();
+  const { primeNotificationPermission } = useDeviceNotifications();
 
   const colorPairs = useMemo(() => buildColorPairs(theme.notesColor), [theme.notesColor]);
   const title = t.profileScreen?.Notes?.notes ?? i18nText("autoI18n.notlar", "Notlar");
@@ -655,8 +658,14 @@ export default function NotesScreen({ navigation }) {
       saveNote(note);
       setModalVisible(false);
       setEditingNote(null);
+      // Tarihli not = hatırlatma; OS izni yoksa bildirim ASLA düşmez. İzin
+      // sayfası da bir alt sayfa, düzenleme sayfasının kapanışını bekliyor —
+      // iki alt sayfa üst üste binmesin.
+      if (note?.scheduledDate) {
+        setTimeout(primeNotificationPermission, PRIME_HANDOFF_MS);
+      }
     },
-    [saveNote],
+    [saveNote, primeNotificationPermission],
   );
 
   const requestDelete = (id) => {
