@@ -270,15 +270,26 @@
 
 **Kabul:** sınır altı doğum tarihi iki kayıt yolunda da kaydı tamamlayamıyor; testler yeşil; karar değeri bu dosyaya not edildi.
 
-### [~] GÖREV B8 — Android izin bloğu temizliği (kod 2026-08-08, prebuild doğrulaması bekliyor)
+### [x] GÖREV B8 — Android izin bloğu temizliği (2026-08-08)
 
 > **Sonuç:** `9e76871`. `permissions` iki medya iznine indi, `blockedPermissions` aynen kaldı.
 > `app.json version` 1.4.1 → **1.4.2**.
 >
-> **⚠ KALAN — adım 3 yapılmadı:** `npx expo prebuild -p android --clean` sonrası üretilen
-> `AndroidManifest.xml`'de eski izinlerin gerçekten olmadığı Grep'le doğrulanacak. Prebuild
-> çalışma ağacına `android/` klasörü üretir (gitignore'da), bu yüzden kullanıcı onayıyla
-> çalıştırılmalı. Story kaydetme akışı da manuel test listesinde.
+> **Prebuild doğrulaması yapıldı** (`npx expo prebuild -p android --clean`). Üretilen
+> `AndroidManifest.xml`:
+> - `READ_MEDIA_IMAGES`, `READ_MEDIA_VISUAL_USER_SELECTED` → isteniyor ✅
+> - `WRITE_EXTERNAL_STORAGE`, `READ_MEDIA_AUDIO`, `READ_MEDIA_VIDEO`, `RECORD_AUDIO` →
+>   hepsinde `tools:node="remove"` var; kütüphane manifestlerinden geliyorlar ve
+>   `blockedPermissions` sayesinde birleştirmede düşüyorlar ✅
+> - `READ_EXTERNAL_STORAGE` **duruyor ama `android:maxSdkVersion="32"` ile** — bunu
+>   expo-image-picker/media-library kendi manifestinde tanımlıyor. **Doğru davranış:**
+>   Android 12 ve altında `READ_MEDIA_IMAGES` yok, görsel seçmek için bu izin şart; SDK 33+
+>   için kapalı. Yani app.json'dan çıkarmak Android ≤12'yi bozmadı.
+>
+> Prebuild'in ürettiği `android/` klasörü **silindi**: varlığı EAS'i bare workflow'a
+> çevirir ve sürüm build'i prebuild'i yeniden çalıştırmaz, bayat manifest gömülürdü.
+>
+> **Kalan:** story kaydetme akışı (görseli galeriye kaydet) manuel test listesinde.
 
 **Bağlam:** `app.json` ~29-40 çelişkili: `permissions` içinde `READ_EXTERNAL_STORAGE` + `WRITE_EXTERNAL_STORAGE` istenmiş, `blockedPermissions` içinde `WRITE_EXTERNAL_STORAGE` yeniden engellenmiş. Story kaydetme için gerçek ihtiyaç: `READ_MEDIA_IMAGES` + `READ_MEDIA_VISUAL_USER_SELECTED`.
 
