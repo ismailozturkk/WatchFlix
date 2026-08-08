@@ -406,7 +406,7 @@ export default function SettingsScreen() {
 
   const { t, language, toggleLanguage } = useLanguage();
   const { theme } = useTheme();
-  const { adultContent, chaneAdultContent } = useContentSettings();
+  const { adultContent, chaneAdultContent, ageRestricted } = useContentSettings();
   const { showOngoingTvShows, changeShowOngoingTvShows } =
     useOngoingTvShowsSettings();
   const { imageQuality, imageQualityLevel, changeImageQuality, getTmdbUrl } =
@@ -925,21 +925,26 @@ export default function SettingsScreen() {
               onToggleAll={(enabled) => changeDataCacheTypes(buildAllTypes(enabled))}
             />
           )}
-          <SettingRow
-            colors={C}
-            iconBg={C.iconPurple}
-            iconColor={C.purple}
-            iconName={adultContent ? "eye-outline" : "eye-off-outline"}
-            title={t.adultContent}
-            subtitle={t.adultContentSubtitle}
-            right={
-              <SwitchToggle
-                value={adultContent}
-                onValueChange={() => chaneAdultContent(!adultContent)}
-                size={36}
-              />
-            }
-          />
+          {/* Yetişkin içerik — 18 altı hesapta satır HİÇ ÇİZİLMEZ. Kapalı bir
+              anahtar göstermek "neden açamıyorum" sorusunu doğuruyor; içerik
+              süzgeci zaten ayrıca kilitli (bkz. utils/tmdbAdultGuard.js). */}
+          {!ageRestricted && (
+            <SettingRow
+              colors={C}
+              iconBg={C.iconPurple}
+              iconColor={C.purple}
+              iconName={adultContent ? "eye-outline" : "eye-off-outline"}
+              title={t.adultContent}
+              subtitle={t.adultContentSubtitle}
+              right={
+                <SwitchToggle
+                  value={adultContent}
+                  onValueChange={() => chaneAdultContent(!adultContent)}
+                  size={36}
+                />
+              }
+            />
+          )}
           <SettingRow
             colors={C}
             iconBg={C.iconGreen}

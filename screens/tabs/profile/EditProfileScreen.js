@@ -39,6 +39,8 @@ import {
 import { propagateProfileChange } from "../../../services/profilePropagation";
 import { i18nText } from "../../../utils/i18nText";
 import ScreenDecor from "../../../components/ScreenDecor";
+import BirthDateField from "../../../components/auth/BirthDateField";
+import { MIN_ADULT_AGE, calculateAge, syncAgeRestriction } from "../../../utils/ageGate";
 
 
 const BIO_MAX = 160;
@@ -53,6 +55,9 @@ export default function EditProfileScreen({ navigation }) {
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
+  // Bu alan sonradan eklendi: eski hesaplarda boş gelir ve boş bırakılabilir —
+  // kaydetmeyi zorunlu kılmak, yalnızca bio'sunu düzeltmek isteyeni kilitlerdi.
+  const [birthDate, setBirthDate] = useState(null);
   const [avatarIndex, setAvatarIndex] = useState(0);
   const [usernameStatus, setUsernameStatus] = useState("idle"); // idle|same|invalid|checking|available|taken
   const [saving, setSaving] = useState(false);
@@ -85,6 +90,7 @@ export default function EditProfileScreen({ navigation }) {
       setDisplayName(profile.displayName || "");
       setUsername(profile.username || "");
       setBio(profile.bio || "");
+      setBirthDate(profile.birthDate || null);
       setAvatarIndex(
         clampAvatarIndex(
           typeof profile.avatarIndex === "number"
@@ -157,7 +163,14 @@ export default function EditProfileScreen({ navigation }) {
       const patch = {};
       if (dn !== (profile?.displayName || "")) patch.displayName = dn;
       if (bo !== (profile?.bio || "")) patch.bio = bo;
+      const birthChanged = !!birthDate && birthDate !== (profile?.birthDate || null);
+      if (birthChanged) patch.birthDate = birthDate;
       if (Object.keys(patch).length) await updateField(patch);
+
+      // Yaş kısıtını BEKLETMEDEN tazele. Profil dinleyicisi zaten tetiklenecek
+      // ama bu yazma yetişkin içerik kapısını doğrudan etkiliyor; kullanıcı
+      // kaydeder kaydetmez doğru durumda olmalı.
+      if (birthChanged) syncAgeRestriction(birthDate);
 
       const avatarChanged = avatarIndex !== clampAvatarIndex(profile?.avatarIndex);
       if (avatarChanged) {
@@ -288,6 +301,7 @@ export default function EditProfileScreen({ navigation }) {
     }
   };
   const hint = usernameHint();
+  const birthAge = calculateAge(birthDate);
 
   if (loading && !profile) {
     return (
@@ -468,6 +482,37 @@ export default function EditProfileScreen({ navigation }) {
                   {hint.text}
                 </Text>
               )}
+            </View>
+
+            {/* Doğum tarihi — yetişkin içerik ayarının kapısı buna bakıyor */}
+            <View style={styles.field}>
+              <Text style={[styles.label, { color: theme.text.secondary }]}>
+                {i18nText("autoI18n.dogum_tarihi", "Doğum tarihi")}
+              </Text>
+              <BirthDateField
+                value={birthDate}
+                onChange={setBirthDate}
+                theme={theme}
+                accent={theme.accent}
+                fieldSurface={theme.secondary}
+                showHint={false}
+              />
+              <Text style={[styles.hint, { color: theme.text.muted }]}>
+                {birthAge === null
+                  ? i18nText(
+                      "autoI18n.dogum_tarihi_profil_alt",
+                      "Profilinde gösterilmez; yalnızca yetişkin içerik ayarı için kullanılır.",
+                    )
+                  : birthAge < MIN_ADULT_AGE
+                    ? i18nText(
+                        "autoI18n.yas_alti_yetiskin_kapali",
+                        "{{age}} yaşındasın — yetişkin içerik kapalı kalacak.",
+                        { age: birthAge },
+                      )
+                    : i18nText("autoI18n.yas_bilgisi", "{{age}} yaşındasın.", {
+                        age: birthAge,
+                      })}
+              </Text>
             </View>
 
             {/* Bio */}

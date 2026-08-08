@@ -32,12 +32,20 @@ import {
   DEFAULT_PRIVACY,
 } from "../services/userService";
 import useStartupGate from "../hooks/useStartupGate";
+import {
+  calculateAge,
+  clearAgeRestriction,
+  isAgeRestrictedProfile,
+  syncAgeRestriction,
+} from "../utils/ageGate";
 
 const UserProfileContext = createContext();
 export const useUserProfile = () => useContext(UserProfileContext);
 
 export function UserProfileProvider({ children }) {
-  const { user } = useAuth();
+  // `loading`: Firebase oturumu HENÜZ çözmedi. Yaş kısıtı aynasında "çıkış
+  // yapılmış" ile "daha bilmiyoruz" durumlarını ayırmak için gerekli.
+  const { user, loading: authLoading } = useAuth();
   const uid = user?.uid;
 
   // AÇILIŞ TOHUMU — son oturumun profili diskten SENKRON okunur, yani ilk
@@ -134,6 +142,34 @@ export function UserProfileProvider({ children }) {
     return () => unsub();
   }, [uid, startupReady]);
 
+  // ── 3) Yaş kısıtı aynası ─────────────────────────────────────────────────
+  //
+  // Yetişkin içerik süzgeci (utils/tmdbAdultGuard.js) her TMDB isteğinde SENKRON
+  // bir cevap istiyor, Firestore ise asenkron. Profilden türetilen tek bir
+  // boolean cihaza yazılıyor; süzgeç ve Ayarlar ekranı onu okuyor.
+  //
+  // `startupReady`i BEKLEMİYOR: yukarıdaki `ilkTohum` profili ilk render'da
+  // diskten senkron veriyor, yani uygulama yeniden açıldığında kısıt daha ilk
+  // karede yerinde oluyor. Kapak açık kalan tek pencere, HİÇ önbelleği olmayan
+  // taze bir girişte listener'ın ilk anlık görüntüsüne kadar geçen süre.
+  //
+  // BAYRAĞA "BİLMİYORUM" DURUMUNDA DOKUNULMAZ. Bayrak oturum deposunda, yani
+  // uygulama yeniden açıldığında geçen oturumdan kalan doğru değerle geliyor.
+  // Firebase oturumu çözene kadar `uid` null; bunu "çıkış yapılmış" sayıp
+  // temizleseydik 18 altı bir cihaz her açılışta birkaç saniye korumasız
+  // kalırdı. Aynı şekilde profil henüz gelmediyse de eldeki değer korunur.
+  const birthDate = profile?.birthDate ?? null;
+  const profilVar = !!profile;
+  useEffect(() => {
+    if (authLoading) return;
+    if (!uid) {
+      clearAgeRestriction();
+      return;
+    }
+    if (!profilVar) return;
+    syncAgeRestriction(birthDate);
+  }, [authLoading, uid, profilVar, birthDate]);
+
   // ── Actions ──────────────────────────────────────────────────────────────
 
   const updateField = useCallback(
@@ -172,6 +208,10 @@ export function UserProfileProvider({ children }) {
 
   const privacy = profile?.privacy || DEFAULT_PRIVACY;
   const avatarIndex = typeof profile?.avatarIndex === "number" ? profile.avatarIndex : 0;
+  // Yaş her okumada doğum tarihinden türetilir — 18'ine giren kullanıcının
+  // kısıtı doğru günde kendiliğinden kalkar (bkz. utils/ageGate.js).
+  const age = calculateAge(birthDate);
+  const ageRestricted = isAgeRestrictedProfile(birthDate);
 
   const value = useMemo(
     () => ({
@@ -185,6 +225,9 @@ export function UserProfileProvider({ children }) {
       displayName: profile?.displayName || "",
       avatarIndex,
       privacy,
+      birthDate,
+      age,
+      ageRestricted,
 
       // counters (denormalize)
       friendsCount: profile?.friendsCount || 0,
@@ -208,6 +251,9 @@ export function UserProfileProvider({ children }) {
       uid,
       avatarIndex,
       privacy,
+      birthDate,
+      age,
+      ageRestricted,
       updateField,
       changeAvatarIndex,
       updatePrivacy,

@@ -351,7 +351,6 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
             `movie_bests_${shortLang}_${sort}_page_1`,
             "discover/movie",
             {
-              include_adult: "true",
               include_null_first_air_dates: "false",
               language: shortLang,
               page: 1,
@@ -366,7 +365,6 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
             `movie_trends_${shortLang}_${window}_trending`,
             `trending/movie/${window}`,
             {
-              include_adult: "false",
               include_null_first_air_dates: "false",
               language: shortLang,
               page: "1",
@@ -437,7 +435,6 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
             `tv_trends_${shortLang}_${window}_trending`,
             `trending/tv/${window}`,
             {
-              include_adult: "false",
               include_null_first_air_dates: "false",
               language: shortLang,
               page: "1",
@@ -452,7 +449,6 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
             `tv_bests_${shortLang}_discover_${sort}_page_1`,
             "discover/tv",
             {
-              include_adult: "false",
               include_null_first_air_dates: "false",
               language: shortLang,
               page: 1,
@@ -472,7 +468,6 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
           `tv_airing_today_${tmdbLanguage}_${tmdbRegion}_page_1`,
           "tv/airing_today",
           {
-            include_adult: "false",
             include_video: "false",
             language: tmdbLanguage,
             region: tmdbRegion,
@@ -498,7 +493,6 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
           `tv_on_the_air_${tmdbLanguage}_${tmdbRegion}_page_1`,
           "tv/on_the_air",
           {
-            include_adult: "false",
             include_video: "false",
             language: tmdbLanguage,
             region: tmdbRegion,

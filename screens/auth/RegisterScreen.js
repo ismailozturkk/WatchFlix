@@ -36,6 +36,7 @@ import {
 } from "../../services/userService";
 import ScreenDecor from "../../components/ScreenDecor";
 import EmailSuffixRow from "../../components/auth/EmailSuffixRow";
+import BirthDateField from "../../components/auth/BirthDateField";
 import { alpha } from "../../theme/colors";
 import {
   describeGoogleAuthError,
@@ -62,6 +63,9 @@ export default function RegisterScreen({ navigation }) {
   const [usernameAvailable, setUsernameAvailable] = useState(null);
   const [name, setName] = useState("");
   const [lastname, setLastname] = useState("");
+  // Doğum tarihi — seçici yalnız var olan tarihleri üretiyor, ayrıca biçim
+  // doğrulaması gerekmiyor: değer ya null ya geçerli bir ISO.
+  const [birthDate, setBirthDate] = useState(null);
   const [password, setPassword] = useState("");
   const [passwordAgain, setPasswordAgain] = useState("");
   const [isloading, setIsloading] = useState(false);
@@ -73,7 +77,9 @@ export default function RegisterScreen({ navigation }) {
   const [passwordCorrect, setPasswordCorrect] = useState(null);
   const [passwordCorrectAgain, setPasswordCorrectAgain] = useState(null);
 
-  // Klavye akışı: isim → soyisim → kullanıcı adı → e-posta → şifre → tekrar
+  // Klavye akışı: isim → soyisim → kullanıcı adı → e-posta → şifre → tekrar.
+  // Doğum tarihi bu zincirin dışında: klavyeyle değil dokunmayla açılan bir
+  // sayfa; "ileri" tuşunun altından modal açmak akışı kesip şaşırtıyor.
   const lastnameRef = useRef(null);
   const usernameRef = useRef(null);
   const emailRef = useRef(null);
@@ -86,6 +92,8 @@ export default function RegisterScreen({ navigation }) {
   const canSubmit =
     name.trim().length > 0 &&
     lastname.trim().length > 0 &&
+    // 18 altı olmak kaydı engellemez — yalnız tarih SEÇİLMİŞ olmalı.
+    !!birthDate &&
     username.length >= 3 &&
     usernameAvailable !== false &&
     emailValid === true &&
@@ -166,6 +174,13 @@ export default function RegisterScreen({ navigation }) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.lutfen_isim_ve_soyisim_giriniz", "Lütfen isim ve soyisim giriniz!") });
       return;
     }
+    if (!birthDate) {
+      Toast.show({
+        type: "error",
+        text1: i18nText("autoI18n.dogum_tarihini_sec", "Doğum tarihini seç"),
+      });
+      return;
+    }
     if (password !== passwordAgain) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.sifreler_eslesmiyor", "Şifreler eşleşmiyor!") });
       return;
@@ -194,12 +209,17 @@ export default function RegisterScreen({ navigation }) {
         username,
         email,
         displayName,
+        birthDate,
         // Yeni hesaba rastgele avatar: herkes 0 numaralı görselle başlamasın.
         // Kullanıcı Profil ekranından dilediği zaman değiştirebiliyor.
         avatarIndex: randomAvatarIndex(),
         method: "email",
       });
       profileCreated = true;
+      // NOT: yaş kısıtı burada UYGULANMAZ. Bu akış birkaç satır aşağıda
+      // signOut'a gidiyor, o da oturum deposunu (dolayısıyla kısıt bayrağını)
+      // temizliyor. Kısıt, kullanıcı gerçekten giriş yaptığında profilden
+      // türetiliyor — bkz. context/UserProfileContext.js.
 
       // Profil olusmadan once verification gondermiyoruz. Profil transaction'i
       // duserse Auth kullanicisini silebilir ve e-postayi kilitlemeyiz.
@@ -448,6 +468,15 @@ export default function RegisterScreen({ navigation }) {
                 />
               </View>
             </View>
+
+            {/* Doğum tarihi — yetişkin içerik kapısı buna bakıyor */}
+            <BirthDateField
+              value={birthDate}
+              onChange={setBirthDate}
+              theme={theme}
+              accent={accent}
+              fieldSurface={fieldSurface}
+            />
 
             {/* Kullanıcı adı */}
             <View

@@ -11,7 +11,7 @@ import React, {
 import Toast from "react-native-toast-message";
 import { buildTmdbUrl } from "../utils/tmdbImageUtils";
 import { i18nText } from "../utils/i18nText";
-import { Keys, get, set } from "../services/storage";
+import { Keys, get, set, useStored } from "../services/storage";
 import {
   DEFAULT_DATA_TYPES,
   normalizeDataTypes,
@@ -180,7 +180,15 @@ export const AppSettingsProvider = ({ children }) => {
   const [selectedLanguage, setSelectedLanguage] = useState(() => get(Keys.language));
   const [selectedTheme, setSelectedTheme] = useState(() => get(Keys.theme));
   const [customThemes, setCustomThemes] = useState(() => get(Keys.customThemes));
-  const [adultContent, setAdultContent] = useState(() => get(Keys.adultContent));
+  const [storedAdultContent, setAdultContent] = useState(() => get(Keys.adultContent));
+  // Oturumdaki hesap 18 altı mı? Kaynağı Users/{uid}.birthDate; UserProfileContext
+  // türetip depoya yazıyor (bkz. utils/ageGate.js). Bağlam üzerinden değil DEPO
+  // üzerinden okunuyor çünkü UserProfileProvider bu sağlayıcının ALTINDA render
+  // ediliyor — depo iki yönlü çalışan tek ortak kanal.
+  const ageRestricted = useStored(Keys.ageRestricted);
+  // Ayarın ETKİN değeri. Kayıtlı bayrak açık kalmış olabilir (aynı cihazda daha
+  // önce yetişkin bir hesap kullanılmışsa); yaş kısıtı onu daima ezer.
+  const adultContent = storedAdultContent && !ageRestricted;
   const [showOngoingTvShows, setShowOngoingTvShows] = useState(() =>
     get(Keys.showOngoingTvShows),
   );
@@ -306,10 +314,17 @@ export const AppSettingsProvider = ({ children }) => {
     persist(Keys.selectedAvatar, newAvatar, "Avatar kaydedilemedi");
   }, []);
 
-  const chaneAdultContent = useCallback((newVal) => {
-    setAdultContent(newVal);
-    persist(Keys.adultContent, newVal, "Content kaydedilemedi");
-  }, []);
+  // Yaş kısıtlıyken AÇILAMAZ. Ayarlar ekranı satırı zaten gizliyor; buradaki
+  // kontrol ikinci kapı — başka bir çağrı yeri (ör. bir onboarding adımı)
+  // eklendiğinde kısıt sessizce delinmesin.
+  const chaneAdultContent = useCallback(
+    (newVal) => {
+      if (newVal && ageRestricted) return;
+      setAdultContent(newVal);
+      persist(Keys.adultContent, newVal, "Content kaydedilemedi");
+    },
+    [ageRestricted],
+  );
 
   const changeShowOngoingTvShows = useCallback((newVal) => {
     setShowOngoingTvShows(newVal);
@@ -480,6 +495,7 @@ export const AppSettingsProvider = ({ children }) => {
       changeAvatar,
       adultContent,
       chaneAdultContent,
+      ageRestricted,
       showOngoingTvShows,
       changeShowOngoingTvShows,
       imageQuality,
@@ -502,6 +518,7 @@ export const AppSettingsProvider = ({ children }) => {
       selectedTheme,
       selectedAvatar,
       adultContent,
+      ageRestricted,
       imageQuality,
       imageQualityLevel,
       changeShowSnow,
@@ -557,8 +574,11 @@ export const AppSettingsProvider = ({ children }) => {
     () => ({
       adultContent,
       chaneAdultContent,
+      // Ayarlar ekranı satırı bu bayrakla gizliyor: 18 altı kullanıcı
+      // kapatılmış bir anahtarı görüp neden açamadığını merak etmesin.
+      ageRestricted,
     }),
-    [adultContent, chaneAdultContent],
+    [adultContent, chaneAdultContent, ageRestricted],
   );
 
   const ongoingTvShowsValue = useMemo(

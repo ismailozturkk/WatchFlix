@@ -263,7 +263,6 @@ export default function DiscoveryMediaRail({ mediaType, preset, navigation, genr
       const params = {
         language: isTr ? "tr-TR" : "en-US",
         page: requestedPage,
-        include_adult: false,
         sort_by: preset === "hiddenGems" ? "vote_average.desc" : "popularity.desc",
         "vote_count.gte": preset === "hiddenGems" ? 120 : 300,
       };

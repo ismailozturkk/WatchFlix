@@ -76,6 +76,7 @@ import { enableFreeze } from "react-native-screens";
 import SplashPosterWave from "./components/SplashPosterWave";
 import { CalendarProvider } from "./context/CalendarContext";
 import { installAxiosDataCache } from "./utils/axiosDataCache";
+import { installTmdbAdultGuard } from "./utils/tmdbAdultGuard";
 import { isMigrated, runStorageMigration } from "./services/storage";
 import { startPresence, stopPresence } from "./services/presenceService";
 import {
@@ -107,6 +108,9 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 enableFreeze(true);
 installAxiosDataCache();
+// SIRA: önbellekten SONRA kurulmalı — önbelleğe ham cevap yazılsın, yetişkin
+// süzmesi hem taze hem önbellekten gelen cevaba uygulansın.
+installTmdbAdultGuard();
 ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Hata raporlama İLK iş: bundan sonra çalışan her şeyin (cache preload, font

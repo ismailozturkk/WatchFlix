@@ -5,7 +5,9 @@
 // ── Şema ─────────────────────────────────────────────────────────────────────
 // Users/{uid}
 //   uid, username, usernameLower, email, displayName, bio?,
-//   avatarIndex,
+//   avatarIndex, birthDate?      ← "YYYY-MM-DD"; yetişkin içerik kapısı
+//                                  (utils/ageGate.js) yaşı buradan türetir.
+//                                  Bu alan eklenmeden önceki hesaplarda YOK.
 //   friendsCount, postsCount, followersCount, followingCount,
 //   pendingRequestsInCount, pendingRequestsOutCount, unreadNotifsCount,
 //   isOnline, lastActiveAt, lastSeen,
@@ -36,6 +38,7 @@ import {
 import { updateProfile } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { clampAvatarIndex, DEFAULT_AVATAR_INDEX } from "../utils/avatars";
+import { parseBirthDate } from "../utils/ageGate";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 
 export const SCHEMA_VERSION = 2;
@@ -132,12 +135,16 @@ export async function isUsernameAvailable(username, { excludeUid } = {}) {
  * @param {string} params.email
  * @param {string} params.displayName
  * @param {number} params.avatarIndex
+ * @param {string} [params.birthDate] "YYYY-MM-DD" — yetişkin içerik kapısı
+ *   yaşı bundan türetir. Biçim bozuksa alan hiç yazılmaz (kayıt düşmez);
+ *   zorunluluğu kayıt ekranları uyguluyor.
  */
 export async function createUserProfile({
   uid,
   username,
   email,
   displayName,
+  birthDate,
   avatarIndex = DEFAULT_AVATAR_INDEX,
   // GA4 `sign_up` olayının `method` parametresi: "email" | "google".
   // Kayıt hunisinde hangi yöntemin dönüştüğünü ayırt etmek için.
@@ -155,6 +162,9 @@ export async function createUserProfile({
     );
 
   const usernameLower = normalizeUsername(username);
+  // Doğrulanmamış bir değer Firestore'a girmesin; `undefined` yazmak da
+  // setDoc'u düşürür, o yüzden alan ya geçerli ya da hiç yok.
+  const dogumTarihi = parseBirthDate(birthDate) ? birthDate.trim() : null;
 
   // Bu çağrı hem YENİ profil açar hem de var olanın kimlik alanlarını tazeler
   // (Google bağlayan eski kullanıcı). `sign_up` yalnız gerçekten yeni profil
@@ -211,6 +221,9 @@ export async function createUserProfile({
       usernameLower,
       email,
       displayName: displayName || username,
+      // Var olan profilde bu alan varsa ve bu çağrıda gelmediyse SİLİNMEMELİ —
+      // merge yolundan geçen eski hesabın yaş kaydı düşerse kapı açılır.
+      ...(dogumTarihi ? { birthDate: dogumTarihi } : {}),
       updatedAt: serverTimestamp(),
     };
 

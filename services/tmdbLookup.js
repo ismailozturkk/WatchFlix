@@ -9,12 +9,15 @@
 
 import * as cacheStore from "../utils/cacheStore";
 import { shouldPersistInternetData } from "../utils/dataCacheSettings";
+import { adultContentAllowed } from "../utils/ageGate";
 
 const cache = new Map(); // key -> Card
 
 const langOf = (language) => (language === "tr" ? "tr-TR" : "en-US");
-const cacheKey = (mediaType, language, title, includeDetails = false) =>
-  `${mediaType}|${langOf(language)}|${title.toLowerCase().trim()}|${includeDetails ? "details" : "card"}`;
+// Yetişkin içerik açıkken anahtara "+adult" ekleniyor: ayar sonradan
+// kapatıldığında önbellekte kalmış yetişkin kart geri dönmesin.
+const cacheKey = (mediaType, language, title, includeDetails = false, includeAdult = false) =>
+  `${mediaType}|${langOf(language)}|${title.toLowerCase().trim()}|${includeDetails ? "details" : "card"}${includeAdult ? "|+adult" : ""}`;
 const regionOf = (language) => (language === "tr" ? "TR" : "US");
 
 function cardFromResult(result, mediaType, query) {
@@ -73,14 +76,17 @@ export async function lookupTitle({
   title,
   mediaType,
   language = "en",
-  includeAdult = false,
+  // Varsayılan doğrudan ayardan: bu modül fetch kullandığı için
+  // utils/tmdbAdultGuard'ın axios interceptor'ına takılmıyor. Ayarı ÇIPLAK
+  // okumak yaş kısıtını atlardı — kural tek yerde: utils/ageGate.js.
+  includeAdult = adultContentAllowed(),
   includeDetails = false,
 }) {
   const query = (title || "").trim();
   const fallback = { key: `${mediaType}-${query}`, mediaType, query, found: false };
   if (!query) return fallback;
 
-  const key = cacheKey(mediaType, language, query, includeDetails);
+  const key = cacheKey(mediaType, language, query, includeDetails, includeAdult);
   if (cache.has(key)) return cache.get(key);
 
   const diskCached = cacheStore.getJSON("tmdbLookup", key);
@@ -109,7 +115,9 @@ export async function lookupTitle({
       return fallback;
     }
     const data = await res.json();
-    const results = Array.isArray(data?.results) ? data.results : [];
+    const results = (Array.isArray(data?.results) ? data.results : []).filter(
+      (result) => includeAdult || result?.adult !== true,
+    );
 
     // En iyi eşleşme: tam ad eşleşmesini önceliklendir, yoksa en popüler/oy sayılı.
     const norm = (s) => (s || "").toLowerCase().trim();

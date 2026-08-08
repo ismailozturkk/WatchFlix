@@ -32,7 +32,9 @@ import {
   GOOGLE_PROFILE_PENDING_KEY,
 } from "../../services/googleAuthService";
 import { randomAvatarIndex } from "../../utils/avatars";
+import { syncAgeRestriction } from "../../utils/ageGate";
 import ScreenDecor from "../../components/ScreenDecor";
+import BirthDateField from "../../components/auth/BirthDateField";
 
 export default function GoogleProfileCompletionScreen({ navigation }) {
   const { theme, selectedTheme } = useTheme();
@@ -45,6 +47,9 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
   const [available, setAvailable] = useState(null);
   const [checking, setChecking] = useState(false);
   const [saving, setSaving] = useState(false);
+  // E-posta kaydıyla aynı kural: doğum tarihi burada da zorunlu, yoksa Google
+  // yolu yaş kapısının etrafından dolaşırdı.
+  const [birthDate, setBirthDate] = useState(null);
   const checkId = useRef(0);
   const tr = language === "tr";
   const isLight = selectedTheme === "light" || selectedTheme === "green";
@@ -81,8 +86,9 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
       displayName.trim().length >= 2 &&
       isValidUsername(username) &&
       available === true &&
+      !!birthDate &&
       !saving,
-    [available, displayName, saving, user, username]
+    [available, birthDate, displayName, saving, user, username]
   );
 
   const completeProfile = async () => {
@@ -95,10 +101,15 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
         username: username.trim(),
         email: user.email,
         displayName: cleanName,
+        birthDate,
         // E-posta kaydıyla aynı davranış: yeni hesap rastgele avatarla başlar.
         avatarIndex: randomAvatarIndex(),
         method: "google",
       });
+      // Bu akış oturumu KAPATMIYOR — kullanıcı buradan doğrudan uygulamaya
+      // giriyor. Kısıtı profil dinleyicisinin ilk anlık görüntüsüne bırakmak,
+      // 18 altı bir hesabın ilk saniyelerini korumasız bırakırdı.
+      syncAgeRestriction(birthDate);
       // Profil yazıldı → kapıyı HEMEN aç. Bunu updateProfile'dan sonraya
       // bırakmak, o ağ çağrısı hata aldığında kullanıcıyı tamamlanmış bir
       // profille bu ekrana kalıcı olarak kilitliyordu.
@@ -239,6 +250,17 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
                 returnKeyType="next"
               />
             </View>
+
+            <Text style={[styles.label, { color: theme.text.muted }]}>
+              {tr ? "DOĞUM TARİHİ" : "DATE OF BIRTH"}
+            </Text>
+            <BirthDateField
+              value={birthDate}
+              onChange={setBirthDate}
+              theme={theme}
+              accent={theme.accent}
+              fieldSurface={theme.between}
+            />
 
             <Text style={[styles.label, { color: theme.text.muted }]}>
               {tr ? "KULLANICI ADI" : "USERNAME"}

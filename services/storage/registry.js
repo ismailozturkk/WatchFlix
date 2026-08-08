@@ -350,6 +350,12 @@ const cacheKeys = {
 // deposunda duruyor.
 const sessionKeys = {
   cachedUserId: { key: "cachedUserId", type: TYPES.string, default: null },
+  // "Oturumdaki hesap 18 yaşından küçük mü?" — Users/{uid}.birthDate'ten
+  // TÜRETİLİR, doğum tarihinin kendisi cihaza yazılmaz. Yetişkin içerik
+  // süzgeci her istekte senkron cevap istediği için burada aynalanıyor
+  // (bkz. utils/ageGate.js). `session` deposunda olması çıkış temizliğini
+  // bedava getiriyor: bayrak sonraki hesaba sızmaz.
+  ageRestricted: { key: "ageRestricted", type: TYPES.boolean, default: false },
   googleProfilePendingUid: {
     key: "googleProfilePendingUid",
     type: TYPES.string,

@@ -209,7 +209,7 @@ export async function fetchSuggestionsForList({
             // çöp sonuç yerine gerçekten bilinen yapımlar gelsin.
             const byGenre = await readList(
               `${TMDB}/discover/${type}?language=${langOf(language)}&page=1` +
-                `&include_adult=false&sort_by=popularity.desc&vote_count.gte=300` +
+                `&sort_by=popularity.desc&vote_count.gte=300` +
                 `&with_genres=${ids.join("|")}`,
             );
             if (byGenre.length) return byGenre;

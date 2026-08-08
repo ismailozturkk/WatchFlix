@@ -2197,7 +2197,16 @@
     "film_detayi": "Movie details",
     "oyuncular_fragman_benzerler": "Cast, trailer, similar titles",
     "n_dakika": "{{count}} min",
-    "sezon_sayisi": "{{count}} seasons"
+    "sezon_sayisi": "{{count}} seasons",
+    "gecerli_bir_dogum_yili_sec": "Earlier dates cannot be selected",
+    "dogum_tarihi": "Date of birth",
+    "dogum_tarihini_sec": "Pick your date of birth",
+    "dogum_tarihi_alt_baslik": "The adult content setting follows this date.",
+    "dogum_tarihi_profil_alt": "Not shown on your profile; used only for the adult content setting.",
+    "tarihi_sec": "Select Date",
+    "yas_bilgisi": "You are {{age}}.",
+    "yas_alti_yetiskin_kapali": "You are {{age}} — adult content will stay off.",
+    "dogum_tarihi_neden": "Your date of birth is required for the adult content setting; it is not shown on your profile."
   },
   "comments": "Comments"
 }

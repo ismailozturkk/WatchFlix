@@ -2197,7 +2197,16 @@
     "film_detayi": "Film detayı",
     "oyuncular_fragman_benzerler": "Oyuncular, fragman, benzerler",
     "n_dakika": "{{count}} dk",
-    "sezon_sayisi": "{{count}} sezon"
+    "sezon_sayisi": "{{count}} sezon",
+    "gecerli_bir_dogum_yili_sec": "Daha eski bir tarih seçilemez",
+    "dogum_tarihi": "Doğum tarihi",
+    "dogum_tarihini_sec": "Doğum tarihini seç",
+    "dogum_tarihi_alt_baslik": "Yetişkin içerik ayarı bu tarihe göre belirlenir.",
+    "dogum_tarihi_profil_alt": "Profilinde gösterilmez; yalnızca yetişkin içerik ayarı için kullanılır.",
+    "tarihi_sec": "Tarihi Seç",
+    "yas_bilgisi": "{{age}} yaşındasın.",
+    "yas_alti_yetiskin_kapali": "{{age}} yaşındasın — yetişkin içerik kapalı kalacak.",
+    "dogum_tarihi_neden": "Doğum tarihin yetişkin içerik ayarı için gerekli; profilinde gösterilmez."
   },
   "comments": "Yorumlar"
 }

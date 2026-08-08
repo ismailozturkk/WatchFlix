@@ -76,7 +76,6 @@ export async function fetchNominees({ mediaType, genreId, sortBy = "popularity.d
       language: tmdbLang(language),
       sort_by: sortBy,
       with_genres: String(genreId),
-      include_adult: false,
       page,
       "vote_count.gte": sortBy.startsWith("vote_count") ? 50 : 100, // çöp/duplikasyon ele
     };
@@ -121,7 +120,7 @@ export async function searchCandidates({
   if (!q || !API_KEY) return [];
   const path = mediaType === "tv" ? "search/tv" : "search/movie";
   const res = await axios.get(`https://api.themoviedb.org/3/${path}`, {
-    params: { query: q, language: tmdbLang(language), include_adult: false, page: 1 },
+    params: { query: q, language: tmdbLang(language), page: 1 },
     headers: { accept: "application/json", Authorization: API_KEY },
     signal,
   });

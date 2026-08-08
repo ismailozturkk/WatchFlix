@@ -185,7 +185,6 @@ export const MovieProvider = ({ children }) => {
           method: "GET",
           url: "https://api.themoviedb.org/3/discover/movie",
           params: {
-            include_adult: "true",
             include_null_first_air_dates: "false",
             language: lang,
             page,
@@ -275,7 +274,6 @@ export const MovieProvider = ({ children }) => {
         method: "GET",
         url: `https://api.themoviedb.org/3/${selectedCategoryTrendsMovie}/movie/${selectedCategoryTrends}`,
         params: {
-          include_adult: "false",
           include_null_first_air_dates: "false",
           language: lang,
           page,
@@ -760,7 +758,7 @@ export const MovieProvider = ({ children }) => {
       setLoading: setLoadingUpcoming,
       setLoadingMore: setLoadingMoreUpcoming,
       request: async () => {
-        const url = `https://api.themoviedb.org/3/discover/movie?include_adult=false&include_video=false&language=${tmdbLanguage}&primary_release_date.gte=${formatDate(today)}&primary_release_date.lte=${calculatedDate}&region=${tmdbRegion}&page=${page}&sort_by=popularity.desc`;
+        const url = `https://api.themoviedb.org/3/discover/movie?include_video=false&language=${tmdbLanguage}&primary_release_date.gte=${formatDate(today)}&primary_release_date.lte=${calculatedDate}&region=${tmdbRegion}&page=${page}&sort_by=popularity.desc`;
         const response = await axios.get(url, { headers: { Authorization: API_KEY } });
         return {
           results: response.data.results,

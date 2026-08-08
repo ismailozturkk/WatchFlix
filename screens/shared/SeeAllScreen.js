@@ -486,7 +486,6 @@ function useDiscoverPagination({ mediaType, genreIds, providerId, preset }) {
         const params = new URLSearchParams({
           language: tmdbLanguage,
           page: String(pageNum),
-          include_adult: "false",
           sort_by: preset === "hiddenGems" ? "vote_average.desc" : "popularity.desc",
           "vote_count.gte": preset === "hiddenGems" ? "120" : "300",
         });

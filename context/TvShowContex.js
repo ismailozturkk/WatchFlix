@@ -225,7 +225,6 @@ export const TvShowProvider = ({ children }) => {
         method: "GET",
         url: `https://api.themoviedb.org/3/${selectedCategoryTrendShow}/tv/${selectedCategoryTrend}`,
         params: {
-          include_adult: "false",
           include_null_first_air_dates: "false",
           language: lang,
           page,
@@ -303,7 +302,6 @@ export const TvShowProvider = ({ children }) => {
           method: "GET",
           url: `https://api.themoviedb.org/3/${selectedCategoryBestShow}/tv`,
           params: {
-            include_adult: "false",
             include_null_first_air_dates: "false",
             language: lang,
             page,
@@ -350,7 +348,7 @@ export const TvShowProvider = ({ children }) => {
       setLoading: setLoadingAiringToday,
       setLoadingMore: setLoadingMoreAiringToday,
       request: async () => {
-        const url = `https://api.themoviedb.org/3/tv/airing_today?include_adult=false&include_video=false&language=${tmdbLanguage}&region=${tmdbRegion}&page=${page}&sort_by=popularity.desc`;
+        const url = `https://api.themoviedb.org/3/tv/airing_today?include_video=false&language=${tmdbLanguage}&region=${tmdbRegion}&page=${page}&sort_by=popularity.desc`;
         const response = await axios.get(url, { headers: { Authorization: API_KEY } });
         return {
           results: response.data.results,
@@ -553,7 +551,7 @@ export const TvShowProvider = ({ children }) => {
       setLoading: setLoadingOnTheAir,
       setLoadingMore: setLoadingMoreOnTheAir,
       request: async () => {
-        const url = `https://api.themoviedb.org/3/tv/on_the_air?include_adult=false&include_video=false&language=${tmdbLanguage}&region=${tmdbRegion}&page=${page}&sort_by=popularity.desc`;
+        const url = `https://api.themoviedb.org/3/tv/on_the_air?include_video=false&language=${tmdbLanguage}&region=${tmdbRegion}&page=${page}&sort_by=popularity.desc`;
         const response = await axios.get(url, { headers: { Authorization: API_KEY } });
         return {
           results: response.data.results,
