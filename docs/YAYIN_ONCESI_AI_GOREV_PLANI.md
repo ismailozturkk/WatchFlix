@@ -110,7 +110,29 @@
 
 **Kabul:** dört açık kapandı; mevcut meşru akışlar (yorum yazma, puanlama, DM) bozulmadı; kurallar deploy edildi (onay sonrası).
 
-### [ ] GÖREV B3 — Expo push token'larını gizli alt koleksiyona taşı (~2-3 saat)
+### [~] GÖREV B3 — Expo push token'larını gizli alt koleksiyona taşı (kod 2026-08-08, deploy bekliyor)
+
+> **Sonuç:** `48c281a`. Token'lar `Users/{uid}/private/push`'ta; kural + istemci göçü +
+> iki sunucu tüketicisi fallback'li. 5 kural testi daha eklendi (toplam 33 yeşil).
+>
+> **Planın üstüne çıkan üç şey:**
+> 1. **Hesap silme purge'una `private` alt koleksiyonu eklendi** (`services/accountService.js`).
+>    Planda yoktu; olmasa hesap silindikten sonra token artığı kalır ve o cihaza bildirim
+>    gitmeye devam ederdi — hesap silme uyumluluğunu deler.
+> 2. **`dailyStreamingAvailability`'de sıra değişti:** sağlayıcı kontrolü token okumasının
+>    önüne alındı. Token artık ayrı doküman = her kullanıcı için ekstra okuma, bu fonksiyon
+>    da her gün tüm kullanıcıları geziyor.
+> 3. `pushNotificationsService` başlığındaki bayat "backend yok" yorumu düzeltildi —
+>    **B9 adım 3 bu yüzden zaten yapılmış durumda.**
+>
+> **Fallback'in kaldırılacağı sürüm:** `app.json version` 1.5.0 (yani 1.4.x sahadan düşünce).
+> `functions/index.js` içinde "GEÇİŞ" olarak işaretli bloklar + kök dokümana yazan ölü token
+> temizliği silinecek.
+>
+> **Bekleyen — DEPLOY SIRASI KRİTİK:**
+> 1. `firebase deploy --only functions` (fallback'li sunucu; eski istemciler çalışmaya devam eder)
+> 2. `firebase deploy --only firestore:rules` (B2 + B3 kuralları birlikte)
+> 3. İstemci sürümü / OTA
 
 **Bağlam:** `services/pushNotificationsService.js` (~193-202) token'ı `Users/{uid}.expoPushToken` + `expoPushTokens`'a yazıyor; `Users` ise tüm oturumlulara okunur → herhangi bir kullanıcı tüm token'ları dökebilir ve Expo push ucu üzerinden herkese sahte bildirim atabilir.
 

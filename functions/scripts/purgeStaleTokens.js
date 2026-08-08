@@ -1,5 +1,12 @@
 // functions/scripts/purgeStaleTokens.js
 //
+// ⚠ ARTIK GEÇERSİZ — ÇALIŞTIRMA. Bu betik token'ları Users/{uid} KÖK
+// dokümanında arıyor; token'lar Users/{uid}/private/push'a taşındı ve kök
+// alanlar istemci tarafından temizleniyor. Bugün çalıştırılırsa hiçbir şey
+// bulamaz (sessiz no-op). Geçmişte ne yapıldığını belgelemek için duruyor.
+// Aynı sorun tekrarlarsa yeni yola göre yazılmalı; ayrıca ölü token temizliği
+// artık otomatik (functions/index.js → clearDeadPushTokens).
+//
 // TEK SEFERLİK temizlik: eski (Expo Go) push token'larını ayıkla.
 //
 // Problem: expoPushTokens[] dizisine arrayUnion ile token EKLENİYOR ama hiç
