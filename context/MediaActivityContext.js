@@ -12,6 +12,7 @@ import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 import { snapshotErrorHandler } from "../utils/firestoreError";
 import { sameJson } from "../utils/sameData";
+import useStartupGate from "../hooks/useStartupGate";
 
 // Kullanıcının içerik-bazlı ETKİNLİK durumu (puan verdi mi / yorum yaptı mı).
 // ListStatusContext'in kardeşi: o "hangi listede" sorusuna, bu "ne yaptı"
@@ -96,7 +97,13 @@ export const MediaActivityProvider = ({ children }) => {
     if (parsed?.activityIndex) setCachedIndex(parsed.activityIndex);
   }, [user?.uid]);
 
+  // Poster rozetleri ilk kareyi yukarıdaki senkron tohumdan (cachedIndex)
+  // çiziyor; canlı listener'lar tazeleme işi — splash penceresinin dışına.
+  // Kademeler: hooks/useStartupGate.js.
+  const startupReady = useStartupGate(1800);
+
   useEffect(() => {
+    if (!startupReady) return undefined;
     if (!user?.uid) {
       setRatingsMap({});
       setCommentsMap({});
@@ -135,7 +142,7 @@ export const MediaActivityProvider = ({ children }) => {
       unsubRatings();
       unsubComments();
     };
-  }, [user?.uid]);
+  }, [user?.uid, startupReady]);
 
   const firestoreIndex = useMemo(
     () => buildActivityIndex({ ratingsMap, commentsMap }),

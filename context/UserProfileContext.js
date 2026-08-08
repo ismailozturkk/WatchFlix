@@ -31,6 +31,7 @@ import {
   changeUsername as changeUsernameService,
   DEFAULT_PRIVACY,
 } from "../services/userService";
+import useStartupGate from "../hooks/useStartupGate";
 
 const UserProfileContext = createContext();
 export const useUserProfile = () => useContext(UserProfileContext);
@@ -65,8 +66,15 @@ export function UserProfileProvider({ children }) {
 
   const migrationDoneRef = useRef(new Set());
 
+  // Açılış karesi profili tohumdan çiziyor (yukarıdaki ilkTohum, senkron);
+  // migration round-trip'i ve canlı listener splash penceresinin dışına
+  // ertelenebilir. ChatModal ~3,8 sn'de kurulduğu için kapı ondan önce açılır.
+  // Kademeler: hooks/useStartupGate.js.
+  const startupReady = useStartupGate(2800);
+
   // ── 1) Login sonrası migration (yalnızca bir kez per uid) ────────────────
   useEffect(() => {
+    if (!startupReady) return;
     if (!uid) {
       setProfile(null);
       setLoading(false);
@@ -86,10 +94,11 @@ export function UserProfileProvider({ children }) {
         if (__DEV__) console.warn("[UserProfile] migration failed:", e.message);
       })
       .finally(() => setMigrating(false));
-  }, [uid]);
+  }, [uid, startupReady]);
 
   // ── 2) Realtime listener — kullanıcının kendi profili ────────────────────
   useEffect(() => {
+    if (!startupReady) return undefined;
     if (!uid) return;
     // Offline-first: önce cache'ten anında seed et (internet yoksa da gösterir).
     // İlk render için bu iş yukarıdaki `ilkTohum` ile zaten yapıldı; burası
@@ -123,7 +132,7 @@ export function UserProfileProvider({ children }) {
       },
     );
     return () => unsub();
-  }, [uid]);
+  }, [uid, startupReady]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
 

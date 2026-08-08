@@ -15,6 +15,7 @@ import { i18nText } from "../utils/i18nText";
 import { cacheKeys } from "../utils/cacheKeys";
 import { publish, seed } from "../services/snapshotCache";
 import { getActiveUser } from "../services/storage";
+import useStartupGate from "../hooks/useStartupGate";
 
 
 const ProfileNotesContext = createContext();
@@ -84,7 +85,13 @@ export const ProfileNotesProvider = ({ children }) => {
     }
   };
 
+  // İlk kare tohumdan çiziliyor; listener DeviceNotifications'ın not
+  // hatırlatıcı zamanlayıcısını (4200+800 ms'de koşuyor) beslediği için kapı
+  // ondan önce açılacak şekilde seçildi. Kademeler: hooks/useStartupGate.js.
+  const startupReady = useStartupGate(2600);
+
   useEffect(() => {
+    if (!startupReady) return;
     if (!uid) {
       // Logout: önceki hesabın notları yeni oturuma sızmasın (bildirim
       // zamanlayıcı da bu listeden besleniyor).
@@ -143,7 +150,7 @@ export const ProfileNotesProvider = ({ children }) => {
     );
 
     return () => unsub();
-  }, [uid]);
+  }, [uid, startupReady]);
 
   const handleAddNote = async () => {
     try {

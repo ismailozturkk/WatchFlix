@@ -30,6 +30,7 @@ import {
 import { useUserProfile } from "./UserProfileContext";
 import { getUserProfile } from "../services/userService";
 import { i18nText } from "../utils/i18nText";
+import useStartupGate from "../hooks/useStartupGate";
 
 
 const FriendsContext = createContext();
@@ -45,8 +46,14 @@ export function FriendsProvider({ children }) {
   const [outgoingRequests, setOutgoingRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Açılış yolundaki hiçbir ekran bu context'i okumuyor (sekmeler + ilk
+  // raylar); 3 listener'ı splash sonrası pencerenin dışına ertele. Kademeler
+  // için bkz. hooks/useStartupGate.js.
+  const startupReady = useStartupGate(3000);
+
   // ── Realtime listeners ───────────────────────────────────────────────────
   useEffect(() => {
+    if (!startupReady) return undefined;
     if (!uid) {
       setFriends([]);
       setIncomingRequests([]);
@@ -81,7 +88,7 @@ export function FriendsProvider({ children }) {
       unsubIn();
       unsubOut();
     };
-  }, [uid]);
+  }, [uid, startupReady]);
 
   // ── Derived helpers ──────────────────────────────────────────────────────
   const friendUidSet = useMemo(

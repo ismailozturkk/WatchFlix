@@ -19,6 +19,7 @@ import {
   markAllNotificationsRead as markAllApi,
   deleteNotification as deleteApi,
 } from "../services/notificationsService";
+import useStartupGate from "../hooks/useStartupGate";
 
 const NotificationsContext = createContext();
 export const useNotifications = () => useContext(NotificationsContext);
@@ -30,7 +31,16 @@ export function NotificationsProvider({ children }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Sekme çubuğunda rozet yok; items'ı yalnız bildirim ekranı ve
+  // DeviceNotifications'ın uygulama-rozeti/ön-plan gösterimi tüketiyor. O
+  // tüketici `loading` true iken zaten hiçbir şey yapmıyor; kapı açılıp İLK
+  // snapshot gelince "mevcutları bilinen say" tohumlaması normal işliyor —
+  // erteleme geriye dönük (backfill) bildirim ÜRETMEZ. Kademeler:
+  // hooks/useStartupGate.js.
+  const startupReady = useStartupGate(3400);
+
   useEffect(() => {
+    if (!startupReady) return undefined;
     if (!uid) {
       setItems([]);
       setLoading(false);
@@ -42,7 +52,7 @@ export function NotificationsProvider({ children }) {
       setLoading(false);
     });
     return () => unsub();
-  }, [uid]);
+  }, [uid, startupReady]);
 
   const markRead = useCallback(
     async (notifId) => {

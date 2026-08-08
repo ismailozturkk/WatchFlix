@@ -6,6 +6,7 @@ import React, {
   useMemo,
 } from "react";
 import { useAuth } from "./AuthContext";
+import useStartupGate from "../hooks/useStartupGate";
 import {
   subscribeToMySharedLists,
   subscribeToSharedListItems,
@@ -47,7 +48,14 @@ export const SharedListsProvider = ({ children }) => {
   const [sharedItemsByList, setSharedItemsByList] = useState({});
   const [loading, setLoading] = useState(true);
 
+  // Açılış yolunda bunu okuyan tek şey poster rozetlerindeki "shared" işareti;
+  // tohum/cache olmadığı için rozet kapı+snapshot kadar geç görünür (kayıp
+  // yok, kozmetik). Üyelik listesi gelmeden item listener'ları da açılmıyor —
+  // ikinci effect'i ayrıca kapılamaya gerek yok. Kademeler: hooks/useStartupGate.js.
+  const startupReady = useStartupGate(2000);
+
   useEffect(() => {
+    if (!startupReady) return undefined;
     if (!user?.uid) {
       setSharedLists([]);
       setLoading(false);
@@ -62,7 +70,7 @@ export const SharedListsProvider = ({ children }) => {
       setLoading(false);
     });
     return () => unsub();
-  }, [user?.uid]);
+  }, [user?.uid, startupReady]);
 
   const sharedListIds = useMemo(
     () => sharedLists.map((list) => list.id).filter(Boolean),

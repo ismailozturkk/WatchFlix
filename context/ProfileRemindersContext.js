@@ -14,6 +14,7 @@ import {
 import { cacheKeys } from "../utils/cacheKeys";
 import { publish, seed } from "../services/snapshotCache";
 import { getActiveUser } from "../services/storage";
+import useStartupGate from "../hooks/useStartupGate";
 import {
   clearReminderWidget,
   syncReminderWidget,
@@ -145,7 +146,15 @@ export const ProfileRemindersProvider = ({ children }) => {
   const epUnsubsRef = useRef({});
   const epDataRef   = useRef({}); // showId → episode[]
 
+  // İlk kare + ana ekran widget'ı tohumdan besleniyor (aşağıdaki widget
+  // effect'i kapıya TABİ DEĞİL, seed'i hemen aynalar). Buradaki 2+N listener
+  // kümesi (dizi başına episodes aboneliği) açılışın en pahalı ikinci Firestore
+  // yükü — DeviceNotifications'ın zamanlayıcısı (4200+800 ms) koşmadan önce
+  // taze veri gelecek şekilde ertelendi. Kademeler: hooks/useStartupGate.js.
+  const startupReady = useStartupGate(2400);
+
   useEffect(() => {
+    if (!startupReady) return;
     if (!uid) {
       setMovieReminders([]);
       setAllTvEpisodes([]);
@@ -247,7 +256,7 @@ export const ProfileRemindersProvider = ({ children }) => {
       epUnsubsRef.current = {};
       epDataRef.current   = {};
     };
-  }, [uid]);
+  }, [uid, startupReady]);
 
   const reminders = useMemo(() => ({
     movieReminders,
