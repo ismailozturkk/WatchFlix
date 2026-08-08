@@ -276,6 +276,16 @@ service cloud.firestore {
       allow read, write: if isOwner(uid);
     }
 
+    // ─── Gizli kullanıcı verisi (yalnız sahibi) ─────────────────────────
+    // Users/{uid} kök dokümanı TÜM oturumlulara okunur (profil kartları,
+    // arkadaş listeleri). Bu yüzden başkasının görmemesi gereken hiçbir alan
+    // orada duramaz. Expo push token'ları buraya taşındı: kökte dururken
+    // herhangi bir kullanıcı tüm token'ları dökebiliyor ve Expo push ucundan
+    // herkese sahte bildirim atabiliyordu (private/push).
+    match /Users/{uid}/private/{docId} {
+      allow read, write: if isOwner(uid);
+    }
+
     // ─── Following / Followers / Liked / Bookmarks (Posts için) ─────────
     match /Users/{uid}/following/{targetUid} {
       allow read: if isSignedIn();

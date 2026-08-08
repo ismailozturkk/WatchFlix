@@ -613,6 +613,77 @@ function buildContent(n, lang) {
   }
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// PUSH TOKEN ERİŞİMİ (iki tüketici de bunu kullanır)
+//
+// Token'lar Users/{uid}/private/push dokümanında. Kök Users dokümanı tüm
+// oturumlu kullanıcılara okunur olduğu için token'lar orada duramazdı.
+//
+// ⚠ GEÇİŞ FALLBACK'İ — KALDIRILACAK: aşağıdaki "legacy" blokları, sahada
+// henüz güncellenmemiş istemcilerin hâlâ kök alanlara yazması için duruyor.
+// İstemci yeni yola yazdıktan sonra kök alanları kendisi siliyor, yani
+// kullanıcılar uygulamayı bir kez açtıkça alanlar kendiliğinden boşalıyor.
+// app.json version 1.5.0'a geçtiğinde (yani 1.4.x sahadan düştüğünde) bu
+// bloklar ve kök dokümana yazan temizlik silinsin. Admin SDK kural tanımadığı
+// için okuma tarafında bir izin sorunu yok.
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Kullanıcının geçerli Expo push token'ları + gizli dokümanın ham içeriği. */
+async function loadPushTokens(uid, userData) {
+  let priv = {};
+  try {
+    const snap = await db.doc(`Users/${uid}/private/push`).get();
+    if (snap.exists) priv = snap.data() || {};
+  } catch (e) {
+    console.error("private/push okunamadı:", e);
+  }
+
+  const tokenSet = new Set();
+  if (priv.expoPushToken) tokenSet.add(priv.expoPushToken);
+  if (Array.isArray(priv.expoPushTokens)) {
+    priv.expoPushTokens.forEach((t) => t && tokenSet.add(t));
+  }
+  // legacy (geçiş) — bkz. yukarıdaki not.
+  if (userData.expoPushToken) tokenSet.add(userData.expoPushToken);
+  if (Array.isArray(userData.expoPushTokens)) {
+    userData.expoPushTokens.forEach((t) => t && tokenSet.add(t));
+  }
+
+  return { tokens: [...tokenSet].filter((t) => Expo.isExpoPushToken(t)), priv };
+}
+
+/**
+ * Uygulaması silinmiş/çıkış yapılmış cihazların token'larını temizle.
+ * Tek alan (expoPushToken) da gönderim setine giriyor; yalnız diziden
+ * silersek ölü token oradan sonsuza dek yeniden denenir.
+ */
+async function clearDeadPushTokens(uid, userData, priv, deadTokens) {
+  if (!deadTokens.length) return;
+  try {
+    const patch = { expoPushTokens: FieldValue.arrayRemove(...deadTokens) };
+    if (priv.expoPushToken && deadTokens.includes(priv.expoPushToken)) {
+      patch.expoPushToken = FieldValue.delete();
+    }
+    // update değil set+merge: doküman hiç oluşmamış olabilir (yalnız legacy
+    // alanları olan kullanıcı), update o durumda hata verirdi.
+    await db.doc(`Users/${uid}/private/push`).set(patch, { merge: true });
+  } catch (e) {
+    console.error("Ölü token temizliği hatası (private):", e);
+  }
+
+  // legacy (geçiş) — kök alanlar duruyorsa oradan da düş.
+  if (!userData.expoPushToken && !Array.isArray(userData.expoPushTokens)) return;
+  try {
+    const patch = { expoPushTokens: FieldValue.arrayRemove(...deadTokens) };
+    if (userData.expoPushToken && deadTokens.includes(userData.expoPushToken)) {
+      patch.expoPushToken = FieldValue.delete();
+    }
+    await db.doc(`Users/${uid}`).update(patch);
+  } catch (e) {
+    console.error("Ölü token temizliği hatası (legacy):", e);
+  }
+}
+
 exports.onSocialNotificationCreated = onDocumentCreated(
   "Users/{uid}/notifications/{notifId}",
   async (event) => {
@@ -657,13 +728,8 @@ exports.onSocialNotificationCreated = onDocumentCreated(
       return;
     }
 
-    // expoPushToken (tek) + expoPushTokens (dizi) → birleştir, tekille, geçerli olanları al.
-    const tokenSet = new Set();
-    if (userData.expoPushToken) tokenSet.add(userData.expoPushToken);
-    if (Array.isArray(userData.expoPushTokens)) {
-      userData.expoPushTokens.forEach((t) => t && tokenSet.add(t));
-    }
-    const tokens = [...tokenSet].filter((t) => Expo.isExpoPushToken(t));
+    // Token'lar Users/{uid}/private/push'ta (+ geçiş süresince kök alanlar).
+    const { tokens, priv } = await loadPushTokens(recipientUid, userData);
     if (tokens.length === 0) {
       console.log(`Geçerli Expo push token yok: ${recipientUid}`);
       return;
@@ -711,20 +777,7 @@ exports.onSocialNotificationCreated = onDocumentCreated(
       }
     }
 
-    // Uygulaması silinmiş/çıkış yapılmış cihazların token'larını temizle.
-    // Legacy tek alan (expoPushToken) da gönderim setine giriyor — yalnız
-    // diziden silersek ölü token oradan sonsuza dek yeniden denenir.
-    if (deadTokens.length) {
-      try {
-        const patch = { expoPushTokens: FieldValue.arrayRemove(...deadTokens) };
-        if (userData.expoPushToken && deadTokens.includes(userData.expoPushToken)) {
-          patch.expoPushToken = FieldValue.delete();
-        }
-        await db.doc(`Users/${recipientUid}`).update(patch);
-      } catch (e) {
-        console.error("Ölü token temizliği hatası:", e);
-      }
-    }
+    await clearDeadPushTokens(recipientUid, userData, priv, deadTokens);
 
     console.log(
       `Push gönderildi → ${recipientUid} | tür: ${n.type} | cihaz: ${tokens.length} | ölü: ${deadTokens.length}`,
@@ -1056,19 +1109,19 @@ async function processUserStreaming(userDoc, getProviders) {
   const uid = userDoc.id;
   const u = userDoc.data() || {};
 
-  // Geçerli Expo token'ları.
-  const tokenSet = new Set();
-  if (u.expoPushToken) tokenSet.add(u.expoPushToken);
-  if (Array.isArray(u.expoPushTokens)) u.expoPushTokens.forEach((t) => t && tokenSet.add(t));
-  const tokens = [...tokenSet].filter((t) => Expo.isExpoPushToken(t));
-  if (tokens.length === 0) return 0;
-
-  // Abone olunan sağlayıcılar + bölge.
+  // SIRA: sağlayıcı kontrolü ÖNCE. Token'lar artık ayrı bir dokümanda
+  // (Users/{uid}/private/push) yani okumaya mal oluyor; bu fonksiyon her gün
+  // tüm kullanıcıları geziyor. Sağlayıcı seçmemiş kullanıcı zaten eleneceği
+  // için o okumayı hiç yapmıyoruz.
   const sp = u.streamingProviders || {};
   const subscribedIds = (Array.isArray(sp.ids) ? sp.ids : [])
     .map(Number)
     .filter((n) => Number.isInteger(n) && n > 0);
   if (subscribedIds.length === 0) return 0;
+
+  const { tokens, priv } = await loadPushTokens(uid, u);
+  if (tokens.length === 0) return 0;
+
   const region = typeof sp.region === "string" && sp.region ? sp.region : "US";
   const lang = u.notificationLanguage === "en" ? "en" : "tr";
   const S = STREAM_STRINGS[lang];
@@ -1166,13 +1219,7 @@ async function processUserStreaming(userDoc, getProviders) {
       console.error("[streaming] push hatası:", e && e.message);
     }
   }
-  if (deadTokens.length) {
-    const patch = { expoPushTokens: FieldValue.arrayRemove(...deadTokens) };
-    if (u.expoPushToken && deadTokens.includes(u.expoPushToken)) {
-      patch.expoPushToken = FieldValue.delete();
-    }
-    await db.doc(`Users/${uid}`).update(patch).catch(() => {});
-  }
+  await clearDeadPushTokens(uid, u, priv, deadTokens);
 
   return new Set(messages.map((m) => m.title)).size;
 }

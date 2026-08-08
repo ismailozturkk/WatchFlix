@@ -9,15 +9,29 @@
 //   2) Foreground social — uygulama açık/canlıyken Firestore listener bir
 //      "anlık" bildirim sunar (presentNow). identifier prefix: social_
 //
-// Backend (Cloud Functions) yok → cihaz kapalıyken push gelmez. Push token
-// yine de kaydedilir ki ileride sunucu eklenince hazır olsun.
+// Uzak push CANLI: functions/index.js içindeki onSocialNotificationCreated
+// (sosyal bildirimler) ve dailyStreamingAvailability (yayın uygunluğu) burada
+// kaydedilen token'lara gönderim yapar.
 
 import { Platform, AppState } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import Constants from "expo-constants";
-import { doc, updateDoc, arrayUnion, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  updateDoc,
+  arrayUnion,
+  deleteField,
+  serverTimestamp,
+} from "firebase/firestore";
 import { db } from "../firebase";
+
+// Token'ların YERİ: Users/{uid} kök dokümanı tüm oturumlulara okunur olduğu
+// için token'lar orada duramaz — herhangi bir kullanıcı hepsini döküp Expo
+// push ucundan herkese sahte bildirim atabilirdi. Bu doküman yalnız sahibine
+// açık (firestore.rules → match /Users/{uid}/private/{docId}).
+const pushDocRef = (uid) => doc(db, "Users", uid, "private", "push");
 
 export const REMINDER_PREFIX = "reminder_";
 export const SOCIAL_PREFIX = "social_";
@@ -194,11 +208,30 @@ export async function registerForPushNotificationsAsync(uid) {
     const token = tokenResp?.data;
     if (!token || !uid) return token || null;
 
-    // Token'ı kullanıcı dokümanına yaz (ileride backend tüketecek).
+    // Token'ı gizli alt dokümana yaz. setDoc+merge: doküman ilk seferde yok.
+    try {
+      await setDoc(
+        pushDocRef(uid),
+        {
+          expoPushToken: token,
+          expoPushTokens: arrayUnion(token),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    } catch (e) {
+      if (__DEV__) console.warn("push token yazilamadi:", e?.message);
+      return token;
+    }
+
+    // KENDİ KENDİNİ GÖÇ ETTİRME: yeni yol yazıldıktan SONRA eski kök alanları
+    // sil. Sırası önemli — önce silip sonra yazma başarısız olsaydı kullanıcı
+    // token'sız kalır, bildirim almazdı. Sunucu bir süre daha eski alanlara da
+    // bakıyor (functions/index.js), o yüzden ara durumda kayıp olmuyor.
     await updateDoc(doc(db, "Users", uid), {
-      expoPushToken: token,
-      expoPushTokens: arrayUnion(token),
-      pushTokenUpdatedAt: serverTimestamp(),
+      expoPushToken: deleteField(),
+      expoPushTokens: deleteField(),
+      pushTokenUpdatedAt: deleteField(),
     }).catch(() => {});
 
     return token;

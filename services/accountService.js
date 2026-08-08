@@ -432,6 +432,9 @@ export async function purgeUserData(uid) {
     "friendRequests",
     "sentRequests",
     "blocked",
+    // Push token'ları burada (private/push). Silinmezse hesap gittikten sonra
+    // cihaz token'ı artık olarak kalır ve o cihaza bildirim gitmeye devam eder.
+    "private",
     "notifications",
     "following",
     "followers",

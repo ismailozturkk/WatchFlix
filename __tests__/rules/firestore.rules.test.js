@@ -373,7 +373,73 @@ describe("DM mesajlari", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4) Doğum tarihi: bir kez yazılır, sonra kilitli
+// 4) Gizli kullanıcı verisi: push token'ları yalnız sahibine
+// ─────────────────────────────────────────────────────────────────────────────
+describe("Users/{uid}/private", () => {
+  const TOKEN = "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]";
+
+  test("sahibi kendi push dokumanini yazip okuyabilir", async () => {
+    await assertSucceeds(
+      setDoc(doc(alice, "Users", ALICE, "private", "push"), {
+        expoPushToken: TOKEN,
+        expoPushTokens: [TOKEN],
+      }),
+    );
+    await assertSucceeds(getDoc(doc(alice, "Users", ALICE, "private", "push")));
+  });
+
+  test("BASKA kullanici push dokumanini OKUYAMAZ", async () => {
+    await seed((db) =>
+      setDoc(doc(db, "Users", ALICE, "private", "push"), {
+        expoPushToken: TOKEN,
+        expoPushTokens: [TOKEN],
+      }),
+    );
+    // Asıl açık buydu: kök Users dokümanı tüm oturumlulara okunur, token
+    // orada dururken herkes hepsini dökebiliyordu.
+    await assertFails(getDoc(doc(bob, "Users", ALICE, "private", "push")));
+  });
+
+  test("BASKA kullanici push dokumanina YAZAMAZ", async () => {
+    await assertFails(
+      setDoc(doc(bob, "Users", ALICE, "private", "push"), { expoPushToken: TOKEN }),
+    );
+  });
+
+  test("oturumsuz kullanici okuyamaz", async () => {
+    await seed((db) =>
+      setDoc(doc(db, "Users", ALICE, "private", "push"), { expoPushToken: TOKEN }),
+    );
+    const anon = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(anon, "Users", ALICE, "private", "push")));
+  });
+
+  test("kok dokumandaki eski token alanlari sahibince silinebilir", async () => {
+    await seed((db) =>
+      setDoc(doc(db, "Users", ALICE), {
+        uid: ALICE,
+        username: "alice",
+        usernameLower: "alice",
+        displayName: "Alice",
+        expoPushToken: TOKEN,
+        expoPushTokens: [TOKEN],
+        pushTokenUpdatedAt: null,
+      }),
+    );
+    // İstemcinin kendi kendini göç ettirme adımı
+    // (services/pushNotificationsService.js).
+    await assertSucceeds(
+      updateDoc(doc(alice, "Users", ALICE), {
+        expoPushToken: deleteField(),
+        expoPushTokens: deleteField(),
+        pushTokenUpdatedAt: deleteField(),
+      }),
+    );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5) Doğum tarihi: bir kez yazılır, sonra kilitli
 // ─────────────────────────────────────────────────────────────────────────────
 describe("birthDate kilidi", () => {
   const profil = (extra = {}) => ({
