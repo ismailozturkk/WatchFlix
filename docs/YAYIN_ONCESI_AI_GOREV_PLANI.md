@@ -60,7 +60,26 @@
 
 ## FAZ B — KOD BLOKERLERİ
 
-### [ ] GÖREV B1 — Çift `AIChatScreen`'i tek bileşende birleştir (~yarım gün)
+### [x] GÖREV B1 — Çift `AIChatScreen`'i tek bileşende birleştir (2026-08-08)
+
+> **Sonuç:** `672bcf1`. Tek dosya kaldı (`screens/chat/AIChatScreen.js`, +83 satır);
+> `screens/AIChatScreen.js` silindi (-942). Üç giriş noktası da aynı bileşeni kullanıyor
+> (`ChatModal`, `MovieDetail`, `TvShowsDetails`). Prop imzası aynı kaldığı için JSX'e
+> dokunulmadı. `npm test` 59/908 yeşil.
+>
+> **i18n adımı gerekmedi:** taşınan blokta (startPromptChat + iki efekt) kullanıcıya
+> görünen metin yok; ham Türkçe fallback'ler zaten silinen kopyadaydı. `AICineChat`
+> anahtarlarının tamamının iki pakette de bulunduğu ayrıca doğrulandı — koddaki
+> `t?.AICineChat?.X || "..."` fallback'leri erişilemez durumda.
+>
+> **⚠ MANUEL DOĞRULAMA (dev build'de yapılmalı, kod tarafı bitti):**
+> 1. Film detayı → "AI'ya sor" → panel açılır, başlık satırında **kota göstergesi** yazar
+>    (eskiden bu akışta "Film & dizi asistanı" yazıyordu).
+> 2. `initialPrompt` ilk mesaj olarak kendiliğinden gider; baloncukta yapım kartı iliştirilmiş
+>    görünür ve balonda ham yönerge değil kısa metin yazar.
+> 3. Panel kapatılıp **aynı yapım için** tekrar "AI'ya sor" → sohbet yeniden başlar
+>    (initialPromptRef sıfırlaması bunun içindi).
+> 4. Dizi detayında aynısı; FAB/pet akışı bozulmamış olmalı.
 
 **Bağlam:** İki canlı kopya var ve ayrışmış durumda:
 - `screens/chat/AIChatScreen.js` → giriş noktası `components/modals/ChatModal.js` ("`ChatModal.js:66`", pet/FAB akışı). Kota UI'sı var (`AI_PLAN_LIMITS`, `usePremium`, `quotaText`), tamamı `i18nText` sarılı. Prop'ları `{ visible, onClose, fabOrigin }`.
