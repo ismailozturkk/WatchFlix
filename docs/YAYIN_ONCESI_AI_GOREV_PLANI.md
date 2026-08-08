@@ -168,8 +168,11 @@
 
 **Kabul:** yeni token'lar `private/push`'a yazılıyor; `Users` dokümanında token kalmıyor (aktif kullanıcılarda kendiliğinden temizleniyor); push bildirimleri iki fonksiyondan da gitmeye devam ediyor.
 
-### [~] GÖREV B4 — Şikâyet Et + Engelle: UI ve filtreleme (Apple 1.2 / Play UGC) (2026-08-08 başladı)
+### [x] GÖREV B4 — Şikâyet Et + Engelle: UI ve filtreleme (Apple 1.2 / Play UGC) (2026-08-08)
 
+> **Sekiz adımın hepsi bitti.** `npm test` 60 suite / 917 test, `npm run test:rules` 41 test.
+> Son commit `82d0193` (profil + süzgeçler + engellenenler ekranı).
+>
 > **Bitenler (adım 1-4 + kısmi 6/8):**
 > - `ace6dcc` — veri + servis: `ContentReports` kuralı (create-only, alan/tip doğrulamalı,
 >   kendini şikâyet yasağı), `utils/reportValidation.js` (saf, 9 test),
@@ -185,12 +188,13 @@
 > görünmeli, tek seferlik `getBlockedUsers` yetmiyordu. Listener `loading` sayacına
 > KATILMIYOR (eşik 3'te sabit, yoksa loading hiç kapanmazdı).
 >
-> **KALAN:**
-> - Adım 5: `FriendProfileScreen` → engelle/engeli kaldır + şikâyet.
-> - Adım 6: kalan süzgeçler — feed (`context/PostsContext.js`), sohbet listesi
->   (`MessagesScreen`), engellenmiş kişiyle yeni DM/mesaj gönderimi, arama
->   (`SearchFriendsScreen`).
-> - Adım 7: Ayarlar → Gizlilik altında "Engellenen kullanıcılar" ekranı.
+> - `82d0193` — adım 5-7: profil menüsü (şikâyet + engelle/kaldır), engellenenler ekranı
+>   (Ayarlar → Gizlilik), engel süzgeçleri dört yüzeyde (feed, sohbet listesi, sohbet
+>   composer'ı, arama).
+>
+> **Süzme kararı:** feed'de ham `posts` state'i değiştirilmedi, dışarı süzülmüş liste
+> veriliyor. Sayfalama ve iyimser güncellemeler (beğeni/düzenle/sil) öğeleri kimliğe göre
+> buluyor; ham listeden çıkarmak o akışları bozardı.
 >
 > **⚠ MANUEL DOĞRULAMA (dev build):** `ReportReasonSheet` bir `BottomSheetModal` (RN Modal)
 > ve yorum yüzeyinde **zaten açık olan** `CommentSheetModal`'ın içinden açılıyor. Projede
