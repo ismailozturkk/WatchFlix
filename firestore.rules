@@ -573,6 +573,37 @@ service cloud.firestore {
                     && request.resource.data.reporterId == request.auth.uid;
     }
 
+    // ─── İçerik şikayetleri: yorum / mesaj / kullanıcı ───────────────────
+    // PostReports ile AYNI model (create-only). Ayrı koleksiyon çünkü şema
+    // farklı: gönderi şikayeti postId taşıyor, buradakiler hedefin tam
+    // Firestore yolunu + kısa önizlemesini taşıyor. PostReports'a
+    // dokunulmadı; gönderi şikayetleri orada kalmaya devam ediyor.
+    //
+    // Okuma da KAPALI: şikayet edilen kişi kendisi hakkındaki şikayetleri
+    // görmesin ve koleksiyon "kim kimi ihbar etti" veri tabanına dönüşmesin.
+    // İnceleme konsoldan (iç moderasyon görünümü: yol haritası D5).
+    //
+    // Alan listesi ve tipler sıkı doğrulanıyor; istemci tarafındaki karşılığı
+    // utils/reportValidation.js (testli) — ikisi birlikte değişmeli.
+    match /ContentReports/{reportId} {
+      allow read, update, delete: if false;
+      allow create: if isSignedIn()
+                    && request.resource.data.reporterId == request.auth.uid
+                    && request.resource.data.keys().hasOnly([
+                         'type', 'targetPath', 'targetPreview',
+                         'targetUserId', 'reporterId', 'reason', 'createdAt'
+                       ])
+                    && request.resource.data.type in ['comment', 'message', 'user']
+                    && request.resource.data.targetUserId is string
+                    && request.resource.data.targetUserId != request.auth.uid
+                    && request.resource.data.targetPath is string
+                    && request.resource.data.targetPath.size() <= 500
+                    && request.resource.data.reason is string
+                    && request.resource.data.reason.size() <= 40
+                    && request.resource.data.targetPreview is string
+                    && request.resource.data.targetPreview.size() <= 300;
+    }
+
     // ─── Presence (online status, ayrı koleksiyon) ──────────────────────
     // Heartbeat'i Users üzerindeki listener fan-out'undan kaçırmak için
     // ayrı koleksiyon. Tüm signed-in kullanıcılar okur (privacy filtresi

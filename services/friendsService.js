@@ -389,3 +389,20 @@ export async function fetchBlockedUsers(uid) {
   const snap = await getDocs(collection(db, "Users", uid, "blocked"));
   return snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
 }
+
+/**
+ * Realtime: engellenen kullanıcılar.
+ *
+ * Tek seferlik fetchBlockedUsers yeterli DEĞİL: engelin etkisi (feed, yorum,
+ * sohbet, arama süzgeçleri) anında görünmeli. Kullanıcı birini engelledikten
+ * sonra o kişinin gönderisi ekranda kalmaya devam ederse engelleme çalışmıyor
+ * gibi duruyor — mağaza incelemesinde de ilk bakılan şey bu.
+ */
+export function subscribeToBlocked(uid, callback) {
+  if (!uid) return () => {};
+  return onSnapshot(
+    collection(db, "Users", uid, "blocked"),
+    (snap) => callback(snap.docs.map((d) => ({ uid: d.id, ...d.data() }))),
+    snapshotErrorHandler("blocked"),
+  );
+}

@@ -18,6 +18,7 @@ import {
   subscribeToFriends,
   subscribeToIncomingRequests,
   subscribeToOutgoingRequests,
+  subscribeToBlocked,
   sendFriendRequest as sendReq,
   acceptFriendRequest as acceptReq,
   declineFriendRequest as declineReq,
@@ -44,6 +45,7 @@ export function FriendsProvider({ children }) {
   const [friends, setFriends] = useState([]);
   const [incomingRequests, setIncomingRequests] = useState([]);
   const [outgoingRequests, setOutgoingRequests] = useState([]);
+  const [blockedUsers, setBlockedUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Açılış yolundaki hiçbir ekran bu context'i okumuyor (sekmeler + ilk
@@ -58,6 +60,7 @@ export function FriendsProvider({ children }) {
       setFriends([]);
       setIncomingRequests([]);
       setOutgoingRequests([]);
+      setBlockedUsers([]);
       setLoading(false);
       return;
     }
@@ -81,12 +84,18 @@ export function FriendsProvider({ children }) {
       setOutgoingRequests(list);
       markLoaded();
     });
+    // markLoaded ÇAĞIRMIYOR: `loading` üç listener'ın sayacına bağlı ve
+    // ekranlar onu "arkadaş verisi hazır" anlamında kullanıyor. Engel listesi
+    // ayrı bir yüzey (süzgeç) besliyor; sayaca katarsak eşik 3'te kalır ve
+    // loading hiç kapanmaz.
+    const unsubBlocked = subscribeToBlocked(uid, setBlockedUsers);
 
     return () => {
       mounted = false;
       unsubFriends();
       unsubIn();
       unsubOut();
+      unsubBlocked();
     };
   }, [uid, startupReady]);
 
@@ -104,7 +113,18 @@ export function FriendsProvider({ children }) {
     [outgoingRequests],
   );
 
+  // Engel süzgeçlerinin tek kaynağı. Set olarak veriliyor: feed/yorum/arama
+  // listeleri her öğe için sorguluyor, dizide arama O(n×m) olurdu.
+  const blockedUidSet = useMemo(
+    () => new Set(blockedUsers.map((b) => b.uid)),
+    [blockedUsers],
+  );
+
   const isFriend = useCallback((targetUid) => friendUidSet.has(targetUid), [friendUidSet]);
+  const isBlocked = useCallback(
+    (targetUid) => !!targetUid && blockedUidSet.has(targetUid),
+    [blockedUidSet],
+  );
   const hasIncomingFrom = useCallback(
     (targetUid) => incomingUidSet.has(targetUid),
     [incomingUidSet],
@@ -220,11 +240,14 @@ export function FriendsProvider({ children }) {
       friends,
       incomingRequests,
       outgoingRequests,
+      blockedUsers,
       loading,
       // derived
       isFriend,
       hasIncomingFrom,
       hasOutgoingTo,
+      blockedUidSet,
+      isBlocked,
       // actions
       sendRequest,
       acceptRequest,
@@ -239,10 +262,13 @@ export function FriendsProvider({ children }) {
       friends,
       incomingRequests,
       outgoingRequests,
+      blockedUsers,
       loading,
       isFriend,
       hasIncomingFrom,
       hasOutgoingTo,
+      blockedUidSet,
+      isBlocked,
       sendRequest,
       acceptRequest,
       declineRequest,

@@ -439,7 +439,79 @@ describe("Users/{uid}/private", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5) Doğum tarihi: bir kez yazılır, sonra kilitli
+// 5) İçerik şikayetleri: yalnız create, yalnız kendi adına
+// ─────────────────────────────────────────────────────────────────────────────
+describe("ContentReports", () => {
+  const rapor = (extra = {}) => ({
+    type: "comment",
+    targetPath: "MovieComment/550/comments/c1",
+    targetPreview: "kotu bir yorum",
+    targetUserId: BOB,
+    reporterId: ALICE,
+    reason: "harassment",
+    createdAt: new Date(),
+    ...extra,
+  });
+
+  test("oturumlu kullanici kendi adina sikayet yazabilir", async () => {
+    await assertSucceeds(addDoc(collection(alice, "ContentReports"), rapor()));
+  });
+
+  test("uc turun hepsi kabul edilir", async () => {
+    for (const type of ["comment", "message", "user"]) {
+      await assertSucceeds(
+        addDoc(collection(alice, "ContentReports"), rapor({ type })),
+      );
+    }
+  });
+
+  test("BASKASININ adina sikayet yazilamaz", async () => {
+    await assertFails(
+      addDoc(collection(alice, "ContentReports"), rapor({ reporterId: CAROL })),
+    );
+  });
+
+  test("kendini sikayet edemez", async () => {
+    await assertFails(
+      addDoc(collection(alice, "ContentReports"), rapor({ targetUserId: ALICE })),
+    );
+  });
+
+  test("bilinmeyen tur reddedilir", async () => {
+    await assertFails(
+      addDoc(collection(alice, "ContentReports"), rapor({ type: "post" })),
+    );
+  });
+
+  test("fazladan alan reddedilir", async () => {
+    await assertFails(
+      addDoc(collection(alice, "ContentReports"), rapor({ adminNote: "x" })),
+    );
+  });
+
+  test("asiri uzun onizleme reddedilir", async () => {
+    await assertFails(
+      addDoc(
+        collection(alice, "ContentReports"),
+        rapor({ targetPreview: "a".repeat(301) }),
+      ),
+    );
+  });
+
+  test("hicbir kullanici okuyamaz, guncelleyemez, silemez", async () => {
+    let id;
+    await seed(async (db) => {
+      const ref = await addDoc(collection(db, "ContentReports"), rapor());
+      id = ref.id;
+    });
+    await assertFails(getDoc(doc(alice, "ContentReports", id)));
+    await assertFails(updateDoc(doc(alice, "ContentReports", id), { reason: "spam" }));
+    await assertFails(deleteDoc(doc(alice, "ContentReports", id)));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6) Doğum tarihi: bir kez yazılır, sonra kilitli
 // ─────────────────────────────────────────────────────────────────────────────
 describe("birthDate kilidi", () => {
   const profil = (extra = {}) => ({
