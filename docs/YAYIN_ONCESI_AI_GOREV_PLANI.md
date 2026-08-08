@@ -316,7 +316,43 @@
 
 **Kabul:** manifest'te yalnız gerekli medya izinleri; story kaydetme çalışıyor.
 
-### [ ] GÖREV B9 — Bildirim izni ön-açıklama ekranı (priming) (~2-3 saat)
+### [x] GÖREV B9 — Bildirim izni ön-açıklama ekranı (priming) (2026-08-08)
+
+> **Sonuç:** `npm test` 62 suite / 938 test yeşil. Açılıştaki habersiz izin isteği kaldırıldı;
+> sistem diyaloğu artık yalnız kullanıcı ön-açıklama sayfasında "İzin ver" dedikten sonra açılıyor.
+>
+> **Karar — tetik yeri:** plan "ilk hatırlatıcı kurma denemesi VEYA onboarding'in bildirim adımı"
+> diyordu. Onboarding'de bildirim adımı YOK (2343 satır, hiç bildirim geçmiyor) ve oraya bir adım
+> eklemek izni yine bağlamsız sorardı. Tetik dört hatırlatma kurma noktasına bağlandı:
+> `components/Reminder.js`, `screens/movie/MovieDetail.js`, `components/modals/MediaQuickActionsSheet.js`,
+> `screens/tabs/profile/NotesScreen.js` (tarihli not = `reminder_note_`).
+>
+> **Karar — sayfa nerede çiziliyor:** tek örnek `DeviceNotificationsProvider` içinde; çağrı yerleri
+> yalnız `primeNotificationPermission()` diyor. B4'teki `ReportReasonSheet` riskinin tekrarı
+> OLMAMASI için iç içe modal kurulmadı: alt sayfadan tetiklenen iki yerde önce KENDİ sayfası
+> kapanıyor (`closeThen` / `PRIME_HANDOFF_MS`), sonra izin sayfası açılıyor — projenin
+> `WatchedDateSheet`/`WatchHistorySheet` geçişlerindeki deseninin aynısı.
+>
+> **Karar — bayrak iki düğmede de yanıyor.** Plan yalnız "Şimdi değil" için bayrak diyordu. Ama
+> Android'de ilk ret KALICI DEĞİL (`canAskAgain` true kalıyor); yalnız "Şimdi değil"e bayrak
+> koysaydık "İzin ver" deyip sistem diyaloğunda reddeden kullanıcıya sayfa her hatırlatmada geri
+> gelirdi. Sayfa tek seferlik; geri dönüş yolu Ayarlar › Hatırlatıcılar'daki mevcut uyarı satırı.
+>
+> **Planın üstüne çıkan:** `registerForPushNotificationsAsync` içindeki
+> `requestNotificationPermission()` çağrısı `getPermissionsAsync()` kontrolüne çevrildi. Tek çağrı
+> yeri zaten izni kontrol ettiği için diyalog açılmıyordu, ama kapı açıktı — kabul ölçütü artık
+> yapısal olarak sağlanıyor, tesadüfen değil.
+>
+> **Adım 3 (bayat yorum) zaten B3'te yapılmıştı** — `pushNotificationsService.js` başlığı
+> "Uzak push CANLI" diyor.
+>
+> **Sürüm artışı gerekmedi:** yalnız JS değişti (paket/config plugin/manifest yok), `app.json`
+> 1.4.2'de kaldı.
+>
+> **Manuel test listesine eklendi:** ① ilk hatırlatma kurulunca sayfa açılıyor mu, ② "İzin ver"
+> sonrası sistem diyaloğu geliyor mu (iOS'ta sayfa kapanışıyla çakışmıyor mu), ③ "Şimdi değil"
+> dedikten sonra sayfa bir daha gelmiyor mu, ④ hızlı eylem sayfasından hatırlatma kurunca sayfa
+> ÖNCE kapanıp izin sayfası sonra mı açılıyor.
 
 **Bağlam:** `context/DeviceNotificationsContext.js` ~198-218: açılıştan ~4.2 sn sonra sistem izni habersiz isteniyor — iOS'ta tek seferlik hakkı yakar, App Review'da yorum konusu. `components/NotificationPermissionNotice.js` yalnız RET SONRASI bilgilendirme; ön-açıklama değil.
 
