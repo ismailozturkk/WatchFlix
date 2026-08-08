@@ -29,7 +29,17 @@
 
 ## FAZ A — DAL TOPARLAMA
 
-### [ ] GÖREV A1 — Bekleyen işi commit'le, master ile birleşmeyi öner (~1 saat)
+### [x] GÖREV A1 — Bekleyen işi commit'le, master ile birleşmeyi öner (2026-08-08)
+
+> **Sonuç:** ağaç temiz, 59 suite / 908 test yeşil, altı tema ayrı commit'te:
+> `d166ed2` yaş kapısı + yetişkin süzgeci · `1573468` yorum alt sayfası ·
+> `96b0e39` "benzerler" rayı · `d3f3adc` sohbet giriş çubuğu ·
+> `8e1d4bd` TV grafik ızgara boşluğu · `1320ecb` bu doküman.
+> Plandaki "MMKV kayıt eklemesi" teması ayrı çıkmadı: `registry.js`'teki tek
+> değişiklik `ageRestricted` anahtarıydı, yaş kapısı commit'ine girdi. Buna
+> karşılık planda olmayan iki tema çıktı (sohbet composer'ı — ChatScreen'in
+> yanında iki `AIChatScreen` kopyası da; TV grafik ızgarası).
+> **Bekleyen:** master'a birleştirme + push — kullanıcı onayı bekliyor.
 
 **Bağlam:** `checkpoint/oyun-ve-bekleyen-isler-2026-06-26` dalı master'dan 60 commit ileride ve 29 dosya + 5 yeni dosya commit'lenmemiş. İçerik denetlendi: yarım iş değil, biten işlerin commit'i atılmamış.
 
