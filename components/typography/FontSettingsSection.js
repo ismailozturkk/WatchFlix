@@ -17,9 +17,10 @@
 //
 // Bu bileşen kendi kartını ÇİZMEZ; PersonalizationScreen onu ps.card içine
 // sarar ve colors=buildUiColors(theme) ile besler.
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import AppIcon from "../AppIcon";
+import { ensureCatalogFontsLoaded } from "../../context/TypographyContext";
 import {
   FONT_PRESETS,
   FONT_PRESET_BY_ID,
@@ -81,6 +82,13 @@ export default function FontSettingsSection({ colors, language }) {
   const [aktifRol, setAktifRol] = useState("heading");
   const [tumunuGoster, setTumunuGoster] = useState(false);
 
+  // Galeri önizlemeleri katalogdaki TÜM dosyaları ister; açılışta yalnız
+  // seçili rollerin dosyaları yüklenir (bkz. TypographyContext). Gecikmiş arka
+  // plan yüklemesi henüz koşmadıysa burada beklemeden başlat.
+  useEffect(() => {
+    ensureCatalogFontsLoaded();
+  }, []);
+
   const rolMeta = ROLLER.find((rol) => rol.id === aktifRol) || ROLLER[0];
   const secili =
     FONT_PRESETS.find((preset) => preset.id === durum[aktifRol]) ||
@@ -112,9 +120,14 @@ export default function FontSettingsSection({ colors, language }) {
 
   // Örnekleri ELDEN veriyoruz: AppText, stilde fontFamily görünce rol
   // çözümlemesini atlar (bkz. components/typography/AppText.js) — henüz
-  // seçilmemiş bir fontu göstermenin tek yolu budur.
+  // seçilmemiş bir fontu göstermenin tek yolu budur. Katalog daha inmediyse
+  // yalnız seçili rollerin (açılışta yüklenen) aileleri gerçek fontla çizilir;
+  // kalan hücreler catalogFontsLoaded açılınca kendi fontuna döner.
+  const dosyasiYuklu = (presetId) =>
+    durum.catalogFontsLoaded ||
+    (durum.fontsLoaded && TEXT_ROLES.some((rol) => durum[rol] === presetId));
   const ailesi = (presetId, agirlik) =>
-    presetId === "system" || !durum.fontsLoaded
+    presetId === "system" || !dosyasiYuklu(presetId)
       ? SISTEM_FONTU
       : resolveFontFamily({ presetId, fontWeight: agirlik }) || SISTEM_FONTU;
 

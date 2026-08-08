@@ -5,13 +5,28 @@
 // gerekçesi orada yazılı (tercihi ağacın tepesindeki provider'da tutmak, font
 // değişiminde tüm uygulamayı yeniden çizdiriyordu).
 //
+// AÇILIŞ STRATEJİSİ: manifest ~100 dosya, ama seçili üç rol en fazla üç aile
+// kullanır (varsayılan "system"da hiçbiri). Açılışta YALNIZ o dosyalar yüklenip
+// setFontsLoaded(true) denir; katalogdaki geri kalan dosyalara tek ihtiyaç
+// ayarlardaki font galerisi olduğundan onlar açılış penceresinin dışında, arka
+// planda yüklenir ve setCatalogFontsLoaded(true) ile duyurulur. Ayar ekranı
+// arka plan yüklemesinden önce açılırsa ensureCatalogFontsLoaded() ile kalanı
+// kendisi tetikler. Eskiden 105 dosyanın tamamı splash sırasında okunuyordu.
+//
 // Buradaki manifest ile utils/typographyRoles.js'teki FONT_FAMILY_MAP birbirini
 // tutmak ZORUNDA: haritada olup burada yüklenmeyen bir aile hata vermez,
 // sessizce sistem fontuna düşer. __tests__/typographyRoles.test.js bu dosyayı
 // okuyup eşitliği doğrular — yeni bir aile eklerken iki tarafı da güncelle.
-import { useFonts } from "expo-font";
+import * as Font from "expo-font";
 import { useEffect } from "react";
-import { setFontsLoaded } from "../services/typographySettings";
+import { InteractionManager } from "react-native";
+import {
+  getTypographyState,
+  setCatalogFontsLoaded,
+  setFontsLoaded,
+  subscribeTypography,
+} from "../services/typographySettings";
+import { FONT_FAMILY_MAP, TEXT_ROLES } from "../utils/typographyRoles";
 
 export const APP_FONT_MANIFEST = {
   Inter_400Regular: require("@expo-google-fonts/inter/400Regular").Inter_400Regular,
@@ -121,14 +136,110 @@ export const APP_FONT_MANIFEST = {
   Julee_400Regular: require("@expo-google-fonts/julee/400Regular").Julee_400Regular,
 };
 
-export function TypographyProvider({ children }) {
-  const [fontsLoaded] = useFonts(APP_FONT_MANIFEST);
+// Katalog yüklemesini açılış penceresinin dışına atan gecikme. ChatModal
+// 3,8 sn'de mount oluyor (App.js); katalog G/Ç'si onunla da yarışmasın.
+const KATALOG_ERTELEME_MS = 5000;
 
+/** Seçili rollerin (heading/body/numeric) kullandığı tüm aile adları. */
+const rolAileAdlari = (roller) => {
+  const adlar = new Set();
+  for (const rol of TEXT_ROLES) {
+    const aile = FONT_FAMILY_MAP[roller[rol]];
+    if (!aile) continue; // "system": dosya gerekmez
+    for (const varyant of Object.values(aile)) {
+      for (const ad of Object.values(varyant)) adlar.add(ad);
+    }
+  }
+  return adlar;
+};
+
+const manifestParcasi = (adlar) => {
+  const parca = {};
+  for (const ad of adlar) {
+    if (APP_FONT_MANIFEST[ad]) parca[ad] = APP_FONT_MANIFEST[ad];
+  }
+  return parca;
+};
+
+// Söz modül seviyesinde: Fast Refresh'te provider yeniden mount olsa da katalog
+// bir kez yüklenir. Hata olursa sıfırlanır ki sonraki çağrı yeniden denesin.
+let katalogSozu = null;
+
+/** Katalogdaki TÜM fontları yükler (idempotent; yüklüler atlanır). */
+export function ensureCatalogFontsLoaded() {
+  if (!katalogSozu) {
+    katalogSozu = Font.loadAsync(APP_FONT_MANIFEST).then(
+      () => setCatalogFontsLoaded(true),
+      (hata) => {
+        katalogSozu = null;
+        console.warn("Font kataloğu yüklenemedi:", hata?.message);
+      },
+    );
+  }
+  return katalogSozu;
+}
+
+// Rol değişimleri yarışabilir: yalnız SON isteğin sonucu bayrağı açar (eski
+// istek geç bitince yeni rolün eksik dosyalarıyla "hazır" demesin).
+let rolYuklemeKimligi = 0;
+
+/** Seçili rollerin dosyalarını tamamlar; hepsi hazır olunca fontsLoaded=true. */
+const rolFontlariniYukle = () => {
+  const eksikler = [...rolAileAdlari(getTypographyState())].filter(
+    (ad) => !Font.isLoaded(ad),
+  );
+  if (eksikler.length === 0) {
+    setFontsLoaded(true);
+    return;
+  }
+  // Dosyası inmemiş aile adı vermek metni görünmez kılabilir; inene kadar
+  // sistem fontu çizilir (eski useFonts akışıyla aynı sözleşme).
+  setFontsLoaded(false);
+  const kimlik = ++rolYuklemeKimligi;
+  Font.loadAsync(manifestParcasi(eksikler)).then(
+    () => {
+      if (kimlik === rolYuklemeKimligi) setFontsLoaded(true);
+    },
+    (hata) => {
+      // Eski davranışla aynı: yükleme başarısızsa bayrak kapalı kalır,
+      // uygulama sistem fontuyla devam eder.
+      console.warn("Rol fontları yüklenemedi:", hata?.message);
+    },
+  );
+};
+
+export function TypographyProvider({ children }) {
   useEffect(() => {
-    // Yükleme bitene kadar metinler sistem fontuyla çizilir; store'a haber
-    // verince abone olan metin bileşenleri bir kez yeniden çizilir.
-    setFontsLoaded(fontsLoaded);
-  }, [fontsLoaded]);
+    let onceki = getTypographyState();
+    rolFontlariniYukle();
+    // Rol değişince (ayar ekranındaki seçim, MMKV göçünün geç yazması) yeni
+    // ailenin dosyalarını tamamla. Bayrak değişimlerinde roller aynı kaldığı
+    // için yeniden yükleme tetiklenmez.
+    const birak = subscribeTypography(() => {
+      const simdiki = getTypographyState();
+      let rolDegisti = false;
+      for (const rol of TEXT_ROLES) {
+        if (simdiki[rol] !== onceki[rol]) {
+          rolDegisti = true;
+          break;
+        }
+      }
+      onceki = simdiki;
+      if (rolDegisti) rolFontlariniYukle();
+    });
+
+    // Katalog: açılış animasyonları bitip uygulama oturduktan sonra.
+    let zamanlayici = null;
+    const gorev = InteractionManager.runAfterInteractions(() => {
+      zamanlayici = setTimeout(ensureCatalogFontsLoaded, KATALOG_ERTELEME_MS);
+    });
+
+    return () => {
+      birak();
+      gorev.cancel?.();
+      if (zamanlayici) clearTimeout(zamanlayici);
+    };
+  }, []);
 
   return children;
 }

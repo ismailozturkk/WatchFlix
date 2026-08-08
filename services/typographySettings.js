@@ -30,7 +30,11 @@ export const LEGACY_FONT_STORAGE_KEY = "appFontFamily";
 // kare boyunca göremeyen kullanıcı deneyimi buradan geliyordu. Hidrasyon
 // asenkron olmadığı için "kullanıcı seçimi geç gelen kayıtla ezilmesin"
 // koruması (kullaniciSecti) da gereksizleşti.
-let durum = Object.freeze({ ...DEFAULT_FONT_ROLES, fontsLoaded: false });
+let durum = Object.freeze({
+  ...DEFAULT_FONT_ROLES,
+  fontsLoaded: false,
+  catalogFontsLoaded: false,
+});
 const dinleyiciler = new Set();
 
 const yayinla = () => {
@@ -78,7 +82,7 @@ kayittanUygula();
 subscribe(Keys.fontRoles, kayittanUygula);
 
 const kalicilastir = () => {
-  const { fontsLoaded, ...roller } = durum;
+  const { fontsLoaded, catalogFontsLoaded, ...roller } = durum;
   // Yazılamadıysa oturum içi seçim yine de geçerli — hata depolama katmanında
   // raporlanır.
   set(Keys.fontRoles, roller);
@@ -106,11 +110,21 @@ export function setAllFontRoles(presetId, { persist = true } = {}) {
 }
 
 /**
- * Font dosyaları yüklendi. Yüklenmeden özel aile adı vermek metni GÖRÜNMEZ
- * kılabilir; o ana kadar sistem fontu çizilir.
+ * SEÇİLİ rollerin font dosyaları yüklendi. Yüklenmeden özel aile adı vermek
+ * metni GÖRÜNMEZ kılabilir; o ana kadar sistem fontu çizilir.
  */
 export function setFontsLoaded(yuklendi) {
   uygula({ fontsLoaded: Boolean(yuklendi) });
+}
+
+/**
+ * Katalogdaki TÜM aileler yüklendi. Açılışta yalnız seçili rollerin dosyaları
+ * gelir (fontsLoaded); kalan katalog arka planda yüklenir ve yalnız ayarlardaki
+ * font önizlemelerinin beklediği bu bayrakla duyurulur
+ * (bkz. context/TypographyContext.js).
+ */
+export function setCatalogFontsLoaded(yuklendi) {
+  uygula({ catalogFontsLoaded: Boolean(yuklendi) });
 }
 
 /** React dışı çağıranlar için anlık değer. */
@@ -124,7 +138,7 @@ export const subscribeTypography = (fn) => {
 
 const abone = subscribeTypography;
 
-/** {heading, body, numeric, fontsLoaded} — tercih değişince abone yeniden çizilir. */
+/** {heading, body, numeric, fontsLoaded, catalogFontsLoaded} — tercih değişince abone yeniden çizilir. */
 export function useTypographyState() {
   return useSyncExternalStore(abone, getTypographyState, getTypographyState);
 }
