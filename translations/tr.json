@@ -2235,7 +2235,9 @@
     "gizlilik_politikasi": "Gizlilik Politikası",
     "kayit_onay_bas": "Kayıt olarak ",
     "kayit_onay_orta": "'nı ve ",
-    "kayit_onay_son": "'nı kabul etmiş olursun."
+    "kayit_onay_son": "'nı kabul etmiş olursun.",
+    "yas_siniri_basligi": "Bu uygulama {{age}} yaş ve üzeri için",
+    "yas_siniri_aciklama": "Girdiğin doğum tarihiyle hesap açılamıyor."
   },
   "comments": "Yorumlar"
 }

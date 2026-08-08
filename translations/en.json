@@ -2235,7 +2235,9 @@
     "gizlilik_politikasi": "Privacy Policy",
     "kayit_onay_bas": "By signing up you agree to the ",
     "kayit_onay_orta": " and ",
-    "kayit_onay_son": "."
+    "kayit_onay_son": ".",
+    "yas_siniri_basligi": "This app is for ages {{age}} and up",
+    "yas_siniri_aciklama": "An account cannot be created with the date of birth you entered."
   },
   "comments": "Comments"
 }

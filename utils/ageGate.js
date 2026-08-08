@@ -24,6 +24,19 @@ import { Keys, get, remove, set } from "../services/storage";
 /** 18 — yetişkin içerik için alt sınır. */
 export const MIN_ADULT_AGE = 18;
 
+/**
+ * 13 — hesap açmak için alt sınır (2026-08-08 kullanıcı kararı).
+ *
+ * Neden 13: COPPA'nın "çocuk" eşiği. Uygulamada DM, grup sohbeti ve kullanıcı
+ * üretimi içerik var; 13 altına hesap açtırmak Play hedef kitle beyanı ve IARC
+ * derecelendirmesiyle tutarsız kalırdı. 13-17 arası kullanıcılar yetişkin
+ * içerik kapısıyla (MIN_ADULT_AGE) ayrıca korunuyor.
+ *
+ * DEĞER MAĞAZA FORMLARINA DA GİRİYOR — burada değiştirilirse Play Console
+ * hedef kitle beyanı ve IARC anketi de güncellenmeli.
+ */
+export const MIN_REGISTER_AGE = 13;
+
 /** Makul doğum yılı aralığı (form doğrulaması). */
 export const MAX_AGE = 120;
 
@@ -102,6 +115,22 @@ export function isAdultBirthDate(value, now) {
 export function isAgeRestrictedProfile(birthDate, now) {
   const age = calculateAge(birthDate, now);
   return age !== null && age < MIN_ADULT_AGE;
+}
+
+/**
+ * Bu doğum tarihiyle hesap açılabilir mi?
+ *
+ * Yetişkin içerik kapısının aksine burada "bilinmiyor" GEÇERLİ SAYILMAZ:
+ * orada bilinmezlik kısıtı açık bırakıyor (kullanıcıyı korumak için), burada
+ * ise kaydı engelliyor — geçersiz/eksik tarihle hesap açılmamalı. Tarih
+ * seçici zaten yalnız var olan tarihleri üretiyor, yani bu yalnızca ikinci
+ * kapı.
+ *
+ * @returns {boolean} tarih geçerli VE yaş >= MIN_REGISTER_AGE
+ */
+export function canRegister(birthDate, now) {
+  const age = calculateAge(birthDate, now);
+  return age !== null && age >= MIN_REGISTER_AGE;
 }
 
 /* ------------------------------------------------------------------ */

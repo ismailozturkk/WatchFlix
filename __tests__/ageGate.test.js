@@ -10,6 +10,8 @@
 
 import {
   MIN_ADULT_AGE,
+  MIN_REGISTER_AGE,
+  canRegister,
   calculateAge,
   clearAgeRestriction,
   formatBirthDate,
@@ -148,5 +150,53 @@ describe("cihaz aynası", () => {
     syncAgeRestriction(`${new Date().getFullYear() - 10}-01-01`);
     clearAgeRestriction();
     expect(isAgeRestricted()).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Asgari kayıt yaşı (13). Sınır günü kritik: "tam bugün 13" kabul, "bir gün
+// eksik" ret. Yaş türetilen bir değer olduğu için buradaki off-by-one hatası
+// sahada ancak doğum gününde fark edilirdi.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("canRegister", () => {
+  const bugun = new Date(2026, 7, 8); // 2026-08-08 (ay 0-tabanlı)
+
+  test("asgari yaş 13", () => {
+    expect(MIN_REGISTER_AGE).toBe(13);
+  });
+
+  test("tam bugün 13 olan kaydolabilir", () => {
+    expect(canRegister("2013-08-08", bugun)).toBe(true);
+  });
+
+  test("bir gün eksik olan kaydolamaz", () => {
+    expect(canRegister("2013-08-09", bugun)).toBe(false);
+  });
+
+  test("dünden beri 13 olan kaydolabilir", () => {
+    expect(canRegister("2013-08-07", bugun)).toBe(true);
+  });
+
+  test("artık yıl: 29 Şubat doğumlu, artık olmayan yılda 1 Mart'ta 13 olur", () => {
+    // 2012-02-29 doğumlu; 2025 artık yıl DEĞİL.
+    expect(canRegister("2012-02-29", new Date(2025, 1, 28))).toBe(false);
+    expect(canRegister("2012-02-29", new Date(2025, 2, 1))).toBe(true);
+  });
+
+  test("çok küçük ve çok büyük yaşlar", () => {
+    expect(canRegister("2020-01-01", bugun)).toBe(false);
+    expect(canRegister("1990-01-01", bugun)).toBe(true);
+  });
+
+  test("geçersiz/eksik tarih kaydı ENGELLER", () => {
+    // Yetişkin içerik kapısının aksine burada "bilinmiyor" geçerli sayılmaz.
+    expect(canRegister(null, bugun)).toBe(false);
+    expect(canRegister("", bugun)).toBe(false);
+    expect(canRegister("2013-02-30", bugun)).toBe(false); // takvimde yok
+    expect(canRegister("abc", bugun)).toBe(false);
+  });
+
+  test("gelecek tarih kaydı engeller", () => {
+    expect(canRegister("2027-01-01", bugun)).toBe(false);
   });
 });

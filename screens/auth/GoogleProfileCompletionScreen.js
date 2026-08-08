@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { Keys, remove } from "../../services/storage";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { updateProfile } from "firebase/auth";
+import { deleteUser, signOut, updateProfile } from "firebase/auth";
 import Toast from "react-native-toast-message";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth } from "../../firebase";
@@ -32,7 +32,8 @@ import {
   GOOGLE_PROFILE_PENDING_KEY,
 } from "../../services/googleAuthService";
 import { randomAvatarIndex } from "../../utils/avatars";
-import { syncAgeRestriction } from "../../utils/ageGate";
+import { canRegister, MIN_REGISTER_AGE, syncAgeRestriction } from "../../utils/ageGate";
+import { i18nText } from "../../utils/i18nText";
 import ScreenDecor from "../../components/ScreenDecor";
 import BirthDateField from "../../components/auth/BirthDateField";
 import LegalConsentNotice from "../../components/auth/LegalConsentNotice";
@@ -87,13 +88,46 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
       displayName.trim().length >= 2 &&
       isValidUsername(username) &&
       available === true &&
-      !!birthDate &&
+      // E-posta kaydıyla aynı kural: 13 altı hesap açamaz
+      // (utils/ageGate.js → MIN_REGISTER_AGE).
+      canRegister(birthDate) &&
       !saving,
     [available, birthDate, displayName, saving, user, username]
   );
 
+  /**
+   * 13 altı reddi. Google girişi Auth hesabını ZATEN AÇMIŞ oldu; profil
+   * yazılmadığı için ortada yetim bir Auth kaydı kalır. E-posta kaydındaki
+   * yetim-hesap temizliğinin aynısı: sil, silinemezse en azından çıkış yap
+   * (aksi halde kullanıcı bir daha bu ekrana düşer ve kilitli kalırdı).
+   * deleteUser recent-login ister; giriş az önce olduğu için koşul sağlanıyor.
+   */
+  const rejectUnderage = async () => {
+    Toast.show({
+      type: "error",
+      text1: i18nText("autoI18n.yas_siniri_basligi", "Bu uygulama {{age}} yaş ve üzeri için", {
+        age: MIN_REGISTER_AGE,
+      }),
+      text2: i18nText(
+        "autoI18n.yas_siniri_aciklama",
+        "Girdiğin doğum tarihiyle hesap açılamıyor.",
+      ),
+    });
+    const current = auth.currentUser;
+    if (current) {
+      await deleteUser(current).catch(() => signOut(auth).catch(() => {}));
+    }
+    remove(Keys.googleProfilePendingUid);
+  };
+
   const completeProfile = async () => {
     if (!canSave) return;
+    // Yaş sınırı ikinci kapı: buton zaten kilitli ama tarih bu arada
+    // değişmiş olabilir.
+    if (!canRegister(birthDate)) {
+      await rejectUnderage();
+      return;
+    }
     setSaving(true);
     try {
       const cleanName = displayName.trim();

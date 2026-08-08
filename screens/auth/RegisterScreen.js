@@ -38,6 +38,7 @@ import ScreenDecor from "../../components/ScreenDecor";
 import EmailSuffixRow from "../../components/auth/EmailSuffixRow";
 import BirthDateField from "../../components/auth/BirthDateField";
 import LegalConsentNotice from "../../components/auth/LegalConsentNotice";
+import { canRegister, MIN_REGISTER_AGE } from "../../utils/ageGate";
 import { alpha } from "../../theme/colors";
 import {
   describeGoogleAuthError,
@@ -93,8 +94,9 @@ export default function RegisterScreen({ navigation }) {
   const canSubmit =
     name.trim().length > 0 &&
     lastname.trim().length > 0 &&
-    // 18 altı olmak kaydı engellemez — yalnız tarih SEÇİLMİŞ olmalı.
-    !!birthDate &&
+    // 18 altı olmak kaydı ENGELLEMEZ (yalnız yetişkin içerik kapanır), ama
+    // 13 altı engeller — bkz. utils/ageGate.js → MIN_REGISTER_AGE.
+    canRegister(birthDate) &&
     username.length >= 3 &&
     usernameAvailable !== false &&
     emailValid === true &&
@@ -179,6 +181,21 @@ export default function RegisterScreen({ navigation }) {
       Toast.show({
         type: "error",
         text1: i18nText("autoI18n.dogum_tarihini_sec", "Doğum tarihini seç"),
+      });
+      return;
+    }
+    // Metin SUÇLAYICI DEĞİL: kullanıcı bir kural çiğnemedi, uygulama onun yaş
+    // grubuna uygun değil. Yaşı da tekrarlamıyoruz.
+    if (!canRegister(birthDate)) {
+      Toast.show({
+        type: "error",
+        text1: i18nText("autoI18n.yas_siniri_basligi", "Bu uygulama {{age}} yaş ve üzeri için", {
+          age: MIN_REGISTER_AGE,
+        }),
+        text2: i18nText(
+          "autoI18n.yas_siniri_aciklama",
+          "Girdiğin doğum tarihiyle hesap açılamıyor.",
+        ),
       });
       return;
     }
