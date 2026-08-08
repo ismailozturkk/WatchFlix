@@ -149,6 +149,35 @@ export default function PrivacySettingsScreen({ navigation }) {
             ))}
           </View>
         ))}
+
+        {/* Engellenen kullanıcılar — görünürlük ayarlarının devamı: engelleme
+            de "kim beni görebilir / ben kimi görürüm" kararı. Mağaza incelemesi
+            engellemenin geri alınabilir ve görülebilir olmasını arıyor. */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons
+              name="account-off-outline"
+              size={16}
+              color={theme.accent}
+            />
+            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
+              {i18nText("autoI18n.engellenen_kullanicilar", "Engellenen kullanıcılar")}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => navigation?.navigate?.("BlockedUsersScreen")}
+            activeOpacity={0.85}
+            style={[styles.blockedRow, { borderColor: theme.border }]}
+          >
+            <Text style={[styles.blockedText, { color: theme.text.secondary }]}>
+              {i18nText(
+                "autoI18n.engellenen_kullanicilar_alt",
+                "Engellediğin kişilerin gönderileri, yorumları ve mesajları sana görünmez.",
+              )}
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={theme.text.muted} />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -168,6 +197,15 @@ const styles = StyleSheet.create({
     justifyContent: "center", alignItems: "center",
   },
   title: { fontSize: 18, fontWeight: "800" },
+  blockedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  blockedText: { flex: 1, fontSize: 12.5, lineHeight: 18 },
   section: { paddingHorizontal: 16, marginBottom: 22 },
   sectionHeader: {
     flexDirection: "row",

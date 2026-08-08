@@ -22,6 +22,7 @@ import { Keys, get, set } from "../services/storage";
 import Toast from "react-native-toast-message";
 import * as PostsApi from "../services/postsService";
 import { useAuth } from "./AuthContext";
+import { useFriends } from "./FriendsContext";
 import { i18nText } from "../utils/i18nText";
 import { shouldPersistInternetData } from "../utils/dataCacheSettings";
 import { POST_TYPES } from "../utils/postComposer";
@@ -61,6 +62,9 @@ const sameIds = (a, b) =>
 
 export function PostsProvider({ children }) {
   const { user } = useAuth();
+  // FriendsProvider bu sağlayıcının ÜSTÜNDE (App.js) — engel kümesi doğrudan
+  // okunabiliyor, tüketici ekranlara süzme görevi dağıtmaya gerek yok.
+  const { isBlocked } = useFriends();
 
   // Feed açılışta hiçbir ekranda görünmüyor (Hub sekmesi lazy mount).
   // Cache parse + ilk fetch + realtime listener'ı splash sonrası donma
@@ -509,10 +513,19 @@ export function PostsProvider({ children }) {
     [user?.uid, posts],
   );
 
+  // ENGEL SÜZGECİ — dışarı `posts` yerine bu liste veriliyor. Süzme ham
+  // `posts` state'inde YAPILMIYOR: sayfalama (loadMore) ve iyimser güncellemeler
+  // (beğeni, düzenleme, silme) ham listeyi kimliğe göre buluyor; oradan öğe
+  // çıkarmak o akışları bozardı. Süzme yalnız görünürlük katmanında.
+  const visiblePosts = useMemo(
+    () => posts.filter((post) => !isBlocked(post?.authorId)),
+    [posts, isBlocked],
+  );
+
   const value = useMemo(
     () => ({
       // state
-      posts,
+      posts: visiblePosts,
       filter,
       sort,
       loading,
@@ -537,7 +550,7 @@ export function PostsProvider({ children }) {
       SORTS,
     }),
     [
-      posts,
+      visiblePosts,
       filter,
       sort,
       loading,

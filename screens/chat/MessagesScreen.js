@@ -5,7 +5,7 @@
 //   - Gruplar:   kullanıcının grupları (+ yeni grup)
 // Çok arkadaş olsa da yalnızca gerçekten mesajlaşılanlar görünür.
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useTheme } from "@context/ThemeContext";
 import { useProfileUi } from "@context/ProfileUiContext";
+import { useFriends } from "@context/FriendsContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BackButton from "@components/BackButton";
 import ScreenDecor from "@components/ScreenDecor";
@@ -50,6 +51,7 @@ export default function MessagesScreen({ navigation }) {
 
   const [tab, setTab] = useState("dm"); // "dm" | "group"
   const [convs, setConvs] = useState([]);
+  const { isBlocked } = useFriends();
   const [groups, setGroups] = useState([]);
 
   useEffect(() => {
@@ -165,7 +167,15 @@ export default function MessagesScreen({ navigation }) {
   };
 
   const isDm = tab === "dm";
-  const data = isDm ? convs : groups;
+  // Engellenen kişinin sohbeti listede görünmez. Konuşma kaydı SİLİNMİYOR:
+  // engel kaldırıldığında geçmiş geri gelsin (engel geri alınabilir bir
+  // eylem, veri kaybı değil).
+  const visibleConvs = useMemo(
+    () => convs.filter((c) => !isBlocked(c.withUid)),
+    [convs, isBlocked],
+  );
+
+  const data = isDm ? visibleConvs : groups;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>

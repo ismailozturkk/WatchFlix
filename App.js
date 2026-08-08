@@ -623,6 +623,11 @@ function AppContent() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="BlockedUsersScreen"
+          getComponent={() => require("./screens/tabs/profile/BlockedUsersScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="ReminderNotificationsScreen"
           getComponent={() => require("./screens/tabs/settings/ReminderNotificationsScreen").default}
           options={{ headerShown: false }}

@@ -35,8 +35,13 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import Feather from "@expo/vector-icons/Feather";
 import { db } from "../../../firebase";
+import Toast from "react-native-toast-message";
 import { useTheme } from "../../../context/ThemeContext";
+import { useAuth } from "../../../context/AuthContext";
 import { useFriends } from "../../../context/FriendsContext";
+import { appAlert } from "../../../components/AppAlert";
+import ReportReasonSheet from "../../../components/moderation/ReportReasonSheet";
+import { reportUser } from "../../../services/reportService";
 import { useProfileUi } from "../../../context/ProfileUiContext";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 import { useLanguage } from "../../../context/LanguageContext";
@@ -303,6 +308,7 @@ const SharedListMediaCard = memo(function SharedListMediaCard({ item, theme, get
 export default function FriendProfileScreen({ route, navigation }) {
   const { friendUid, friendName } = route.params || {};
   const { theme } = useTheme();
+  const { user: currentUser } = useAuth();
   const { language } = useLanguage();
   const { avatars } = useProfileUi();
   const { getTmdbUrl } = useImageQualitySettings();
@@ -315,6 +321,9 @@ export default function FriendProfileScreen({ route, navigation }) {
     acceptRequest,
     cancelRequest,
     removeFriend,
+    block,
+    unblock,
+    isBlocked,
   } = useFriends();
 
   const [profile, setProfile] = useState(null);
@@ -326,8 +335,10 @@ export default function FriendProfileScreen({ route, navigation }) {
   const [subShows, setSubShows] = useState(null);
   const [selectedSharedList, setSelectedSharedList] = useState(null);
   const [unfriendModalVisible, setUnfriendModalVisible] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
 
   const friend = isFriend(friendUid);
+  const blocked = isBlocked(friendUid);
   const incoming = hasIncomingFrom(friendUid);
   const outgoing = hasOutgoingTo(friendUid);
 
@@ -509,6 +520,89 @@ export default function FriendProfileScreen({ route, navigation }) {
     [windowWidth],
   );
 
+  // ── Moderasyon: şikâyet + engelle ─────────────────────────────────────────
+  const isSelf = !!currentUser?.uid && currentUser.uid === friendUid;
+
+  const submitUserReport = useCallback(
+    async (reason) => {
+      setReportVisible(false);
+      if (!currentUser?.uid) return;
+      try {
+        await reportUser({
+          targetUserId: friendUid,
+          reporterId: currentUser.uid,
+          displayName: profile?.displayName || friendName || "",
+          reason,
+        });
+        Toast.show({
+          type: "success",
+          text1: i18nText("autoI18n.sikayetin_alindi", "Şikayetin alındı"),
+        });
+      } catch {
+        Toast.show({
+          type: "error",
+          text1: i18nText("autoI18n.sikayet_gonderilemedi", "Şikayet gönderilemedi"),
+        });
+      }
+    },
+    [currentUser?.uid, friendUid, profile?.displayName, friendName],
+  );
+
+  const openModerationMenu = useCallback(() => {
+    // Engelliyken tek anlamlı eylem engeli kaldırmak; şikâyet yolu yine açık
+    // kalıyor (engellemek bildirmenin yerine geçmez).
+    appAlert(
+      i18nText("autoI18n.secenekler", "Seçenekler"),
+      undefined,
+      [
+        {
+          text: i18nText("autoI18n.sikayet_et", "Şikayet et"),
+          onPress: () => setReportVisible(true),
+        },
+        blocked
+          ? {
+              text: i18nText("autoI18n.engeli_kaldir", "Engeli kaldır"),
+              onPress: () =>
+                appAlert(
+                  i18nText("autoI18n.engeli_kaldir", "Engeli kaldır"),
+                  i18nText(
+                    "autoI18n.engeli_kaldir_onay_metni",
+                    "Bu kullanıcının gönderilerini ve mesajlarını yeniden görebileceksin.",
+                  ),
+                  [
+                    { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
+                    {
+                      text: i18nText("autoI18n.engeli_kaldir", "Engeli kaldır"),
+                      onPress: () => unblock(friendUid),
+                    },
+                  ],
+                ),
+            }
+          : {
+              text: i18nText("autoI18n.kullaniciyi_engelle", "Kullanıcıyı engelle"),
+              style: "destructive",
+              onPress: () =>
+                appAlert(
+                  i18nText("autoI18n.kullaniciyi_engelle", "Kullanıcıyı engelle"),
+                  i18nText(
+                    "autoI18n.engelle_onay_metni",
+                    "Gönderilerini, yorumlarını ve mesajlarını görmezsin. Arkadaşsanız arkadaşlık da kalkar.",
+                  ),
+                  [
+                    { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
+                    {
+                      text: i18nText("autoI18n.engelle", "Engelle"),
+                      style: "destructive",
+                      onPress: () => block(friendUid),
+                    },
+                  ],
+                ),
+            },
+        { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
+      ],
+    );
+  }, [blocked, block, unblock, friendUid]);
+
   // ── İlişki butonu ─────────────────────────────────────────────────────────
   const confirmUnfriend = useCallback(() => setUnfriendModalVisible(true), []);
   const handleRemoveFriend = useCallback(() => {
@@ -659,6 +753,23 @@ export default function FriendProfileScreen({ route, navigation }) {
                     <Text allowFontScaling={false} style={styles.compactMessageText}>
                       {i18nText("autoI18n.mesaj_2", "Mesaj")}
                     </Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Moderasyon menüsü — mağaza şartı: profilden de şikâyet ve
+                    engelleme erişilebilir olmalı. Kendi profilinde çizilmiyor. */}
+                {!isSelf && (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={openModerationMenu}
+                    style={[
+                      styles.compactActionBtn,
+                      styles.moderationBtn,
+                      { borderColor: theme.border ?? "rgba(255,255,255,0.12)" },
+                    ]}
+                    accessibilityLabel={i18nText("autoI18n.secenekler", "Seçenekler")}
+                  >
+                    <Feather name="more-horizontal" size={16} color={theme.text?.muted ?? "#999"} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -999,6 +1110,17 @@ export default function FriendProfileScreen({ route, navigation }) {
             )}
       </BottomSheetModal>
 
+      <ReportReasonSheet
+        visible={reportVisible}
+        onClose={() => setReportVisible(false)}
+        onSelect={submitUserReport}
+        subtitle={i18nText(
+          "autoI18n.sikayet_hedefi_kullanici",
+          "{{name}} adlı kullanıcı bildiriliyor.",
+          { name: profile?.displayName || friendName || "" },
+        )}
+      />
+
       <Modal
         visible={unfriendModalVisible}
         transparent
@@ -1152,6 +1274,9 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   compactActionText: { fontSize: 10.5, fontWeight: "800", flexShrink: 1 },
+  // "..." düğmesi metin taşımıyor: flex:1 verilirse ilişki düğmesiyle eşit
+  // yer kapar ve satır dengesiz görünür. Kare kalıyor.
+  moderationBtn: { flex: 0, width: 34, paddingHorizontal: 0 },
   compactMessageBtn: {
     height: 32,
     borderRadius: 10,

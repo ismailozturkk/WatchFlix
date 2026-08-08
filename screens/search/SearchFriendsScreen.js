@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   View,
   TextInput,
@@ -38,7 +38,16 @@ export default function SearchFriendsScreen({ navigation }) {
     sendRequest,
     cancelRequest,
     removeFriend,
+    isBlocked,
   } = useFriends();
+
+  // Engellenen kullanıcı arama sonuçlarında çıkmaz — çıksa "Arkadaş Ekle"
+  // düğmesi görünür ve istek kural düzeyinde (notBlocked) reddedilirdi;
+  // kullanıcı sebebini anlamadan bir hata görürdü.
+  const visibleResults = useMemo(
+    () => results.filter((u) => !isBlocked(u?.uid || u?.id)),
+    [results, isBlocked],
+  );
 
   const titleAnim = useRef(new Animated.Value(0)).current;
   const searchBarAnim = useRef(new Animated.Value(0)).current;
@@ -297,7 +306,7 @@ export default function SearchFriendsScreen({ navigation }) {
           />
           <Text style={[styles.emptyText, { color: theme.text?.secondary ?? "#aaa" }]}>{i18nText("autoI18n.arkadaslarini_bulmak_icin_kullanici_adi_yaz", "Arkadaşlarını bulmak için kullanıcı adı yaz")}</Text>
         </View>
-      ) : results.length === 0 ? (
+      ) : visibleResults.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="person-outline" size={52} color={theme.text?.muted ?? "#444"} />
           <Text style={[styles.emptyText, { color: theme.text?.secondary ?? "#aaa" }]}>
@@ -305,7 +314,7 @@ export default function SearchFriendsScreen({ navigation }) {
         </View>
       ) : (
         <FlatList
-          data={results}
+          data={visibleResults}
           keyExtractor={(item) => item.uid}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}

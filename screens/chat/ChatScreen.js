@@ -2246,7 +2246,25 @@ export default function ChatScreen({ route, navigation }) {
                 </View>
               )}
 
-              {/* Tek parça hap: [+ FAB][input][gönder] */}
+              {/* Engellenen kişiye yazma yolu KAPALI: hap yerine bilgi satırı.
+                  Engeli kaldırmak profil ekranından ya da Ayarlar → Gizlilik →
+                  Engellenen kullanıcılar'dan. Grup sohbetinde uygulanmıyor;
+                  orada engel yalnız görünürlüğü etkiliyor. */}
+              {!isGroup && isBlocked(friendUid) ? (
+                <View style={[styles.composerPill, styles.composerBlocked]}>
+                  <MaterialCommunityIcons
+                    name="account-cancel-outline"
+                    size={18}
+                    color="rgba(255,255,255,0.6)"
+                  />
+                  <Text style={styles.composerBlockedText}>
+                    {i18nText(
+                      "autoI18n.engellendi_mesaj_gonderilemez",
+                      "Bu kullanıcıyı engelledin",
+                    )}
+                  </Text>
+                </View>
+              ) : (
               <Animated.View
                 style={[
                   styles.composerPill,
@@ -2324,6 +2342,7 @@ export default function ChatScreen({ route, navigation }) {
                   )}
                 </TouchableOpacity>
               </Animated.View>
+              )}
             </View>
 
         {/* ── # ARAMA MODALİ ── */}
@@ -3267,6 +3286,20 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     shadowRadius: 14,
     elevation: 10,
+  },
+  // Engel bilgisi hapın yerini alıyor: aynı yükseklikte durur ki sohbet
+  // listesi engelleme anında zıplamasın.
+  composerBlocked: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 52,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
+  composerBlockedText: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 13,
+    fontWeight: "600",
   },
   inputInnerGlow: {
     position: "absolute",
