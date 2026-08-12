@@ -3,6 +3,7 @@
 // Cihaz dili seçimi: yanlış karar "her yabancı kullanıcı Türkçe açılıyor"
 // hatasını geri getirir, ekranda da sessizce olur — sınırlar burada kilitli.
 const {
+  cihazDilleriniOku,
   cihazDilindenSec,
   DESTEKLENEN_DILLER,
   YEDEK_DIL,
@@ -60,5 +61,34 @@ describe("cihazDilindenSec", () => {
     for (const girdi of girdiler) {
       expect(DESTEKLENEN_DILLER).toContain(cihazDilindenSec(girdi));
     }
+  });
+});
+
+describe("cihazDilleriniOku", () => {
+  it("native modül varsa locale listesini döndürür", () => {
+    const locales = [locale("tr")];
+    expect(
+      cihazDilleriniOku(() => ({ getLocales: () => locales })),
+    ).toBe(locales);
+  });
+
+  it("native modül eksikse uygulamayı çökertmeden boş liste döndürür", () => {
+    expect(
+      cihazDilleriniOku(() => {
+        throw new Error("Cannot find native module 'ExpoLocalization'");
+      }),
+    ).toEqual([]);
+  });
+
+  it("getLocales yoksa veya hata verirse boş liste döndürür", () => {
+    expect(cihazDilleriniOku(() => null)).toEqual([]);
+    expect(cihazDilleriniOku(() => ({}))).toEqual([]);
+    expect(
+      cihazDilleriniOku(() => ({
+        getLocales: () => {
+          throw new Error("native call failed");
+        },
+      })),
+    ).toEqual([]);
   });
 });

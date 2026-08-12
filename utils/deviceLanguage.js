@@ -4,8 +4,9 @@
 //
 // NEDEN: depoda kayıtlı dil yokken varsayılan "tr" idi, yani uygulamayı ilk kez
 // açan HER yabancı kullanıcı Türkçe bir ekranla karşılaşıyordu. Seçim burada
-// yapılıyor; cihazdan okuma (expo-localization) çağıran tarafta kalıyor ki bu
-// dosya native modül olmadan test edilebilsin.
+// yapılıyor. Native modül henüz cihazdaki uygulama paketine eklenmemişse
+// uygulamanın açılışta çökmesini önlemek için okuma güvenli bir sınır içinde
+// yapılıyor.
 
 export const DESTEKLENEN_DILLER = ["tr", "en"];
 
@@ -14,6 +15,30 @@ export const DESTEKLENEN_DILLER = ["tr", "en"];
 // Türkçe cihazlar dilini zaten bildiriyor. Yanlış tahminin bedeli asimetrik:
 // İngilizce açılan Türk kullanıcı ayarı bulur, Türkçe açılan yabancı bulamaz.
 export const YEDEK_DIL = "en";
+
+/**
+ * expo-localization native modülü eski bir development/preview uygulamasında
+ * bulunmayabilir. Paketi dosya yüklenirken statik import etmek bu durumda JS
+ * çalışmaya başlamadan uygulamayı çökertir. Gecikmeli require + güvenli yedek,
+ * yeni native build kurulana kadar uygulamanın kayıtlı dil/yedek dil ile
+ * açılabilmesini sağlar.
+ *
+ * Loader parametresi yalnız saf birim testinde native bağımlılığı ayırmak için
+ * enjekte edilir.
+ *
+ * @param {() => {getLocales?: () => Array}|null} localizationLoader
+ * @returns {Array}
+ */
+export function cihazDilleriniOku(
+  localizationLoader = () => require("expo-localization"),
+) {
+  try {
+    const getLocales = localizationLoader()?.getLocales;
+    return typeof getLocales === "function" ? getLocales() : [];
+  } catch {
+    return [];
+  }
+}
 
 /**
  * @param {Array<{languageCode?: string|null}>} locales

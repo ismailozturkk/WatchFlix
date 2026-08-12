@@ -1,8 +1,10 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import { getLocales } from "expo-localization";
 import { Keys, get, has } from "../services/storage";
-import { cihazDilindenSec } from "../utils/deviceLanguage";
+import {
+  cihazDilleriniOku,
+  cihazDilindenSec,
+} from "../utils/deviceLanguage";
 import en from "./en.json";
 import tr from "./tr.json";
 
@@ -20,7 +22,9 @@ const STORE_LANGUAGE_KEY = Keys.language.key;
 // AppSettingsContext açılış state'ini bu fonksiyondan alır; ayrışsalardı
 // LanguageContext depodaki "tr"yi i18n'e geri yazıp cihaz dilini ezerdi.
 export const cozumlenmisDil = () =>
-  has(Keys.language) ? get(Keys.language) : cihazDilindenSec(getLocales());
+  has(Keys.language)
+    ? get(Keys.language)
+    : cihazDilindenSec(cihazDilleriniOku());
 
 const languageDetector = {
   type: "languageDetector",
