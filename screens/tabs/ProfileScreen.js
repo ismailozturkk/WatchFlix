@@ -43,6 +43,7 @@ import { useWatchProgressContext } from "../../context/WatchProgressContext";
 import { odulAdi, odulBasligi } from "../../components/badges/badgeMeta";
 import { PERDE_ADLARI } from "../../utils/watchScoring";
 import { toast } from "../../components/AppToast";
+import { appAlert } from "../../components/AppAlert";
 import {
   badgeLabel,
   getIdentityBadges,
@@ -153,7 +154,12 @@ const ProfileScreen = ({ navigation }) => {
       await auth.signOut();
       handleLogout();
     } catch (error) {
-      alert(error.message);
+      appAlert(
+        i18nText("autoI18n.hata", "Hata"),
+        error?.message || i18nText("autoI18n.hata_olustu", "Hata oluştu"),
+        undefined,
+        { type: "error" },
+      );
     }
   };
   const handleLogout = () => {

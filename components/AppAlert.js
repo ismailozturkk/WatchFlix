@@ -21,25 +21,36 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  Modal,
-  Animated,
-  Dimensions,
 } from "react-native";
-import ModalBlurBackdrop from "./common/ModalBlurBackdrop";
+import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "@services/hapticsService";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
+import BottomSheetModal from "./common/BottomSheetModal";
 
-const { width: SCREEN_W } = Dimensions.get("window");
-
-// Tür → ikon + renk. 'confirm' rengi render'da theme.accent ile değişir.
+// Tür → ikon + vurgu geçişi. 'confirm' rengi render'da theme.accent olur.
 const ALERT_TYPES = {
-  info: { icon: "information-circle", color: "#3B82F6" },
-  success: { icon: "checkmark-circle", color: "#22C55E" },
-  warning: { icon: "warning", color: "#F59E0B" },
-  error: { icon: "alert-circle", color: "#EF4444" },
-  confirm: { icon: "help-circle", color: "#6C63FF" },
+  info: {
+    icon: "information-circle-outline",
+    gradient: ["#60A5FA", "#2563EB"],
+  },
+  success: {
+    icon: "checkmark-circle-outline",
+    gradient: ["#4ADE80", "#16A34A"],
+  },
+  warning: {
+    icon: "warning-outline",
+    gradient: ["#FBBF24", "#F97316"],
+  },
+  error: {
+    icon: "alert-circle-outline",
+    gradient: ["#F87171", "#DC2626"],
+  },
+  confirm: {
+    icon: "help-circle-outline",
+    gradient: ["#8B5CF6", "#6D5DFB"],
+  },
 };
 
 // options.type açıkça verilmişse onu kullan; yoksa butonlardan çıkar:
@@ -93,20 +104,20 @@ export function AppAlertHost() {
   const [visible, setVisible] = useState(false);
   const [data, setData] = useState(null);
 
-  const scale = useRef(new Animated.Value(0.9)).current;
-  const backdrop = useRef(new Animated.Value(0)).current;
-
   // Görünür bir alert varken gelenler burada bekler; kapanınca sıradaki
   // gösterilir. Önceki davranış: yeni alert görünenin içeriğini anında ezer,
   // ilkinin buton callback'leri kaybolurdu; mount kuyruğundan da yalnız ilk
   // kayıt gösterilir, kalanı sonsuza dek asılı kalırdı.
   const pendingRef = useRef([]);
   const visibleRef = useRef(false);
+  const closingRef = useRef(false);
+  const closeTimerRef = useRef(null);
 
   const showNow = (payload) => {
     setData(payload);
     setVisible(true);
     visibleRef.current = true;
+    closingRef.current = false;
   };
 
   useEffect(() => {
@@ -121,62 +132,39 @@ export function AppAlertHost() {
     }
     return () => {
       listener = null;
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (visible) {
-      openHaptic(data?.type);
-      scale.setValue(0.9);
-      backdrop.setValue(0);
-      Animated.parallel([
-        Animated.spring(scale, {
-          toValue: 1,
-          useNativeDriver: true,
-          damping: 18,
-          stiffness: 220,
-          mass: 0.8,
-        }),
-        Animated.timing(backdrop, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [visible]);
+    if (visible) openHaptic(data?.type);
+  }, [visible, data?.type]);
 
   const close = useCallback(
     (cb) => {
-      Animated.parallel([
-        Animated.timing(scale, {
-          toValue: 0.92,
-          duration: 140,
-          useNativeDriver: true,
-        }),
-        Animated.timing(backdrop, {
-          toValue: 0,
-          duration: 140,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setVisible(false);
+      if (closingRef.current) return;
+      closingRef.current = true;
+      setVisible(false);
+      // BottomSheetModal kapanış hareketini 260 ms'de tamamlar. İçerik ve
+      // callback bu pencere boyunca korunur; sıradaki uyarı ancak sonra açılır.
+      closeTimerRef.current = setTimeout(() => {
         visibleRef.current = false;
         if (typeof cb === "function") cb();
-        // Bekleyen alert varsa modal tamamen kapandıktan sonra göster.
         const next = pendingRef.current.shift();
-        if (next) setTimeout(() => showNow(next), 80);
-      });
+        if (next) showNow(next);
+        else closingRef.current = false;
+      }, 280);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scale, backdrop],
+    [],
   );
 
   if (!data) return null;
   const { title, message, buttons, options, type } = data;
   const meta = ALERT_TYPES[type] || ALERT_TYPES.info;
-  const iconColor = type === "confirm" ? theme.accent : meta.color;
+  const iconGradient =
+    type === "confirm" ? [theme.accent, theme.accent] : meta.gradient;
 
   const pressButton = (btn) => {
     try {
@@ -198,118 +186,124 @@ export function AppAlertHost() {
   const stacked = buttons.length > 2;
 
   return (
-    <Modal
-      transparent
+    <BottomSheetModal
       visible={visible}
-      animationType="none"
-      onRequestClose={onBackdrop}
-      statusBarTranslucent
+      onClose={onBackdrop}
+      intensity={30}
+      dimColor="rgba(0,0,0,0.18)"
+      dismissOnBackdropPress={options?.cancelable !== false}
+      liftWithKeyboard={false}
+      sheetStyle={[
+        styles.sheet,
+        { backgroundColor: theme.primary, borderColor: theme.border },
+      ]}
     >
-      <Animated.View style={[styles.backdrop, { opacity: backdrop }]}>
-        <ModalBlurBackdrop intensity={18} />
-        <Pressable style={StyleSheet.absoluteFill} onPress={onBackdrop} />
-      </Animated.View>
+      <View style={[styles.handle, { backgroundColor: theme.border }]} />
+      <LinearGradient colors={iconGradient} style={styles.iconCircle}>
+        <Ionicons name={meta.icon} size={28} color="#FFFFFF" />
+      </LinearGradient>
 
-      <View style={styles.center} pointerEvents="box-none">
-        <Animated.View
-          style={[
-            styles.card,
-            {
-              backgroundColor: theme.secondary,
-              borderColor: theme.border,
-              transform: [{ scale }],
-            },
-          ]}
+      {title ? (
+        <Text
+          allowFontScaling={false}
+          style={[styles.title, { color: theme.text.primary }]}
         >
-          {/* Tür ikonu */}
-          <View style={[styles.iconCircle, { backgroundColor: iconColor + "1F" }]}>
-            <Ionicons name={meta.icon} size={30} color={iconColor} />
-          </View>
+          {title}
+        </Text>
+      ) : null}
+      {message ? (
+        <Text
+          allowFontScaling={false}
+          style={[styles.message, { color: theme.text.secondary }]}
+        >
+          {message}
+        </Text>
+      ) : null}
 
-          {title ? (
-            <Text allowFontScaling={false} style={[styles.title, { color: theme.text.primary }]}>
-              {title}
-            </Text>
-          ) : null}
-          {message ? (
-            <Text allowFontScaling={false} style={[styles.message, { color: theme.text.secondary }]}>
-              {message}
-            </Text>
-          ) : null}
-
-          <View style={[styles.buttons, stacked && styles.buttonsCol]}>
-            {buttons.map((b, i) => {
-              const destructive = b.style === "destructive";
-              const cancel = b.style === "cancel";
-              const bg = cancel
-                ? "transparent"
-                : destructive
-                  ? "#EF444418"
-                  : theme.accent + "1A";
-              const fg = destructive
-                ? "#EF4444"
-                : cancel
-                  ? theme.text.muted
-                  : theme.accent;
-              return (
-                <Pressable
-                  key={i}
-                  onPress={() => pressButton(b)}
-                  style={({ pressed }) => [
-                    styles.btn,
-                    stacked && styles.btnFull,
-                    {
-                      backgroundColor: bg,
-                      borderColor: cancel ? theme.border : "transparent",
-                      opacity: pressed ? 0.7 : 1,
-                    },
-                  ]}
-                >
-                  <Text allowFontScaling={false} style={[styles.btnText, { color: fg }]}>
-                    {b.text}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </Animated.View>
+      <View style={[styles.buttons, stacked && styles.buttonsCol]}>
+        {buttons.map((b, i) => {
+          const destructive = b.style === "destructive";
+          const cancel = b.style === "cancel";
+          const bg = cancel
+            ? theme.secondary
+            : destructive
+              ? "#EF4444"
+              : theme.accent;
+          const fg = cancel ? theme.text.secondary : "#FFFFFF";
+          return (
+            <Pressable
+              key={`${b.text}-${i}`}
+              accessibilityRole="button"
+              onPress={() => pressButton(b)}
+              style={({ pressed }) => [
+                styles.btn,
+                stacked && styles.btnFull,
+                {
+                  backgroundColor: bg,
+                  borderColor: cancel ? theme.border : bg,
+                  opacity: pressed ? 0.72 : 1,
+                },
+              ]}
+            >
+              <Text
+                allowFontScaling={false}
+                style={[styles.btnText, { color: fg }]}
+              >
+                {b.text}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.45)" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 28 },
-  card: {
-    width: Math.min(SCREEN_W - 56, 380),
-    borderRadius: 22,
+  sheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     borderWidth: 1,
-    paddingTop: 22,
+    borderBottomWidth: 0,
+    paddingTop: 10,
     paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingBottom: 30,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.4,
-    shadowRadius: 24,
-    elevation: 24,
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.28,
+    shadowRadius: 20,
+    elevation: 28,
+  },
+  handle: {
+    width: 42,
+    height: 5,
+    borderRadius: 3,
+    alignSelf: "center",
+    marginBottom: 18,
+    opacity: 0.65,
   },
   iconCircle: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignSelf: "center",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: 13,
   },
-  title: { fontSize: 18, fontWeight: "800", letterSpacing: -0.3, textAlign: "center" },
-  message: {
-    fontSize: 14,
-    fontWeight: "500",
-    lineHeight: 20,
+  title: {
+    fontSize: 19,
+    fontWeight: "900",
+    letterSpacing: -0.35,
     textAlign: "center",
-    marginTop: 8,
+  },
+  message: {
+    fontSize: 13.5,
+    fontWeight: "500",
+    lineHeight: 19.5,
+    textAlign: "center",
+    marginTop: 7,
+    paddingHorizontal: 6,
   },
   buttons: {
     flexDirection: "row",
@@ -319,14 +313,18 @@ const styles = StyleSheet.create({
   buttonsCol: { flexDirection: "column" },
   btn: {
     flex: 1,
-    paddingVertical: 13,
+    minHeight: 48,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     borderRadius: 14,
     borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
     justifyContent: "center",
     alignItems: "center",
   },
   btnFull: { flex: 0, width: "100%" },
-  btnText: { fontSize: 15, fontWeight: "700" },
+  btnText: { fontSize: 14.5, fontWeight: "800" },
 });
 
 export default appAlert;
