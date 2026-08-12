@@ -24,6 +24,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import { getRatingColors } from "../../utils/ratingColors";
+import { TV_GRAPH_GRID_SIZES } from "../../utils/tvGraphGrid";
 
 import {
   useApiSettings,
@@ -43,30 +44,7 @@ import ScreenSnow from "../../components/ScreenSnow";
 // kareler %28 küçülürken aralarındaki boşluk aynı kalıyor ve ızgara
 // seyrekleşmiş görünüyordu. Artık boşluk da hücreyle aynı oranda küçülür —
 // görünüm yalnızca ÖLÇEKLENİR.
-const GAP_RATIO = 2 / 50;
-const withGap = (size) =>
-  Object.freeze({ ...size, margin: +(size.cell * GAP_RATIO).toFixed(2) });
-
-const GRID_SIZES = {
-  default: withGap({
-    cell: 50,
-    radius: 8,
-    rating: 14,
-    label: 8,
-    labelOffset: 3,
-    headerFont: 10,
-    dot: 24,
-  }),
-  compact: withGap({
-    cell: 36,
-    radius: 6,
-    rating: 11,
-    label: 6.5,
-    labelOffset: 2,
-    headerFont: 9,
-    dot: 18,
-  }),
-};
+const GRID_SIZES = TV_GRAPH_GRID_SIZES;
 
 // ─── Bölüm Hücresi (Memoize) ──────────────────────────────────────────────────
 const EpisodeCell = React.memo(
@@ -551,7 +529,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                   {" · "}
                   {showDetail.status === "Ended"
                     ? showDetail.last_air_date
-                    : "Devam ediyor"}
+                    : i18nText("autoI18n.devam_ediyor", "Devam ediyor")}
                 </Text>
                 <View style={styles.panelBottomRow}>
                   <View style={styles.ratingBadge}>

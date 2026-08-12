@@ -2,7 +2,7 @@
 //
 // TV ana ekranındaki "Devam Eden Dizilerim" rayının kartı. Poster ölçüsü ve
 // rozet düzeni diğer raylarla aynıdır; farkı SIRADAKİ BÖLÜM katmanıdır:
-// bölüm adı ve "İzledim" düğmesi POSTERİN ÜZERİNDE, alt kısmındaki gradient
+// sıradaki bölüm aksiyonları POSTERİN ÜZERİNDE, alt kısmındaki gradient
 // karartmanın içinde durur. Böylece kart rayın standart yüksekliğini korur —
 // poster altına şerit eklenseydi bu bölüm diğer raylardan uzun görünürdü.
 //
@@ -170,10 +170,7 @@ function UpNextRailCard({
         {/* ── Sıradaki bölüm katmanı: posterin alt kısmında ── */}
         <View style={styles.overlay}>
           {!resolved ? (
-            <>
-              <View style={[styles.skeletonLine, { width: "72%" }]} />
-              <View style={styles.skeletonAction} />
-            </>
+            <View style={styles.skeletonAction} />
           ) : !item ? (
             <>
               {caption(
@@ -218,12 +215,7 @@ function UpNextRailCard({
               </View>
             </>
           ) : (
-            <>
-              {caption(
-                item.episodeName ||
-                  i18nText("autoI18n.up_next_ray_bolum", "Sıradaki bölüm")
-              )}
-              <View style={styles.actionRow}>
+            <View style={styles.actionRow}>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={i18nText(
@@ -274,8 +266,7 @@ function UpNextRailCard({
                 >
                   <Ionicons name="calendar-outline" size={13} color="#fff" />
                 </Pressable>
-              </View>
-            </>
+            </View>
           )}
         </View>
       </Animated.View>
@@ -373,15 +364,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.18)",
   },
   waitingText: { color: "#fff", fontSize: 9.5, fontWeight: "800" },
-  // Çubuk ince kalsın ama YERİ bölüm adının satırı kadar olsun: 9 + 2×2.5 = 14,
-  // yani caption'ın lineHeight'i. Aksi hâlde bölüm adı düşünce katman 5px
-  // yukarı sıçrıyor.
-  skeletonLine: {
-    height: 9,
-    marginVertical: 2.5,
-    borderRadius: 5,
-    backgroundColor: "rgba(255,255,255,0.22)",
-  },
   skeletonAction: {
     height: 28,
     borderRadius: 9,

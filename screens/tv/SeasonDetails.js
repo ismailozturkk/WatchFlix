@@ -16,6 +16,7 @@ import { SeasonSkeleton } from "../../components/Skeleton";
 import BackButton from "../../components/BackButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
+import WatchProgressBar from "../../components/tv/WatchProgressBar";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import LottieView from "lottie-react-native";
 import WatchedAdd from "./WatchedAdd";
@@ -333,7 +334,7 @@ export default function SeasonDetails({ route, navigation }) {
   const watchedSeasonCount = watched.seasonWatchedCount(seasonNumber);
   const isSeasonWatched =
     details?.episodes?.length > 0
-      ? watchedSeasonCount / details.episodes.length
+      ? Math.min(1, watchedSeasonCount / details.episodes.length)
       : 0;
 
   // ── Yardımcılar ───────────────────────────────────────────────────────────
@@ -599,24 +600,14 @@ export default function SeasonDetails({ route, navigation }) {
         )}
 
         {/* ── İzlenme Çubuğu ───────────────────────────────────────────── */}
-        <View style={styles.progressWrapper}>
-          <View style={styles.progressBarTrack}>
-            <View
-              style={[
-                styles.progressBarFill,
-                {
-                  width: `${Math.round(isSeasonWatched * 100)}%`,
-                  backgroundColor: progressColor,
-                },
-              ]}
-            />
-          </View>
-          {isSeasonWatched > 0 && (
-            <Text style={[styles.progressLabel, { color: progressColor }]}>
-              %{Math.round(isSeasonWatched * 100)}
-            </Text>
-          )}
-        </View>
+        <WatchProgressBar
+          watched={watchedSeasonCount}
+          total={details.episodes?.length || 0}
+          startColor={progressColor}
+          endColor={theme.accent}
+          trackColor={theme.border}
+          style={styles.progressWrapper}
+        />
 
         {/* ── Sezon yorumları ──────────────────────────────────────────── */}
         {/* Dizinin ortak yorum sayfasını bu sezona süzülmüş açar. */}
@@ -843,27 +834,7 @@ const styles = StyleSheet.create({
 
   // ── İlerleme ──────────────────────────────────────────────────────────────
   progressWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
     marginBottom: 18,
-  },
-  progressBarTrack: {
-    flex: 1,
-    height: 4,
-    borderRadius: 4,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    overflow: "hidden",
-  },
-  progressBarFill: {
-    height: "100%",
-    borderRadius: 4,
-  },
-  progressLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    minWidth: 32,
-    textAlign: "right",
   },
 
   commentButton: { marginBottom: 18 },

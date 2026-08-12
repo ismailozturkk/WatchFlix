@@ -155,7 +155,7 @@ export default function TvOngoingSection({ navigation }) {
           allowFontScaling={false}
           style={[styles.title, { color: theme.text.secondary }]}
         >
-          {i18nText("autoI18n.devam_eden_dizilerim", "Devam Eden Dizilerim")}
+          {i18nText("autoI18n.devam_eden_dizilerim", "Devam Edenler")}
         </Text>
 
         {readyCount > 0 ? (

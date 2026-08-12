@@ -1,7 +1,7 @@
 // utils/watchBadgeLedger.js
 //
 // İzleme rozeti defterinin DEPOLAMA katmanı. Mantığın tamamı saf çekirdekte
-// (utils/watchLedgerCore.js); burası yalnızca AsyncStorage I/O'su.
+// (utils/watchLedgerCore.js); burası yalnızca tipli MMKV I/O'su.
 //
 // FIRESTORE'A HİÇBİR ŞEY YAZMAZ — bilinçli bir karar (docs §10.6):
 //   • Users/{uid} `read: if isSignedIn()`; oraya yazılan bir puan, kullanıcı
