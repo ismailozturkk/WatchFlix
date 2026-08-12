@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useCallback } fro
 import { useTranslation } from "react-i18next";
 import "../translations"; // i18next yapılandırmasını başlatır
 import { useLanguageSettings } from "./AppSettingsContext";
+import { setTmdbTitleLanguage } from "../utils/tmdbTitleFallback";
 
 const LanguageContext = createContext();
 
@@ -12,6 +13,7 @@ export const LanguageProvider = ({ children }) => {
   // Keep i18n in sync with AppSettings (covers the initial load case where
   // AppSettings resolves after i18n has already initialized with its default).
   useEffect(() => {
+    setTmdbTitleLanguage(selectedLanguage);
     if (selectedLanguage && selectedLanguage !== i18n.language) {
       i18n.changeLanguage(selectedLanguage);
     }

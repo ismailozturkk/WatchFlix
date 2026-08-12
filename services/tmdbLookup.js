@@ -10,6 +10,10 @@
 import * as cacheStore from "../utils/cacheStore";
 import { shouldPersistInternetData } from "../utils/dataCacheSettings";
 import { adultContentAllowed } from "../utils/ageGate";
+import {
+  resolveTmdbItemTitle,
+  resolveTmdbItems,
+} from "../utils/tmdbTitleFallback";
 
 const cache = new Map(); // key -> Card
 
@@ -135,14 +139,40 @@ export async function lookupTitle({
       return fallback;
     }
 
-    let card = cardFromResult(best, mediaType, query);
+    const titledBest = await resolveTmdbItemTitle(best, {
+      mediaType,
+      language,
+      authorization: apiKey,
+    });
+    let card = cardFromResult(titledBest, mediaType, query);
     if (includeDetails) {
       try {
         const detailsUrl = `https://api.themoviedb.org/3/${mediaType}/${best.id}` +
           `?language=${langOf(language)}` +
-          "&append_to_response=credits%2Cwatch%2Fproviders%2Crecommendations";
+          "&append_to_response=credits%2Cwatch%2Fproviders%2Crecommendations%2Ctranslations";
         const detailsRes = await fetch(detailsUrl, { headers: { Authorization: apiKey } });
-        if (detailsRes.ok) card = mergeDetails(card, await detailsRes.json(), language);
+        if (detailsRes.ok) {
+          let details = await detailsRes.json();
+          details = await resolveTmdbItemTitle(details, {
+            mediaType,
+            language,
+            authorization: apiKey,
+          });
+          if (Array.isArray(details?.recommendations?.results)) {
+            details = {
+              ...details,
+              recommendations: {
+                ...details.recommendations,
+                results: await resolveTmdbItems(details.recommendations.results, {
+                  mediaType,
+                  language,
+                  authorization: apiKey,
+                }),
+              },
+            };
+          }
+          card = mergeDetails(card, details, language);
+        }
       } catch {
         // Detay isteği başarısızsa arama sonucu kartı yine kullanılabilir.
       }

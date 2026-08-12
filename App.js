@@ -78,6 +78,7 @@ import SplashPosterWave from "./components/SplashPosterWave";
 import { CalendarProvider } from "./context/CalendarContext";
 import { installAxiosDataCache } from "./utils/axiosDataCache";
 import { installTmdbAdultGuard } from "./utils/tmdbAdultGuard";
+import { installTmdbTitleFallback } from "./utils/tmdbTitleFallback";
 import { isMigrated, runStorageMigration } from "./services/storage";
 import { startPresence, stopPresence } from "./services/presenceService";
 import {
@@ -112,6 +113,10 @@ installAxiosDataCache();
 // SIRA: önbellekten SONRA kurulmalı — önbelleğe ham cevap yazılsın, yetişkin
 // süzmesi hem taze hem önbellekten gelen cevaba uygulansın.
 installTmdbAdultGuard();
+// Baslik secimi filtre uygulamaz: uygulama dili -> Ingilizce -> ozgun ad.
+// Ham cevap once cache'e yazilir, yetiskin filtresi uygulanir, en son yalniz
+// gosterilecek title/name alani ortak kuralla cozulur.
+installTmdbTitleFallback();
 ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Hata raporlama İLK iş: bundan sonra çalışan her şeyin (cache preload, font
