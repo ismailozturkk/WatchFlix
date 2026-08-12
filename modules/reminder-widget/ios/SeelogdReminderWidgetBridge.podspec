@@ -1,5 +1,5 @@
 Pod::Spec.new do |s|
-  s.name           = 'ReminderWidget'
+  s.name           = 'SeelogdReminderWidgetBridge'
   s.version        = '1.0.0'
   s.summary        = 'Seelogd hatırlatıcı verisini iOS WidgetKit widget’ına köprüler.'
   s.description    = 'Paylaşılan App Group UserDefaults’a yazıp WidgetKit zaman çizelgelerini yenileyen yerel Expo modülü.'

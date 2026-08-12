@@ -18,6 +18,15 @@
         "buildType": "apk"
       }
     },
+    "appetize": {
+      "extends": "preview",
+      "env": {
+        "FIREBASE_SDK_VERSION": "12.14.0"
+      },
+      "ios": {
+        "simulator": true
+      }
+    },
     "production": {
       "autoIncrement": true,
       "channel": "production",

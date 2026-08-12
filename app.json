@@ -9,7 +9,11 @@
     "scheme": "seelogd",
     "ios": {
       "bundleIdentifier": "com.smlztrk.seelogd",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.com.smlztrk.seelogd"
@@ -80,6 +84,7 @@
       ],
       "@react-native-firebase/app",
       "@react-native-firebase/analytics",
+      "./plugins/withRNFirebaseCocoaPods.js",
       [
         "@sentry/react-native/expo",
         {
@@ -90,7 +95,8 @@
       ],
       "./plugins/withAndroidWidgets.js",
       "expo-secure-store",
-      "expo-localization"
+      "expo-localization",
+      "expo-sharing"
     ],
     "owner": "smlztrk",
     "updates": {

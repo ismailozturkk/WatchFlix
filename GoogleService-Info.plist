@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>427087836931-t6og3mehr3uop2n0eofe8vqbl0mna1f3.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.427087836931-t6og3mehr3uop2n0eofe8vqbl0mna1f3</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>427087836931-6f3bui0ruo2arq47vu9b4br94e5c4g71.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyCMoFPRal6brHe5mhE0m4B9A2Iq3M-r5Vo</string>
+	<key>GCM_SENDER_ID</key>
+	<string>427087836931</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.smlztrk.seelogd</string>
+	<key>PROJECT_ID</key>
+	<string>movieandtv-2832a</string>
+	<key>STORAGE_BUCKET</key>
+	<string>movieandtv-2832a.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:427087836931:ios:e57725568ed87d03e91b36</string>
+	<key>DATABASE_URL</key>
+	<string>https://movieandtv-2832a-default-rtdb.firebaseio.com</string>
+</dict>
+</plist>
