@@ -25,6 +25,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import axios from "axios";
 import Toast from "react-native-toast-message";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
 import {
@@ -288,6 +289,7 @@ function EpisodeGraph({ block, width }) {
 export default function StoryShareScreen({ route, navigation }) {
   const { theme } = useTheme();
   const { t, language } = useLanguage();
+  const insets = useSafeAreaInsets();
   const { API_KEY } = useApiSettings();
   const { getTmdbUrl } = useImageQualitySettings();
   const imageLanguageOrder = language === "tr" ? "tr,en,null" : "en,tr,null";
@@ -1083,7 +1085,14 @@ export default function StoryShareScreen({ route, navigation }) {
 
       {/* ══════ ALT EYLEM (paylaş + düzenle) ══════ */}
       <Animated.View
-        style={[styles.bottomBar, { borderTopColor: theme.border, opacity: actionBarOpacity }]}
+        style={[
+          styles.bottomBar,
+          {
+            borderTopColor: theme.border,
+            opacity: actionBarOpacity,
+            paddingBottom: Math.max(24, insets.bottom + 14),
+          },
+        ]}
         pointerEvents={settingsOpen ? "none" : "auto"}
       >
         <StoryActionBar
@@ -1130,7 +1139,10 @@ export default function StoryShareScreen({ route, navigation }) {
 
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={styles.sheetScroll}
+          contentContainerStyle={[
+            styles.sheetScroll,
+            { paddingBottom: 34 + insets.bottom },
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -2180,8 +2192,8 @@ const styles = StyleSheet.create({
 
   bottomBar: {
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 18,
+    paddingTop: 8,
+    paddingBottom: 24,
     borderTopWidth: 1,
   },
 });

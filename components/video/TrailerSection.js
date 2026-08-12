@@ -34,26 +34,12 @@ import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { i18nText } from "../../utils/i18nText";
 import MovieVideoItem from "../../screens/movie/components/MovieVideoItem";
-
-// Seçilebilir diller (TMDB language paramı için bölge kodlu). İlk ikisi hızlı çip.
-export const TRAILER_LANGUAGES = [
-  { code: "en", region: "en-US", label: "English" },
-  { code: "tr", region: "tr-TR", label: "Türkçe" },
-  { code: "de", region: "de-DE", label: "Deutsch" },
-  { code: "fr", region: "fr-FR", label: "Français" },
-  { code: "es", region: "es-ES", label: "Español" },
-  { code: "it", region: "it-IT", label: "Italiano" },
-  { code: "pt", region: "pt-BR", label: "Português" },
-  { code: "ru", region: "ru-RU", label: "Русский" },
-  { code: "ja", region: "ja-JP", label: "日本語" },
-  { code: "ko", region: "ko-KR", label: "한국어" },
-  { code: "zh", region: "zh-CN", label: "中文" },
-  { code: "hi", region: "hi-IN", label: "हिन्दी" },
-  { code: "ar", region: "ar-SA", label: "العربية" },
-];
-
-const langOf = (code) =>
-  TRAILER_LANGUAGES.find((l) => l.code === code) || TRAILER_LANGUAGES[0];
+import {
+  TRAILER_LANGUAGES,
+  buildTrailerLanguageOrder,
+  normalizeTrailerLanguageCode,
+  trailerLanguageOf,
+} from "../../utils/trailerLanguages";
 
 // Fragmanları öne al (Trailer > Teaser > Clip ...), resmi olanları üste.
 const TYPE_ORDER = { Trailer: 0, Teaser: 1, Clip: 2, Featurette: 3, Behind: 4 };
@@ -248,7 +234,13 @@ function TrailerPlayerModal({ visible, video, onClose, theme }) {
 }
 
 /* ───────────────────────── Dil seçim sayfası ───────────────────────── */
-function LanguageSheet({ visible, selected, onSelect, onClose, theme }) {
+function LanguageSheet({ visible, selected, originalLanguage, onSelect, onClose, theme }) {
+  const languages = useMemo(() => {
+    const original = trailerLanguageOf(originalLanguage);
+    return TRAILER_LANGUAGES.some((language) => language.code === original.code)
+      ? TRAILER_LANGUAGES
+      : [original, ...TRAILER_LANGUAGES];
+  }, [originalLanguage]);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.sheetBackdrop} onPress={onClose} />
@@ -258,7 +250,7 @@ function LanguageSheet({ visible, selected, onSelect, onClose, theme }) {
           {i18nText("autoI18n.video_dili", "Video Dili")}
         </Text>
         <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-          {TRAILER_LANGUAGES.map((l) => {
+          {languages.map((l) => {
             const active = l.code === selected;
             return (
               <TouchableOpacity
@@ -282,16 +274,21 @@ function LanguageSheet({ visible, selected, onSelect, onClose, theme }) {
 }
 
 /* ───────────────────────── Ana bölüm ───────────────────────── */
-export default function TrailerSection({ mediaType, id, apiKey }) {
+export default function TrailerSection({ mediaType, id, apiKey, originalLanguage }) {
   const { theme } = useTheme();
   const { language, t } = useLanguage();
   const appLangCode = language === "tr" ? "tr" : "en";
 
-  const [selectedLang, setSelectedLang] = useState("en"); // varsayılan İngilizce
+  const normalizedOriginalLanguage = normalizeTrailerLanguageCode(originalLanguage);
+  const [selectedLang, setSelectedLang] = useState(normalizedOriginalLanguage);
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState(null);
+
+  useEffect(() => {
+    setSelectedLang(normalizedOriginalLanguage);
+  }, [id, mediaType, normalizedOriginalLanguage]);
 
   useEffect(() => {
     let cancelled = false;
@@ -300,7 +297,7 @@ export default function TrailerSection({ mediaType, id, apiKey }) {
       .request({
         method: "GET",
         url: `https://api.themoviedb.org/3/${mediaType}/${id}/videos`,
-        params: { language: langOf(selectedLang).region },
+        params: { language: trailerLanguageOf(selectedLang).region },
         headers: { accept: "application/json", Authorization: apiKey },
       })
       .then((res) => {
@@ -319,13 +316,14 @@ export default function TrailerSection({ mediaType, id, apiKey }) {
     };
   }, [mediaType, id, selectedLang, apiKey]);
 
-  // Hızlı çipler: İngilizce + uygulama dili (+ seçili dil farklıysa o da görünsün)
+  // Hızlı çipler: özgün dil (ilk seçili) → İngilizce → uygulama dili.
   const chipCodes = useMemo(() => {
-    const base = ["en"];
-    if (appLangCode !== "en") base.push(appLangCode);
-    if (!base.includes(selectedLang)) base.push(selectedLang);
-    return base;
-  }, [appLangCode, selectedLang]);
+    return buildTrailerLanguageOrder({
+      originalLanguage: normalizedOriginalLanguage,
+      appLanguage: appLangCode,
+      selectedLanguage: selectedLang,
+    });
+  }, [appLangCode, normalizedOriginalLanguage, selectedLang]);
 
   return (
     <View style={styles.section}>
@@ -357,7 +355,7 @@ export default function TrailerSection({ mediaType, id, apiKey }) {
               <Text
                 style={[styles.chipText, { color: active ? "#fff" : theme.text.secondary }]}
               >
-                {langOf(code).label}
+                {trailerLanguageOf(code).label}
               </Text>
             </TouchableOpacity>
           );
@@ -405,6 +403,7 @@ export default function TrailerSection({ mediaType, id, apiKey }) {
       <LanguageSheet
         visible={sheetVisible}
         selected={selectedLang}
+        originalLanguage={normalizedOriginalLanguage}
         theme={theme}
         onClose={() => setSheetVisible(false)}
         onSelect={(code) => {
