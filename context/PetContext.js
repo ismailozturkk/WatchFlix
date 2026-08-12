@@ -60,7 +60,9 @@ export const PET_SIZES = [
 ];
 const DEFAULT_SIZE = 124;
 
-// Pet'e basılı tutunca yayınlanan event — ChatModal bunu dinleyip AI sohbetini açar.
+// Eski event adı dışarıdaki olası dinleyiciler için tutuluyor. Uygulama içi AI
+// açılışı artık aşağıdaki kalıcı context isteğini kullanır; böylece ChatModal'ın
+// gecikmeli mount edildiği ilk saniyelerde dokunuş kaybolmaz.
 export const AI_CHAT_EVENT = "pet:openAiChat";
 
 // Anahtar adları artık services/storage/registry.js'de (Keys.pet*).
@@ -81,6 +83,7 @@ export const PetProvider = ({ children }) => {
   const [petState, setPetState] = useState("idle"); // runtime, kalıcı değil
   const [position, setPosition] = useState(() => get(Keys.petPosition)); // {x,y} | null = varsayılan konum
   const [petSize, setPetSize] = useState(() => get(Keys.petSize));
+  const [pendingAiRequest, setPendingAiRequest] = useState(null);
 
   // İndirme/önbellek durumu (R2'den indirilen petler cihaz önbelleğinde tutulur).
   const [cachedPets, setCachedPets] = useState({});     // { id: true } — indirilmiş
@@ -226,6 +229,20 @@ export const PetProvider = ({ children }) => {
     set(Keys.petSize, size);
   }, []);
 
+  const requestAiChat = useCallback((request = {}) => {
+    setPendingAiRequest({
+      ...request,
+      requestId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    });
+  }, []);
+
+  const clearAiChatRequest = useCallback((requestId) => {
+    setPendingAiRequest((current) => {
+      if (!current || (requestId && current.requestId !== requestId)) return current;
+      return null;
+    });
+  }, []);
+
   const value = useMemo(
     () => ({
       catalog: PET_CATALOG,
@@ -251,6 +268,9 @@ export const PetProvider = ({ children }) => {
       removePet,
       clearAllPets,
       getPetSource,
+      pendingAiRequest,
+      requestAiChat,
+      clearAiChatRequest,
     }),
     [
       petEnabled,
@@ -273,6 +293,9 @@ export const PetProvider = ({ children }) => {
       removePet,
       clearAllPets,
       getPetSource,
+      pendingAiRequest,
+      requestAiChat,
+      clearAiChatRequest,
     ],
   );
 

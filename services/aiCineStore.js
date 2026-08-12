@@ -1,6 +1,6 @@
 // services/aiCineStore.js
 //
-// CineMatch Pro (yapılandırılmış AI) sohbet geçmişi — AsyncStorage kalıcılığı.
+// CineMatch Pro (yapılandırılmış AI) sohbet geçmişi — MMKV kalıcılığı.
 // Eski CineMatch (aiConversationsStore.js) ile AYRI bir anahtarda saklanır.
 //
 // Conversation = { id, title, messages: Message[], createdAt, updatedAt }

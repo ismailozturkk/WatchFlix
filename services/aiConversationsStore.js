@@ -1,6 +1,6 @@
 // services/aiConversationsStore.js
 //
-// Seelogd AI asistanı sohbet geçmişi — AsyncStorage kalıcılığı.
+// Seelogd AI asistanı sohbet geçmişi — kullanıcı kapsamlı MMKV kalıcılığı.
 //
 // Veri modeli (tek JSON blob altında saklanır):
 //   Conversation = {

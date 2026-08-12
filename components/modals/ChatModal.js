@@ -22,8 +22,7 @@ import {
   Keyboard,
   LayoutAnimation,
   UIManager,
-    Dimensions,
-  DeviceEventEmitter,
+  Dimensions,
 } from "react-native";
 
 if (Platform.OS === "android") {
@@ -66,7 +65,7 @@ import { resolveCards } from "@services/tmdbLookup";
 import AIChatScreen from "@screens/chat/AIChatScreen";
 import { i18nText } from "@utils/i18nText";
 import { appAlert } from "@components/AppAlert";
-import { AI_CHAT_EVENT } from "@context/PetContext";
+import { usePet } from "@context/PetContext";
 
 import {
   loadConversations,
@@ -506,6 +505,7 @@ export const ChatModal = () => {
   const { theme, selectedTheme, changeTheme } = useTheme();
   const { API_KEY, adultContent } = useAppSettings();
   const { getTmdbUrl } = useImageQualitySettings();
+  const { pendingAiRequest, clearAiChatRequest } = usePet();
   const {
     mostWatchedGenre,
     secondWatchedGenre,
@@ -568,17 +568,19 @@ export const ChatModal = () => {
     loadConversations().then(setConversations).catch(() => {});
   }, []);
 
-  // ── Yüzen PET'e basılı tutunca AI sohbetini aç (eski gemini FAB'ının yerine) ──
+  // ── Kalıcı CineMatch isteğini tüket ──────────────────────────────────────────
+  // ChatModal performans için gecikmeli mount edilir. EventEmitter kullanılırsa
+  // ilk saniyelerdeki dokunuş listener kurulmadan yayınlanıp kaybolabiliyordu;
+  // context'teki istek burada mount sonrasında güvenle tüketilir.
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener(AI_CHAT_EVENT, (origin) => {
-      // Pet'in merkez konumu → modal o noktadan büyüyerek açılsın.
-      if (origin && typeof origin.x === "number") {
-        setAiOrigin([origin.x, origin.y, 0]);
-      }
-      setAiVisible(true);
-    });
-    return () => sub.remove();
-  }, []);
+    if (!pendingAiRequest) return;
+    const origin = pendingAiRequest.origin;
+    if (origin && typeof origin.x === "number") {
+      setAiOrigin([origin.x, origin.y, 0]);
+    }
+    setAiVisible(true);
+    clearAiChatRequest(pendingAiRequest.requestId);
+  }, [pendingAiRequest, clearAiChatRequest]);
 
   // ── Klavye dinleyicileri ────────────────────────────────────────────────────
   useEffect(() => {
@@ -883,8 +885,7 @@ export const ChatModal = () => {
   // ─────────────────────────────────────────────────────────────────────────────
   return (
     <View>
-      {/* Eski gemini Lottie FAB kaldırıldı — artık yüzen PET (PetCompanion)
-          basılı tutunca AI_CHAT_EVENT yayınlıyor, yukarıdaki listener açıyor. */}
+      {/* CineMatch FAB/pet isteği kalıcı PetContext kuyruğundan gelir. */}
       <AIChatScreen
         visible={aiVisible}
         fabOrigin={aiOrigin}

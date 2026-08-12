@@ -40,7 +40,7 @@ import {
 } from "../../components/common/BlurTarget";
 import { LinearGradient } from "expo-linear-gradient";
 import { Screen, ScreenContainer } from "react-native-screens";
-import PetCompanion from "@components/pet/PetCompanion";
+import PetCompanion, { AI_FAB_SIZE } from "@components/pet/PetCompanion";
 import { alpha } from "../../theme/colors";
 
 // Sıradaki artık sekme DEĞİL: içerik yalnız diziye dayandığı için film izleyen
@@ -156,9 +156,25 @@ function TabScreenNavigator({ navigation, route }) {
   // Etiketler kalkınca sekmenin genişliğe ihtiyacı kalmadı: çubuk yuvaların
   // toplamı kadar — ortada yüzen bir hap. Kısıt yalnızca çok dar ekranlar için.
   const tabBarWidth = Math.min(windowWidth - 32, TAB_BAR_NATURAL_WIDTH);
+  const tabBarBottom = Math.max(18, insets.bottom + 12);
   // Gösterge mutlak konumlu olduğu için yuvanın genişliği elle hesaplanıyor:
   // çubuk genişliği eksi tabContainer'ın yatay iç boşluğu.
   const slotWidth = (tabBarWidth - TAB_BAR_PADDING * 2) / TAB_NAMES.length;
+  // Şeffaf CineMatch animasyonu son yuvadaki profil düğmesinin sağ üst
+  // köşesine hafifçe biner. Hesap çubuk, yuva ve safe-area ölçülerinden
+  // türediği için farklı ekran genişliklerinde aynı köşeyi takip eder.
+  const tabBarSide = (windowWidth - tabBarWidth) / 2;
+  const aiFabRight = Math.max(
+    4,
+    tabBarSide +
+      TAB_BAR_PADDING +
+      slotWidth / 2 -
+      INDICATOR_SIZE / 2 -
+      20 -
+      AI_FAB_SIZE / 2
+  );
+  const aiFabBottom =
+    tabBarBottom + TAB_BAR_HEIGHT - AI_FAB_SIZE / 2 - TAB_BAR_PADDING + 24;
   const activeIndex = Math.max(0, TAB_NAMES.indexOf(activeTab));
 
   const indicatorX = useSharedValue(activeIndex * slotWidth);
@@ -342,11 +358,14 @@ function TabScreenNavigator({ navigation, route }) {
         </ScreenContainer>
       </BlurTargetSurface>
 
-      <PetCompanion />
+      <PetCompanion
+        fabRight={aiFabRight}
+        fabBottom={aiFabBottom}
+      />
 
       <View
         pointerEvents="box-none"
-        style={[styles.bottomTabs, { bottom: Math.max(18, insets.bottom + 12) }]}
+        style={[styles.bottomTabs, { bottom: tabBarBottom }]}
       >
         <View
           style={[

@@ -282,6 +282,8 @@ export function buildCineSystemInstruction({
   tvGenres = [],
   offTopicReply = "I can only help with movies, TV series, and watchable content.",
   userLibrary = "",
+  discoveryPreferences = "",
+  targetMedia = null,
 } = {}) {
   const movieList = formatGenres(movieGenres);
   const tvList = formatGenres(tvGenres);
@@ -291,6 +293,18 @@ export function buildCineSystemInstruction({
   const tasteBlock = tasteLines.length
     ? `USER TASTE PROFILE (use softly for personalization, do not announce it):\n${tasteLines.join("\n")}`
     : "USER TASTE PROFILE: unknown — infer from the conversation.";
+  const targetBlock = targetMedia?.title
+    ? `AUTHORITATIVE TARGET MEDIA (do not replace it with a more popular or similarly named title):
+- TMDB ID: ${toStr(targetMedia.id)}
+- Media type: ${normMediaType(targetMedia.mediaType)}
+- Display title: ${toStr(targetMedia.title)}
+- Original title: ${toStr(targetMedia.originalTitle) || "unknown"}
+- Year: ${toStr(targetMedia.year) || "unknown"}
+- Genres: ${safeArr(targetMedia.genres).map(toStr).filter(Boolean).join(", ") || "unknown"}
+- Overview: ${toStr(targetMedia.overview).slice(0, 900) || "unknown"}
+- Cast: ${safeArr(targetMedia.cast).map(toStr).filter(Boolean).slice(0, 8).join(", ") || "unknown"}
+The user's title-specific question refers ONLY to this exact TMDB record. Return title_spotlight with its display title and media type.`
+    : null;
 
   return [
     `ROLE: You are CineMatch, Seelogd's concise film and TV decision assistant.`,
@@ -303,6 +317,10 @@ export function buildCineSystemInstruction({
 - Keep every text field to one short spoiler-free sentence. Write human-readable text in ${language}.`,
 
     tasteBlock,
+
+    discoveryPreferences || null,
+
+    targetBlock,
 
     userLibrary || null,
 
@@ -341,6 +359,7 @@ general:
 
     `BEHAVIOR:
 - If the user gives no details, confidently pick great titles from their taste profile — never stall.
+- Apply AI DISCOVERY FILTERS strictly to recommendations and generated watchlists. Direct questions about named titles, comparisons and title details always take priority over filters.
 - If the request is unrelated to movies/TV/watchable content, return:
   {"type":"general","content":"${offTopicReply}"}
 - If a USER LIBRARY is provided: personalize with it, NEVER recommend titles listed under WATCHED HISTORY, and when the user refers to "my watchlist / favorites / my list" choose ONLY from the listed items.
@@ -348,6 +367,25 @@ general:
   ]
     .filter(Boolean)
     .join("\n\n");
+}
+
+export function enforceTargetMediaResponse(response, targetMedia) {
+  if (!targetMedia?.title || !response || typeof response !== "object") return response;
+
+  const take = toStr(
+    response.take ||
+      response.content ||
+      response.summary ||
+      response.reason ||
+      safeArr(response.items)[0]?.reason,
+  );
+
+  return {
+    type: "title_spotlight",
+    title: toStr(targetMedia.title),
+    mediaType: normMediaType(targetMedia.mediaType),
+    take,
+  };
 }
 
 // ── Ağ katmanı: callGemini Cloud Function proxy'si ───────────────────────────
@@ -379,6 +417,8 @@ export async function askCineStructured({
   tvGenres = [],
   offTopicReply,
   userLibrary = "",
+  discoveryPreferences = "",
+  targetMedia = null,
   onQuota,
 } = {}) {
   if (!userMessage || userMessage.trim() === "") {
@@ -399,6 +439,8 @@ export async function askCineStructured({
       tvGenres,
       offTopicReply,
       userLibrary,
+      discoveryPreferences,
+      targetMedia,
     }),
     onQuota,
   });
@@ -417,5 +459,5 @@ export async function askCineStructured({
     output_tokens: data?.usageMetadata?.candidatesTokenCount ?? null,
   });
 
-  return parseCineResponse(data);
+  return enforceTargetMediaResponse(parseCineResponse(data), targetMedia);
 }

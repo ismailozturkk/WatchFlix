@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   StyleSheet,
-  Dimensions,
-  DeviceEventEmitter,
   TouchableOpacity,
+  useWindowDimensions,
 } from "react-native";
 import Animated, {
   useAnimatedStyle,
@@ -18,20 +17,18 @@ import SpritePet, {
   PET_STATE_ORDER,
   spriteFrameWidth,
 } from "@components/pet/SpritePet";
-import { usePet, AI_CHAT_EVENT } from "@context/PetContext";
+import { usePet } from "@context/PetContext";
 import useAppActive from "@hooks/useAppActive";
-
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
 const MIN_X = 6;
 const MIN_Y = 50;
 const BOTTOM_GAP = 40; // alt tab bar payı
 
-// Pet kapalıyken gösterilen yapay zeka FAB'ı (AI.json Lottie). Tab bar'ın
-// üstünde sağ altta durur, dokununca AI sohbet modalını açar.
-const AI_FAB_SIZE = 64;
+// Pet tercihinden bağımsız CineMatch FAB'ı. Tab bar'ın sağ üst kenarına
+// hizalanır; dokununca doğrudan AI sohbetini açar.
+export const AI_FAB_SIZE = 44;
 const AI_FAB_RIGHT = 20;
-const AI_FAB_BOTTOM = 92;
+const AI_FAB_BOTTOM = 86;
 
 const clamp = (v, min, max) => {
   "worklet";
@@ -42,11 +39,11 @@ const clamp = (v, min, max) => {
  * Tab navigator üzerinde duran, sürüklenebilir SEÇİLİ PET.
  * - Sürükle → taşı (bırakınca clamp + kalıcı kaydet).
  * - Dokun → pet durumunu sıradakine geçir (PET_STATE_ORDER).
- * - Basılı tut → AI_CHAT_EVENT yayınla; ChatModal bunu dinleyip AIChatScreen'i açar
- *   (projedeki gemini Lottie FAB'ının yerini alır).
+ * - Basılı tut → doğrudan CineMatch sohbetini açar.
  * `petEnabled` ile gösterilir/gizlenir; boyut ayarlardan (petSize) gelir.
  */
-function PetCompanion() {
+function PetCompanion({ fabRight = AI_FAB_RIGHT, fabBottom = AI_FAB_BOTTOM }) {
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const {
     petEnabled,
     selectedPetId,
@@ -60,11 +57,10 @@ function PetCompanion() {
     downloadPet,
     downloadingPets,
     cacheReady,
+    requestAiChat,
   } = usePet();
 
-  // Pet de AI FAB'ı da tab navigator'ın üstünde sürekli görünür. Uygulama arka
-  // plana geçtiğinde ikisi de görünmez ama animasyonları dönmeye devam eder —
-  // bedava pil tüketimi. Ön plan durumunu ikisine de bağlıyoruz.
+  // AI animasyonunu uygulamanın ön plan durumuna bağla; arka planda pil harcamasın.
   const appActive = useAppActive();
   const aiFabRef = useRef(null);
 
@@ -85,15 +81,14 @@ function PetCompanion() {
   // AI FAB Lottie'sini ön plan durumuna bağla. `autoPlay` yalnız mount anında
   // geçerli olduğu için arka plandan dönüşte oynatmayı ref üzerinden sürdürüyoruz.
   useEffect(() => {
-    if (visible) return; // pet gösteriliyorsa FAB mount edilmemiştir
     if (appActive) aiFabRef.current?.play();
     else aiFabRef.current?.pause();
-  }, [appActive, visible]);
+  }, [appActive]);
 
   // Boyuta bağlı sınırlar (her render'da güncellenir → gesture worklet'i yakalar).
   const petW = spriteFrameWidth(petSize);
-  const maxX = SCREEN_W - petW - 6;
-  const maxY = SCREEN_H - petSize - BOTTOM_GAP;
+  const maxX = screenWidth - petW - 6;
+  const maxY = screenHeight - petSize - BOTTOM_GAP;
 
   const tx = useSharedValue(position?.x ?? maxX);
   const ty = useSharedValue(position?.y ?? maxY);
@@ -128,7 +123,7 @@ function PetCompanion() {
       stiffness: 180,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [petSize]);
+  }, [petSize, maxX, maxY, tx, ty]);
 
   const cycleState = () => {
     const i = PET_STATE_ORDER.indexOf(petState);
@@ -136,10 +131,11 @@ function PetCompanion() {
   };
 
   const openAiChat = () => {
-    // Pet'in ekran merkezini gönder → AIChatScreen oradan büyüyerek açılır.
-    DeviceEventEmitter.emit(AI_CHAT_EVENT, {
-      x: tx.value + petW / 2,
-      y: ty.value + petSize / 2,
+    requestAiChat({
+      origin: {
+        x: tx.value + petW / 2,
+        y: ty.value + petSize / 2,
+      },
     });
   };
 
@@ -228,40 +224,48 @@ function PetCompanion() {
     ],
   }));
 
-  // Pet kapalıyken: yapay zeka modalını açmak için AI Lottie FAB göster.
-  // (Pet açıkken AI'a pet'e basılı tutarak erişiliyor; pet kapatılınca bu
-  // erişim kaybolmasın diye burada yedek bir giriş noktası sunuyoruz.)
   const openAiChatFromFab = () => {
-    DeviceEventEmitter.emit(AI_CHAT_EVENT, {
-      x: SCREEN_W - AI_FAB_RIGHT - AI_FAB_SIZE / 2,
-      y: SCREEN_H - AI_FAB_BOTTOM - AI_FAB_SIZE / 2,
+    requestAiChat({
+      origin: {
+        x: screenWidth - fabRight - AI_FAB_SIZE / 2,
+        y: screenHeight - fabBottom - AI_FAB_SIZE / 2,
+      },
     });
   };
 
-  if (!visible) {
-    return (
+  return (
+    <>
+      {visible ? (
+        <GestureDetector gesture={gesture}>
+          <Animated.View style={[styles.petWrap, petStyle]}>
+            <SpritePet source={petSource} state={displayState} size={petSize} />
+          </Animated.View>
+        </GestureDetector>
+      ) : null}
+
       <TouchableOpacity
         activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="CineMatch"
         onPress={openAiChatFromFab}
-        style={styles.aiFab}
+        style={[
+          styles.aiFab,
+          {
+            right: fabRight,
+            bottom: fabBottom,
+          },
+        ]}
       >
         <LottieView
           ref={aiFabRef}
           style={styles.aiFabLottie}
           source={require("@lottie/gemini.json")}
           autoPlay={appActive}
-          loop
+          loop={false}
         />
       </TouchableOpacity>
-    );
-  }
 
-  return (
-    <GestureDetector gesture={gesture}>
-      <Animated.View style={[styles.petWrap, petStyle]}>
-        <SpritePet source={petSource} state={displayState} size={petSize} />
-      </Animated.View>
-    </GestureDetector>
+    </>
   );
 }
 
@@ -274,15 +278,15 @@ const styles = StyleSheet.create({
   },
   aiFab: {
     position: "absolute",
-    right: AI_FAB_RIGHT,
-    bottom: AI_FAB_BOTTOM,
     width: AI_FAB_SIZE,
     height: AI_FAB_SIZE,
-    zIndex: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 42,
   },
   aiFabLottie: {
-    width: "80%",
-    height: "80%",
+    width: "100%",
+    height: "100%",
   },
 });
 
