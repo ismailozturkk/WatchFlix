@@ -98,6 +98,12 @@ describe("createUserProfile", () => {
       usernameLower: "ali_42",
       friendsCount: 0,
       createdAt: "TS",
+      listVisible: {
+        watchedMovies: false,
+        watchedTv: false,
+        watchList: false,
+        favorites: false,
+      },
     });
   });
 

@@ -35,7 +35,7 @@ const ACCENT = "#38bdf8";
 export default function SharedListsSection({ sharedItem, visible }) {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { displayName, avatarIndex } = useUserProfile();
+  const { displayName, username, avatarIndex } = useUserProfile();
   const { sharedLists, sharedItemsByList } = useSharedLists();
 
   // listId → item verisi | null (bu içerik listede mi + kim eklemiş)
@@ -165,7 +165,7 @@ export default function SharedListsSection({ sharedItem, visible }) {
     try {
       await addItemToSharedList({
         listId: list.id,
-        user: { uid, displayName, avatarIndex },
+        user: { uid, displayName, username, avatarIndex },
         item: sharedItem,
       });
     } catch (e) {

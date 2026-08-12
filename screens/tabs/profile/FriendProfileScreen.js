@@ -29,7 +29,7 @@ import {
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { doc, collection, onSnapshot, getDocs } from "firebase/firestore";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -53,7 +53,9 @@ import {
 } from "../../../services/presenceService";
 import ScreenDecor from "../../../components/ScreenDecor";
 import BackButton from "../../../components/BackButton";
+import SaveSharedListModal from "../../../components/modals/SaveSharedListModal";
 import { i18nText } from "../../../utils/i18nText";
+import { listItemToMedia } from "../../../utils/listShare";
 
 
 const PROTECTED_LISTS = ["watchedMovies", "watchedTv", "watchList", "favorites"];
@@ -70,6 +72,22 @@ const ListIcon = ({ name, iconLib, color, size = 15 }) => {
   if (iconLib === "feather") return <Feather name={name} size={size} color={color} />;
   return <Ionicons name={name} size={size} color={color} />;
 };
+
+const FriendProfileHeader = ({ title, theme }) => (
+  <View style={styles.screenHeader}>
+    <View style={styles.screenHeaderSide}>
+      <BackButton absolute={false} />
+    </View>
+    <Text
+      allowFontScaling={false}
+      numberOfLines={1}
+      style={[styles.screenHeaderTitle, { color: theme.text?.primary ?? "#fff" }]}
+    >
+      {title || i18nText("profile", "Profil")}
+    </Text>
+    <View style={styles.screenHeaderSide} />
+  </View>
+);
 
 // ── Süre formatı: 12345dk → "8 gün 13 sa" / "3 sa 25 dk" / "45 dk" ──────────
 const formatDuration = (totalMinutes) => {
@@ -313,6 +331,7 @@ export default function FriendProfileScreen({ route, navigation }) {
   const { avatars } = useProfileUi();
   const { getTmdbUrl } = useImageQualitySettings();
   const { width: windowWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const {
     isFriend,
     hasIncomingFrom,
@@ -334,6 +353,9 @@ export default function FriendProfileScreen({ route, navigation }) {
   const [subMovies, setSubMovies] = useState(null);
   const [subShows, setSubShows] = useState(null);
   const [selectedSharedList, setSelectedSharedList] = useState(null);
+  const [sharedListColumns, setSharedListColumns] = useState(3);
+  const [pendingSaveListPost, setPendingSaveListPost] = useState(null);
+  const [saveListPost, setSaveListPost] = useState(null);
   const [unfriendModalVisible, setUnfriendModalVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
 
@@ -501,7 +523,8 @@ export default function FriendProfileScreen({ route, navigation }) {
       : Object.entries(rawVisible || {}).filter(([, v]) => v === true).map(([k]) => k);
 
     const entries = Object.entries(allLists).filter(
-      ([name, items]) => visibleNames.includes(name) && Array.isArray(items),
+      ([name, items]) =>
+        visibleNames.includes(name) && Array.isArray(items) && items.length > 0,
     );
     return [
       ...PROTECTED_LISTS.map((n) => entries.find(([ln]) => ln === n)).filter(Boolean),
@@ -626,20 +649,55 @@ export default function FriendProfileScreen({ route, navigation }) {
   const selectedListMeta = LIST_META[selectedListName];
   const selectedListTitle = selectedListMeta?.label ?? selectedListName;
 
+  // Aynı anda iki native Modal sunmak iOS'ta arada boş kare/presentation
+  // yarışına yol açıyor. Liste sayfasının 260 ms çıkışını tamamlatıp ortak
+  // kaydet sayfasını ondan sonra açıyoruz.
+  useEffect(() => {
+    if (!pendingSaveListPost || selectedSharedList) return undefined;
+    const timer = setTimeout(() => {
+      setSaveListPost(pendingSaveListPost);
+      setPendingSaveListPost(null);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [pendingSaveListPost, selectedSharedList]);
+
+  const openSaveList = useCallback(() => {
+    if (!selectedListName || selectedListItems.length === 0) return;
+    const mediaList = selectedListItems
+      .map((item) =>
+        listItemToMedia(item, {
+          fallbackType: selectedListName === "watchedTv" ? "tv" : "movie",
+        }),
+      )
+      .filter(Boolean);
+    if (mediaList.length === 0) return;
+    setPendingSaveListPost({
+      id: `friend-list-${friendUid}-${selectedListName}`,
+      title: selectedListTitle,
+      mediaList,
+    });
+    setSelectedSharedList(null);
+  }, [friendUid, selectedListItems, selectedListName, selectedListTitle]);
+
   // ── Yükleniyor / bulunamadı ───────────────────────────────────────────────
   if (profileLoading) {
     return (
-      <SafeAreaView style={[styles.container, styles.center, { backgroundColor: theme.primary }]}>
-        <ActivityIndicator size="large" color={theme.accent} />
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
+        <FriendProfileHeader title={friendName} theme={theme} />
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={theme.accent} />
+        </View>
       </SafeAreaView>
     );
   }
   if (!profile) {
     return (
-      <SafeAreaView style={[styles.container, styles.center, { backgroundColor: theme.primary }]}>
-        <Ionicons name="person-outline" size={52} color={theme.text?.muted ?? "#444"} />
-        <Text style={[styles.emptyText, { color: theme.text?.secondary ?? "#aaa" }]}>{i18nText("autoI18n.kullanici_bulunamadi", "Kullanıcı bulunamadı")}</Text>
-        <BackButton />
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
+        <FriendProfileHeader title={friendName} theme={theme} />
+        <View style={styles.centerContent}>
+          <Ionicons name="person-outline" size={52} color={theme.text?.muted ?? "#444"} />
+          <Text style={[styles.emptyText, { color: theme.text?.secondary ?? "#aaa" }]}>{i18nText("autoI18n.kullanici_bulunamadi", "Kullanıcı bulunamadı")}</Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -654,6 +712,7 @@ export default function FriendProfileScreen({ route, navigation }) {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
       <ScreenDecor iconOpacity={0.3} />
+      <FriendProfileHeader title={displayName || profile.username || friendName} theme={theme} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* ── Üst bilgi kartı ──────────────────────────────────────────────── */}
@@ -1056,22 +1115,87 @@ export default function FriendProfileScreen({ route, navigation }) {
         ]}
       >
             <View style={{ width: 44, height: 5, borderRadius: 3, backgroundColor: theme.text?.muted ?? "#666", alignSelf: "center", marginBottom: 20 }} />
-            <View style={[styles.modalHeaderRow, { marginBottom: 20 }]}>
+            <View style={[styles.modalHeaderRow, { marginBottom: 16 }]}>
               <View style={styles.modalTitleGroup}>
-                <Text allowFontScaling={false} style={[styles.modalTitle, { color: theme.text?.primary ?? "#fff", fontSize: 22 }]}>
+                <Text
+                  allowFontScaling={false}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={[styles.modalTitle, { color: theme.text?.primary ?? "#fff", fontSize: 22 }]}
+                >
                   {selectedListTitle}
                 </Text>
                 <Text allowFontScaling={false} style={[styles.modalSubtitle, { color: theme.accent ?? "#aaa", fontSize: 13, fontWeight: "800", marginTop: 4 }]}>
                   {i18nText("autoI18n.item_count", "{{count}} içerik", { count: selectedListItems.length })}
                 </Text>
               </View>
-              <Pressable
-                onPress={() => setSelectedSharedList(null)}
-                hitSlop={10}
-                style={[styles.modalCloseBtn, { backgroundColor: theme.primary ?? "#111", borderColor: theme.border ?? "rgba(255,255,255,0.08)", borderRadius: 18, width: 44, height: 44 }]}
-              >
-                <Ionicons name="close" size={22} color={theme.text?.primary ?? "#fff"} />
-              </Pressable>
+              <View style={styles.listModalHeaderActions}>
+                <Pressable
+                  onPress={openSaveList}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel={i18nText("autoI18n.listeyi_kaydet", "Listeyi kaydet")}
+                  style={[styles.modalActionButton, { backgroundColor: theme.accent }]}
+                >
+                  <Ionicons name="download-outline" size={18} color="#fff" />
+                </Pressable>
+
+                <View
+                  style={[
+                    styles.columnSelector,
+                    {
+                      backgroundColor: theme.primary ?? "#111",
+                      borderColor: theme.border ?? "rgba(255,255,255,0.08)",
+                    },
+                  ]}
+                >
+                  {[3, 4].map((columns) => {
+                    const active = sharedListColumns === columns;
+                    return (
+                      <Pressable
+                        key={columns}
+                        onPress={() => setSharedListColumns(columns)}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          columns === 3
+                            ? i18nText("autoI18n.uclu_dizilim", "3'lü")
+                            : i18nText("autoI18n.dortlu_dizilim", "4'lü")
+                        }
+                        style={[
+                          styles.columnSelectorButton,
+                          active && { backgroundColor: `${theme.accent}22` },
+                        ]}
+                      >
+                        <Text
+                          allowFontScaling={false}
+                          style={[
+                            styles.columnSelectorText,
+                            { color: active ? theme.accent : theme.text?.muted ?? "#666" },
+                          ]}
+                        >
+                          {columns}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Pressable
+                  onPress={() => setSelectedSharedList(null)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
+                  style={[
+                    styles.modalCloseBtn,
+                    {
+                      backgroundColor: theme.primary ?? "#111",
+                      borderColor: theme.border ?? "rgba(255,255,255,0.08)",
+                    },
+                  ]}
+                >
+                  <Ionicons name="close" size={21} color={theme.text?.primary ?? "#fff"} />
+                </Pressable>
+              </View>
             </View>
 
             {selectedListItems.length === 0 ? (
@@ -1083,14 +1207,23 @@ export default function FriendProfileScreen({ route, navigation }) {
               </View>
             ) : (
               <FlatList
+                key={`shared-list-${sharedListColumns}`}
                 data={selectedListItems}
                 keyExtractor={(item, index) => `${item?.type ?? "item"}-${item?.id ?? index}`}
-                numColumns={3}
+                numColumns={sharedListColumns}
                 showsVerticalScrollIndicator={false}
                 columnWrapperStyle={styles.sharedListsModalRow}
-                contentContainerStyle={styles.sharedListsModalContent}
+                contentContainerStyle={[
+                  styles.sharedListsModalContent,
+                  { paddingBottom: Math.max(insets.bottom + 24, 40) },
+                ]}
                 renderItem={({ item }) => (
-                  <View style={styles.sharedListModalCell}>
+                  <View
+                    style={[
+                      styles.sharedListModalCell,
+                      { width: sharedListColumns === 4 ? "23.2%" : "31.8%" },
+                    ]}
+                  >
                     <SharedListMediaCard
                       item={item}
                       theme={theme}
@@ -1109,6 +1242,13 @@ export default function FriendProfileScreen({ route, navigation }) {
               />
             )}
       </BottomSheetModal>
+
+      <SaveSharedListModal
+        visible={!!saveListPost}
+        post={saveListPost}
+        onClose={() => setSaveListPost(null)}
+        onSaved={() => setSaveListPost(null)}
+      />
 
       <ReportReasonSheet
         visible={reportVisible}
@@ -1175,7 +1315,6 @@ export default function FriendProfileScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
-      <BackButton />
     </SafeAreaView>
   );
 }
@@ -1183,9 +1322,24 @@ export default function FriendProfileScreen({ route, navigation }) {
 // ── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  center: { justifyContent: "center", alignItems: "center", gap: 14 },
-  // paddingTop: şeffaf header'daki geri butonunun kartla çakışmaması için
-  scrollContent: { paddingHorizontal: 16, paddingTop: 44, paddingBottom: 40 },
+  centerContent: { flex: 1, justifyContent: "center", alignItems: "center", gap: 14 },
+  screenHeader: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    zIndex: 2,
+  },
+  screenHeaderSide: { width: 40 },
+  screenHeaderTitle: {
+    flex: 1,
+    paddingHorizontal: 10,
+    fontSize: 17,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
   emptyText: { fontSize: 14, textAlign: "center" },
 
   // ── Üst kart ───────────────────────────────────────────────────────────────
@@ -1614,8 +1768,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  listModalHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 7,
+    flexShrink: 0,
+  },
+  modalActionButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  columnSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 13,
+    borderWidth: 1,
+    padding: 2,
+  },
+  columnSelectorButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  columnSelectorText: { fontSize: 13, fontWeight: "900" },
   sharedListsModalContent: {
-    paddingBottom: 4,
     gap: 10,
   },
   sharedListsModalRow: {

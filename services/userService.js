@@ -66,11 +66,11 @@ export const DEFAULT_PRIVACY = {
   onlineStatus: "everyone",
 };
 
-const DEFAULT_LIST_VISIBLE = {
-  watchedMovies: true,
-  watchedTv: true,
-  watchList: true,
-  favorites: true,
+export const DEFAULT_LIST_VISIBLE = {
+  watchedMovies: false,
+  watchedTv: false,
+  watchList: false,
+  favorites: false,
 };
 
 // ── Username helpers ────────────────────────────────────────────────────────
