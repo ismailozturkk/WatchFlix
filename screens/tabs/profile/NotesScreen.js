@@ -32,11 +32,48 @@ import DatePickerModal from "@components/modals/DatePickerModal";
 import { toast } from "@components/AppToast";
 import { i18nText } from "../../../utils/i18nText";
 import { PRIME_HANDOFF_MS } from "../../../utils/notificationPriming";
+import {
+  getNoteTodoDraft,
+  removeNoteTodoDraft,
+  saveNoteTodoDraft,
+  todoDraftKey,
+} from "../../../services/noteTodoDraftService";
+import {
+  getTodoMoveAvailability,
+  moveTodoItem,
+} from "../../../utils/todoOrder";
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
 // Küçük ikon butonları için ortak dokunma alanı payı.
 const ICON_HIT_SLOP = { top: 8, bottom: 8, left: 6, right: 6 };
+const NOTE_CONTENT_LIMIT = 5000;
+const TODO_ITEM_LIMIT = 240;
+const NOTE_TITLE_LIMIT = 120;
+
+const RemainingCounter = ({ value, limit, theme, inside = false }) => {
+  const remaining = Math.max(0, limit - String(value || "").length);
+  const nearLimit = remaining <= Math.ceil(limit * 0.1);
+  return (
+    <Text
+      allowFontScaling={false}
+      numberOfLines={1}
+      pointerEvents="none"
+      style={[
+        inside
+          ? inside === "edit"
+            ? styles.todoEditCounter
+            : inside === "note"
+              ? styles.noteInputCounter
+              : styles.todoInputCounter
+          : styles.remainingCounter,
+        { color: nearLimit ? theme.colors?.orange || theme.accent : theme.text.muted },
+      ]}
+    >
+      {remaining}
+    </Text>
+  );
+};
 
 // Tema'nın notesColor paletinden { color, background } çiftleri üret.
 const buildColorPairs = (notesColor) => [
@@ -244,8 +281,15 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
   const [editingTodoText, setEditingTodoText] = useState("");
   /* Kopyalanan maddede kısa süre gösterilen onay ikonu */
   const [copiedTodoId, setCopiedTodoId] = useState(null);
+  const [draftReadyKey, setDraftReadyKey] = useState(null);
   const copyTimerRef = useRef(null);
   const todoInputRef = useRef(null);
+  // Mevcut kaydın tipi düzenleme sırasında değiştirilemez. `type` state'i yalnızca
+  // yeni kayıt oluştururken üstteki Not/Todo seçicisini yönetir.
+  const activeType = initialNote
+    ? initialNote.type === "todo" ? "todo" : "note"
+    : type;
+  const draftStorageKey = todoDraftKey(initialNote?.id);
 
   useEffect(() => () => clearTimeout(copyTimerRef.current), []);
 
@@ -253,12 +297,14 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
   const dateLabel = scheduledDate
     ? new Date(scheduledDate + "T12:00:00").toLocaleDateString(language === "tr" ? "tr-TR" : "en-US", {
         day: "numeric",
-        month: "short",
+        month: "long",
+        year: "numeric",
       })
     : i18nText("autoI18n.tarih_sec", "Tarih Seç");
 
   useEffect(() => {
     if (!visible) return;
+    setDraftReadyKey(null);
     if (initialNote) {
       setTitle(initialNote.title || "");
       setContent(initialNote.content || "");
@@ -284,6 +330,70 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
     setEditingTodoText("");
     setCopiedTodoId(null);
   }, [visible, initialNote, defaultType]);
+
+  // Todo değişiklikleri buluta gönderilmeden önce cihazdaki kullanıcı kapsamlı
+  // taslaktan geri yüklenir. Buluttaki kayıt taslaktan daha yeniyse eski taslak
+  // kullanılmaz.
+  useEffect(() => {
+    if (!visible || activeType !== "todo" || draftReadyKey === draftStorageKey) return;
+    const draft = getNoteTodoDraft(draftStorageKey);
+    const cloudUpdatedAt = Number(initialNote?.updatedAt || 0);
+    const draftSourceUpdatedAt = Number(draft?.sourceUpdatedAt || 0);
+    const staleDraft = !!initialNote && draftSourceUpdatedAt > 0 && cloudUpdatedAt > draftSourceUpdatedAt;
+
+    if (staleDraft) {
+      removeNoteTodoDraft(draftStorageKey);
+    } else if (draft) {
+      setTitle(typeof draft.title === "string" ? draft.title : initialNote?.title || "");
+      setTodos(Array.isArray(draft.todos) ? draft.todos.map((item) => ({ ...item })) : []);
+      setNewTodoText(typeof draft.newTodoText === "string" ? draft.newTodoText : "");
+      setScheduledDate(draft.scheduledDate || null);
+      setEditingTodoId(draft.editingTodoId || null);
+      setEditingTodoText(typeof draft.editingTodoText === "string" ? draft.editingTodoText : "");
+      const savedPair = colorPairs.find((item) => item.color === draft.color);
+      if (savedPair) setPair(savedPair);
+    }
+    setDraftReadyKey(draftStorageKey);
+  }, [
+    activeType,
+    colorPairs,
+    draftReadyKey,
+    draftStorageKey,
+    initialNote,
+    visible,
+  ]);
+
+  // Her madde ekleme/silme, tamamlandı işareti, sıralama ve metin değişikliği
+  // senkron MMKV taslağına gider. Firestore'a yalnız alttaki Kaydet basar.
+  useEffect(() => {
+    if (!visible || activeType !== "todo" || draftReadyKey !== draftStorageKey) return;
+    saveNoteTodoDraft(draftStorageKey, {
+      title,
+      todos,
+      newTodoText,
+      scheduledDate,
+      editingTodoId,
+      editingTodoText,
+      color: pair.color,
+      backgroundColor: pair.background,
+      sourceUpdatedAt: initialNote?.updatedAt || null,
+      updatedAt: Date.now(),
+    });
+  }, [
+    activeType,
+    draftReadyKey,
+    draftStorageKey,
+    editingTodoId,
+    editingTodoText,
+    initialNote?.updatedAt,
+    newTodoText,
+    pair.background,
+    pair.color,
+    scheduledDate,
+    title,
+    todos,
+    visible,
+  ]);
 
   const color = pair.color;
 
@@ -340,10 +450,15 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
     copyTimerRef.current = setTimeout(() => setCopiedTodoId(null), 1200);
   };
 
+  const moveTodo = (id, direction) => {
+    setTodos((prev) => moveTodoItem(prev, id, direction));
+  };
+
   /* Tek satır: yapılacak / yapılan ayrımı `item.done` ile yapılır. */
   const renderTodoRow = (item) => {
     const isEditing = editingTodoId === item.id;
     const isCopied = copiedTodoId === item.id;
+    const { canMoveUp, canMoveDown } = getTodoMoveAvailability(todos, item.id);
     return (
       <View key={item.id} style={styles.todoRow}>
         <TouchableOpacity onPress={() => toggleTodo(item.id)} disabled={isEditing}>
@@ -355,20 +470,28 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
         </TouchableOpacity>
 
         {isEditing ? (
-          <TextInput
-            allowFontScaling={false}
-            style={[
-              styles.todoItemText,
-              styles.todoEditInput,
-              { color: theme.text.primary, borderBottomColor: color },
-            ]}
-            value={editingTodoText}
-            onChangeText={setEditingTodoText}
-            maxLength={60}
-            autoFocus
-            returnKeyType="done"
-            onSubmitEditing={commitEditTodo}
-          />
+          <View style={styles.todoEditField}>
+            <TextInput
+              allowFontScaling={false}
+              style={[
+                styles.todoItemText,
+                styles.todoEditInput,
+                { color: theme.text.primary, borderBottomColor: color },
+              ]}
+              value={editingTodoText}
+              onChangeText={setEditingTodoText}
+              maxLength={TODO_ITEM_LIMIT}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={commitEditTodo}
+            />
+            <RemainingCounter
+              inside="edit"
+              value={editingTodoText}
+              limit={TODO_ITEM_LIMIT}
+              theme={theme}
+            />
+          </View>
         ) : (
           <Text
             allowFontScaling={false}
@@ -397,6 +520,34 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
             </>
           ) : (
             <>
+              <TouchableOpacity
+                onPress={() => moveTodo(item.id, "up")}
+                disabled={!canMoveUp}
+                hitSlop={ICON_HIT_SLOP}
+                style={{ opacity: canMoveUp ? 1 : 0.28 }}
+                accessibilityRole="button"
+                accessibilityLabel={i18nText("autoI18n.maddeyi_yukari_tasi", "Maddeyi yukarı taşı")}
+              >
+                <Ionicons
+                  name="chevron-up"
+                  size={17}
+                  color={canMoveUp ? theme.text.secondary : theme.text.muted}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => moveTodo(item.id, "down")}
+                disabled={!canMoveDown}
+                hitSlop={ICON_HIT_SLOP}
+                style={{ opacity: canMoveDown ? 1 : 0.28 }}
+                accessibilityRole="button"
+                accessibilityLabel={i18nText("autoI18n.maddeyi_asagi_tasi", "Maddeyi aşağı taşı")}
+              >
+                <Ionicons
+                  name="chevron-down"
+                  size={17}
+                  color={canMoveDown ? theme.text.secondary : theme.text.muted}
+                />
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => startEditTodo(item)} hitSlop={ICON_HIT_SLOP}>
                 <Ionicons name="pencil-outline" size={16} color={theme.text.muted} />
               </TouchableOpacity>
@@ -417,20 +568,20 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
     );
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const base = initialNote || { id: uid(), createdAt: Date.now() };
-    const cleanContent = type === "note" ? content : "";
+    const cleanContent = activeType === "note" ? content : "";
     // Bir madde düzenlenirken kaydedilirse taslak metin kaybolmasın.
     const pendingText = editingTodoText.trim();
     const cleanTodos =
-      type === "todo"
+      activeType === "todo"
         ? todos.map((t) =>
             t.id === editingTodoId && pendingText ? { ...t, text: pendingText } : t,
           )
         : [];
     // Tarih yalnızca todo UI'ında düzenlenir; mevcut not tarihleri korunur.
     const cleanScheduled =
-      type === "todo"
+      activeType === "todo"
         ? scheduledDate || null
         : initialNote && initialNote.type === "note"
           ? initialNote.scheduledDate || null
@@ -439,7 +590,7 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
     const note = {
       id: base.id,
       createdAt: base.createdAt,
-      type,
+      type: activeType,
       title: title.trim(),
       content: cleanContent,
       todos: cleanTodos,
@@ -447,7 +598,10 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
       backgroundColor: pair.background,
       scheduledDate: cleanScheduled,
     };
-    onSave(note);
+    const saved = await onSave(note);
+    if (saved !== false && activeType === "todo") {
+      removeNoteTodoDraft(draftStorageKey);
+    }
   };
 
   const activeTodos = todos.filter((t) => !t.done);
@@ -465,45 +619,95 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
     >
           <View style={[styles.handle, { backgroundColor: theme.border }]} />
 
-          {/* Tip seçici */}
-          <View style={[styles.typeSwitch, { backgroundColor: theme.primary }]}>
-            {["note", "todo"].map((tp) => (
+          {/* Tip yalnızca ilk kez kayıt oluşturulurken seçilebilir. */}
+          {!initialNote && (
+            <View style={[styles.typeSwitch, { backgroundColor: theme.primary }]}>
+              {["note", "todo"].map((tp) => (
+                <TouchableOpacity
+                  key={tp}
+                  style={[styles.typeBtn, activeType === tp && { backgroundColor: color }]}
+                  onPress={() => setType(tp)}
+                >
+                  <Ionicons
+                    name={tp === "note" ? "document-text" : "checkbox"}
+                    size={14}
+                    color={activeType === tp ? "#fff" : theme.text.secondary}
+                  />
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.typeBtnText, { color: activeType === tp ? "#fff" : theme.text.secondary }]}
+                  >
+                    {tp === "note"
+                      ? i18nText("autoI18n.not", "Not")
+                      : i18nText("autoI18n.yapilacak", "Yapılacak")}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Todo'da tarih ve renkler aynı kompakt satırı paylaşır. */}
+          {activeType === "todo" ? (
+            <View style={styles.todoOptionsRow}>
               <TouchableOpacity
-                key={tp}
-                style={[styles.typeBtn, type === tp && { backgroundColor: color }]}
-                onPress={() => setType(tp)}
+                onPress={() => setShowDatePicker(true)}
+                style={[
+                  styles.dueDatePicker,
+                  styles.compactDueDatePicker,
+                  {
+                    backgroundColor: scheduledDate ? color + "22" : theme.primary,
+                    borderColor: scheduledDate ? color : theme.border,
+                  },
+                ]}
               >
-                <Ionicons
-                  name={tp === "note" ? "document-text" : "checkbox"}
-                  size={14}
-                  color={type === tp ? "#fff" : theme.text.secondary}
-                />
+                <Ionicons name="calendar-outline" size={14} color={scheduledDate ? color : theme.text.muted} />
                 <Text
                   allowFontScaling={false}
-                  style={[styles.typeBtnText, { color: type === tp ? "#fff" : theme.text.secondary }]}
+                  numberOfLines={2}
+                  style={[styles.compactDueDateText, { color: scheduledDate ? color : theme.text.muted }]}
                 >
-                  {tp === "note"
-                    ? i18nText("autoI18n.not", "Not")
-                    : i18nText("autoI18n.yapilacak", "Yapılacak")}
+                  {dateLabel}
                 </Text>
+                {scheduledDate && (
+                  <TouchableOpacity
+                    onPress={() => setScheduledDate(null)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="close-circle" size={14} color={theme.text.muted} />
+                  </TouchableOpacity>
+                )}
               </TouchableOpacity>
-            ))}
-          </View>
 
-          {/* Renk paleti */}
-          <View style={styles.colorRow}>
-            {colorPairs.map((p) => (
-              <TouchableOpacity
-                key={p.color}
-                style={[
-                  styles.colorDot,
-                  { backgroundColor: p.color },
-                  pair.color === p.color && styles.colorDotSelected,
-                ]}
-                onPress={() => setPair(p)}
-              />
-            ))}
-          </View>
+              <View style={[styles.colorRow, styles.compactColorRow]}>
+                {colorPairs.map((p) => (
+                  <TouchableOpacity
+                    key={p.color}
+                    style={[
+                      styles.colorDot,
+                      styles.compactColorDot,
+                      { backgroundColor: p.color },
+                      pair.color === p.color && styles.compactColorDotSelected,
+                    ]}
+                    onPress={() => setPair(p)}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : (
+            <View style={styles.colorRow}>
+              {colorPairs.map((p) => (
+                <TouchableOpacity
+                  key={p.color}
+                  style={[
+                    styles.colorDot,
+                    { backgroundColor: p.color },
+                    pair.color === p.color && styles.colorDotSelected,
+                  ]}
+                  onPress={() => setPair(p)}
+                />
+              ))}
+            </View>
+          )}
 
           {/* Başlık */}
           <TextInput
@@ -513,51 +717,29 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
             placeholderTextColor={theme.text.muted}
             value={title}
             onChangeText={setTitle}
-            maxLength={60}
+            maxLength={NOTE_TITLE_LIMIT}
           />
 
-          {/* Tarih seçici — sadece todo tipinde */}
-          {type === "todo" && (
-            <TouchableOpacity
-              onPress={() => setShowDatePicker(true)}
-              style={[
-                styles.dueDatePicker,
-                {
-                  backgroundColor: scheduledDate ? color + "22" : theme.primary,
-                  borderColor: scheduledDate ? color : theme.border,
-                },
-              ]}
-            >
-              <Ionicons name="calendar-outline" size={16} color={scheduledDate ? color : theme.text.muted} />
-              <Text
+          {activeType === "note" ? (
+            <View style={[styles.noteContentField, { backgroundColor: theme.primary }]}>
+              <TextInput
                 allowFontScaling={false}
-                style={{ color: scheduledDate ? color : theme.text.muted, fontSize: 13, fontWeight: "600", flex: 1 }}
-              >
-                {dateLabel}
-              </Text>
-              {scheduledDate && (
-                <TouchableOpacity
-                  onPress={() => setScheduledDate(null)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons name="close-circle" size={16} color={theme.text.muted} />
-                </TouchableOpacity>
-              )}
-            </TouchableOpacity>
-          )}
-
-          {type === "note" ? (
-            <TextInput
-              allowFontScaling={false}
-              style={[styles.contentInput, { color: theme.text.secondary, backgroundColor: theme.primary }]}
-              placeholder={i18nText("autoI18n.notunu_yaz", "Notunuzu buraya yazın…")}
-              placeholderTextColor={theme.text.muted}
-              multiline
-              value={content}
-              onChangeText={setContent}
-              maxLength={2000}
-              textAlignVertical="top"
-            />
+                style={[styles.contentInput, { color: theme.text.secondary }]}
+                placeholder={i18nText("autoI18n.notunu_yaz", "Notunuzu buraya yazın…")}
+                placeholderTextColor={theme.text.muted}
+                multiline
+                value={content}
+                onChangeText={setContent}
+                maxLength={NOTE_CONTENT_LIMIT}
+                textAlignVertical="top"
+              />
+              <RemainingCounter
+                inside="note"
+                value={content}
+                limit={NOTE_CONTENT_LIMIT}
+                theme={theme}
+              />
+            </View>
           ) : (
             <View style={styles.todoContainer}>
               <ScrollView
@@ -587,23 +769,42 @@ const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, langu
                 )}
               </ScrollView>
 
-              <View style={[styles.addTodoRow, { borderColor: color + "66", backgroundColor: theme.primary }]}>
-                <TextInput
-                  ref={todoInputRef}
-                  allowFontScaling={false}
-                  style={[styles.addTodoInput, { color: theme.text.primary }]}
-                  placeholder={i18nText("autoI18n.yeni_madde_ekle", "Yeni madde ekle…")}
-                  placeholderTextColor={theme.text.muted}
-                  value={newTodoText}
-                  onChangeText={setNewTodoText}
-                  maxLength={60}
-                  onSubmitEditing={addTodo}
-                  returnKeyType="done"
-                  blurOnSubmit={false}
-                />
-                <TouchableOpacity onPress={addTodo} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="add-circle" size={26} color={color} />
-                </TouchableOpacity>
+              <View style={styles.todoComposer}>
+                <View style={styles.addTodoRow}>
+                  <View
+                    style={[
+                      styles.addTodoInputShell,
+                      { borderColor: color + "66", backgroundColor: theme.primary },
+                    ]}
+                  >
+                    <TextInput
+                      ref={todoInputRef}
+                      allowFontScaling={false}
+                      style={[styles.addTodoInput, { color: theme.text.primary }]}
+                      placeholder={i18nText("autoI18n.yeni_madde_ekle", "Yeni madde ekle…")}
+                      placeholderTextColor={theme.text.muted}
+                      value={newTodoText}
+                      onChangeText={setNewTodoText}
+                      maxLength={TODO_ITEM_LIMIT}
+                      onSubmitEditing={addTodo}
+                      returnKeyType="done"
+                      blurOnSubmit={false}
+                    />
+                    <RemainingCounter
+                      inside
+                      value={newTodoText}
+                      limit={TODO_ITEM_LIMIT}
+                      theme={theme}
+                    />
+                  </View>
+                  <TouchableOpacity
+                    onPress={addTodo}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    style={[styles.addTodoButton, { backgroundColor: color + "1F" }]}
+                  >
+                    <Ionicons name="add-circle" size={26} color={color} />
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           )}
@@ -654,8 +855,9 @@ export default function NotesScreen({ navigation }) {
   );
 
   const handleSave = useCallback(
-    (note) => {
-      saveNote(note);
+    async (note) => {
+      const saved = await saveNote(note);
+      if (saved === false) return false;
       setModalVisible(false);
       setEditingNote(null);
       // Tarihli not = hatırlatma; OS izni yoksa bildirim ASLA düşmez. İzin
@@ -664,6 +866,7 @@ export default function NotesScreen({ navigation }) {
       if (note?.scheduledDate) {
         setTimeout(primeNotificationPermission, PRIME_HANDOFF_MS);
       }
+      return true;
     },
     [saveNote, primeNotificationPermission],
   );
@@ -673,7 +876,10 @@ export default function NotesScreen({ navigation }) {
     setDeleteModalVisible(true);
   };
   const confirmDelete = () => {
-    if (deleteTargetId) handleDeleteNote(deleteTargetId);
+    if (deleteTargetId) {
+      handleDeleteNote(deleteTargetId);
+      removeNoteTodoDraft(todoDraftKey(deleteTargetId));
+    }
     setDeleteModalVisible(false);
     setDeleteTargetId(null);
   };
@@ -939,6 +1145,20 @@ const styles = StyleSheet.create({
   colorRow: { flexDirection: "row", gap: 8, justifyContent: "center", flexWrap: "wrap" },
   colorDot: { width: 26, height: 26, borderRadius: 13 },
   colorDotSelected: { borderWidth: 3, borderColor: "#fff", transform: [{ scale: 1.15 }] },
+  todoOptionsRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  compactColorRow: {
+    flex: 1,
+    minWidth: 0,
+    gap: 5,
+    justifyContent: "flex-start",
+    alignContent: "center",
+  },
+  compactColorDot: { width: 18, height: 18, borderRadius: 9 },
+  compactColorDotSelected: {
+    borderWidth: 2,
+    borderColor: "#fff",
+    transform: [{ scale: 1.08 }],
+  },
 
   titleInput: {
     fontSize: 18,
@@ -948,32 +1168,99 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
 
-  contentInput: {
+  noteContentField: {
+    position: "relative",
     borderRadius: 12,
-    padding: 12,
+    overflow: "hidden",
+  },
+  contentInput: {
+    width: "100%",
+    paddingTop: 12,
+    paddingHorizontal: 12,
+    paddingBottom: 28,
     fontSize: 14,
     lineHeight: 20,
     minHeight: 120,
     maxHeight: 200,
   },
+  remainingCounter: {
+    alignSelf: "flex-end",
+    fontSize: 10.5,
+    fontWeight: "700",
+    marginTop: 4,
+    marginRight: 3,
+  },
+  todoInputCounter: {
+    position: "absolute",
+    right: 7,
+    bottom: 3,
+    width: 30,
+    fontSize: 9.5,
+    fontWeight: "700",
+    textAlign: "right",
+  },
+  noteInputCounter: {
+    width: 42,
+    position: "absolute",
+    right: 8,
+    bottom: 6,
+    fontSize: 10,
+    fontWeight: "700",
+    textAlign: "right",
+  },
+  todoEditCounter: {
+    width: 27,
+    position: "absolute",
+    right: 1,
+    bottom: 1,
+    fontSize: 9,
+    fontWeight: "700",
+    textAlign: "right",
+  },
 
   todoContainer: { gap: 8 },
+  todoComposer: { gap: 2 },
   todoScroll: { maxHeight: 240 },
   sectionLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 1.2, marginBottom: 4, marginTop: 4 },
   doneDivider: { borderTopWidth: 1, marginTop: 8, marginBottom: 4, paddingTop: 6 },
   todoRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 5 },
   todoItemText: { fontSize: 14 },
-  todoRowActions: { flexDirection: "row", alignItems: "center", gap: 12 },
-  todoEditInput: { flex: 1, borderBottomWidth: 1, paddingVertical: 2, paddingHorizontal: 0 },
+  todoRowActions: { flexDirection: "row", alignItems: "center", gap: 9 },
+  todoEditField: { flex: 1, position: "relative" },
+  todoEditInput: {
+    width: "100%",
+    borderBottomWidth: 1,
+    paddingTop: 2,
+    paddingBottom: 11,
+    paddingHorizontal: 0,
+  },
   addTodoRow: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
+  },
+  addTodoInputShell: {
+    flex: 1,
+    height: 44,
+    position: "relative",
     borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingLeft: 12,
   },
-  addTodoInput: { flex: 1, fontSize: 14, paddingVertical: 8 },
+  addTodoInput: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 8,
+    paddingLeft: 0,
+    paddingRight: 8,
+  },
+  addTodoButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   saveBtn: { paddingVertical: 14, borderRadius: 16, alignItems: "center" },
   saveBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
@@ -1022,5 +1309,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+  compactDueDatePicker: {
+    width: 144,
+    flexShrink: 0,
+    gap: 4,
+    minHeight: 42,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  compactDueDateText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 10.5,
+    lineHeight: 12.5,
+    fontWeight: "700",
+    textAlign: "center",
   },
 });

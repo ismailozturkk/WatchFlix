@@ -313,11 +313,28 @@ export const ProfileNotesProvider = ({ children }) => {
    * optimistic günceller ve setDoc ile yazar. Hem "note" hem "todo" için çalışır.
    */
   const saveNote = async (note) => {
-    if (!uid || !note?.id) return;
+    if (!uid || !note?.id) return false;
     const now = Date.now();
-    const exists = notesRef.current.some((n) => n.id === note.id);
+    const existingNote = notesRef.current.find((n) => n.id === note.id);
+    const exists = !!existingNote;
+    const requestedType = note.type === "todo" ? "todo" : "note";
+    const existingType = existingNote
+      ? existingNote.type === "todo" ? "todo" : "note"
+      : null;
+    // Düzenlenen bir belge Not ↔ Todo arasında dönüştürülemez. UI yanlışlıkla
+    // farklı tip gönderse bile mevcut tipe ait içerik/maddeler korunur.
+    const typeChangeBlocked = !!existingNote && requestedType !== existingType;
     const finalNote = {
       ...note,
+      type: typeChangeBlocked ? existingType : requestedType,
+      ...(typeChangeBlocked
+        ? {
+            title: existingNote.title || "",
+            content: existingNote.content || "",
+            todos: existingNote.todos || [],
+            scheduledDate: existingNote.scheduledDate || null,
+          }
+        : {}),
       createdAt: note.createdAt || now,
       updatedAt: now,
     };
@@ -332,8 +349,10 @@ export const ProfileNotesProvider = ({ children }) => {
 
     try {
       await setDoc(itemDoc(uid, note.id), finalNote);
+      return true;
     } catch (err) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.not_kaydedilemedi", "Not kaydedilemedi") });
+      return false;
     }
   };
 
