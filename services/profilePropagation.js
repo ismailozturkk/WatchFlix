@@ -1,6 +1,8 @@
 // services/profilePropagation.js
 //
-// Profil (isim / avatar) değişince DENORMALIZE kopyaları güncelle.
+// Profil (isim / kullanıcı adı / avatar) değişince, istemcinin yazma izni olan
+// birkaç denormalize kopyayı gecikmeden güncelle. Tam ve yetkili fan-out
+// functions/index.js:onUserProfileUpdated tarafından yapılır.
 // Postlar ve arkadaşlık kayıtları, oluşturulduğu andaki isim+avatar'ı snapshot
 // olarak tutar. Kullanıcı profilini değiştirince bu kopyalar eski kalmasın diye
 // burada toplu (batch) güncelleme yapılır.
@@ -62,15 +64,18 @@ async function filterExistingRefs(items) {
  * @param {string} uid
  * @param {Object} change
  * @param {string} [change.displayName] verilirse isim güncellenir
+ * @param {string} [change.username] verilirse kullanıcı adı güncellenir
  * @param {number} [change.avatarIndex] verilirse avatar güncellenir
  */
-export async function propagateProfileChange(uid, { displayName, avatarIndex } = {}) {
+export async function propagateProfileChange(uid, { displayName, username, avatarIndex } = {}) {
   if (!uid) return;
   const nameSet = typeof displayName === "string" && displayName.trim().length > 0;
+  const usernameSet = typeof username === "string" && username.trim().length > 0;
   const avaSet = typeof avatarIndex === "number";
-  if (!nameSet && !avaSet) return;
+  if (!nameSet && !usernameSet && !avaSet) return;
 
   const name = nameSet ? displayName.trim() : null;
+  const handle = usernameSet ? username.trim() : null;
   const idx = avaSet ? clampAvatarIndex(avatarIndex) : null;
 
   // 1) Kullanıcının postları
@@ -81,6 +86,7 @@ export async function propagateProfileChange(uid, { displayName, avatarIndex } =
     const items = snap.docs.map((d) => {
       const patch = {};
       if (nameSet) patch.authorName = name;
+      if (usernameSet) patch.authorUsername = handle;
       if (avaSet) patch.authorAvatarIndex = idx;
       return { ref: d.ref, patch };
     });
@@ -96,6 +102,7 @@ export async function propagateProfileChange(uid, { displayName, avatarIndex } =
       const friendUid = f.id;
       const patch = {};
       if (nameSet) patch.friendName = name;
+      if (usernameSet) patch.friendUsername = handle;
       if (avaSet) patch.friendAvatarIndex = idx;
       return { ref: doc(db, "Users", friendUid, "friends", uid), patch };
     });

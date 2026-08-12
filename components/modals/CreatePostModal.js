@@ -33,6 +33,7 @@ import Toast from "react-native-toast-message";
 import { Octicons } from "@expo/vector-icons";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
+import { useUserProfile } from "@context/UserProfileContext";
 import { appAlert } from "@components/AppAlert";
 import { i18nText } from "@utils/i18nText";
 import { validatePost, buildPollObject, reorderArray, postTypeBadge } from "@utils/postComposer";
@@ -126,6 +127,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
   const { getTmdbUrl } = useImageQualitySettings();
   const { user } = useAuth();
   const { avatar, selectAvatarIndex } = useProfileUi();
+  const { displayName, username, avatarIndex: profileAvatarIndex } = useUserProfile();
 
   const isEditing = !!editingPost;
 
@@ -615,10 +617,16 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
       hasSpoiler,
       ranked: postType === "list" ? ranked : false,
       visibility: "public",
+      authorName: displayName || user?.displayName || "",
+      authorUsername: username || "",
       // Avatar tam URL değil sadece index olarak gider.
       // utils/avatars.js içinde clampAvatarIndex bir güvenlik ağı.
       authorAvatarIndex:
-        typeof selectAvatarIndex === "number" ? selectAvatarIndex : 0,
+        typeof profileAvatarIndex === "number"
+          ? profileAvatarIndex
+          : typeof selectAvatarIndex === "number"
+            ? selectAvatarIndex
+            : 0,
     };
     if (postType === "poll") {
       payload.poll = buildPollObject({
@@ -1128,7 +1136,9 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                           activeOpacity={0.8}
                         >
                           <Ionicons name={hasSpoiler ? "warning" : "warning-outline"} size={14} color={hasSpoiler ? "#f04f4f" : theme.text.muted} />
-                          <Text style={[s.spoilerText, { color: hasSpoiler ? "#f04f4f" : theme.text.muted }]}>Spoiler</Text>
+                          <Text style={[s.spoilerText, { color: hasSpoiler ? "#f04f4f" : theme.text.muted }]}>
+                            {i18nText("autoI18n.spoiler", "Spoiler")}
+                          </Text>
                         </TouchableOpacity>
                       </View>
                     </>

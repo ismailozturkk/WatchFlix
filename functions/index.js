@@ -40,6 +40,11 @@ const { createHash, timingSafeEqual } = require("node:crypto");
 const { extractRegionProviders, computeNewlyAvailable } = require("./streamingDiff");
 const tournamentBracket = require("./tournamentBracket");
 const {
+  buildProfileIdentityChanges,
+  mappedPatch,
+  hasPatch,
+} = require("./profileIdentity");
+const {
   getTransferChanges,
   parseRevenueCatPremiumState,
   resolveFirebaseUserId,
@@ -794,8 +799,8 @@ exports.onSocialNotificationCreated = onDocumentCreated(
 // Self-trigger yok: yalnız ALT koleksiyonlara + Posts'a yazar, hiçbir Users/{x}
 // ÜST dokümanına dokunmaz.
 //
-// Kapsam (kullanıcı kararı): Posts + post yorumları, arkadaş kayıtları + istekler
-// (friendRequests/sentRequests), bildirimler. Film/dizi yorumları KAPSAM DIŞI.
+// Users/{uid} tek dogru kaynaktir. Kimlik bilgisini snapshot olarak tutmak
+// zorunda olan eski/yeni butun sosyal yuzeyler bu tetikleyiciyle tazelenir.
 // ───────────────────────────────────────────────────────────────────────────
 
 // Bir referans listesini verilen patch ile chunk'lı (max 450/batch) günceller.
@@ -817,48 +822,95 @@ async function commitRefs(refs, patch) {
   return total;
 }
 
-exports.onUserProfileUpdated = onDocumentUpdated("Users/{uid}", async (event) => {
+// Her hedefin patch'i farkli oldugunda (nested member map / lastMessage gibi)
+// ayni chunk guvencesiyle yaz.
+async function commitUpdates(items) {
+  let batch = db.batch();
+  let n = 0;
+  let total = 0;
+  for (const item of items) {
+    if (!item?.ref || !hasPatch(item.patch)) continue;
+    batch.update(item.ref, item.patch);
+    n++;
+    total++;
+    if (n >= 450) {
+      await batch.commit();
+      batch = db.batch();
+      n = 0;
+    }
+  }
+  if (n) await batch.commit();
+  return total;
+}
+
+exports.onUserProfileUpdated = onDocumentUpdated(
+  {
+    document: "Users/{uid}",
+    timeoutSeconds: 540,
+    memory: "512MiB",
+  },
+  async (event) => {
   const uid = event.params.uid;
   const before = event.data?.before?.data() || {};
   const after = event.data?.after?.data() || {};
 
-  const nameChanged = before.displayName !== after.displayName;
-  const userChanged = before.username !== after.username;
-  const avaChanged = before.avatarIndex !== after.avatarIndex;
-  if (!nameChanged && !userChanged && !avaChanged) return; // ilgisiz güncelleme
+  const changes = buildProfileIdentityChanges(before, after);
+  const { nameChanged, usernameChanged, avatarChanged } = changes;
+  if (!nameChanged && !usernameChanged && !avatarChanged) return;
 
-  const name = typeof after.displayName === "string" ? after.displayName : "";
-  const username = typeof after.username === "string" ? after.username : "";
-  const avatarIndex = typeof after.avatarIndex === "number" ? after.avatarIndex : 0;
+  const { displayName: name, username, avatarIndex } = changes.after;
 
-  // Hedefe göre yalnız DEĞİŞEN alanları içeren patch'ler (gereksiz yazma yok).
-  const patchAuthor = {}; // Posts + post yorumları (username tutmaz)
-  if (nameChanged) patchAuthor.authorName = name;
-  if (avaChanged) patchAuthor.authorAvatarIndex = avatarIndex;
-
-  const patchFriend = {}; // Users/{friendUid}/friends/{uid}
-  if (nameChanged) patchFriend.friendName = name;
-  if (userChanged) patchFriend.friendUsername = username;
-  if (avaChanged) patchFriend.friendAvatarIndex = avatarIndex;
-
-  const patchFrom = {}; // friendRequests (fromUid==uid)
-  if (nameChanged) patchFrom.fromName = name;
-  if (userChanged) patchFrom.fromUsername = username;
-  if (avaChanged) patchFrom.fromAvatarIndex = avatarIndex;
-
-  const patchTo = {}; // sentRequests (toUid==uid) — karşı tarafın listesindeki ben
-  if (nameChanged) patchTo.toName = name;
-  if (userChanged) patchTo.toUsername = username;
-  if (avaChanged) patchTo.toAvatarIndex = avatarIndex;
-
-  const patchNotif = {}; // notifications (fromUid==uid) — username tutmaz
-  if (nameChanged) patchNotif.fromName = name;
-  if (avaChanged) patchNotif.fromAvatarIndex = avatarIndex;
+  // Hedefe gore yalniz DEGISEN alanlar (gereksiz yazma yok).
+  const patchAuthor = mappedPatch(changes, {
+    displayName: "authorName",
+    username: "authorUsername",
+    avatarIndex: "authorAvatarIndex",
+  });
+  const patchMediaComment = mappedPatch(changes, {
+    displayName: "username",
+    username: "userHandle",
+    avatarIndex: "avatarIndex",
+  });
+  const patchFriend = mappedPatch(changes, {
+    displayName: "friendName",
+    username: "friendUsername",
+    avatarIndex: "friendAvatarIndex",
+  });
+  const patchFrom = mappedPatch(changes, {
+    displayName: "fromName",
+    username: "fromUsername",
+    avatarIndex: "fromAvatarIndex",
+  });
+  const patchTo = mappedPatch(changes, {
+    displayName: "toName",
+    username: "toUsername",
+    avatarIndex: "toAvatarIndex",
+  });
+  const patchNotif = mappedPatch(changes, {
+    displayName: "fromName",
+    username: "fromUsername",
+    avatarIndex: "fromAvatarIndex",
+  });
+  const patchConversation = mappedPatch(changes, {
+    displayName: "withName",
+    username: "withUsername",
+    avatarIndex: "withAvatarIndex",
+  });
+  const patchMessage = mappedPatch(changes, {
+    displayName: "senderName",
+    username: "senderUsername",
+    avatarIndex: "senderAvatarIndex",
+  });
+  const patchLeaderboard = mappedPatch(changes, {
+    displayName: "displayNameSnapshot",
+    username: "usernameSnapshot",
+    avatarIndex: "avatarIndexSnapshot",
+  });
 
   const log = (k, c) => console.log(`profil fan-out [${k}] uid=${uid}: ${c}`);
 
   // 1) Postlar (authorId==uid) + 2) post yorumları (collectionGroup "comments")
-  if (Object.keys(patchAuthor).length) {
+  if (hasPatch(patchAuthor)) {
     try {
       const s = await db.collection("Posts").where("authorId", "==", uid).get();
       log("posts", await commitRefs(s.docs.map((d) => d.ref), patchAuthor));
@@ -875,8 +927,27 @@ exports.onUserProfileUpdated = onDocumentUpdated("Users/{uid}", async (event) =>
     }
   }
 
+  // 2b) Film/dizi yorumlari ve yanitlari. Bu sema gorunen adi tarihsel olarak
+  // `username` alaninda tutuyor; userHandle yeni gercek kullanici adidir.
+  if (hasPatch(patchMediaComment)) {
+    for (const collectionId of ["comments", "replies"]) {
+      try {
+        const s = await db
+          .collectionGroup(collectionId)
+          .where("userId", "==", uid)
+          .get();
+        log(
+          `media-${collectionId}`,
+          await commitRefs(s.docs.map((d) => d.ref), patchMediaComment),
+        );
+      } catch (e) {
+        console.error(`fan-out media-${collectionId}:`, e);
+      }
+    }
+  }
+
   // 3) Arkadaş kayıtları: her arkadaşın listesindeki benim kaydım.
-  if (Object.keys(patchFriend).length) {
+  if (hasPatch(patchFriend)) {
     try {
       const s = await db.collection("Users").doc(uid).collection("friends").get();
       const refs = s.docs.map((d) => db.doc(`Users/${d.id}/friends/${uid}`));
@@ -897,7 +968,7 @@ exports.onUserProfileUpdated = onDocumentUpdated("Users/{uid}", async (event) =>
   }
 
   // 4) Gelen istekler (başka kullanıcıların friendRequests'inde fromUid==uid)
-  if (Object.keys(patchFrom).length) {
+  if (hasPatch(patchFrom)) {
     try {
       const s = await db.collectionGroup("friendRequests").where("fromUid", "==", uid).get();
       log("friendRequests", await commitRefs(s.docs.map((d) => d.ref), patchFrom));
@@ -907,7 +978,7 @@ exports.onUserProfileUpdated = onDocumentUpdated("Users/{uid}", async (event) =>
   }
 
   // 5) Giden istekler (başka kullanıcıların bana gönderdiği sentRequests'te toUid==uid)
-  if (Object.keys(patchTo).length) {
+  if (hasPatch(patchTo)) {
     try {
       const s = await db.collectionGroup("sentRequests").where("toUid", "==", uid).get();
       log("sentRequests", await commitRefs(s.docs.map((d) => d.ref), patchTo));
@@ -917,7 +988,7 @@ exports.onUserProfileUpdated = onDocumentUpdated("Users/{uid}", async (event) =>
   }
 
   // 6) Bildirimler (başka kullanıcıların notifications'ında fromUid==uid)
-  if (Object.keys(patchNotif).length) {
+  if (hasPatch(patchNotif)) {
     try {
       const s = await db.collectionGroup("notifications").where("fromUid", "==", uid).get();
       log("notifications", await commitRefs(s.docs.map((d) => d.ref), patchNotif));
@@ -926,23 +997,140 @@ exports.onUserProfileUpdated = onDocumentUpdated("Users/{uid}", async (event) =>
     }
   }
 
-  // 7) Gruplar: üyesi olduğum grupların memberInfo.{uid} kaydı. Grup sohbetinde
-  //    gönderen ad/avatar bu denormalize alandan CANLI çözülür (istemci),
-  //    böylece eski mesajlar da güncel ad/avatarı gösterir. username tutulmaz →
-  //    yalnız isim veya avatar değişince güncelle.
-  if (nameChanged || avaChanged) {
+  // 7) Birebir sohbet gelen kutusu. Acik sohbet ayrica Users/{uid}'yi canli
+  // dinler; bu indeks Mesajlar ekranini ve sonraki acilislari gunceller.
+  if (hasPatch(patchConversation)) {
+    try {
+      const s = await db
+        .collectionGroup("conversations")
+        .where("withUid", "==", uid)
+        .get();
+      log(
+        "conversations",
+        await commitRefs(s.docs.map((d) => d.ref), patchConversation),
+      );
+    } catch (e) {
+      console.error("fan-out conversations:", e);
+    }
+  }
+
+  // 8) Gruplar: uye karti + son mesaj onizlemesi. Nested leaf patch yetkileri
+  // ve gelecekte eklenecek uye alanlarini ezmez.
+  if (nameChanged || usernameChanged || avatarChanged) {
     try {
       const s = await db
         .collection("groups")
         .where("members", "array-contains", uid)
         .get();
-      const memberPatch = { [`memberInfo.${uid}`]: { name, avatarIndex } };
-      log("groups", await commitRefs(s.docs.map((d) => d.ref), memberPatch));
+      const items = s.docs.map((d) => {
+        const data = d.data() || {};
+        const patch = {};
+        if (nameChanged) patch[`memberInfo.${uid}.name`] = name;
+        if (usernameChanged) patch[`memberInfo.${uid}.username`] = username;
+        if (avatarChanged) patch[`memberInfo.${uid}.avatarIndex`] = avatarIndex;
+        if (data.lastMessage?.senderId === uid && nameChanged) {
+          patch["lastMessage.senderName"] = name;
+        }
+        return { ref: d.ref, patch };
+      });
+      log("groups", await commitUpdates(items));
     } catch (e) {
       console.error("fan-out groups:", e);
     }
   }
-});
+
+  // 9) Grup mesajlari, reply snapshot'lari ve sabitlenen mesajlar. Chat UI
+  // memberInfo'dan canli cozer; bunlar ayrilan uye/legacy kayit fallback'idir.
+  if (hasPatch(patchMessage)) {
+    try {
+      const s = await db.collectionGroup("messages").where("senderId", "==", uid).get();
+      log("messages", await commitRefs(s.docs.map((d) => d.ref), patchMessage));
+    } catch (e) {
+      console.error("fan-out messages:", e);
+    }
+    try {
+      const s = await db.collectionGroup("messages").where("reply.senderId", "==", uid).get();
+      const replyPatch = {};
+      if (nameChanged) replyPatch["reply.senderName"] = name;
+      if (usernameChanged) replyPatch["reply.senderUsername"] = username;
+      if (avatarChanged) replyPatch["reply.senderAvatarIndex"] = avatarIndex;
+      log("message-replies", await commitRefs(s.docs.map((d) => d.ref), replyPatch));
+    } catch (e) {
+      console.error("fan-out message replies:", e);
+    }
+    try {
+      const s = await db.collectionGroup("pins").where("senderId", "==", uid).get();
+      log("pins", await commitRefs(s.docs.map((d) => d.ref), patchMessage));
+    } catch (e) {
+      console.error("fan-out pins:", e);
+    }
+  }
+
+  // 10) Ortak listeler: uye/kurucu kimligi ve eski ogelerdeki ekleyen kimligi.
+  try {
+    const s = await db
+      .collection("SharedLists")
+      .where("memberIds", "array-contains", uid)
+      .get();
+    const items = s.docs.map((d) => {
+      const data = d.data() || {};
+      const patch = {};
+      if (nameChanged) patch[`members.${uid}.name`] = name;
+      if (usernameChanged) patch[`members.${uid}.username`] = username;
+      if (avatarChanged) patch[`members.${uid}.avatarIndex`] = avatarIndex;
+      if (data.ownerId === uid && nameChanged) patch.ownerName = name;
+      if (data.ownerId === uid && usernameChanged) patch.ownerUsername = username;
+      if (data.ownerId === uid && avatarChanged) patch.ownerAvatarIndex = avatarIndex;
+      return { ref: d.ref, patch };
+    });
+    log("shared-lists", await commitUpdates(items));
+  } catch (e) {
+    console.error("fan-out shared lists:", e);
+  }
+  const patchSharedItem = mappedPatch(changes, {
+    displayName: "addedByName",
+    username: "addedByUsername",
+    avatarIndex: "addedByAvatarIndex",
+  });
+  if (hasPatch(patchSharedItem)) {
+    try {
+      const s = await db.collectionGroup("items").where("addedBy", "==", uid).get();
+      log("shared-list-items", await commitRefs(s.docs.map((d) => d.ref), patchSharedItem));
+    } catch (e) {
+      console.error("fan-out shared list items:", e);
+    }
+  }
+
+  // 11) Oyun liderlik yuzeyleri. Kisisel istatistikler degismez; yalniz
+  // oyuncunun gorunen kimlik snapshot'i tazelenir.
+  if (hasPatch(patchLeaderboard)) {
+    try {
+      const s = await db.collectionGroup("entries").where("uid", "==", uid).get();
+      log("leaderboards", await commitRefs(s.docs.map((d) => d.ref), patchLeaderboard));
+    } catch (e) {
+      console.error("fan-out leaderboards:", e);
+    }
+    const legacyPatch = mappedPatch(changes, {
+      displayName: "displayName",
+      username: "username",
+      avatarIndex: "avatarIndex",
+    });
+    const refs = [
+      db.collection("SceneGame").doc(uid),
+      db.collection("Users").doc(uid).collection("gameProfile").doc("summary"),
+    ];
+    try {
+      const snaps = await db.getAll(...refs);
+      log(
+        "game-profile",
+        await commitRefs(snaps.filter((s) => s.exists).map((s) => s.ref), legacyPatch),
+      );
+    } catch (e) {
+      console.error("fan-out game profile:", e);
+    }
+  }
+  },
+);
 
 // ───────────────────────────────────────────────────────────────────────────
 // TURNUVA OY AGREGASYONU

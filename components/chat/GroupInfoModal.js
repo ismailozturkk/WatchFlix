@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   SectionList,
@@ -34,6 +33,7 @@ import { i18nText } from "@utils/i18nText";
 import { toast } from "@components/AppToast";
 import GroupAvatar from "@components/chat/GroupAvatar";
 import GroupAvatarGrid from "@components/chat/GroupAvatarGrid";
+import { appAlert } from "@components/AppAlert";
 
 const ACCENT = "#6C63FF";
 const DANGER = "#FF6B6B";
@@ -113,6 +113,7 @@ export default function GroupInfoModal({
           (uid === currentUid
             ? i18nText("autoI18n.sen", "Sen")
             : i18nText("autoI18n.isimsiz_kullanici", "İsimsiz kullanıcı")),
+        username: groupData?.memberInfo?.[uid]?.username || "",
         avatarIndex: groupData?.memberInfo?.[uid]?.avatarIndex ?? 0,
       })), groupData),
     [memberIds, groupData?.memberInfo, currentUid]
@@ -176,7 +177,7 @@ export default function GroupInfoModal({
 
   const confirmRemove = useCallback(
     (member) => {
-      Alert.alert(
+      appAlert(
         i18nText("autoI18n.uyeyi_cikar", "Üyeyi çıkar"),
         i18nText(
           "autoI18n.uyeyi_cikar_onay",
@@ -242,7 +243,7 @@ export default function GroupInfoModal({
       const message = shouldBeAdmin
         ? i18nText("autoI18n.yonetici_yap_onay", "{{name}} grup yöneticisi yapılsın mı?", { name: member.displayName })
         : i18nText("autoI18n.yoneticilikten_al_onay", "{{name}} yöneticilikten alınsın mı?", { name: member.displayName });
-      Alert.alert(title, message, [
+      appAlert(title, message, [
         { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
         {
           text: i18nText("autoI18n.onayla", "Onayla"),
@@ -340,9 +341,11 @@ export default function GroupInfoModal({
               ? item.username
                 ? `@${item.username}`
                 : i18nText("autoI18n.arkadas", "Arkadaş")
-              : item.uid === currentUid
-              ? i18nText("autoI18n.bu_sensin", "Bu sensin")
-              : i18nText("autoI18n.profili_gor", "Profili gör")}
+              : item.username
+                ? `@${item.username}`
+                : item.uid === currentUid
+                  ? i18nText("autoI18n.bu_sensin", "Bu sensin")
+                  : i18nText("autoI18n.profili_gor", "Profili gör")}
           </Text>
         </View>
         {loading ? (

@@ -21,6 +21,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useTheme } from "@context/ThemeContext";
 import { useProfileUi } from "@context/ProfileUiContext";
+import { useUserProfile } from "@context/UserProfileContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BackButton from "@components/BackButton";
 import ScreenDecor from "@components/ScreenDecor";
@@ -42,6 +43,7 @@ export default function CreateGroupScreen({ navigation }) {
   const user = auth.currentUser;
   const { theme } = useTheme();
   const { avatars, selectAvatarIndex } = useProfileUi();
+  const { displayName, username, avatarIndex: profileAvatarIndex } = useUserProfile();
 
   const [friends, setFriends] = useState([]);
   const [selected, setSelected] = useState({}); // uid -> friend
@@ -96,12 +98,22 @@ export default function CreateGroupScreen({ navigation }) {
       const members = [user.uid, ...selectedList.map((f) => f.uid)];
       const memberInfo = {
         [user.uid]: {
-          name: user.displayName || "",
-          avatarIndex: typeof selectAvatarIndex === "number" ? selectAvatarIndex : 0,
+          name: displayName || user.displayName || "",
+          username: username || "",
+          avatarIndex:
+            typeof profileAvatarIndex === "number"
+              ? profileAvatarIndex
+              : typeof selectAvatarIndex === "number"
+                ? selectAvatarIndex
+                : 0,
         },
       };
       selectedList.forEach((f) => {
-        memberInfo[f.uid] = { name: f.displayName, avatarIndex: f.avatarIndex ?? 0 };
+        memberInfo[f.uid] = {
+          name: f.displayName,
+          username: f.username || "",
+          avatarIndex: f.avatarIndex ?? 0,
+        };
       });
 
       const groupId = await createGroup({
@@ -126,7 +138,7 @@ export default function CreateGroupScreen({ navigation }) {
       );
       setCreating(false);
     }
-  }, [canCreate, creating, user, selectedList, name, color, avatarIndex, selectAvatarIndex, navigation]);
+  }, [canCreate, creating, user, selectedList, name, color, avatarIndex, selectAvatarIndex, profileAvatarIndex, displayName, username, navigation]);
 
   const renderFriend = ({ item }) => {
     const isSel = !!selected[item.uid];

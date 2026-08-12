@@ -55,7 +55,7 @@ export function memberColor(uid) {
  * @param {string}   p.color       grup avatar rengi
  * @param {number}   p.avatarIndex iconBacground görselinin 0-based index'i
  * @param {string[]} p.members     uid listesi (oluşturan dahil)
- * @param {object}   p.memberInfo  { uid: { name, avatarIndex } }
+ * @param {object}   p.memberInfo  { uid: { name, username, avatarIndex } }
  * @param {string}   p.createdBy   uid
  * @returns {Promise<string>} groupId
  */
@@ -125,6 +125,7 @@ export async function addGroupMember(groupId, member) {
     members: arrayUnion(member.uid),
     [`memberInfo.${member.uid}`]: {
       name: member.displayName || member.name || "",
+      username: member.username || "",
       avatarIndex: member.avatarIndex ?? 0,
     },
     updatedAt: serverTimestamp(),

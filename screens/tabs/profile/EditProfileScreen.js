@@ -181,11 +181,13 @@ export default function EditProfileScreen({ navigation }) {
         await selectAvatar(avatarIndex);
       }
 
-      // İsim/avatar değiştiyse postlara ve arkadaşlık kayıtlarına yay (best-effort).
+      // İstemcinin izinli oldugu kopyalari hemen tazele. Tum sosyal yuzeylerin
+      // yetkili fan-out'u Users/{uid} degisimini dinleyen Cloud Function'dadir.
       const nameChanged = patch.displayName !== undefined;
-      if ((nameChanged || avatarChanged) && profile?.uid) {
+      if ((nameChanged || usernameChanged || avatarChanged) && profile?.uid) {
         propagateProfileChange(profile.uid, {
           displayName: nameChanged ? dn : undefined,
+          username: usernameChanged ? un : undefined,
           avatarIndex: avatarChanged ? avatarIndex : undefined,
         }).catch(() => {});
       }

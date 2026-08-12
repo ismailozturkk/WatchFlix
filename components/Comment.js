@@ -530,7 +530,11 @@ const Comment = ({
   const { theme } = useTheme();
   const styles = getStyles(theme);
   const { user: currentUser } = useAuth();
-  const { avatarIndex: myAvatarIndex } = useUserProfile();
+  const {
+    displayName: myDisplayName,
+    username: myUsername,
+    avatarIndex: myAvatarIndex,
+  } = useUserProfile();
   const { isBlocked, block } = useFriends();
   const [comments, setComments] = useState([]);
   const [isSending, setIsSending] = useState(false);
@@ -922,7 +926,8 @@ const Comment = ({
           collection(db, collectionName, cid, "comments", parentId, "replies"),
           {
             userId:      currentUser.uid,
-            username:    currentUser.displayName || "Anonim",
+            username:    myDisplayName || currentUser.displayName || "Anonim",
+            userHandle:  myUsername || "",
             avatar:      currentUser.photoURL,
             avatarIndex: clampAvatarIndex(myAvatarIndex),
             text:        text.trim(),
@@ -943,7 +948,8 @@ const Comment = ({
           collection(db, collectionName, cid, "comments"),
           {
             userId:      currentUser.uid,
-            username:    currentUser.displayName || "Anonim",
+            username:    myDisplayName || currentUser.displayName || "Anonim",
+            userHandle:  myUsername || "",
             avatar:      currentUser.photoURL,
             avatarIndex: clampAvatarIndex(myAvatarIndex),
             text:        text.trim(),

@@ -111,7 +111,8 @@ export async function createPost(user, payload) {
 
   const base = {
     authorId: user.uid,
-    authorName: user.displayName || payload.authorName || i18nText("autoI18n.kullanici", "Kullanıcı"),
+    authorName: payload.authorName || user.displayName || i18nText("autoI18n.kullanici", "Kullanıcı"),
+    authorUsername: payload.authorUsername || "",
     authorAvatarIndex,
     type: payload.type,
     title: payload.title.trim(),
@@ -455,7 +456,7 @@ export async function addComment(
   postId,
   user,
   text,
-  { parentId = null, authorAvatarIndex = DEFAULT_AVATAR_INDEX, postTitle = "", postPoster = null } = {},
+  { parentId = null, authorUsername = "", authorAvatarIndex = DEFAULT_AVATAR_INDEX, postTitle = "", postPoster = null } = {},
 ) {
   if (!user?.uid) throw new Error("addComment: user yok");
   if (!text?.trim()) throw new Error("addComment: text boş olamaz");
@@ -465,6 +466,7 @@ export async function addComment(
   batch.set(commRef, {
     authorId: user.uid,
     authorName: user.displayName || i18nText("autoI18n.kullanici", "Kullanıcı"),
+    authorUsername: authorUsername || "",
     authorAvatarIndex: clampAvatarIndex(authorAvatarIndex),
     text: text.trim(),
     parentId,

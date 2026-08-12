@@ -48,6 +48,7 @@ import * as Haptics from "@services/hapticsService";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
+import { useUserProfile } from "@context/UserProfileContext";
 import { getAvatarSource } from "@utils/avatars";
 import { i18nText } from "@utils/i18nText";
 import appAlert from "@components/AppAlert";
@@ -263,6 +264,11 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { selectAvatarIndex } = useProfileUi();
+  const {
+    displayName: profileDisplayName,
+    username: profileUsername,
+    avatarIndex: profileAvatarIndex,
+  } = useUserProfile();
   const styles = getStyles(theme);
 
   const postId = post?.id;
@@ -382,13 +388,26 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
       if (editId) {
         await updateComment(postId, editId, text, user.uid);
       } else {
-        await addComment(postId, user, text, {
+        await addComment(
+          postId,
+          {
+            uid: user?.uid,
+            displayName: profileDisplayName || user?.displayName || "",
+          },
+          text,
+          {
           parentId: parentId || null,
+          authorUsername: profileUsername || "",
           authorAvatarIndex:
-            typeof selectAvatarIndex === "number" ? selectAvatarIndex : 0,
+            typeof profileAvatarIndex === "number"
+              ? profileAvatarIndex
+              : typeof selectAvatarIndex === "number"
+                ? selectAvatarIndex
+                : 0,
           postTitle: post?.title || "",
           postPoster: post?.mediaList?.[0]?.poster || null,
-        });
+          },
+        );
         // Yanıt yazıldıysa o thread'i otomatik aç
         if (parentId) {
           setReplyVisibility((prev) => ({ ...prev, [parentId]: true }));
