@@ -285,13 +285,13 @@ export default function LoginScreen({ navigation }) {
               ]}
             >
               <Image
-                source={require("../../assets/icon.png")}
+                source={require("../../assets/android-icon-foreground.png")}
                 style={styles.heroIconImage}
                 resizeMode="contain"
               />
             </View>
             <Text allowFontScaling={false} style={[styles.brandTitle, { color: theme.text.primary }]}>
-              Watch<Text style={{ color: accent }}>ify</Text>
+              See<Text style={{ color: accent }}>logd</Text>
             </Text>
             <Text allowFontScaling={false} style={[styles.brandSub, { color: theme.text.secondary }]}>
               {i18nText("autoI18n.izleme_listelerin_ve_sosyal_akisin_hazir", "İzleme listelerin ve sosyal akışın hazır.")}

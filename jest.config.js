@@ -17,6 +17,11 @@ module.exports = {
   transform: {
     "^.+\\.[jt]sx?$": "babel-jest",
   },
+  // Yerel splash kataloğu gibi saf metadata modülleri statik görsel require
+  // eder. Node/Jest ikili dosyayı JS gibi açmaya çalışmasın.
+  moduleNameMapper: {
+    "\\.(jpg|jpeg|png|webp)$": "<rootDir>/__mocks__/fileMock.js",
+  },
   // SDK 57 ile babel-preset-expo, `process.env.X` okumalarini derleme aninda
   // `expo/virtual/env` modulunden okunacak sekilde yeniden yaziyor. O dosya ESM
   // ("export const env = ...") ve jest node_modules'u varsayilan olarak

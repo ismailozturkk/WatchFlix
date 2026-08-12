@@ -24,8 +24,15 @@ import { ANALYTICS_EVENTS, trackEvent } from "@services/analytics";
 import IconBacground from "../../components/IconBacground";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
-import { useApiSettings, useImageQualitySettings } from "../../context/AppSettingsContext";
+import {
+  STREAMING_PROVIDERS,
+  useApiSettings,
+  useDiscoveryPreferenceSettings,
+  useImageQualitySettings,
+  useStreamingProviderSettings,
+} from "../../context/AppSettingsContext";
 import { alpha } from "../../theme/colors";
+import { ONBOARDING_GENRES } from "../../utils/onboardingPreferences";
 import {
   AiShowcase,
   TournamentShowcase,
@@ -57,10 +64,6 @@ const COPY = {
     tagline: "Ne izleyeceğini bul. İzlediklerini hatırla. Hikâyeni paylaş.",
     introEyebrow: "SENİN İZLEME EVRENİN",
     introTap: "Devam etmek için dokun",
-    langEyebrow: "SANA GÖRE HAZIRLAYALIM",
-    langTitle: "Hangi dilde keşfetmek istersin?",
-    langHint: "İçerikleri, önerileri ve topluluğu seçtiğin dilde deneyimle.",
-    langContinue: "Seelogd'ı Keşfet",
     skip: "Atla",
     next: "Devam Et",
     start: "Son Adım",
@@ -112,10 +115,6 @@ const COPY = {
     tagline: "Find what to watch. Remember what you loved. Share your story.",
     introEyebrow: "YOUR WATCHING UNIVERSE",
     introTap: "Tap to continue",
-    langEyebrow: "LET'S MAKE IT YOURS",
-    langTitle: "Which language would you like to explore in?",
-    langHint: "Experience titles, recommendations and the community in your language.",
-    langContinue: "Explore Seelogd",
     skip: "Skip",
     next: "Continue",
     start: "Final Step",
@@ -168,23 +167,32 @@ const COPY = {
 // Özellik slaytlarının tanımı: hangi mock gösterilecek + ikon.
 // index 0 (discover) kayan poster arka planı kullanır; diğerleri mock gösterir.
 const DISCOVER_LOTTIE = require("@lottie/dizi_film_animation.json");
-const FLAGS = {
-  tr: require("../../assets/flags/Turkey.png"),
-  en: require("../../assets/flags/England.png"),
-};
-
 export default function OnboardingScreen({ navigation }) {
   const { theme, selectedTheme } = useTheme();
   const { language, toggleLanguage, t } = useLanguage();
   const { API_KEY } = useApiSettings();
   const { getTmdbUrl } = useImageQualitySettings();
+  const { streamingProviderIds, changeStreamingProviderIds } =
+    useStreamingProviderSettings();
+  const { onboardingGenreKeys, changeOnboardingGenreKeys } =
+    useDiscoveryPreferenceSettings();
   const insets = useSafeAreaInsets();
 
   const accent = theme.accent;
   const isLightTheme = selectedTheme === "light" || selectedTheme === "green";
   const copy = COPY[language === "en" ? "en" : "tr"];
 
-  const [phase, setPhase] = useState("intro"); // "intro" | "lang" | "main"
+  const [phase, setPhase] = useState("intro"); // "intro" | "main"
+  const [selectedGenreKeys, setSelectedGenreKeys] = useState(onboardingGenreKeys);
+  const [selectedProviderIds, setSelectedProviderIds] = useState(streamingProviderIds);
+  const [providerCatalog, setProviderCatalog] = useState(
+    STREAMING_PROVIDERS.map((provider, priority) => ({
+      ...provider,
+      logoPath: null,
+      priority,
+      mediaTypes: ["movie", "tv"],
+    })),
+  );
   const [index, setIndex] = useState(0);
   const [posters, setPosters] = useState([]); // TMDB poster URI'leri (kayan arka plan)
   const [posterPaths, setPosterPaths] = useState([]); // ham poster_path'ler (turnuva ağacı için)
@@ -196,15 +204,27 @@ export default function OnboardingScreen({ navigation }) {
   const scrollRef = useRef(null);
   const scrollX = useRef(new Animated.Value(0)).current;
 
-  const SLIDE_COUNT = copy.features.length + 1; // özellikler + 1 kayıt
-  const isCtaSlide = index === SLIDE_COUNT - 1;
+  const onboardingSteps = useMemo(
+    () => [
+      { type: "feature", feature: copy.features[0] },
+      { type: "preference", kind: "genre" },
+      { type: "feature", feature: copy.features[1] },
+      { type: "preference", kind: "provider" },
+      { type: "feature", feature: copy.features[2] },
+      { type: "cta" },
+    ],
+    [copy.features],
+  );
+  const SLIDE_COUNT = onboardingSteps.length;
+  const currentStep = onboardingSteps[index] || onboardingSteps[0];
+  const isCtaSlide = currentStep.type === "cta";
 
   useEffect(() => {
     if (startedEventSent.current) return;
     startedEventSent.current = true;
     trackEvent(ANALYTICS_EVENTS.ONBOARDING_STARTED, {
       entry_language: language === "en" ? "en" : "tr",
-      feature_step_count: copy.features.length,
+      feature_step_count: SLIDE_COUNT - 1,
     });
   }, []);
 
@@ -215,11 +235,16 @@ export default function OnboardingScreen({ navigation }) {
     lastTrackedStep.current = stepKey;
     trackEvent(ANALYTICS_EVENTS.ONBOARDING_STEP_VIEWED, {
       step_number: index + 1,
-      step_name: isCtaSlide ? "account_cta" : copy.features[index]?.kind || "unknown",
+      step_name:
+        currentStep.type === "cta"
+          ? "account_cta"
+          : currentStep.type === "preference"
+            ? `${currentStep.kind}_preferences`
+            : currentStep.feature?.kind || "unknown",
       total_steps: SLIDE_COUNT,
       language: language === "en" ? "en" : "tr",
     });
-  }, [copy.features, index, isCtaSlide, language, phase, SLIDE_COUNT]);
+  }, [currentStep, index, language, phase, SLIDE_COUNT]);
 
   // En çok oy alan film + dizi verisini (tam nesne + tür isimleri) çek.
   // Tüm mock içerikleri bu GERÇEK verilerden üretilir → poster/başlık/puan/yıl tutarlı.
@@ -305,6 +330,95 @@ export default function OnboardingScreen({ navigation }) {
     };
   }, [API_KEY, getTmdbUrl, language]);
 
+  // Bölgeye uygun film ve dizi platformlarını TMDB'den al; aynı sağlayıcının
+  // iki katalogdaki varlığını birleştir ve gerçek logo_path bilgisini koru.
+  useEffect(() => {
+    let alive = true;
+    const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
+    const tmdbRegion = language === "tr" ? "TR" : "US";
+    const headers = { accept: "application/json", Authorization: API_KEY };
+
+    const loadProviders = async () => {
+      try {
+        const [movieResponse, tvResponse] = await Promise.all([
+          axios.get("https://api.themoviedb.org/3/watch/providers/movie", {
+            params: { language: tmdbLanguage, watch_region: tmdbRegion },
+            headers,
+          }),
+          axios.get("https://api.themoviedb.org/3/watch/providers/tv", {
+            params: { language: tmdbLanguage, watch_region: tmdbRegion },
+            headers,
+          }),
+        ]);
+        const merged = new Map();
+        const addProviders = (items, mediaType) => {
+          (items || []).forEach((provider) => {
+            if (!provider?.provider_id) return;
+            const current = merged.get(provider.provider_id);
+            merged.set(provider.provider_id, {
+              id: provider.provider_id,
+              name: provider.provider_name,
+              color:
+                STREAMING_PROVIDERS.find((item) => item.id === provider.provider_id)?.color ||
+                accent,
+              logoPath: provider.logo_path || current?.logoPath || null,
+              priority: Math.min(
+                Number(provider.display_priority ?? 9999),
+                Number(current?.priority ?? 9999),
+              ),
+              mediaTypes: [...new Set([...(current?.mediaTypes || []), mediaType])],
+            });
+          });
+        };
+        addProviders(movieResponse.data?.results, "movie");
+        addProviders(tvResponse.data?.results, "tv");
+        const next = [...merged.values()].sort(
+          (a, b) => a.priority - b.priority || a.name.localeCompare(b.name),
+        );
+        if (alive && next.length) setProviderCatalog(next);
+      } catch (error) {
+        // Başlangıçtaki temel katalog çevrimdışıyken de seçimi kullanılabilir tutar.
+      }
+    };
+
+    loadProviders();
+    return () => {
+      alive = false;
+    };
+  }, [API_KEY, accent, language]);
+
+  const toggleGenrePreference = useCallback(
+    (mediaType, key) => {
+      buzz();
+      setSelectedGenreKeys((current) => {
+        const active = current?.[mediaType] || [];
+        const nextActive = active.includes(key)
+          ? active.filter((item) => item !== key)
+          : active.length >= 3
+            ? active
+            : [...active, key];
+        const next = { movie: current?.movie || [], tv: current?.tv || [], [mediaType]: nextActive };
+        changeOnboardingGenreKeys(next);
+        return next;
+      });
+    },
+    [changeOnboardingGenreKeys],
+  );
+
+  const toggleProviderPreference = useCallback(
+    (id) => {
+      buzz();
+      setSelectedProviderIds((current) => {
+        const next = current.includes(id)
+          ? current.filter((item) => item !== id)
+          : [...current, id];
+        changeStreamingProviderIds(next);
+        return next;
+      });
+    },
+    [changeStreamingProviderIds],
+  );
+
   const markSeen = useCallback(async () => {
     set(Keys.hasSeenOnboarding, true);
   }, []);
@@ -358,8 +472,7 @@ export default function OnboardingScreen({ navigation }) {
 
   // Kayan poster arka planı TÜM onboarding ekranlarında görünür.
   // Slayt 0'da tam görünür; diğer slaytlarda okunabilirlik için tema rengine
-  // doğru soluklaştırılır (scrim). Dil ekranında sabit soluk, intro kendi
-  // yarı saydam fonunu kullanır.
+  // doğru soluklaştırılır (scrim). Intro kendi yarı saydam fonunu kullanır.
   const scrimMax = isLightTheme ? 0.93 : 0.9;
   const marqueeScrim = useMemo(
     () =>
@@ -398,9 +511,7 @@ export default function OnboardingScreen({ navigation }) {
             style={[
               StyleSheet.absoluteFill,
               { backgroundColor: theme.primary },
-              phase === "main"
-                ? { opacity: marqueeScrim }
-                : { opacity: phase === "lang" ? scrimMax : 0 },
+              phase === "main" ? { opacity: marqueeScrim } : { opacity: 0 },
             ]}
           />
         </View>
@@ -454,9 +565,9 @@ export default function OnboardingScreen({ navigation }) {
         <>
           <View style={[styles.mainHeader, { top: insets.top + 8 }]}>
             <View style={styles.headerBrand}>
-              <Image source={require("../../assets/icon.png")} style={styles.headerLogo} />
+              <Image source={require("../../assets/android-icon-foreground.png")} style={styles.headerLogo} />
               <Text style={[styles.headerBrandText, { color: theme.text.primary }]}>
-                Watch<Text style={{ color: accent }}>ify</Text>
+                See<Text style={{ color: accent }}>logd</Text>
               </Text>
             </View>
 
@@ -474,7 +585,7 @@ export default function OnboardingScreen({ navigation }) {
                   <Text style={[styles.stepPillText, { color: theme.text.muted }]}>
                     {copy.step} {index + 1}
                   </Text>
-                  <Text style={[styles.stepPillText, { color: accent }]}>/{copy.features.length}</Text>
+                  <Text style={[styles.stepPillText, { color: accent }]}>/{SLIDE_COUNT - 1}</Text>
                 </View>
               )}
               <TouchableOpacity
@@ -519,8 +630,51 @@ export default function OnboardingScreen({ navigation }) {
             )}
             style={{ flex: 1 }}
           >
-            {copy.features.map((f, i) =>
-              f.kind === "discover" ? (
+            {onboardingSteps.map((step, i) => {
+              if (step.type === "cta") {
+                return (
+                  <CtaSlide
+                    key="cta"
+                    copy={copy}
+                    theme={theme}
+                    accent={accent}
+                    isLightTheme={isLightTheme}
+                    topInset={insets.top}
+                    bottomInset={insets.bottom}
+                    posters={posters}
+                    onRegister={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                      goTo("RegisterScreen", "register_cta");
+                    }}
+                    onLogin={() => {
+                      buzz();
+                      goTo("LoginScreen", "login_cta");
+                    }}
+                  />
+                );
+              }
+              if (step.type === "preference") {
+                return (
+                  <PersonalizationSlide
+                    key={step.kind}
+                    kind={step.kind}
+                    language={language}
+                    theme={theme}
+                    accent={accent}
+                    isLightTheme={isLightTheme}
+                    topInset={insets.top}
+                    bottomInset={insets.bottom}
+                    selectedGenreKeys={selectedGenreKeys}
+                    selectedProviderIds={selectedProviderIds}
+                    providerCatalog={providerCatalog}
+                    getTmdbUrl={getTmdbUrl}
+                    onToggleGenre={toggleGenrePreference}
+                    onToggleProvider={toggleProviderPreference}
+                  />
+                );
+              }
+              const f = step.feature;
+              return f.kind === "discover" ? (
                 <DiscoverSlide
                   key={i}
                   title={f.title}
@@ -561,26 +715,8 @@ export default function OnboardingScreen({ navigation }) {
                   slideIndex={i}
                   active={Math.abs(index - i) <= 1}
                 />
-              ),
-            )}
-
-            <CtaSlide
-              copy={copy}
-              theme={theme}
-              accent={accent}
-              isLightTheme={isLightTheme}
-              topInset={insets.top}
-              bottomInset={insets.bottom}
-              posters={posters}
-              onRegister={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-                goTo("RegisterScreen", "register_cta");
-              }}
-              onLogin={() => {
-                buzz();
-                goTo("LoginScreen", "login_cta");
-              }}
-            />
+              );
+            })}
           </AnimatedScrollView>
 
           {!isCtaSlide && (
@@ -672,30 +808,6 @@ export default function OnboardingScreen({ navigation }) {
         </>
       )}
 
-      {/* ── LANG: dil seçim ekranı ───────────────────────────────────────── */}
-      {phase === "lang" && (
-        <LanguageSelect
-          copy={copy}
-          language={language}
-          theme={theme}
-          accent={accent}
-          isLightTheme={isLightTheme}
-          topInset={insets.top}
-          bottomInset={insets.bottom}
-          onPick={(code) => {
-            buzz();
-            trackEvent(ANALYTICS_EVENTS.ONBOARDING_LANGUAGE_SELECTED, {
-              language: code,
-            });
-            toggleLanguage(code);
-          }}
-          onContinue={() => {
-            buzz();
-            setPhase("main");
-          }}
-        />
-      )}
-
       {/* ── INTRO: animasyonlu marka açılışı (en üstte) ──────────────────── */}
       {phase === "intro" && (
         <IntroOverlay
@@ -705,9 +817,209 @@ export default function OnboardingScreen({ navigation }) {
           tagline={copy.tagline}
           eyebrow={copy.introEyebrow}
           tapHint={copy.introTap}
-          onDone={() => setPhase("lang")}
+          onDone={() => setPhase("main")}
         />
       )}
+    </View>
+  );
+}
+
+function PersonalizationSlide({
+  kind,
+  language,
+  theme,
+  accent,
+  isLightTheme,
+  topInset,
+  bottomInset,
+  selectedGenreKeys,
+  selectedProviderIds,
+  providerCatalog,
+  getTmdbUrl,
+  onToggleGenre,
+  onToggleProvider,
+}) {
+  const isTr = language !== "en";
+  const isGenreStep = kind === "genre";
+  const [mediaType, setMediaType] = useState("movie");
+  const activeGenreKeys = selectedGenreKeys?.[mediaType] || [];
+  const availableGenres = ONBOARDING_GENRES.filter((genre) =>
+    mediaType === "movie" ? genre.movieId : genre.tvId,
+  );
+  const availableProviders = useMemo(
+    () =>
+      (providerCatalog || [])
+        .filter((provider) => provider.mediaTypes?.includes(mediaType))
+        .sort((a, b) => {
+          const selectedDiff = Number(selectedProviderIds.includes(b.id)) - Number(selectedProviderIds.includes(a.id));
+          return selectedDiff || a.priority - b.priority;
+        })
+        .slice(0, 12),
+    [mediaType, providerCatalog, selectedProviderIds],
+  );
+  const surface = alpha(theme.secondary, isLightTheme ? 0.92 : 0.78);
+  const text = isGenreStep
+    ? {
+        eyebrow: isTr ? "SANA GÖRE KEŞİF" : "DISCOVERY FOR YOU",
+        title: isTr ? "Film ve dizi zevkini ayrı ayrı seç." : "Shape movies and shows separately.",
+        description: isTr
+          ? "Her bölüm için en fazla 3 tür seç. Film ve dizi keşif alanların kendi tercihlerine göre hazırlanacak."
+          : "Pick up to 3 for each. Movie and TV discovery will use their own preferences.",
+        count: isTr
+          ? `${selectedGenreKeys?.movie?.length || 0}/3 film · ${selectedGenreKeys?.tv?.length || 0}/3 dizi`
+          : `${selectedGenreKeys?.movie?.length || 0}/3 movies · ${selectedGenreKeys?.tv?.length || 0}/3 shows`,
+      }
+    : {
+        eyebrow: isTr ? "PLATFORMLARIN" : "YOUR SERVICES",
+        title: isTr ? "İzlediğin platformları ekle." : "Add the services you watch.",
+        description: isTr
+          ? "Bölgendeki gerçek film ve dizi kataloglarını ayrı ayrı gösteriyoruz. Seçtiklerin üyelik önerilerini ve platform sıralamasını belirler."
+          : "Browse real regional movie and TV catalogs separately. Your choices shape subscription picks and provider order.",
+        count: isTr
+          ? `${selectedProviderIds.length} platform seçildi`
+          : `${selectedProviderIds.length} selected`,
+      };
+
+  return (
+    <View style={styles.preferenceSlide}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.preferenceContent,
+          { paddingTop: topInset + 86, paddingBottom: bottomInset + 150 },
+        ]}
+      >
+        <View style={[styles.preferenceIcon, { backgroundColor: alpha(accent, 0.14) }]}>
+          <Ionicons
+            name={isGenreStep ? "color-palette-outline" : "play-circle-outline"}
+            size={25}
+            color={accent}
+          />
+        </View>
+        <Text style={[styles.preferenceEyebrow, { color: accent }]}>{text.eyebrow}</Text>
+        <Text style={[styles.preferenceTitle, { color: theme.text.primary }]}>{text.title}</Text>
+        <Text style={[styles.preferenceDescription, { color: theme.text.secondary }]}>
+          {text.description}
+        </Text>
+        <View style={[styles.preferenceCount, { backgroundColor: alpha(accent, 0.12) }]}>
+          <Text style={[styles.preferenceCountText, { color: accent }]}>{text.count}</Text>
+        </View>
+
+        <View style={[styles.mediaTypeSwitch, { backgroundColor: surface, borderColor: theme.border }]}>
+          {[
+            { key: "movie", tr: "Filmler", en: "Movies", icon: "film-outline" },
+            { key: "tv", tr: "Diziler", en: "TV Shows", icon: "tv-outline" },
+          ].map((item) => {
+            const active = mediaType === item.key;
+            return (
+              <TouchableOpacity
+                key={item.key}
+                onPress={() => {
+                  buzz();
+                  setMediaType(item.key);
+                }}
+                style={[styles.mediaTypeButton, active && { backgroundColor: accent }]}
+              >
+                <Ionicons name={item.icon} size={15} color={active ? "#fff" : theme.text.secondary} />
+                <Text style={[styles.mediaTypeButtonText, { color: active ? "#fff" : theme.text.secondary }]}>
+                  {isTr ? item.tr : item.en}
+                </Text>
+                {isGenreStep && (
+                  <View style={[styles.mediaTypeBadge, { backgroundColor: active ? "#ffffff2E" : alpha(accent, 0.12) }]}>
+                    <Text style={[styles.mediaTypeBadgeText, { color: active ? "#fff" : accent }]}>
+                      {selectedGenreKeys?.[item.key]?.length || 0}/3
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {isGenreStep ? (
+          <View style={styles.preferenceGrid}>
+            {availableGenres.map((genre) => {
+              const selected = activeGenreKeys.includes(genre.key);
+              const locked = !selected && activeGenreKeys.length >= 3;
+              return (
+                <TouchableOpacity
+                  key={genre.key}
+                  activeOpacity={0.82}
+                  disabled={locked}
+                  onPress={() => onToggleGenre(mediaType, genre.key)}
+                  style={[
+                    styles.preferenceChoice,
+                    {
+                      backgroundColor: selected ? alpha(accent, 0.16) : surface,
+                      borderColor: selected ? accent : alpha(theme.border, 0.9),
+                      opacity: locked ? 0.42 : 1,
+                    },
+                  ]}
+                >
+                  <View style={[styles.preferenceChoiceIcon, { backgroundColor: alpha(accent, 0.12) }]}>
+                    <Ionicons name={genre.icon} size={18} color={accent} />
+                  </View>
+                  <Text style={[styles.preferenceChoiceText, { color: theme.text.primary }]}>
+                    {mediaType === "tv"
+                      ? isTr ? genre.tvTr || genre.tr : genre.tvEn || genre.en
+                      : isTr ? genre.tr : genre.en}
+                  </Text>
+                  <Ionicons
+                    name={selected ? "checkmark-circle" : "ellipse-outline"}
+                    size={19}
+                    color={selected ? accent : theme.text.muted}
+                  />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={styles.providerGrid}>
+            {availableProviders.map((provider) => {
+              const selected = selectedProviderIds.includes(provider.id);
+              return (
+                <TouchableOpacity
+                  key={provider.id}
+                  activeOpacity={0.82}
+                  onPress={() => onToggleProvider(provider.id)}
+                  style={[
+                    styles.providerChoice,
+                    {
+                      backgroundColor: selected ? alpha(provider.color, 0.18) : surface,
+                      borderColor: selected ? provider.color : alpha(theme.border, 0.9),
+                    },
+                  ]}
+                >
+                  {provider.logoPath ? (
+                    <ExpoImage
+                      source={{ uri: getTmdbUrl(provider.logoPath, "logo", 150) }}
+                      style={styles.providerLogoImage}
+                      contentFit="cover"
+                      transition={180}
+                      cachePolicy="memory-disk"
+                    />
+                  ) : (
+                    <View style={[styles.providerInitial, { backgroundColor: provider.color }]}>
+                      <Text style={styles.providerInitialText}>{provider.name.slice(0, 1)}</Text>
+                    </View>
+                  )}
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.providerChoiceText, { color: theme.text.primary }]}
+                  >
+                    {provider.name}
+                  </Text>
+                  <Ionicons
+                    name={selected ? "checkmark-circle" : "ellipse-outline"}
+                    size={19}
+                    color={selected ? provider.color : theme.text.muted}
+                  />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 }
@@ -912,7 +1224,7 @@ function IntroOverlay({ theme, accent, isLightTheme, tagline, eyebrow, tapHint, 
             style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }}
           >
             <Image
-              source={require("../../assets/icon.png")}
+              source={require("../../assets/android-icon-foreground.png")}
               style={styles.logoImage}
               resizeMode="contain"
             />
@@ -970,131 +1282,6 @@ function IntroOverlay({ theme, accent, isLightTheme, tagline, eyebrow, tapHint, 
         )}
       </Pressable>
     </Animated.View>
-  );
-}
-
-// ── Dil seçim ekranı ─────────────────────────────────────────────────────────
-function LanguageSelect({
-  copy,
-  language,
-  theme,
-  accent,
-  isLightTheme,
-  topInset,
-  bottomInset,
-  onPick,
-  onContinue,
-}) {
-  const fade = useRef(new Animated.Value(0)).current;
-  const rise = useRef(new Animated.Value(20)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fade, {
-        toValue: 1,
-        duration: 420,
-        useNativeDriver: true,
-      }),
-      Animated.timing(rise, {
-        toValue: 0,
-        duration: 460,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
-
-  const surface = isLightTheme
-    ? "rgba(255,255,255,0.62)"
-    : "rgba(255,255,255,0.05)";
-
-  const options = [
-    { code: "tr", label: "Türkçe", sub: "Turkish" },
-    { code: "en", label: "English", sub: "İngilizce" },
-  ];
-
-  return (
-    <Animated.ScrollView
-      style={[StyleSheet.absoluteFill, { opacity: fade, transform: [{ translateY: rise }] }]}
-      contentContainerStyle={[
-        styles.langContainer,
-        { paddingTop: topInset + 42, paddingBottom: bottomInset + 24 },
-      ]}
-      showsVerticalScrollIndicator={false}
-      bounces={false}
-    >
-      <View style={styles.langBrandRow}>
-        <Image source={require("../../assets/icon.png")} style={styles.langBrandLogo} />
-        <Text style={[styles.langBrandName, { color: theme.text.primary }]}>Watch<Text style={{ color: accent }}>ify</Text></Text>
-      </View>
-
-      <View style={[styles.langIconBadge, { backgroundColor: alpha(accent, 0.14) }]}>
-        <Ionicons name="language" size={26} color={accent} />
-      </View>
-      <Text style={[styles.langEyebrow, { color: accent }]}>{copy.langEyebrow}</Text>
-      <Text style={[styles.langTitle, { color: theme.text.primary }]}>{copy.langTitle}</Text>
-      <Text style={[styles.langHint, { color: theme.text.secondary }]}>{copy.langHint}</Text>
-
-      <View style={styles.langOptions}>
-        {options.map((opt) => {
-          const selected = language === opt.code;
-          return (
-            <TouchableOpacity
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              key={opt.code}
-              activeOpacity={0.85}
-              onPress={() => onPick(opt.code)}
-              style={[
-                styles.langCard,
-                {
-                  backgroundColor: selected ? alpha(accent, isLightTheme ? 0.1 : 0.16) : surface,
-                  borderColor: selected ? accent : alpha(theme.border, 0.9),
-                },
-              ]}
-            >
-              <View style={[styles.langFlagWrap, { borderColor: selected ? alpha(accent, 0.5) : theme.border }]}>
-                <Image source={FLAGS[opt.code]} style={styles.langFlag} resizeMode="cover" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.langLabel, { color: theme.text.primary }]}>{opt.label}</Text>
-                <Text style={[styles.langSub, { color: theme.text.muted }]}>{opt.sub}</Text>
-              </View>
-              <View
-                style={[
-                  styles.langCheck,
-                  {
-                    backgroundColor: selected ? accent : "transparent",
-                    borderColor: selected ? accent : theme.border,
-                  },
-                ]}
-              >
-                {selected && <Ionicons name="checkmark" size={15} color="#fff" />}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <TouchableOpacity
-        accessibilityRole="button"
-        style={[styles.langContinue, { shadowColor: accent }]}
-        onPress={onContinue}
-        activeOpacity={0.85}
-      >
-        <LinearGradient
-          colors={[accent, theme.bold]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.langContinueGradient}
-        >
-          <Text style={styles.langContinueText}>{copy.langContinue}</Text>
-          <View style={styles.buttonArrowBubble}>
-            <Ionicons name="arrow-forward" size={17} color="#fff" />
-          </View>
-        </LinearGradient>
-      </TouchableOpacity>
-    </Animated.ScrollView>
   );
 }
 
@@ -1430,7 +1617,7 @@ function PosterFan({ posters, theme, accent }) {
   if (!cards.length) {
     return (
       <View style={[styles.ctaLogoFallback, { backgroundColor: alpha(accent, 0.12), borderColor: alpha(accent, 0.24) }]}>
-        <Image source={require("../../assets/icon.png")} style={styles.ctaLogoImage} />
+        <Image source={require("../../assets/android-icon-foreground.png")} style={styles.ctaLogoImage} />
       </View>
     );
   }
@@ -1569,6 +1756,137 @@ function CtaSlide({ copy, theme, accent, isLightTheme, topInset, bottomInset, po
 }
 
 const styles = StyleSheet.create({
+  preferenceSlide: { width, height },
+  preferenceContent: {
+    minHeight: height,
+    paddingHorizontal: 20,
+  },
+  preferenceTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Math.max(22, height * 0.035),
+  },
+  preferenceBrandRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  preferenceLogo: { width: 30, height: 30 },
+  preferenceBrand: { fontSize: 18, fontWeight: "900", letterSpacing: -0.35 },
+  preferenceSteps: { flexDirection: "row", alignItems: "center", gap: 6 },
+  preferenceStepDot: { width: 18, height: 5, borderRadius: 3 },
+  preferenceStepDotActive: { width: 30 },
+  preferenceIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  preferenceEyebrow: { fontSize: 10.5, fontWeight: "900", letterSpacing: 1.25 },
+  preferenceTitle: {
+    fontSize: 27,
+    lineHeight: 33,
+    fontWeight: "900",
+    letterSpacing: -0.55,
+    marginTop: 7,
+  },
+  preferenceDescription: { fontSize: 13.5, lineHeight: 20, marginTop: 7, maxWidth: 380 },
+  preferenceCount: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 9,
+    marginTop: 13,
+    marginBottom: 15,
+  },
+  preferenceCountText: { fontSize: 10.5, fontWeight: "800" },
+  mediaTypeSwitch: {
+    flexDirection: "row",
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
+    marginBottom: 14,
+  },
+  mediaTypeButton: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 8,
+  },
+  mediaTypeButtonText: { fontSize: 12, fontWeight: "800" },
+  mediaTypeBadge: { borderRadius: 7, paddingHorizontal: 5, paddingVertical: 2 },
+  mediaTypeBadgeText: { fontSize: 9, fontWeight: "900" },
+  preferenceGrid: { flexDirection: "row", flexWrap: "wrap", gap: 9 },
+  preferenceChoice: {
+    width: "48%",
+    minHeight: 56,
+    borderRadius: 16,
+    borderWidth: 1.25,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  preferenceChoiceIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  preferenceChoiceText: { flex: 1, fontSize: 12, fontWeight: "800" },
+  providerGrid: { flexDirection: "row", flexWrap: "wrap", gap: 9 },
+  providerChoice: {
+    width: "31%",
+    minHeight: 104,
+    borderRadius: 16,
+    borderWidth: 1.25,
+    paddingHorizontal: 7,
+    paddingVertical: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  providerLogoImage: { width: 46, height: 46, borderRadius: 12, backgroundColor: "#FFFFFF" },
+  providerChoiceText: { width: "100%", fontSize: 10.5, fontWeight: "800", textAlign: "center" },
+  providerInitial: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  providerInitialText: { color: "#FFFFFF", fontSize: 14, fontWeight: "900" },
+  preferenceActions: { marginTop: 20 },
+  preferenceSecondaryActions: {
+    minHeight: 30,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 7,
+  },
+  preferenceTextButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 6,
+  },
+  preferenceTextButtonLabel: { fontSize: 11.5, fontWeight: "700" },
+  preferenceContinue: { borderRadius: 16, overflow: "hidden" },
+  preferenceContinueGradient: {
+    height: 54,
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  preferenceContinueText: { color: "#FFFFFF", fontSize: 14.5, fontWeight: "800" },
   backdropWash: {
     position: "absolute",
     top: 0,
@@ -2133,126 +2451,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
   },
   nextText: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#fff",
-  },
-
-  // ── Dil seçim ekranı ──
-  langContainer: {
-    minHeight: height,
-    alignItems: "center",
-    justifyContent: "flex-start",
-    paddingHorizontal: 22,
-  },
-  langBrandRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    alignSelf: "flex-start",
-    marginBottom: Math.max(30, height * 0.055),
-  },
-  langBrandLogo: {
-    width: 29,
-    height: 29,
-  },
-  langBrandName: {
-    fontSize: 18,
-    fontWeight: "900",
-    letterSpacing: -0.35,
-  },
-  langIconBadge: {
-    width: 58,
-    height: 58,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 15,
-  },
-  langEyebrow: {
-    fontSize: 10.5,
-    fontWeight: "900",
-    letterSpacing: 1.3,
-    marginBottom: 9,
-  },
-  langTitle: {
-    maxWidth: 360,
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: "900",
-    textAlign: "center",
-    letterSpacing: -0.55,
-  },
-  langHint: {
-    maxWidth: 340,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: "center",
-    marginTop: 8,
-    marginBottom: 27,
-  },
-  langOptions: {
-    width: "100%",
-    maxWidth: 380,
-    gap: 11,
-  },
-  langCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 13,
-    minHeight: 72,
-    paddingVertical: 11,
-    paddingHorizontal: 13,
-    borderRadius: 19,
-    borderWidth: 1.5,
-  },
-  langFlagWrap: {
-    width: 45,
-    height: 45,
-    borderRadius: 15,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  langFlag: {
-    width: "100%",
-    height: "100%",
-  },
-  langLabel: {
-    fontSize: 17,
-    fontWeight: "800",
-  },
-  langSub: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  langCheck: {
-    width: 25,
-    height: 25,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  langContinue: {
-    width: "100%",
-    maxWidth: 380,
-    borderRadius: 16,
-    overflow: "hidden",
-    marginTop: 22,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 14,
-    elevation: 8,
-  },
-  langContinueGradient: {
-    height: 56,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingLeft: 20,
-    paddingRight: 10,
-  },
-  langContinueText: {
     fontSize: 16,
     fontWeight: "800",
     color: "#fff",
