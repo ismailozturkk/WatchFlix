@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useState } from "react";
+import React, { useEffect, useRef, useMemo, useState } from "react";
 import { i18nText } from "@utils/i18nText";
 import {
   View,
@@ -31,7 +31,6 @@ const StatisticsSection = () => {
     statsCountMode,
     toggleStatsCountMode,
     totalWatchedTime,
-    displayTvCount,
     displayEpisodesCount,
     totalWatchedTimeTv,
     totalMinutesTime,
@@ -57,6 +56,20 @@ const StatisticsSection = () => {
   }, [listItems, flatEpisodesTv]);
   const latestWrappedYear = wrappedYears[0];
   const [archiveModalVisible, setArchiveModalVisible] = useState(false);
+  const [countModeWidth, setCountModeWidth] = useState(0);
+  const countModeAnim = useRef(
+    new Animated.Value(statsCountMode === "unique" ? 1 : 0),
+  ).current;
+
+  useEffect(() => {
+    Animated.spring(countModeAnim, {
+      toValue: statsCountMode === "unique" ? 1 : 0,
+      stiffness: 260,
+      damping: 24,
+      mass: 0.8,
+      useNativeDriver: true,
+    }).start();
+  }, [countModeAnim, statsCountMode]);
 
   // Karta özel: Yalnızca seçili yılda (latestWrappedYear) izlenen film, dizi ve bölüm sayıları
   const yearStats = useMemo(() => {
@@ -208,7 +221,7 @@ const StatisticsSection = () => {
 
               {/* Lüks İkon Motifleri */}
               <MaterialCommunityIcons
-                name="sparkles"
+                name="creation"
                 size={110}
                 color="rgba(255,255,255,0.075)"
                 style={styles.wrappedMotif}
@@ -460,13 +473,42 @@ const StatisticsSection = () => {
           {/* Tekrarlı / tekrarsız anahtarı — kartlardaki sayıları belirler.
               Süre her iki kipte de aynı kalır, o dakikalar gerçekten harcandı. */}
           <View
+            onLayout={(event) => setCountModeWidth(event.nativeEvent.layout.width)}
             style={[
               styles.countModeSwitch,
               { backgroundColor: theme.primary, borderColor: theme.border },
             ]}
           >
+            {countModeWidth > 0 && (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.countModeIndicator,
+                  {
+                    width: (countModeWidth - 4) / 2,
+                    backgroundColor: theme.accent,
+                    transform: [
+                      {
+                        translateX: countModeAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, (countModeWidth - 4) / 2],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              />
+            )}
             {COUNT_MODES.map((mode) => {
               const active = statsCountMode === mode;
+              const labelActivity = countModeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: mode === "total" ? [1, 0.58] : [0.58, 1],
+              });
+              const labelScale = countModeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: mode === "total" ? [1, 0.96] : [0.96, 1],
+              });
               return (
                 <TouchableOpacity
                   key={mode}
@@ -476,22 +518,20 @@ const StatisticsSection = () => {
                   onPress={() => {
                     if (!active) toggleStatsCountMode();
                   }}
-                  style={[
-                    styles.countModeButton,
-                    active && { backgroundColor: theme.accent },
-                  ]}
+                  style={styles.countModeButton}
                 >
-                  <Text
+                  <Animated.Text
                     allowFontScaling={false}
                     style={[
                       styles.countModeText,
                       { color: active ? "#FFFFFF" : theme.text.muted },
+                      { opacity: labelActivity, transform: [{ scale: labelScale }] },
                     ]}
                   >
                     {mode === "total"
                       ? i18nText("autoI18n.tekrarli", "Tekrarlı")
                       : i18nText("autoI18n.tekrarsiz", "Tekrarsız")}
-                  </Text>
+                  </Animated.Text>
                 </TouchableOpacity>
               );
             })}
@@ -790,36 +830,13 @@ const StatisticsSection = () => {
                 style={[
                   styles.watchStatsView12,
                   {
-                    flexDirection: "row",
-                    justifyContent: "space-around",
+                    alignItems: "center",
+                    justifyContent: "center",
                     backgroundColor: theme.secondary,
                     borderColor: theme.border,
                   },
                 ]}
               >
-                <View>
-                  <Text
-                    style={[
-                      styles.textSecondary,
-                      {
-                        color: theme.text.secondary,
-                      },
-                    ]}
-                  >
-                    {displayTvCount}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.textMuted,
-                      {
-                        color: theme.text.muted,
-                      },
-                    ]}
-                  >
-                    {t.profileScreen.tvShowCount}
-                  </Text>
-                </View>
-
                 <View>
                   <Text
                     style={[
@@ -1288,11 +1305,24 @@ const styles = StyleSheet.create({
     padding: 2,
     marginBottom: 10,
     marginRight: 6,
+    minWidth: 148,
+    position: "relative",
+  },
+  countModeIndicator: {
+    position: "absolute",
+    left: 2,
+    top: 2,
+    bottom: 2,
+    borderRadius: 999,
   },
   countModeButton: {
-    paddingHorizontal: 10,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 999,
+    zIndex: 1,
   },
   countModeText: {
     fontSize: 10.5,

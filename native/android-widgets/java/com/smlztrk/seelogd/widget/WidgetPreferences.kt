@@ -105,7 +105,7 @@ data class WidgetPreferences(
           reminderShowPosters = reminders.optBoolean("showPosters", true),
           reminderShowDates = reminders.optBoolean("showDates", true),
           reminderMaxItems = reminders.optInt("maxItems", 5)
-            .takeIf { it in setOf(3, 5, 8) } ?: 5,
+            .takeIf { it in setOf(3, 5, 8, 20, 50, 100) } ?: 5,
           listsAppearance = parseAppearance(
             lists.optJSONObject("appearance"),
             legacy ?: PURPLE_APPEARANCE,
@@ -115,7 +115,7 @@ data class WidgetPreferences(
           listsShowCount = lists.optBoolean("showCount", true),
           listsShowNavigation = lists.optBoolean("showNavigation", true),
           listsMaxPosters = lists.optInt("maxPosters", 12)
-            .takeIf { it in setOf(6, 12, 18) } ?: 12,
+            .takeIf { it in setOf(6, 12, 18, 36, 60, 100) } ?: 12,
           statsAppearance = parseAppearance(
             stats.optJSONObject("appearance"),
             legacy ?: BLUE_APPEARANCE,

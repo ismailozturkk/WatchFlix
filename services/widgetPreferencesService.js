@@ -62,8 +62,12 @@ export const DEFAULT_WIDGET_PREFERENCES = Object.freeze({
 
 const DENSITIES = new Set(["compact", "comfortable"]);
 const CONTENT_FILTERS = new Set(["all", "movie", "tv"]);
-const REMINDER_LIMITS = new Set([3, 5, 8]);
-const POSTER_LIMITS = new Set([6, 12, 18]);
+export const REMINDER_LIMIT_OPTIONS = Object.freeze([5, 20, 50, 100]);
+export const POSTER_LIMIT_OPTIONS = Object.freeze([12, 36, 60, 100]);
+// Önceki sürümlerde seçilebilen 3/8 ve 6/18 değerlerini okumaya devam et;
+// kullanıcı yeni bir seçim yapana kadar mevcut widget yoğunluğu değişmesin.
+const REMINDER_LIMITS = new Set([3, 8, ...REMINDER_LIMIT_OPTIONS]);
+const POSTER_LIMITS = new Set([6, 18, ...POSTER_LIMIT_OPTIONS]);
 const HEX_COLOR = /^#[0-9A-F]{6}$/;
 const APPEARANCE_COLOR_KEYS = [
   "background",

@@ -54,7 +54,7 @@ export const buildReminderWidgetItems = (reminders, language = "tr") => {
         item.dateEpoch !== null && item.dateEpoch >= startOfToday.getTime(),
     )
     .sort((a, b) => a.dateEpoch - b.dateEpoch)
-    .slice(0, 20);
+    .slice(0, 100);
 };
 
 export const syncReminderWidget = (reminders, language = "tr") =>

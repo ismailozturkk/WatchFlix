@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- "İstatistikler" widget'ı — profildeki StatisticsSection'ın birebir düzeni:
      film kartı (sayı + yıl/ay/gün/saat/dakika), toplam süre şeridi, dizi kartı
-     (dizi + bölüm sayısı + süre dökümü).
+     (bölüm sayısı + süre dökümü).
 
      Tüm metinler JS'ten hazır gelir (services/statsWidgetService.js); buradaki
      `text` değerleri yalnız Android Studio önizlemesi ve ilk çizim içindir. -->
@@ -24,11 +24,11 @@
 
         <ImageView
             android:id="@+id/stats_widget_logo"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
             android:background="@drawable/reminder_widget_logo_badge"
             android:importantForAccessibility="no"
-            android:padding="4dp"
+            android:padding="3dp"
             android:scaleType="fitCenter"
             android:src="@mipmap/ic_launcher_monochrome"
             android:tint="#FFFFFF" />
@@ -37,13 +37,13 @@
             android:id="@+id/stats_widget_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="5dp"
             android:layout_weight="1"
             android:ellipsize="end"
             android:maxLines="1"
             android:text="@string/stats_widget_preview_title"
             android:textColor="#FFFFFF"
-            android:textSize="14sp"
+            android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -52,12 +52,12 @@
         android:id="@+id/stats_widget_movie_card"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="9dp"
+        android:layout_marginTop="3dp"
         android:layout_weight="1"
         android:background="@drawable/stats_widget_card_bg"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:padding="6dp">
+        android:padding="2dp">
 
         <!-- Sol panel: izlenen film sayısı -->
         <LinearLayout
@@ -69,7 +69,7 @@
             android:gravity="center"
             android:orientation="vertical"
             android:paddingHorizontal="4dp"
-            android:paddingVertical="5dp">
+            android:paddingVertical="1dp">
 
             <TextView
                 android:id="@+id/stats_widget_movie_count"
@@ -103,7 +103,7 @@
             android:gravity="center"
             android:orientation="horizontal"
             android:paddingHorizontal="3dp"
-            android:paddingVertical="5dp">
+            android:paddingVertical="1dp">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -242,12 +242,12 @@
         android:id="@+id/stats_widget_duration_strip"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="7dp"
+        android:layout_marginTop="3dp"
         android:background="@drawable/stats_widget_strip_bg"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="8dp"
-        android:paddingVertical="7dp">
+        android:paddingVertical="2dp">
 
         <ImageView
             android:layout_width="14dp"
@@ -357,14 +357,14 @@
         android:id="@+id/stats_widget_tv_card"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="7dp"
+        android:layout_marginTop="3dp"
         android:layout_weight="1"
         android:background="@drawable/stats_widget_card_bg"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:padding="6dp">
+        android:padding="2dp">
 
-        <!-- Sol panel: dizi + bölüm sayısı -->
+        <!-- Sol panel: bölüm sayısı -->
         <LinearLayout
             android:id="@+id/stats_widget_tv_count_panel"
             android:layout_width="0dp"
@@ -372,40 +372,13 @@
             android:layout_weight="43"
             android:background="@drawable/stats_widget_panel_bg"
             android:gravity="center"
-            android:orientation="horizontal"
+            android:orientation="vertical"
             android:paddingHorizontal="3dp"
-            android:paddingVertical="5dp">
+            android:paddingVertical="1dp">
 
             <LinearLayout
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:orientation="vertical">
-                <TextView
-                    android:id="@+id/stats_widget_tv_count"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0"
-                    android:textColor="#F7F7FC"
-                    android:textSize="19sp"
-                    android:textStyle="bold" />
-                <TextView
-                    android:id="@+id/stats_widget_tv_count_label"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:gravity="center"
-                    android:maxLines="1"
-                    android:text="@string/stats_widget_preview_shows"
-                    android:textColor="#9AA3B8"
-                    android:textSize="9sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:gravity="center"
                 android:orientation="vertical">
                 <TextView
@@ -440,7 +413,7 @@
             android:gravity="center"
             android:orientation="horizontal"
             android:paddingHorizontal="3dp"
-            android:paddingVertical="5dp">
+            android:paddingVertical="1dp">
 
             <LinearLayout
                 android:layout_width="0dp"

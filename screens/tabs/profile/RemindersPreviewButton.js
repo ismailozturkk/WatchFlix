@@ -3,13 +3,14 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   TouchableOpacity,
+  useWindowDimensions,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Extrapolation,
   interpolate,
+  interpolateColor,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
@@ -26,15 +27,23 @@ import { i18nText } from "../../../utils/i18nText";
 import { parseAirDate, startOfDay } from "../../../utils/airDate";
 
 
-const { width } = Dimensions.get("window");
 const H_MARGIN = 16;
-const CARD_W = width - H_MARGIN * 2;
 const CARD_H = 96;
 const PEEK = 9; // alttaki kartların aşağıdan göründüğü pay
-const THRESHOLD = 70; // bu kadar kaydırınca sonraki karta geçer
-const SWIPE_OUT = CARD_W * 1.1;
-const SNAP_SPRING = { damping: 18, stiffness: 190, mass: 0.75 };
-const ENTER_SPRING = { damping: 17, stiffness: 175, mass: 0.72 };
+const THRESHOLD = 62; // yavaş sürüklemede bu mesafeden sonra karta geçer
+const VELOCITY_PROJECTION = 0.12; // kısa ve kararlı flick hareketlerini de yakala
+const SNAP_SPRING = {
+  damping: 23,
+  stiffness: 245,
+  mass: 0.72,
+  overshootClamping: true,
+};
+const ENTER_SPRING = {
+  damping: 20,
+  stiffness: 210,
+  mass: 0.78,
+  overshootClamping: true,
+};
 
 // Kalan güne göre renk/ikon (ProfileReminders'taki mantığın kompakt hâli)
 function countdownStyle(diff, c) {
@@ -49,7 +58,7 @@ function countdownStyle(diff, c) {
   return { color: c.purple, bg: c.purpleBackground, icon: "ellipse" };
 }
 
-function buildItems(reminders) {
+function buildItems(reminders, limit = 5) {
   const movies = (reminders.movieReminders || []).map((m) => ({
     key: `m-${m.movieId}`,
     type: "movie",
@@ -74,26 +83,18 @@ function buildItems(reminders) {
     ),
   );
   const all = [...movies, ...eps].filter((x) => startOfDay(x.date) !== null);
-  // Sınır "şu an" değil "bugünün başlangıcı": bugün yayınlanan bir bölüm gün
-  // boyu yaklaşanlarda kalmalı, saat geçti diye geçmişe düşmemeli. Widget'ın
-  // filtresiyle de aynı sınır (bkz. reminderWidgetService).
-  const todayStart = startOfDay(new Date()).getTime();
-  const dayOf = (x) => startOfDay(x.date).getTime();
-  // Eleme gün bazında, sıralama tam zaman bazında: aynı güne düşen iki kayıt
-  // saatine göre sıralı kalsın.
   const timeOf = (x) => parseAirDate(x.date).getTime();
+  const now = Date.now();
+  // Profil önizlemesi yalnız yaklaşanları gösterir. Limit bir üst sınırdır;
+  // 20 seçilip 15 yaklaşan kayıt varsa geçmiş/yayınlanmış içerikle doldurulmaz.
   const upcoming = all
-    .filter((x) => dayOf(x) >= todayStart)
+    .filter((x) => timeOf(x) > now)
     .sort((a, b) => timeOf(a) - timeOf(b));
-  const past = all
-    .filter((x) => dayOf(x) < todayStart)
-    .sort((a, b) => timeOf(b) - timeOf(a));
   return {
-    items: [...upcoming, ...past].slice(0, 5),
-    total: all.length,
-    // Başlık rozetleri — ProfileReminders ile aynı sayım (tarih filtresi yok)
-    movieCount: movies.length,
-    tvCount: eps.length,
+    items: upcoming.slice(0, limit),
+    total: upcoming.length,
+    movieCount: upcoming.filter((item) => item.type === "movie").length,
+    tvCount: upcoming.filter((item) => item.type === "tv").length,
   };
 }
 
@@ -109,8 +110,10 @@ function ReminderStackCard({
   onAdvance,
   onOpen,
   colors,
+  cardWidth,
   children,
 }) {
+  const swipeOut = cardWidth * 1.1;
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   // Arkadaki kart öne geçmeden önce giriş konumunda hazır bekler.
@@ -132,17 +135,25 @@ function ReminderStackCard({
     () =>
       Gesture.Pan()
         .enabled(isFront)
-        .minDistance(6)
+        // Profilin dikey ScrollView hareketini ele geçirmeden yalnızca belirgin
+        // yatay sürüklemeyi etkinleştir.
+        .activeOffsetX([-10, 10])
+        .failOffsetY([-12, 12])
         .onUpdate((event) => {
           translateX.value = event.translationX;
-          translateY.value = event.translationY;
+          // Parmaktaki küçük dikey sapmayı hissettir ama kartı aşağı/yukarı
+          // kaçırma; bırakma anındaki görsel sıçramanın ana nedeni buydu.
+          translateY.value = Math.max(-7, Math.min(7, event.translationY * 0.1));
         })
         .onEnd((event) => {
-          if (Math.abs(event.translationX) > THRESHOLD && canAdvance) {
-            const direction = event.translationX > 0 ? 1 : -1;
+          const projectedX =
+            event.translationX + event.velocityX * VELOCITY_PROJECTION;
+          if (Math.abs(projectedX) > THRESHOLD && canAdvance) {
+            const direction = projectedX > 0 ? 1 : -1;
+            translateY.value = withTiming(0, { duration: 160 });
             translateX.value = withTiming(
-              direction * SWIPE_OUT,
-              { duration: 200 },
+              direction * swipeOut,
+              { duration: 190 },
               (finished) => {
                 if (finished) runOnJS(onAdvance)();
               },
@@ -159,7 +170,7 @@ function ReminderStackCard({
             translateY.value = withSpring(0, SNAP_SPRING);
           }
         }),
-    [canAdvance, isFront, onAdvance, translateX, translateY],
+    [canAdvance, isFront, onAdvance, swipeOut, translateX, translateY],
   );
 
   const tapGesture = useMemo(
@@ -183,19 +194,19 @@ function ReminderStackCard({
     const enterScale = interpolate(enter.value, [0, 1], [1, 0.95]);
     const rotation = interpolate(
       translateX.value,
-      [-CARD_W, 0, CARD_W],
+      [-cardWidth, 0, cardWidth],
       [-6, 0, 6],
       Extrapolation.CLAMP,
     );
-    const opacity = interpolate(
+    const swipeOpacity = interpolate(
       translateX.value,
-      [-SWIPE_OUT, -THRESHOLD, 0, THRESHOLD, SWIPE_OUT],
+      [-swipeOut, -THRESHOLD, 0, THRESHOLD, swipeOut],
       [0, 1, 1, 1, 0],
       Extrapolation.CLAMP,
     );
 
     return {
-      opacity,
+      opacity: swipeOpacity,
       transform: [
         { translateX: translateX.value },
         { translateY: translateY.value + enterOffset },
@@ -217,6 +228,7 @@ function ReminderStackCard({
       <Animated.View
         style={[
           styles.card,
+          { width: cardWidth },
           colors,
           isFront ? styles.frontCard : backStyle,
           isFront ? frontStyle : null,
@@ -228,17 +240,42 @@ function ReminderStackCard({
   );
 }
 
+function ReminderDot({ active, activeColor, inactiveColor }) {
+  const progress = useSharedValue(active ? 1 : 0);
+
+  useEffect(() => {
+    progress.value = withTiming(active ? 1 : 0, { duration: 190 });
+  }, [active, progress]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    width: interpolate(progress.value, [0, 1], [6, 16]),
+    opacity: interpolate(progress.value, [0, 1], [0.65, 1]),
+    backgroundColor: interpolateColor(
+      progress.value,
+      [0, 1],
+      [inactiveColor, activeColor],
+    ),
+    transform: [
+      { scale: interpolate(progress.value, [0, 1], [0.92, 1]) },
+    ],
+  }));
+
+  return <Animated.View style={[styles.dot, animatedStyle]} />;
+}
+
 export default function RemindersPreviewButton({ navigation }) {
+  const { width } = useWindowDimensions();
+  const cardWidth = Math.max(0, width - H_MARGIN * 2);
   const { theme } = useTheme();
   const { t } = useLanguage();
   const { getTmdbUrl } = useImageQualitySettings();
-  const { posterBadges } = useListLayoutSettings();
+  const { posterBadges, reminderPreviewLimit } = useListLayoutSettings();
   const { reminders, calculateDateDifference, formatDate } =
     useProfileReminders();
 
   const { items, movieCount, tvCount } = useMemo(
-    () => buildItems(reminders),
-    [reminders],
+    () => buildItems(reminders, reminderPreviewLimit),
+    [reminders, reminderPreviewLimit],
   );
   const n = items.length;
   const [top, setTop] = useState(0);
@@ -251,6 +288,7 @@ export default function RemindersPreviewButton({ navigation }) {
   const advance = useCallback(() => {
     setTop((tp) => (nRef.current ? (tp + 1) % nRef.current : 0));
   }, []);
+  const returnToStart = useCallback(() => setTop(0), []);
   const goAll = useCallback(
     () => navigation.navigate("RemindersScreen"),
     [navigation],
@@ -316,7 +354,7 @@ export default function RemindersPreviewButton({ navigation }) {
   const visibleCount = Math.min(n, 3);
   const start = ((top % n) + n) % n;
 
-  const renderCardContent = (item) => {
+  const renderCardContent = (item, isFront) => {
     const diff = calculateDateDifference(item.date);
     const cs = countdownStyle(diff, theme.notesColor);
     const isMovie = item.type === "movie";
@@ -332,7 +370,10 @@ export default function RemindersPreviewButton({ navigation }) {
               style={styles.poster}
               contentFit="cover"
               cachePolicy="memory-disk"
-              transition={120}
+              // Öne geçen kart rol anahtarı nedeniyle yeniden mount edilir.
+              // Cache'deki posterin fade geçişini tekrar çalıştırmak bir anlık
+              // kararma yaratıyordu; ön kartta görsel doğrudan gösterilir.
+              transition={isFront ? 0 : 120}
             />
           ) : (
             <Ionicons name="image-outline" size={18} color={theme.text.muted} />
@@ -447,15 +488,20 @@ export default function RemindersPreviewButton({ navigation }) {
 
     return (
       <ReminderStackCard
-        key={item.key}
+        // İçerik anahtarı tek başına kullanılırsa çıkan kartın Animated
+        // instance'ı React tarafından arkadaki role taşınır. Translate değeri
+        // sıfırlanınca kart bir kareliğine yeniden görünür. Rolü de anahtara
+        // dahil ederek her yığın konumunun animasyon yaşam döngüsünü ayırıyoruz.
+        key={`${p}-${item.key}`}
         isFront={isFront}
         depth={p}
         canAdvance={n > 1}
         onAdvance={advance}
         onOpen={goAll}
         colors={cardColors}
+        cardWidth={cardWidth}
       >
-        {renderCardContent(item)}
+        {renderCardContent(item, isFront)}
       </ReminderStackCard>
     );
   });
@@ -471,7 +517,7 @@ export default function RemindersPreviewButton({ navigation }) {
           {label}
         </Text>
         <View style={styles.headerRight}>
-          {/* Film/dizi sayıları — ProfileReminders başlığındaki rozetlerle aynı */}
+          {/* Film/dizi sayıları — yalnızca henüz yayınlanmamış kayıtlar */}
           {movieCount > 0 && (
             <View
               style={[
@@ -535,23 +581,41 @@ export default function RemindersPreviewButton({ navigation }) {
       </View>
 
       {/* Kaydırılabilir kart yığını (arkadan öne render) */}
-      <View style={styles.stack}>{cards.reverse()}</View>
+      <View style={[styles.stack, { width: cardWidth }]}>{cards.reverse()}</View>
 
       {/* Nokta göstergesi */}
       {n > 1 && (
-        <View style={styles.dots}>
-          {items.map((it, i) => (
-            <View
-              key={it.key}
-              style={[
-                styles.dot,
-                {
-                  width: i === start ? 16 : 6,
-                  backgroundColor: i === start ? theme.accent : theme.border,
-                },
-              ]}
-            />
-          ))}
+        <View style={styles.paginationRow}>
+          <View style={styles.paginationSide} />
+          <View style={[styles.dots, n > 15 && styles.dotsCompact]}>
+            {items.map((it, i) => (
+              <ReminderDot
+                key={it.key}
+                active={i === start}
+                activeColor={theme.accent}
+                inactiveColor={theme.border}
+              />
+            ))}
+          </View>
+          <View style={styles.paginationSide}>
+            {start !== 0 && (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={i18nText("autoI18n.basa_don", "Başa dön")}
+                activeOpacity={0.72}
+                onPress={returnToStart}
+                style={[
+                  styles.returnToStartButton,
+                  {
+                    backgroundColor: `${theme.accent}18`,
+                    borderColor: `${theme.accent}44`,
+                  },
+                ]}
+              >
+                <Ionicons name="return-up-back" size={14} color={theme.accent} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       )}
     </View>
@@ -593,7 +657,6 @@ const styles = StyleSheet.create({
   },
 
   stack: {
-    width: CARD_W,
     height: CARD_H + 2 * PEEK + 2,
     marginHorizontal: H_MARGIN,
   },
@@ -601,7 +664,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 0,
     left: 0,
-    width: CARD_W,
     height: CARD_H,
     flexDirection: "row",
     alignItems: "center",
@@ -665,14 +727,31 @@ const styles = StyleSheet.create({
   daysNum: { fontSize: 14, fontWeight: "700" },
   daysLabel: { fontSize: 9, fontWeight: "700" },
 
+  paginationRow: {
+    minHeight: 28,
+    marginTop: 7,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  paginationSide: { width: 32, alignItems: "center" },
   dots: {
+    flex: 1,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     gap: 5,
-    marginTop: 10,
   },
+  dotsCompact: { gap: 3 },
   dot: { height: 6, borderRadius: 3 },
+  returnToStartButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   /* Boş durum */
   emptyBtn: {

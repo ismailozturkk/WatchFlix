@@ -13,8 +13,13 @@ import NotificationPermissionNotice from "@components/NotificationPermissionNoti
 import { appAlert } from "@components/AppAlert";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
-import { useNotificationSettings } from "@context/AppSettingsContext";
+import {
+  REMINDER_PREVIEW_LIMITS,
+  useListLayoutSettings,
+  useNotificationSettings,
+} from "@context/AppSettingsContext";
 import { useDeviceNotifications } from "@context/DeviceNotificationsContext";
+import { i18nText } from "@utils/i18nText";
 import { SettingsSubScreen, SettingRow, buildUiColors } from "./settingsUi";
 
 const REMINDER_NOTIFICATION_TIMINGS = [
@@ -30,6 +35,8 @@ export default function ReminderNotificationsScreen() {
   const C = buildUiColors(theme);
   const { notificationSettings, changeNotificationSettings } =
     useNotificationSettings();
+  const { reminderPreviewLimit, changeReminderPreviewLimit } =
+    useListLayoutSettings();
   const { permissionStatus, requestPermission } = useDeviceNotifications();
 
   const notificationsEnabled = notificationSettings.enabled;
@@ -218,6 +225,56 @@ export default function ReminderNotificationsScreen() {
             })}
           </View>
         </View>
+        <View style={[ns.previewLimit, { borderTopColor: C.border }]}>
+          <View style={ns.notificationTimingHeader}>
+            <View style={[ns.iconWrap, { backgroundColor: C.iconPurple }]}>
+              <AppIcon name="layers-outline" size={15} color={C.purple} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text allowFontScaling={false} style={[ns.rowTitle, { color: C.text }]}>
+                {i18nText(
+                  "autoI18n.profil_hatirlatici_limiti",
+                  "Profil hatırlatıcı sayısı",
+                )}
+              </Text>
+              <Text allowFontScaling={false} style={[ns.rowSub, { color: C.muted }]}>
+                {i18nText(
+                  "autoI18n.profil_hatirlatici_limiti_aciklama",
+                  "Kaydırılabilir alanda {{count}} içerik gösterilir",
+                  { count: reminderPreviewLimit },
+                )}
+              </Text>
+            </View>
+          </View>
+          <View style={[ns.segment, { backgroundColor: C.cardAlt, borderTopColor: C.border }]}>
+            {REMINDER_PREVIEW_LIMITS.map((limit) => {
+              const active = reminderPreviewLimit === limit;
+              return (
+                <TouchableOpacity
+                  key={limit}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  style={[ns.segOpt, active && { backgroundColor: C.accent }]}
+                  onPress={() => changeReminderPreviewLimit(limit)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    allowFontScaling={false}
+                    style={[
+                      ns.segText,
+                      {
+                        color: active ? C.white : C.muted,
+                        fontWeight: active ? "700" : "500",
+                      },
+                    ]}
+                  >
+                    {limit}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
         {/* Android: pil optimizasyonu yerel hatırlatmaları engelleyebilir */}
         <BatteryOptimizationNotice colors={C} />
       </View>
@@ -238,6 +295,7 @@ const ns = StyleSheet.create({
   rowTitle: { fontSize: 14, fontWeight: "500" },
   rowSub: { fontSize: 11, marginTop: 2 },
   notificationTiming: { paddingTop: 13 },
+  previewLimit: { paddingTop: 13, borderTopWidth: 1 },
   notificationTimingHeader: {
     flexDirection: "row",
     alignItems: "center",

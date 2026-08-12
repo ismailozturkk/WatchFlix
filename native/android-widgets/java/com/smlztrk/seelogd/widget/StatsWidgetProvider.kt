@@ -110,13 +110,9 @@ class StatsWidgetProvider : AppWidgetProvider() {
 
       // ── Dizi kartı ──────────────────────────────────────────────────────
       val tv = stats?.optJSONObject("tv")
-      views.setTextViewText(R.id.stats_widget_tv_count, tv?.optString("showCount") ?: "0")
-      views.setTextViewText(R.id.stats_widget_tv_count_label, tv?.optString("showCountLabel") ?: "")
       views.setTextViewText(R.id.stats_widget_episode_count, tv?.optString("episodeCount") ?: "0")
       views.setTextViewText(R.id.stats_widget_episode_count_label, tv?.optString("episodeCountLabel") ?: "")
-      views.setTextColor(R.id.stats_widget_tv_count, appearance.text)
       views.setTextColor(R.id.stats_widget_episode_count, appearance.text)
-      views.setTextColor(R.id.stats_widget_tv_count_label, appearance.muted)
       views.setTextColor(R.id.stats_widget_episode_count_label, appearance.muted)
       bindTime(views, tv?.optJSONObject("time"), TV_TIME_IDS)
 
@@ -157,8 +153,8 @@ class StatsWidgetProvider : AppWidgetProvider() {
       }
 
       val density = context.resources.displayMetrics.density
-      val horizontal = ((if (preferences.statsCompact) 8 else 12) * density).toInt()
-      val vertical = ((if (preferences.statsCompact) 7 else 11) * density).toInt()
+      val horizontal = ((if (preferences.statsCompact) 6 else 8) * density).toInt()
+      val vertical = ((if (preferences.statsCompact) 3 else 4) * density).toInt()
       views.setViewPadding(
         R.id.stats_widget_root,
         horizontal,

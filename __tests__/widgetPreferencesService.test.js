@@ -83,6 +83,15 @@ describe("widgetPreferencesService", () => {
     expect(result.lists.appearance.accent).toBe("#123456");
   });
 
+  it("liste ve hatırlatma widget'ında 100 öğelik kapasiteyi korur", () => {
+    const result = normalizeWidgetPreferences({
+      reminders: { maxItems: 100 },
+      lists: { maxPosters: 100 },
+    });
+    expect(result.reminders.maxItems).toBe(100);
+    expect(result.lists.maxPosters).toBe(100);
+  });
+
   it("kaydedince native widgetları yeniler", async () => {
     await saveWidgetPreferences({
       ...DEFAULT_WIDGET_PREFERENCES,

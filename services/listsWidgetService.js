@@ -24,9 +24,10 @@ const PROTECTED_ORDER = ["watchedTv", "watchedMovies", "watchList", "favorites"]
 // hale gelir; SharedPreferences payload'u da gereksiz şişer.
 export const MAX_LISTS = 12;
 
-// Liste başına gönderilen poster sayısı — 3 sütunlu ızgarada 12 satır.
-// Üst sınır bitmap cache'ine göre seçildi (bkz. ListsWidgetRemoteViewsService).
-export const MAX_POSTERS = 36;
+// Kaydırılabilir ızgara yüz öğeye kadar taşıyabilir. RemoteViews servisi
+// yalnız görünür bitmap'leri sınırlı LRU belleğinde tuttuğu için payload'un
+// 100 URL içermesi 100 bitmap'i aynı anda belleğe yüklemek anlamına gelmez.
+export const MAX_POSTERS = 100;
 
 // w342: ızgara hücresi ~90dp; w185 büyütülünce yumuşuyor.
 const posterUrl = (path) => widgetPosterUrl(path, "w342");

@@ -18,6 +18,8 @@ import { toHex } from "../../../utils/colorUtils";
 import { i18nText } from "@utils/i18nText";
 import {
   DEFAULT_WIDGET_PREFERENCES,
+  POSTER_LIMIT_OPTIONS,
+  REMINDER_LIMIT_OPTIONS,
   loadWidgetPreferences,
   resetWidgetPreferences,
   saveWidgetPreferences,
@@ -60,10 +62,10 @@ const copy = (key, fallback, options) =>
   i18nText(`autoI18n.${key}`, fallback, options);
 
 // Widget'ın ana ekrandaki gerçek en/boy oranı (res/xml/*_widget_info.xml
-// targetCellWidth × targetCellHeight). Yaklaşanlar ve Listeler 4×3 hücre —
-// yani ENİNE; İstatistikler 4×4 — kareye yakın. Önizleme bu orana oturur ve
+// targetCellWidth × targetCellHeight). Yaklaşanlar ve Listeler 4×3 hücre;
+// kompakt İstatistikler 4×2 (dar launcher'da 3×2). Önizleme bu orana oturur ve
 // taşan içerik gerçeğinde olduğu gibi kırpılır (ikisi de kaydırılabilir liste).
-const WIDGET_ASPECT = { reminders: 1.4, lists: 1.35, stats: 1.05 };
+const WIDGET_ASPECT = { reminders: 1.4, lists: 1.35, stats: 2.05 };
 
 // GridView horizontalSpacing/verticalSpacing = 6dp (lists_widget.xml).
 const GRID_GAP = 6;
@@ -282,7 +284,9 @@ function ReminderPreview({ settings }) {
       ? REMINDER_SAMPLES
       : REMINDER_SAMPLES.filter((item) => item.type === settings.content);
   // Servis `take(maxItems)` yapar — eksikse eksik gösterilir, tekrar edilmez.
-  const display = filtered.slice(0, settings.maxItems);
+  // Ayar 100'e çıkabilir; canlı önizleme gerçek widget gibi kaydırılabilir ama
+  // aynı örnekleri onlarca kez render etmek Ayarlar ekranını gereksiz yorar.
+  const display = filtered.slice(0, Math.min(settings.maxItems, 8));
   const typeLabel = (type) =>
     type === "movie" ? (isTr ? "Film" : "Movie") : isTr ? "Dizi" : "TV";
 
@@ -428,7 +432,7 @@ function ListsPreview({ settings }) {
   // afişin solunda/sağında hücre zemini şerit olarak görünür — ızgaranın en
   // tanınır özelliği bu.
   const cells = Array.from(
-    { length: settings.maxPosters },
+    { length: Math.min(settings.maxPosters, 12) },
     (_, index) => POSTERS[index % POSTERS.length],
   );
   return (
@@ -606,14 +610,14 @@ function StatsPreview({ settings }) {
         {
           backgroundColor: p.background,
           aspectRatio: WIDGET_ASPECT.stats,
-          paddingHorizontal: compact ? 8 : 12,
-          paddingVertical: compact ? 7 : 11,
+          paddingHorizontal: compact ? 6 : 8,
+          paddingVertical: compact ? 3 : 4,
         },
       ]}
     >
       {settings.showTitle && (
         <View style={styles.statsHeader}>
-          <WidgetBrand size={24} radius={9} />
+          <WidgetBrand size={18} radius={7} />
           <Text
             numberOfLines={1}
             allowFontScaling={false}
@@ -826,7 +830,13 @@ export default function WidgetSettingsScreen() {
   const [preferences, setPreferences] = useState(DEFAULT_WIDGET_PREFERENCES);
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const persistTimer = useRef(null);
+  const persistVersion = useRef(0);
+  const dirty = useRef(false);
+  const latestPreferences = useRef(DEFAULT_WIDGET_PREFERENCES);
+
+  latestPreferences.current = preferences;
 
   const themeCatalog = useMemo(() => {
     const builtins = BUILTIN_THEMES.map((item) => ({
@@ -868,21 +878,39 @@ export default function WidgetSettingsScreen() {
     return () => {
       mounted = false;
       if (persistTimer.current) clearTimeout(persistTimer.current);
+      // Kullanıcı son seçimin ardından hemen geri giderse 220 ms'lik debounce
+      // yüzünden tercih kaybolmasın. MMKV yazımı senkrondur; native yenileme
+      // güvenli biçimde fire-and-forget devam eder.
+      if (dirty.current) saveWidgetPreferences(latestPreferences.current);
     };
   }, []);
 
   useEffect(() => {
-    if (!ready) return undefined;
+    if (!ready || !dirty.current) return undefined;
     if (persistTimer.current) clearTimeout(persistTimer.current);
     setSaving(true);
+    setSaveFailed(false);
+    const version = ++persistVersion.current;
     persistTimer.current = setTimeout(() => {
-      saveWidgetPreferences(preferences).finally(() => setSaving(false));
+      saveWidgetPreferences(preferences)
+        .then(() => {
+          if (version !== persistVersion.current) return;
+          dirty.current = false;
+          setSaveFailed(false);
+        })
+        .catch(() => {
+          if (version === persistVersion.current) setSaveFailed(true);
+        })
+        .finally(() => {
+          if (version === persistVersion.current) setSaving(false);
+        });
     }, 220);
     return () => clearTimeout(persistTimer.current);
   }, [preferences, ready]);
 
   const patchActive = useCallback(
     (next) => {
+      dirty.current = true;
       setPreferences((current) => ({
         ...current,
         [activeWidget]: { ...current[activeWidget], ...next },
@@ -893,6 +921,7 @@ export default function WidgetSettingsScreen() {
 
   const patchAppearance = useCallback(
     (next) => {
+      dirty.current = true;
       setPreferences((current) => ({
         ...current,
         [activeWidget]: {
@@ -909,9 +938,16 @@ export default function WidgetSettingsScreen() {
 
   const handleReset = useCallback(async () => {
     setSaving(true);
-    const defaults = await resetWidgetPreferences();
-    setPreferences(defaults);
-    setSaving(false);
+    setSaveFailed(false);
+    try {
+      const defaults = await resetWidgetPreferences();
+      dirty.current = false;
+      setPreferences(defaults);
+    } catch {
+      setSaveFailed(true);
+    } finally {
+      setSaving(false);
+    }
   }, []);
 
   if (!ready) {
@@ -952,11 +988,13 @@ export default function WidgetSettingsScreen() {
           <View
             style={[
               styles.saveDot,
-              { backgroundColor: saving ? C.amber : C.green },
+              { backgroundColor: saveFailed ? C.red : saving ? C.amber : C.green },
             ]}
           />
           <Text style={[styles.saveText, { color: C.text }]}>
-            {saving
+            {saveFailed
+              ? copy("widget_save_failed", "Kaydedilemedi")
+              : saving
               ? copy("widget_saving", "Kaydediliyor")
               : copy("widget_saved", "Güncel")}
           </Text>
@@ -1163,7 +1201,7 @@ export default function WidgetSettingsScreen() {
               colors={C}
               value={settings.maxItems}
               onChange={(maxItems) => patchActive({ maxItems })}
-              options={[3, 5, 8].map((value) => ({
+              options={[...new Set([settings.maxItems, ...REMINDER_LIMIT_OPTIONS])].map((value) => ({
                 value,
                 label: String(value),
               }))}
@@ -1197,7 +1235,7 @@ export default function WidgetSettingsScreen() {
               colors={C}
               value={settings.maxPosters}
               onChange={(maxPosters) => patchActive({ maxPosters })}
-              options={[6, 12, 18].map((value) => ({
+              options={[...new Set([settings.maxPosters, ...POSTER_LIMIT_OPTIONS])].map((value) => ({
                 value,
                 label: String(value),
               }))}
@@ -1416,15 +1454,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     borderRadius: 18,
     borderWidth: 1,
-    padding: 6,
-    marginTop: 9,
+    padding: 2,
+    marginTop: 3,
   },
-  statsCardFollow: { marginTop: 7 },
+  statsCardFollow: { marginTop: 3 },
   statsPanel: {
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 5,
+    paddingVertical: 1,
   },
   statsCountPanel: { flex: 43, paddingHorizontal: 4 },
   statsTvCountPanel: { flexDirection: "row", paddingHorizontal: 3 },
@@ -1446,8 +1484,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 8,
-    paddingVertical: 7,
-    marginTop: 7,
+    paddingVertical: 2,
+    marginTop: 3,
   },
   durationGroup: { flex: 1, flexDirection: "row", alignItems: "center" },
   durationCopy: { flex: 1, marginStart: 5 },

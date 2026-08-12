@@ -105,7 +105,7 @@ describe("buildListsWidgetPayload", () => {
     const payload = buildListsWidgetPayload(lists, LABELS);
     expect(payload).toHaveLength(MAX_LISTS);
     expect(payload[0].posters).toHaveLength(MAX_POSTERS);
-    // Kırpma sayıyı bozmamalı — widget "36" değil gerçek toplamı göstermeli.
+    // Kırpma sayıyı bozmamalı — widget sınırı değil gerçek toplamı göstermeli.
     expect(payload[0].count).toBe(MAX_POSTERS + 10);
   });
 

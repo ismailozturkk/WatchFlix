@@ -72,4 +72,16 @@ describe("buildReminderWidgetItems", () => {
       }),
     ).toEqual([]);
   });
+
+  test("yaklaşan 100 öğeyi taşır ve payload'u bu sınırda tutar", () => {
+    const movieReminders = Array.from({ length: 120 }, (_, index) => ({
+      movieId: index,
+      movieName: `Film ${index}`,
+      releaseDate: futureDate(index + 1),
+    }));
+    const items = buildReminderWidgetItems({ movieReminders, tvReminders: [] });
+    expect(items).toHaveLength(100);
+    expect(items[0].title).toBe("Film 0");
+    expect(items[99].title).toBe("Film 99");
+  });
 });

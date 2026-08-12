@@ -264,8 +264,8 @@ private class ReminderRemoteViewsFactory(
     private const val POSTER_W_PX = 108
     private const val POSTER_H_PX = 156
     private const val CORNER_PX = 20f
-    // En fazla 20 öğe var; 30'luk sayı-tabanlı cache tümünü tutar
-    // (~30 × 108×156×4B ≈ 2 MB) ve yenilemede tekrar indirmeyi önler.
+    // Liste 100 öğeye çıkabilir; cache görünür alan + kaydırma tamponunu tutar.
+    // Böylece 100 poster aynı anda belleğe alınmaz.
     private val cache = LruCache<String, Bitmap>(30)
   }
 }
