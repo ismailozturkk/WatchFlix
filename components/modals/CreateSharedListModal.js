@@ -28,8 +28,8 @@ import { i18nText } from "@utils/i18nText";
 //     arkadaşlar mevcut listeye eklenir (kurucu akışı) → addSharedListMembers.
 //
 // Seçilen arkadaş varsayılan "sadece görür" (canAdd=false) başlar; kurucu
-// dilerse çip üzerinden ekleme yetkisi verir. canRemove burada verilmez —
-// içerik silme yetkisi SharedListScreen üye yönetiminden açılır.
+// dilerse çip üzerinden ekleme yetkisi verir. canRemove/canReorder burada
+// verilmez — silme ve taşıma yetkileri SharedListScreen üye yönetiminden açılır.
 
 export default function CreateSharedListModal({
   visible,
@@ -88,7 +88,12 @@ export default function CreateSharedListModal({
     if (saving) return;
     const members = selectableFriends
       .filter((f) => selected[f.uid])
-      .map((f) => ({ ...f, canAdd: selected[f.uid].canAdd, canRemove: false }));
+      .map((f) => ({
+        ...f,
+        canAdd: selected[f.uid].canAdd,
+        canRemove: false,
+        canReorder: false,
+      }));
 
     if (!isAddMode && !name.trim()) {
       Toast.show({ type: "warning", text1: i18nText("autoI18n.liste_adi_girin", "Liste adı girin") });

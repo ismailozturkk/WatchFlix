@@ -40,6 +40,8 @@ import CaseOpeningModal from "@components/modals/CaseOpeningModal";
 import DatePickerModal from "@components/modals/DatePickerModal";
 import ListSearchBar from "@components/lists/ListSearchBar";
 import GlobalSearchResults from "@components/lists/GlobalSearchResults";
+import ListItemActionsSheet from "@components/lists/ListItemActionsSheet";
+import ListPosterInfoControls from "@components/lists/ListPosterInfoControls";
 import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "@services/hapticsService";
@@ -60,10 +62,12 @@ import {
   fetchSuggestionsForList,
   searchForList,
 } from "@services/listQuickAdd";
-import { reorderWatchedShows } from "../../services/watchedTvService";
+import { reorderWatchedShows, unmarkShow } from "../../services/watchedTvService";
 import ScreenDecor from "@components/ScreenDecor";
 import {
   reorderList,
+  removeFromList,
+  removeFromCustomRootList,
   PREDEFINED_MOVIE_LISTS,
 } from "../../services/listItemsService";
 
@@ -115,6 +119,8 @@ export default function ListsScreen({ route, navigation }) {
     changeListsGridColumns: changeGridColumns,
     listsPosterRadius: posterRadius,
     changeListsPosterRadius: changePosterRadius,
+    listPosterInfo,
+    changeListPosterInfo,
   } = useListLayoutSettings();
   // Sütun sayısına göre afiş boyutu. Genişlik, sabit kolon boşluğu üzerinden
   // hesaplanır; space-between kalan alanı şişirip poster aralarını açmasın.
@@ -169,6 +175,48 @@ export default function ListsScreen({ route, navigation }) {
     suppressNextPressRef.current = false;
     setReorderModalVisible(false);
     setValue("");
+  };
+
+  const removeSelectedItem = async () => {
+    if (!reorderItems || !user?.uid || isReordering) return;
+    setIsReordering(true);
+    try {
+      if (listName === "watchedTv") {
+        await unmarkShow(user.uid, reorderItems.id);
+      } else if (PREDEFINED_MOVIE_LISTS.includes(listName)) {
+        await removeFromList(user.uid, listName, reorderItems.type, reorderItems.id);
+      } else {
+        await removeFromCustomRootList(
+          user.uid,
+          listName,
+          reorderItems.type,
+          reorderItems.id,
+        );
+      }
+      setListItems((current) =>
+        current.filter(
+          (item) =>
+            !(
+              String(item.id) === String(reorderItems.id) &&
+              item.type === reorderItems.type
+            ),
+        ),
+      );
+      setReorderModalVisible(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Toast.show({
+        type: "success",
+        text1: i18nText("autoI18n.listeden_kaldirildi", "Listeden kaldırıldı"),
+      });
+    } catch (error) {
+      captureError(error, { tags: { source: "lists_remove_item" } });
+      Toast.show({
+        type: "error",
+        text1: i18nText("autoI18n.islem_tamamlanamadi", "İşlem tamamlanamadı"),
+      });
+    } finally {
+      setIsReordering(false);
+    }
   };
 
   const stepTargetPosition = (delta) => {
@@ -900,20 +948,27 @@ export default function ListsScreen({ route, navigation }) {
     >
       {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
       <ScreenDecor iconOpacity={0.25} />
-      <Text
-        allowFontScaling={false}
-        style={[styles.header, { color: theme.text.primary }]}
-      >
-        {listName == "watchedMovies"
-          ? i18nText("autoI18n.izlenen_filmler", "İzlenen Filmler")
-          : listName == "watchedTv"
-            ? i18nText("autoI18n.izlenen_diziler", "İzlenen Diziler")
-            : listName == "favorites"
-              ? i18nText("autoI18n.favoriler", "Favoriler")
-              : listName == "watchList"
-                ? i18nText("autoI18n.izlenecekler", "İzlenecekler")
-                : listName}
-      </Text>
+      <View style={styles.headerRow}>
+        <View style={styles.headerSide}>
+          <BackButton absolute={false} />
+        </View>
+        <Text
+          allowFontScaling={false}
+          numberOfLines={1}
+          style={[styles.header, { color: theme.text.primary }]}
+        >
+          {listName == "watchedMovies"
+            ? i18nText("autoI18n.izlenen_filmler", "İzlenen Filmler")
+            : listName == "watchedTv"
+              ? i18nText("autoI18n.izlenen_diziler", "İzlenen Diziler")
+              : listName == "favorites"
+                ? i18nText("autoI18n.favoriler", "Favoriler")
+                : listName == "watchList"
+                  ? i18nText("autoI18n.izlenecekler", "İzlenecekler")
+                  : listName}
+        </Text>
+        <View style={styles.headerSide} />
+      </View>
 
       {isLoading ? (
         renderSkeleton()
@@ -1381,8 +1436,7 @@ export default function ListsScreen({ route, navigation }) {
                         </View>
                       </>
                     ) : null}
-                    {listName !== "watchedTv" &&
-                    listName !== "watchedMovies" ? (
+                    {listPosterInfo.mediaType ? (
                       <Text
                         style={[
                           styles.typeBadge,
@@ -1397,7 +1451,7 @@ export default function ListsScreen({ route, navigation }) {
                         {item.type == "movie" ? t.typeMovies : t.typeTvSeries}
                       </Text>
                     ) : null}
-                    {listName !== "watchedTv" ? (
+                    {listPosterInfo.duration && (listName !== "watchedTv" ? (
                       item.minutes ? (
                         <Text
                           style={[
@@ -1411,7 +1465,7 @@ export default function ListsScreen({ route, navigation }) {
                           {item.minutes + " " + t.minutes}
                         </Text>
                       ) : null
-                    ) : (
+                    ) : durationTextById[item.id] ? (
                       <Text
                         style={[
                           styles.nameBadge,
@@ -1420,9 +1474,17 @@ export default function ListsScreen({ route, navigation }) {
                       >
                         {durationTextById[item.id]}
                       </Text>
-                    )}
+                    ) : null)}
                   </Animated.View>
                 </SwipeCard>
+                  {listPosterInfo.title ? (
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.posterTitle, { color: theme.text.secondary }]}
+                    >
+                      {item.name}
+                    </Text>
+                  ) : null}
                   </TouchableOpacity>
                 ))}
                 {row.length < gridColumns
@@ -1849,10 +1911,23 @@ export default function ListsScreen({ route, navigation }) {
           );
         }}
       />
+      <ListItemActionsSheet
+        visible={reorderModalVisible}
+        item={reorderItems}
+        currentIndex={index}
+        itemCount={listItems.length}
+        accent={accent}
+        busy={isReordering}
+        onClose={closeReorderModal}
+        onMove={(targetIndex) =>
+          reorderWatchedTv(index, String(targetIndex + 1), listName)
+        }
+        onDelete={removeSelectedItem}
+      />
       <Modal
         animationType="fade"
         transparent={true}
-        visible={reorderModalVisible}
+        visible={false}
         statusBarTranslucent
         onRequestClose={closeReorderModal}
       >
@@ -2310,6 +2385,16 @@ export default function ListsScreen({ route, navigation }) {
                 })}
               </View>
 
+              <Text style={[fStyles.section, { color: theme.text.muted }]}>
+                {i18nText("autoI18n.poster_bilgileri", "POSTER BİLGİLERİ")}
+              </Text>
+              <ListPosterInfoControls
+                theme={theme}
+                accent={accent}
+                value={listPosterInfo}
+                onValueChange={changeListPosterInfo}
+              />
+
               {/* Tür (yalnız karışık listelerde) */}
               {listName !== "watchedMovies" && listName !== "watchedTv" ? (
                 <>
@@ -2466,7 +2551,6 @@ export default function ListsScreen({ route, navigation }) {
         confirmLabel={i18nText("autoI18n.tarihi_onayla", "Tarihi Onayla")}
         maxDate={new Date()}
       />
-      <BackButton />
     </SafeAreaView>
   );
 }
@@ -2485,12 +2569,21 @@ const styles = StyleSheet.create({
     // çubuğu artık her durumda aynı yerde duruyor.
     justifyContent: "flex-start",
   },
+  headerRow: {
+    width: "100%",
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    marginBottom: 16,
+  },
+  headerSide: { width: 40, height: 40 },
   header: {
+    flex: 1,
     fontWeight: "bold",
     fontSize: 22,
     textAlign: "center",
-    marginBottom: 20,
-    paddingHorizontal: 15,
+    paddingHorizontal: 10,
   },
   // Arama satırı ve kip seçici components/lists/ListSearchBar.js'te.
   emptyText: {
@@ -2557,7 +2650,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 3,
     right: 3,
-    left: 3,
     fontSize: 9,
     textAlign: "center",
     backgroundColor: "#555",
@@ -2565,6 +2657,11 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
     paddingHorizontal: 5,
     borderRadius: 10,
+  },
+  posterTitle: {
+    marginTop: 5,
+    fontSize: 11,
+    fontWeight: "600",
   },
   modalContainer: {
     flex: 1,

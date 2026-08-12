@@ -12,7 +12,7 @@ import {
   StatusBar
 } from "react-native";
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc, writeBatch } from "firebase/firestore";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
@@ -460,7 +460,15 @@ export default function ListsViewScreen({ navigation }) {
         // setDoc+merge: updateDoc string anahtardaki noktaları field-path
         // ayracı sayar ("S.W.A.T." → iç içe map, liste asla görünmez);
         // setDoc data anahtarlarını literal işler.
-        await setDoc(docRef, { [name]: [] }, { merge: true });
+        const batch = writeBatch(db);
+        batch.set(docRef, { [name]: [] }, { merge: true });
+        batch.set(
+          doc(db, "Users", user.uid),
+          { listVisible: { [name]: false } },
+          { merge: true },
+        );
+        await batch.commit();
+        setListVisible((prev) => ({ ...prev, [name]: false }));
         setNewListName("");
         Keyboard.dismiss();
         Toast.show({ type: "success", text1: i18nText("autoI18n.liste_olusturuldu", "Liste oluşturuldu") });

@@ -206,6 +206,7 @@ export function PosterBadgeSkeleton({ variant = "rating", corner, style, scale, 
 
   if (variant === "rating" && posterBadges?.tmdbRating === false) return null;
   if (variant === "date" && posterBadges?.releaseDate === false) return null;
+  if (variant === "countdown" && posterBadges?.countdown === false) return null;
 
   // Gerçek hapta yükseklik ikondan değil yazı satırından gelir (≈ 1.25 × font).
   const line = Math.round(r(10.5) * 1.25);
@@ -226,7 +227,7 @@ export function PosterBadgeSkeleton({ variant = "rating", corner, style, scale, 
   return (
     <View style={[styles.pill, box, cornerStyle(corner, s), style]}>
       {bar(line, "icon")}
-      {bar(Math.round(line * (variant === "date" ? 2 : 1.5)), "label")}
+      {bar(Math.round(line * (variant === "rating" ? 1.5 : 2)), "label")}
       {withVotes ? bar(Math.round(line * 1.8), "votes") : null}
     </View>
   );

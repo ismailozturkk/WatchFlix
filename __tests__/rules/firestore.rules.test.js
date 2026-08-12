@@ -70,6 +70,66 @@ beforeEach(async () => {
 /** Kuralları atlayarak başlangıç verisi yaz (test kurulumu). */
 const seed = (fn) => testEnv.withSecurityRulesDisabled((ctx) => fn(ctx.firestore()));
 
+describe("ortak liste siralama yetkisi", () => {
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "SharedLists", "shared-1"), {
+        name: "Ortak",
+        ownerId: ALICE,
+        memberIds: [ALICE, BOB],
+        members: {
+          [ALICE]: { canAdd: true, canRemove: true },
+          [BOB]: { canAdd: false, canRemove: false, canReorder: true },
+        },
+      });
+      await setDoc(doc(db, "SharedLists", "shared-1", "items", KEY), {
+        id: 550,
+        type: "movie",
+        name: "Fight Club",
+        addedBy: ALICE,
+      });
+    });
+  });
+
+  test("uye yalniz listOrder alanini guncelleyebilir", async () => {
+    await assertSucceeds(
+      updateDoc(doc(bob, "SharedLists", "shared-1", "items", KEY), {
+        listOrder: 2,
+      }),
+    );
+  });
+
+  test("uye siralama izniyle icerik verisini degistiremez", async () => {
+    await assertFails(
+      updateDoc(doc(bob, "SharedLists", "shared-1", "items", KEY), {
+        listOrder: 2,
+        name: "Degistirildi",
+      }),
+    );
+  });
+
+  test("uye olmayan kisi sirayi degistiremez", async () => {
+    await assertFails(
+      updateDoc(doc(carol, "SharedLists", "shared-1", "items", KEY), {
+        listOrder: 1,
+      }),
+    );
+  });
+
+  test("canReorder yetkisi olmayan uye sirayi degistiremez", async () => {
+    await seed((db) =>
+      updateDoc(doc(db, "SharedLists", "shared-1"), {
+        [`members.${BOB}.canReorder`]: false,
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(bob, "SharedLists", "shared-1", "items", KEY), {
+        listOrder: 3,
+      }),
+    );
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1) Film/dizi yorumları: create dokümandaki userId ile kimliği bağlamalı
 // ─────────────────────────────────────────────────────────────────────────────

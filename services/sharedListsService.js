@@ -11,7 +11,7 @@
 //     memberIds: [uid, ...]            ← kurucu DAHİL; array-contains sorgusu
 //                                        ve kural üyelik kontrolü buradan
 //     members: {                       ← uid → meta + yetkiler
-//       [uid]: { name, username, avatarIndex, canAdd, canRemove, addedAt }
+//       [uid]: { name, username, avatarIndex, canAdd, canRemove, canReorder, addedAt }
 //     }
 //     createdAt, updatedAt
 //
@@ -20,7 +20,7 @@
 //     addedBy, addedByName, addedByAvatarIndex, addedAt
 //
 // Yetki modeli (kurallarda da zorlanır — firestore.rules):
-//   • Kurucu tam yetkili: üye ekle/çıkar, canAdd/canRemove ver/al,
+//   • Kurucu tam yetkili: üye ekle/çıkar, canAdd/canRemove/canReorder ver/al,
 //     her öğeyi sil, listeyi sil/yeniden adlandır.
 //   • canAdd=false üye yalnız görür; canAdd=true öğe ekler.
 //   • Öğeyi ekleyen kendi eklediğini her zaman geri alabilir;
@@ -50,12 +50,13 @@ import { snapshotErrorHandler } from "../utils/firestoreError";
 
 export const sharedItemKey = (type, id) => `${type}_${id}`;
 
-const memberMeta = ({ name, username, avatarIndex, canAdd, canRemove }) => ({
+const memberMeta = ({ name, username, avatarIndex, canAdd, canRemove, canReorder }) => ({
   name: name || "",
   username: username || "",
   avatarIndex: clampAvatarIndex(avatarIndex),
   canAdd: !!canAdd,
   canRemove: !!canRemove,
+  canReorder: !!canReorder,
   addedAt: Date.now(), // members map içinde serverTimestamp kullanılamaz (nested)
 });
 
@@ -82,6 +83,7 @@ export async function createSharedList({ owner, name, friends = [] }) {
       avatarIndex: owner.avatarIndex,
       canAdd: true,
       canRemove: true,
+      canReorder: true,
     }),
   };
   const memberIds = [owner.uid];
@@ -95,6 +97,8 @@ export async function createSharedList({ owner, name, friends = [] }) {
     name: trimmed,
     ownerId: owner.uid,
     ownerName: owner.displayName || "",
+    ownerUsername: owner.username || "",
+    ownerAvatarIndex: clampAvatarIndex(owner.avatarIndex),
     memberIds,
     members,
     createdAt: serverTimestamp(),
@@ -161,6 +165,8 @@ export async function updateSharedListPermission(listId, memberUid, perms) {
     update[`members.${memberUid}.canAdd`] = perms.canAdd;
   if (typeof perms.canRemove === "boolean")
     update[`members.${memberUid}.canRemove`] = perms.canRemove;
+  if (typeof perms.canReorder === "boolean")
+    update[`members.${memberUid}.canReorder`] = perms.canReorder;
   await updateDoc(doc(db, "SharedLists", listId), update);
 }
 
@@ -183,8 +189,8 @@ export async function leaveSharedList(listId, uid) {
  * zararsızdır — aynı içerik, sadece ekleyen adı değişir).
  * @param {Object} p
  * @param {string} p.listId
- * @param {{uid,displayName,avatarIndex}} p.user
- * @param {{id,type,name,imagePath,minutes,genres,dateAdded}} p.item
+ * @param {{uid,displayName,username,avatarIndex}} p.user
+ * @param {{id,type,name,imagePath,minutes,totalMinutes,genres,dateAdded}} p.item
  */
 export async function addItemToSharedList({ listId, user, item }) {
   if (!listId || !user?.uid || item?.id == null)
@@ -196,10 +202,12 @@ export async function addItemToSharedList({ listId, user, item }) {
     name: item.name || "",
     imagePath: item.imagePath ?? null,
     minutes: item.minutes ?? null,
+    totalMinutes: item.totalMinutes ?? null,
     genres: item.genres || [],
     dateAdded: item.dateAdded || new Date().toISOString().slice(0, 10),
     addedBy: user.uid,
     addedByName: user.displayName || "",
+    addedByUsername: user.username || "",
     addedByAvatarIndex: clampAvatarIndex(user.avatarIndex),
     addedAt: serverTimestamp(),
   });
@@ -213,6 +221,26 @@ export async function addItemToSharedList({ listId, user, item }) {
 export async function removeItemFromSharedList(listId, type, id) {
   if (!listId || id == null) throw new Error("removeItemFromSharedList: eksik parametre");
   await deleteDoc(doc(db, "SharedLists", listId, "items", sharedItemKey(type, id)));
+}
+
+/** Ortak listedeki manuel sırayı yalnız `listOrder` alanıyla günceller. */
+export async function reorderSharedListItems(listId, orderedItems, fromIndex, toIndex) {
+  if (!listId || !Array.isArray(orderedItems) || orderedItems.length < 2) return;
+  const start = orderedItems.every((it) => Number.isFinite(it?.listOrder))
+    ? Math.min(fromIndex, toIndex)
+    : 0;
+  const end = orderedItems.every((it) => Number.isFinite(it?.listOrder))
+    ? Math.max(fromIndex, toIndex)
+    : orderedItems.length - 1;
+  const batch = writeBatch(db);
+  for (let index = start; index <= end; index += 1) {
+    const item = orderedItems[index];
+    batch.update(
+      doc(db, "SharedLists", listId, "items", sharedItemKey(item.type, item.id)),
+      { listOrder: index },
+    );
+  }
+  await batch.commit();
 }
 
 /** Tek öğe var mı? (detay ekranı toggle durumu için) */
@@ -259,18 +287,24 @@ export function subscribeToSharedList(listId, callback) {
   );
 }
 
-/** Listenin öğelerini canlı dinle (eklenme sırasına göre eski→yeni). */
+/** Listenin öğelerini canlı dinle (manuel sıra, yoksa eklenme sırası). */
 export function subscribeToSharedListItems(listId, callback) {
   if (!listId) return () => {};
   return onSnapshot(
     collection(db, "SharedLists", listId, "items"),
     (snap) => {
       const items = snap.docs.map((d) => ({ key: d.id, ...d.data() }));
-      items.sort(
-        (a, b) =>
+      items.sort((a, b) => {
+        const aHasOrder = Number.isFinite(a.listOrder);
+        const bHasOrder = Number.isFinite(b.listOrder);
+        if (aHasOrder && bHasOrder && a.listOrder !== b.listOrder)
+          return a.listOrder - b.listOrder;
+        if (aHasOrder !== bHasOrder) return aHasOrder ? -1 : 1;
+        return (
           (a.addedAt?.toMillis?.() ?? Infinity) -
-          (b.addedAt?.toMillis?.() ?? Infinity),
-      );
+          (b.addedAt?.toMillis?.() ?? Infinity)
+        );
+      });
       callback(items);
     },
     snapshotErrorHandler("SharedLists/items"),
@@ -289,3 +323,7 @@ export const canRemoveFromSharedList = (list, uid, item) =>
   (list.ownerId === uid ||
     item?.addedBy === uid ||
     list.members?.[uid]?.canRemove === true);
+
+export const canReorderSharedList = (list, uid) =>
+  !!list &&
+  (list.ownerId === uid || list.members?.[uid]?.canReorder === true);

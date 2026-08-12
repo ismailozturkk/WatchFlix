@@ -203,11 +203,18 @@ export async function createCustomList(uid, name, currentLists = []) {
     order: currentLists.length,
     createdAt: new Date().toISOString(),
   };
-  await setDoc(
+  const batch = writeBatch(db);
+  batch.set(
     doc(db, "Lists", uid),
     { customLists: arrayUnion(entry) },
     { merge: true },
   );
+  batch.set(
+    doc(db, "Users", uid),
+    { listVisible: { [entry.name]: false } },
+    { merge: true },
+  );
+  await batch.commit();
   return listId;
 }
 
@@ -420,6 +427,14 @@ export async function saveSharedListToProfile(uid, name, items, meta = {}) {
     // field-path ayracı sayar, "S.W.A.T. Favorilerim" iç içe map'e dönüşür ve
     // liste hiç görünmezdi. tx.set data anahtarlarını literal işler.
     tx.set(ref, { [finalName]: items.map(normalizeItem) }, { merge: true });
+    // Arkadaş profilinde kullanıcı açıkça paylaşmayı seçene kadar
+    // kopyalanan liste kapalı kalır. Nested map, noktalı liste adını da
+    // literal anahtar olarak korur.
+    tx.set(
+      doc(db, "Users", uid),
+      { listVisible: { [finalName]: false } },
+      { merge: true },
+    );
   });
 
   trackEvent(ANALYTICS_EVENTS.SHARED_LIST_SAVED, {

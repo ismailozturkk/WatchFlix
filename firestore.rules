@@ -89,7 +89,8 @@ service cloud.firestore {
     //   • Kurucu (ownerId) tam yetkili: üye/yetki yönetimi, silme, adlandırma.
     //   • Üye yalnız KENDİNİ çıkarabilir (ayrıl) — başka alan değiştiremez.
     //   • items: canAdd üyesi ekler; ekleyen kendi öğesini, canRemove üyesi
-    //     ve kurucu her öğeyi silebilir.
+    //     ve kurucu her öğeyi silebilir. Sıralamayı yalnız canReorder üyesi
+    //     veya kurucu değiştirebilir.
     function sharedList(listId) {
       return get(/databases/$(database)/documents/SharedLists/$(listId)).data;
     }
@@ -141,7 +142,17 @@ service cloud.firestore {
                       && (request.auth.uid == sharedList(listId).ownerId
                           || resource.data.addedBy == request.auth.uid
                           || sharedList(listId).members[request.auth.uid].canRemove == true);
-        allow update: if false; // öğeler değişmez — sil + yeniden ekle
+        // Tüm üyeler ortak sırayı değiştirebilir; bunun dışında öğe verisi
+        // değişmez. Sayısal ve negatif olmayan değer zorlaması, başka bir alanı
+        // bu izin üzerinden yazmayı engeller.
+        allow update: if isSignedIn()
+                      && request.auth.uid in sharedList(listId).memberIds
+                      && (request.auth.uid == sharedList(listId).ownerId
+                          || sharedList(listId).members[request.auth.uid].canReorder == true)
+                      && request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['listOrder'])
+                      && request.resource.data.listOrder is int
+                      && request.resource.data.listOrder >= 0;
       }
     }
 

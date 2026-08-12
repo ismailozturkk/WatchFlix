@@ -26,6 +26,7 @@ import {
 } from "../utils/firestoreError";
 import * as cacheStore from "../utils/cacheStore";
 import { cacheKeys } from "../utils/cacheKeys";
+import { publish as publishSnapshot } from "../services/snapshotCache";
 import { sameJson } from "../utils/sameData";
 
 const PREDEFINED = new Set([
@@ -117,10 +118,6 @@ const tohumOku = (uid) => {
 
   // Depolama katmanı bozuk kayıtta varsayılana düşüyor ve asla throw etmiyor.
   const parsed = get(Keys.listStatus, { uid });
-  if (parsed?.statusIndex) {
-    return { statusIndex: parsed.statusIndex, allLists: parsed.allLists ?? null };
-  }
-
   try {
     const root = cacheStore.getJSON(...cacheKeys.lists(uid, "root"));
     const favorites = cacheStore.getJSON(...cacheKeys.lists(uid, "favorites")) || {};
@@ -128,22 +125,31 @@ const tohumOku = (uid) => {
     const watchedMovies = cacheStore.getJSON(...cacheKeys.lists(uid, "watchedMovies")) || {};
     const watchedTv = cacheStore.getJSON(...cacheKeys.lists(uid, "watchedTv")) || {};
 
-    if (
+    const hasMaps =
       root ||
       Object.keys(favorites).length ||
       Object.keys(watchList).length ||
       Object.keys(watchedMovies).length ||
-      Object.keys(watchedTv).length
-    ) {
+      Object.keys(watchedTv).length;
+
+    if (hasMaps || parsed?.statusIndex) {
+      const allLists = root ?? parsed?.allLists ?? null;
       return {
-        statusIndex: buildStatusIndex({
-          allLists: root,
-          favoritesMap: favorites,
-          watchListMap: watchList,
-          watchedMoviesMap: watchedMovies,
-          watchedTvMap: watchedTv,
-        }),
-        allLists: root ?? null,
+        statusIndex:
+          parsed?.statusIndex ||
+          buildStatusIndex({
+            allLists,
+            favoritesMap: favorites,
+            watchListMap: watchList,
+            watchedMoviesMap: watchedMovies,
+            watchedTvMap: watchedTv,
+          }),
+        allLists,
+        favoritesMap: favorites,
+        watchListMap: watchList,
+        watchedMoviesMap: watchedMovies,
+        watchedTvMap: watchedTv,
+        hasMaps: Boolean(hasMaps),
       };
     }
   } catch {}
@@ -175,12 +181,17 @@ export const ListStatusProvider = ({ children }) => {
   const cacheHydratedForUid = useRef(null);
   const hasHydratedStatusCache = useRef(Boolean(ilkTohum));
 
-  const [favoritesMap, setFavoritesMap] = useState({});
-  const [watchListMap, setWatchListMap] = useState({});
-  const [watchedMoviesMap, setWatchedMoviesMap] = useState({});
-  const [watchedTvMap, setWatchedTvMap] = useState({});
+  const [favoritesMap, setFavoritesMap] = useState(ilkTohum?.favoritesMap ?? {});
+  const [watchListMap, setWatchListMap] = useState(ilkTohum?.watchListMap ?? {});
+  const [watchedMoviesMap, setWatchedMoviesMap] = useState(
+    ilkTohum?.watchedMoviesMap ?? {},
+  );
+  const [watchedTvMap, setWatchedTvMap] = useState(ilkTohum?.watchedTvMap ?? {});
   // watchedTv subcollection en az bir kez yüklendi mi? (migration yarışını önler)
-  const [watchedTvLoaded, setWatchedTvLoaded] = useState(false);
+  // Ekran yerel snapshot ile hazır olabilir; migrasyon ise yalnız gerçek
+  // Firestore snapshot'ından sonra koşmalı. Bu iki durumu ayrı tutuyoruz.
+  const [watchedTvLoaded, setWatchedTvLoaded] = useState(Boolean(ilkTohum?.hasMaps));
+  const [watchedTvRemoteLoaded, setWatchedTvRemoteLoaded] = useState(false);
 
   useEffect(() => {
     const uid = user?.uid ?? getActiveUser();
@@ -193,6 +204,11 @@ export const ListStatusProvider = ({ children }) => {
     hasHydratedStatusCache.current = true;
     setCachedStatusIndex(tohum.statusIndex);
     setAllLists(tohum.allLists);
+    setFavoritesMap(tohum.favoritesMap ?? {});
+    setWatchListMap(tohum.watchListMap ?? {});
+    setWatchedMoviesMap(tohum.watchedMoviesMap ?? {});
+    setWatchedTvMap(tohum.watchedTvMap ?? {});
+    if (tohum.hasMaps) setWatchedTvLoaded(true);
     setLoading(false);
   }, [user?.uid]);
 
@@ -215,6 +231,7 @@ export const ListStatusProvider = ({ children }) => {
       (docSnap) => {
         const next = docSnap.exists() ? docSnap.data() : null;
         setAllLists((current) => (sameJson(current, next) ? current : next));
+        publishSnapshot(cacheKeys.lists(user.uid, "root"), next);
         setRootLoaded(true);
         setLoading(false);
       },
@@ -240,15 +257,20 @@ export const ListStatusProvider = ({ children }) => {
       setWatchedMoviesMap({});
       setWatchedTvMap({});
       setWatchedTvLoaded(true);
+      setWatchedTvRemoteLoaded(false);
       return undefined;
     }
 
-    setFavoritesMap({});
-    setWatchListMap({});
-    setWatchedMoviesMap({});
-    setWatchedTvMap({});
-    setWatchedTvLoaded(false);
     const uid = user.uid;
+    // Firebase oturumu çözüldüğünde ilk karede çizilmiş yerel snapshot'ı
+    // boşaltma. Hesap değişmişse doğrudan yeni hesabın snapshot'ına geç.
+    const local = tohumOku(uid);
+    setFavoritesMap(local?.favoritesMap ?? {});
+    setWatchListMap(local?.watchListMap ?? {});
+    setWatchedMoviesMap(local?.watchedMoviesMap ?? {});
+    setWatchedTvMap(local?.watchedTvMap ?? {});
+    setWatchedTvLoaded(Boolean(local?.hasMaps));
+    setWatchedTvRemoteLoaded(false);
     const snap2map = (snap) => {
       const m = {};
       snap.docs.forEach((d) => {
@@ -256,34 +278,37 @@ export const ListStatusProvider = ({ children }) => {
       });
       return m;
     };
-    const updateMap = (setter) => (snap) => {
+    const updateMap = (setter, cacheName) => (snap) => {
       const next = snap2map(snap);
       setter((current) => (sameJson(current, next) ? current : next));
+      publishSnapshot(cacheKeys.lists(uid, cacheName), next);
     };
 
     const unsubFav = onSnapshot(
       collection(db, "Lists", uid, "favorites"),
-      updateMap(setFavoritesMap),
+      updateMap(setFavoritesMap, "favorites"),
       snapshotErrorHandler("Lists/favorites"),
     );
     const unsubWatch = onSnapshot(
       collection(db, "Lists", uid, "watchList"),
-      updateMap(setWatchListMap),
+      updateMap(setWatchListMap, "watchList"),
       snapshotErrorHandler("Lists/watchList"),
     );
     const unsubMov = onSnapshot(
       collection(db, "Lists", uid, "watchedMovies"),
-      updateMap(setWatchedMoviesMap),
+      updateMap(setWatchedMoviesMap, "watchedMovies"),
       snapshotErrorHandler("Lists/watchedMovies"),
     );
     const unsubTv = onSnapshot(
       collection(db, "Lists", uid, "watchedTv"),
       (snap) => {
-        updateMap(setWatchedTvMap)(snap);
+        updateMap(setWatchedTvMap, "watchedTv")(snap);
         setWatchedTvLoaded(true);
+        setWatchedTvRemoteLoaded(true);
       },
       (error) => {
         setWatchedTvLoaded(true);
+        setWatchedTvRemoteLoaded(true);
         snapshotErrorHandler("Lists/watchedTv")(error);
       },
     );
@@ -311,7 +336,7 @@ export const ListStatusProvider = ({ children }) => {
     }
     // Subcollection en az bir kez yüklenmeden migrate etme (aksi halde zaten taşınmış
     // bir diziyi eski veriyle ezebiliriz).
-    if (migratingRef.current || !watchedTvLoaded) return;
+    if (migratingRef.current || !watchedTvRemoteLoaded) return;
 
     // Doc id artık `tv_${id}`; varlık kontrolünü doc.id KEY'iyle değil, doc
     // verisindeki `id` ALANIYLA yap (re-key sonrası key'ler tv_ olur).
@@ -358,7 +383,7 @@ export const ListStatusProvider = ({ children }) => {
         if (__DEV__) console.warn("[watchedTv] migration error:", e?.message);
       }
     })();
-  }, [user?.uid, allLists, watchedTvMap, watchedTvLoaded]);
+  }, [user?.uid, allLists, watchedTvMap, watchedTvRemoteLoaded]);
 
   // ── Tek seferlik: watchedTv doc id şemasını birleştir (`1399` → `tv_1399`) ──
   // Tüm liste öğesi doc id'leri `${type}_${id}` olsun (favorites/watchList karışık
@@ -367,7 +392,7 @@ export const ListStatusProvider = ({ children }) => {
   const rekeyRef = useRef(false);
   const rekeyForUid = useRef(null);
   useEffect(() => {
-    if (!user?.uid || !watchedTvLoaded) return;
+    if (!user?.uid || !watchedTvRemoteLoaded) return;
     if (rekeyForUid.current !== user.uid) {
       rekeyForUid.current = user.uid;
       rekeyRef.current = false;
@@ -391,7 +416,7 @@ export const ListStatusProvider = ({ children }) => {
       rekeyRef.current = false; // sonraki snapshot'ta tekrar dene
       if (__DEV__) console.warn("[watchedTv] rekey error:", e?.message);
     });
-  }, [user?.uid, watchedTvMap, watchedTvLoaded]);
+  }, [user?.uid, watchedTvMap, watchedTvRemoteLoaded]);
 
   // ── Tek seferlik migration: eski kök-array film listeleri → subcollection ──
   // favorites/watchList/watchedMovies eski dev array'lerini her-öğe-ayrı-doküman

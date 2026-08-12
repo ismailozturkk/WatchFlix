@@ -78,6 +78,7 @@ const ResultRow = memo(function ResultRow({
   actionColor,
   added,
   adding,
+  addDisabled,
   addIcon,
   addLabel,
   genreMap,
@@ -214,19 +215,23 @@ const ResultRow = memo(function ResultRow({
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={addLabel}
-          accessibilityState={{ disabled: adding, busy: adding }}
+          accessibilityState={{ disabled: adding || addDisabled, busy: adding }}
           style={[
             styles.actionBtn,
             {
-              backgroundColor: actionColor + "22",
-              borderColor: actionColor + "66",
+              backgroundColor: addDisabled ? theme.primary : actionColor + "22",
+              borderColor: addDisabled ? theme.border : actionColor + "66",
             },
           ]}
         >
           {adding ? (
             <ActivityIndicator size="small" color={actionColor} />
           ) : (
-            <Feather name={addIcon} size={18} color={actionColor} />
+            <Feather
+              name={addDisabled ? "lock" : addIcon}
+              size={18}
+              color={addDisabled ? theme.text.muted : actionColor}
+            />
           )}
         </TouchableOpacity>
       )}
@@ -245,6 +250,7 @@ function GlobalSearchResults({
   error,
   existingKeys = EMPTY_SET,
   addingKey = null,
+  addDisabled = false,
   genreMap = null,
   onAdd,
   onOpen,
@@ -256,9 +262,11 @@ function GlobalSearchResults({
   const isWatchList = listRequiresWatchDate(listName);
   // İzlenenler listelerinde "ekleme" bir izleme kaydıdır — ikon da onu söylesin.
   const addIcon = isWatchList ? "eye" : "plus";
-  const addLabel = isWatchList
-    ? i18nText("autoI18n.izlendi_isaretle", "İzlendi işaretle")
-    : i18nText("autoI18n.listeye_ekle", "Listeye ekle");
+  const addLabel = addDisabled
+    ? i18nText("autoI18n.ekleme_yetkin_yok", "Bu listeye ekleme yetkin yok")
+    : isWatchList
+      ? i18nText("autoI18n.izlendi_isaretle", "İzlendi işaretle")
+      : i18nText("autoI18n.listeye_ekle", "Listeye ekle");
 
   // `accent` ListsScreen'de `theme.between` (bir YÜZEY tonu) olarak
   // hesaplanıyor; gray temada #24262B, satır zemini ise #2A2D33 — yani panelin
@@ -276,6 +284,7 @@ function GlobalSearchResults({
         actionColor={actionColor}
         added={existingKeys.has(item.key)}
         adding={addingKey === item.key}
+        addDisabled={addDisabled}
         addIcon={addIcon}
         addLabel={addLabel}
         genreMap={genreMap}
@@ -290,6 +299,7 @@ function GlobalSearchResults({
       actionColor,
       existingKeys,
       addingKey,
+      addDisabled,
       addIcon,
       addLabel,
       genreMap,

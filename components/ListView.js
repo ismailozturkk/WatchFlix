@@ -471,7 +471,7 @@ const ListView = ({
           </View>
         </ActionButton>
         <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>
-          {t.otherListKeys || i18nText("autoI18n.digerleri", "Diğerleri")}
+          {i18nText("autoI18n.digerleri", "Diğerleri")}
         </Text>
       </View>
 
@@ -504,7 +504,7 @@ const ListView = ({
                 </View>
                 <View>
                   <Text allowFontScaling={false} style={[styles.sheetTitle, { color: theme.text.primary }]}>
-                    {t.otherListKeys || i18nText("autoI18n.diger_listeler", "Diğer Listeler")}
+                    {i18nText("autoI18n.diger_listeler", "Diğer Listeler")}
                   </Text>
                   {otherListKeys?.length > 0 && (
                     <Text allowFontScaling={false} style={[styles.sheetSubtitle, { color: theme.text.muted }]}>

@@ -39,6 +39,7 @@ import { resolveGenreIds } from "../utils/discoveryPersonalization";
 import { applyFacts, langOf, todayListDate } from "../utils/mediaFacts";
 import { getReleaseState, RELEASE_STATE } from "../utils/watchState";
 import { mediaToListItem } from "../utils/listShare";
+import { addItemToSharedList } from "./sharedListsService";
 import {
   listAcceptedTypes,
   mergeRankedGroups,
@@ -399,4 +400,31 @@ export async function addMediaToList({
   // ── Özel liste: kök dokümandaki dizi ───────────────────────────────────────
   const added = await addToCustomRootList(uid, listName, item);
   return { status: added ? "added" : "duplicate", item };
+}
+
+/** Global arama adayını ortak liste öğesine dönüştürüp kaydeder. */
+export async function addMediaToSharedList({
+  listId,
+  user,
+  media,
+  apiKey,
+  language,
+  genreMap = null,
+}) {
+  if (!listId || !user?.uid || media?.id == null)
+    throw new Error("addMediaToSharedList: eksik parametre");
+  const item = await buildListItem({
+    media: {
+      ...media,
+      type: media.type === "tv" ? "tv" : "movie",
+      media_type: media.type === "tv" ? "tv" : "movie",
+    },
+    apiKey,
+    language,
+    genreMap,
+    dateAdded: todayListDate(),
+  });
+  if (!item) throw new Error("addMediaToSharedList: öğe oluşturulamadı");
+  await addItemToSharedList({ listId, user, item });
+  return item;
 }

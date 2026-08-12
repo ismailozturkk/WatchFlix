@@ -359,7 +359,7 @@ const ListViewTv = ({
         scale={scaleValuesRef.current["apps"]}
         opacity={opacityValuesRef.current["apps"]}
         onPress={() => { animateBounce("apps"); openSheet(); }}
-        label={t.otherListKeys || i18nText("autoI18n.digerleri", "Diğerleri")}
+        label={i18nText("autoI18n.digerleri", "Diğerleri")}
         theme={theme}
       >
         <View
