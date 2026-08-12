@@ -27,6 +27,7 @@ describe("tipli okuma/yazma", () => {
     expect(get(Keys.listsGridColumns)).toBe(3);
     expect(get(Keys.adultContent)).toBe(false);
     expect(get(Keys.streamingProviderIds)).toEqual([]);
+    expect(get(Keys.searchResultsViewMode)).toBe("row");
   });
 
   it("yazılan değeri aynı tiple geri verir", () => {
@@ -34,11 +35,13 @@ describe("tipli okuma/yazma", () => {
     set(Keys.listsGridColumns, 4);
     set(Keys.adultContent, true);
     set(Keys.streamingProviderIds, [8, 337]);
+    set(Keys.searchResultsViewMode, "grid");
 
     expect(get(Keys.theme)).toBe("dark");
     expect(get(Keys.listsGridColumns)).toBe(4);
     expect(get(Keys.adultContent)).toBe(true);
     expect(get(Keys.streamingProviderIds)).toEqual([8, 337]);
+    expect(get(Keys.searchResultsViewMode)).toBe("grid");
   });
 
   it("tip uyuşmazlığında yazmaz", () => {
@@ -50,6 +53,8 @@ describe("tipli okuma/yazma", () => {
     expect(set(Keys.railPosterRadius, 7)).toBe(false);
     expect(set(Keys.railPosterRadius, 15)).toBe(true);
     expect(get(Keys.railPosterRadius)).toBe(15);
+    expect(set(Keys.searchResultsViewMode, "cards")).toBe(false);
+    expect(get(Keys.searchResultsViewMode)).toBe("row");
   });
 
   it("null yazmak anahtarı siler", () => {

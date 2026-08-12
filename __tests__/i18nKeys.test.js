@@ -25,7 +25,8 @@ const TARANAN_DOSYALAR = ["App.js"];
 // `i18nText("autoI18n.x"` ve `t("autoI18n.x"` — tek/çift tırnak.
 // `t` öncesindeki [\w.] engeli `format(`/`.at(` gibi çağrıları eler; zaten
 // "autoI18n." öneki şartı olduğu için yanlış eşleşme pratikte imkânsız.
-const STATIK_DESEN = /(?:i18nText|(?<![\w.])t)\(\s*(["'])autoI18n\.([A-Za-z0-9_]+)\1/g;
+const STATIK_DESEN = /i18nText\(\s*(["'])([A-Za-z0-9_.-]+)\1/g;
+const T_FONKSIYON_DESEN = /(?<![\w.])t\(\s*(["'])(autoI18n\.[A-Za-z0-9_.-]+)\1/g;
 
 // Anahtarı şablonla kuran dosyalar. Her kayıt, o dosyadaki anahtar TABLOSUNU
 // okuyan desenleri verir — böylece tabloya satır eklenince test onu da korur.
@@ -86,13 +87,16 @@ for (const tamYol of kaynakDosyalari) {
   const rel = goreliYol(tamYol);
 
   for (const eslesme of kaynak.matchAll(STATIK_DESEN)) ekle(eslesme[2], rel);
+  for (const eslesme of kaynak.matchAll(T_FONKSIYON_DESEN)) ekle(eslesme[2], rel);
 
   if (/autoI18n\.\$\{/.test(kaynak)) dinamikSablonluDosyalar.add(rel);
 
   const kayit = DINAMIK_YERLER.find((y) => y.dosya === rel);
   if (kayit) {
     for (const desen of kayit.desenler) {
-      for (const eslesme of kaynak.matchAll(desen)) ekle(`${kayit.onek || ""}${eslesme[1]}`, rel);
+      for (const eslesme of kaynak.matchAll(desen)) {
+        ekle(`autoI18n.${kayit.onek || ""}${eslesme[1]}`, rel);
+      }
     }
   }
 }
@@ -100,6 +104,22 @@ for (const tamYol of kaynakDosyalari) {
 const paket = (ad) => JSON.parse(fs.readFileSync(path.join(KOK, "translations", ad), "utf8"));
 const tr = paket("tr.json");
 const en = paket("en.json");
+
+// `useLanguage()` içindeki `t.movieScreens.title` gibi nesne erişimleri.
+// Yerel döngü değişkeni olarak kullanılan `t.id` benzeri eşleşmeleri elemek
+// için yalnız sözlükte gerçekten bulunan kök namespace'leri denetlenir.
+const tKokleri = new Set([...Object.keys(tr), ...Object.keys(en)]);
+const T_NESNE_DESEN = /(?<![\w.])t(?:\?\.)?\.([A-Za-z_][A-Za-z0-9_]*(?:(?:\?\.)?\.[A-Za-z_][A-Za-z0-9_]*)*)/g;
+for (const tamYol of kaynakDosyalari) {
+  const kaynak = fs.readFileSync(tamYol, "utf8");
+  const rel = goreliYol(tamYol);
+  for (const eslesme of kaynak.matchAll(T_NESNE_DESEN)) {
+    const yol = eslesme[1]
+      .replace(/\?\./g, ".")
+      .replace(/\.(?:toUpperCase|toLowerCase|trim|replace|map|filter|slice).*$/, "");
+    if (tKokleri.has(yol.split(".")[0])) ekle(yol, rel);
+  }
+}
 
 // Sözlüğü "a.b.c" düz anahtar listesine indirger (paketler iç içe).
 function duzAnahtarlar(nesne, onek = "", toplam = []) {
@@ -112,22 +132,30 @@ function duzAnahtarlar(nesne, onek = "", toplam = []) {
   return toplam;
 }
 
+function anahtarVar(nesne, yol) {
+  return yol.split(".").every((parca) => {
+    if (!nesne || typeof nesne !== "object" || !(parca in nesne)) return false;
+    nesne = nesne[parca];
+    return true;
+  });
+}
+
 describe("i18n anahtar bekçisi", () => {
   it("tarama gerçekten çalışıyor (desen bozulursa test sessizce yeşile dönmesin)", () => {
     expect(kaynakDosyalari.length).toBeGreaterThan(200);
     expect(kullanilanAnahtarlar.size).toBeGreaterThan(1000);
   });
 
-  it("koddan çağrılan her autoI18n anahtarı tr.json'da var", () => {
+  it("koddan çağrılan her statik çeviri anahtarı tr.json'da var", () => {
     const eksik = [...kullanilanAnahtarlar.entries()]
-      .filter(([anahtar]) => !(anahtar in (tr.autoI18n || {})))
+      .filter(([anahtar]) => !anahtarVar(tr, anahtar))
       .map(([anahtar, dosyalar]) => `${anahtar}  (${[...dosyalar].join(", ")})`);
     expect(eksik).toEqual([]);
   });
 
-  it("koddan çağrılan her autoI18n anahtarı en.json'da var", () => {
+  it("koddan çağrılan her statik çeviri anahtarı en.json'da var", () => {
     const eksik = [...kullanilanAnahtarlar.entries()]
-      .filter(([anahtar]) => !(anahtar in (en.autoI18n || {})))
+      .filter(([anahtar]) => !anahtarVar(en, anahtar))
       .map(([anahtar, dosyalar]) => `${anahtar}  (${[...dosyalar].join(", ")})`);
     expect(eksik).toEqual([]);
   });

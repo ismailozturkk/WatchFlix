@@ -122,6 +122,12 @@ const settingsKeys = {
     default: 10,
     validate: oneOf(2, 10, 20),
   },
+  listPosterInfo: {
+    key: "listPosterInfo",
+    type: TYPES.json,
+    default: null,
+    validate: plainObject,
+  },
   seeAllGridColumns: {
     key: "seeAllGridColumns",
     type: TYPES.number,
@@ -152,12 +158,33 @@ const settingsKeys = {
     default: "spaced",
     validate: oneOf("spaced", "joined"),
   },
+  reminderPreviewLimit: {
+    key: "reminderPreviewLimit",
+    type: TYPES.number,
+    default: 5,
+    validate: oneOf(5, 10, 15, 20),
+  },
+  // Birleşik film/dizi/oyuncu aramasındaki sonuç düzeni cihazda hatırlanır.
+  searchResultsViewMode: {
+    key: "searchResultsViewMode",
+    type: TYPES.string,
+    default: "row",
+    validate: oneOf("row", "grid"),
+  },
   posterBadges: { key: "showPosterBadges", type: TYPES.json, default: null },
   streamingProviderIds: {
     key: "streamingProviderIds",
     type: TYPES.json,
     default: [],
     validate: Array.isArray,
+  },
+  onboardingGenreKeys: {
+    key: "onboardingGenreKeys",
+    type: TYPES.json,
+    default: [],
+    validate: (value) =>
+      Array.isArray(value) ||
+      (!!value && typeof value === "object" && Array.isArray(value.movie) && Array.isArray(value.tv)),
   },
   // Profil/liste görünümü
   // ---- Cihaz düzeyi, çıkışta KORUNUR ------------------------------------
@@ -259,6 +286,13 @@ const dataKeys = {
     default: [],
     scope: "user",
     legacy: ["story_drafts_v1"],
+  },
+  noteTodoDrafts: {
+    key: "note_todo_drafts:",
+    type: TYPES.json,
+    default: {},
+    scope: "user",
+    validate: plainObject,
   },
   aiConversations: {
     key: "@seelogd/ai_conversations:",

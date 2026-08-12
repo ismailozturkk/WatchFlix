@@ -367,6 +367,24 @@
       "plan": "Karşılaştır & Planla",
       "lists": "Listeler"
     },
+    "tabHints": {
+      "explore": "Sana uygun yapımlar",
+      "plan": "Karar ver ve programla",
+      "lists": "Temalı seçkiler oluştur"
+    },
+    "personalizeTitle": "CineMatch'i özelleştir",
+    "personalizeHint": "Öneriler seçtiğin liste, platform ve türlere göre hazırlanır.",
+    "platformsTitle": "Platformlar",
+    "platformsHint": "Boş bırakırsan tüm platformlarda arar.",
+    "allPlatforms": "Tümü",
+    "contentTypeTitle": "İçerik türü",
+    "contentAll": "Film + Dizi",
+    "contentMovies": "Yalnız film",
+    "contentSeries": "Yalnız dizi",
+    "genresTitle": "Türler",
+    "genresHint": "Birden fazla tür seçebilirsin.",
+    "clear": "Temizle",
+    "clearDiscoveryFilters": "Platform ve tür filtrelerini temizle",
     "chips": {
       "explore": [
         {
@@ -380,6 +398,18 @@
         {
           "label": "🔥 Bu akşam?",
           "prompt": "Bu akşam izlemem için ne önerirsin?"
+        },
+        {
+          "label": "⏱️ Kısa ve etkileyici",
+          "prompt": "90 dakikadan kısa, etkileyici birkaç film öner"
+        },
+        {
+          "label": "💎 Gizli cevherler",
+          "prompt": "Çok popüler olmayan ama gerçekten kaliteli film ve diziler öner"
+        },
+        {
+          "label": "🎯 Zevkime göre",
+          "prompt": "İzleme zevkime ve seçtiğim filtrelere göre bana özel yapımlar öner"
         }
       ],
       "plan": [
@@ -394,6 +424,18 @@
         {
           "label": "🎬 Film gecesi",
           "prompt": "Cumartesi arkadaşlarla film gecesi için 3 filmlik bir plan yap"
+        },
+        {
+          "label": "🍿 Hafta sonu maratonu",
+          "prompt": "Hafta sonuna uygun, bölümlere ayrılmış bir film veya dizi maratonu planla"
+        },
+        {
+          "label": "👥 Birlikte izleme",
+          "prompt": "Farklı zevklere sahip iki kişinin birlikte izleyebileceği 3 yapımı karşılaştırarak öner"
+        },
+        {
+          "label": "⚡ Hızlı bitirme planı",
+          "prompt": "Kısa sürede tamamlanabilecek kaliteli bir mini dizi seç ve 3 günlük izleme planı yap"
         }
       ],
       "lists": [
@@ -402,12 +444,24 @@
           "prompt": "En iyi uzay filmlerinden bir liste yap"
         },
         {
-          "label": "😌 Feel-good",
-          "prompt": "Moral bozukken izlenecek feel-good filmler listesi yap"
+          "label": "😌 İyi hissettirenler",
+          "prompt": "Moral yükselten, sıcak ve iyi hissettiren film ve dizilerden bir liste yap"
         },
         {
-          "label": "🔎 Künye",
-          "prompt": "Dune (2021) hakkında detaylı künye ver"
+          "label": "⭐ Mutlaka izlenmesi gerekenler",
+          "prompt": "Herkesin en az bir kez izlemesi gereken film ve dizilerden dengeli bir liste yap"
+        },
+        {
+          "label": "🕵️ Suç ve gizem",
+          "prompt": "Sürükleyici suç ve gizem film ve dizilerinden bir liste yap"
+        },
+        {
+          "label": "⚡ Mini diziler",
+          "prompt": "Kısa sürede bitirilebilecek en iyi mini dizilerden bir liste yap"
+        },
+        {
+          "label": "👨‍👩‍👧 Ailece izlenecekler",
+          "prompt": "Ailece birlikte izlenebilecek eğlenceli ve güvenli yapımlardan bir liste yap"
         }
       ]
     },
@@ -555,8 +609,8 @@
     "popular": "En Popüler Diziler",
     "trendWeek": "Haftanın Trendleri",
     "trendDay": "Günün Trendleri",
-    "airingToday": "Bugün Yayınlanan Dizi Bölümleri",
-    "onTheAir": "Önümüzdeki 7 gün içerisinde yayınlanacak olan TV dizilerinin listesi"
+    "airingToday": "Bugün Yayında",
+    "onTheAir": "Bu Hafta Yayında"
   },
   "profileScreen": {
     "emailVerified": "E-postanız gönderilen link ile doğrulama yapınız",
@@ -682,7 +736,7 @@
     "sadece_gorur": "Sadece görür",
     "ekleme": "Ekleme",
     "silme": "Silme",
-    "uye_yetki_aciklama": "Ekleme ve silme yetkilerini yönetebilirsin",
+    "uye_yetki_aciklama": "Ekleme, silme ve yer değiştirme yetkilerini yönetebilirsin",
     "uye_listesi": "Bu listeyi paylaşan kişiler",
     "uyeyi_cikar": "Üyeyi çıkar",
     "uyeyi_cikar_onay": "{{name}} gruptan çıkarılsın mı?",
@@ -861,12 +915,20 @@
     "mesajlar": "Mesajlar",
     "sohbetler": "Sohbetler",
     "henuz_sohbet_yok": "Henüz sohbet yok. Arkadaşlarından birine mesaj at!",
+    "yeni_sohbet": "Yeni Sohbet",
+    "sohbet_icin_arkadas_sec": "Sohbet etmek istediğin arkadaşını seç",
+    "arkadas_ara": "Arkadaş ara",
     "sezon": "sezon",
     "devam_ediyor": "Devam ediyor",
     "dizi_ilerlemesi": "Dizi ilerlemesi",
     "bolum_izlendi": "bölüm izlendi",
     "sezonlar_upper": "SEZONLAR",
     "gorunum": "GÖRÜNÜM",
+    "poster_bilgileri": "POSTER BİLGİLERİ",
+    "poster_tur_etiketi": "Film / dizi etiketi",
+    "poster_sure_bilgisi": "Süre bilgisi",
+    "poster_icerik_adi": "İçerik adı",
+    "poster_ekleyen_kisi": "Ekleyen kişi",
     "uclu_dizilim": "3'lü",
     "dortlu_dizilim": "4'lü",
     "kose_koseli": "Köşeli",
@@ -1344,6 +1406,9 @@
     "film_detay_sayfasindan_hatirlatici_ekleyebilirsin": "Film detay sayfasından hatırlatıcı ekleyebilirsin.",
     "dizi_detay_sayfasindan_hatirlatici_ekleyebilirsin": "Dizi detay sayfasından hatırlatıcı ekleyebilirsin.",
     "hatirlatmalar": "Hatırlatmalar",
+    "profil_hatirlatici_limiti": "Profil hatırlatıcı sayısı",
+    "profil_hatirlatici_limiti_aciklama": "Kaydırılabilir alanda {{count}} içerik gösterilir",
+    "basa_don": "Başa dön",
     "henuz_hatirlatma_yok": "Henüz hatırlatma yok",
     "yayinda": "Yayında",
     "bugun": "Bugün",
@@ -1474,6 +1539,7 @@
     "not_silinemedi": "Not silinemedi",
     "liste_basariyla_silindi": "Liste başarıyla silindi",
     "gorunum_ayari_kaydedilemedi": "Görünüm ayarı kaydedilemedi",
+    "gorunumu_degistir": "Görünümü değiştir",
     "avatar_yuklenemedi": "Avatar yüklenemedi",
     "yarin": "Yarın",
     "dun": "Dün",
@@ -1926,6 +1992,9 @@
     "hubda_paylas": "Hub'da paylaş",
     "yapay_zeka": "Yapay Zeka",
     "bilgi_al": "Bilgi al",
+    "sohbete_gonder": "Sohbete gönder",
+    "gonderilecek_kisiyi_veya_grubu_sec": "Göndermek istediğin arkadaşını veya grubu seç",
+    "grup_ara": "Grup ara",
     "izleme_kaydi_silindi": "Seçilen izleme kaydı silindi.",
     "bu_filmi_ne_zaman_izlediniz": "Bu filmi ne zaman izlediniz?",
     "film_izleme_tarihini_sec": "Filmi izlediğiniz tarihi seçin",
@@ -2017,6 +2086,26 @@
     "yayinlanmadi": "Yayınlanmadı",
     "video": "Video",
     "platform_uyelikleri_kaydedilemedi": "Platform üyelikleri kaydedilemedi: ",
+    "tur_tercihleri_kaydedilemedi": "Tür tercihleri kaydedilemedi: ",
+    "maddeyi_yukari_tasi": "Maddeyi yukarı taşı",
+    "maddeyi_asagi_tasi": "Maddeyi aşağı taşı",
+    "son_mesaja_git": "Son mesaja git",
+    "aktif_upper": "AKTİF",
+    "uyelik_kontrol_ediliyor": "Üyelik durumun kontrol ediliyor…",
+    "unlimited_aciklamasi": "Sınırsız CineMatch AI ve tüm premium ayrıcalıklar açık.",
+    "premium_aciklamasi": "Premium özelliklerin açık. Unlimited ile sınırları kaldır.",
+    "free_plan_aciklamasi": "Daha fazla AI, gelişmiş istatistikler ve özel deneyim.",
+    "yonet": "Yönet",
+    "planlari_gor": "Planları Gör",
+    "izleme_platformlarim_upper": "İZLEME PLATFORMLARIM",
+    "platform_uyeliklerim": "Platform üyeliklerim",
+    "hesap_baglantilari": "Hesap bağlantıları",
+    "hesap_baglantilari_aciklama": "Google, Apple ve parola yöntemleri",
+    "platform_uyelikleri_aciklama": "Üyesi olduğun servisleri seç. Film ve dizi ana ekranlarında sana özel bir alan oluşturulur.",
+    "platform_ara": "Platform ara...",
+    "n_platform": "{{count}} platform",
+    "secimi_temizle": "Seçimi temizle",
+    "platform_bulunamadi": "Platform bulunamadı",
     "oy_vermek_icin_giris_yap": "Oy vermek için giriş yap",
     "oy_kaydedilemedi": "Oy kaydedilemedi",
     "bagli_eki": " — bağlı",
@@ -2057,7 +2146,7 @@
     "siralama_upper": "SIRALAMA",
     "sezon_lower": "sezon",
     "devam_eden_diziler": "Devam Eden Diziler",
-    "devam_eden_dizilerim": "Devam Eden Dizilerim",
+    "devam_eden_dizilerim": "Devam Edenler",
     "bu_sezonu_ne_zaman_izlediniz": "Bu sezonu ne zaman izlediniz?",
     "yeni_sezon_geliyor": "Yeni Sezon Geliyor",
     "tarih_belirsiz": "Tarih Belirsiz",
@@ -2328,6 +2417,7 @@
     "widget_private_appearance": "BU WIDGET’A ÖZEL GÖRÜNÜM",
     "widget_reset": "Varsayılanlara dön",
     "widget_saved": "Güncel",
+    "widget_save_failed": "Kaydedilemedi",
     "widget_saving": "Kaydediliyor",
     "widget_section": "bölüm",
     "widget_settings_description": "Ana ekran widget’larının görünümünü özelleştir",
@@ -2348,6 +2438,30 @@
     "xp_ilerlemesi": "XP İlerlemesi",
     "yil_kucuk": "Yıl",
     "media_added_to_list": "{{media}} {{list}} listesine eklendi!",
+    "icerik_islemleri": "İçerik işlemleri",
+    "yapmak_istedigin_islemi_sec": "Yapmak istediğin işlemi seç",
+    "tasinacak_baska_konum_yok": "Taşınacak başka konum yok",
+    "listedeki_yeni_konumu_sec": "Listedeki yeni konumu seç",
+    "icerigi_bu_listeden_siler": "İçeriği yalnız bu listeden siler",
+    "diger_listeler_etkilenmez": "Diğer listelerdeki kayıtların etkilenmez.",
+    "sira_guncellendi": "Sıra güncellendi",
+    "listeden_kaldirildi": "Listeden kaldırıldı",
+    "sirala_ve_filtrele": "Sırala ve filtrele",
+    "paylasan_uye": "PAYLAŞAN ÜYE",
+    "tum_uyeler": "Tüm üyeler",
+    "tum_uyeleri_goster": "Tüm üyeleri göster",
+    "daralt": "Daralt",
+    "yer_degistirme": "Taşıma",
+    "silebilir": "Silebilir",
+    "yer_degistirebilir": "Taşıyabilir",
+    "yer_degistirme_yetkin_yok": "Bu listede yer değiştirme yetkin yok",
+    "ortak_listeye_eklendi": "Ortak listeye eklendi",
+    "siralama": "SIRALAMA",
+    "filtreleri_temizle": "Filtreleri temizle",
+    "liste_sirasi": "Liste sırası",
+    "ada_gore": "Ada göre",
+    "n_sonuc_goster": "{{n}} sonuç göster",
+    "siliniyor": "Siliniyor...",
     "islem_tamamlanamadi": "İşlem tamamlanamadı"
   },
   "comments": "Yorumlar"

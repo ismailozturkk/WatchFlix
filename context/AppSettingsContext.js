@@ -19,6 +19,7 @@ import {
   setAutoDataCacheEnabled,
   setDataTypes,
 } from "../utils/dataCacheSettings";
+import { normalizeOnboardingGenrePreferences } from "../utils/onboardingPreferences";
 
 
 const AppSettingsContext = createContext();
@@ -36,6 +37,9 @@ const NotificationSettingsContext = createContext();
 const AutoDataCacheSettingsContext = createContext();
 const ListLayoutSettingsContext = createContext();
 const StreamingProviderSettingsContext = createContext();
+const DiscoveryPreferenceSettingsContext = createContext();
+
+export const REMINDER_PREVIEW_LIMITS = Object.freeze([5, 10, 15, 20]);
 
 export const STREAMING_PROVIDERS = Object.freeze([
   { id: 8, name: "Netflix", color: "#E50914" },
@@ -99,6 +103,13 @@ const DEFAULT_POSTER_BADGES = Object.freeze({
   countdown: true,
 });
 const POSTER_BADGE_KEYS = Object.keys(DEFAULT_POSTER_BADGES);
+const DEFAULT_LIST_POSTER_INFO = Object.freeze({
+  mediaType: true,
+  duration: true,
+  title: false,
+  addedBy: true,
+});
+const LIST_POSTER_INFO_KEYS = Object.keys(DEFAULT_LIST_POSTER_INFO);
 
 const genThemeId = () =>
   `ct_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -149,6 +160,21 @@ const normalizePosterBadges = (settings) => {
       typeof source[key] === "boolean"
         ? source[key]
         : DEFAULT_POSTER_BADGES[key];
+    return acc;
+  }, {});
+};
+
+const normalizeListPosterInfo = (settings) => {
+  const source =
+    settings && typeof settings === "object" && !Array.isArray(settings)
+      ? settings
+      : {};
+
+  return LIST_POSTER_INFO_KEYS.reduce((acc, key) => {
+    acc[key] =
+      typeof source[key] === "boolean"
+        ? source[key]
+        : DEFAULT_LIST_POSTER_INFO[key];
     return acc;
   }, {});
 };
@@ -229,6 +255,9 @@ export const AppSettingsProvider = ({ children }) => {
   const [listsPosterRadius, setListsPosterRadius] = useState(() =>
     get(Keys.listsPosterRadius),
   );
+  const [listPosterInfo, setListPosterInfo] = useState(() =>
+    normalizeListPosterInfo(get(Keys.listPosterInfo)),
+  );
   // "Tümünü Gör" (poster grid) görünümü — listelerden bağımsız kendi ayarı
   const [seeAllGridColumns, setSeeAllGridColumns] = useState(() =>
     get(Keys.seeAllGridColumns),
@@ -243,6 +272,9 @@ export const AppSettingsProvider = ({ children }) => {
   const [postListPosterLayout, setPostListPosterLayout] = useState(() =>
     get(Keys.postListPosterLayout),
   );
+  const [reminderPreviewLimit, setReminderPreviewLimit] = useState(() =>
+    get(Keys.reminderPreviewLimit),
+  );
   // Poster üzerindeki rozetlerin (ListBadges) TÜR BAZINDA görünürlüğü —
   // her rozet ayrı açılıp kapatılabilir; kapalı olan posterde çizilmez.
   const [posterBadges, setPosterBadges] = useState(() =>
@@ -252,6 +284,9 @@ export const AppSettingsProvider = ({ children }) => {
     [...new Set((get(Keys.streamingProviderIds) || []).map(Number))].filter(
       (id) => Number.isInteger(id) && id > 0,
     ),
+  );
+  const [onboardingGenreKeys, setOnboardingGenreKeys] = useState(() =>
+    normalizeOnboardingGenrePreferences(get(Keys.onboardingGenreKeys)),
   );
 
   // NOT: burada eskiden 200 satırlık bir `AsyncStorage.multiGet` hidrasyon
@@ -394,6 +429,15 @@ export const AppSettingsProvider = ({ children }) => {
     persist(Keys.listsPosterRadius, n, GORUNUM_HATASI);
   }, []);
 
+  const changeListPosterInfo = useCallback((key, value) => {
+    if (!LIST_POSTER_INFO_KEYS.includes(key)) return;
+    setListPosterInfo((current) => {
+      const next = normalizeListPosterInfo({ ...current, [key]: !!value });
+      persist(Keys.listPosterInfo, next, GORUNUM_HATASI);
+      return next;
+    });
+  }, []);
+
   const changeSeeAllGridColumns = useCallback((n) => {
     if (n !== 3 && n !== 4) return;
     setSeeAllGridColumns(n);
@@ -422,6 +466,12 @@ export const AppSettingsProvider = ({ children }) => {
     if (layout !== "spaced" && layout !== "joined") return;
     setPostListPosterLayout(layout);
     persist(Keys.postListPosterLayout, layout, GORUNUM_HATASI);
+  }, []);
+
+  const changeReminderPreviewLimit = useCallback((limit) => {
+    if (!REMINDER_PREVIEW_LIMITS.includes(limit)) return;
+    setReminderPreviewLimit(limit);
+    persist(Keys.reminderPreviewLimit, limit, GORUNUM_HATASI);
   }, []);
 
   const showPosterBadges = useMemo(
@@ -485,6 +535,16 @@ export const AppSettingsProvider = ({ children }) => {
     );
     setStreamingProviderIds(next);
     persist(Keys.streamingProviderIds, next, i18nText("autoI18n.platform_uyelikleri_kaydedilemedi", "Platform üyelikleri kaydedilemedi: "));
+  }, []);
+
+  const changeOnboardingGenreKeys = useCallback((genreKeys) => {
+    const next = normalizeOnboardingGenrePreferences(genreKeys);
+    setOnboardingGenreKeys(next);
+    persist(
+      Keys.onboardingGenreKeys,
+      next,
+      i18nText("autoI18n.tur_tercihleri_kaydedilemedi", "Tür tercihleri kaydedilemedi: "),
+    );
   }, []);
 
   const value = useMemo(
@@ -676,6 +736,10 @@ export const AppSettingsProvider = ({ children }) => {
     () => ({ streamingProviderIds, changeStreamingProviderIds }),
     [streamingProviderIds, changeStreamingProviderIds],
   );
+  const discoveryPreferenceValue = useMemo(
+    () => ({ onboardingGenreKeys, changeOnboardingGenreKeys }),
+    [onboardingGenreKeys, changeOnboardingGenreKeys],
+  );
 
   const listLayoutValue = useMemo(
     () => ({
@@ -683,6 +747,8 @@ export const AppSettingsProvider = ({ children }) => {
       changeListsGridColumns,
       listsPosterRadius,
       changeListsPosterRadius,
+      listPosterInfo,
+      changeListPosterInfo,
       seeAllGridColumns,
       changeSeeAllGridColumns,
       seeAllPosterRadius,
@@ -693,6 +759,8 @@ export const AppSettingsProvider = ({ children }) => {
       changeRailPosterRadius,
       postListPosterLayout,
       changePostListPosterLayout,
+      reminderPreviewLimit,
+      changeReminderPreviewLimit,
       showPosterBadges,
       changeShowPosterBadges,
       posterBadges,
@@ -704,6 +772,8 @@ export const AppSettingsProvider = ({ children }) => {
       changeListsGridColumns,
       listsPosterRadius,
       changeListsPosterRadius,
+      listPosterInfo,
+      changeListPosterInfo,
       seeAllGridColumns,
       changeSeeAllGridColumns,
       seeAllPosterRadius,
@@ -714,6 +784,8 @@ export const AppSettingsProvider = ({ children }) => {
       changeRailPosterRadius,
       postListPosterLayout,
       changePostListPosterLayout,
+      reminderPreviewLimit,
+      changeReminderPreviewLimit,
       showPosterBadges,
       changeShowPosterBadges,
       posterBadges,
@@ -745,9 +817,13 @@ export const AppSettingsProvider = ({ children }) => {
                               <StreamingProviderSettingsContext.Provider
                                 value={streamingProviderValue}
                               >
-                                <AppSettingsContext.Provider value={value}>
-                                  {children}
-                                </AppSettingsContext.Provider>
+                                <DiscoveryPreferenceSettingsContext.Provider
+                                  value={discoveryPreferenceValue}
+                                >
+                                  <AppSettingsContext.Provider value={value}>
+                                    {children}
+                                  </AppSettingsContext.Provider>
+                                </DiscoveryPreferenceSettingsContext.Provider>
                               </StreamingProviderSettingsContext.Provider>
                             </ListLayoutSettingsContext.Provider>
                           </AutoDataCacheSettingsContext.Provider>
@@ -833,6 +909,12 @@ export const useStreamingProviderSettings = () =>
   useRequiredContext(
     StreamingProviderSettingsContext,
     "useStreamingProviderSettings",
+  );
+
+export const useDiscoveryPreferenceSettings = () =>
+  useRequiredContext(
+    DiscoveryPreferenceSettingsContext,
+    "useDiscoveryPreferenceSettings",
   );
 
 export const useReminderNotificationSettings = useNotificationSettings;

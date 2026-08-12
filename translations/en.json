@@ -367,6 +367,24 @@
       "plan": "Compare & Plan",
       "lists": "Lists"
     },
+    "tabHints": {
+      "explore": "Find titles that fit you",
+      "plan": "Compare and schedule",
+      "lists": "Build themed collections"
+    },
+    "personalizeTitle": "Personalize CineMatch",
+    "personalizeHint": "Recommendations follow your selected lists, services and genres.",
+    "platformsTitle": "Streaming services",
+    "platformsHint": "Leave empty to search across all services.",
+    "allPlatforms": "All",
+    "contentTypeTitle": "Content type",
+    "contentAll": "Movies + Series",
+    "contentMovies": "Movies only",
+    "contentSeries": "Series only",
+    "genresTitle": "Genres",
+    "genresHint": "You can select multiple genres.",
+    "clear": "Clear",
+    "clearDiscoveryFilters": "Clear service and genre filters",
     "chips": {
       "explore": [
         {
@@ -380,6 +398,18 @@
         {
           "label": "🔥 Tonight?",
           "prompt": "What should I watch tonight?"
+        },
+        {
+          "label": "⏱️ Short and memorable",
+          "prompt": "Recommend a few memorable movies under 90 minutes"
+        },
+        {
+          "label": "💎 Hidden gems",
+          "prompt": "Recommend genuinely great movies and series that are not overly popular"
+        },
+        {
+          "label": "🎯 Based on my taste",
+          "prompt": "Recommend titles personalized to my viewing taste and selected filters"
         }
       ],
       "plan": [
@@ -394,6 +424,18 @@
         {
           "label": "🎬 Movie night",
           "prompt": "Plan a 3-movie Saturday movie night with friends"
+        },
+        {
+          "label": "🍿 Weekend marathon",
+          "prompt": "Plan a movie or series marathon split into practical weekend sessions"
+        },
+        {
+          "label": "👥 Watch together",
+          "prompt": "Compare and recommend 3 titles that two people with different tastes can enjoy together"
+        },
+        {
+          "label": "⚡ Quick finish plan",
+          "prompt": "Choose a great limited series that can be finished quickly and create a 3-day watch plan"
         }
       ],
       "lists": [
@@ -402,12 +444,24 @@
           "prompt": "Make a list of the best space movies"
         },
         {
-          "label": "😌 Feel-good",
-          "prompt": "Make a feel-good movies list for when I'm down"
+          "label": "😌 Uplifting picks",
+          "prompt": "Make a list of warm, uplifting movies and series that leave you feeling good"
         },
         {
-          "label": "🔎 Spotlight",
-          "prompt": "Give me a detailed spotlight on Dune (2021)"
+          "label": "⭐ Essential watches",
+          "prompt": "Make a balanced list of movies and series everyone should watch at least once"
+        },
+        {
+          "label": "🕵️ Crime and mystery",
+          "prompt": "Make a list of gripping crime and mystery movies and series"
+        },
+        {
+          "label": "⚡ Limited series",
+          "prompt": "Make a list of the best limited series that can be finished quickly"
+        },
+        {
+          "label": "👨‍👩‍👧 Family night",
+          "prompt": "Make a list of fun and family-friendly titles to watch together"
         }
       ]
     },
@@ -555,8 +609,8 @@
     "popular": "Most Popular Series",
     "trendWeek": "Trends Of The Week",
     "trendDay": "Trends Of The Day",
-    "airingToday": "Episodes Airing Today",
-    "onTheAir": "List of TV series that will be broadcast in the next 7 days"
+    "airingToday": "Airing Today",
+    "onTheAir": "Airing This Week"
   },
   "profileScreen": {
     "emailVerified": "Your email has been verified with the link sent",
@@ -682,7 +736,7 @@
     "sadece_gorur": "View only",
     "ekleme": "Add",
     "silme": "Remove",
-    "uye_yetki_aciklama": "You can manage add and remove permissions",
+    "uye_yetki_aciklama": "You can manage add, remove, and reorder permissions",
     "uye_listesi": "People sharing this list",
     "uyeyi_cikar": "Remove member",
     "uyeyi_cikar_onay": "Remove {{name}} from the group?",
@@ -861,12 +915,20 @@
     "mesajlar": "Messages",
     "sohbetler": "Chats",
     "henuz_sohbet_yok": "No chats yet. Message one of your friends!",
+    "yeni_sohbet": "New Chat",
+    "sohbet_icin_arkadas_sec": "Choose a friend to start chatting",
+    "arkadas_ara": "Search friends",
     "sezon": "seasons",
     "devam_ediyor": "Ongoing",
     "dizi_ilerlemesi": "Show progress",
     "bolum_izlendi": "episodes watched",
     "sezonlar_upper": "SEASONS",
     "gorunum": "LAYOUT",
+    "poster_bilgileri": "POSTER DETAILS",
+    "poster_tur_etiketi": "Movie / TV label",
+    "poster_sure_bilgisi": "Duration",
+    "poster_icerik_adi": "Content title",
+    "poster_ekleyen_kisi": "Added by",
     "uclu_dizilim": "3-up",
     "dortlu_dizilim": "4-up",
     "kose_koseli": "Sharp",
@@ -1343,6 +1405,9 @@
     "film_detay_sayfasindan_hatirlatici_ekleyebilirsin": "You can add a reminder from the movie detail page.",
     "dizi_detay_sayfasindan_hatirlatici_ekleyebilirsin": "You can add a reminder from the TV show detail page.",
     "hatirlatmalar": "Reminders",
+    "profil_hatirlatici_limiti": "Profile reminder count",
+    "profil_hatirlatici_limiti_aciklama": "Show {{count}} items in the swipeable area",
+    "basa_don": "Back to start",
     "henuz_hatirlatma_yok": "No reminders yet",
     "yayinda": "Aired",
     "bugun": "Today",
@@ -1473,6 +1538,7 @@
     "not_silinemedi": "Note could not be deleted",
     "liste_basariyla_silindi": "List deleted successfully",
     "gorunum_ayari_kaydedilemedi": "Appearance setting could not be saved",
+    "gorunumu_degistir": "Change view",
     "avatar_yuklenemedi": "Avatar could not be loaded",
     "yarin": "Tomorrow",
     "dun": "Yesterday",
@@ -1926,6 +1992,9 @@
     "hubda_paylas": "Share on Hub",
     "yapay_zeka": "AI",
     "bilgi_al": "Get info",
+    "sohbete_gonder": "Send to chat",
+    "gonderilecek_kisiyi_veya_grubu_sec": "Choose a friend or group to send this to",
+    "grup_ara": "Search groups",
     "izleme_kaydi_silindi": "Selected watch entry removed.",
     "bu_filmi_ne_zaman_izlediniz": "When did you watch this movie?",
     "film_izleme_tarihini_sec": "Pick the date you watched this movie",
@@ -2017,6 +2086,26 @@
     "yayinlanmadi": "Unreleased",
     "video": "Video",
     "platform_uyelikleri_kaydedilemedi": "Could not save platform subscriptions: ",
+    "tur_tercihleri_kaydedilemedi": "Could not save genre preferences: ",
+    "maddeyi_yukari_tasi": "Move item up",
+    "maddeyi_asagi_tasi": "Move item down",
+    "son_mesaja_git": "Jump to latest message",
+    "aktif_upper": "ACTIVE",
+    "uyelik_kontrol_ediliyor": "Checking your membership…",
+    "unlimited_aciklamasi": "Unlimited CineMatch AI and every premium benefit are unlocked.",
+    "premium_aciklamasi": "Premium is active. Remove the limits with Unlimited.",
+    "free_plan_aciklamasi": "More AI, advanced statistics, and a personalized experience.",
+    "yonet": "Manage",
+    "planlari_gor": "View Plans",
+    "izleme_platformlarim_upper": "MY STREAMING SERVICES",
+    "platform_uyeliklerim": "My subscriptions",
+    "hesap_baglantilari": "Account connections",
+    "hesap_baglantilari_aciklama": "Google, Apple and password methods",
+    "platform_uyelikleri_aciklama": "Choose the services you subscribe to. A personalized rail will appear on movie and TV home screens.",
+    "platform_ara": "Search services...",
+    "n_platform": "{{count}} services",
+    "secimi_temizle": "Clear selection",
+    "platform_bulunamadi": "No services found",
     "oy_vermek_icin_giris_yap": "Sign in to vote",
     "oy_kaydedilemedi": "Could not save your vote",
     "bagli_eki": " — linked",
@@ -2057,7 +2146,7 @@
     "siralama_upper": "SORT",
     "sezon_lower": "seasons",
     "devam_eden_diziler": "Ongoing Shows",
-    "devam_eden_dizilerim": "My Ongoing Shows",
+    "devam_eden_dizilerim": "Ongoing Shows",
     "bu_sezonu_ne_zaman_izlediniz": "When did you watch this season?",
     "yeni_sezon_geliyor": "New Season Coming",
     "tarih_belirsiz": "Date TBA",
@@ -2328,6 +2417,7 @@
     "widget_private_appearance": "APPEARANCE FOR THIS WIDGET",
     "widget_reset": "Reset to defaults",
     "widget_saved": "Saved",
+    "widget_save_failed": "Save failed",
     "widget_saving": "Saving",
     "widget_section": "sections",
     "widget_settings_description": "Customize how your home screen widgets look",
@@ -2348,6 +2438,30 @@
     "xp_ilerlemesi": "XP Progress",
     "yil_kucuk": "Year",
     "media_added_to_list": "{{media}} added to the {{list}} list!",
+    "icerik_islemleri": "Item actions",
+    "yapmak_istedigin_islemi_sec": "Choose an action",
+    "tasinacak_baska_konum_yok": "There is no other position",
+    "listedeki_yeni_konumu_sec": "Choose a new position in the list",
+    "icerigi_bu_listeden_siler": "Removes the item only from this list",
+    "diger_listeler_etkilenmez": "Your entries in other lists are not affected.",
+    "sira_guncellendi": "Order updated",
+    "listeden_kaldirildi": "Removed from list",
+    "sirala_ve_filtrele": "Sort and filter",
+    "paylasan_uye": "SHARED BY",
+    "tum_uyeler": "All members",
+    "tum_uyeleri_goster": "Show all members",
+    "daralt": "Collapse",
+    "yer_degistirme": "Reorder",
+    "silebilir": "Can remove",
+    "yer_degistirebilir": "Can reorder",
+    "yer_degistirme_yetkin_yok": "You do not have permission to reorder this list",
+    "ortak_listeye_eklendi": "Added to shared list",
+    "siralama": "SORTING",
+    "filtreleri_temizle": "Clear filters",
+    "liste_sirasi": "List order",
+    "ada_gore": "By name",
+    "n_sonuc_goster": "Show {{n}} results",
+    "siliniyor": "Removing...",
     "islem_tamamlanamadi": "Something went wrong"
   },
   "comments": "Comments"
