@@ -822,7 +822,7 @@ export default function SettingsScreen() {
                     {isUnlimited
                       ? "UNLIMITED"
                       : isPremium
-                        ? language === "tr" ? "AKTİF" : "ACTIVE"
+                        ? i18nText("autoI18n.aktif_upper", "AKTİF")
                         : "FREE"}
                   </Text>
                 </View>
@@ -831,12 +831,12 @@ export default function SettingsScreen() {
 
             <Text style={[s.premiumDescription, { color: C.muted }]}>
               {premiumLoading
-                ? language === "tr" ? "Üyelik durumun kontrol ediliyor…" : "Checking your membership…"
+                ? i18nText("autoI18n.uyelik_kontrol_ediliyor", "Üyelik durumun kontrol ediliyor…")
                 : isUnlimited
-                  ? language === "tr" ? "Sınırsız CineMatch AI ve tüm premium ayrıcalıklar açık." : "Unlimited CineMatch AI and every premium benefit are unlocked."
+                  ? i18nText("autoI18n.unlimited_aciklamasi", "Sınırsız CineMatch AI ve tüm premium ayrıcalıklar açık.")
                   : isPremium
-                    ? language === "tr" ? "Premium özelliklerin açık. Unlimited ile sınırları kaldır." : "Premium is active. Remove the limits with Unlimited."
-                    : language === "tr" ? "Daha fazla AI, gelişmiş istatistikler ve özel deneyim." : "More AI, advanced statistics, and a personalized experience."}
+                    ? i18nText("autoI18n.premium_aciklamasi", "Premium özelliklerin açık. Unlimited ile sınırları kaldır.")
+                    : i18nText("autoI18n.free_plan_aciklamasi", "Daha fazla AI, gelişmiş istatistikler ve özel deneyim.")}
             </Text>
 
             <View style={s.premiumFooter}>
@@ -853,8 +853,8 @@ export default function SettingsScreen() {
               <View style={[s.premiumAction, { backgroundColor: C.accent }]}>
                 <Text style={s.premiumActionText}>
                   {isPremium
-                    ? language === "tr" ? "Yönet" : "Manage"
-                    : language === "tr" ? "Planları Gör" : "View Plans"}
+                    ? i18nText("autoI18n.yonet", "Yönet")
+                    : i18nText("autoI18n.planlari_gor", "Planları Gör")}
                 </Text>
                 <AppIcon name="chevron-forward" size={14} color="#FFFFFF" />
               </View>
@@ -863,7 +863,7 @@ export default function SettingsScreen() {
         </TouchableOpacity>
 
         <SectionLabel color={C.muted}>
-          {(language === "tr" ? "İZLEME PLATFORMLARIM" : "MY STREAMING SERVICES")}
+          {i18nText("autoI18n.izleme_platformlarim_upper", "İZLEME PLATFORMLARIM")}
         </SectionLabel>
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <SettingRow
@@ -871,7 +871,7 @@ export default function SettingsScreen() {
             iconBg={C.iconTeal}
             iconColor={C.teal}
             iconName="play-circle-outline"
-            title={language === "tr" ? "Platform üyeliklerim" : "My subscriptions"}
+            title={i18nText("autoI18n.platform_uyeliklerim", "Platform üyeliklerim")}
             subtitle={providerSummary}
             onPress={() => {
               setProviderSearch("");
@@ -989,12 +989,8 @@ export default function SettingsScreen() {
             iconBg={C.iconBlue}
             iconColor={C.blue}
             iconName="person-circle-outline"
-            title={language === "tr" ? "Hesap bağlantıları" : "Account connections"}
-            subtitle={
-              language === "tr"
-                ? "Google, Apple ve parola yöntemleri"
-                : "Google, Apple and password methods"
-            }
+            title={i18nText("autoI18n.hesap_baglantilari", "Hesap bağlantıları")}
+            subtitle={i18nText("autoI18n.hesap_baglantilari_aciklama", "Google, Apple ve parola yöntemleri")}
             onPress={() => navigation.navigate("AccountConnectionsScreen")}
             right={<Chevron color={C.muted} />}
           />
@@ -1165,7 +1161,7 @@ export default function SettingsScreen() {
                 <View style={s.sheetTitleRow}>
                   <AppIcon name="play-circle-outline" size={20} color={C.text} />
                   <Text allowFontScaling={false} style={[s.sheetTitle, { color: C.text }]}>
-                    {language === "tr" ? "Platform üyeliklerim" : "My subscriptions"}
+                    {i18nText("autoI18n.platform_uyeliklerim", "Platform üyeliklerim")}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -1179,9 +1175,7 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
               </View>
               <Text allowFontScaling={false} style={[s.providerHelp, { color: C.muted }]}>
-                {language === "tr"
-                  ? "Üyesi olduğun servisleri seç. Film ve dizi ana ekranlarında sana özel bir alan oluşturulur."
-                  : "Choose the services you subscribe to. A personalized rail will appear on movie and TV home screens."}
+                {i18nText("autoI18n.platform_uyelikleri_aciklama", "Üyesi olduğun servisleri seç. Film ve dizi ana ekranlarında sana özel bir alan oluşturulur.")}
               </Text>
               <View
                 style={[
@@ -1193,9 +1187,7 @@ export default function SettingsScreen() {
                 <TextInput
                   allowFontScaling={false}
                   style={[s.providerSearchInput, { color: C.text }]}
-                  placeholder={
-                    language === "tr" ? "Platform ara..." : "Search services..."
-                  }
+                  placeholder={i18nText("autoI18n.platform_ara", "Platform ara...")}
                   placeholderTextColor={C.muted}
                   value={providerSearch}
                   onChangeText={setProviderSearch}
@@ -1211,14 +1203,14 @@ export default function SettingsScreen() {
               </View>
               <View style={s.providerListMeta}>
                 <Text style={[s.providerListMetaText, { color: C.muted }]}>
-                  {language === "tr"
-                    ? `${filteredProviders.length} platform`
-                    : `${filteredProviders.length} services`}
+                  {i18nText("autoI18n.n_platform", "{{count}} platform", {
+                    count: filteredProviders.length,
+                  })}
                 </Text>
                 {streamingProviderIds.length > 0 && (
                   <TouchableOpacity onPress={() => changeStreamingProviderIds([])}>
                     <Text style={[s.providerClearText, { color: C.accent }]}>
-                      {language === "tr" ? "Seçimi temizle" : "Clear selection"}
+                      {i18nText("autoI18n.secimi_temizle", "Seçimi temizle")}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -1241,7 +1233,7 @@ export default function SettingsScreen() {
                     <View style={s.providerEmpty}>
                       <AppIcon name="search-outline" size={26} color={C.muted} />
                       <Text style={[s.providerEmptyText, { color: C.muted }]}>
-                        {language === "tr" ? "Platform bulunamadı" : "No services found"}
+                        {i18nText("autoI18n.platform_bulunamadi", "Platform bulunamadı")}
                       </Text>
                     </View>
                   }
@@ -1299,11 +1291,11 @@ export default function SettingsScreen() {
                 style={[s.providerDone, { backgroundColor: C.accent }]}
               >
                 <Text style={s.providerDoneText}>
-                  {language === "tr" ? "Tamam" : "Done"}
+                  {i18nText("autoI18n.tamam", "Tamam")}
                 </Text>
               </TouchableOpacity>
               <Text allowFontScaling={false} style={[s.providerAttribution, { color: C.muted }]}>
-                Watch provider data by JustWatch
+                {t.justwatchAttribution}
               </Text>
         </BottomSheetModal>
 
