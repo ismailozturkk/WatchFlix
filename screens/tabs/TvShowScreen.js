@@ -1,8 +1,6 @@
 import {
   RefreshControl,
   StyleSheet,
-  Pressable,
-  TextInput,
   View,
 } from "react-native";
 import Animated from "react-native-reanimated";
@@ -21,12 +19,14 @@ import {
   useOngoingTvShowsSettings,
 } from "../../context/AppSettingsContext";
 import { useLanguage } from "../../context/LanguageContext";
-import AppIcon from "../../components/AppIcon";
 import ScreenDecor from "../../components/ScreenDecor";
+import DiscoverSearchButton from "../../components/home/DiscoverSearchButton";
 import usePullToSearch from "../../hooks/usePullToSearch";
 import DiscoveryMediaRail from "../../components/DiscoveryMediaRail";
 import { useStreamingProviderSettings } from "../../context/AppSettingsContext";
+import { useDiscoveryPreferenceSettings } from "../../context/AppSettingsContext";
 import { useProfileStats } from "../../context/ProfileStatsContext";
+import { resolveOnboardingGenreIds } from "../../utils/onboardingPreferences";
 
 const INITIAL_SECTION_COUNT = 2;
 
@@ -34,6 +34,11 @@ export default function TvShowScreen({ navigation }) {
   const { theme } = useTheme();
   const { showOngoingTvShows } = useOngoingTvShowsSettings();
   const { streamingProviderIds } = useStreamingProviderSettings();
+  const { onboardingGenreKeys } = useDiscoveryPreferenceSettings();
+  const onboardingGenreIds = useMemo(
+    () => resolveOnboardingGenreIds(onboardingGenreKeys, "tv"),
+    [onboardingGenreKeys],
+  );
   const { topTvGenres } = useProfileStats();
   const { t } = useLanguage();
   const { loadingTrend } = useTvShow();
@@ -77,7 +82,9 @@ export default function TvShowScreen({ navigation }) {
         : []),
       ...(topTvGenres?.length === 3
         ? [{ key: "topGenres", Component: DiscoveryMediaRail, preset: "topGenres", genreNames: topTvGenres }]
-        : []),
+        : onboardingGenreIds.length > 0
+          ? [{ key: "topGenres", Component: DiscoveryMediaRail, preset: "topGenres", genreIds: onboardingGenreIds }]
+          : []),
       { key: "recentFavorites", Component: DiscoveryMediaRail, preset: "recentFavorites" },
       { key: "hiddenGems", Component: DiscoveryMediaRail, preset: "hiddenGems" },
       { key: "providers", Component: TvShowsProvders },
@@ -87,7 +94,7 @@ export default function TvShowScreen({ navigation }) {
     ];
 
     return items.filter(Boolean);
-  }, [showOngoingTvShows, streamingProviderIds, topTvGenres]);
+  }, [onboardingGenreIds, showOngoingTvShows, streamingProviderIds, topTvGenres]);
 
   const [visibleSectionCount, setVisibleSectionCount] = useState(INITIAL_SECTION_COUNT);
 
@@ -105,6 +112,7 @@ export default function TvShowScreen({ navigation }) {
           mediaType="tv"
           preset={item.preset}
           genreNames={item.genreNames}
+          genreIds={item.genreIds}
         />
       );
     },
@@ -113,31 +121,16 @@ export default function TvShowScreen({ navigation }) {
 
   const renderHeader = useCallback(
     () => (
-      <Pressable
-        onPress={openSearch}
-        style={styles.fakeSearchContainer}
-      >
-        <Animated.View
+      <View style={styles.fakeSearchContainer}>
+        <DiscoverSearchButton
           ref={searchInputRef}
-          collapsable={false}
-          style={[
-            styles.searchInput,
-            { backgroundColor: theme.secondary },
-            animatedSearchStyle,
-          ]}
-        >
-          <AppIcon family="Ionicons" name="search" size={20} color={theme.text.muted} />
-          <TextInput
-            editable={false}
-            pointerEvents="none"
-            style={[styles.searchTextInput, { color: theme.text.muted }]}
-            placeholder={t.SearchScreen.searchTvShows}
-            placeholderTextColor={theme.text.muted}
-          />
-        </Animated.View>
-      </Pressable>
+          onPress={openSearch}
+          placeholder={t.SearchScreen.searchTvShows}
+          animatedStyle={animatedSearchStyle}
+        />
+      </View>
     ),
-    [animatedSearchStyle, openSearch, t.SearchScreen.searchTvShows, theme.secondary, theme.text.muted],
+    [animatedSearchStyle, openSearch, t.SearchScreen.searchTvShows],
   );
 
   const revealNextSection = useCallback(() => {
@@ -184,19 +177,5 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingHorizontal: 15,
     zIndex: 10,
-  },
-  searchInput: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 15,
-    gap: 10,
-    paddingVertical: 7,
-    borderRadius: 10,
-  },
-  searchTextInput: {
-    flex: 1,
-    paddingVertical: 0,
-    fontSize: 14,
   },
 });

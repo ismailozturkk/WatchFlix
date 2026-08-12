@@ -54,6 +54,7 @@ const loadPage = async ({
   setLoading,
   setLoadingMore,
   isStale,
+  startupSnapshot = false,
 }) => {
   // `arkaPlan`: ekranda zaten (bayat) veri var, tazeleme sessizce yapılıyor.
   // Böyle durumda listeyi KİMLİK bazında karşılaştırıyoruz — TMDB aynı listeyi
@@ -85,7 +86,11 @@ const loadPage = async ({
   try {
     const { results, total_pages } = await request();
     apply(results, total_pages, { arkaPlan: Boolean(cachedData) });
-    setCachedValue(cacheKey, { results, total_pages });
+    setCachedValue(
+      cacheKey,
+      { results, total_pages },
+      { startupSnapshot: startupSnapshot && !append },
+    );
   } catch (error) {
     if (__DEV__) console.error("loadPage:", error?.message || error);
   } finally {
@@ -233,7 +238,9 @@ export const TvShowProvider = ({ children }) => {
       });
       const results = response.data.results || [];
       // Cache doğru anahtara yazılabilir; yalnızca state güncellemesi stale'de atlanır.
-      setCachedValue(append ? cacheKey : baseKey, results);
+      setCachedValue(append ? cacheKey : baseKey, results, {
+        startupSnapshot: !append,
+      });
       if (isStale()) return;
       setTotalPagesTrend(response.data.total_pages || 1);
       if (append) {
@@ -271,7 +278,7 @@ export const TvShowProvider = ({ children }) => {
   const [selectedCategoryBest, setSelectedCategoryBest] =
     useState("vote_count");
   const [pageBest, setPageBest] = useState(1);
-  const [totalPagesBest, setTotalPagesBest] = useState(1);
+  const [totalPagesBest, setTotalPagesBest] = useState(bestSeed.totalPages);
   const [loadingMoreBest, setLoadingMoreBest] = useState(false);
   const categoriesBest = ["vote_count", "popularity"];
   const getCategoryTitleBest = (category) => {
@@ -297,6 +304,7 @@ export const TvShowProvider = ({ children }) => {
       setTotal: setTotalPagesBest,
       setLoading: setLoadingBest,
       setLoadingMore: setLoadingMoreBest,
+      startupSnapshot: true,
       request: async () => {
         const response = await axios.request({
           method: "GET",

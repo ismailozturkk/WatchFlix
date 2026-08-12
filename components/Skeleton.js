@@ -121,6 +121,7 @@ export const TrendRailSkeleton = ({ metrics, count = 3 }) => {
 export const RailPosterSkeleton = ({
   showRating = true,
   showReleaseDate = false,
+  showCountdown = false,
   // TvShowsGenres'in kartında alt boşluk yok; iskelet de ray yüksekliğini
   // 5px şişirmesin diye ayarlanabilir.
   cellMarginBottom = 5,
@@ -144,6 +145,9 @@ export const RailPosterSkeleton = ({
         {showReleaseDate && (
           <PosterBadgeSkeleton variant="date" style={POSTER_BADGE_POS.topRight} />
         )}
+        {showCountdown && (
+          <PosterBadgeSkeleton variant="countdown" style={POSTER_BADGE_POS.topLeft} />
+        )}
         {showRating && (
           <PosterBadgeSkeleton variant="rating" style={POSTER_BADGE_POS.bottomRight} />
         )}
@@ -159,6 +163,7 @@ export const RailSkeleton = ({
   count,
   showRating = true,
   showReleaseDate = false,
+  showCountdown = false,
   cellMarginBottom = 5,
   style,
 }) => {
@@ -171,6 +176,7 @@ export const RailSkeleton = ({
           key={index}
           showRating={showRating}
           showReleaseDate={showReleaseDate}
+          showCountdown={showCountdown}
           cellMarginBottom={cellMarginBottom}
         />
       ))}
@@ -201,185 +207,69 @@ export const ChipRowSkeleton = ({
   </View>
 );
 export const MovieBestsSkeleton = () => {
-  const { theme } = useTheme();
-  return (
-    <View style={{ marginBottom: 5, marginRight: 10 }}>
-      <Skeleton
-        width={width * 0.4}
-        height={width * 0.6}
-        style={{ borderRadius: 15, marginBottom: 5 }}
-      />
-
-      <Skeleton
-        width={30}
-        height={15}
-        style={{
-          position: "absolute",
-          right: 10,
-          bottom: 13,
-          borderRadius: 10,
-        }}
-      />
-    </View>
-  );
+  return <RailPosterSkeleton />;
 };
-// MovieCollection kartı yatay poster (0.4 × 0.45) — Oscar skeleton'ı uymuyordu.
+// Koleksiyon kartı da standart poster ayarını kullanır; sağ üstte film sayısı vardır.
 export const MovieCollectionSkeleton = () => {
+  const rp = useRailPosterStyle();
   return (
-    <View style={{ marginBottom: 5, marginRight: 15 }}>
+    <View style={{ width: rp.itemWidth, height: rp.posterHeight, marginRight: 14 }}>
       <Skeleton
-        width={width * 0.4}
-        height={width * 0.45}
+        width={rp.posterWidth}
+        height={rp.posterHeight}
         style={{
-          borderRadius: 15,
-          marginBottom: 5,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.94,
-          shadowRadius: 10.32,
-          elevation: 5,
+          borderRadius: rp.radius,
         }}
       />
       <Skeleton
-        width={30}
-        height={15}
-        style={{ position: "absolute", right: 10, bottom: 13, borderRadius: 10 }}
+        width={42}
+        height={20}
+        style={{ position: "absolute", right: 6, top: 6, borderRadius: 10 }}
       />
     </View>
   );
 };
 export const MovieOscarSkeleton = () => {
-  const { theme } = useTheme();
+  const rp = useRailPosterStyle();
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{
-        flexDirection: "column",
-        gap: 5,
-        marginBottom: 10,
+    <View
+      style={{
+        width: rp.posterWidth + width * 0.04,
+        height: rp.posterHeight,
+        marginRight: 15,
+        flexDirection: "row",
       }}
     >
-      <View style={{ flexDirection: "row", gap: 5 }}>
-        <View
-          style={{
-            gap: 10,
-            justifyContent: "space-around",
-            alignItems: "center",
-          }}
-        >
-          <Skeleton width={20} height={60} style={{ borderRadius: 10 }} />
-          <Skeleton width={20} height={120} style={{ borderRadius: 10 }} />
-        </View>
+      <View style={{ width: width * 0.04, alignItems: "center", justifyContent: "space-around" }}>
+        <Skeleton width={10} height={40} style={{ borderRadius: 5 }} />
+        <Skeleton width={10} height={Math.min(120, rp.posterHeight * 0.5)} style={{ borderRadius: 5 }} />
+      </View>
+      <View style={{ width: rp.posterWidth, height: rp.posterHeight }}>
         <Skeleton
-          width={width * 0.4}
-          height={width * 0.6}
-          style={{
-            marginRight: 15,
-            borderRadius: 15,
-            marginBottom: 5,
-            shadowColor: "#000",
-            shadowOffset: {
-              width: 0,
-              height: 8,
-            },
-            shadowOpacity: 0.94,
-            shadowRadius: 10.32,
-            elevation: 5,
-          }}
+          width={rp.posterWidth}
+          height={rp.posterHeight}
+          style={{ borderRadius: rp.radius }}
         />
-        <Skeleton
-          width={30}
-          height={15}
-          style={{
-            position: "absolute",
-            right: 23,
-            bottom: 10,
-            borderRadius: 10,
-          }}
+        <PosterBadgeSkeleton
+          variant="rating"
+          style={POSTER_BADGE_POS.bottomRight}
         />
       </View>
-    </ScrollView>
+    </View>
   );
 };
 // Yatay poster section'ları (Genres, NowPlaying, Provders, TvGenres, TvProvders…)
 // Gerçek kart 0.4×0.6 r15 → skeleton de aynı ölçüde.
 export const MovieSkeleton = () => {
-  return (
-    <View style={{ marginBottom: 5, marginRight: 10 }}>
-      <Skeleton
-        width={width * 0.4}
-        height={width * 0.6}
-        style={{
-          borderRadius: 15,
-          marginBottom: 5,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.94,
-          shadowRadius: 10.32,
-          elevation: 5,
-        }}
-      />
-      <Skeleton
-        width={30}
-        height={15}
-        style={{
-          position: "absolute",
-          right: 10,
-          bottom: 13,
-          borderRadius: 10,
-        }}
-      />
-    </View>
-  );
+  return <RailPosterSkeleton />;
 };
 export const MovieUpComingSkeleton = () => {
-  const { theme } = useTheme();
   return (
-    <View style={{ paddingBottom: 15, gap: 10 }}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          flexDirection: "column",
-          gap: 5,
-          marginRight: 10,
-          marginBottom: 6,
-        }}
-      >
-        <View style={{ gap: 5, width: width * 0.4 }}>
-          <Skeleton
-            width={width * 0.4}
-            height={width * 0.6}
-            style={{
-              marginRight: 15,
-              width: width * 0.4,
-              height: width * 0.6,
-              borderRadius: 15,
-              marginBottom: 5,
-              shadowColor: "#000",
-              shadowOffset: {
-                width: 0,
-                height: 8,
-              },
-              shadowOpacity: 0.94,
-              shadowRadius: 10.32,
-              elevation: 5,
-            }}
-          />
-          <Skeleton
-            width={30}
-            height={15}
-            style={{
-              position: "absolute",
-              right: 5,
-              top: 5,
-              borderRadius: 10,
-            }}
-          />
-        </View>
-      </ScrollView>
-    </View>
+    <RailPosterSkeleton
+      showRating={false}
+      showReleaseDate
+      showCountdown
+    />
   );
 };
 export const AvatarSkeleton = () => {

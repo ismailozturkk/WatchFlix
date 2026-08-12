@@ -3,7 +3,7 @@
 // railPosterRadius (4 | 15 | 24) değerlerine göre poster/hücre ölçülerini döner.
 //
 // Taban ölçüler tüm rail bölümlerinde ortaktır (similarItem/similarPoster):
-//   poster: width*0.4 × width*0.6, hücre yüksekliği: width*0.62
+//   poster ve hücre: width*0.4 × width*0.6
 // "small" seçiminde bu ölçüler 0.85 ile çarpılır (biraz küçültür).
 
 import { useMemo } from "react";
@@ -19,11 +19,15 @@ export default function useRailPosterStyle() {
   return useMemo(() => {
     const scale = railPosterSize === "small" ? 0.85 : 1;
     const posterWidth = width * 0.4 * scale;
+    const posterHeight = width * 0.6 * scale;
     return {
       posterWidth,
-      posterHeight: width * 0.6 * scale,
+      posterHeight,
       itemWidth: posterWidth,
-      itemHeight: width * 0.62 * scale,
+      // Ana ekran raylarında poster altında artık başlık/yıl çizilmiyor.
+      // Hücreyi postere göre yüksek tutmak her bölümün sonunda görünmez bir
+      // boşluk oluşturuyordu; gerekli nefes kartların marginBottom değerinde.
+      itemHeight: posterHeight,
       radius: railPosterRadius,
     };
   }, [railPosterRadius, railPosterSize]);

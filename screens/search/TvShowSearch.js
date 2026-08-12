@@ -29,6 +29,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { i18nText } from "../../utils/i18nText";
 import { searchMediaWithFuzzyFallback } from "../../services/fuzzyMediaSearch";
 import ScreenSnow from "../../components/ScreenSnow";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 
 
 const { width } = Dimensions.get("window");
@@ -109,6 +110,7 @@ const useEnterAnim = (index) => {
 const TvRowItem = memo(({ item, navigation, imageQuality, theme, index }) => {
   const { getTmdbUrl } = useImageQualitySettings();
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const { scale, onIn, onOut } = usePressAnim();
   const { opacity, translateY } = useEnterAnim(index);
   const rating = item.vote_average ?? 0;
@@ -124,6 +126,10 @@ const TvRowItem = memo(({ item, navigation, imageQuality, theme, index }) => {
           Keyboard.dismiss();
           navigation.navigate("TvShowsDetails", { id: item.id });
         }}
+        onLongPress={() =>
+          openQuickActions({ item, mediaType: "tv", navigation })
+        }
+        delayLongPress={350}
       >
         <View
           style={[
@@ -248,6 +254,7 @@ const TvRowItem = memo(({ item, navigation, imageQuality, theme, index }) => {
 const TvGridItem = memo(({ item, navigation, imageQuality, theme, index }) => {
   const { getTmdbUrl } = useImageQualitySettings();
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const { scale, onIn, onOut } = usePressAnim();
   const { opacity, translateY } = useEnterAnim(index);
   const rating = item.vote_average ?? 0;
@@ -263,6 +270,10 @@ const TvGridItem = memo(({ item, navigation, imageQuality, theme, index }) => {
           Keyboard.dismiss();
           navigation.navigate("TvShowsDetails", { id: item.id });
         }}
+        onLongPress={() =>
+          openQuickActions({ item, mediaType: "tv", navigation })
+        }
+        delayLongPress={350}
       >
         <View style={styles.gridCard}>
           {/* Poster */}

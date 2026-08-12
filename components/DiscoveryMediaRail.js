@@ -23,6 +23,9 @@ import {
   mergeProviderResults,
   resolveGenreIds,
 } from "../utils/discoveryPersonalization";
+import { sameListIdentity } from "../utils/sameData";
+
+const EMPTY_GENRES = Object.freeze([]);
 
 const mergeUnique = (current, incoming) => {
   const byId = new Map(current.map((item) => [item.id, item]));
@@ -146,7 +149,13 @@ const DiscoveryCard = memo(function DiscoveryCard({
   );
 });
 
-export default function DiscoveryMediaRail({ mediaType, preset, navigation, genreNames = [] }) {
+export default function DiscoveryMediaRail({
+  mediaType,
+  preset,
+  navigation,
+  genreNames = EMPTY_GENRES,
+  genreIds: preferredGenreIds = EMPTY_GENRES,
+}) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const { API_KEY } = useApiSettings();
@@ -157,18 +166,35 @@ export default function DiscoveryMediaRail({ mediaType, preset, navigation, genr
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [providerCatalog, setProviderCatalog] = useState({});
-  const [genreIds, setGenreIds] = useState([]);
+  const itemsRef = useRef([]);
+  // Effect bağımlılıklarını dizi referansına değil içeriğine bağla. Context aynı
+  // üç türü yeni bir Array olarak yayınladığında bunu tercih değişikliği sanmak,
+  // tür çözümünü tekrar başlatıp posterleri sürekli skeleton'a çeviriyordu.
+  const preferredGenreIdsKey = [...new Set((preferredGenreIds || []).map(Number))]
+    .filter((id) => Number.isInteger(id) && id > 0)
+    .slice(0, 3)
+    .join("|");
+  const normalizedPreferredGenreIds = useMemo(
+    () => preferredGenreIdsKey
+      ? preferredGenreIdsKey.split("|").map(Number)
+      : EMPTY_GENRES,
+    [preferredGenreIdsKey],
+  );
+  const [resolvedGenreIds, setResolvedGenreIds] = useState(normalizedPreferredGenreIds);
   const [genreResolutionComplete, setGenreResolutionComplete] = useState(preset !== "topGenres");
 
   const isTr = language === "tr";
+  const genreNamesKey = JSON.stringify(
+    [...new Set((genreNames || []).filter((name) => name && name !== "-"))].slice(0, 3),
+  );
   const normalizedGenreNames = useMemo(
-    () => [...new Set((genreNames || []).filter((name) => name && name !== "-"))].slice(0, 3),
-    [genreNames],
+    () => JSON.parse(genreNamesKey),
+    [genreNamesKey],
   );
   const section = useMemo(() => {
     if (preset === "subscriptions") {
       return {
-        title: isTr ? "Üyeliklerimde popüler" : "Popular with my subscriptions",
+        title: isTr ? "Platform Favorileri" : "Service Favorites",
         subtitle: isTr
           ? "Seçtiğin platformlarda izleyebileceğin içerikler"
           : "Titles available on your selected services",
@@ -182,12 +208,14 @@ export default function DiscoveryMediaRail({ mediaType, preset, navigation, genr
     }
     if (preset === "topGenres") {
       return {
-        title: isTr ? "Favori türlerinden seçtik" : "Inspired by your favorite genres",
-        subtitle: normalizedGenreNames.join("  •  "),
+        title: isTr ? "Favori Türlerin" : "Favorite Genres",
+        subtitle:
+          normalizedGenreNames.join("  •  ") ||
+          (isTr ? "Başlangıçta seçtiğin türlere göre" : "Based on your onboarding picks"),
       };
     }
     return {
-      title: isTr ? "Son yılların beğenilenleri" : "Recent favorites",
+      title: isTr ? "Yeni Beğenilenler" : "Recent Favorites",
       subtitle: isTr ? "Yeni ve güçlü izleyici puanına sahip" : "Recent titles with strong audience scores",
     };
   }, [isTr, normalizedGenreNames, preset]);
@@ -227,7 +255,12 @@ export default function DiscoveryMediaRail({ mediaType, preset, navigation, genr
     if (preset !== "topGenres") return;
     let active = true;
     setGenreResolutionComplete(false);
-    setGenreIds([]);
+    setResolvedGenreIds(normalizedPreferredGenreIds);
+
+    if (normalizedPreferredGenreIds.length > 0) {
+      setGenreResolutionComplete(true);
+      return () => { active = false; };
+    }
 
     if (normalizedGenreNames.length !== 3) {
       setGenreResolutionComplete(true);
@@ -247,7 +280,7 @@ export default function DiscoveryMediaRail({ mediaType, preset, navigation, genr
           setCachedValue(cacheKey, data);
           return data.genres || [];
         }));
-        if (active) setGenreIds(resolveGenreIds(normalizedGenreNames, ...catalogs));
+        if (active) setResolvedGenreIds(resolveGenreIds(normalizedGenreNames, ...catalogs));
       } catch (error) {
         if (__DEV__) console.error("Discovery genre resolver:", error?.message || error);
       } finally {
@@ -256,7 +289,7 @@ export default function DiscoveryMediaRail({ mediaType, preset, navigation, genr
     };
     loadGenreIds();
     return () => { active = false; };
-  }, [API_KEY, mediaType, normalizedGenreNames, preset]);
+  }, [API_KEY, mediaType, normalizedGenreNames, normalizedPreferredGenreIds, preset]);
 
   const buildParams = useCallback(
     (requestedPage) => {
@@ -282,32 +315,35 @@ export default function DiscoveryMediaRail({ mediaType, preset, navigation, genr
       }
 
       if (preset === "topGenres") {
-        params.with_genres = genreIds.join("|");
+        params.with_genres = resolvedGenreIds.join("|");
       }
 
       return params;
     },
-    [genreIds, isTr, mediaType, preset, streamingProviderIds],
+    [resolvedGenreIds, isTr, mediaType, preset, streamingProviderIds],
   );
 
   const load = useCallback(
     async (requestedPage = 1, append = false) => {
       if (preset === "subscriptions" && streamingProviderIds.length === 0) {
+        itemsRef.current = [];
         setItems([]);
         setLoading(false);
         return;
       }
-      if (preset === "topGenres" && genreIds.length !== 3) {
+      if (preset === "topGenres" && resolvedGenreIds.length === 0) {
+        itemsRef.current = [];
         setItems([]);
         setLoading(false);
         return;
       }
 
-      append ? setLoadingMore(true) : setLoading(true);
+      if (append) setLoadingMore(true);
+      else if (itemsRef.current.length === 0) setLoading(true);
       const filterKey = preset === "subscriptions"
         ? streamingProviderIds.join("-")
         : preset === "topGenres"
-          ? genreIds.join("-")
+          ? resolvedGenreIds.join("-")
           : "all";
       const cacheKey = `discovery_v2_${mediaType}_${preset}_${language}_${filterKey}_${requestedPage}`;
       try {
@@ -340,18 +376,28 @@ export default function DiscoveryMediaRail({ mediaType, preset, navigation, genr
           })).data;
         }
         const results = (data.results || []).filter((item) => item.poster_path);
-        setItems((current) => (append ? mergeUnique(current, results) : results));
+        setItems((current) => {
+          const next = append ? mergeUnique(current, results) : results;
+          if (sameListIdentity(current, next)) {
+            itemsRef.current = current;
+            return current;
+          }
+          itemsRef.current = next;
+          return next;
+        });
         setPage(requestedPage);
         setTotalPages(Math.min(data.total_pages || 1, 20));
         if (!cached) setCachedValue(cacheKey, data);
       } catch (error) {
         if (__DEV__) console.error("DiscoveryMediaRail:", error?.message || error);
-        if (!append) setItems([]);
+        // Önceden çizilmiş önerileri geçici ağ hatasında koru. İlk yükleme
+        // başarısızsa zaten boş kalır; yenilemede posterler yanıp sönmez.
+        if (!append && itemsRef.current.length === 0) setItems([]);
       } finally {
         append ? setLoadingMore(false) : setLoading(false);
       }
     },
-    [API_KEY, buildParams, genreIds, language, mediaType, preset, streamingProviderIds],
+    [API_KEY, buildParams, resolvedGenreIds, language, mediaType, preset, streamingProviderIds],
   );
 
   useEffect(() => {
@@ -373,30 +419,34 @@ export default function DiscoveryMediaRail({ mediaType, preset, navigation, genr
   );
 
   if (preset === "subscriptions" && streamingProviderIds.length === 0) return null;
-  if (preset === "topGenres" && (normalizedGenreNames.length !== 3 || (genreResolutionComplete && genreIds.length !== 3))) return null;
+  if (
+    preset === "topGenres" &&
+    normalizedPreferredGenreIds.length === 0 &&
+    (normalizedGenreNames.length !== 3 ||
+      (genreResolutionComplete && resolvedGenreIds.length !== 3))
+  ) return null;
   if (!loading && items.length === 0) return null;
 
   return (
     <View style={styles.section}>
       <SeeAllHeader
         title={section.title}
+        style={styles.header}
         onPress={() =>
           navigation.navigate("SeeAllScreen", {
             mediaType,
             section: preset,
             title: section.title,
-            genreIds: preset === "topGenres" ? genreIds : undefined,
+            genreIds: preset === "topGenres" ? resolvedGenreIds : undefined,
           })
         }
       />
-      <Text allowFontScaling={false} style={[styles.subtitle, { color: theme.text.muted }]}>
+      <Text
+        allowFontScaling={false}
+        style={[styles.subtitle, { color: theme.text.muted }]}
+      >
         {section.subtitle}
       </Text>
-      {preset === "subscriptions" && (
-        <Text allowFontScaling={false} style={[styles.attribution, { color: theme.text.muted }]}>
-          Watch provider data by JustWatch
-        </Text>
-      )}
       {loading ? (
         <RailSkeleton />
       ) : (
@@ -418,9 +468,9 @@ export default function DiscoveryMediaRail({ mediaType, preset, navigation, genr
 }
 
 const styles = StyleSheet.create({
-  section: { paddingVertical: 12 },
-  subtitle: { fontSize: 11, marginTop: -10, paddingHorizontal: 15, marginBottom: 12 },
-  attribution: { fontSize: 9, paddingHorizontal: 15, marginTop: -7, marginBottom: 12 },
+  section: { paddingVertical: 10 },
+  header: { marginBottom: 0 },
+  subtitle: { fontSize: 11, marginTop: -4, paddingHorizontal: 15, marginBottom: 12 },
   rail: { paddingHorizontal: 15 },
   item: { marginRight: 10, marginBottom: 5 },
   rating: { position: "absolute", right: 5, bottom: 10, minWidth: 30, borderRadius: 10, alignItems: "center" },

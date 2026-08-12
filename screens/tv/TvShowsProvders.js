@@ -12,7 +12,6 @@ import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
-import { useLanguage } from "../../context/LanguageContext";
 import { ChipRowSkeleton, RailSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
 import { useTvShow } from "../../context/TvShowContex";
@@ -85,7 +84,6 @@ const TvProvidersCard = memo(function TvProvidersCard({ item, navigation, theme,
 
 export default function TvShowsProvders({ navigation }) {
   const { theme } = useTheme();
-  const { t } = useLanguage();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const { streamingProviderIds } = useStreamingProviderSettings();
   const {
@@ -189,8 +187,7 @@ export default function TvShowsProvders({ navigation }) {
     providers.find((p) => p.provider_id === selectedProvider)?.provider_name ||
     i18nText("autoI18n.saglayicilar", "Sağlayıcılar");
 
-  // Sağlayıcı satırı + JustWatch atfı yükleme sırasında da AYNI kurguda çizilir;
-  // sağlayıcılar henüz gelmediyse yerlerini aynı yükseklikte (40) iskelet çipler
+  // Sağlayıcılar henüz gelmediyse yerlerini aynı yükseklikte (40) iskelet çipler
   // tutar. Aksi hâlde ray, çipler düştükçe aşağı kayıyordu.
   const providerHeader = (
     <>
@@ -225,18 +222,6 @@ export default function TvShowsProvders({ navigation }) {
         />
       </View>
 
-      {/* TMDB koşulları: watch-provider verisi için zorunlu JustWatch atfı */}
-      <Text
-        allowFontScaling={false}
-        style={{
-          color: theme.text.muted,
-          fontSize: 10,
-          paddingHorizontal: 15,
-          marginTop: 6,
-        }}
-      >
-        {t.justwatchAttribution}
-      </Text>
     </>
   );
 

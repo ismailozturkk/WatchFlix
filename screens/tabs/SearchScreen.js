@@ -18,10 +18,14 @@ import IconBacground from "../../components/IconBacground";
 import MovieSearch from "../search/MovieSearch";
 import TvShowSearch from "../search/TvShowSearch";
 import ActorSearch from "../search/ActorSearch";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  initialWindowMetrics,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import BackButton from "../../components/BackButton";
 import { useFocusEffect } from "@react-navigation/native";
 import { i18nText } from "../../utils/i18nText";
+import { Keys, get, set } from "../../services/storage";
 
 
 const LayoutToggle = React.memo(({ viewMode, onToggle, theme }) => {
@@ -42,14 +46,32 @@ const LayoutToggle = React.memo(({ viewMode, onToggle, theme }) => {
     <TouchableOpacity
       onPress={toggle}
       activeOpacity={0.7}
-      style={[styles.layoutToggleBtn, { backgroundColor: theme.secondary }]}
+      accessibilityRole="button"
+      accessibilityLabel={i18nText("autoI18n.gorunumu_degistir", "Görünümü değiştir")}
+      style={[
+        styles.layoutToggleBtn,
+        { backgroundColor: theme.secondary, borderColor: theme.border },
+      ]}
     >
-      <AppIcon
-        family="Ionicons"
-        name={viewMode === "row" ? "grid-outline" : "list-outline"}
-        size={22}
-        color={theme.text?.primary ?? "#fff"}
-      />
+      <Animated.View
+        style={{
+          transform: [
+            {
+              rotate: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ["0deg", "180deg"],
+              }),
+            },
+          ],
+        }}
+      >
+        <AppIcon
+          family="Ionicons"
+          name={viewMode === "row" ? "grid-outline" : "list-outline"}
+          size={20}
+          color={theme.accent ?? theme.text?.primary ?? "#fff"}
+        />
+      </Animated.View>
     </TouchableOpacity>
   );
 });
@@ -57,7 +79,16 @@ const LayoutToggle = React.memo(({ viewMode, onToggle, theme }) => {
 export default function SearchScreen({ navigation, route }) {
   const { t } = useLanguage();
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  // Bu ekran native-stack'te `transparentModal` olarak açılıyor. iOS'ta bu
+  // sunum tipindeki SafeAreaView bazen üst inset'i 0 uygulayıp arama çubuğunu
+  // status barın altına taşıyor. Canlı inset'i, ilk pencere metriğini güvenli
+  // yedek olarak kullanarak doğrudan köke uygula.
+  const topInset = Math.max(
+    insets.top,
+    initialWindowMetrics?.insets?.top || 0,
+  );
   const searchOrigin = route?.params?.searchOrigin;
   const hasSearchOrigin =
     searchOrigin &&
@@ -72,8 +103,14 @@ export default function SearchScreen({ navigation, route }) {
 
   const [activeTab, setActiveTab] = useState(initialType);
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState("row");
+  const [viewMode, setViewModeState] = useState(() => get(Keys.searchResultsViewMode));
   const inputRef = useRef(null);
+
+  const setViewMode = useCallback((nextMode) => {
+    if (nextMode !== "row" && nextMode !== "grid") return;
+    setViewModeState(nextMode);
+    set(Keys.searchResultsViewMode, nextMode);
+  }, []);
 
   // Genişleme animasyonu bitti mi? Bittiğinde kabuk sabit ölçü yerine
   // absoluteFill'e geçer; edge-to-edge'de kökün gerçek yüksekliği pencere
@@ -199,7 +236,7 @@ export default function SearchScreen({ navigation, route }) {
           }),
           borderRadius: expandAnim.interpolate({
             inputRange: [0, 1],
-            outputRange: [10, 0],
+            outputRange: [18, 0],
           }),
         }
       : StyleSheet.absoluteFill;
@@ -217,13 +254,23 @@ export default function SearchScreen({ navigation, route }) {
       <Animated.View
         style={[styles.animatedContent, { opacity: contentRevealAnim }]}
       >
-        <SafeAreaView style={styles.container} edges={['top']}>
+        <View
+          style={[
+            styles.container,
+            { paddingTop: topInset + (Platform.OS === "android" ? 10 : 0) },
+          ]}
+        >
           <IconBacground opacity={0.3} />
 
       {/* ── Arama Kutusu ──────────────────────────────────────── */}
       <Animated.View style={[styles.searchContainer, searchBarStyle]}>
         <BackButton absolute={false} style={{ alignSelf: "center" }} />
-        <View style={[styles.searchBar, { backgroundColor: theme.secondary }]}>
+        <View
+          style={[
+            styles.searchBar,
+            { backgroundColor: theme.secondary, borderColor: theme.border },
+          ]}
+        >
           <AppIcon
             family="Ionicons"
             name="search"
@@ -329,7 +376,7 @@ export default function SearchScreen({ navigation, route }) {
           />
         )}
           </View>
-        </SafeAreaView>
+        </View>
       </Animated.View>
     </View>
   );
@@ -349,10 +396,10 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? 10 : 0,
   },
   searchContainer: {
     flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     marginBottom: 12,
     marginTop: 10,
@@ -363,14 +410,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
-    paddingVertical: 4,
-    borderRadius: 16,
-    minHeight: 50,
+    paddingVertical: 0,
+    borderRadius: 12,
+    borderWidth: 1,
+    height: 40,
   },
   layoutToggleBtn: {
-    width: 50,
-    height: 50,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
     flexShrink: 0,
@@ -378,7 +427,8 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    paddingVertical: 10,
+    height: 40,
+    paddingVertical: 0,
   },
   tabsContainer: {
     flexDirection: "row",

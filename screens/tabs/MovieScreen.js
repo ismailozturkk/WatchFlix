@@ -1,9 +1,7 @@
 import {
   RefreshControl,
   StyleSheet,
-  TextInput,
   View,
-  Pressable,
 } from "react-native";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import Animated from "react-native-reanimated";
@@ -19,12 +17,16 @@ import MovieBests from "../movie/MovieBests";
 import MovieTrends from "../movie/MovieTrends";
 import MovieCollection from "../movie/MovieCollection";
 import { useLanguage } from "../../context/LanguageContext";
-import AppIcon from "../../components/AppIcon";
 import ScreenDecor from "../../components/ScreenDecor";
+import DiscoverSearchButton from "../../components/home/DiscoverSearchButton";
 import usePullToSearch from "../../hooks/usePullToSearch";
 import DiscoveryMediaRail from "../../components/DiscoveryMediaRail";
-import { useStreamingProviderSettings } from "../../context/AppSettingsContext";
+import {
+  useDiscoveryPreferenceSettings,
+  useStreamingProviderSettings,
+} from "../../context/AppSettingsContext";
 import { useProfileStats } from "../../context/ProfileStatsContext";
+import { resolveOnboardingGenreIds } from "../../utils/onboardingPreferences";
 
 const INITIAL_SECTION_COUNT = 2;
 
@@ -33,6 +35,11 @@ export default function MovieScreen({ navigation }) {
   const { t } = useLanguage();
 
   const { streamingProviderIds } = useStreamingProviderSettings();
+  const { onboardingGenreKeys } = useDiscoveryPreferenceSettings();
+  const onboardingGenreIds = useMemo(
+    () => resolveOnboardingGenreIds(onboardingGenreKeys, "movie"),
+    [onboardingGenreKeys],
+  );
   const { topMovieGenres } = useProfileStats();
   const searchInputRef = useRef(null);
   const openSearch = useCallback(() => {
@@ -65,7 +72,9 @@ export default function MovieScreen({ navigation }) {
         : []),
       ...(topMovieGenres?.length === 3
         ? [{ key: "topGenres", Component: DiscoveryMediaRail, preset: "topGenres", genreNames: topMovieGenres }]
-        : []),
+        : onboardingGenreIds.length > 0
+          ? [{ key: "topGenres", Component: DiscoveryMediaRail, preset: "topGenres", genreIds: onboardingGenreIds }]
+          : []),
       { key: "recentFavorites", Component: DiscoveryMediaRail, preset: "recentFavorites" },
       { key: "hiddenGems", Component: DiscoveryMediaRail, preset: "hiddenGems" },
       { key: "nowPlaying", Component: MovieNowPlaying },
@@ -75,7 +84,7 @@ export default function MovieScreen({ navigation }) {
       { key: "genres", Component: MovieGenres },
       { key: "upcoming", Component: MovieUpcoming },
     ],
-    [streamingProviderIds, topMovieGenres],
+    [onboardingGenreIds, streamingProviderIds, topMovieGenres],
   );
 
   const [visibleSectionCount, setVisibleSectionCount] = useState(INITIAL_SECTION_COUNT);
@@ -94,6 +103,7 @@ export default function MovieScreen({ navigation }) {
           mediaType="movie"
           preset={item.preset}
           genreNames={item.genreNames}
+          genreIds={item.genreIds}
         />
       );
     },
@@ -102,31 +112,16 @@ export default function MovieScreen({ navigation }) {
 
   const renderHeader = useCallback(
     () => (
-      <Pressable
-        onPress={openSearch}
-        style={styles.fakeSearchContainer}
-      >
-        <Animated.View
+      <View style={styles.fakeSearchContainer}>
+        <DiscoverSearchButton
           ref={searchInputRef}
-          collapsable={false}
-          style={[
-            styles.searchInput,
-            { backgroundColor: theme.secondary },
-            animatedSearchStyle,
-          ]}
-        >
-          <AppIcon family="Ionicons" name="search" size={20} color={theme.text.muted} />
-          <TextInput
-            editable={false}
-            pointerEvents="none"
-            style={[styles.searchTextInput, { color: theme.text.muted }]}
-            placeholder={t.SearchScreen.searchMovies}
-            placeholderTextColor={theme.text.muted}
-          />
-        </Animated.View>
-      </Pressable>
+          onPress={openSearch}
+          placeholder={t.SearchScreen.searchMovies}
+          animatedStyle={animatedSearchStyle}
+        />
+      </View>
     ),
-    [animatedSearchStyle, openSearch, t.SearchScreen.searchMovies, theme.secondary, theme.text.muted],
+    [animatedSearchStyle, openSearch, t.SearchScreen.searchMovies],
   );
 
   const revealNextSection = useCallback(() => {
@@ -173,19 +168,5 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingHorizontal: 15,
     zIndex: 10, // Listenin üstünde kalması için
-  },
-  searchInput: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 15,
-    gap: 10,
-    paddingVertical: 7,
-    borderRadius: 10,
-  },
-  searchTextInput: {
-    flex: 1,
-    paddingVertical: 0,
-    fontSize: 14,
   },
 });

@@ -60,6 +60,7 @@ const loadPage = async ({
   setLoading,
   setLoadingMore,
   isStale,
+  startupSnapshot = false,
 }) => {
   // `arkaPlan`: ekranda zaten (bayat) veri var, tazeleme sessizce yapılıyor.
   // TMDB aynı listeyi her istekte biraz farklı `popularity` ondalığıyla
@@ -89,7 +90,11 @@ const loadPage = async ({
   try {
     const { results, total_pages } = await request();
     apply(results, total_pages, { arkaPlan: Boolean(cachedData) });
-    setCachedValue(cacheKey, { results, total_pages });
+    setCachedValue(
+      cacheKey,
+      { results, total_pages },
+      { startupSnapshot: startupSnapshot && !append },
+    );
   } catch (error) {
     if (__DEV__) console.error("loadPage:", error?.message || error);
   } finally {
@@ -148,7 +153,7 @@ export const MovieProvider = ({ children }) => {
     });
   }, []);
 
-  const [totalPagesBest, setTotalPagesBest] = useState(1);
+  const [totalPagesBest, setTotalPagesBest] = useState(bestsSeed.totalPages);
   const [pageBest, setPageBest] = useState(1);
   const [loadingBests, setLoadingBests] = useState(!bestsSeed.hasCache);
   const [loadingMoreBests, setLoadingMoreBests] = useState(false);
@@ -180,6 +185,7 @@ export const MovieProvider = ({ children }) => {
       setTotal: setTotalPagesBest,
       setLoading: setLoadingBests,
       setLoadingMore: setLoadingMoreBests,
+      startupSnapshot: true,
       request: async () => {
         const response = await axios.request({
           method: "GET",
@@ -282,7 +288,9 @@ export const MovieProvider = ({ children }) => {
       });
       const results = response.data.results || [];
       // Cache doğru anahtara yazılabilir; yalnızca state güncellemesi stale'de atlanır.
-      setCachedValue(append ? cacheKey : baseKey, results);
+      setCachedValue(append ? cacheKey : baseKey, results, {
+        startupSnapshot: !append,
+      });
       if (isStale()) return;
       setTotalPagesTrends(response.data.total_pages || 1);
       if (append) {

@@ -29,6 +29,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { i18nText } from "../../utils/i18nText";
 import { searchMediaWithFuzzyFallback } from "../../services/fuzzyMediaSearch";
 import ScreenSnow from "../../components/ScreenSnow";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 
 
 const { width } = Dimensions.get("window");
@@ -108,6 +109,7 @@ const MovieRowItem = memo(
   ({ item, navigation, imageQuality, theme, index }) => {
     const { getTmdbUrl } = useImageQualitySettings();
     const { posterBadges } = useListLayoutSettings();
+    const { openQuickActions } = useMediaQuickActions();
     const { scale, onIn, onOut } = usePressAnim();
     const { opacity, translateY } = useEnterAnim(index);
     const rating = item.vote_average ?? 0;
@@ -125,6 +127,10 @@ const MovieRowItem = memo(
             Keyboard.dismiss();
             navigation.navigate("MovieDetails", { id: item.id });
           }}
+          onLongPress={() =>
+            openQuickActions({ item, mediaType: "movie", navigation })
+          }
+          delayLongPress={350}
         >
           <View
             style={[
@@ -249,8 +255,9 @@ const MovieRowItem = memo(
 // ─── GRID POSTER KART ─────────────────────────────────────────────────────────
 const MovieGridItem = memo(
   ({ item, navigation, imageQuality, theme, index }) => {
-    const { getTmdbUrl } = useImageQualitySettings();
-    const { posterBadges } = useListLayoutSettings();
+  const { getTmdbUrl } = useImageQualitySettings();
+  const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
     const { scale, onIn, onOut } = usePressAnim();
     const { opacity, translateY } = useEnterAnim(index);
     const rating = item.vote_average ?? 0;
@@ -264,10 +271,14 @@ const MovieGridItem = memo(
           activeOpacity={1}
           onPressIn={onIn}
           onPressOut={onOut}
-          onPress={() => {
-            Keyboard.dismiss();
-            navigation.navigate("MovieDetails", { id: item.id });
-          }}
+        onPress={() => {
+          Keyboard.dismiss();
+          navigation.navigate("MovieDetails", { id: item.id });
+        }}
+        onLongPress={() =>
+          openQuickActions({ item, mediaType: "movie", navigation })
+        }
+        delayLongPress={350}
         >
           <View style={styles.gridCard}>
             {/* Poster */}

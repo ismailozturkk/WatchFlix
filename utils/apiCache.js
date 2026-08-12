@@ -120,7 +120,11 @@ export const seedList = (key, { maxAge = 0 } = {}) => {
  * Writes data to memory and MMKV.
  * Fire-and-forget — never throws.
  */
-export const setCachedValue = (key, data, { force = false } = {}) => {
+export const setCachedValue = (
+  key,
+  data,
+  { force = false, startupSnapshot = false } = {},
+) => {
   // Oturum içi bellek katmanı HER ZAMAN dolar: `mem` bir Map, diske hiçbir şey
   // yazmıyor ve uygulama kapanınca gidiyor. "Verileri indir" ayarı yalnız KALICI
   // yazmayı kapatıyor (bkz. utils/dataCacheSettings.js). Eskiden kapı bunun
@@ -129,8 +133,15 @@ export const setCachedValue = (key, data, { force = false } = {}) => {
   const entry = { data, ts: Date.now() };
   mem.set(key, entry);
 
-  // Kalıcı kopya — kategori anahtar önekinden türetilir (movie_* → film, tv_* → dizi).
-  if (!shouldPersistInternetData({ force, category: categoryForCacheKey(key) }))
+  // Ana ekranın ilk görünür rayları küçük bir "açılış snapshot'ı"dır. Bunlar
+  // çevrimdışı arşiv ayarından bağımsız tutulur: amaç bütün kataloğu indirmek
+  // değil, uygulama yeniden açıldığında boş ekran/iskelet yerine son görüleni
+  // ilk karede çizmektir. Diğer tüm TMDB kayıtları kullanıcının veri indirme
+  // tercihine bağlı kalır.
+  if (
+    !startupSnapshot &&
+    !shouldPersistInternetData({ force, category: categoryForCacheKey(key) })
+  )
     return;
   store.setJSON(key, entry);
 };

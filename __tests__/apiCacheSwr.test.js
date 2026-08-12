@@ -125,3 +125,36 @@ describe("seedList", () => {
     expect(seed.list).toEqual([{ id: 1 }]);
   });
 });
+
+describe("ana ekran açılış snapshot'ı", () => {
+  test("çevrimdışı indirme kapalıyken bile yeniden başlatmada okunur", () => {
+    jest.resetModules();
+    const { Keys, set } = require("../services/storage");
+    set(Keys.autoDataCache, false);
+
+    const api = require("../utils/apiCache");
+    api.setCachedValue(
+      "movie_trends_tr-TR_week_trending",
+      [{ id: 42 }],
+      { startupSnapshot: true },
+    );
+
+    // `cachedKeys` yalnız MMKV namespace'ini tarar; süreç içi Map'i görmez.
+    expect(api.cachedKeys()).toContain("movie_trends_tr-TR_week_trending");
+    expect(
+      api.seedList("movie_trends_tr-TR_week_trending", { maxAge: 60_000 }).list,
+    ).toEqual([{ id: 42 }]);
+  });
+
+  test("normal katalog cache'i indirme kapalıyken yalnız RAM'de kalır", () => {
+    jest.resetModules();
+    const { Keys, set } = require("../services/storage");
+    set(Keys.autoDataCache, false);
+    require("../utils/apiCache").setCachedValue("movie_genres_content_test", [
+      { id: 7 },
+    ]);
+
+    const api = require("../utils/apiCache");
+    expect(api.cachedKeys()).not.toContain("movie_genres_content_test");
+  });
+});

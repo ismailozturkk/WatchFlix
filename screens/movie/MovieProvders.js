@@ -12,7 +12,6 @@ import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
-import { useLanguage } from "../../context/LanguageContext";
 import { MovieSkeleton } from "../../components/Skeleton";
 import {
   useImageQualitySettings,
@@ -86,7 +85,6 @@ const MovieProvidersCard = memo(function MovieProvidersCard({ item, navigation, 
 
 export default function MovieProviders({ navigation }) {
   const { theme } = useTheme();
-  const { t } = useLanguage();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const { streamingProviderIds } = useStreamingProviderSettings();
   // Sağlayıcıları çek
@@ -245,19 +243,6 @@ export default function MovieProviders({ navigation }) {
           }
         />
       </View>
-
-      {/* TMDB koşulları: watch-provider verisi için zorunlu JustWatch atfı */}
-      <Text
-        allowFontScaling={false}
-        style={{
-          color: theme.text.muted,
-          fontSize: 10,
-          paddingHorizontal: 15,
-          marginTop: 6,
-        }}
-      >
-        {t.justwatchAttribution}
-      </Text>
 
       <PaginatedRail
         data={moviesProvider}
