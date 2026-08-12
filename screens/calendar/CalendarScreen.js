@@ -5,7 +5,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
+  FlatList,
   ActivityIndicator,
   StatusBar,
 } from "react-native";
@@ -269,6 +269,113 @@ const PosterMediaCard = ({ item, theme, onPress, savedSet, onSavedChange, viewMo
   );
 };
 
+const AgendaGroup = React.memo(function AgendaGroup({
+  group,
+  language,
+  theme,
+  savedSet,
+  onSavedChange,
+  viewMode,
+  onFocus,
+  onNotePress,
+  onMoviePress,
+  onTvPress,
+}) {
+  const { dateStr, notes, movies, tvs, count } = group;
+  const headerColor = urgencyColor(dateStr) || theme.accent;
+  const parts = dateTileParts(dateStr, language);
+  const cards = useMemo(
+    () => [
+      ...notes.map((item, index) => ({ key: `note-${item.id}-${index}`, kind: "note", item })),
+      ...movies.map((item, index) => ({ key: `movie-${item.id}-${index}`, kind: "movie", item })),
+      ...tvs.map((item, index) => ({
+        key: `tv-${item.id}-${item.episodeNumber || index}-${index}`,
+        kind: "tv",
+        item,
+      })),
+    ],
+    [movies, notes, tvs],
+  );
+
+  const renderCard = useCallback(({ item: card }) => {
+    if (card.kind === "note") {
+      return (
+        <PosterNoteCard
+          item={card.item}
+          theme={theme}
+          onPress={onNotePress}
+          savedSet={savedSet}
+          onSavedChange={onSavedChange}
+          viewMode={viewMode}
+        />
+      );
+    }
+    return (
+      <PosterMediaCard
+        item={card.item}
+        theme={theme}
+        onPress={() => (card.kind === "movie" ? onMoviePress(card.item) : onTvPress(card.item))}
+        savedSet={savedSet}
+        onSavedChange={onSavedChange}
+        viewMode={viewMode}
+      />
+    );
+  }, [onMoviePress, onNotePress, onSavedChange, onTvPress, savedSet, theme, viewMode]);
+
+  return (
+    <View style={styles.dateGroup}>
+      <TouchableOpacity
+        onPress={() => onFocus(dateStr)}
+        activeOpacity={0.7}
+        style={styles.groupHeader}
+      >
+        <View
+          style={[
+            styles.groupTile,
+            { backgroundColor: headerColor + "1A", borderColor: headerColor + "33" },
+          ]}
+        >
+          <Text allowFontScaling={false} style={[styles.groupTileDay, { color: headerColor }]}>
+            {parts.day}
+          </Text>
+          <Text allowFontScaling={false} style={[styles.groupTileMonth, { color: headerColor }]}>
+            {parts.month}
+          </Text>
+        </View>
+        <View style={styles.groupInfo}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.groupWeekday, { color: theme.text.primary }]}
+            numberOfLines={1}
+          >
+            {parts.weekday}
+          </Text>
+          <Text allowFontScaling={false} style={[styles.groupRel, { color: headerColor }]}>
+            {dayRelativeLabel(dateStr)}
+          </Text>
+        </View>
+        <View style={[styles.groupCount, { backgroundColor: headerColor + "1A" }]}>
+          <Text allowFontScaling={false} style={[styles.groupCountText, { color: headerColor }]}>
+            {count}
+          </Text>
+        </View>
+      </TouchableOpacity>
+
+      <FlatList
+        horizontal
+        data={cards}
+        renderItem={renderCard}
+        keyExtractor={(card) => card.key}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.posterScrollContent}
+        initialNumToRender={4}
+        maxToRenderPerBatch={4}
+        windowSize={5}
+      />
+    </View>
+  );
+});
+
 /* ── Ana bileşen ── */
 export default function CalendarScreen({ navigation }) {
   const { theme } = useTheme();
@@ -366,6 +473,25 @@ export default function CalendarScreen({ navigation }) {
     });
     return n;
   }, [dateGroups, activeFilter]);
+
+  // Dikey ajandayı tek tek React elemanlarıyla bir ScrollView içine basmak,
+  // uzun hatırlatıcı geçmişinde görünmeyen tüm posterleri de aynı anda
+  // oluşturuyordu. FlatList yalnız görünür tarih gruplarını mount eder.
+  const agendaGroups = useMemo(
+    () =>
+      sortedDateKeys
+        .map((dateStr) => {
+          const group = dateGroups[dateStr];
+          if (!group) return null;
+          const notes = activeFilter === "all" || activeFilter === "note" ? group.notes : [];
+          const movies = activeFilter === "all" || activeFilter === "movie" ? group.movies : [];
+          const tvs = activeFilter === "all" || activeFilter === "tv" ? group.tvs : [];
+          const count = notes.length + movies.length + tvs.length;
+          return count ? { dateStr, notes, movies, tvs, count } : null;
+        })
+        .filter(Boolean),
+    [activeFilter, dateGroups, sortedDateKeys],
+  );
 
   /* Filtre çiplerinde, seçili türden bağımsız aralık dağılımı */
   const filterCounts = useMemo(() => {
@@ -518,6 +644,10 @@ export default function CalendarScreen({ navigation }) {
     [],
   );
 
+  const focusOnDate = useCallback((dateStr) => {
+    setFocusDate(dateStr);
+  }, []);
+
   const handleNotePress = useCallback(() => {
     // TabScreen gerçek bir navigator değil; sekme seçimi initialTab param'ıyla
     // yapılır ("screen" param'ı sessizce yok sayılıyordu → hep dizi sekmesi açılırdı).
@@ -537,6 +667,140 @@ export default function CalendarScreen({ navigation }) {
     },
     [navigation],
   );
+
+  const agendaRows = useMemo(
+    () => [
+      { type: "filters", key: "filters" },
+      { type: "summary", key: "summary" },
+      ...(agendaGroups.length
+        ? agendaGroups.map((group) => ({ type: "group", key: group.dateStr, group }))
+        : [{ type: "empty", key: "empty" }]),
+    ],
+    [agendaGroups],
+  );
+
+  const renderAgendaRow = useCallback(({ item }) => {
+    if (item.type === "filters") {
+      return (
+        <CalendarFilterPanel
+          theme={theme}
+          viewMode={viewMode}
+          onViewModeChange={changeViewMode}
+          rangeLabel={currentRangeLabel}
+          onRangePress={() => setShowRangeDropdown(true)}
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+          filterCounts={filterCounts}
+          resultCount={totalCount}
+          bulkActionCount={bulkActionCount}
+          isBulkLoading={isBulkLoading}
+          onBulkAction={handleBulkAction}
+        />
+      );
+    }
+
+    if (item.type === "summary") {
+      return (
+        <View style={styles.dateHeader}>
+          <View style={{ flex: 1 }}>
+            <Text allowFontScaling={false} style={[styles.dateTitle, { color: theme.text.primary }]}>
+              {focusDate
+                ? formatDisplayDate(focusDate, language)
+                : rangeTitle(viewMode, rangeMonths)}
+            </Text>
+            {focusDate && (
+              <Text allowFontScaling={false} style={[styles.dateSubTitle, { color: theme.text.muted }]}>
+                {dayRelativeLabel(focusDate)}
+              </Text>
+            )}
+          </View>
+          {focusDate && (
+            <TouchableOpacity
+              onPress={() => setFocusDate(null)}
+              style={[
+                styles.clearFocusBtn,
+                { borderColor: theme.border, backgroundColor: theme.secondary },
+              ]}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close" size={12} color={theme.text.muted} />
+              <Text allowFontScaling={false} style={[styles.clearFocusText, { color: theme.text.muted }]}>
+                {i18nText("autoI18n.araliga_don", "Aralığa dön")}
+              </Text>
+            </TouchableOpacity>
+          )}
+          <View
+            style={[
+              styles.countBadge,
+              { backgroundColor: theme.accent + "22", borderColor: theme.accent + "55" },
+            ]}
+          >
+            <Text allowFontScaling={false} style={[styles.countText, { color: theme.accent }]}>
+              {totalCount}
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    if (item.type === "empty") {
+      return (
+        <View style={styles.emptyState}>
+          <View style={[styles.emptyIcon, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+            <Ionicons name="calendar-outline" size={36} color={theme.accent} />
+          </View>
+          <Text allowFontScaling={false} style={[styles.emptyText, { color: theme.text.primary }]}>
+            {focusDate
+              ? i18nText("autoI18n.bugun_icin_hatirlatma_yok", "Bu gün için hatırlatma yok")
+              : viewMode === "future"
+                ? i18nText("autoI18n.aralikta_yaklasan_hatirlatma_yok", "Bu aralıkta yaklaşan hatırlatma yok")
+                : i18nText("autoI18n.aralikta_gecmis_hatirlatma_yok", "Bu aralıkta geçmiş hatırlatma yok")}
+          </Text>
+          <Text allowFontScaling={false} style={[styles.emptySubText, { color: theme.text.muted }]}>
+            {i18nText(
+              "autoI18n.notlariniza_tarih_ekleyerek_veya_film_dizi_hatirla",
+              "Notlarınıza tarih ekleyerek veya film/dizi hatırlatması kurarak burada görebilirsiniz",
+            )}
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <AgendaGroup
+        group={item.group}
+        language={language}
+        theme={theme}
+        savedSet={savedSet}
+        onSavedChange={onSavedChange}
+        viewMode={viewMode}
+        onFocus={focusOnDate}
+        onNotePress={handleNotePress}
+        onMoviePress={handleMoviePress}
+        onTvPress={handleTvPress}
+      />
+    );
+  }, [
+    activeFilter,
+    bulkActionCount,
+    changeViewMode,
+    currentRangeLabel,
+    filterCounts,
+    focusDate,
+    focusOnDate,
+    handleBulkAction,
+    handleMoviePress,
+    handleNotePress,
+    handleTvPress,
+    isBulkLoading,
+    language,
+    onSavedChange,
+    rangeMonths,
+    savedSet,
+    theme,
+    totalCount,
+    viewMode,
+  ]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
@@ -574,261 +838,73 @@ export default function CalendarScreen({ navigation }) {
         </View>
         <TouchableOpacity
           onPress={refreshEvents}
+          disabled={isLoadingEvents}
           style={[styles.iconBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={language === "tr" ? "Takvimi yenile" : "Refresh calendar"}
+          accessibilityState={{ disabled: isLoadingEvents }}
         >
-          <Ionicons name="refresh" size={18} color={theme.accent} />
+          {isLoadingEvents ? (
+            <ActivityIndicator size="small" color={theme.accent} />
+          ) : (
+            <Ionicons name="refresh" size={18} color={theme.accent} />
+          )}
         </TouchableOpacity>
       </SafeAreaView>
 
-      <ScrollView
+      <FlatList
+        data={agendaRows}
+        renderItem={renderAgendaRow}
+        keyExtractor={(item) => item.key}
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={[1]}
-      >
-        {/* Takvim */}
-        <View
-          style={[
-            styles.calendarWrapper,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
-        >
-          {isLoadingEvents && (
-            <View style={styles.loadingOverlay}>
-              <ActivityIndicator color={theme.accent} />
-            </View>
-          )}
-          <Calendar
-            current={focusDate || todayLocal}
-            onDayPress={onDayPress}
-            markingType="multi-dot"
-            markedDates={combinedMarked}
-            theme={calendarTheme}
-            enableSwipeMonths
-            style={styles.calendar}
-          />
-          {/* Renk açıklaması */}
-          <View style={[styles.legend, { borderTopColor: theme.border }]}>
-            {[
-              { c: "#138DF0", label: i18nText("autoI18n.not", "Not") },
-              { c: "#FF7C25", label: i18nText("autoI18n.film", "Film") },
-              { c: "#AF00AF", label: i18nText("autoI18n.dizi", "Dizi") },
-            ].map((l) => (
-              <View key={l.label} style={[styles.legendChip, { backgroundColor: l.c + "1A" }]}>
-                <View style={[styles.legendDot, { backgroundColor: l.c }]} />
-                <Text allowFontScaling={false} style={[styles.legendText, { color: l.c }]}>
-                  {l.label}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Filtre paneli (sticky) */}
-        <CalendarFilterPanel
-          theme={theme}
-          viewMode={viewMode}
-          onViewModeChange={changeViewMode}
-          rangeLabel={currentRangeLabel}
-          onRangePress={() => setShowRangeDropdown(true)}
-          activeFilter={activeFilter}
-          onFilterChange={setActiveFilter}
-          filterCounts={filterCounts}
-          resultCount={totalCount}
-          bulkActionCount={bulkActionCount}
-          isBulkLoading={isBulkLoading}
-          onBulkAction={handleBulkAction}
-        />
-
-        {/* Aralık özeti / Odak gün başlığı */}
-        <View style={styles.dateHeader}>
-          <View style={{ flex: 1 }}>
-            <Text
-              allowFontScaling={false}
-              style={[styles.dateTitle, { color: theme.text.primary }]}
-            >
-              {focusDate
-                ? formatDisplayDate(focusDate, language)
-                : rangeTitle(viewMode, rangeMonths)}
-            </Text>
-            {focusDate && (
-              <Text
-                allowFontScaling={false}
-                style={[styles.dateSubTitle, { color: theme.text.muted }]}
-              >
-                {dayRelativeLabel(focusDate)}
-              </Text>
-            )}
-          </View>
-          {focusDate && (
-            <TouchableOpacity
-              onPress={() => setFocusDate(null)}
-              style={[
-                styles.clearFocusBtn,
-                { borderColor: theme.border, backgroundColor: theme.secondary },
-              ]}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="close" size={12} color={theme.text.muted} />
-              <Text
-                allowFontScaling={false}
-                style={[styles.clearFocusText, { color: theme.text.muted }]}
-              >{i18nText("autoI18n.araliga_don", "Aralığa dön")}</Text>
-            </TouchableOpacity>
-          )}
+        initialNumToRender={5}
+        maxToRenderPerBatch={5}
+        windowSize={7}
+        contentContainerStyle={styles.agendaContent}
+        ListHeaderComponent={(
           <View
             style={[
-              styles.countBadge,
-              {
-                backgroundColor: theme.accent + "22",
-                borderColor: theme.accent + "55",
-              },
+              styles.calendarWrapper,
+              { backgroundColor: theme.secondary, borderColor: theme.border },
             ]}
           >
-            <Text
-              allowFontScaling={false}
-              style={[styles.countText, { color: theme.accent }]}
-            >
-              {totalCount}
-            </Text>
-          </View>
-        </View>
-
-        {/* Tarih gruplu event listesi */}
-        <View style={styles.eventList}>
-          {totalCount === 0 ? (
-            <View style={styles.emptyState}>
-              <View style={[styles.emptyIcon, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-                <Ionicons
-                  name="calendar-outline"
-                  size={36}
-                  color={theme.accent}
-                />
+            {isLoadingEvents && (
+              <View style={styles.loadingOverlay} pointerEvents="none">
+                <ActivityIndicator color={theme.accent} />
               </View>
-              <Text
-                allowFontScaling={false}
-                style={[styles.emptyText, { color: theme.text.primary }]}
-              >
-                {focusDate
-                  ? i18nText("autoI18n.bugun_icin_hatirlatma_yok", "Bu gün için hatırlatma yok")
-                  : viewMode === "future"
-                    ? i18nText("autoI18n.aralikta_yaklasan_hatirlatma_yok", "Bu aralıkta yaklaşan hatırlatma yok")
-                    : i18nText("autoI18n.aralikta_gecmis_hatirlatma_yok", "Bu aralıkta geçmiş hatırlatma yok")}
-              </Text>
-              <Text
-                allowFontScaling={false}
-                style={[styles.emptySubText, { color: theme.text.muted }]}
-              >{i18nText("autoI18n.notlariniza_tarih_ekleyerek_veya_film_dizi_hatirla", "Notlarınıza tarih ekleyerek veya film/dizi hatırlatması kurarak burada görebilirsiniz")}</Text>
-            </View>
-          ) : (
-            sortedDateKeys.map((dateStr) => {
-              const grp = dateGroups[dateStr];
-              const dayNotes  = activeFilter === "all" || activeFilter === "note"  ? grp.notes  : [];
-              const dayMovies = activeFilter === "all" || activeFilter === "movie" ? grp.movies : [];
-              const dayTvs    = activeFilter === "all" || activeFilter === "tv"    ? grp.tvs    : [];
-              const dayCount  = dayNotes.length + dayMovies.length + dayTvs.length;
-              if (dayCount === 0) return null;
-
-              const uColor = urgencyColor(dateStr);
-              const headerColor = uColor || theme.accent;
-              const parts = dateTileParts(dateStr, language);
-
-              return (
-                <View key={`grp-${dateStr}`} style={styles.dateGroup}>
-                  <TouchableOpacity
-                    onPress={() => setFocusDate(dateStr)}
-                    activeOpacity={0.7}
-                    style={styles.groupHeader}
-                  >
-                    <View
-                      style={[
-                        styles.groupTile,
-                        { backgroundColor: headerColor + "1A", borderColor: headerColor + "33" },
-                      ]}
-                    >
-                      <Text
-                        allowFontScaling={false}
-                        style={[styles.groupTileDay, { color: headerColor }]}
-                      >
-                        {parts.day}
-                      </Text>
-                      <Text
-                        allowFontScaling={false}
-                        style={[styles.groupTileMonth, { color: headerColor }]}
-                      >
-                        {parts.month}
-                      </Text>
-                    </View>
-                    <View style={styles.groupInfo}>
-                      <Text
-                        allowFontScaling={false}
-                        style={[styles.groupWeekday, { color: theme.text.primary }]}
-                        numberOfLines={1}
-                      >
-                        {parts.weekday}
-                      </Text>
-                      <Text
-                        allowFontScaling={false}
-                        style={[styles.groupRel, { color: headerColor }]}
-                      >
-                        {dayRelativeLabel(dateStr)}
-                      </Text>
-                    </View>
-                    <View style={[styles.groupCount, { backgroundColor: headerColor + "1A" }]}>
-                      <Text
-                        allowFontScaling={false}
-                        style={[styles.groupCountText, { color: headerColor }]}
-                      >
-                        {dayCount}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.posterScrollContent}
-                  >
-                    {dayNotes.map((n, idx) => (
-                      <PosterNoteCard
-                        key={`note-${dateStr}-${n.id}-${idx}`}
-                        item={n}
-                        theme={theme}
-                        onPress={handleNotePress}
-                        savedSet={savedSet}
-                        onSavedChange={onSavedChange}
-                        viewMode={viewMode}
-                      />
-                    ))}
-                    {dayMovies.map((m, idx) => (
-                      <PosterMediaCard
-                        key={`movie-${dateStr}-${m.id}-${idx}`}
-                        item={m}
-                        theme={theme}
-                        onPress={() => handleMoviePress(m)}
-                        savedSet={savedSet}
-                        onSavedChange={onSavedChange}
-                        viewMode={viewMode}
-                      />
-                    ))}
-                    {dayTvs.map((t, idx) => (
-                      <PosterMediaCard
-                        key={`tv-${dateStr}-${t.id}-${t.episodeNumber || idx}-${idx}`}
-                        item={t}
-                        theme={theme}
-                        onPress={() => handleTvPress(t)}
-                        savedSet={savedSet}
-                        onSavedChange={onSavedChange}
-                        viewMode={viewMode}
-                      />
-                    ))}
-                  </ScrollView>
+            )}
+            <Calendar
+              initialDate={focusDate || todayLocal}
+              onDayPress={onDayPress}
+              markingType="multi-dot"
+              markedDates={combinedMarked}
+              theme={calendarTheme}
+              enableSwipeMonths
+              hideExtraDays
+              style={styles.calendar}
+            />
+            <View style={[styles.legend, { borderTopColor: theme.border }]}>
+              {[
+                { c: "#138DF0", label: i18nText("autoI18n.not", "Not") },
+                { c: "#FF7C25", label: i18nText("autoI18n.film", "Film") },
+                { c: "#AF00AF", label: i18nText("autoI18n.dizi", "Dizi") },
+              ].map((legend) => (
+                <View
+                  key={legend.label}
+                  style={[styles.legendChip, { backgroundColor: legend.c + "1A" }]}
+                >
+                  <View style={[styles.legendDot, { backgroundColor: legend.c }]} />
+                  <Text allowFontScaling={false} style={[styles.legendText, { color: legend.c }]}>
+                    {legend.label}
+                  </Text>
                 </View>
-              );
-            })
-          )}
-        </View>
-        <View style={{ height: 100 }} />
-      </ScrollView>
+              ))}
+            </View>
+          </View>
+        )}
+      />
 
       <CalendarRangePicker
         visible={showRangeDropdown}
@@ -881,6 +957,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   calendar: { borderRadius: 20 },
+  agendaContent: { paddingBottom: 100 },
   loadingOverlay: {
     position: "absolute",
     zIndex: 10,
@@ -943,8 +1020,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   countText: { fontSize: 12, fontWeight: "700" },
-
-  eventList: { paddingHorizontal: 0, paddingTop: 2 },
 
   dateGroup: { marginBottom: 14 },
 

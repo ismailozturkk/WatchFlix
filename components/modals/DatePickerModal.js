@@ -69,7 +69,10 @@ const WHEEL_H = ITEM_H * VISIBLE_COUNT;
 const WHEEL_PAD = 8;
 const COLUMN_LABEL_H = 20;
 // Hızlı kaydırmada her satır için titreşim tetiklemek cihazı boğar.
-const HAPTIC_MIN_GAP_MS = 45;
+const HAPTIC_MIN_GAP_MS = 80;
+// Android'de momentum başlangıcı parmağın kalkış olayından birkaç frame sonra
+// gelebiliyor. Bu pay dolmadan eski offset'e hizalama başlatmıyoruz.
+const DRAG_SETTLE_GRACE_MS = 220;
 const getWheelItemLayout = (_, index) => ({
   length: ITEM_H,
   offset: ITEM_H * index,
@@ -119,6 +122,7 @@ function daysInMonth(month, year) {
 
 /** {y, m(0-11), d(1-31)} → "YYYY-MM-DD" */
 const partsToIso = ({ y, m, d }) => `${y}-${pad2(m + 1)}-${pad2(d)}`;
+const sameParts = (a, b) => a?.y === b?.y && a?.m === b?.m && a?.d === b?.d;
 
 /** "YYYY-MM-DD" → {y, m(0-11), d(1-31)} */
 const isoToParts = (iso) => {
@@ -315,6 +319,7 @@ const WheelColumn = memo(function WheelColumn({
   disabledColor,
   flat,
   accessibilityLabel,
+  onInteractionChange,
 }) {
   const scrollRef = useRef(null);
   const scrollY = useRef(new Animated.Value(selectedIndex * ITEM_H)).current;
@@ -328,6 +333,8 @@ const WheelColumn = memo(function WheelColumn({
   const pendingLiveIndex = useRef(null);
   const programmaticScroll = useRef(false);
   const didLayout = useRef(false);
+  const lastOffset = useRef(selectedIndex * ITEM_H);
+  const interactionActive = useRef(false);
   const initialContentOffset = useRef({
     x: 0,
     y: selectedIndex * ITEM_H,
@@ -339,6 +346,12 @@ const WheelColumn = memo(function WheelColumn({
   lenRef.current = items.length;
   disabledRef.current = disabledFlags;
   onSelectRef.current = onSelect;
+
+  const setInteraction = useCallback((active) => {
+    if (interactionActive.current === active) return;
+    interactionActive.current = active;
+    onInteractionChange?.(active);
+  }, [onInteractionChange]);
 
   const clearPendingLive = useCallback(() => {
     if (liveFrame.current !== null) {
@@ -389,6 +402,7 @@ const WheelColumn = memo(function WheelColumn({
         useNativeDriver: true,
         listener: (event) => {
           const y = event.nativeEvent.contentOffset.y;
+          lastOffset.current = y;
           const idx = Math.round(y / ITEM_H);
           if (idx === lastTick.current) return;
           if (idx < 0 || idx >= lenRef.current) return;
@@ -438,8 +452,9 @@ const WheelColumn = memo(function WheelColumn({
       if (dragEndTimer.current) clearTimeout(dragEndTimer.current);
       if (programmaticTimer.current) clearTimeout(programmaticTimer.current);
       clearPendingLive();
+      if (interactionActive.current) onInteractionChange?.(false);
     },
-    [clearPendingLive],
+    [clearPendingLive, onInteractionChange],
   );
 
   // Dışarıdan gelen düzeltmeler (sınır clamp'i, ay kısalınca gün düşmesi…)
@@ -515,6 +530,7 @@ const WheelColumn = memo(function WheelColumn({
           didLayout.current = true;
         }}
         onScrollBeginDrag={() => {
+          setInteraction(true);
           clearPendingLive();
           if (dragEndTimer.current) clearTimeout(dragEndTimer.current);
           if (programmaticTimer.current) {
@@ -526,13 +542,17 @@ const WheelColumn = memo(function WheelColumn({
           momentum.current = false;
         }}
         onScrollEndDrag={(e) => {
-          const y = e.nativeEvent.contentOffset.y;
-          // Parmak kalkınca momentum başlayabilir; başlamazsa burada oturt.
+          lastOffset.current = e.nativeEvent.contentOffset.y;
+          // Momentum başlamazsa en son görülen fiziksel offset'i oturt. Eski
+          // sürüm drag-end anındaki offset'i 60 ms sonra kullanıp devam eden
+          // hızlı fling ile karşı yönde animasyon başlatabiliyordu.
           if (dragEndTimer.current) clearTimeout(dragEndTimer.current);
           dragEndTimer.current = setTimeout(() => {
             dragEndTimer.current = null;
-            if (!momentum.current) settle(y);
-          }, 60);
+            if (momentum.current) return;
+            settle(lastOffset.current);
+            setInteraction(false);
+          }, DRAG_SETTLE_GRACE_MS);
         }}
         onMomentumScrollBegin={() => {
           if (dragEndTimer.current) {
@@ -553,6 +573,7 @@ const WheelColumn = memo(function WheelColumn({
           programmaticScroll.current = false;
           momentum.current = false;
           settle(e.nativeEvent.contentOffset.y);
+          setInteraction(false);
         }}
       />
     </View>
@@ -658,6 +679,10 @@ export default function DatePickerModal({
   const apply = useCallback(
     (patch) => {
       const result = clamp({ ...partsRef.current, ...patch });
+      if (sameParts(partsRef.current, result.parts)) {
+        if (result.hint) showHint(result.hint);
+        return;
+      }
       partsRef.current = result.parts;
       setParts(result.parts);
       if (result.hint) showHint(result.hint);
@@ -668,9 +693,10 @@ export default function DatePickerModal({
   // Dışarıdan value / sınır değişirse senkronize et.
   useEffect(() => {
     const next = clamp(isoToParts(normalizeDate(value) || todayIso())).parts;
+    setHint(null);
+    if (sameParts(partsRef.current, next)) return;
     partsRef.current = next;
     setParts(next);
-    setHint(null);
   }, [value, clamp]);
 
   // ─── Sütun verileri ────────────────────────────────────────────────────────
@@ -846,8 +872,20 @@ export default function DatePickerModal({
   // Düşük katman cihazlarda 3B çevirme kapalı: aynı his, daha ucuz transform.
   const flatWheel = reduceMotion || deviceTier === "low";
   const previewScale = useRef(new Animated.Value(1)).current;
+  const [wheelActive, setWheelActive] = useState(false);
+  const handleWheelInteraction = useCallback((active) => {
+    setWheelActive(active);
+  }, []);
 
   useEffect(() => {
+    // Canlı tarih metni kayarken güncellenmeye devam eder; fakat her satırda
+    // yeni spring başlatmak JS/native animasyon kuyruğunu gereksiz şişirirdi.
+    // Kaydırma bitince tek, kısa bir vurgu animasyonu çalışır.
+    if (wheelActive) {
+      previewScale.stopAnimation();
+      previewScale.setValue(1);
+      return undefined;
+    }
     if (reduceMotion) {
       previewScale.setValue(1);
       return undefined;
@@ -863,7 +901,7 @@ export default function DatePickerModal({
     });
     animation.start();
     return () => animation.stop();
-  }, [selectedIso, reduceMotion, previewScale]);
+  }, [selectedIso, wheelActive, reduceMotion, previewScale]);
 
   // ─── Açılış / kapanış animasyonu ───────────────────────────────────────────
 
@@ -1177,6 +1215,7 @@ export default function DatePickerModal({
               activeColor={theme.text.primary}
               disabledColor={alpha(dangerColor, 0.75)}
               flat={flatWheel}
+              onInteractionChange={handleWheelInteraction}
               accessibilityLabel={i18nText("autoI18n.gun_seciniz", "Gün seçiniz")}
             />
             <WheelColumn
@@ -1188,6 +1227,7 @@ export default function DatePickerModal({
               activeColor={theme.text.primary}
               disabledColor={alpha(dangerColor, 0.75)}
               flat={flatWheel}
+              onInteractionChange={handleWheelInteraction}
               accessibilityLabel={i18nText("autoI18n.ay", "Ay")}
             />
             <WheelColumn
@@ -1199,6 +1239,7 @@ export default function DatePickerModal({
               activeColor={theme.text.primary}
               disabledColor={alpha(dangerColor, 0.75)}
               flat={flatWheel}
+              onInteractionChange={handleWheelInteraction}
               accessibilityLabel={i18nText("autoI18n.yil_kucuk", "yıl")}
             />
           </View>
