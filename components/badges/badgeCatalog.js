@@ -42,10 +42,10 @@ export const IDENTITY_BADGES = Object.freeze({
     glyphSolid: "infinite",
     rarity: RARITY.legendary,
     ornate: true,
-    tr: "Unlimited",
-    en: "Premium Unlimited",
-    descTr: "Sınırsız CineMatch AI",
-    descEn: "Unlimited CineMatch AI",
+    tr: "Premium Max",
+    en: "Premium Max",
+    descTr: "Günde 50, ayda 900 CineMatch AI mesajı",
+    descEn: "50 CineMatch AI messages per day, 900 per month",
   },
 });
 

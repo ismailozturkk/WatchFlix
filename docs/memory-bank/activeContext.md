@@ -5,7 +5,7 @@
 _(29 Tem 2026)_ **Yayın hazırlığı** — tek doğruluk kaynağı
 `docs/planlama/YAYIN_VE_GELIR_YOL_HARITASI.md`. Rebrand tamam (Watchify → seelogd,
 paket `com.smlztrk.seelogd`). Kodda biten büyük parçalar: premium (RevenueCat
-Pro/Unlimited), ölçüm (Firebase Analytics + Sentry), performans (device tier +
+Premium/Premium Max), ölçüm (Firebase Analytics + Sentry), performans (device tier +
 AdaptiveBlurView), Gemini proxy Cloud Function. Bekleyen işler operasyonel:
 Firebase billing → functions/rules/hosting deploy'ları, Play Console hesabı,
 kapalı test kullanıcıları, marka/ad kararı.

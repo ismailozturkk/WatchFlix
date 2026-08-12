@@ -307,7 +307,7 @@
     "plans": {
       "free": "Free",
       "premium": "Premium",
-      "unlimited": "Unlimited"
+      "unlimited": "Premium Max"
     },
     "typing": "Düşünüyor…",
     "retry": "Tekrar dene",
@@ -2092,9 +2092,9 @@
     "son_mesaja_git": "Son mesaja git",
     "aktif_upper": "AKTİF",
     "uyelik_kontrol_ediliyor": "Üyelik durumun kontrol ediliyor…",
-    "unlimited_aciklamasi": "Sınırsız CineMatch AI ve tüm premium ayrıcalıklar açık.",
-    "premium_aciklamasi": "Premium özelliklerin açık. Unlimited ile sınırları kaldır.",
-    "free_plan_aciklamasi": "Daha fazla AI, gelişmiş istatistikler ve özel deneyim.",
+    "unlimited_aciklamasi": "Premium Max aktif: günde 50, ayda 900 CineMatch AI mesajı.",
+    "premium_aciklamasi": "Premium aktif: günde 20, ayda 300 CineMatch AI mesajı. Premium Max ile daha yüksek limite geç.",
+    "free_plan_aciklamasi": "Free planda günde 5, ayda 30 CineMatch AI mesajı. Daha yüksek limitler için planları incele.",
     "yonet": "Yönet",
     "planlari_gor": "Planları Gör",
     "izleme_platformlarim_upper": "İZLEME PLATFORMLARIM",

@@ -30,12 +30,12 @@ yazılmaz.
 
 RevenueCat > Product catalog altında Test Store için bu dört ürünü oluştur:
 
-| Gösterim          | Product ID         | Süre  | Uygulama seviyesi |
-| ----------------- | ------------------ | ----- | ----------------- |
-| Premium           | `monthly_2`        | 1 ay  | Premium           |
-| Yearly            | `yearly`           | 1 yıl | Premium           |
-| Premium Unlimited | `monthly`          | 1 ay  | Unlimited         |
-| Unlimited Yearly  | `unlimited_yearly` | 1 yıl | Unlimited         |
+| Gösterim           | Product ID         | Süre  | Uygulama seviyesi |
+| ------------------ | ------------------ | ----- | ----------------- |
+| Premium            | `monthly_2`        | 1 ay  | Premium           |
+| Premium Yıllık     | `yearly`           | 1 yıl | Premium           |
+| Premium Max        | `monthly`          | 1 ay  | Premium Max       |
+| Premium Max Yıllık | `unlimited_yearly` | 1 yıl | Premium Max       |
 
 Tek entitlement oluştur:
 
@@ -45,7 +45,9 @@ com.smlztrk.seelogd Pro
 
 Dört ürünün tamamını bu entitlement'a bağla. Uygulama aktif entitlement'ın
 `productIdentifier` alanını okuyarak `monthly` ve `unlimited_yearly` ürünlerini
-Unlimited, `monthly_2` ve `yearly` ürünlerini Premium olarak sınıflandırır.
+kullanıcıya Premium Max olarak gösterir; teknik planda bunlar geriye dönük
+uyumluluk için `unlimited` anahtarına eşlenir. `monthly_2` ve `yearly` ürünleri
+Premium olarak sınıflandırılır.
 
 `default` adında bir Offering oluştur, Current olarak işaretle ve dört custom
 package ekle:
@@ -74,8 +76,8 @@ uygulama sürümü çıkarmadan yapılabilir.
 | ------------------------------------- | --------: | -----------------: |
 | Premium aylık (`monthly_2`)           |    ₺79,99 |              $3.99 |
 | Premium yıllık (`yearly`)             |   ₺599,99 |             $29.99 |
-| Unlimited aylık (`monthly`)           |   ₺159,99 |              $7.99 |
-| Unlimited yıllık (`unlimited_yearly`) | ₺1.199,99 |             $59.99 |
+| Premium Max aylık (`monthly`)           |   ₺159,99 |              $7.99 |
+| Premium Max yıllık (`unlimited_yearly`) | ₺1.199,99 |             $59.99 |
 
 Bu yapı her iki yıllık planda da 12 aylık ödemeye göre yaklaşık `%37` gerçek
 avantaj sağlar. Fiyatları Google Play Console ve App Store Connect'te bu şekilde
@@ -113,8 +115,8 @@ Authorization header değeri, `REVENUECAT_WEBHOOK_AUTH` secret'ıyla aynı olmal
 
 Webhook `Users/{firebaseUid}.entitlements` altında `premium`,
 `premiumUnlimited`, `premiumPlan`, ürün ve bitiş bilgilerini günceller. Free
-kullanıcıda AI kotası 5/gün, Premium'da 100/gün, Unlimited'da günlük sayaç
-uygulanmaz.
+kullanıcıda AI kotası 5/gün ve 30/ay, Premium'da 20/gün ve 300/ay, Premium
+Max'te 50/gün ve 900/aydır.
 
 ## 6. Uygulama akışı
 
@@ -133,7 +135,7 @@ uygulanmaz.
 - Test Store'da başarı, kullanıcı iptali ve hata sonuçlarını ayrı dene.
 - `monthly_2`, `yearly`, `monthly` ve `unlimited_yearly` ürünlerinin doğru planı
   açtığını doğrula.
-- Purchase, restore, Premium -> Unlimited geçişi, expiration ve hesap değiştirme
+- Purchase, restore, Premium -> Premium Max geçişi, expiration ve hesap değiştirme
   akışlarını test et.
 - Production öncesinde Test Store anahtarını kaldır; gerçek platform anahtarları
   ve mağaza sandbox/internal testing ile son testleri yap.

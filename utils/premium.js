@@ -13,6 +13,22 @@ export const PREMIUM_PLAN = Object.freeze({
   UNLIMITED: "unlimited",
 });
 
+export const PREMIUM_PLAN_DISPLAY_NAME = Object.freeze({
+  [PREMIUM_PLAN.FREE]: "Free",
+  [PREMIUM_PLAN.PREMIUM]: "Premium",
+  [PREMIUM_PLAN.UNLIMITED]: "Premium Max",
+});
+
+export const AI_PLAN_LIMITS = Object.freeze({
+  [PREMIUM_PLAN.FREE]: Object.freeze({ daily: 5, monthly: 30 }),
+  [PREMIUM_PLAN.PREMIUM]: Object.freeze({ daily: 20, monthly: 300 }),
+  [PREMIUM_PLAN.UNLIMITED]: Object.freeze({ daily: 50, monthly: 900 }),
+});
+
+export function getPremiumPlanDisplayName(plan) {
+  return PREMIUM_PLAN_DISPLAY_NAME[plan] || PREMIUM_PLAN_DISPLAY_NAME.free;
+}
+
 export const RECOMMENDED_LAUNCH_PRICES = Object.freeze({
   [REVENUECAT_PRODUCT_IDS.PREMIUM_MONTHLY]: Object.freeze({
     tr: Object.freeze({ price: 79.99, currencyCode: "TRY" }),

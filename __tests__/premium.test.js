@@ -1,16 +1,28 @@
 import {
+  AI_PLAN_LIMITS,
   getPackagesForTier,
   getPackageDisplayProduct,
   getPackagePeriodKey,
   getPackageSavings,
   getPackageTierKey,
   getPremiumPlan,
+  getPremiumPlanDisplayName,
   hasActivePremiumEntitlement,
   PREMIUM_PLAN,
   selectPreferredPackage,
 } from "../utils/premium";
 
+const { AI_PLAN_LIMITS: SERVER_AI_PLAN_LIMITS } = require("../functions/aiQuota");
+
 describe("premium helpers", () => {
+  test("keeps client plan labels and quotas aligned with the server", () => {
+    expect(getPremiumPlanDisplayName(PREMIUM_PLAN.PREMIUM)).toBe("Premium");
+    expect(getPremiumPlanDisplayName(PREMIUM_PLAN.UNLIMITED)).toBe(
+      "Premium Max"
+    );
+    expect(AI_PLAN_LIMITS).toEqual(SERVER_AI_PLAN_LIMITS);
+  });
+
   test("active entitlement is the only premium source", () => {
     expect(
       hasActivePremiumEntitlement({

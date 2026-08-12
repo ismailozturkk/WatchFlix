@@ -94,6 +94,14 @@ Gerçek sunucu kotası `functions/aiQuota.js` içinde Free `5/30`, Premium `20/3
 
 **Kabul:** Satın alma öncesi görünen her vaat ölçülebilir ve gerçekten açılıyor; Free/Premium/Unlimited test matrisi geçiyor; mağaza metadata'sı aynı gerçeği anlatıyor.
 
+**Durum (12 Ağustos 2026): Kod ve yerel metadata tamam.** Üst planın kullanıcıya
+görünen adı Premium Max oldu; teknik `unlimited` anahtarı mevcut aboneliklerle
+uyumluluk için korundu. Uygulama, Hakkında, TR/EN Play metinleri ve şartlarda
+Free `5/30`, Premium `20/300`, Premium Max `50/900` limitleri açıklandı;
+uygulanmayan ücretli özellik vaatleri kaldırıldı. İstemci/sunucu kota eşitliği
+testle güvenceye alındı. RevenueCat panelindeki offering/paywall metni mağaza
+ürünleri kurulurken ayrıca Premium Max olarak güncellenmelidir.
+
 ### P0.3 — iOS kimlik ve imza yapılandırmasını tamamla
 
 **Kanıt:**

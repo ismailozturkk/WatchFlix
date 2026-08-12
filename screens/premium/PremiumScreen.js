@@ -36,6 +36,8 @@ import {
   getPackagePeriodKey,
   getPackageSavings,
   getPackageTierKey,
+  getPremiumPlanDisplayName,
+  AI_PLAN_LIMITS,
   PREMIUM_PLAN,
   selectPreferredPackage,
 } from "../../utils/premium";
@@ -47,45 +49,35 @@ const FEATURES = {
   premium: [
     {
       icon: "sparkles",
-      tr: "Günde 100 CineMatch AI mesajı",
-      en: "100 CineMatch AI messages per day",
+      tr: `Günde ${AI_PLAN_LIMITS.premium.daily} CineMatch AI mesajı`,
+      en: `${AI_PLAN_LIMITS.premium.daily} CineMatch AI messages per day`,
     },
     {
-      icon: "stats-chart",
-      tr: "Gelişmiş istatistikler ve tüm Wrapped yılları",
-      en: "Advanced stats and every Wrapped year",
+      icon: "calendar",
+      tr: `Ayda ${AI_PLAN_LIMITS.premium.monthly} CineMatch AI mesajı`,
+      en: `${AI_PLAN_LIMITS.premium.monthly} CineMatch AI messages per month`,
     },
     {
-      icon: "color-palette",
-      tr: "Özel temalar ve premium kişiselleştirme",
-      en: "Custom themes and premium personalization",
-    },
-    {
-      icon: "game-controller",
-      tr: "Premium oyun modları ve başarımlar",
-      en: "Premium game modes and achievements",
+      icon: "diamond",
+      tr: "Premium profil kimlik rozeti",
+      en: "Premium profile identity badge",
     },
   ],
   unlimited: [
     {
       icon: "infinite",
-      tr: "Sınırsız CineMatch AI kullanımı",
-      en: "Unlimited CineMatch AI usage",
+      tr: `Günde ${AI_PLAN_LIMITS.unlimited.daily} CineMatch AI mesajı`,
+      en: `${AI_PLAN_LIMITS.unlimited.daily} CineMatch AI messages per day`,
     },
     {
-      icon: "albums",
-      tr: "Sınırsız liste, not ve hatırlatıcı",
-      en: "Unlimited lists, notes, and reminders",
+      icon: "calendar",
+      tr: `Ayda ${AI_PLAN_LIMITS.unlimited.monthly} CineMatch AI mesajı`,
+      en: `${AI_PLAN_LIMITS.unlimited.monthly} CineMatch AI messages per month`,
     },
     {
       icon: "diamond",
-      tr: "Tüm Premium özellikleri dahil",
-      en: "Every Premium feature included",
-    },
-    {
-      icon: "rocket",
-      tr: "Yeni premium özelliklere tam erişim",
-      en: "Full access to new premium features",
+      tr: "Premium Max profil kimlik rozeti",
+      en: "Premium Max profile identity badge",
     },
   ],
 };
@@ -114,10 +106,6 @@ const EXPERIENCE_GROUPS = [
         "Manage notes, reminders, and your release calendar together",
       ],
     },
-    unlimited: {
-      tr: "Unlimited ile liste, not ve hatırlatıcı sınırlarını kaldır.",
-      en: "Remove list, note, and reminder limits with Unlimited.",
-    },
   },
   {
     id: "insights",
@@ -143,8 +131,8 @@ const EXPERIENCE_GROUPS = [
       ],
     },
     unlimited: {
-      tr: "Unlimited planda CineMatch AI mesaj sınırı yok.",
-      en: "Unlimited removes the CineMatch AI message limit.",
+      tr: `Premium Max: günde ${AI_PLAN_LIMITS.unlimited.daily}, ayda ${AI_PLAN_LIMITS.unlimited.monthly} CineMatch AI mesajı.`,
+      en: `Premium Max: ${AI_PLAN_LIMITS.unlimited.daily} CineMatch AI messages per day and ${AI_PLAN_LIMITS.unlimited.monthly} per month.`,
     },
   },
   {
@@ -422,8 +410,7 @@ export default function PremiumScreen() {
     pricedPackages.find((item) => item.identifier === selectedId) || null;
   const selectedTierPackages = getPackagesForTier(pricedPackages, selectedTier);
   const busy = Boolean(busyAction);
-  const selectedPlanName =
-    selectedTier === PREMIUM_PLAN.UNLIMITED ? "Premium Unlimited" : "Premium";
+  const selectedPlanName = getPremiumPlanDisplayName(selectedTier);
   const selectedIdentityBadge =
     selectedTier === PREMIUM_PLAN.UNLIMITED
       ? IDENTITY_BADGES.unlimited
@@ -438,8 +425,8 @@ export default function PremiumScreen() {
         en: `${selectedPlanName} benefits`,
       },
       summary: {
-        tr: "Seçtiğin planla açılan temel premium özellikler.",
-        en: "The core premium features unlocked by your selected plan.",
+        tr: "Seçtiğin planın CineMatch AI limitleri ve profil kimlik rozeti.",
+        en: "CineMatch AI limits and the profile identity badge for your selected plan.",
       },
       compactItems: FEATURES[selectedTier].map((feature) => ({
         icon: feature.icon,
@@ -624,7 +611,7 @@ export default function PremiumScreen() {
             <View style={styles.heroActiveBadge}>
               <AppIcon name="checkmark" size={12} color="#FFFFFF" />
               <Text style={styles.heroActiveText}>
-                {isUnlimited ? "UNLIMITED" : tr ? "AKTİF" : "ACTIVE"}
+                {isUnlimited ? "PREMIUM MAX" : tr ? "AKTİF" : "ACTIVE"}
               </Text>
             </View>
           )}
@@ -646,8 +633,8 @@ export default function PremiumScreen() {
           <Text style={styles.heroTitle}>
             {isUnlimited
               ? tr
-                ? "Sınırları kaldırdın."
-                : "You removed the limits."
+                ? "Premium Max deneyimin hazır."
+                : "Your Premium Max experience is ready."
               : isPremium
               ? tr
                 ? "Premium deneyimin hazır."
@@ -659,15 +646,15 @@ export default function PremiumScreen() {
           <Text style={styles.heroSubtitle}>
             {isUnlimited
               ? tr
-                ? "CineMatch AI ve tüm Seelogd ayrıcalıkları artık sınırsız."
-                : "CineMatch AI and every Seelogd benefit are now unlimited."
+                ? `CineMatch AI limitin günde ${AI_PLAN_LIMITS.unlimited.daily}, ayda ${AI_PLAN_LIMITS.unlimited.monthly} mesaj.`
+                : `Your CineMatch AI limit is ${AI_PLAN_LIMITS.unlimited.daily} messages per day and ${AI_PLAN_LIMITS.unlimited.monthly} per month.`
               : isPremium
               ? tr
-                ? "Tüm Premium ayrıcalıkların açık. Dilersen Unlimited'a geç."
-                : "Your Premium benefits are unlocked. Upgrade to Unlimited anytime."
+                ? `CineMatch AI limitin günde ${AI_PLAN_LIMITS.premium.daily}, ayda ${AI_PLAN_LIMITS.premium.monthly} mesaj. Dilersen Premium Max'e geç.`
+                : `Your CineMatch AI limit is ${AI_PLAN_LIMITS.premium.daily} messages per day and ${AI_PLAN_LIMITS.premium.monthly} per month. Upgrade to Premium Max anytime.`
               : tr
-              ? "Daha güçlü öneriler, derin istatistikler ve kusursuz bir keşif deneyimi."
-              : "Smarter recommendations, deeper insights, and effortless discovery."}
+              ? `Free planda günde ${AI_PLAN_LIMITS.free.daily}, ayda ${AI_PLAN_LIMITS.free.monthly} CineMatch AI mesajı.`
+              : `The Free plan includes ${AI_PLAN_LIMITS.free.daily} CineMatch AI messages per day and ${AI_PLAN_LIMITS.free.monthly} per month.`}
           </Text>
         </View>
         <View style={styles.heroTrustRow}>
@@ -738,12 +725,12 @@ export default function PremiumScreen() {
         </View>
         <View style={styles.exploreCopy}>
           <Text style={[styles.exploreTitle, { color: C.text }]}>
-            {tr ? "Premium'u yakından incele" : "See what Premium unlocks"}
+            {tr ? "Planları yakından incele" : "Explore the plans"}
           </Text>
           <Text style={[styles.exploreSubtitle, { color: C.muted }]}>
             {tr
-              ? "Plan ayrıcalıklarını, kimlik rozetini ve Seelogd deneyimini görüntüle."
-              : "View plan benefits, your identity badge, and the Seelogd experience."}
+              ? "CineMatch AI limitlerini ve plana özel kimlik rozetini karşılaştır."
+              : "Compare CineMatch AI limits and plan-specific identity badges."}
           </Text>
         </View>
         <View style={[styles.exploreArrow, { backgroundColor: C.cardAlt }]}>
@@ -771,8 +758,8 @@ export default function PremiumScreen() {
                 </Text>
                 <Text style={[styles.exploreModalSubtitle, { color: C.muted }]}>
                   {tr
-                    ? `${selectedPlanName} ile açılan deneyim`
-                    : `The experience unlocked with ${selectedPlanName}`}
+                    ? `${selectedPlanName} planının limitleri ve rozeti`
+                    : `${selectedPlanName} limits and identity badge`}
                 </Text>
               </View>
               <Pressable
@@ -902,7 +889,9 @@ export default function PremiumScreen() {
               <View style={styles.experienceHeading}>
                 <View style={styles.experienceHeadingCopy}>
                   <Text style={[styles.experienceTitle, { color: C.text }]}>
-                    {tr ? "Premium ayrıcalıkları" : "Premium benefits"}
+                    {tr
+                      ? "Plan ayrıcalıkları ve Seelogd deneyimi"
+                      : "Plan benefits and the Seelogd experience"}
                   </Text>
                   <Text style={[styles.experienceSubtitle, { color: C.muted }]}>
                     {tr
@@ -1180,16 +1169,16 @@ export default function PremiumScreen() {
                     />
                   </View>
                   <Text style={[styles.tierTitle, { color: C.text }]}>
-                    {unlimited ? "Premium Unlimited" : "Premium"}
+                    {getPremiumPlanDisplayName(tier)}
                   </Text>
                   <Text style={[styles.tierDescription, { color: C.muted }]}>
                     {unlimited
                       ? tr
-                        ? "Limitleri kaldır"
-                        : "Remove every limit"
+                        ? `${AI_PLAN_LIMITS.unlimited.daily}/gün · ${AI_PLAN_LIMITS.unlimited.monthly}/ay`
+                        : `${AI_PLAN_LIMITS.unlimited.daily}/day · ${AI_PLAN_LIMITS.unlimited.monthly}/month`
                       : tr
-                      ? "Premium deneyimi aç"
-                      : "Unlock Premium"}
+                      ? `${AI_PLAN_LIMITS.premium.daily}/gün · ${AI_PLAN_LIMITS.premium.monthly}/ay`
+                      : `${AI_PLAN_LIMITS.premium.daily}/day · ${AI_PLAN_LIMITS.premium.monthly}/month`}
                   </Text>
                   <View
                     style={[
@@ -1534,8 +1523,8 @@ export default function PremiumScreen() {
                             : "Manage subscription"
                           : selectedTier === PREMIUM_PLAN.UNLIMITED
                           ? tr
-                            ? "Unlimited'a geç"
-                            : "Upgrade to Unlimited"
+                            ? "Premium Max'e geç"
+                            : "Upgrade to Premium Max"
                           : tr
                           ? "Premium'a geç"
                           : "Upgrade to Premium"}

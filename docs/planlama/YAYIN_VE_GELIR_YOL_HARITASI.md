@@ -201,29 +201,26 @@ Sosyal özellik kilitlemek ağ etkisini öldürür.
 
 **Seelogd Premium içeriği:**
 
-| Kategori | Özellik                                                                                                 |
-| -------- | ------------------------------------------------------------------------------------------------------- |
-| Konfor   | Reklamsız deneyim                                                                                       |
-| AI       | AI sohbet: free 5 mesaj/gün → premium 100/gün (sunucu tarafı kota — Faz 0 proxy'si bunu mümkün kılıyor) |
-| İçgörü   | Gelişmiş istatistikler, tüm-zamanlar Wrapped, CSV/dışa aktarım                                          |
-| Kimlik   | Özel temalar + custom theme, premium pet kostümleri, profil rozeti, özel avatar çerçeveleri             |
-| Oyun     | Premium oyun modları/kaynakları, gelişmiş başarım takibi                                                |
-| Güç      | Sınırsız liste/not/hatırlatıcı (free: örn. 5 liste, 50 hatırlatıcı)                                     |
+| Kategori | Özellik                                                                 |
+| -------- | ----------------------------------------------------------------------- |
+| AI       | Free 5/gün–30/ay; Premium 20/gün–300/ay; Premium Max 50/gün–900/ay     |
+| Kimlik   | Premium ve Premium Max planlarına özel profil kimlik rozeti             |
 
-Mevcut kod tabanı için iyi haber: temalar, pet, oyun modları, Wrapped ve AI zaten
-var — **premium paket %80 hazır, sadece kapı (entitlement) eklenecek.**
+Tema, istatistik, Wrapped, oyun, liste, not ve hatırlatıcılar bu sürümde ücretli
+plan vaadi değildir. İleride ücretli fark olarak eklenecekse önce gerçek yetki
+kapısı ve testi tamamlanmalı, ardından mağaza ve uygulama metnine eklenmelidir.
 
 ### 2.2 Fiyatlandırma
 
 Hedef kitle TR + EN → **bölgesel fiyatlandırma şart** (Türkiye'de küresel fiyat
 satmaz; küresel pazarda TR fiyatı para bırakır).
 
-| Plan                |              Türkiye | Global (ABD baz) | Not                                              |
-| ------------------- | -------------------: | ---------------: | ------------------------------------------------ |
-| Premium aylık       |               ₺79,99 |            $3.99 | 100 CineMatch AI mesajı/gün + Premium özellikler |
-| Premium yıllık ⭐   |    ₺599,99 (≈₺50/ay) |           $29.99 | Aylık ödemeye göre yaklaşık %37 avantaj          |
-| Unlimited aylık     |              ₺159,99 |            $7.99 | Sınırsız AI + sınırsız güç özellikleri           |
-| Unlimited yıllık ⭐ | ₺1.199,99 (≈₺100/ay) |           $59.99 | Aylık ödemeye göre yaklaşık %37 avantaj          |
+| Plan                  |              Türkiye | Global (ABD baz) | Not                                     |
+| --------------------- | -------------------: | ---------------: | --------------------------------------- |
+| Premium aylık         |               ₺79,99 |            $3.99 | 20/gün ve 300/ay CineMatch AI mesajı    |
+| Premium yıllık ⭐     |    ₺599,99 (≈₺50/ay) |           $29.99 | Aylık ödemeye göre yaklaşık %37 avantaj |
+| Premium Max aylık     |              ₺159,99 |            $7.99 | 50/gün ve 900/ay CineMatch AI mesajı    |
+| Premium Max yıllık ⭐ | ₺1.199,99 (≈₺100/ay) |           $59.99 | Aylık ödemeye göre yaklaşık %37 avantaj |
 
 - Mağaza komisyonu: iki mağazada da küçük işletme programıyla **%15** → net ~%85.
 - İlk fiyat testi bu dört mağaza fiyatıyla başlatılır; kampanya/deneme uygulanacaksa
@@ -455,14 +452,14 @@ aylığa bölünmüş, mağaza kesintisi düşülmüş).
       modülleri içinde.)_ **KALAN (manuel):** ④ Firebase Console →
       Analytics'te DebugView ile olayları doğrula.)_
 - [x] Google Play Console hesabı _(29 Tem — developer hesabı AÇILDI)_
-      — [ ] ürün kaydı; IAP ürünlerinin tanımı (Pro/Unlimited abonelikleri,
+      — [ ] ürün kaydı; IAP ürünlerinin tanımı (Premium/Premium Max abonelikleri,
       TR+global fiyat; RevenueCat panel bağlantısı + webhook yapılandırması
       bununla birlikte)
 
 **Hafta 5–6 (3–16 Ağu)**
 
 - [x] RevenueCat entegrasyonu — KOD tarafı _(erken bitti, commit 2b77a93:
-      `services/revenueCatService.js`, Pro/Unlimited akışı. KALAN: Play
+      `services/revenueCatService.js`, Premium/Premium Max akışı. KALAN: Play
       Console'da abonelik ürünlerinin tanımı (TR+global fiyat) + RevenueCat
       panelinde Play service credentials bağlanması — Play Console hesabı
       ön koşul)_

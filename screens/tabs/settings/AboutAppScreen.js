@@ -144,8 +144,8 @@ export default function AboutAppScreen() {
         ? "Seelogd Premium avantajları nelerdir?"
         : "What are Seelogd Premium benefits?",
       a: isTr
-        ? "Premium üyeler; reklamsız deneyim, özel altın profil kartları, sınırsız AI SineKayıt önerileri, özel rozetler ve detaylı izleme analitiği elde eder."
-        : "Premium members enjoy an ad-free experience, exclusive gold profile styling, unlimited AI recommendations, custom badges, and advanced analytics.",
+        ? "Premium üyeliği CineMatch AI için günde 20, ayda 300 mesaj; Premium Max ise günde 50, ayda 900 mesaj ve plana özel profil kimlik rozeti sunar."
+        : "Premium includes 20 CineMatch AI messages per day and 300 per month; Premium Max includes 50 per day, 900 per month, and a plan-specific profile identity badge.",
       icon: "star-outline",
     },
     {

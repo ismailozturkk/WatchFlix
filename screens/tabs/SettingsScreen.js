@@ -49,6 +49,7 @@ import TmdbLogo from "../../components/TmdbLogo";
 import JustWatchLogo from "../../components/JustWatchLogo";
 import { getCachedValue, setCachedValue, TTL } from "../../utils/apiCache";
 import { usePremium } from "../../context/PremiumContext";
+import { getPremiumPlanDisplayName, PREMIUM_PLAN } from "../../utils/premium";
 import {
   DATA_TYPE_COUNT,
   buildAllTypes,
@@ -795,7 +796,9 @@ export default function SettingsScreen() {
               <View style={s.premiumHeaderCopy}>
                 <Text style={[s.premiumEyebrow, { color: C.purple }]}>SEELOGD</Text>
                 <Text style={[s.premiumTitle, { color: C.text }]}>
-                  {isUnlimited ? "Premium Unlimited" : "Premium"}
+                  {getPremiumPlanDisplayName(
+                    isUnlimited ? PREMIUM_PLAN.UNLIMITED : PREMIUM_PLAN.PREMIUM
+                  )}
                 </Text>
               </View>
               {premiumLoading ? (
@@ -820,7 +823,7 @@ export default function SettingsScreen() {
                     ]}
                   >
                     {isUnlimited
-                      ? "UNLIMITED"
+                      ? "PREMIUM MAX"
                       : isPremium
                         ? i18nText("autoI18n.aktif_upper", "AKTİF")
                         : "FREE"}
@@ -833,10 +836,10 @@ export default function SettingsScreen() {
               {premiumLoading
                 ? i18nText("autoI18n.uyelik_kontrol_ediliyor", "Üyelik durumun kontrol ediliyor…")
                 : isUnlimited
-                  ? i18nText("autoI18n.unlimited_aciklamasi", "Sınırsız CineMatch AI ve tüm premium ayrıcalıklar açık.")
+                  ? i18nText("autoI18n.unlimited_aciklamasi", "Premium Max aktif: günde 50, ayda 900 CineMatch AI mesajı.")
                   : isPremium
-                    ? i18nText("autoI18n.premium_aciklamasi", "Premium özelliklerin açık. Unlimited ile sınırları kaldır.")
-                    : i18nText("autoI18n.free_plan_aciklamasi", "Daha fazla AI, gelişmiş istatistikler ve özel deneyim.")}
+                    ? i18nText("autoI18n.premium_aciklamasi", "Premium aktif: günde 20, ayda 300 CineMatch AI mesajı. Premium Max ile daha yüksek limite geç.")
+                    : i18nText("autoI18n.free_plan_aciklamasi", "Free planda günde 5, ayda 30 CineMatch AI mesajı. Daha yüksek limitler için planları incele.")}
             </Text>
 
             <View style={s.premiumFooter}>

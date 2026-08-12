@@ -82,6 +82,7 @@ import ChatBubble from "@components/AICineCards";
 import { i18nText } from "@utils/i18nText";
 import { appAlert } from "@components/AppAlert";
 import { ONBOARDING_GENRES } from "@utils/onboardingPreferences";
+import { AI_PLAN_LIMITS } from "@utils/premium";
 
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
@@ -103,11 +104,6 @@ const DEFAULT_PREFS = {
   mediaType: "all",
   providerIds: [],
   genreKeys: [],
-};
-const AI_PLAN_LIMITS = {
-  free: { daily: 5, monthly: 30 },
-  premium: { daily: 20, monthly: 300 },
-  unlimited: { daily: 50, monthly: 900 },
 };
 const LIST_TOGGLES = [
   ["watchList", "listWatchList"],
