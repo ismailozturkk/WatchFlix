@@ -1,7 +1,7 @@
 // screens/chat/GroupsListScreen.js
 //
 // Kullanıcının gruplarını listeler; satıra basınca ChatScreen'i grup modunda
-// açar. Üstte "Yeni Grup" aksiyonu CreateGroupScreen'e gider.
+// açar. Yeni grup aksiyonu listeyi kapatmayan sağ-alt FAB üzerinden açılır.
 
 import React, { useEffect, useState } from "react";
 import {
@@ -18,6 +18,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import BackButton from "@components/BackButton";
 import ScreenDecor from "@components/ScreenDecor";
 import GroupAvatar from "@components/chat/GroupAvatar";
+import ChatCreateFab from "@components/chat/ChatCreateFab";
 import { i18nText } from "@utils/i18nText";
 import { subscribeUserGroups } from "@services/groupsService";
 
@@ -49,6 +50,8 @@ export default function GroupsListScreen({ navigation }) {
 
   const renderGroup = ({ item }) => {
     const last = item.lastMessage;
+    const lastSenderName =
+      item.memberInfo?.[last?.senderId]?.name || last?.senderName || "";
     return (
       <TouchableOpacity
         activeOpacity={0.8}
@@ -80,7 +83,7 @@ export default function GroupsListScreen({ navigation }) {
           </View>
           <Text style={[styles.gLast, { color: theme.text?.secondary ?? "#aaa" }]} numberOfLines={1}>
             {last
-              ? (last.senderName ? last.senderName + ": " : "") + (last.text || "")
+              ? (lastSenderName ? lastSenderName + ": " : "") + (last.text || "")
               : i18nText("autoI18n.n_uye", "{{n}} üye", { n: item.members?.length || 0 })}
           </Text>
         </View>
@@ -101,14 +104,6 @@ export default function GroupsListScreen({ navigation }) {
         >
           {i18nText("autoI18n.gruplar", "Gruplar")}
         </Text>
-        <TouchableOpacity
-          onPress={() => navigation.navigate("CreateGroupScreen")}
-          style={[styles.newBtn, { backgroundColor: theme.accent }]}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="add" size={20} color="#fff" />
-          <Text style={styles.newBtnText}>{i18nText("autoI18n.yeni", "Yeni")}</Text>
-        </TouchableOpacity>
       </View>
 
       {groups.length === 0 ? (
@@ -123,10 +118,15 @@ export default function GroupsListScreen({ navigation }) {
           data={groups}
           keyExtractor={(it) => it.id}
           renderItem={renderGroup}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 30 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
         />
       )}
+      <ChatCreateFab
+        icon="people"
+        label={i18nText("autoI18n.yeni_grup", "Yeni Grup")}
+        onPress={() => navigation.navigate("CreateGroupScreen")}
+      />
     </SafeAreaView>
   );
 }
@@ -144,16 +144,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   title: { flex: 1, fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
-  newBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 14,
-  },
-  newBtnText: { color: "#fff", fontSize: 13.5, fontWeight: "800" },
-
   row: {
     flexDirection: "row",
     alignItems: "center",

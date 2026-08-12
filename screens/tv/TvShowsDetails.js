@@ -17,10 +17,10 @@ import {
   StatusBar,
   Modal,
   Animated,
-  Platform,
     Linking,
   FlatList,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -64,6 +64,7 @@ import { i18nText } from "../../utils/i18nText";
 import { useWatchedShow } from "../../hooks/useWatchedShow";
 import { markShow, removeTvWatchEvent } from "../../services/watchedTvService";
 import AIChatScreen from "@screens/chat/AIChatScreen";
+import NewConversationSheet from "@components/chat/NewConversationSheet";
 import {
   getWatchState,
   isAired,
@@ -71,20 +72,11 @@ import {
   watchStateColor,
 } from "../../utils/watchState";
 import Reminder from "../../components/Reminder";
+import WatchProgressBar from "../../components/tv/WatchProgressBar";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 
 const { height, width } = Dimensions.get("window");
 const BACKDROP_HEIGHT = width * (9 / 16);
-
-// İlerleme çubuğundaki etiketler tek renk (beyaz) + hafif koyu bir hap zemini
-// kullanıyor. Renk seçimi ÖLÇÜME bağlı değil: eskiden yazı, altındaki gradyanın
-// rengine göre siyah/beyaz seçiliyordu ve ölçüm ilk karede gelmediği için ekrana
-// girerken renk gözle görülür şekilde atlıyordu. Hap zemini o kararı gereksiz
-// kılıyor — kontrastı arka plan sağlıyor, yazı sabit kalıyor.
-// rgba(0,0,0,0.5): 7 temanın hepsinde, gradyanın her noktasında ve boş kanalda
-// beyaz yazıyla en kötü 4.92:1 (AA >= 4.5). Daha şeffafı yetmiyor: 0.45'te en
-// parlak dolguda (izlendi yeşili #64FF64) 4.23:1'e düşüyor.
-const PROGRESS_CHIP_BG = "rgba(0, 0, 0, 0.5)";
-const PROGRESS_CHIP_TEXT = "#FFFFFF";
 
 // Fragman oynatıcısı: 16:9 oranını koruyarak cihaza göre boyutlanır
 // (tablette aşırı genişlememesi için üst sınır var).
@@ -114,6 +106,7 @@ const RecommendedTvShow = memo(function RecommendedTvShow({
 }) {
   const { getTmdbUrl } = useImageQualitySettings();
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
 
   const onPressIn = () =>
@@ -137,6 +130,10 @@ const RecommendedTvShow = memo(function RecommendedTvShow({
         activeOpacity={0.9}
         style={styles.railItem}
         onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
+        onLongPress={() =>
+          openQuickActions({ item, mediaType: "tv", navigation })
+        }
+        delayLongPress={350}
       >
         <PosterImage
           path={item.poster_path}
@@ -176,6 +173,7 @@ const RecommendedTvShow = memo(function RecommendedTvShow({
 
 /* ─── Ana bileşen ── */
 export default function TvShowsDetails({ route, navigation }) {
+  const insets = useSafeAreaInsets();
   // openComments / commentScope: "Etkinliklerim → Yorumlarım" satırından
   // gelindiğinde yorum sayfası doğrudan o yorumun kapsamında (dizi/sezon/bölüm)
   // açılır — kullanıcı kendi yorumunu aramak zorunda kalmasın.
@@ -232,6 +230,7 @@ export default function TvShowsDetails({ route, navigation }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [watchHistoryVisible, setWatchHistoryVisible] = useState(false);
   const [aiVisible, setAiVisible] = useState(false);
+  const [sendVisible, setSendVisible] = useState(false);
 
   /* ── Format helpers ── */
   const formatDate = (ts) => {
@@ -373,7 +372,6 @@ export default function TvShowsDetails({ route, navigation }) {
     showTotalEpisodes > 0
       ? Math.min(1, watchedEpisodeCount / showTotalEpisodes)
       : 0;
-  const showProgressPercent = Math.round(isSeasonWatched * 100);
 
   /* ── updateTvSeriesList ── */
   const updateTvSeriesList = async (listType, type) => {
@@ -610,6 +608,43 @@ export default function TvShowsDetails({ route, navigation }) {
     });
   }, [details, getTmdbUrl, id, navigation]);
 
+  const chatMedia = useMemo(() => {
+    if (!details?.id) return null;
+    return {
+      id: details.id,
+      media_type: "tv",
+      title: details.name || "",
+      poster_path: details.poster_path || null,
+      vote_average: details.vote_average ?? null,
+      vote_count: details.vote_count ?? null,
+      overview: details.overview || null,
+      release_date: details.first_air_date || null,
+    };
+  }, [details]);
+
+  const sendToRecipient = useCallback((recipient) => {
+    if (!chatMedia || !recipient) return;
+    const sharedParams = {
+      initialMedia: chatMedia,
+      initialMediaKey: `tv-${chatMedia.id}-${Date.now()}`,
+    };
+    if (recipient.recipientType === "group") {
+      navigation.navigate("ChatScreen", {
+        groupId: recipient.id,
+        groupName: recipient.name,
+        groupAvatarIndex: recipient.avatarIndex,
+        ...sharedParams,
+      });
+      return;
+    }
+    navigation.navigate("ChatScreen", {
+      friendUid: recipient.uid,
+      friendName: recipient.name,
+      friendAvatarIndex: recipient.avatarIndex,
+      ...sharedParams,
+    });
+  }, [chatMedia, navigation]);
+
   const aiPrompt = useMemo(() => {
     if (!details?.name) return "";
     const year = details.first_air_date
@@ -636,8 +671,20 @@ export default function TvShowsDetails({ route, navigation }) {
       year: details.first_air_date ? String(details.first_air_date).slice(0, 4) : "",
       posterPath: details.poster_path || "",
       rating: details.vote_average || 0,
+      originalTitle: details.original_name || details.name,
+      overview: details.overview || "",
+      genres: details.genres?.map((genre) => genre.name).filter(Boolean) || [],
+      cast: details.credits?.cast?.slice(0, 8).map((person) => person.name).filter(Boolean) || [],
+      director:
+        details.created_by?.[0]?.name ||
+        details.credits?.crew?.find((person) => person.job === "Director")?.name ||
+        "",
+      providers:
+        details["watch/providers"]?.results?.[providerRegion]?.flatrate
+          ?.map((provider) => provider.provider_name)
+          .filter(Boolean) || [],
     };
-  }, [details, id]);
+  }, [details, id, providerRegion]);
 
   // Oyuncu kartı — MovieDetail.renderCastMember ile birebir aynı yapı.
   const renderCastMember = useCallback(
@@ -882,54 +929,14 @@ export default function TvShowsDetails({ route, navigation }) {
                 genres: details.genres?.map((g) => g.name) || [],
               }}
             />
-            {showTotalEpisodes > 0 && (
-              <View
-                style={[
-                  styles.showProgressTrack,
-                  { backgroundColor: theme.border },
-                ]}
-              >
-                {showProgressPercent > 0 && (
-                  <View
-                    style={[
-                      styles.showProgressFill,
-                      { width: `${showProgressPercent}%` },
-                    ]}
-                  >
-                    <LinearGradient
-                      colors={[watchedColor, theme.accent]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={StyleSheet.absoluteFill}
-                    />
-                  </View>
-                )}
-
-                <View pointerEvents="none" style={styles.showProgressLabelRow}>
-                  <View style={styles.showProgressChip}>
-                    <Text
-                      allowFontScaling={false}
-                      style={styles.showProgressCount}
-                    >
-                      <Text style={styles.showProgressCountValue}>
-                        {watchedEpisodeCount}
-                      </Text>
-                      {" / "}
-                      {showTotalEpisodes}{" "}
-                      {i18nText("autoI18n.bolum_birim", "bölüm")}
-                    </Text>
-                  </View>
-                  <View style={styles.showProgressChip}>
-                    <Text
-                      allowFontScaling={false}
-                      style={styles.showProgressPercentText}
-                    >
-                      {showProgressPercent}%
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
+            <WatchProgressBar
+              watched={watchedEpisodeCount}
+              total={showTotalEpisodes}
+              startColor={watchedColor}
+              endColor={theme.accent}
+              trackColor={theme.border}
+              style={styles.showProgressTrack}
+            />
           </View>
 
           <View style={styles.detailActionRow}>
@@ -1015,6 +1022,32 @@ export default function TvShowsDetails({ route, navigation }) {
                   numberOfLines={1}
                 >
                   {i18nText("autoI18n.bilgi_al", "Bilgi al")}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.88}
+              onPress={() => setSendVisible(true)}
+              style={[
+                styles.detailActionBtn,
+                { backgroundColor: theme.secondary, borderColor: theme.border },
+              ]}
+            >
+              <View
+                style={[
+                  styles.detailActionIcon,
+                  { backgroundColor: (theme.colors?.green || "#3CCB9A") + "20" },
+                ]}
+              >
+                <Ionicons name="paper-plane-outline" size={17} color={theme.colors?.green || "#3CCB9A"} />
+              </View>
+              <View style={styles.detailActionCopy}>
+                <Text allowFontScaling={false} style={[styles.detailActionTitle, { color: theme.text.primary }]}>
+                  {i18nText("autoI18n.gonder", "Gönder")}
+                </Text>
+                <Text allowFontScaling={false} style={[styles.detailActionSub, { color: theme.text.muted }]} numberOfLines={1}>
+                  {i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -1441,7 +1474,12 @@ export default function TvShowsDetails({ route, navigation }) {
           )}
 
           {/* ── VİDEOLAR ── */}
-          <TrailerSection mediaType="tv" id={id} apiKey={API_KEY} />
+          <TrailerSection
+            mediaType="tv"
+            id={id}
+            apiKey={API_KEY}
+            originalLanguage={details.original_language}
+          />
 
           {/* ── OYUNCULAR (ana kadro) ── */}
           {details.credits?.cast?.length > 0 && (
@@ -1625,7 +1663,7 @@ export default function TvShowsDetails({ route, navigation }) {
 
       {/* ─── ÜST OVERLAY BUTONLARI (her zaman tıklanabilir) ─── */}
       <TouchableOpacity
-        style={styles.backBtn}
+        style={[styles.backBtn, { top: insets.top + 8 }]}
         onPress={() => navigation.goBack()}
         activeOpacity={0.8}
       >
@@ -1635,7 +1673,7 @@ export default function TvShowsDetails({ route, navigation }) {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={styles.storyBtn}
+        style={[styles.storyBtn, { top: insets.top + 8 }]}
         onPress={() =>
           navigation.navigate("StoryShareScreen", {
             id,
@@ -1755,6 +1793,14 @@ export default function TvShowsDetails({ route, navigation }) {
         initialDisplay={aiDisplay}
         initialAttachment={aiAttachment}
       />
+      <NewConversationSheet
+        visible={sendVisible}
+        onClose={() => setSendVisible(false)}
+        onSelect={sendToRecipient}
+        includeGroups
+        title={i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
+        subtitle={i18nText("autoI18n.gonderilecek_kisiyi_veya_grubu_sec", "Göndermek istediğin arkadaşını veya grubu seç")}
+      />
     </View>
   );
 }
@@ -1801,14 +1847,12 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 52 : 36,
     left: 16,
     zIndex: 50,
     elevation: 50,
   },
   storyBtn: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 52 : 36,
     right: 16,
     zIndex: 50,
     elevation: 50,
@@ -1878,44 +1922,6 @@ const styles = StyleSheet.create({
   listActionsBlock: { marginBottom: 10 },
   showProgressTrack: {
     marginTop: -4,
-    height: 24,
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-  showProgressFill: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-  showProgressLabelRow: {
-    ...StyleSheet.absoluteFillObject,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 5,
-  },
-  // Hap zemini: kontrastı bu sağlıyor, yazı rengi bu yüzden sabit kalabiliyor.
-  showProgressChip: {
-    backgroundColor: PROGRESS_CHIP_BG,
-    paddingHorizontal: 7,
-    paddingVertical: 1,
-    borderRadius: 9,
-  },
-  showProgressCount: {
-    fontSize: 11,
-    lineHeight: 15,
-    fontWeight: "700",
-    color: PROGRESS_CHIP_TEXT,
-  },
-  showProgressCountValue: { fontSize: 12.5, fontWeight: "900" },
-  showProgressPercentText: {
-    fontSize: 12,
-    lineHeight: 15,
-    fontWeight: "900",
-    color: PROGRESS_CHIP_TEXT,
   },
 
   /* Stat row */
@@ -1943,30 +1949,31 @@ const styles = StyleSheet.create({
 
   detailActionRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: 8,
     marginBottom: 16,
   },
   detailActionBtn: {
     flex: 1,
-    minHeight: 64,
-    borderRadius: 16,
+    minWidth: 0,
+    minHeight: 70,
+    borderRadius: 14,
     borderWidth: 1,
-    paddingHorizontal: 11,
-    paddingVertical: 10,
-    flexDirection: "row",
+    paddingHorizontal: 5,
+    paddingVertical: 7,
     alignItems: "center",
-    gap: 9,
+    justifyContent: "center",
+    gap: 4,
   },
   detailActionIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 30,
+    height: 30,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  detailActionCopy: { flex: 1, minWidth: 0 },
-  detailActionTitle: { fontSize: 13.5, fontWeight: "800" },
-  detailActionSub: { fontSize: 11, fontWeight: "700", marginTop: 2 },
+  detailActionCopy: { minWidth: 0, alignItems: "center" },
+  detailActionTitle: { fontSize: 11.5, fontWeight: "800", textAlign: "center" },
+  detailActionSub: { fontSize: 9.5, fontWeight: "700", marginTop: 1, textAlign: "center" },
 
   /* Sections */
   section: { marginBottom: 28 },

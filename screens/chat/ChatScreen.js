@@ -40,7 +40,6 @@ import { getAuth } from "firebase/auth";
 import {
   collection,
   doc,
-  getDoc,
   addDoc,
   onSnapshot,
   orderBy,
@@ -68,6 +67,7 @@ import {
 import * as Haptics from "@services/hapticsService";
 import { useLanguage } from "@context/LanguageContext";
 import { useProfileUi } from "@context/ProfileUiContext";
+import { useUserProfile } from "@context/UserProfileContext";
 import { createSocialNotification } from "@services/socialNotificationsService";
 import {
   subscribeToUserPresence,
@@ -136,6 +136,7 @@ const ACCENT_SOFT = "rgba(108,99,255,0.15)";
 const SEEN_COLOR = "#5EE8A0";
 const DANGER = "#FF6B6B";
 const EDIT_COLOR = "#4FC3F7";
+const LATEST_MESSAGE_BUTTON_THRESHOLD = 420;
 
 // ─── Tarih yardımcıları (mesaj gruplama + gün ayracı) ───────────────────────
 const tsToDate = (ts) => {
@@ -537,6 +538,8 @@ export default function ChatScreen({ route, navigation }) {
     groupId,
     groupName,
     groupAvatarIndex,
+    initialMedia,
+    initialMediaKey,
   } = route.params;
   const isGroup = !!groupId;
   const auth = getAuth();
@@ -550,7 +553,18 @@ export default function ChatScreen({ route, navigation }) {
   const { adultContent } = useContentSettings();
   const { block, isBlocked } = useFriends();
   const { selectAvatarIndex, avatars } = useProfileUi();
+  const {
+    displayName: profileDisplayName,
+    username: profileUsername,
+    avatarIndex: profileAvatarIndex,
+  } = useUserProfile();
   const [groupData, setGroupData] = useState(null); // grup modunda doc
+  const [friendIdentity, setFriendIdentity] = useState(() => ({
+    displayName: friendName || "",
+    username: "",
+    avatarIndex:
+      typeof friendAvatarIndex === "number" ? friendAvatarIndex : 0,
+  }));
   const { getTmdbUrl } = useImageQualitySettings();
   const [editingMessage, setEditingMessage] = useState(null);
   const [text, setText] = useState("");
@@ -634,7 +648,25 @@ export default function ChatScreen({ route, navigation }) {
   const highlightTimerRef = useRef(null);
   const pendingJumpIdRef = useRef(null);
   const [composerTransitioning, setComposerTransitioning] = useState(false);
+  const [showLatestMessageButton, setShowLatestMessageButton] = useState(false);
+  const [composerHeight, setComposerHeight] = useState(76);
+  const latestButtonVisibleRef = useRef(false);
+  const handledInitialMediaRef = useRef(null);
   const { theme } = useTheme();
+
+  const handleMessageListScroll = useCallback((event) => {
+    const nextVisible =
+      (event?.nativeEvent?.contentOffset?.y || 0) > LATEST_MESSAGE_BUTTON_THRESHOLD;
+    if (latestButtonVisibleRef.current === nextVisible) return;
+    latestButtonVisibleRef.current = nextVisible;
+    setShowLatestMessageButton(nextVisible);
+  }, []);
+
+  const scrollToLatestMessage = useCallback(() => {
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    latestButtonVisibleRef.current = false;
+    setShowLatestMessageButton(false);
+  }, []);
 
   // React Native Modal ayrı bir native PENCEREDE açılır; useAnimatedKeyboard
   // ana pencerenin insets animasyonuna bağlı olduğundan modal açıkken değeri
@@ -953,6 +985,7 @@ export default function ChatScreen({ route, navigation }) {
     // Grup: doc'u dinle (header + memberInfo). 1-1: typing + presence.
     let unsubMeta = () => {};
     let unsubPresence = () => {};
+    let unsubFriendProfile = () => {};
     let unsubGroup = () => {};
     if (isGroup) {
       unsubGroup = subscribeGroup(groupId, (g) => setGroupData(g));
@@ -983,15 +1016,27 @@ export default function ChatScreen({ route, navigation }) {
           friendPresence: hidden ? null : lastPresence,
         }));
       };
-      getDoc(doc(db, "Users", friendUid))
-        .then((snap) => {
-          friendPrivacy = snap.data()?.privacy || null;
-        })
-        .catch(() => {})
-        .finally(() => {
+      unsubFriendProfile = onSnapshot(
+        doc(db, "Users", friendUid),
+        (snap) => {
+          const data = snap.data() || {};
+          friendPrivacy = data.privacy || null;
+          setFriendIdentity((prev) => ({
+            displayName: data.displayName || prev.displayName,
+            username: data.username || "",
+            avatarIndex:
+              typeof data.avatarIndex === "number"
+                ? data.avatarIndex
+                : prev.avatarIndex,
+          }));
           privacyReady = true;
           applyPresence();
-        });
+        },
+        () => {
+          privacyReady = true;
+          applyPresence();
+        },
+      );
       unsubPresence = subscribeToUserPresence(friendUid, (presence) => {
         lastPresence = presence;
         applyPresence();
@@ -1002,6 +1047,7 @@ export default function ChatScreen({ route, navigation }) {
       unsubscribeMessages();
       unsubMeta();
       unsubPresence();
+      unsubFriendProfile();
       unsubGroup();
     };
   }, [isGroup, groupId, chatId, friendUid, messageLimit]);
@@ -1071,18 +1117,23 @@ export default function ChatScreen({ route, navigation }) {
     () =>
       isGroup
         ? {
-            senderName: currentUser.displayName || "",
+            senderName: profileDisplayName || currentUser.displayName || "",
+            senderUsername: profileUsername || "",
             senderAvatarIndex:
-              typeof selectAvatarIndex === "number" ? selectAvatarIndex : 0,
+              typeof profileAvatarIndex === "number"
+                ? profileAvatarIndex
+                : typeof selectAvatarIndex === "number"
+                  ? selectAvatarIndex
+                  : 0,
           }
         : {},
-    [isGroup, currentUser.displayName, selectAvatarIndex],
+    [isGroup, currentUser.displayName, profileDisplayName, profileUsername, profileAvatarIndex, selectAvatarIndex],
   );
 
   const resolveSenderName = useCallback(
     (message) => {
       if (message?.senderId === currentUser.uid) {
-        return currentUser.displayName || i18nText("autoI18n.sen", "Sen");
+        return profileDisplayName || currentUser.displayName || i18nText("autoI18n.sen", "Sen");
       }
       if (isGroup) {
         return (
@@ -1091,9 +1142,9 @@ export default function ChatScreen({ route, navigation }) {
           i18nText("autoI18n.uye", "Üye")
         );
       }
-      return friendName || i18nText("autoI18n.arkadas", "Arkadaş");
+      return friendIdentity.displayName || friendName || i18nText("autoI18n.arkadas", "Arkadaş");
     },
-    [currentUser.uid, currentUser.displayName, isGroup, groupData?.memberInfo, friendName],
+    [currentUser.uid, currentUser.displayName, profileDisplayName, isGroup, groupData?.memberInfo, friendIdentity.displayName, friendName],
   );
 
   const beginReply = useCallback(
@@ -1147,7 +1198,7 @@ export default function ChatScreen({ route, navigation }) {
           preview: messagePreview(message),
           kind: message.kind || (message.media ? "media" : "text"),
           pinnedBy: currentUser.uid,
-          pinnedByName: currentUser.displayName || i18nText("autoI18n.bir_uye", "Bir üye"),
+          pinnedByName: profileDisplayName || currentUser.displayName || i18nText("autoI18n.bir_uye", "Bir üye"),
           pinnedAt: serverTimestamp(),
         });
         toast.success(i18nText("autoI18n.mesaj_sabitlendi", "Mesaj sabitlendi"));
@@ -1167,6 +1218,7 @@ export default function ChatScreen({ route, navigation }) {
       resolveSenderName,
       currentUser.uid,
       currentUser.displayName,
+      profileDisplayName,
     ],
   );
 
@@ -1192,7 +1244,11 @@ export default function ChatScreen({ route, navigation }) {
   const finalizeThread = useCallback(
     async (previewText) => {
       const fromAvatarIndex =
-        typeof selectAvatarIndex === "number" ? selectAvatarIndex : 0;
+        typeof profileAvatarIndex === "number"
+          ? profileAvatarIndex
+          : typeof selectAvatarIndex === "number"
+            ? selectAvatarIndex
+            : 0;
       if (isGroup) {
         await setDoc(
           chatRef,
@@ -1200,7 +1256,8 @@ export default function ChatScreen({ route, navigation }) {
             lastMessage: {
               text: previewText,
               senderId: currentUser.uid,
-              senderName: currentUser.displayName || "",
+              senderName: profileDisplayName || currentUser.displayName || "",
+              senderUsername: profileUsername || "",
               time: serverTimestamp(),
             },
             updatedAt: serverTimestamp(),
@@ -1214,7 +1271,7 @@ export default function ChatScreen({ route, navigation }) {
           createSocialNotification({
             toUid: uid,
             fromUid: currentUser.uid,
-            fromName: currentUser.displayName || "",
+            fromName: profileDisplayName || currentUser.displayName || "",
             fromAvatarIndex,
             type: "message",
             text: previewText,
@@ -1226,7 +1283,7 @@ export default function ChatScreen({ route, navigation }) {
         createSocialNotification({
           toUid: friendUid,
           fromUid: currentUser.uid,
-          fromName: currentUser.displayName || "",
+          fromName: profileDisplayName || currentUser.displayName || "",
           fromAvatarIndex,
           type: "message",
           text: previewText,
@@ -1248,22 +1305,33 @@ export default function ChatScreen({ route, navigation }) {
           { merge: true },
         );
         // Gelen kutusu index'i (iki taraf) — Mesajlar ekranı bunu listeler.
-        const convEntry = (withUid, withName, withAvatarIndex) => ({
+        const convEntry = (withUid, withName, withUsername, withAvatarIndex) => ({
           withUid,
           withName: withName || "",
+          withUsername: withUsername || "",
           ...(typeof withAvatarIndex === "number" ? { withAvatarIndex } : {}),
           lastText: previewText,
           lastTime: serverTimestamp(),
         });
         setDoc(
           doc(db, "Users", currentUser.uid, "conversations", friendUid),
-          convEntry(friendUid, friendName, friendAvatarIndex),
+          convEntry(
+            friendUid,
+            friendIdentity.displayName || friendName,
+            friendIdentity.username,
+            friendIdentity.avatarIndex,
+          ),
           { merge: true },
         ).catch(() => {});
         setDoc(
           doc(db, "Users", friendUid, "conversations", currentUser.uid),
           {
-            ...convEntry(currentUser.uid, currentUser.displayName, fromAvatarIndex),
+            ...convEntry(
+              currentUser.uid,
+              profileDisplayName || currentUser.displayName,
+              profileUsername,
+              fromAvatarIndex,
+            ),
             // Alıcı sohbeti açana dek biriken okunmamış sayacı; alıcının
             // ChatScreen'i sohbet açıkken sıfırlar.
             unreadCount: increment(1),
@@ -1277,11 +1345,15 @@ export default function ChatScreen({ route, navigation }) {
       chatRef,
       currentUser.uid,
       currentUser.displayName,
+      profileDisplayName,
+      profileUsername,
+      profileAvatarIndex,
       selectAvatarIndex,
       groupData,
       friendUid,
       friendName,
       friendAvatarIndex,
+      friendIdentity,
     ],
   );
 
@@ -1941,15 +2013,70 @@ export default function ChatScreen({ route, navigation }) {
     resetCompose,
   ]);
 
-  const friendInitial = friendName ? friendName.charAt(0).toUpperCase() : "?";
+  // Detay ekranındaki "Gönder" akışı da sohbet aramasının ürettiği tekli
+  // media mesajıyla aynı şemayı kullanır. Grup üyeleri yüklenmeden göndermeyiz;
+  // aksi halde mesaj gider fakat diğer üyelere bildirim oluşturulamaz.
+  useEffect(() => {
+    if (!initialMedia?.id || !initialMediaKey) return;
+    if (handledInitialMediaRef.current === initialMediaKey) return;
+    if (isGroup && !groupData) return;
+
+    handledInitialMediaRef.current = initialMediaKey;
+    navigation.setParams({ initialMedia: undefined, initialMediaKey: undefined });
+
+    const sendInitialMedia = async () => {
+      const previewText = initialMedia.title || i18nText("autoI18n.icerik", "İçerik");
+      try {
+        await addDoc(messagesRef, {
+          text: previewText,
+          senderId: currentUser.uid,
+          timestamp: serverTimestamp(),
+          status: "sent",
+          ...senderFields(),
+          media: initialMedia,
+        });
+        await finalizeThread(previewText);
+      } catch (error) {
+        console.error("detailMediaSend:", error);
+        appAlert(
+          i18nText("autoI18n.hata", "Hata"),
+          i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."),
+        );
+      }
+    };
+
+    sendInitialMedia();
+  }, [
+    currentUser.uid,
+    finalizeThread,
+    groupData,
+    initialMedia,
+    initialMediaKey,
+    isGroup,
+    messagesRef,
+    navigation,
+    senderFields,
+  ]);
+
+  const resolvedFriendName = friendIdentity.displayName || friendName || "";
+  const resolvedFriendAvatarIndex =
+    typeof friendIdentity.avatarIndex === "number"
+      ? friendIdentity.avatarIndex
+      : friendAvatarIndex;
+  const friendInitial = resolvedFriendName
+    ? resolvedFriendName.charAt(0).toUpperCase()
+    : "?";
 
   const handleHeaderPress = useCallback(() => {
     if (isGroup) {
       setGroupInfoVisible(true);
       return;
     }
-    navigation.navigate("FriendProfileScreen", { friendUid, friendName });
-  }, [isGroup, navigation, friendUid, friendName]);
+    navigation.navigate("FriendProfileScreen", {
+      friendUid,
+      friendName: resolvedFriendName,
+    });
+  }, [isGroup, navigation, friendUid, resolvedFriendName]);
 
   const statusColor = chatData.friendInChat
     ? "#64B5F6"
@@ -2017,16 +2144,23 @@ export default function ChatScreen({ route, navigation }) {
               style={{ borderWidth: 1.5, borderColor: "rgba(255,255,255,0.2)" }}
             />
           ) : (
-            <View
-              style={[
-                styles.avatar,
-                { backgroundColor: ACCENT_SOFT, borderColor: ACCENT + "55" },
-              ]}
-            >
-              <Text allowFontScaling={false} style={styles.avatarText}>
-                {friendInitial}
-              </Text>
-            </View>
+            avatars?.[resolvedFriendAvatarIndex] ? (
+              <Image
+                source={avatars[resolvedFriendAvatarIndex]}
+                style={[styles.avatar, { borderColor: ACCENT + "55" }]}
+              />
+            ) : (
+              <View
+                style={[
+                  styles.avatar,
+                  { backgroundColor: ACCENT_SOFT, borderColor: ACCENT + "55" },
+                ]}
+              >
+                <Text allowFontScaling={false} style={styles.avatarText}>
+                  {friendInitial}
+                </Text>
+              </View>
+            )
           )}
           {!isGroup && (chatData.friendIsOnline || chatData.friendInChat) && (
             <View
@@ -2041,7 +2175,7 @@ export default function ChatScreen({ route, navigation }) {
             style={styles.headerName}
             numberOfLines={1}
           >
-            {isGroup ? groupData?.name || groupName || i18nText("autoI18n.grup", "Grup") : friendName}
+            {isGroup ? groupData?.name || groupName || i18nText("autoI18n.grup", "Grup") : resolvedFriendName}
           </Text>
           {isGroup ? (
             <Text
@@ -2130,6 +2264,8 @@ export default function ChatScreen({ route, navigation }) {
             renderItem={renderItem}
             contentContainerStyle={styles.listContent}
             inverted
+            onScroll={handleMessageListScroll}
+            scrollEventThrottle={32}
             onEndReached={loadMoreMessages}
             onEndReachedThreshold={0.5}
             keyboardShouldPersistTaps="handled"
@@ -2155,6 +2291,29 @@ export default function ChatScreen({ route, navigation }) {
             }
           />
 
+          {showLatestMessageButton && (
+            <TouchableOpacity
+              activeOpacity={0.84}
+              onPress={scrollToLatestMessage}
+              style={[
+                styles.latestMessageButton,
+                {
+                  bottom: composerHeight + 12,
+                  backgroundColor: theme.secondary,
+                  borderColor: theme.border,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={i18nText(
+                "autoI18n.son_mesaja_git",
+                "Son mesaja git",
+              )}
+            >
+              <Ionicons name="chevron-down" size={21} color={theme.text.primary} />
+              <View style={[styles.latestMessageDot, { backgroundColor: theme.accent }]} />
+            </TouchableOpacity>
+          )}
+
           {/* FAB menüsü açıkken listeyi karartan / menüyü kapatan katman */}
           {attachMenuVisible && (
             <TouchableOpacity
@@ -2165,7 +2324,10 @@ export default function ChatScreen({ route, navigation }) {
           )}
 
           {/* ── INPUT ALANI ── */}
-          <View style={styles.inputContainer}>
+          <View
+            style={styles.inputContainer}
+            onLayout={(event) => setComposerHeight(event.nativeEvent.layout.height)}
+          >
               {/* Düzenleme banner */}
               {replyingTo && (
                 <View style={styles.replyingBanner}>
@@ -3008,6 +3170,30 @@ const styles = StyleSheet.create({
   // ── Mesaj listesi ──────────────────────────────────────
   chatList: { flex: 1 },
   listContent: { padding: 14, paddingBottom: 18 },
+  latestMessageButton: {
+    position: "absolute",
+    right: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: StyleSheet.hairlineWidth,
+    zIndex: 8,
+    elevation: 7,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.24,
+    shadowRadius: 6,
+  },
+  latestMessageDot: {
+    position: "absolute",
+    top: 7,
+    right: 7,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
   pinnedBanner: {
     minHeight: 56,
     flexDirection: "row",

@@ -12,8 +12,8 @@ import {
   Linking,
   Modal,
   Animated,
-  Platform,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import axios from "axios";
 import { DetailsSkeleton } from "../../components/Skeleton";
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
@@ -58,6 +58,8 @@ import { daysUntil, parseAirDate } from "../../utils/airDate";
 import { getCachedValue, setCachedValue, TTL } from "../../utils/apiCache";
 import { getReleaseState, RELEASE_STATE } from "../../utils/watchState";
 import AIChatScreen from "@screens/chat/AIChatScreen";
+import NewConversationSheet from "@components/chat/NewConversationSheet";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 
 
 const { width, height } = Dimensions.get("window");
@@ -84,6 +86,7 @@ const RecommendedMovieItem = memo(function RecommendedMovieItem({
   const { theme } = useTheme();
   const { getTmdbUrl } = useImageQualitySettings();
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const scale = React.useRef(new Animated.Value(1)).current;
 
   const onPressIn = () =>
@@ -107,6 +110,10 @@ const RecommendedMovieItem = memo(function RecommendedMovieItem({
         activeOpacity={0.9}
         style={styles.railItem}
         onPress={() => navigation.push("MovieDetails", { id: item.id })}
+        onLongPress={() =>
+          openQuickActions({ item, mediaType: "movie", navigation })
+        }
+        delayLongPress={350}
       >
         <PosterImage
           path={item.poster_path}
@@ -257,6 +264,7 @@ const SectionHeader = ({ title, right, theme }) => (
    Main screen
 ───────────────────────────────────────── */
 export default function MovieDetails({ navigation, route }) {
+  const insets = useSafeAreaInsets();
   // openComments: "Etkinliklerim → Yorumlarım" satırından gelindiğinde yorum
   // sayfası doğrudan açılır (dizi tarafındaki davranışın filmdeki karşılığı).
   const { id, openComments = false } = route.params;
@@ -301,6 +309,7 @@ export default function MovieDetails({ navigation, route }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [watchHistoryVisible, setWatchHistoryVisible] = useState(false);
   const [aiVisible, setAiVisible] = useState(false);
+  const [sendVisible, setSendVisible] = useState(false);
   const [PosterModalVisible, setPosterModalVisible] = useState(false);
   const [backdropModalVisible, setBacdropModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -803,6 +812,43 @@ export default function MovieDetails({ navigation, route }) {
     });
   }, [details, getTmdbUrl, id, navigation]);
 
+  const chatMedia = useMemo(() => {
+    if (!details?.id) return null;
+    return {
+      id: details.id,
+      media_type: "movie",
+      title: details.title || "",
+      poster_path: details.poster_path || null,
+      vote_average: details.vote_average ?? null,
+      vote_count: details.vote_count ?? null,
+      overview: details.overview || null,
+      release_date: details.release_date || null,
+    };
+  }, [details]);
+
+  const sendToRecipient = useCallback((recipient) => {
+    if (!chatMedia || !recipient) return;
+    const sharedParams = {
+      initialMedia: chatMedia,
+      initialMediaKey: `movie-${chatMedia.id}-${Date.now()}`,
+    };
+    if (recipient.recipientType === "group") {
+      navigation.navigate("ChatScreen", {
+        groupId: recipient.id,
+        groupName: recipient.name,
+        groupAvatarIndex: recipient.avatarIndex,
+        ...sharedParams,
+      });
+      return;
+    }
+    navigation.navigate("ChatScreen", {
+      friendUid: recipient.uid,
+      friendName: recipient.name,
+      friendAvatarIndex: recipient.avatarIndex,
+      ...sharedParams,
+    });
+  }, [chatMedia, navigation]);
+
   const aiPrompt = useMemo(() => {
     if (!details?.title) return "";
     const year = details.release_date ? ` (${String(details.release_date).slice(0, 4)})` : "";
@@ -827,8 +873,18 @@ export default function MovieDetails({ navigation, route }) {
       year: details.release_date ? String(details.release_date).slice(0, 4) : "",
       posterPath: details.poster_path || "",
       rating: details.vote_average || 0,
+      originalTitle: details.original_title || details.title,
+      overview: details.overview || "",
+      genres: details.genres?.map((genre) => genre.name).filter(Boolean) || [],
+      cast: details.credits?.cast?.slice(0, 8).map((person) => person.name).filter(Boolean) || [],
+      director:
+        details.credits?.crew?.find((person) => person.job === "Director")?.name || "",
+      providers:
+        details["watch/providers"]?.results?.[providerRegion]?.flatrate
+          ?.map((provider) => provider.provider_name)
+          .filter(Boolean) || [],
     };
-  }, [details, id]);
+  }, [details, id, providerRegion]);
 
   if (loading) return <DetailsSkeleton />;
   if (!details)
@@ -1091,6 +1147,32 @@ export default function MovieDetails({ navigation, route }) {
                   numberOfLines={1}
                 >
                   {i18nText("autoI18n.bilgi_al", "Bilgi al")}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.88}
+              onPress={() => setSendVisible(true)}
+              style={[
+                styles.detailActionBtn,
+                { backgroundColor: theme.secondary, borderColor: theme.border },
+              ]}
+            >
+              <View
+                style={[
+                  styles.detailActionIcon,
+                  { backgroundColor: (theme.colors?.green || "#3CCB9A") + "20" },
+                ]}
+              >
+                <Ionicons name="paper-plane-outline" size={17} color={theme.colors?.green || "#3CCB9A"} />
+              </View>
+              <View style={styles.detailActionCopy}>
+                <Text allowFontScaling={false} style={[styles.detailActionTitle, { color: theme.text.primary }]}>
+                  {i18nText("autoI18n.gonder", "Gönder")}
+                </Text>
+                <Text allowFontScaling={false} style={[styles.detailActionSub, { color: theme.text.muted }]} numberOfLines={1}>
+                  {i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -1424,7 +1506,12 @@ export default function MovieDetails({ navigation, route }) {
             )}
 
           {/* ── VİDEOLAR ── */}
-          <TrailerSection mediaType="movie" id={id} apiKey={API_KEY} />
+          <TrailerSection
+            mediaType="movie"
+            id={id}
+            apiKey={API_KEY}
+            originalLanguage={details.original_language}
+          />
 
           {/* ── OYUNCULAR ── */}
           {details.credits?.cast.length > 0 && (
@@ -1531,7 +1618,7 @@ export default function MovieDetails({ navigation, route }) {
 
       {/* ─── ÜST OVERLAY BUTONLARI (her zaman tıklanabilir) ─── */}
       <TouchableOpacity
-        style={styles.backBtn}
+        style={[styles.backBtn, { top: insets.top + 8 }]}
         onPress={() => navigation.goBack()}
         activeOpacity={0.8}
       >
@@ -1541,7 +1628,7 @@ export default function MovieDetails({ navigation, route }) {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={styles.storyBtn}
+        style={[styles.storyBtn, { top: insets.top + 8 }]}
         onPress={() =>
           navigation.navigate("StoryShareScreen", {
             id,
@@ -1671,6 +1758,14 @@ export default function MovieDetails({ navigation, route }) {
         initialDisplay={aiDisplay}
         initialAttachment={aiAttachment}
       />
+      <NewConversationSheet
+        visible={sendVisible}
+        onClose={() => setSendVisible(false)}
+        onSelect={sendToRecipient}
+        includeGroups
+        title={i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
+        subtitle={i18nText("autoI18n.gonderilecek_kisiyi_veya_grubu_sec", "Göndermek istediğin arkadaşını veya grubu seç")}
+      />
     </View>
   );
 }
@@ -1699,14 +1794,12 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 52 : 36,
     left: 16,
     zIndex: 50,
     elevation: 50,
   },
   storyBtn: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 52 : 36,
     right: 16,
     zIndex: 50,
     elevation: 50,
@@ -1800,30 +1893,31 @@ const styles = StyleSheet.create({
 
   detailActionRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: 8,
     marginBottom: 16,
   },
   detailActionBtn: {
     flex: 1,
-    minHeight: 64,
-    borderRadius: 16,
+    minWidth: 0,
+    minHeight: 70,
+    borderRadius: 14,
     borderWidth: 1,
-    paddingHorizontal: 11,
-    paddingVertical: 10,
-    flexDirection: "row",
+    paddingHorizontal: 5,
+    paddingVertical: 7,
     alignItems: "center",
-    gap: 9,
+    justifyContent: "center",
+    gap: 4,
   },
   detailActionIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 30,
+    height: 30,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  detailActionCopy: { flex: 1, minWidth: 0 },
-  detailActionTitle: { fontSize: 13.5, fontWeight: "800" },
-  detailActionSub: { fontSize: 11, fontWeight: "700", marginTop: 2 },
+  detailActionCopy: { minWidth: 0, alignItems: "center" },
+  detailActionTitle: { fontSize: 11.5, fontWeight: "800", textAlign: "center" },
+  detailActionSub: { fontSize: 9.5, fontWeight: "700", marginTop: 1, textAlign: "center" },
 
   /* Comments btn */
   commentsBtn: {
