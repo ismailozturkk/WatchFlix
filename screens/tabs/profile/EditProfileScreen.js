@@ -36,6 +36,10 @@ import {
   describeGoogleAuthError,
   GoogleAuthCode,
 } from "../../../services/googleAuthService";
+import {
+  AppleAuthCode,
+  describeAppleAuthError,
+} from "../../../services/appleAuthService";
 import { propagateProfileChange } from "../../../services/profilePropagation";
 import { i18nText } from "../../../utils/i18nText";
 import ScreenDecor from "../../../components/ScreenDecor";
@@ -73,14 +77,20 @@ export default function EditProfileScreen({ navigation }) {
   const [signInMethods, setSignInMethods] = useState({
     hasPassword: false,
     hasGoogle: false,
+    hasApple: false,
   });
-  const [googleVerified, setGoogleVerified] = useState(false);
+  const [providerVerified, setProviderVerified] = useState(false);
+  const [appleAuthorizationCode, setAppleAuthorizationCode] = useState(null);
   const [verifying, setVerifying] = useState(false);
 
-  const usesPassword = signInMethods.hasPassword;
-  const usesGoogleOnly = !signInMethods.hasPassword && signInMethods.hasGoogle;
-  // Google hesabında kırmızı buton doğrulama bitene kadar kapalı kalır.
-  const deleteBlocked = deleting || verifying || (usesGoogleOnly && !googleVerified);
+  const verificationProvider = signInMethods.hasApple
+    ? "apple"
+    : !signInMethods.hasPassword && signInMethods.hasGoogle
+      ? "google"
+      : null;
+  const usesPassword = !verificationProvider && signInMethods.hasPassword;
+  const deleteBlocked =
+    deleting || verifying || (!!verificationProvider && !providerVerified);
 
   const initRef = useRef(false);
 
@@ -203,31 +213,41 @@ export default function EditProfileScreen({ navigation }) {
 
   const openDeleteModal = () => {
     setDeletePassword("");
-    setGoogleVerified(false);
+    setProviderVerified(false);
+    setAppleAuthorizationCode(null);
     setSignInMethods(getSignInMethods());
     setShowDelete(true);
   };
 
-  // Google hesapları için ayrı doğrulama adımı: hesap seçici açılır, taze bir
-  // idToken ile reauth yapılır. Silme yine kırmızı butona basılınca olur —
+  // Sosyal hesaplar için ayrı doğrulama adımı: sağlayıcı seçicisi açılır. Apple
+  // ayrıca hesap silme öncesi yetki iptali için authorization code döndürür.
+  // Silme yine kırmızı butona basılınca olur —
   // seçiciden çıkmak hesabı silmemeli.
-  const onVerifyWithGoogle = async () => {
+  const onVerifyWithProvider = async () => {
     if (verifying || deleting) return;
     setVerifying(true);
     try {
-      const { cancelled } = await reauthenticateForDeletion();
+      const { cancelled, appleAuthorizationCode: authorizationCode } =
+        await reauthenticateForDeletion();
       if (cancelled) return;
-      setGoogleVerified(true);
+      setAppleAuthorizationCode(authorizationCode || null);
+      setProviderVerified(true);
       Toast.show({
         type: "success",
         text1: i18nText("autoI18n.kimligin_dogrulandi", "Kimliğin doğrulandı"),
       });
     } catch (e) {
-      if (e?.code === GoogleAuthCode.CANCELLED) return; // iptal hata değil
+      if (
+        e?.code === GoogleAuthCode.CANCELLED ||
+        e?.code === AppleAuthCode.CANCELLED
+      ) return; // iptal hata değil
       Toast.show({
         type: "error",
         text1: i18nText("autoI18n.dogrulama_basarisiz", "Doğrulama başarısız"),
-        text2: describeGoogleAuthError(e, tr),
+        text2:
+          verificationProvider === "apple"
+            ? describeAppleAuthError(e, tr)
+            : describeGoogleAuthError(e, tr),
       });
     } finally {
       setVerifying(false);
@@ -240,10 +260,13 @@ export default function EditProfileScreen({ navigation }) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.devam_etmek_icin_sifreni_gir", "Devam etmek için şifreni gir") });
       return;
     }
-    if (usesGoogleOnly && !googleVerified) {
+    if (verificationProvider && !providerVerified) {
       Toast.show({
         type: "error",
-        text1: i18nText("autoI18n.once_google_ile_dogrula", "Önce Google ile doğrula"),
+        text1:
+          verificationProvider === "apple"
+            ? (tr ? "Önce Apple ile doğrula" : "Verify with Apple first")
+            : i18nText("autoI18n.once_google_ile_dogrula", "Önce Google ile doğrula"),
       });
       return;
     }
@@ -251,8 +274,9 @@ export default function EditProfileScreen({ navigation }) {
     try {
       const result = await deleteAccount({
         password: usesPassword ? deletePassword : undefined,
-        // Google akışında doğrulama az önce yapıldı; tekrar hesap seçici açma.
-        reauthenticated: googleVerified,
+        // Sosyal akışta doğrulama az önce yapıldı; seçiciyi tekrar açma.
+        reauthenticated: providerVerified,
+        appleAuthorizationCode,
       });
       if (result?.cancelled) {
         setDeleting(false);
@@ -272,9 +296,10 @@ export default function EditProfileScreen({ navigation }) {
       } else if (code === "auth/too-many-requests") {
         msg = i18nText("autoI18n.cok_fazla_deneme", "Çok fazla deneme. Biraz sonra tekrar dene");
       } else if (code === "auth/requires-recent-login") {
-        // Doğrulama bayatladı. Google akışında kullanıcıyı doğrulama adımına
+        // Doğrulama bayatladı. Sosyal akışta kullanıcıyı doğrulama adımına
         // geri gönder; parola akışında şifreyi yeniden göndermesi yeterli.
-        setGoogleVerified(false);
+        setProviderVerified(false);
+        setAppleAuthorizationCode(null);
         msg = i18nText(
           "autoI18n.guvenlik_icin_kimligini_yeniden_dogrula",
           "Güvenlik için kimliğini yeniden doğrula",
@@ -284,8 +309,16 @@ export default function EditProfileScreen({ navigation }) {
           setDeleting(false);
           return;
         }
-        setGoogleVerified(false);
+        setProviderVerified(false);
         msg = describeGoogleAuthError(e, tr);
+      } else if (typeof code === "string" && code.startsWith("apple/")) {
+        if (code === AppleAuthCode.CANCELLED) {
+          setDeleting(false);
+          return;
+        }
+        setProviderVerified(false);
+        setAppleAuthorizationCode(null);
+        msg = describeAppleAuthError(e, tr);
       }
       Toast.show({ type: "error", text1: msg });
       setDeleting(false);
@@ -600,26 +633,30 @@ export default function EditProfileScreen({ navigation }) {
             </View>
             <Text style={[styles.modalTitle, { color: theme.text.primary }]}>{i18nText("autoI18n.hesabi_sil_2", "Hesabı sil")}</Text>
             <Text style={[styles.modalDesc, { color: theme.text.secondary }]}>
-              {usesGoogleOnly
-                ? i18nText(
-                    "autoI18n.bu_islem_geri_alinamaz_devam_etmek_icin_google_ile_dogrula",
-                    "Bu işlem geri alınamaz. Devam etmek için Google hesabınla doğrula.",
-                  )
+              {verificationProvider
+                ? verificationProvider === "apple"
+                  ? (tr
+                    ? "Bu işlem geri alınamaz. Devam etmek ve Apple yetkisini iptal etmek için Apple hesabınla doğrula."
+                    : "This cannot be undone. Verify with Apple so its authorization can also be revoked.")
+                  : i18nText(
+                      "autoI18n.bu_islem_geri_alinamaz_devam_etmek_icin_google_ile_dogrula",
+                      "Bu işlem geri alınamaz. Devam etmek için Google hesabınla doğrula.",
+                    )
                 : i18nText("autoI18n.bu_islem_geri_alinamaz_devam_etmek_icin_sifreni_gi", "Bu işlem geri alınamaz. Devam etmek için şifreni gir.")}
             </Text>
 
-            {/* Doğrulama alanı sağlayıcıya göre değişir: parolası olan hesapta
-                şifre girişi, yalnızca Google ile açılmış hesapta hesap seçici. */}
-            {usesGoogleOnly ? (
+            {/* Doğrulama alanı sağlayıcıya göre değişir. Apple bağlıysa yetki
+                iptali için Apple her zaman önceliklidir. */}
+            {verificationProvider ? (
               <TouchableOpacity
                 activeOpacity={0.85}
-                disabled={deleting || verifying || googleVerified}
-                onPress={onVerifyWithGoogle}
+                disabled={deleting || verifying || providerVerified}
+                onPress={onVerifyWithProvider}
                 style={[
                   styles.verifyBtn,
                   {
-                    borderColor: googleVerified ? theme.colors.green : theme.border,
-                    backgroundColor: googleVerified
+                    borderColor: providerVerified ? theme.colors.green : theme.border,
+                    backgroundColor: providerVerified
                       ? theme.colors.green + "14"
                       : theme.primary,
                   },
@@ -630,23 +667,31 @@ export default function EditProfileScreen({ navigation }) {
                 ) : (
                   <>
                     <Ionicons
-                      name={googleVerified ? "checkmark-circle" : "logo-google"}
+                      name={
+                        providerVerified
+                          ? "checkmark-circle"
+                          : verificationProvider === "apple"
+                            ? "logo-apple"
+                            : "logo-google"
+                      }
                       size={18}
-                      color={googleVerified ? theme.colors.green : theme.text.primary}
+                      color={providerVerified ? theme.colors.green : theme.text.primary}
                     />
                     <Text
                       style={[
                         styles.verifyBtnText,
                         {
-                          color: googleVerified
+                          color: providerVerified
                             ? theme.colors.green
                             : theme.text.primary,
                         },
                       ]}
                     >
-                      {googleVerified
+                      {providerVerified
                         ? i18nText("autoI18n.kimligin_dogrulandi", "Kimliğin doğrulandı")
-                        : i18nText("autoI18n.google_ile_dogrula", "Google ile doğrula")}
+                        : verificationProvider === "apple"
+                          ? (tr ? "Apple ile doğrula" : "Verify with Apple")
+                          : i18nText("autoI18n.google_ile_dogrula", "Google ile doğrula")}
                     </Text>
                   </>
                 )}

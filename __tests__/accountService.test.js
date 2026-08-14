@@ -74,6 +74,13 @@ jest.mock("../services/googleAuthService", () => ({
   reauthenticateWithGoogle: (...a) => mockReauthenticateWithGoogle(...a),
 }));
 
+const mockReauthenticateWithApple = jest.fn();
+const mockRevokeAppleAuthorization = jest.fn();
+jest.mock("../services/appleAuthService", () => ({
+  reauthenticateWithApple: (...a) => mockReauthenticateWithApple(...a),
+  revokeAppleAuthorization: (...a) => mockRevokeAppleAuthorization(...a),
+}));
+
 const {
   DeleteAccountCode,
   deleteAccount,
@@ -95,6 +102,11 @@ beforeEach(() => {
   mockAuth.currentUser = null;
   mockReauthenticateWithCredential.mockResolvedValue({});
   mockReauthenticateWithGoogle.mockResolvedValue({ cancelled: false });
+  mockReauthenticateWithApple.mockResolvedValue({
+    cancelled: false,
+    appleAuthorizationCode: "apple-code",
+  });
+  mockRevokeAppleAuthorization.mockResolvedValue(undefined);
   mockDeleteUser.mockImplementation(async () => void calls.push("deleteUser"));
 });
 
@@ -103,14 +115,22 @@ describe("getSignInMethods", () => {
     expect(getSignInMethods(userWith("google.com"))).toMatchObject({
       hasPassword: false,
       hasGoogle: true,
+      hasApple: false,
     });
     expect(getSignInMethods(userWith("password"))).toMatchObject({
       hasPassword: true,
       hasGoogle: false,
+      hasApple: false,
     });
     expect(getSignInMethods(userWith("password", "google.com"))).toMatchObject({
       hasPassword: true,
       hasGoogle: true,
+      hasApple: false,
+    });
+    expect(getSignInMethods(userWith("apple.com"))).toMatchObject({
+      hasPassword: false,
+      hasGoogle: false,
+      hasApple: true,
     });
   });
 
@@ -119,6 +139,7 @@ describe("getSignInMethods", () => {
       providerIds: [],
       hasPassword: false,
       hasGoogle: false,
+      hasApple: false,
     });
   });
 });
@@ -166,6 +187,18 @@ describe("reauthenticateForDeletion", () => {
     });
     expect(mockReauthenticateWithCredential).not.toHaveBeenCalled();
   });
+
+  it("Apple bagliysa authorization code icin Apple'i onceliklendirir", async () => {
+    mockAuth.currentUser = userWith("password", "apple.com");
+
+    await expect(reauthenticateForDeletion()).resolves.toEqual({
+      cancelled: false,
+      appleAuthorizationCode: "apple-code",
+    });
+
+    expect(mockReauthenticateWithApple).toHaveBeenCalledTimes(1);
+    expect(mockReauthenticateWithCredential).not.toHaveBeenCalled();
+  });
 });
 
 describe("deleteAccount", () => {
@@ -209,6 +242,28 @@ describe("deleteAccount", () => {
 
     expect(mockReauthenticateWithGoogle).not.toHaveBeenCalled();
     expect(calls[calls.length - 1]).toBe("deleteUser");
+  });
+
+  it("Apple hesabinda yetkiyi verileri silmeden once iptal eder", async () => {
+    mockAuth.currentUser = userWith("apple.com");
+
+    await deleteAccount();
+
+    expect(mockReauthenticateWithApple).toHaveBeenCalledTimes(1);
+    expect(mockRevokeAppleAuthorization).toHaveBeenCalledWith("apple-code");
+    expect(mockRevokeAppleAuthorization.mock.invocationCallOrder[0]).toBeLessThan(
+      mockDeleteUser.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("Apple yetkisi iptal edilemezse kullanici verilerine dokunmaz", async () => {
+    mockAuth.currentUser = userWith("apple.com");
+    mockRevokeAppleAuthorization.mockRejectedValue(new Error("revoke failed"));
+
+    await expect(deleteAccount()).rejects.toThrow("revoke failed");
+
+    expect(calls).toEqual([]);
+    expect(mockDeleteUser).not.toHaveBeenCalled();
   });
 
   it("dogrulama bayatlarsa yeniden dogrulayip deleteUser'i tekrar dener", async () => {

@@ -9,8 +9,8 @@
 // NEDEN reauth? Firebase, hesap silme gibi hassas işlemler için "yakın zamanda
 // giriş" ister (auth/requires-recent-login). Yeniden doğrulama yolu hesabın
 // SAĞLAYICISINA göre seçilir (providerData): parola hesaplarında e-posta+şifre,
-// yalnızca Google ile açılmış hesaplarda native Google akışıyla alınan taze bir
-// idToken. Google hesaplarının şifresi yoktur; sağlayıcı ayrımı olmadan bu
+// Google hesaplarında native Google akışıyla alınan taze bir idToken, Apple
+// hesaplarında ise native Apple akışı ve yetki iptali için authorization code.
 // kullanıcılar uygulama içinden hesabını hiç silemez (mağaza uyumluluk şartı).
 //
 // NEDEN purge önce, deleteUser sonra? Auth kullanıcısı silinince request.auth
@@ -93,6 +93,10 @@ import { ref as rtdbRef, remove as rtdbRemove } from "firebase/database";
 import { auth, db, rtdb } from "../firebase";
 import { removeMyRating } from "./ratingsService";
 import { reauthenticateWithGoogle } from "./googleAuthService";
+import {
+  reauthenticateWithApple,
+  revokeAppleAuthorization,
+} from "./appleAuthService";
 // Post yorumu silme mantığı (yanıtları kaskatlı sil + commentsCount düş +
 // mirror'ı kaldır) postsService'te zaten var — purge onu yeniden kullanır.
 import { deleteComment } from "./postsService";
@@ -685,10 +689,10 @@ function deleteAccountError(code, message) {
 
 /**
  * Hesabın giriş yöntemleri. UI silme kartını buna göre çizer: parolası olanlara
- * şifre alanı, yalnızca Google ile açılmışlara "Google ile doğrula" butonu.
+ * şifre alanı, sosyal sağlayıcı hesaplarına sağlayıcı doğrulama butonu.
  *
  * @param {import("firebase/auth").User} [user] Varsayılan: auth.currentUser
- * @returns {{providerIds: string[], hasPassword: boolean, hasGoogle: boolean}}
+ * @returns {{providerIds: string[], hasPassword: boolean, hasGoogle: boolean, hasApple: boolean}}
  */
 export function getSignInMethods(user = auth.currentUser) {
   const providerIds = [
@@ -698,21 +702,23 @@ export function getSignInMethods(user = auth.currentUser) {
     providerIds,
     hasPassword: providerIds.includes(EmailAuthProvider.PROVIDER_ID),
     hasGoogle: providerIds.includes(GoogleAuthProvider.PROVIDER_ID),
+    hasApple: providerIds.includes("apple.com"),
   };
 }
 
 /**
  * Silme öncesi yeniden doğrulama. Sağlayıcıya göre yol seçer:
+ *   - Apple varsa   → native Apple akışı (silmede yetki iptali için kod gerekir)
  *   - parola varsa  → e-posta + şifre (şifre zorunlu)
  *   - yoksa Google  → native hesap seçici + taze idToken
  *   - hiçbiri yoksa → doğrulama yapılamaz; deleteUser'ın kendi kararına bırak
  *
- * Parola VE Google birlikte bağlıysa parola tercih edilir: kullanıcı zaten
- * şifresini biliyor ve bu yol hesap seçici açmadan tamamlanır.
+ * Apple bağlıysa diğer yöntemlerden önce Apple tercih edilir. Apple'ın hesap
+ * silme yetkilendirmesini iptal etmek için taze authorization code gerekir.
  *
  * @param {Object} [params]
  * @param {string} [params.password]
- * @returns {Promise<{cancelled: boolean}>} Google seçicisi kapatılırsa
+ * @returns {Promise<{cancelled: boolean, appleAuthorizationCode?: string}>}
  *   { cancelled: true } — iptal bir hata değildir, çağıran sessizce durmalı.
  */
 export async function reauthenticateForDeletion({ password } = {}) {
@@ -724,7 +730,11 @@ export async function reauthenticateForDeletion({ password } = {}) {
     );
   }
 
-  const { hasPassword, hasGoogle } = getSignInMethods(user);
+  const { hasPassword, hasGoogle, hasApple } = getSignInMethods(user);
+
+  if (hasApple) {
+    return await reauthenticateWithApple();
+  }
 
   if (hasPassword && user.email) {
     if (!password) {
@@ -755,12 +765,18 @@ export async function reauthenticateForDeletion({ password } = {}) {
  * @param {Object} params
  * @param {string} [params.password]  Parola hesapları için yeniden doğrulama.
  * @param {boolean} [params.reauthenticated]  Çağıran az önce doğruladıysa true
- *   (Google akışında UI ayrı bir adımda doğruluyor). Hesap seçicinin ikinci kez
+ *   (sosyal akışta UI ayrı bir adımda doğruluyor). Hesap seçicinin ikinci kez
  *   açılmasını önler.
+ * @param {string} [params.appleAuthorizationCode] Apple yetkisini iptal etmek
+ *   için ayrı doğrulama adımından alınan tek kullanımlık kod.
  * @returns {Promise<{cancelled: boolean}>} Doğrulama iptal edilirse
  *   { cancelled: true } döner ve HİÇBİR veri silinmez.
  */
-export async function deleteAccount({ password, reauthenticated = false } = {}) {
+export async function deleteAccount({
+  password,
+  reauthenticated = false,
+  appleAuthorizationCode,
+} = {}) {
   const user = auth.currentUser;
   if (!user) {
     throw deleteAccountError(
@@ -771,9 +787,18 @@ export async function deleteAccount({ password, reauthenticated = false } = {}) 
   const uid = user.uid;
 
   // 1) Yeniden doğrulama (requires-recent-login hatasını önler).
+  let authorizationCode = appleAuthorizationCode;
   if (!reauthenticated) {
-    const { cancelled } = await reauthenticateForDeletion({ password });
+    const { cancelled, appleAuthorizationCode: freshAppleCode } =
+      await reauthenticateForDeletion({ password });
     if (cancelled) return { cancelled: true };
+    authorizationCode = freshAppleCode;
+  }
+
+  // Apple bağlı hesapta uygulama hesabını silmeden önce Apple oturum yetkisini
+  // de iptal et. Başarısızsa veriye dokunma; kullanıcı güvenle tekrar deneyebilir.
+  if (getSignInMethods(user).hasApple) {
+    await revokeAppleAuthorization(authorizationCode);
   }
 
   // 2) Firestore izlerini temizle (hâlâ kimlik doğrulanmışken).
@@ -792,6 +817,9 @@ export async function deleteAccount({ password, reauthenticated = false } = {}) 
     try {
       const retry = await reauthenticateForDeletion({ password });
       reauthOk = !retry.cancelled;
+      if (reauthOk && retry.appleAuthorizationCode) {
+        await revokeAppleAuthorization(retry.appleAuthorizationCode);
+      }
     } catch {
       reauthOk = false;
     }

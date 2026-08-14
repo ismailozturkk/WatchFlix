@@ -121,18 +121,27 @@ testle güvenceye alındı. RevenueCat panelindeki offering/paywall metni mağaz
   uygulamasının `appl_...` public SDK anahtarıyla EAS production ortamına
   `sensitive` olarak eklendi. Anahtar kaynak koda yazılmadı. Sandbox satın alma
   ve restore akışları gerçek iOS build/cihaz üzerinde hâlâ doğrulanmalıdır.
-- `expo-apple-authentication` ve Sign in with Apple akışı yok.
+- `expo-apple-authentication`, `usesAppleSignIn` capability ve tam Apple hesap
+  yaşam döngüsü 14 Ağustos 2026'da kodlandı: nonce doğrulamalı giriş, ortak ilk
+  profil tamamlama, aynı e-posta için sunucu kontrolü, açık onaylı hesap bağlama,
+  reauth, bağlantı kaldırma ve hesap silerken Apple token revoke. Birim testleri
+  eklendi. Apple Sign in key'i/Firebase sağlayıcısı, iki Functions secret'ı,
+  callable deploy'u ve gerçek iOS cihaz testi hâlâ insan adımıdır; ayrıntı
+  `docs/kurulum/APPLE_AUTH_KURULUM.md` dosyasındadır.
 - Uygulama Google ile girişi birincil hesap girişi olarak sunuyor.
 
 Apple App Review Guideline 4.8, üçüncü taraf/sosyal giriş kullanan uygulamaların gizlilik özellikleri tanımlanmış eşdeğer bir giriş seçeneği sunmasını ister. En güvenli uygulama Sign in with Apple'dır: <https://developer.apple.com/app-store/review/guidelines/#login-services>
 
 **AI görevi:**
 
-1. Apple Team ID'yi kullanıcıdan/Apple Developer hesabından al; `app.json` içine ekle.
-2. Sign in with Apple hesap yaşam döngüsünü uygula: giriş, ilk profil tamamlama, aynı e-posta/credential çakışması, hesap bağlama, reauth, çıkış ve hesap silerken token revoke.
-3. iOS Google OAuth client/plist yapılandırmasını ekle; bundle ID tam olarak `com.smlztrk.seelogd` olmalı.
-4. RevenueCat iOS public SDK anahtarını EAS production ortamına ekle.
-5. Widget extension ve ana uygulama için App Group/Team/entitlement eşleşmesini macOS/Xcode veya EAS artifact üzerinde doğrula.
+1. [x] Apple Team ID'yi `app.json` içine ekle.
+2. [x] Sign in with Apple hesap yaşam döngüsünü kodla ve birim testlerini ekle.
+3. [x] iOS Google OAuth client/plist yapılandırmasını ekle.
+4. [x] RevenueCat iOS public SDK anahtarını EAS production ortamına ekle.
+5. [ ] Apple Sign in key/Firebase sağlayıcısını ve Functions secret'larını kur;
+   iki Apple callable'ını kullanıcı onayıyla deploy et.
+6. [ ] Widget extension ve ana uygulama için App Group/Team/entitlement
+   eşleşmesini macOS/Xcode veya EAS artifact üzerinde doğrula.
 
 **Kabul:** Temiz production-profile iOS build oluşur; gerçek cihazda e-posta, Google ve Apple girişleri çalışır; hesap bağlama/silme testleri geçer; widget görünür; satın alma ve restore sandbox'ta çalışır.
 

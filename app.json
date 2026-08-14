@@ -10,6 +10,7 @@
     "ios": {
       "bundleIdentifier": "com.smlztrk.seelogd",
       "appleTeamId": "KN77DDXC9U",
+      "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
       "infoPlist": {
@@ -55,6 +56,7 @@
         }
       ],
       "@bacons/apple-targets",
+      "expo-apple-authentication",
       "@react-native-google-signin/google-signin",
       [
         "expo-video",

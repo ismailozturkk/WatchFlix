@@ -29,6 +29,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import Checkbox from "expo-checkbox";
 import { Keys, get, set } from "../../services/storage";
 import * as SecureStore from "expo-secure-store";
+import * as AppleAuthentication from "expo-apple-authentication";
 import ScreenDecor from "../../components/ScreenDecor";
 import EmailSuffixRow from "../../components/auth/EmailSuffixRow";
 import { alpha } from "../../theme/colors";
@@ -38,6 +39,12 @@ import {
   signInWithGoogle,
 } from "../../services/googleAuthService";
 import { i18nText } from "../../utils/i18nText";
+import {
+  AppleAuthCode,
+  describeAppleAuthError,
+  isAppleAuthenticationAvailable,
+  signInWithApple,
+} from "../../services/appleAuthService";
 
 // Hafif dokunsal geri bildirim — desteklemeyen cihazlarda sessizce geç
 const buzz = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -106,6 +113,8 @@ export default function LoginScreen({ navigation }) {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isAppleAvailable, setIsAppleAvailable] = useState(false);
+  const [isAppleLoading, setIsAppleLoading] = useState(false);
 
   // Klavye akışı: e-posta → şifre → giriş
   const passwordRef = useRef(null);
@@ -122,6 +131,10 @@ export default function LoginScreen({ navigation }) {
       }
     };
     loadUsers();
+  }, []);
+
+  useEffect(() => {
+    isAppleAuthenticationAvailable().then(setIsAppleAvailable);
   }, []);
 
   const storeUser = async (email) => {
@@ -218,7 +231,7 @@ export default function LoginScreen({ navigation }) {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const handleGoogleSignIn = async () => {
-    if (isGoogleLoading) return;
+    if (isGoogleLoading || isAppleLoading) return;
     setIsGoogleLoading(true);
     try {
       const result = await signInWithGoogle();
@@ -244,6 +257,39 @@ export default function LoginScreen({ navigation }) {
       });
     } finally {
       setIsGoogleLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    if (isAppleLoading || isGoogleLoading) return;
+    setIsAppleLoading(true);
+    try {
+      const result = await signInWithApple();
+      if (result.cancelled) return;
+      const { user, needsProfileCompletion } = result;
+      if (needsProfileCompletion) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "GoogleProfileCompletionScreen" }],
+        });
+      } else {
+        Toast.show({
+          type: "success",
+          text1:
+            i18nText("autoI18n.hos_geldin", "Hoş geldin, ") +
+            (user.displayName || user.email || (language === "tr" ? "Apple kullanıcısı" : "Apple user")),
+        });
+        navigation.reset({ index: 0, routes: [{ name: "TabScreen" }] });
+      }
+    } catch (error) {
+      if (error?.code === AppleAuthCode.CANCELLED) return;
+      Toast.show({
+        type: "error",
+        text1: language === "tr" ? "Apple ile giriş başarısız" : "Sign in with Apple failed",
+        text2: describeAppleAuthError(error, language === "tr"),
+      });
+    } finally {
+      setIsAppleLoading(false);
     }
   };
 
@@ -382,7 +428,7 @@ export default function LoginScreen({ navigation }) {
               {t.LoginScreen.loginButton}
             </Text>
             <Text allowFontScaling={false} style={[styles.cardSub, { color: theme.text.muted }]}>
-              {i18nText("autoI18n.e_posta_veya_google_ile_hizlica_giris_yap", "E-posta veya Google ile hızlıca giriş yap.")}
+              {i18nText("autoI18n.e_posta_veya_google_ile_hizlica_giris_yap", "E-posta, Google veya Apple ile hızlıca giriş yap.")}
             </Text>
 
             {/* E-posta */}
@@ -546,6 +592,41 @@ export default function LoginScreen({ navigation }) {
               <View style={[styles.orLine, { backgroundColor: hairline }]} />
             </View>
 
+            {isAppleAvailable ? (
+              <View
+                pointerEvents={isAppleLoading || isGoogleLoading ? "none" : "auto"}
+                style={[
+                  styles.appleButtonWrap,
+                  (isAppleLoading || isGoogleLoading) && { opacity: 0.6 },
+                ]}
+              >
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                  buttonStyle={
+                    isLightTheme
+                      ? AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                      : AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE
+                  }
+                  cornerRadius={12}
+                  style={styles.appleButton}
+                  onPress={() => {
+                    buzz();
+                    handleAppleSignIn();
+                  }}
+                />
+                {isAppleLoading ? (
+                  <View style={styles.appleLoadingOverlay} pointerEvents="none">
+                    <LottieView
+                      source={require("@lottie/loading15.json")}
+                      style={{ width: 28, height: 28 }}
+                      autoPlay
+                      loop
+                    />
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+
             {/* Google ile giriş */}
             <TouchableOpacity
               style={[
@@ -557,7 +638,7 @@ export default function LoginScreen({ navigation }) {
                 handleGoogleSignIn();
               }}
               activeOpacity={0.8}
-              disabled={isGoogleLoading}
+              disabled={isGoogleLoading || isAppleLoading}
             >
               {isGoogleLoading ? (
                 <LottieView
@@ -825,6 +906,22 @@ const styles = StyleSheet.create({
   loadingAnim: {
     width: 36,
     height: 36,
+  },
+  appleButtonWrap: {
+    position: "relative",
+    width: "100%",
+    height: 52,
+  },
+  appleButton: {
+    width: "100%",
+    height: 52,
+  },
+  appleLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.36)",
   },
   orRow: {
     flexDirection: "row",

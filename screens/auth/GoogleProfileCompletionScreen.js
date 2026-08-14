@@ -31,6 +31,7 @@ import {
   cancelGoogleRegistration,
   GOOGLE_PROFILE_PENDING_KEY,
 } from "../../services/googleAuthService";
+import { cancelAppleRegistration } from "../../services/appleAuthService";
 import { randomAvatarIndex } from "../../utils/avatars";
 import { canRegister, MIN_REGISTER_AGE, syncAgeRestriction } from "../../utils/ageGate";
 import { i18nText } from "../../utils/i18nText";
@@ -44,6 +45,9 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
   const { markProfileCompleted } = useAuth();
   const insets = useSafeAreaInsets();
   const user = auth.currentUser;
+  const isAppleUser = user?.providerData?.some(
+    (provider) => provider.providerId === "apple.com",
+  );
   const [displayName, setDisplayName] = useState(user?.displayName || "");
   const [username, setUsername] = useState("");
   const [available, setAvailable] = useState(null);
@@ -139,7 +143,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
         birthDate,
         // E-posta kaydıyla aynı davranış: yeni hesap rastgele avatarla başlar.
         avatarIndex: randomAvatarIndex(),
-        method: "google",
+        method: isAppleUser ? "apple" : "google",
       });
       // Bu akış oturumu KAPATMIYOR — kullanıcı buradan doğrudan uygulamaya
       // giriyor. Kısıtı profil dinleyicisinin ilk anlık görüntüsüne bırakmak,
@@ -186,7 +190,8 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
   const cancel = async () => {
     setSaving(true);
     try {
-      await cancelGoogleRegistration();
+      if (isAppleUser) await cancelAppleRegistration();
+      else await cancelGoogleRegistration();
       navigation.reset({ index: 0, routes: [{ name: "LoginScreen" }] });
     } finally {
       setSaving(false);
@@ -227,8 +232,8 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
           </Text>
           <Text style={[styles.subtitle, { color: theme.text.muted }]}>
             {tr
-              ? "Google hesabın doğrulandı. Uygulamada görünecek bilgilerini bir kez belirle."
-              : "Your Google account is verified. Choose the details shown in the app."}
+              ? `${isAppleUser ? "Apple" : "Google"} hesabın doğrulandı. Uygulamada görünecek bilgilerini bir kez belirle.`
+              : `Your ${isAppleUser ? "Apple" : "Google"} account is verified. Choose the details shown in the app.`}
           </Text>
 
           <View
@@ -240,8 +245,17 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
             <View
               style={[styles.googleAccount, { backgroundColor: theme.between }]}
             >
-              <View style={styles.googleBadge}>
-                <Text style={styles.googleLetter}>G</Text>
+              <View
+                style={[
+                  styles.googleBadge,
+                  isAppleUser && { backgroundColor: "#111111" },
+                ]}
+              >
+                {isAppleUser ? (
+                  <Ionicons name="logo-apple" size={18} color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.googleLetter}>G</Text>
+                )}
               </View>
               <View style={styles.flex}>
                 <Text
@@ -249,7 +263,13 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
                   style={[styles.accountName, { color: theme.text.primary }]}
                 >
                   {user?.displayName ||
-                    (tr ? "Google hesabı" : "Google account")}
+                    (isAppleUser
+                      ? tr
+                        ? "Apple hesabı"
+                        : "Apple account"
+                      : tr
+                        ? "Google hesabı"
+                        : "Google account")}
                 </Text>
                 <Text
                   numberOfLines={1}
@@ -258,7 +278,11 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
                   {user?.email}
                 </Text>
               </View>
-              <Ionicons name="checkmark-circle" size={21} color="#34A853" />
+              <Ionicons
+                name="checkmark-circle"
+                size={21}
+                color={isAppleUser ? theme.accent : "#34A853"}
+              />
             </View>
 
             <Text style={[styles.label, { color: theme.text.muted }]}>

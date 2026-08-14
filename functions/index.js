@@ -50,6 +50,10 @@ const {
   resolveFirebaseUserId,
   resolvePremiumWebhookState,
 } = require("./revenueCatWebhook");
+const {
+  revokeAppleAuthorizationCode,
+  verifyAppleIdentityToken,
+} = require("./appleAuth");
 
 initializeApp();
 const db = getFirestore();
@@ -62,11 +66,15 @@ setGlobalOptions({ maxInstances: 10 });
 // Istemcideki googleAuthService WEB_CLIENT_ID ile ayni kalmali.
 const GOOGLE_WEB_CLIENT_ID =
   "427087836931-in7lreg3vjgnvudn5h8gauradaeo58kc.apps.googleusercontent.com";
+const APPLE_CLIENT_ID = "com.smlztrk.seelogd";
+const APPLE_TEAM_ID = "KN77DDXC9U";
 
 // RevenueCat Dashboard > Integrations > Webhooks ekranındaki Authorization
 // header ile aynı olmalı. Public SDK anahtarı değildir.
 const REVENUECAT_WEBHOOK_AUTH = defineSecret("REVENUECAT_WEBHOOK_AUTH");
 const REVENUECAT_SECRET_API_KEY = defineSecret("REVENUECAT_SECRET_API_KEY");
+const APPLE_SIGN_IN_KEY_ID = defineSecret("APPLE_SIGN_IN_KEY_ID");
+const APPLE_SIGN_IN_PRIVATE_KEY = defineSecret("APPLE_SIGN_IN_PRIVATE_KEY");
 
 function webhookAuthorizationMatches(received, expected) {
   if (!received || !expected) return false;
@@ -265,6 +273,81 @@ exports.checkGoogleSignInEligibility = onCall(async (request) => {
 
   return { allowed: true };
 });
+
+/** Apple credential Firebase'e girmeden once ayni e-posta cakismasini denetler. */
+exports.checkAppleSignInEligibility = onCall(async (request) => {
+  const identityToken = request.data?.identityToken;
+  if (
+    typeof identityToken !== "string" ||
+    identityToken.length < 100 ||
+    identityToken.length > 10000
+  ) {
+    throw new HttpsError("invalid-argument", "Valid Apple identityToken required");
+  }
+
+  let claims;
+  try {
+    claims = await verifyAppleIdentityToken(identityToken, APPLE_CLIENT_ID);
+  } catch (error) {
+    console.warn("Apple identityToken verification failed", error?.message);
+    throw new HttpsError("unauthenticated", "Apple identity could not be verified");
+  }
+
+  let existingUser = null;
+  try {
+    existingUser = await getAuth().getUserByEmail(claims.email);
+  } catch (error) {
+    if (error?.code !== "auth/user-not-found") {
+      console.error("Apple eligibility Auth lookup failed", error?.code);
+      throw new HttpsError("unavailable", "Account check is temporarily unavailable");
+    }
+  }
+
+  if (
+    existingUser &&
+    !existingUser.providerData.some((provider) => provider.providerId === "apple.com")
+  ) {
+    throw new HttpsError(
+      "already-exists",
+      "Existing account must link Apple after signing in",
+      { reason: "LINK_REQUIRED" },
+    );
+  }
+  return { allowed: true };
+});
+
+/**
+ * Hesap silme/baglanti kaldirma aninda alinan tek kullanimlik authorization
+ * code'u Apple tokenina cevirir ve Apple yetkilendirmesini iptal eder.
+ */
+exports.revokeAppleAuthorization = onCall(
+  { secrets: [APPLE_SIGN_IN_KEY_ID, APPLE_SIGN_IN_PRIVATE_KEY] },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError("unauthenticated", "Authentication required");
+    }
+    const authorizationCode = request.data?.authorizationCode;
+    if (
+      typeof authorizationCode !== "string" ||
+      authorizationCode.length < 10 ||
+      authorizationCode.length > 5000
+    ) {
+      throw new HttpsError("invalid-argument", "Valid authorization code required");
+    }
+    try {
+      await revokeAppleAuthorizationCode(authorizationCode, {
+        teamId: APPLE_TEAM_ID,
+        clientId: APPLE_CLIENT_ID,
+        keyId: APPLE_SIGN_IN_KEY_ID.value(),
+        privateKey: APPLE_SIGN_IN_PRIVATE_KEY.value(),
+      });
+      return { revoked: true };
+    } catch (error) {
+      console.error("Apple authorization revocation failed", error?.message);
+      throw new HttpsError("internal", "Apple authorization could not be revoked");
+    }
+  },
+);
 
 // ───────────────────────────────────────────────────────────────────────────
 // GEMINI PROXY (callGemini callable)

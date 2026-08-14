@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import React, { useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import LottieView from "lottie-react-native";
@@ -47,6 +47,13 @@ import {
 } from "../../services/googleAuthService";
 import { i18nText } from "../../utils/i18nText";
 import { randomAvatarIndex } from "../../utils/avatars";
+import * as AppleAuthentication from "expo-apple-authentication";
+import {
+  AppleAuthCode,
+  describeAppleAuthError,
+  isAppleAuthenticationAvailable,
+  signInWithApple,
+} from "../../services/appleAuthService";
 
 const SUCCESS = "rgb(37, 211, 102)";
 const ERROR = "rgb(189, 8, 28)";
@@ -74,10 +81,16 @@ export default function RegisterScreen({ navigation }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordAgain, setShowPasswordAgain] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
+  const [isAppleAvailable, setIsAppleAvailable] = useState(false);
+  const [isAppleLoading, setIsAppleLoading] = useState(false);
   const { t, language } = useLanguage();
 
   const [passwordCorrect, setPasswordCorrect] = useState(null);
   const [passwordCorrectAgain, setPasswordCorrectAgain] = useState(null);
+
+  useEffect(() => {
+    isAppleAuthenticationAvailable().then(setIsAppleAvailable);
+  }, []);
 
   // Klavye akışı: isim → soyisim → kullanıcı adı → e-posta → şifre → tekrar.
   // Doğum tarihi bu zincirin dışında: klavyeyle değil dokunmayla açılan bir
@@ -305,7 +318,7 @@ export default function RegisterScreen({ navigation }) {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const signInWithGoogle = async () => {
-    if (isGoogleLoading) return;
+    if (isGoogleLoading || isAppleLoading) return;
     setIsGoogleLoading(true);
     try {
       const result = await authenticateWithGoogle();
@@ -331,6 +344,39 @@ export default function RegisterScreen({ navigation }) {
       });
     } finally {
       setIsGoogleLoading(false);
+    }
+  };
+
+  const registerWithApple = async () => {
+    if (isAppleLoading || isGoogleLoading) return;
+    setIsAppleLoading(true);
+    try {
+      const result = await signInWithApple();
+      if (result.cancelled) return;
+      const { user, needsProfileCompletion } = result;
+      if (needsProfileCompletion) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "GoogleProfileCompletionScreen" }],
+        });
+      } else {
+        Toast.show({
+          type: "success",
+          text1:
+            i18nText("autoI18n.hos_geldin", "Hoş geldin, ") +
+            (user.displayName || user.email || (language === "tr" ? "Apple kullanıcısı" : "Apple user")),
+        });
+        navigation.reset({ index: 0, routes: [{ name: "TabScreen" }] });
+      }
+    } catch (error) {
+      if (error?.code === AppleAuthCode.CANCELLED) return;
+      Toast.show({
+        type: "error",
+        text1: language === "tr" ? "Apple ile kayıt başarısız" : "Sign up with Apple failed",
+        text2: describeAppleAuthError(error, language === "tr"),
+      });
+    } finally {
+      setIsAppleLoading(false);
     }
   };
 
@@ -784,6 +830,41 @@ export default function RegisterScreen({ navigation }) {
               <View style={[styles.orLine, { backgroundColor: hairline }]} />
             </View>
 
+            {isAppleAvailable ? (
+              <View
+                pointerEvents={isAppleLoading || isGoogleLoading ? "none" : "auto"}
+                style={[
+                  styles.appleButtonWrap,
+                  (isAppleLoading || isGoogleLoading) && { opacity: 0.6 },
+                ]}
+              >
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP}
+                  buttonStyle={
+                    isLightTheme
+                      ? AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                      : AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE
+                  }
+                  cornerRadius={12}
+                  style={styles.appleButton}
+                  onPress={() => {
+                    buzz();
+                    registerWithApple();
+                  }}
+                />
+                {isAppleLoading ? (
+                  <View style={styles.appleLoadingOverlay} pointerEvents="none">
+                    <LottieView
+                      source={require("@lottie/loading15.json")}
+                      style={{ width: 28, height: 28 }}
+                      autoPlay
+                      loop
+                    />
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+
             {/* Google ile kayıt */}
             <TouchableOpacity
               style={[
@@ -795,7 +876,7 @@ export default function RegisterScreen({ navigation }) {
                 signInWithGoogle();
               }}
               activeOpacity={0.8}
-              disabled={isGoogleLoading}
+              disabled={isGoogleLoading || isAppleLoading}
             >
               {isGoogleLoading ? (
                 <LottieView
@@ -993,6 +1074,22 @@ const styles = StyleSheet.create({
   loadingAnim: {
     width: 36,
     height: 36,
+  },
+  appleButtonWrap: {
+    position: "relative",
+    width: "100%",
+    height: 52,
+  },
+  appleButton: {
+    width: "100%",
+    height: 52,
+  },
+  appleLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.36)",
   },
   orRow: {
     flexDirection: "row",

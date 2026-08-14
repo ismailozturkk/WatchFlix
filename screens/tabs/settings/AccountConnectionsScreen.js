@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -24,8 +25,14 @@ import {
   addPasswordSignIn,
   describeAccountConnectionError,
   sendCurrentUserPasswordReset,
-  unlinkAccountProvider,
 } from "../../../services/accountConnectionsService";
+import {
+  AppleAuthCode,
+  describeAppleAuthError,
+  isAppleAuthenticationAvailable,
+  linkAppleAccount,
+  unlinkAppleAccount,
+} from "../../../services/appleAuthService";
 import {
   SettingsSubScreen,
   SectionLabel,
@@ -45,6 +52,7 @@ export default function AccountConnectionsScreen() {
   const [password, setPassword] = useState("");
   const [passwordAgain, setPasswordAgain] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
   const user = auth.currentUser;
   const providers = useMemo(
     () => user?.providerData.map((item) => item.providerId) || [],
@@ -65,6 +73,10 @@ export default function AccountConnectionsScreen() {
   const providerCount = providers.length;
 
   const refresh = () => setRevision((value) => value + 1);
+
+  useEffect(() => {
+    isAppleAuthenticationAvailable().then(setAppleAvailable);
+  }, []);
 
   const connectGoogle = async () => {
     if (busy || googleLinked) return;
@@ -150,6 +162,17 @@ export default function AccountConnectionsScreen() {
 
   const disconnectApple = () => {
     if (busy || !appleLinked) return;
+    if (providers.length <= 1) {
+      appAlert(
+        tr ? "Bağlantı kaldırılamaz" : "Cannot disconnect",
+        tr
+          ? "Apple şu anda hesabındaki tek giriş yöntemi. Kaldırılırsa hesabına bir daha giriş yapamazsın."
+          : "Apple is the only sign-in method on your account. Removing it would lock you out.",
+        undefined,
+        { type: "warning" },
+      );
+      return;
+    }
     appAlert(
       tr ? "Apple bağlantısı kaldırılsın mı?" : "Disconnect Apple?",
       tr
@@ -163,7 +186,7 @@ export default function AccountConnectionsScreen() {
           onPress: async () => {
             setBusyAction("apple");
             try {
-              await unlinkAccountProvider("apple.com");
+              await unlinkAppleAccount();
               Toast.show({
                 type: "success",
                 text1: tr ? "Apple bağlantısı kaldırıldı" : "Apple disconnected",
@@ -171,7 +194,44 @@ export default function AccountConnectionsScreen() {
             } catch (error) {
               appAlert(
                 tr ? "İşlem başarısız" : "Action failed",
-                describeAccountConnectionError(error, tr),
+                describeAppleAuthError(error, tr),
+                undefined,
+                { type: "error" },
+              );
+            } finally {
+              refresh();
+              setBusyAction(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const connectApple = () => {
+    if (busy || appleLinked || !appleAvailable) return;
+    appAlert(
+      tr ? "Apple hesabını bağla" : "Connect Apple account",
+      tr
+        ? "Devam edersen Apple hesabındaki kimlik bilgilerini mevcut Seelogd profilinle ilişkilendirmeyi onaylarsın. Profilin ve mevcut verilerin korunur."
+        : "By continuing, you consent to associating your Apple identity with your existing Seelogd profile. Your profile and existing data stay intact.",
+      [
+        { text: tr ? "Vazgeç" : "Cancel", style: "cancel" },
+        {
+          text: tr ? "Devam et" : "Continue",
+          onPress: async () => {
+            setBusyAction("apple");
+            try {
+              await linkAppleAccount();
+              Toast.show({
+                type: "success",
+                text1: tr ? "Apple hesabı bağlandı" : "Apple account connected",
+              });
+            } catch (error) {
+              if (error?.code === AppleAuthCode.CANCELLED) return;
+              appAlert(
+                tr ? "Apple hesabı bağlanamadı" : "Could not connect Apple",
+                describeAppleAuthError(error, tr),
                 undefined,
                 { type: "error" },
               );
@@ -355,13 +415,19 @@ export default function AccountConnectionsScreen() {
                 ? `${providerDetails["apple.com"]?.email || user?.email || "Apple hesabı"} · bağlı`
                 : `${providerDetails["apple.com"]?.email || user?.email || "Apple account"} · connected`
               : tr
-              ? "Bu hesapta bağlı değil"
-              : "Not connected to this account"
+              ? appleAvailable
+                ? "Apple hesabını bağla"
+                : "Apple bağlantısı iPhone veya iPad üzerinden yapılabilir"
+              : appleAvailable
+                ? "Connect your Apple account"
+                : "Apple can be connected from an iPhone or iPad"
           }
-          onPress={appleLinked ? disconnectApple : undefined}
+          onPress={appleLinked ? disconnectApple : appleAvailable ? connectApple : undefined}
           right={statusPill(appleLinked, "apple", {
             linked: tr ? "Bağlı" : "Connected",
-            unlinked: tr ? "Bağlı değil" : "Not linked",
+            unlinked: appleAvailable
+              ? tr ? "Bağla" : "Connect"
+              : Platform.OS === "ios" ? tr ? "Kullanılamıyor" : "Unavailable" : tr ? "iOS gerekli" : "iOS required",
           })}
         />
         <SettingRow
@@ -485,14 +551,6 @@ export default function AccountConnectionsScreen() {
           </View>
         ) : null}
       </View>
-
-      {!appleLinked ? (
-        <Text style={[styles.appleNote, { color: C.muted }]}>
-          {tr
-            ? "Apple bağlantısı, Apple ile giriş daha önce bu hesaba bağlandıysa burada yönetilebilir. Bu sürümde yeni Apple bağlantısı başlatılmıyor."
-            : "An existing Sign in with Apple connection can be managed here. This build does not start a new Apple connection."}
-        </Text>
-      ) : null}
 
       <Text style={[styles.note, { color: C.muted }]}>
         {tr

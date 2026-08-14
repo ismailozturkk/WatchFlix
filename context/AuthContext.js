@@ -27,7 +27,7 @@ import {
 const AuthContext = createContext();
 
 /**
- * Google kullanıcısı profilini tamamlamadan uygulamaya giremez.
+ * Google/Apple kullanıcısı profilini tamamlamadan uygulamaya giremez.
  *
  * GOOGLE_PROFILE_PENDING_KEY yalnızca bir İPUCU'dur, karar değil. Tek başına
  * güvenilirse işaret bayatladığı anda (profil başka cihazda tamamlandı, ya da
@@ -36,12 +36,13 @@ const AuthContext = createContext();
  * işareti her açılışta Firestore'dan uzlaştırıyoruz.
  */
 async function resolveInitialRoute(user) {
-  const isGoogleUser = user.providerData.some(
-    (provider) => provider.providerId === "google.com",
+  const isFederatedUser = user.providerData.some(
+    (provider) =>
+      provider.providerId === "google.com" || provider.providerId === "apple.com",
   );
   const pendingUid = get(Keys.googleProfilePendingUid);
 
-  if (!isGoogleUser) return "TabScreen";
+  if (!isFederatedUser) return "TabScreen";
 
   try {
     const profileSnap = await getDoc(doc(db, "Users", user.uid));
