@@ -223,26 +223,26 @@ const WEB_CLIENT_ID =
   process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
   "427087836931-in7lreg3vjgnvudn5h8gauradaeo58kc.apps.googleusercontent.com";
 
-// iOS'ta native SDK client id'yi GoogleService-Info.plist'ten okur. Plist
-// yoksa iosClientId zorunludur.
+// iOS'ta native SDK varsayılan GoogleService-Info.plist içindeki CLIENT_ID'yi
+// okur. Ortama iosClientId verilirse yalnız açık override olarak kullanılır.
 const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || "";
 
 let configured = false;
 
+export function getGoogleSignInConfiguration({
+  webClientId = WEB_CLIENT_ID,
+  iosClientId = IOS_CLIENT_ID,
+} = {}) {
+  return {
+    webClientId,
+    offlineAccess: false,
+    ...(iosClientId ? { iosClientId } : {}),
+  };
+}
+
 function configureGoogleSignIn() {
   if (configured) return;
-  if (Platform.OS === "ios" && !IOS_CLIENT_ID) {
-    // Kriptik native çökme yerine ne yapılması gerektiğini söyleyen bir hata.
-    throw new GoogleAuthError(
-      GoogleAuthCode.MISCONFIGURED,
-      "iOS için Google girişi yapılandırılmamış (GoogleService-Info.plist / iosClientId eksik).",
-    );
-  }
-  GoogleSignin.configure({
-    webClientId: WEB_CLIENT_ID,
-    offlineAccess: false,
-    ...(IOS_CLIENT_ID ? { iosClientId: IOS_CLIENT_ID } : null),
-  });
+  GoogleSignin.configure(getGoogleSignInConfiguration());
   configured = true;
 }
 

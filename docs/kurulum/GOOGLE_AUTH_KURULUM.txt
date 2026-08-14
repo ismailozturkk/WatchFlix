@@ -60,35 +60,28 @@ COZUM:
      yeniden baslatmak yetmez (JS degil, native kaynak degisiyor).
 
 
-2) IOS — HIC YAPILANDIRILMAMIS
-------------------------------
-BELIRTI: iOS'ta Google girisi calismaz. Kod artik kriptik native cokme yerine
-         net bir hata firlatir (GoogleAuthCode.MISCONFIGURED).
+2) IOS — YAPILANDIRILDI, GERCEK CIHAZ TESTI BEKLIYOR
+----------------------------------------------------
+- Firebase iOS uygulamasinin bundle ID'si `com.smlztrk.seelogd`.
+- `GoogleService-Info.plist` repo kokunde ve `app.json` icindeki
+  `ios.googleServicesFile` alanina bagli.
+- Google Sign-In config plugin'i plist'teki `REVERSED_CLIENT_ID` degerini iOS
+  URL scheme olarak native projeye aktarir.
+- Servis varsayilan plist'i kullanir; `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` yalniz
+  acik override'dir ve plist varken zorunlu degildir.
+- 14 Agustos 2026'da iOS ve Web Client ID'leri EAS production ortaminda
+  `sensitive` gorunurlukle tanimlandi.
 
-EKSIKLER: GoogleService-Info.plist yok, app.json'da ios.googleServicesFile yok,
-          google-signin plugin'i iosUrlScheme parametresi olmadan eklenmis.
-
-COZUM:
-  a) Firebase Console > Add app > iOS. Bundle ID: app.json'daki iOS bundle
-     identifier ile birebir ayni olmali.
-  b) GoogleService-Info.plist'i indirip repo kokune koy.
-  c) app.json:
-       "ios": { "googleServicesFile": "./GoogleService-Info.plist", ... }
-     ve plugin girdisini duz string yerine yapilandirilmis hale getir:
-       ["@react-native-google-signin/google-signin",
-        { "iosUrlScheme": "com.googleusercontent.apps.<REVERSED_CLIENT_ID>" }]
-     <REVERSED_CLIENT_ID> plist icindeki REVERSED_CLIENT_ID degeridir.
-  d) Alternatif/ek olarak .env'e:
-       EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=<plist icindeki CLIENT_ID>
-     Servis bunu configure()'a iosClientId olarak gecer. Plist varsa sart degil.
-  e) expo prebuild --clean && yeniden build.
+KALAN:
+  a) Yeni production/development iOS build al.
+  b) Gercek cihazda hesap secici, Firebase oturumu, ilk profil tamamlama,
+     ayni e-posta baglama ve cikis akislarini test et.
 
 
 3) NOTLAR
 ---------
-- webClientId (type 3) DOGRU ve servisteki fallback ile eslesiyor; sorun orada
-  degil. .env'de EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID tanimli degil, bu yuzden
-  googleAuthService.js'deki fallback kullaniliyor.
+- webClientId (type 3) servis fallback'iyle eslesir ve EAS production ortaminda
+  da acik olarak tanimlidir.
 - Expo Go ile Google girisi CALISMAZ (native modul gerekir). expo-dev-client
   build'i sart.
 - eas.json > build.production > android.credentialsSource: "local" ayarli ama

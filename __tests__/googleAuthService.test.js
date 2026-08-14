@@ -75,9 +75,31 @@ const {
   GOOGLE_PROFILE_PENDING_KEY,
   GoogleAuthCode,
   describeGoogleAuthError,
+  getGoogleSignInConfiguration,
 } = require("../services/googleAuthService");
 
 const snapshot = (data) => ({ exists: () => data !== null, data: () => data });
+
+describe("Google Sign-In configuration", () => {
+  it("uses the default iOS plist when no explicit iosClientId is provided", () => {
+    expect(
+      getGoogleSignInConfiguration({ webClientId: "web-client", iosClientId: "" }),
+    ).toEqual({ webClientId: "web-client", offlineAccess: false });
+  });
+
+  it("keeps an explicit iOS client id override when provided", () => {
+    expect(
+      getGoogleSignInConfiguration({
+        webClientId: "web-client",
+        iosClientId: "ios-client",
+      }),
+    ).toEqual({
+      webClientId: "web-client",
+      offlineAccess: false,
+      iosClientId: "ios-client",
+    });
+  });
+});
 
 const storage = require("../services/storage");
 // Isaretin fiziksel yeri (session deposu) — testin dogrudan mudahale ettigi yer.
