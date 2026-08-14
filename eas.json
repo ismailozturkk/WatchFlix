@@ -30,7 +30,10 @@
     "production": {
       "autoIncrement": true,
       "channel": "production",
-      "environment": "production"
+      "environment": "production",
+      "env": {
+        "FIREBASE_SDK_VERSION": "12.14.0"
+      }
     }
   },
   "submit": {
