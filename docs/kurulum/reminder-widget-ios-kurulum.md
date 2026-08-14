@@ -96,7 +96,7 @@ Her ikisi de Mac adımında ele alınmalı.
    ```json
    "ios": {
      "supportsTablet": true,
-     "appleTeamId": "XXXXXXXXXX",
+     "appleTeamId": "KN77DDXC9U",
      "entitlements": {
        "com.apple.security.application-groups": ["group.com.smlztrk.seelogd"]
      }

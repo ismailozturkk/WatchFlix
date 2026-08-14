@@ -9,6 +9,7 @@
     "scheme": "seelogd",
     "ios": {
       "bundleIdentifier": "com.smlztrk.seelogd",
+      "appleTeamId": "KN77DDXC9U",
       "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
       "infoPlist": {

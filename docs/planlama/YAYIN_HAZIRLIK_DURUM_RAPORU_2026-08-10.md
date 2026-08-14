@@ -106,8 +106,13 @@ testle güvenceye alındı. RevenueCat panelindeki offering/paywall metni mağaz
 
 **Kanıt:**
 
-- `app.json` içinde `ios.appleTeamId` yok; Apple targets eklentisi derleme sırasında bunu açıkça uyarıyor.
-- Depoda `GoogleService-Info.plist` yok.
+- `app.json` içindeki `ios.appleTeamId`, 14 Ağustos 2026'da kullanıcıdan alınan
+  `KN77DDXC9U` değeriyle tamamlandı. Apple targets eklentisi bu değeri ana
+  uygulama ve ReminderWidget hedefinin imza ayarına aktarır; production iOS
+  build ve gerçek cihaz doğrulaması yine gereklidir.
+- `GoogleService-Info.plist` depoda mevcut ve `app.json` içindeki
+  `ios.googleServicesFile` alanına bağlıdır; gerçek cihaz Google OAuth testi
+  yine production kimlik bilgileriyle yapılmalıdır.
 - EAS production ortamında `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY`, `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` ve `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` görünmüyor.
 - `expo-apple-authentication` ve Sign in with Apple akışı yok.
 - Uygulama Google ile girişi birincil hesap girişi olarak sunuyor.
