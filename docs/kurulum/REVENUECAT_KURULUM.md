@@ -20,6 +20,10 @@ EXPO_PUBLIC_REVENUECAT_IOS_API_KEY=appl_...
 EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID="com.smlztrk.seelogd Pro"
 ```
 
+14 Ağustos 2026 itibarıyla Android ve iOS public SDK anahtarları ile entitlement
+EAS production ortamında tanımlıdır. Anahtar değerleri kaynak koda yazılmaz;
+ortamda bulunup bulunmadıkları `eas env:list production` ile doğrulanır.
+
 Kod `test_...` anahtarını yalnız `__DEV__` build'lerde seçer. Release build'de
 platforma ait `goog_...` veya `appl_...` anahtarı zorunludur. Test Store
 anahtarıyla mağazaya uygulama gönderilmemelidir. Public SDK anahtarları istemci

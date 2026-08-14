@@ -117,9 +117,10 @@ testle güvenceye alındı. RevenueCat panelindeki offering/paywall metni mağaz
   14 Ağustos 2026'da Firebase yapılandırma dosyalarındaki değerlerle EAS
   production ortamına `sensitive` olarak eklendi. Google Sign-In servisi plist
   mevcutken iOS env override'ını zorunlu tutmaz. Gerçek cihaz testi bekliyor.
-- EAS production ortamında `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` hâlâ yok;
-  RevenueCat iOS uygulaması oluşturulup public SDK anahtarı alınmadan bu değer
-  güvenli biçimde üretilemez.
+- `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY`, 14 Ağustos 2026'da RevenueCat App Store
+  uygulamasının `appl_...` public SDK anahtarıyla EAS production ortamına
+  `sensitive` olarak eklendi. Anahtar kaynak koda yazılmadı. Sandbox satın alma
+  ve restore akışları gerçek iOS build/cihaz üzerinde hâlâ doğrulanmalıdır.
 - `expo-apple-authentication` ve Sign in with Apple akışı yok.
 - Uygulama Google ile girişi birincil hesap girişi olarak sunuyor.
 
