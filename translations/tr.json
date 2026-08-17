@@ -2462,7 +2462,23 @@
     "ada_gore": "Ada göre",
     "n_sonuc_goster": "{{n}} sonuç göster",
     "siliniyor": "Siliniyor...",
-    "islem_tamamlanamadi": "İşlem tamamlanamadı"
+    "islem_tamamlanamadi": "İşlem tamamlanamadı",
+    "cikis_yap_aciklama": "Hesabından güvenli bir şekilde çıkış yap",
+    "cikis_onay_mesaj": "Hesabından çıkış yapmak istediğine emin misin?",
+    "wrapped_section": "Wrapped & Arşiv",
+    "oscar_pending_title": "Oscar En İyi Film",
+    "oscar_pending_subtitle": "Çok Yakında Belli Olacak",
+    "oscar_pending_toast": "{{year}} yılı Oscar kazananı henüz açıklanmadı.",
+    "oscar_mode_category": "Kategori",
+    "oscar_mode_year": "Yıl",
+    "oscar_select_year": "Yıl Seçin",
+    "oscar_year_title": "{{year}} Oscar Ödülleri",
+    "oscar_cat_best_picture": "En İyi Film",
+    "oscar_cat_international": "Uluslararası",
+    "oscar_cat_animation": "Animasyon",
+    "oscar_cat_visual_effects": "Görsel Efekt",
+    "oscar_cat_documentary": "Belgesel",
+    "oscar_cat_cinematography": "Görüntü Yönetimi"
   },
   "comments": "Yorumlar"
 }

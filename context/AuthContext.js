@@ -105,14 +105,8 @@ export const AuthProvider = ({ children }) => {
         // İlk açılışta (onboarding görülmediyse) tanıtım akışına, sonrasında
         // doğrudan giriş ekranına yönlendir.
         const seenOnboarding = get(Keys.hasSeenOnboarding);
-        // ⚠️ GELİŞTİRME MODU: onboarding'i her açılışta göster.
-        // __DEV__ kapısı sayesinde release build'de normal akış çalışır:
-        // onboarding yalnızca ilk açılışta görünür.
-        const FORCE_ONBOARDING_DEV = __DEV__;
         setInitialRoute(
-          FORCE_ONBOARDING_DEV || !seenOnboarding
-            ? "OnboardingScreen"
-            : "LoginScreen",
+          seenOnboarding ? "LoginScreen" : "OnboardingScreen",
         );
         setUser(null);
         setNeedsProfileCompletion(false);

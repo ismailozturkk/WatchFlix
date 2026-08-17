@@ -201,7 +201,9 @@ function PetCompanion({ fabRight = AI_FAB_RIGHT, fabBottom = AI_FAB_BOTTOM }) {
   const tap = Gesture.Tap()
     .maxDistance(10)
     .onEnd(() => {
-      runOnJS(cycleState)();
+      // Tek dokunuş → yapay zeka sohbetini aç.
+      // Durum değiştirme (cycleState) ileriki sürüme bırakıldı.
+      runOnJS(openAiChat)();
     });
 
   const longPress = Gesture.LongPress()
@@ -243,27 +245,30 @@ function PetCompanion({ fabRight = AI_FAB_RIGHT, fabBottom = AI_FAB_BOTTOM }) {
         </GestureDetector>
       ) : null}
 
-      <TouchableOpacity
-        activeOpacity={0.85}
-        accessibilityRole="button"
-        accessibilityLabel="CineMatch"
-        onPress={openAiChatFromFab}
-        style={[
-          styles.aiFab,
-          {
-            right: fabRight,
-            bottom: fabBottom,
-          },
-        ]}
-      >
-        <LottieView
-          ref={aiFabRef}
-          style={styles.aiFabLottie}
-          source={require("@lottie/gemini.json")}
-          autoPlay={appActive}
-          loop={false}
-        />
-      </TouchableOpacity>
+      {/* Pet açıkken FAB gizlenir: pet zaten aynı işlevi (AI sohbet aç) görüyor. */}
+      {!petEnabled && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="CineMatch"
+          onPress={openAiChatFromFab}
+          style={[
+            styles.aiFab,
+            {
+              right: fabRight,
+              bottom: fabBottom,
+            },
+          ]}
+        >
+          <LottieView
+            ref={aiFabRef}
+            style={styles.aiFabLottie}
+            source={require("@lottie/gemini.json")}
+            autoPlay={appActive}
+            loop={false}
+          />
+        </TouchableOpacity>
+      )}
 
     </>
   );

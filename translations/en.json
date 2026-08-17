@@ -2462,7 +2462,23 @@
     "ada_gore": "By name",
     "n_sonuc_goster": "Show {{n}} results",
     "siliniyor": "Removing...",
-    "islem_tamamlanamadi": "Something went wrong"
+    "islem_tamamlanamadi": "Something went wrong",
+    "cikis_yap_aciklama": "Sign out of your account securely",
+    "cikis_onay_mesaj": "Are you sure you want to sign out of your account?",
+    "wrapped_section": "Wrapped & Archive",
+    "oscar_pending_title": "Oscars Best Picture",
+    "oscar_pending_subtitle": "Winner Coming Soon",
+    "oscar_pending_toast": "The {{year}} Oscar winner has not been announced yet.",
+    "oscar_mode_category": "Category",
+    "oscar_mode_year": "Year",
+    "oscar_select_year": "Select Year",
+    "oscar_year_title": "{{year}} Academy Awards",
+    "oscar_cat_best_picture": "Best Picture",
+    "oscar_cat_international": "International",
+    "oscar_cat_animation": "Animation",
+    "oscar_cat_visual_effects": "Visual Effects",
+    "oscar_cat_documentary": "Documentary",
+    "oscar_cat_cinematography": "Cinematography"
   },
   "comments": "Comments"
 }

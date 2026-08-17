@@ -45,6 +45,10 @@ import {
   useStreamingProviderSettings,
 } from "@context/AppSettingsContext";
 import { useLanguage } from "@context/LanguageContext";
+import AppIcon from "../../components/AppIcon";
+import { LinearGradient } from "expo-linear-gradient";
+import { toast } from "../../components/AppToast";
+import { i18nText } from "../../utils/i18nText";
 
 const { width } = Dimensions.get("window");
 const SIDE = 12;
@@ -54,7 +58,7 @@ const itemWidthFor = (columns) =>
   (width - SIDE * 2 - COL_GAP * (columns - 1)) / columns;
 
 const isSpacer = (x) =>
-  !x || x.id === "left-spacer" || x.id === "right-spacer" || !x.poster_path;
+  !x || x.id === "left-spacer" || x.id === "right-spacer" || (!x.poster_path && !x.isPending);
 
 // Diziyi `size`'lık satırlara böler.
 const chunk = (arr, size) => {
@@ -80,6 +84,77 @@ const PosterCard = React.memo(function PosterCard({
   const onPressOut = () =>
     Animated.timing(scale, { toValue: 1, duration: 150, useNativeDriver: true }).start();
 
+  if (item?.isPending) {
+    return (
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        onPress={() => {
+          toast(
+            i18nText("autoI18n.oscar_pending_toast", "{year} yılı Oscar kazananı henüz açıklanmadı.").replace(
+              "{year}",
+              String(item.year || 2027),
+            ),
+          );
+        }}
+        style={[styles.item, { width: itemW }]}
+      >
+        <Animated.View style={{ transform: [{ scale }] }}>
+          <LinearGradient
+            colors={["#2c2411", "#1a1608", "#0d0b04"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              styles.poster,
+              {
+                width: itemW,
+                height: itemH,
+                borderRadius: radius,
+                borderWidth: 1,
+                borderColor: "rgba(255, 215, 0, 0.4)",
+                justifyContent: "center",
+                alignItems: "center",
+                padding: 4,
+              },
+            ]}
+          >
+            <AppIcon
+              family="MaterialCommunityIcons"
+              name="trophy-award"
+              size={Math.max(18, itemW * 0.26)}
+              color="#ffd700"
+            />
+            <Text
+              allowFontScaling={false}
+              style={{
+                color: "#ffd700",
+                fontWeight: "800",
+                fontSize: Math.max(10, itemW * 0.13),
+                marginTop: 3,
+              }}
+            >
+              {item.year}
+            </Text>
+            <Text
+              allowFontScaling={false}
+              numberOfLines={2}
+              style={{
+                color: "#e6c65c",
+                fontSize: Math.max(8, itemW * 0.08),
+                textAlign: "center",
+                marginTop: 2,
+                fontWeight: "600",
+              }}
+            >
+              {i18nText("autoI18n.oscar_pending_title", "Oscar En İyi Film")}
+            </Text>
+          </LinearGradient>
+        </Animated.View>
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -103,9 +178,16 @@ const PosterCard = React.memo(function PosterCard({
             { width: itemW, height: itemH, borderRadius: radius, shadowColor: theme.shadow },
           ]}
           cachePolicy="memory-disk"
-          recyclingKey={`seeall-${mediaType}-${item.id}`}
+          recyclingKey={`seeall-${mediaType}-${item.year ? `oscar-${item.year}-${item.categoryKey || ""}-` : ""}${item.id}`}
           transition={120}
         />
+        {item?.year ? (
+          <View style={styles.oscarYearBadge}>
+            <Text allowFontScaling={false} style={styles.oscarYearBadgeText}>
+              {item.year}
+            </Text>
+          </View>
+        ) : null}
         {posterBadges?.tmdbRating !== false && typeof item.vote_average === "number" ? (
           <View style={[styles.rating, { backgroundColor: theme.secondaryt }]}>
             <Text allowFontScaling={false} style={styles.ratingText}>
@@ -199,6 +281,7 @@ function SeeAllGrid({
   loadingMore,
   hasMore,
   onActivate,
+  headerExtra,
 }) {
   const { theme } = useTheme();
   const {
@@ -221,7 +304,7 @@ function SeeAllGrid({
     const out = [];
     for (const x of data || []) {
       if (isSpacer(x)) continue;
-      const key = String(x.id);
+      const key = x.year ? `oscar-${x.year}-${x.categoryKey || ""}-${x.id}` : String(x.id);
       if (seen.has(key)) continue;
       seen.add(key);
       out.push(x);
@@ -273,11 +356,11 @@ function SeeAllGrid({
   }, [columns]);
 
   const renderRow = useCallback(
-    ({ item: row }) => (
+    ({ item: row, index: rIdx }) => (
       <View style={[styles.row, { marginBottom: COL_GAP + 4 }]}>
-        {row.map((it) => (
+        {row.map((it, cIdx) => (
           <PosterCard
-            key={String(it.id)}
+            key={it.year ? `oscar-${it.year}-${it.categoryKey || ""}-${it.id || `${rIdx}_${cIdx}`}` : `${it.id || `${rIdx}_${cIdx}`}`}
             item={it}
             mediaType={mediaType}
             theme={theme}
@@ -314,9 +397,13 @@ function SeeAllGrid({
           />
         </View>
 
+        {headerExtra ? <View style={{ paddingBottom: 6 }}>{headerExtra}</View> : null}
+
         <FlatList
           data={rows}
-          keyExtractor={(row, i) => `${row[0] ? row[0].id : "r"}-${i}`}
+          keyExtractor={(row, i) =>
+            `${row[0] ? (row[0].year ? `oscar-${row[0].year}-${row[0].categoryKey || ""}-${row[0].id}` : row[0].id) : "r"}-${i}`
+          }
           renderItem={renderRow}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
@@ -328,11 +415,14 @@ function SeeAllGrid({
             contentHeightRef.current = h;
             runAutoFill();
           }}
+          onScrollBeginDrag={() => {
+            canTrigger.current = true;
+          }}
           onMomentumScrollBegin={() => {
             canTrigger.current = true;
           }}
           onEndReached={handleEndReached}
-          onEndReachedThreshold={0.5}
+          onEndReachedThreshold={0.8}
           initialNumToRender={6}
           maxToRenderPerBatch={6}
           windowSize={7}
@@ -383,11 +473,71 @@ function MovieSeeAll({ section, title, navigation }) {
       loadingMore: ctx.loadingMoreUpcoming,
       hasMore: ctx.pageUpcoming < ctx.totalPagesUpcoming,
     },
+    oscar: {
+      data: ctx.moviesOscar,
+      loadMore: ctx.loadMoreOscar,
+      loadingMore: ctx.loadingMoreOscar,
+      hasMore: ctx.hasMoreOscar,
+    },
   }[section];
+
+  const { theme } = useTheme();
 
   const onActivate = useCallback(() => {
     ctx.activateMovieSection?.(section);
   }, [ctx.activateMovieSection, section]);
+
+  const headerExtra = useMemo(() => {
+    if (section !== "oscar" || !ctx.OSCAR_CATEGORIES) return null;
+    return (
+      <FlatList
+        data={ctx.OSCAR_CATEGORIES}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(item) => item.key}
+        contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
+        renderItem={({ item }) => {
+          const isSelected = ctx.selectedOscarCategory === item.key;
+          return (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                ctx.changeOscarCategory?.(item.key);
+              }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 14,
+                borderWidth: 1,
+                backgroundColor: isSelected ? theme.accent : theme.secondary,
+                borderColor: isSelected ? theme.accent : theme.border,
+              }}
+            >
+              <AppIcon
+                family="MaterialCommunityIcons"
+                name={item.icon || "trophy"}
+                size={13}
+                color={isSelected ? "#ffffff" : theme.text.secondary}
+              />
+              <Text
+                allowFontScaling={false}
+                style={{
+                  fontSize: 11,
+                  color: isSelected ? "#ffffff" : theme.text.secondary,
+                  fontWeight: isSelected ? "700" : "500",
+                }}
+              >
+                {i18nText(item.labelKey, item.tr)}
+              </Text>
+            </TouchableOpacity>
+          );
+        }}
+      />
+    );
+  }, [section, ctx.OSCAR_CATEGORIES, ctx.selectedOscarCategory, ctx.changeOscarCategory, theme]);
 
   return (
     <SeeAllGrid
@@ -399,6 +549,7 @@ function MovieSeeAll({ section, title, navigation }) {
       loadingMore={cfg?.loadingMore}
       hasMore={!!cfg?.hasMore}
       onActivate={onActivate}
+      headerExtra={headerExtra}
     />
   );
 }
@@ -728,5 +879,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     width: "100%",
+  },
+  oscarYearBadge: {
+    position: "absolute",
+    top: 5,
+    left: 5,
+    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: "rgba(255, 215, 0, 0.5)",
+  },
+  oscarYearBadgeText: {
+    color: "#ffd700",
+    fontSize: 10,
+    fontWeight: "800",
   },
 });

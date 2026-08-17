@@ -686,7 +686,15 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     postTypeAnim.setValue(0);
     searchTypeAnim.setValue(0);
     closeSearch();
-    onClose();
+    // iOS'ta AppAlert (BottomSheetModal) kapanış animasyonu ~280 ms sürer.
+    // onClose() hemen çağrılırsa iki modalın kapanışı çakışır ve iOS bazen
+    // CreatePostModal'ı kapatmayı atlıyor. Kısa bir gecikme (320 ms) bu
+    // race condition'ı tamamen ortadan kaldırır.
+    if (Platform.OS === "ios") {
+      setTimeout(onClose, 320);
+    } else {
+      onClose();
+    }
   };
 
   // Kullanıcı kaynaklı kapatma (İptal / backdrop / donanım geri). Formda

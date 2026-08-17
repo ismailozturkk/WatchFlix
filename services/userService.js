@@ -76,13 +76,41 @@ export const DEFAULT_LIST_VISIBLE = {
 // ── Username helpers ────────────────────────────────────────────────────────
 
 export function normalizeUsername(username) {
-  return (username || "").trim().toLowerCase();
+  if (!username || typeof username !== "string") return "";
+  return username
+    .trim()
+    .replace(/İ/g, "i")
+    .replace(/I/g, "i")
+    .toLowerCase();
 }
 
-export const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/;
+/**
+ * Kullanıcı adı kuralları:
+ * - 3 ile 20 karakter arası ({3,20})
+ * - Yalnızca küçük harfler (a-z), rakamlar (0-9) ve alt çizgi (_)
+ * - Sadece rakamlardan oluşamaz; en az bir küçük harf içermelidir (?=.*[a-z])
+ */
+export const USERNAME_REGEX = /^(?=.*[a-z])[a-z0-9_]{3,20}$/;
 
 export function isValidUsername(username) {
-  return USERNAME_REGEX.test((username || "").trim());
+  if (!username || typeof username !== "string") return false;
+  return USERNAME_REGEX.test(username.trim());
+}
+
+/**
+ * Kullanıcı adı girdisini canlı olarak temizler:
+ * - Boşlukları temizler
+ * - Türkçe İ/I harflerini İngilizce i'ye ve küçük harfe çevirir
+ * - Maksimum 20 karakterle sınırlar
+ */
+export function formatUsernameInput(text) {
+  if (!text || typeof text !== "string") return "";
+  return text
+    .replace(/İ/g, "i")
+    .replace(/I/g, "i")
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .slice(0, 20);
 }
 
 /**
@@ -114,7 +142,7 @@ export async function searchUsersByUsername(searchTerm, { excludeUid, max = 20 }
  */
 export async function isUsernameAvailable(username, { excludeUid } = {}) {
   const lower = normalizeUsername(username);
-  if (!isValidUsername(username)) return false;
+  if (!isValidUsername(lower)) return false;
   const snap = await getDoc(doc(db, "Usernames", lower));
   if (!snap.exists()) return true;
   // Kendi rezervasyonun senin için "dolu" değildir. excludeUid verilmezse eski
@@ -155,13 +183,13 @@ export async function createUserProfile({
       UserProfileErrorCode.MISSING_UID,
       "createUserProfile: uid yok",
     );
-  if (!isValidUsername(username))
+  const usernameLower = normalizeUsername(username);
+  if (!isValidUsername(usernameLower))
     throw new UserProfileError(
       UserProfileErrorCode.INVALID_USERNAME,
-      "Geçersiz kullanıcı adı (3-20 char, a-z 0-9 _)",
+      "Geçersiz kullanıcı adı (3-20 char, en az bir harf, a-z 0-9 _)",
     );
 
-  const usernameLower = normalizeUsername(username);
   // Doğrulanmamış bir değer Firestore'a girmesin; `undefined` yazmak da
   // setDoc'u düşürür, o yüzden alan ya geçerli ya da hiç yok.
   const dogumTarihi = parseBirthDate(birthDate) ? birthDate.trim() : null;
@@ -217,10 +245,10 @@ export async function createUserProfile({
 
     const identity = {
       uid,
-      username: username.trim(),
+      username: usernameLower,
       usernameLower,
       email,
-      displayName: displayName || username,
+      displayName: displayName || usernameLower,
       // Var olan profilde bu alan varsa ve bu çağrıda gelmediyse SİLİNMEMELİ —
       // merge yolundan geçen eski hesabın yaş kaydı düşerse kapı açılır.
       ...(dogumTarihi ? { birthDate: dogumTarihi } : {}),
@@ -299,9 +327,9 @@ export async function updateUserProfile(uid, partial) {
  * Username değiştir — eski rezervasyonu sil + yeni rezerve et.
  */
 export async function changeUsername(uid, newUsername) {
-  if (!isValidUsername(newUsername))
-    throw new Error("Geçersiz kullanıcı adı");
   const newLower = normalizeUsername(newUsername);
+  if (!isValidUsername(newLower))
+    throw new Error("Geçersiz kullanıcı adı");
 
   await runTransaction(db, async (tx) => {
     const userRef = doc(db, "Users", uid);
@@ -345,7 +373,7 @@ export async function changeUsername(uid, newUsername) {
       tx.delete(staleUsernameRef);
     }
     tx.update(userRef, {
-      username: newUsername.trim(),
+      username: newLower,
       usernameLower: newLower,
       updatedAt: serverTimestamp(),
     });

@@ -206,20 +206,22 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
   // ── 1c. İzin ön-açıklaması (priming) ─────────────────────────────────────
   //
   // Ayarlarda "Tüm bildirimler" varsayılan olarak AÇIK; OS izni yoksa hiçbir
-  // hatırlatma zamanlanmaz (canSchedule false → tüm reminder_* iptal) ve
-  // kullanıcı bunu hiç fark etmez. İzni sormak şart, ama SORULMA ANI kritik:
+  // hatırlatma zamanlanmaz ve kullanıcı bunu hiç fark etmez. İzni sormak şart,
+  // ama SORULMA ANI kritik:
   //
   //   ESKİDEN: açılıştan ~4.2 sn sonra sistem diyaloğu habersiz açılıyordu.
   //   Kullanıcı neyin sorulduğunu görmeden "İzin verme" diyor, iOS'ta o hak
   //   ömürlük yanıyordu. App Review'da da yorum konusu.
   //
-  //   ŞİMDİ: önce KENDİ sayfamız açılıyor ve yalnız kullanıcı "İzin ver"
-  //   dedikten sonra sistem diyaloğu geliyor. Sayfayı çağıran taraf belirliyor
-  //   (ilk hatırlatıcı kurulduğunda) — açılışta değil, anlamlı bağlamda.
+  //   ŞİMDİ (startup-prime): splash + navigation settle ettikten 1.5 sn sonra
+  //   KENDİ sayfamız açılıyor. Kullanıcı içeriği gördükten sonra bağlamını
+  //   anlayarak karar veriyor. "Şimdi değil" seçeneği hiçbir sistem hakkını
+  //   harcamaz — Ayarlar'daki uyarı satırı her zaman açık kapı.
   //
-  // Sayfa TEK SEFERLİK: iki düğme de bayrağı yakıyor. "Şimdi değil" diyen
-  // kullanıcı bir daha rahatsız edilmez, Ayarlar'daki uyarı satırı
-  // (components/NotificationPermissionNotice.js) her zaman açık kapı.
+  // Sayfa TEK SEFERLİK: iki düğme de bayrağı yakıyor. Daha önce gösterilmişse
+  // (primeShown=true) ya da izin zaten verilmişse (granted) açılmaz.
+  // Kalıcı reddedilmişse (canAskAgain=false) açmak anlamsız — sadece
+  // NotificationPermissionNotice ayarlar satırı aktif olur.
   const [primeVisible, setPrimeVisible] = useState(false);
   const [primeShown, setPrimeShown] = useState(
     () => get(Keys.notificationPrimeShown) === true,
@@ -244,6 +246,35 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
     setPrimeVisible(true);
     return true;
   }, []);
+
+  // ── 1d. Startup otomatik priming ──────────────────────────────────────────
+  //
+  // startupReady=true (splash + 4.2 sn buffer) + uid (oturum açık) olduktan
+  // sonra 1.5 sn daha bekle: navigation stack settle etsin ve kullanıcı ana
+  // içeriği bir an görsün. Ardından izin gerekiyorsa PrimingSheet aç.
+  //
+  // uid bağımlılığı: kullanıcı çıkış yapıp başka hesapla girerse yeni hesap
+  // için de değerlendirilir (primeShown kişiye değil cihaza kayıtlı).
+  const startupPrimeRef = useRef(false);
+  useEffect(() => {
+    // startupReady henüz açılmadıysa veya oturum yoksa bekle.
+    if (!startupReady || !uid) return undefined;
+    // Bu effect uid her değiştiğinde çalışır; bir kez yeterli.
+    if (startupPrimeRef.current) return undefined;
+    startupPrimeRef.current = true;
+
+    const timer = setTimeout(() => {
+      // Gecikme sırasında izin verilmiş ya da bayrak atılmış olabilir —
+      // needsPrimingRef her render'da güncelleniyor, anlık doğru değeri tutar.
+      if (needsPrimingRef.current) {
+        setPrimeVisible(true);
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+    // startupReady bir kez true olur; uid değişirse yeni hesap için de tetikle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startupReady, uid]);
 
   const closePrime = useCallback(() => {
     set(Keys.notificationPrimeShown, true);

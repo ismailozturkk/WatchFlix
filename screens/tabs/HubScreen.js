@@ -31,6 +31,7 @@ import AppIcon from "@components/AppIcon";
 import ScreenDecor from "@components/ScreenDecor";
 import ProfileGamesModule from "@components/profile/ProfileGamesModule";
 import TournamentWidget from "@components/hub/TournamentWidget";
+import HubWrappedModule from "@components/hub/HubWrappedModule";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useAuth } from "@context/AuthContext";
@@ -265,7 +266,10 @@ export default function HubScreen({ navigation }) {
         </Text>
         <TournamentWidget navigation={navigation} />
 
-        {/* Oyunlar (profilden taşındı) */}
+        {/* Wrapped ve Yıllık Arşiv (profilden taşındı) */}
+        <HubWrappedModule navigation={navigation} />
+
+        {/* Oyunlar */}
         <ProfileGamesModule navigation={navigation} />
         </ScrollView>
       </SafeAreaView>

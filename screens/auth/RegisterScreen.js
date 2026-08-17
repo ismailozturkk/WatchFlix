@@ -31,7 +31,10 @@ import { useLanguage } from "../../context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   createUserProfile,
+  formatUsernameInput,
   isUsernameAvailable,
+  isValidUsername,
+  normalizeUsername,
   UserProfileErrorCode,
 } from "../../services/userService";
 import ScreenDecor from "../../components/ScreenDecor";
@@ -103,15 +106,17 @@ export default function RegisterScreen({ navigation }) {
 
   // Basit e-posta biçim kontrolü (boşken nötr)
   const emailValid = email.length === 0 ? null : /^\S+@\S+\.\S+$/.test(email);
-  const usernameChecking = username.length >= 3 && usernameAvailable === null;
+  const usernameValid = isValidUsername(username);
+  const usernameChecking =
+    username.length >= 3 && usernameValid && usernameAvailable === null;
   const canSubmit =
     name.trim().length > 0 &&
     lastname.trim().length > 0 &&
     // 18 altı olmak kaydı ENGELLEMEZ (yalnız yetişkin içerik kapanır), ama
     // 13 altı engeller — bkz. utils/ageGate.js → MIN_REGISTER_AGE.
     canRegister(birthDate) &&
-    username.length >= 3 &&
-    usernameAvailable !== false &&
+    usernameValid &&
+    usernameAvailable === true &&
     emailValid === true &&
     passwordCorrect === true &&
     passwordCorrectAgain === true;
@@ -135,25 +140,21 @@ export default function RegisterScreen({ navigation }) {
     }
   };
 
-  const validateUsername = (text) => {
-    const regex = /^[a-z0-9_]+$/;
-    return regex.test(text);
-  };
-
   const handleUsernameChange = (text) => {
-    setUsername(text);
-    if (!text || text.length < 3) {
+    const clean = formatUsernameInput(text);
+    setUsername(clean);
+    if (!clean || clean.length < 3) {
       setUsernameAvailable(null);
       return;
     }
-    if (text.length > 20 || !validateUsername(text)) {
+    if (!isValidUsername(clean)) {
       setUsernameAvailable(false);
       return;
     }
     setUsernameAvailable(null);
     if (usernameTimeoutRef.current) clearTimeout(usernameTimeoutRef.current);
     usernameTimeoutRef.current = setTimeout(() => {
-      checkUsername(text.toLowerCase());
+      checkUsername(clean);
     }, 500);
   };
 
@@ -175,14 +176,36 @@ export default function RegisterScreen({ navigation }) {
 
   const createAccount = async () => {
     if (isloading) return; // çift dokunma koruması
-    if (!username || username.length < 3) {
+    const cleanUsername = normalizeUsername(username);
+    if (!cleanUsername || cleanUsername.length < 3) {
       Toast.show({
         type: "error",
         text1: i18nText("autoI18n.lutfen_kullanici_adini_duzenleyiniz", "Lütfen kullanıcı adını düzenleyiniz!"),
       });
       return;
     }
-    if (usernameAvailable === false) {
+    if (!isValidUsername(cleanUsername)) {
+      const isAllDigits = /^[0-9]+$/.test(cleanUsername);
+      Toast.show({
+        type: "error",
+        text1: isAllDigits
+          ? (language === "tr"
+              ? "Kullanıcı adı sadece rakamlardan oluşamaz (en az bir harf içermelidir)."
+              : "Username cannot consist only of numbers (must contain at least one letter).")
+          : i18nText("autoI18n.gecersiz_kullanici_adi_3_20_karakter_a_z_0_9", "Geçersiz kullanıcı adı (3-20 karakter, en az bir harf, a-z 0-9 _)"),
+      });
+      return;
+    }
+    if (usernameChecking || usernameAvailable === null) {
+      Toast.show({
+        type: "info",
+        text1: language === "tr"
+          ? "Kullanıcı adı kontrol ediliyor, lütfen bekleyin..."
+          : "Checking username availability, please wait...",
+      });
+      return;
+    }
+    if (usernameAvailable !== true) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.bu_kullanici_adi_alinmis", "Bu kullanıcı adı alınmış!") });
       return;
     }
@@ -237,7 +260,7 @@ export default function RegisterScreen({ navigation }) {
       // Çakışırsa createUserProfile throw eder → catch'e düşer, user'a hata.
       await createUserProfile({
         uid: user.uid,
-        username,
+        username: cleanUsername,
         email,
         displayName,
         birthDate,
@@ -567,6 +590,7 @@ export default function RegisterScreen({ navigation }) {
               />
               <TextInput
                 ref={usernameRef}
+                value={username}
                 allowFontScaling={false}
                 style={[
                   styles.textInput,
@@ -574,7 +598,7 @@ export default function RegisterScreen({ navigation }) {
                     color:
                       usernameAvailable === false ? ERROR : theme.text.primary,
                     textDecorationLine:
-                      usernameAvailable === false ? "line-through" : "none",
+                      usernameAvailable === false && !usernameValid ? "line-through" : "none",
                   },
                 ]}
                 placeholderTextColor={theme.text.muted}
@@ -601,11 +625,28 @@ export default function RegisterScreen({ navigation }) {
                 <Ionicons name="close-circle" size={18} color={ERROR} />
               )}
             </View>
-            {usernameAvailable === null &&
-              username.length > 0 &&
-              username.length < 3 && (
-                <Text style={[styles.hintText, { color: theme.text.muted }]}>{i18nText("autoI18n.en_az_3_karakter_yalnizca_a_z_0_9", "En az 3 karakter · yalnızca a–z, 0–9, _")}</Text>
-              )}
+            {username.length > 0 && username.length < 3 && (
+              <Text style={[styles.hintText, { color: theme.text.muted }]}>
+                {i18nText("autoI18n.en_az_3_karakter_yalnizca_a_z_0_9", "En az 3 karakter · yalnızca a–z, 0–9, _")}
+              </Text>
+            )}
+            {username.length >= 3 && !usernameValid && /^[0-9_]+$/.test(username) && (
+              <Text style={[styles.hintText, { color: ERROR }]}>
+                {language === "tr"
+                  ? "Kullanıcı adı sadece rakamlardan veya alt çizgiden oluşamaz (en az bir harf içermelidir)."
+                  : "Username cannot be only numbers or underscores (must contain at least one letter)."}
+              </Text>
+            )}
+            {username.length >= 3 && !usernameValid && !/^[0-9_]+$/.test(username) && (
+              <Text style={[styles.hintText, { color: ERROR }]}>
+                {i18nText("autoI18n.gecersiz_kullanici_adi_3_20_karakter_a_z_0_9", "Geçersiz kullanıcı adı (3-20 karakter, en az bir harf, a-z 0-9 _)")}
+              </Text>
+            )}
+            {usernameAvailable === false && usernameValid && (
+              <Text style={[styles.hintText, { color: ERROR }]}>
+                {i18nText("autoI18n.bu_kullanici_adi_alinmis", "Bu kullanıcı adı alınmış!")}
+              </Text>
+            )}
 
             {/* E-posta */}
             <View

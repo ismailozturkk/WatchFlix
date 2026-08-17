@@ -37,6 +37,7 @@ import SwitchToggle from "@components/SwitchToggle";
 import SwipeCard from "@components/SwipeCard";
 import ModalBlurBackdrop from "../../components/common/ModalBlurBackdrop";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import ConfirmSheet from "@components/common/ConfirmSheet";
 import useSheetTransition from "@hooks/useSheetTransition";
 import { LinearGradient } from "expo-linear-gradient";
 import CountryFlag from "react-native-country-flag";
@@ -44,6 +45,7 @@ import ScreenDecor from "../../components/ScreenDecor";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
 import { appAlert } from "@components/AppAlert";
+import { getAuth } from "firebase/auth";
 import { Image } from "expo-image";
 import TmdbLogo from "../../components/TmdbLogo";
 import JustWatchLogo from "../../components/JustWatchLogo";
@@ -389,6 +391,25 @@ export default function SettingsScreen() {
   const navigation = useNavigation();
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [langSearch, setLangSearch] = useState("");
+  const [modalVisibleLogout, setModalVisibleLogout] = useState(false);
+
+  const handleSignOut = async () => {
+    try {
+      const auth = getAuth();
+      await auth.signOut();
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "LoginScreen" }],
+      });
+    } catch (error) {
+      appAlert(
+        i18nText("autoI18n.hata", "Hata"),
+        error?.message || i18nText("autoI18n.hata_olustu", "Hata oluştu"),
+        undefined,
+        { type: "error" },
+      );
+    }
+  };
 
   // Dil sayfası: blur yerinde solar, sayfa kayar
   // (bkz. hooks/useSheetTransition.js).
@@ -1092,6 +1113,25 @@ export default function SettingsScreen() {
           />
         </View>
 
+        {/* Çıkış Yap — Hakkında bölümünün hemen üstünde */}
+        <SectionLabel color={C.danger}>
+          {(t.logout || "Çıkış Yap").toUpperCase()}
+        </SectionLabel>
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <SettingRow
+            colors={C}
+            iconBg={C.dangerDim}
+            iconColor={C.danger}
+            iconName="log-out-outline"
+            title={t.logout || "Çıkış Yap"}
+            subtitle={i18nText("autoI18n.cikis_yap_aciklama", "Hesabından güvenli bir şekilde çıkış yap")}
+            danger
+            last
+            onPress={() => setModalVisibleLogout(true)}
+            right={<Chevron color={C.danger} />}
+          />
+        </View>
+
         <SwipeCard>
           <SectionLabel color={C.muted}>{t.about.toUpperCase()}</SectionLabel>
 
@@ -1458,6 +1498,28 @@ export default function SettingsScreen() {
             </View>
           </KeyboardAvoidingView>
         </Modal>
+
+        {/* Çıkış onayı alt sayfası */}
+        <ConfirmSheet
+          visible={modalVisibleLogout}
+          onClose={() => setModalVisibleLogout(false)}
+          onConfirm={() => {
+            setModalVisibleLogout(false);
+            handleSignOut();
+          }}
+          icon="log-out-outline"
+          tone="danger"
+          title={t.logout || "Çıkış Yap"}
+          message={
+            t.profileScreen?.logoutMessage ||
+            i18nText(
+              "autoI18n.cikis_onay_mesaj",
+              "Hesabından çıkış yapmak istediğine emin misin?",
+            )
+          }
+          confirmLabel={t.logout || "Çıkış Yap"}
+          cancelLabel={t.cancel || "İptal"}
+        />
       </ScrollView>
     </View>
   );

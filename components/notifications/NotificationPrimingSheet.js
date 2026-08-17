@@ -102,12 +102,11 @@ export default function NotificationPrimingSheet({ visible, onAllow, onDismiss }
       </Pressable>
 
       {/* Geri dönüş yolunu baştan söylüyoruz: "Şimdi değil" bir kapı kapatmıyor.
-          Adres, NotificationPermissionNotice'ın durduğu ekran
-          (screens/tabs/settings/ReminderNotificationsScreen.js). */}
+          Adres: Ayarlar › İzinler & Veriler veya Hatırlatıcılar */}
       <Text style={[styles.footnote, { color: theme.text.muted }]}>
         {i18nText(
           "autoI18n.bildirim_on_dipnot",
-          "Bunu daha sonra Ayarlar › Hatırlatıcılar'dan açabilirsin.",
+          "Bunu daha sonra Ayarlar › İzinler & Veriler bölümünden de açabilirsin.",
         )}
       </Text>
     </BottomSheetModal>

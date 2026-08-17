@@ -1,10 +1,4 @@
-// createUserProfile + isUsernameAvailable davranis testleri.
-//
-// Denetimde bulunan iki blocker'i kilitler:
-//   1. Kendi rezervasyonuna tx.set atmak -> /Usernames'te `allow update` yok
-//      -> PERMISSION_DENIED -> tum transaction duser (retry akisi tamamen kirik).
-//   2. Var olan Users dokumanina tam tx.set -> sayaclar/bio/privacy/createdAt
-//      sifirlanir (Google baglayan eski kullanicinin hesabi silinir gibi olur).
+// createUserProfile + isUsernameAvailable + username helper testleri.
 
 jest.mock("firebase/auth", () => ({ updateProfile: jest.fn() }));
 jest.mock("../firebase", () => ({ auth: { currentUser: null }, db: {} }));
@@ -35,13 +29,14 @@ jest.mock("firebase/firestore", () => ({
 const {
   createUserProfile,
   isUsernameAvailable,
+  isValidUsername,
+  normalizeUsername,
+  formatUsernameInput,
   UserProfileErrorCode,
 } = require("../services/userService");
 
 const snapshot = (data) => ({ exists: () => data !== null, data: () => data });
 
-// docs: { "Usernames/ali_42": {...}, "Users/u1": {...} } — listelenmeyen her
-// yol "yok" sayilir.
 function primeTx(docs = {}) {
   mockTx.get.mockImplementation((ref) =>
     Promise.resolve(snapshot(ref.path in docs ? docs[ref.path] : null)),
@@ -52,6 +47,93 @@ const setsOn = (col) =>
   mockTx.set.mock.calls.filter(([ref]) => ref.col === col);
 
 beforeEach(() => jest.clearAllMocks());
+
+describe("Username validation and helpers", () => {
+  describe("normalizeUsername", () => {
+    it("bosluklari trimler, Turkce I/İ harflerini i'ye ve kucuk harfe cevirir", () => {
+      expect(normalizeUsername("  Ali_42  ")).toBe("ali_42");
+      expect(normalizeUsername("İSMAİL_42")).toBe("ismail_42");
+      expect(normalizeUsername("")).toBe("");
+      expect(normalizeUsername(null)).toBe("");
+      expect(normalizeUsername(undefined)).toBe("");
+    });
+  });
+
+  describe("formatUsernameInput", () => {
+    it("bosluklari siler, kucuk harfe cevirir, Turkce I/İ harflerini i yapar ve 20 karakterle sinirlar", () => {
+      expect(formatUsernameInput("  John Doe 123  ")).toBe("johndoe123");
+      expect(formatUsernameInput("İSMAİL")).toBe("ismail");
+      expect(formatUsernameInput("A".repeat(25))).toBe("a".repeat(20));
+      expect(formatUsernameInput("User_Name_99")).toBe("user_name_99");
+      expect(formatUsernameInput("")).toBe("");
+      expect(formatUsernameInput(null)).toBe("");
+    });
+  });
+
+  describe("isValidUsername", () => {
+    it("gecerli kullanici adlarini kabul eder (kucuk harf, rakam, alt cizgi, en az 1 harf)", () => {
+      expect(isValidUsername("ali_42")).toBe(true);
+      expect(isValidUsername("john_doe")).toBe(true);
+      expect(isValidUsername("user123")).toBe(true);
+      expect(isValidUsername("a12")).toBe(true);
+      expect(isValidUsername("a_1")).toBe(true);
+      expect(isValidUsername("a".repeat(20))).toBe(true);
+      expect(isValidUsername("123a")).toBe(true);
+      expect(isValidUsername("123_456_a")).toBe(true);
+    });
+
+    it("sadece rakamlardan olusan kullanici adlarini REDDEDER", () => {
+      expect(isValidUsername("123")).toBe(false);
+      expect(isValidUsername("12345")).toBe(false);
+      expect(isValidUsername("987654321")).toBe(false);
+      expect(isValidUsername("007")).toBe(false);
+    });
+
+    it("sadece alt cizgi veya rakam+alt cizgiden olusan (harf icermeyen) adlari REDDEDER", () => {
+      expect(isValidUsername("___")).toBe(false);
+      expect(isValidUsername("123_456")).toBe(false);
+      expect(isValidUsername("_12345_")).toBe(false);
+    });
+
+    it("buyuk harf iceren kullanici adlarini REDDEDER (kucuk harf zorunlu)", () => {
+      expect(isValidUsername("Ali_42")).toBe(false);
+      expect(isValidUsername("JOHN")).toBe(false);
+      expect(isValidUsername("User_1")).toBe(false);
+    });
+
+    it("Turkce karakterleri REDDEDER (yalnizca Ingilizce karakterler)", () => {
+      expect(isValidUsername("şakir")).toBe(false);
+      expect(isValidUsername("ismail_öz")).toBe(false);
+      expect(isValidUsername("ömer_123")).toBe(false);
+      expect(isValidUsername("çağlar")).toBe(false);
+      expect(isValidUsername("gözde")).toBe(false);
+    });
+
+    it("gecersiz ozel karakterleri ve bosluklari REDDEDER", () => {
+      expect(isValidUsername("ali.42")).toBe(false);
+      expect(isValidUsername("ali-42")).toBe(false);
+      expect(isValidUsername("ali@42")).toBe(false);
+      expect(isValidUsername("ali 42")).toBe(false);
+      expect(isValidUsername("ali#42")).toBe(false);
+      expect(isValidUsername("ali!42")).toBe(false);
+    });
+
+    it("uzunluk sinirlarini denetler (min 3, max 20)", () => {
+      expect(isValidUsername("a")).toBe(false);
+      expect(isValidUsername("ab")).toBe(false);
+      expect(isValidUsername("abc")).toBe(true);
+      expect(isValidUsername("a".repeat(20))).toBe(true);
+      expect(isValidUsername("a".repeat(21))).toBe(false);
+    });
+
+    it("null/undefined/string olmayan girdileri REDDEDER", () => {
+      expect(isValidUsername(null)).toBe(false);
+      expect(isValidUsername(undefined)).toBe(false);
+      expect(isValidUsername("")).toBe(false);
+      expect(isValidUsername(12345)).toBe(false);
+    });
+  });
+});
 
 describe("isUsernameAvailable", () => {
   it("kendi rezervasyonunu MUSAIT sayar (excludeUid ile)", async () => {
@@ -77,10 +159,16 @@ describe("isUsernameAvailable", () => {
     mockGetDoc.mockResolvedValue(snapshot(null));
     await expect(isUsernameAvailable("ali_42")).resolves.toBe(true);
   });
+
+  it("gecersiz formattaki username icin false doner", async () => {
+    await expect(isUsernameAvailable("12345")).resolves.toBe(false);
+    await expect(isUsernameAvailable("ab")).resolves.toBe(false);
+    await expect(isUsernameAvailable("ali.42")).resolves.toBe(false);
+  });
 });
 
 describe("createUserProfile", () => {
-  it("yeni kullanici: rezervasyon + tam profil yazar", async () => {
+  it("yeni kullanici: rezervasyon + tam profil yazar (kucuk harfle saklar)", async () => {
     primeTx({});
 
     await createUserProfile({
@@ -94,8 +182,9 @@ describe("createUserProfile", () => {
     const [, payload] = setsOn("Users")[0];
     expect(payload).toMatchObject({
       uid: "u1",
-      username: "Ali_42",
+      username: "ali_42",
       usernameLower: "ali_42",
+      displayName: "Ali",
       friendsCount: 0,
       createdAt: "TS",
       listVisible: {
@@ -119,7 +208,6 @@ describe("createUserProfile", () => {
   it("rezervasyon BASKASININSA kodlu hata firlatir", async () => {
     primeTx({ "Usernames/ali_42": { uid: "other" } });
 
-    // UI metne regex atmasin diye kod sart (ham metin kullaniciya gosterilmez).
     await expect(
       createUserProfile({ uid: "u1", username: "Ali_42", email: "a@b.c" }),
     ).rejects.toMatchObject({ code: UserProfileErrorCode.USERNAME_TAKEN });
@@ -144,7 +232,7 @@ describe("createUserProfile", () => {
     expect(payload).not.toHaveProperty("bio");
     expect(payload).not.toHaveProperty("createdAt");
     expect(payload).not.toHaveProperty("privacy");
-    expect(payload).toMatchObject({ username: "Ali_42", displayName: "Ali" });
+    expect(payload).toMatchObject({ username: "ali_42", displayName: "Ali" });
   });
 
   it("username degistiyse eski rezervasyonu birakmaz (username yanmasin)", async () => {
@@ -182,6 +270,13 @@ describe("createUserProfile", () => {
   it("gecersiz username transaction'a hic girmez", async () => {
     await expect(
       createUserProfile({ uid: "u1", username: "ab", email: "a@b.c" }),
+    ).rejects.toMatchObject({ code: UserProfileErrorCode.INVALID_USERNAME });
+    expect(mockTx.set).not.toHaveBeenCalled();
+  });
+
+  it("sadece rakamlardan olusan username transaction'a hic girmez", async () => {
+    await expect(
+      createUserProfile({ uid: "u1", username: "123456", email: "a@b.c" }),
     ).rejects.toMatchObject({ code: UserProfileErrorCode.INVALID_USERNAME });
     expect(mockTx.set).not.toHaveBeenCalled();
   });

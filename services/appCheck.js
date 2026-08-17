@@ -75,15 +75,22 @@ export function initAppCheck(webApp) {
     } = rnfb;
     const provider = new ReactNativeFirebaseAppCheckProvider();
     const dev = typeof __DEV__ !== "undefined" && __DEV__;
+
+    // Geliştirmede (__DEV__) debug token Firebase Console'a kaydedilmediğinde
+    // Realtime Database "Provided AppCheck credentials are invalid" uyarısı basar.
+    // Geliştirme ortamında bu uyarıyı engellemek ve gereksiz ağ trafiği oluşturmamak
+    // için web SDK App Check köprüsü yalnız yayın (release) build'lerinde bağlanır.
+    if (dev) {
+      initialized = true;
+      return true;
+    }
+
     provider.configure({
       android: {
-        // Play Integrity yalnız imzalı/dağıtılmış build'lerde anlamlı;
-        // geliştirmede debug token kullanılır (Console'a kaydedilecek).
-        provider: dev ? "debug" : "playIntegrity",
+        provider: "playIntegrity",
       },
       apple: {
-        // iOS build'i henüz yok; App Attest Faz 3'te ele alınacak.
-        provider: dev ? "debug" : "appAttestWithDeviceCheckFallback",
+        provider: "appAttestWithDeviceCheckFallback",
       },
     });
     const nativeInstance = initNativeAppCheck(undefined, {
@@ -96,14 +103,20 @@ export function initAppCheck(webApp) {
     const { initializeAppCheck, CustomProvider } = require("firebase/app-check");
     initializeAppCheck(webApp, {
       provider: new CustomProvider({
-        getToken: async () => {
-          const result = await getNativeAppCheckToken(nativeInstance, false);
-          return {
-            token: result.token,
-            // RNFB süre bilgisini vermez; native SDK kendi önbelleğini
-            // yönettiği için kısa tutmak güvenli ve ucuzdur.
-            expireTimeMillis: Date.now() + 30 * 60 * 1000,
-          };
+        getToken: async (forceRefresh) => {
+          try {
+            const result = await getNativeAppCheckToken(nativeInstance, Boolean(forceRefresh));
+            if (result?.token && typeof result.token === "string" && result.token.trim().length > 0) {
+              return {
+                token: result.token,
+                expireTimeMillis: Date.now() + 30 * 60 * 1000,
+              };
+            }
+          } catch (err) {
+            // Token alınamadığında hata fırlatılır; böylece RTDB ve Firestore'a
+            // geçersiz/boş token gönderilmez ve sunucu websocket hatası atmaz.
+          }
+          throw new Error("AppCheck token unavailable");
         },
       }),
       isTokenAutoRefreshEnabled: true,

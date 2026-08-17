@@ -23,6 +23,7 @@ import { useUserProfile } from "../../../context/UserProfileContext";
 import { useProfileUi } from "../../../context/ProfileUiContext";
 import { AVATARS, getAvatarSource, clampAvatarIndex } from "../../../utils/avatars";
 import {
+  formatUsernameInput,
   isValidUsername,
   isUsernameAvailable,
   normalizeUsername,
@@ -115,8 +116,8 @@ export default function EditProfileScreen({ navigation }) {
   // Kullanıcı adı: format + müsaitlik (debounce)
   useEffect(() => {
     if (!initRef.current) return;
-    const u = username.trim();
-    if (normalizeUsername(u) === normalizeUsername(profile?.username || "")) {
+    const u = normalizeUsername(username);
+    if (u === normalizeUsername(profile?.username || "")) {
       setUsernameStatus("same");
       return;
     }
@@ -144,7 +145,7 @@ export default function EditProfileScreen({ navigation }) {
   const onSave = async () => {
     if (saving) return;
     const dn = displayName.trim();
-    const un = username.trim();
+    const un = normalizeUsername(username);
     const bo = bio.trim();
 
     if (!dn) {
@@ -152,16 +153,37 @@ export default function EditProfileScreen({ navigation }) {
       return;
     }
     const usernameChanged =
-      normalizeUsername(un) !== normalizeUsername(profile?.username || "");
+      un !== normalizeUsername(profile?.username || "");
     if (usernameChanged && !isValidUsername(un)) {
+      const isAllDigits = /^[0-9]+$/.test(un);
       Toast.show({
         type: "error",
-        text1: i18nText("autoI18n.gecersiz_kullanici_adi_3_20_karakter_a_z_0_9", "Geçersiz kullanıcı adı (3-20 karakter, a-z 0-9 _)"),
+        text1: isAllDigits
+          ? (tr
+              ? "Kullanıcı adı sadece rakamlardan oluşamaz (en az bir harf içermelidir)."
+              : "Username cannot consist only of numbers (must contain at least one letter).")
+          : i18nText("autoI18n.gecersiz_kullanici_adi_3_20_karakter_a_z_0_9", "Geçersiz kullanıcı adı (3-20 karakter, en az bir harf, a-z 0-9 _)"),
       });
       return;
     }
-    if (usernameChanged && usernameStatus === "taken") {
-      Toast.show({ type: "error", text1: i18nText("autoI18n.bu_kullanici_adi_alinmis_2", "Bu kullanıcı adı alınmış") });
+    if (usernameChanged && usernameStatus !== "available") {
+      if (usernameStatus === "checking") {
+        Toast.show({
+          type: "info",
+          text1: tr
+            ? "Kullanıcı adı kontrol ediliyor, lütfen bekleyin…"
+            : "Checking username availability, please wait…",
+        });
+        return;
+      }
+      if (usernameStatus === "taken") {
+        Toast.show({ type: "error", text1: i18nText("autoI18n.bu_kullanici_adi_alinmis_2", "Bu kullanıcı adı alınmış") });
+        return;
+      }
+      Toast.show({
+        type: "error",
+        text1: i18nText("autoI18n.gecersiz_kullanici_adi_3_20_karakter_a_z_0_9", "Geçersiz kullanıcı adı (3-20 karakter, en az bir harf, a-z 0-9 _)"),
+      });
       return;
     }
 
@@ -326,9 +348,27 @@ export default function EditProfileScreen({ navigation }) {
   };
 
   const usernameHint = () => {
+    const un = normalizeUsername(username);
     switch (usernameStatus) {
       case "invalid":
-        return { text: i18nText("autoI18n.kullanici_adi_kurali", "3-20 karakter · a-z, 0-9, _"), color: theme.colors.red };
+        if (un.length > 0 && un.length < 3) {
+          return {
+            text: i18nText("autoI18n.en_az_3_karakter_yalnizca_a_z_0_9", "En az 3 karakter · yalnızca a–z, 0–9, _"),
+            color: theme.colors.red,
+          };
+        }
+        if (un.length >= 3 && /^[0-9_]+$/.test(un)) {
+          return {
+            text: tr
+              ? "Kullanıcı adı sadece rakamlardan veya alt çizgiden oluşamaz (en az bir harf içermelidir)."
+              : "Username cannot be only numbers or underscores (must contain at least one letter).",
+            color: theme.colors.red,
+          };
+        }
+        return {
+          text: i18nText("autoI18n.gecersiz_kullanici_adi_3_20_karakter_a_z_0_9", "3-20 karakter · yalnızca a-z, 0-9, _ (en az bir harf)"),
+          color: theme.colors.red,
+        };
       case "checking":
         return { text: i18nText("autoI18n.kontrol_ediliyor", "Kontrol ediliyor…"), color: theme.text.muted };
       case "taken":
@@ -492,7 +532,7 @@ export default function EditProfileScreen({ navigation }) {
                 <Text style={[styles.atSign, { color: theme.text.muted }]}>@</Text>
                 <TextInput
                   value={username}
-                  onChangeText={(v) => setUsername(v.replace(/\s/g, ""))}
+                  onChangeText={(v) => setUsername(formatUsernameInput(v))}
                   placeholder={i18nText("autoI18n.kullanici_adi_ornegi", "kullanici_adi")}
                   placeholderTextColor={theme.text.muted}
                   autoCapitalize="none"

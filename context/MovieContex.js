@@ -19,6 +19,13 @@ import {
 } from "../utils/apiCache";
 import { setIfChanged, setListIfChanged } from "../utils/sameData";
 import { i18nText } from "../utils/i18nText";
+import {
+  getOscarConfig,
+  fetchOscarByCategory,
+  fetchOscarByYear,
+  OSCAR_CATEGORIES,
+  DEFAULT_OSCAR_CATEGORY,
+} from "../services/oscarService";
 
 
 const MovieContext = createContext();
@@ -322,52 +329,122 @@ export const MovieProvider = ({ children }) => {
   };
 
   //!--------------------------- movie oscar --------------
-  // Önceki adımda bulduğumuz TMDB ID'leri
-  const moviesOscarIds = [
-    1054867, 1064213, 872585, 545611, 776503, 581734, 496243, 490132, 399055,
-    376867, 314365, 194662, 76203, 68734, 70586, 45269, 12162, 12405, 6978,
-    1422, 10123, 70, 122, 1574, 274, 98, 14, 1934, 597, 409, 197, 13,
-  ];
-
+  const [oscarMode, setOscarMode] = useState("category"); // "category" | "year"
+  const [selectedOscarCategory, setSelectedOscarCategory] = useState(DEFAULT_OSCAR_CATEGORY);
+  const [selectedOscarYear, setSelectedOscarYear] = useState(2026);
   const [moviesOscar, setMoviesOscar] = useState([]);
+  const [moviesOscarYear, setMoviesOscarYear] = useState([]);
   const [loadingOscar, setLoadingOscar] = useState(true);
+  const [loadingOscarYear, setLoadingOscarYear] = useState(false);
+  const [loadingMoreOscar, setLoadingMoreOscar] = useState(false);
+  const [hasMoreOscar, setHasMoreOscar] = useState(true);
   const [errorOscar, setErrorOscar] = useState(null);
+  const oscarConfigRef = useRef(null);
+  const oscarPageRef = useRef(0);
 
-  const fetchMoviesOscar = async () => {
-    const lang = language === "tr" ? "tr-TR" : "en-US";
-    const cacheKey = `movie_oscar_${lang}`;
-    const cached = await getCachedValue(cacheKey, TTL.OSCAR);
-    if (cached) {
-      setIfChanged(setMoviesOscar, cached);
-      setErrorOscar(null);
-      setLoadingOscar(false);
-      return;
-    }
-
+  const fetchMoviesOscar = useCallback(async (catKey = selectedOscarCategory, forceRefresh = false) => {
     setLoadingOscar(true);
+    setErrorOscar(null);
+    oscarPageRef.current = 0;
     try {
-      const moviePromises = moviesOscarIds.map((id) =>
-        axios.get(`https://api.themoviedb.org/3/movie/${id}`, {
-          params: { language: lang },
-          headers: { Authorization: API_KEY },
-        }),
-      );
-      const responses = await Promise.all(moviePromises);
-      const movieResults = responses.map((res) => res.data);
-      setIfChanged(setMoviesOscar, movieResults);
-      setErrorOscar(null);
-      setCachedValue(cacheKey, movieResults);
+      const config = await getOscarConfig({ forceRefresh });
+      oscarConfigRef.current = config?.items || [];
+
+      const res = await fetchOscarByCategory({
+        configItems: oscarConfigRef.current,
+        categoryKey: catKey,
+        page: 0,
+        pageSize: 10,
+        language,
+        apiKey: API_KEY,
+      });
+
+      setIfChanged(setMoviesOscar, res.items);
+      setHasMoreOscar(res.hasMore);
+      oscarPageRef.current = res.nextPage;
     } catch (err) {
       setErrorOscar(err.message);
     } finally {
       setLoadingOscar(false);
     }
-  };
+  }, [selectedOscarCategory, language, API_KEY]);
+
+  const loadMoreOscar = useCallback(async () => {
+    if (loadingMoreOscar || !hasMoreOscar || !oscarConfigRef.current) return;
+    setLoadingMoreOscar(true);
+    try {
+      const res = await fetchOscarByCategory({
+        configItems: oscarConfigRef.current,
+        categoryKey: selectedOscarCategory,
+        page: oscarPageRef.current,
+        pageSize: 10,
+        language,
+        apiKey: API_KEY,
+      });
+
+      if (res.items?.length) {
+        setMoviesOscar((prev) => [...prev, ...res.items]);
+        setHasMoreOscar(res.hasMore);
+        oscarPageRef.current = res.nextPage;
+      } else {
+        setHasMoreOscar(false);
+      }
+    } catch (err) {
+      if (__DEV__) console.warn("loadMoreOscar error:", err?.message);
+    } finally {
+      setLoadingMoreOscar(false);
+    }
+  }, [loadingMoreOscar, hasMoreOscar, selectedOscarCategory, language, API_KEY]);
+
+  const fetchMoviesOscarByYear = useCallback(async (year = selectedOscarYear, forceRefresh = false) => {
+    setLoadingOscarYear(true);
+    try {
+      const config = await getOscarConfig({ forceRefresh });
+      oscarConfigRef.current = config?.items || [];
+
+      const results = await fetchOscarByYear({
+        configItems: oscarConfigRef.current,
+        year,
+        language,
+        apiKey: API_KEY,
+      });
+
+      setIfChanged(setMoviesOscarYear, results);
+    } catch (err) {
+      if (__DEV__) console.warn("fetchMoviesOscarByYear error:", err?.message);
+    } finally {
+      setLoadingOscarYear(false);
+    }
+  }, [selectedOscarYear, language, API_KEY]);
+
+  const changeOscarCategory = useCallback((catKey) => {
+    if (catKey === selectedOscarCategory) return;
+    setSelectedOscarCategory(catKey);
+    fetchMoviesOscar(catKey);
+  }, [selectedOscarCategory, fetchMoviesOscar]);
+
+  const changeOscarYear = useCallback((year) => {
+    const numYear = Number(year);
+    if (numYear === selectedOscarYear) return;
+    setSelectedOscarYear(numYear);
+    fetchMoviesOscarByYear(numYear);
+  }, [selectedOscarYear, fetchMoviesOscarByYear]);
+
+  const changeOscarMode = useCallback((mode) => {
+    setOscarMode(mode);
+    if (mode === "year" && (!moviesOscarYear || moviesOscarYear.length === 0)) {
+      fetchMoviesOscarByYear(selectedOscarYear);
+    }
+  }, [moviesOscarYear, selectedOscarYear, fetchMoviesOscarByYear]);
 
   useEffect(() => {
     if (!activeSections.oscar) return;
-    fetchMoviesOscar();
-  }, [activeSections.oscar, language]);
+    if (oscarMode === "category") {
+      fetchMoviesOscar(selectedOscarCategory);
+    } else {
+      fetchMoviesOscarByYear(selectedOscarYear);
+    }
+  }, [activeSections.oscar, language, oscarMode, selectedOscarCategory, selectedOscarYear, fetchMoviesOscar, fetchMoviesOscarByYear]);
   //!------------------ movie collection --------------
 
   const moviesCollectionList = [
@@ -820,7 +897,10 @@ export const MovieProvider = ({ children }) => {
     totalPagesBest,
     moviesOscar,
     loadingOscar,
+    loadingMoreOscar,
+    hasMoreOscar,
     errorOscar,
+    loadMoreOscar,
     selectedProvider,
     providers,
     loadingProvider,
@@ -865,6 +945,26 @@ export const MovieProvider = ({ children }) => {
     loadingMoreTrends,
     pageTrends,
     totalPagesTrends,
+    oscarMode,
+    setOscarMode,
+    changeOscarMode,
+    selectedOscarCategory,
+    setSelectedOscarCategory,
+    changeOscarCategory,
+    OSCAR_CATEGORIES,
+    selectedOscarYear,
+    setSelectedOscarYear,
+    changeOscarYear,
+    moviesOscar,
+    moviesOscarYear,
+    loadingOscar,
+    loadingOscarYear,
+    loadingMoreOscar,
+    hasMoreOscar,
+    errorOscar,
+    fetchMoviesOscar,
+    loadMoreOscar,
+    fetchMoviesOscarByYear,
     setSelectedCategoryBests,
     getCategoryTitleTrends,
     getCategoryTitleBests,
@@ -882,7 +982,6 @@ export const MovieProvider = ({ children }) => {
     //!
     fetchSeriesTrends,
     fetchMoviesBests,
-    fetchMoviesOscar,
     fetchMoviesCollection,
     fetchProviders,
     fetchMoviNowPlaying,
@@ -892,7 +991,10 @@ export const MovieProvider = ({ children }) => {
     pageBest, loadingBests, movieBests, selectedCategoryTrends,
     categoriesTrends, categorieBests, movieTrends, loadingTrends,
     selectedCategoryTrendsMovie, selectedCategoryBests, totalPagesBest,
-    moviesOscar, loadingOscar, errorOscar, selectedProvider, providers,
+    oscarMode, selectedOscarCategory, selectedOscarYear, moviesOscar, moviesOscarYear,
+    loadingOscar, loadingOscarYear, loadingMoreOscar, hasMoreOscar, errorOscar,
+    changeOscarMode, changeOscarCategory, changeOscarYear, fetchMoviesOscar, loadMoreOscar, fetchMoviesOscarByYear,
+    selectedProvider, providers,
     loadingProvider, loadingMovieProvider, moviesProvider, moviesNowPlaying,
     loadingNowPlaying, genres, loadingGenres, moviesGenres, pageGenres,
     selectedGenres, dateData, moviesUpcoming, loadingUpcoming,

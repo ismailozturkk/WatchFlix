@@ -70,10 +70,15 @@ nul
 # gecmise girmesin. Gerceklestirilen ikonlar assets/ kokunde.
 assets/oldicon/
 assets/oldicon1/
+assets/unused-lottie/
 
-.env.local
+# AI Agent ve çalışma alanları
+.agent/
+.agents/
+.codex/
 
-# Firebase emulator gunlukleri (npm run test:rules her kosuda uretir)
+# Firebase emulator ve genel loglar
+*.log
 firestore-debug.log
 firebase-debug.log
 database-debug.log

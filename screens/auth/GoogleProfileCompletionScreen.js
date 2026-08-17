@@ -23,8 +23,10 @@ import { useLanguage } from "../../context/LanguageContext";
 import { alpha } from "../../theme/colors";
 import {
   createUserProfile,
+  formatUsernameInput,
   isUsernameAvailable,
   isValidUsername,
+  normalizeUsername,
   UserProfileErrorCode,
 } from "../../services/userService";
 import {
@@ -61,7 +63,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
   const isLight = selectedTheme === "light" || selectedTheme === "green";
 
   useEffect(() => {
-    const normalized = username.trim();
+    const normalized = normalizeUsername(username);
     const currentCheck = ++checkId.current;
     if (!isValidUsername(normalized)) {
       setAvailable(null);
@@ -86,17 +88,20 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
     return () => clearTimeout(timer);
   }, [username, user?.uid]);
 
+  const usernameNormalized = normalizeUsername(username);
+  const usernameValid = isValidUsername(usernameNormalized);
+
   const canSave = useMemo(
     () =>
       !!user &&
       displayName.trim().length >= 2 &&
-      isValidUsername(username) &&
+      usernameValid &&
       available === true &&
       // E-posta kaydıyla aynı kural: 13 altı hesap açamaz
       // (utils/ageGate.js → MIN_REGISTER_AGE).
       canRegister(birthDate) &&
       !saving,
-    [available, birthDate, displayName, saving, user, username]
+    [available, birthDate, displayName, saving, user, usernameValid]
   );
 
   /**
@@ -137,7 +142,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
       const cleanName = displayName.trim();
       await createUserProfile({
         uid: user.uid,
-        username: username.trim(),
+        username: usernameNormalized,
         email: user.email,
         displayName: cleanName,
         birthDate,
@@ -341,7 +346,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
               <Ionicons name="at-outline" size={18} color={theme.text.muted} />
               <TextInput
                 value={username}
-                onChangeText={setUsername}
+                onChangeText={(text) => setUsername(formatUsernameInput(text))}
                 style={[styles.input, { color: theme.text.primary }]}
                 placeholder={tr ? "benzersiz_kullanici_adi" : "unique_username"}
                 placeholderTextColor={theme.text.muted}
@@ -366,17 +371,38 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
                 styles.hint,
                 {
                   color:
-                    available === false ? theme.colors.red : theme.text.muted,
+                    available === false ||
+                    (username.length >= 3 && !usernameValid)
+                      ? theme.colors.red
+                      : available === true
+                        ? "#34A853"
+                        : theme.text.muted,
                 },
               ]}
             >
-              {available === false
+              {username.length > 0 && username.length < 3
+                ? tr
+                  ? "En az 3 karakter · yalnızca a–z, 0–9, _"
+                  : "At least 3 characters · only a–z, 0–9, _"
+                : username.length >= 3 && !usernameValid && /^[0-9_]+$/.test(username)
+                ? tr
+                  ? "Kullanıcı adı sadece rakamlardan veya alt çizgiden oluşamaz (en az bir harf içermelidir)."
+                  : "Username cannot be only numbers or underscores (must contain at least one letter)."
+                : username.length >= 3 && !usernameValid
+                ? tr
+                  ? "3–20 karakter; yalnızca küçük harf, sayı ve alt çizgi (en az bir harf)."
+                  : "3–20 characters; only lowercase letters, numbers, and underscore (at least one letter)."
+                : available === false
                 ? tr
                   ? "Bu kullanıcı adı alınmış."
                   : "This username is taken."
+                : available === true
+                ? tr
+                  ? "Kullanıcı adı kullanılabilir."
+                  : "Username is available."
                 : tr
-                ? "3–20 karakter; harf, sayı ve alt çizgi kullanabilirsin."
-                : "3–20 characters; letters, numbers, and underscore."}
+                ? "3–20 karakter; yalnızca küçük harf, sayı ve alt çizgi (en az bir harf)."
+                : "3–20 characters; only lowercase letters, numbers, and underscore (at least one letter)."}
             </Text>
 
             {/* Yasal bilgilendirme — e-posta kaydıyla aynı: bu ekran da bir

@@ -12,7 +12,6 @@ import { useTheme } from "../../context/ThemeContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLanguage } from "../../context/LanguageContext";
 import AppIcon from "../../components/AppIcon";
-import { getAuth } from "firebase/auth";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import ProfileLists from "./profile/ProfileLists";
@@ -27,7 +26,6 @@ import MyActivityButton from "./profile/MyActivityButton";
 import {
   CircularProgressBase,
 } from "react-native-circular-progress-indicator";
-import ConfirmSheet from "../../components/common/ConfirmSheet";
 import ScreenDecor from "../../components/ScreenDecor";
 // BackButton bilinçli olarak yok: profil sekme kökü olarak render edilir
 // (TabScreenNavigator), stack'e push edilmez — buton yalnızca üstteki ekrandan
@@ -53,7 +51,6 @@ import { usePremium } from "../../context/PremiumContext";
 const ProfileScreen = ({ navigation }) => {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
-  const [modalVisibleLogout, setModalVisibleLogout] = useState(false);
   const { user } = useAuth();
   const { profile } = useUserProfile();
   const { isPremium, isUnlimited } = usePremium();
@@ -148,26 +145,6 @@ const ProfileScreen = ({ navigation }) => {
     }
     kutlamayiKapat();
   }, [kutlama, kutlamayiKapat, language]);
-  const SingOut = async () => {
-    const auth = getAuth();
-    try {
-      await auth.signOut();
-      handleLogout();
-    } catch (error) {
-      appAlert(
-        i18nText("autoI18n.hata", "Hata"),
-        error?.message || i18nText("autoI18n.hata_olustu", "Hata oluştu"),
-        undefined,
-        { type: "error" },
-      );
-    }
-  };
-  const handleLogout = () => {
-    navigation.reset({
-      index: 0,
-      routes: [{ name: "LoginScreen" }],
-    });
-  };
 
   const convertTimestampToDate = (timestamp) => {
     const date = new Date(Number(timestamp)); // Timestamp'i Date objesine çevir
@@ -300,7 +277,7 @@ const ProfileScreen = ({ navigation }) => {
                   }}
                 >
                   <View style={styles.circularProgress}>
-                    {!modalVisible && !modalVisibleLogout && (
+                    {!modalVisible && (
                       <CircularProgressBase
                         {...props}
                         value={safeProgressMovie}
@@ -719,60 +696,12 @@ const ProfileScreen = ({ navigation }) => {
           {/* <CalendarWidget navigation={navigation} /> */}
           <RemindersPreviewButton navigation={navigation} />
           <NotesCard navigation={navigation} />
-          <View style={styles.section}>
-            <Text
-              allowFontScaling={false}
-              style={[styles.sectionTitle, { color: theme.text.muted }]}
-            >
-              {t.logout}
-            </Text>
-            <TouchableOpacity
-              onPress={() => setModalVisibleLogout(true)}
-              style={[
-                styles.logout,
-                {
-                  backgroundColor: theme.secondary,
-                  borderColor: theme.border,
-                  shadowColor: theme.shadow,
-                },
-              ]}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.settingText, { color: theme.colors.red }]}
-              >
-                {t.logout}
-              </Text>
-              <AppIcon
-                family="Ionicons"
-                name={"log-out-outline"}
-                size={24}
-                color={theme.colors.red}
-              />
-            </TouchableOpacity>
-          </View>
           <ProfileAvatarPickerModal
             visible={modalVisible}
             selectedIndex={selectAvatarIndex}
             saving={isloadingAvatar}
             onSelect={handleAvatarSelect}
             onClose={() => setModalVisible(false)}
-          />
-          {/* Çıkış onayı — uygulamadaki yıkıcı onaylarla aynı alt sayfa dili
-              (bkz. components/common/ConfirmSheet.js). */}
-          <ConfirmSheet
-            visible={modalVisibleLogout}
-            onClose={() => setModalVisibleLogout(false)}
-            onConfirm={() => {
-              setModalVisibleLogout(false);
-              SingOut();
-            }}
-            icon="log-out-outline"
-            tone="danger"
-            title={t.logout}
-            message={t.profileScreen.logoutMessage}
-            confirmLabel={t.logout}
-            cancelLabel={t.profileScreen.cancel}
           />
         </SafeAreaView>
       </ScrollView>

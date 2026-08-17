@@ -12,18 +12,16 @@ import PosterImage from "../../components/PosterImage";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
-import { Dropdown } from "react-native-element-dropdown";
-import { useFontFamilyForRole } from "../../components/typography/AppText";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { MovieUpComingSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
-//import { API_KEY } from "@env";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import { CountdownBadge, ReleaseDateBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
-import { i18nText } from "../../utils/i18nText";
+import { SeeAllButton } from "../../components/SeeAllHeader";
+import { triggerHaptic } from "../../services/hapticsService";
 
 const { width } = Dimensions.get("window");
 
@@ -84,25 +82,16 @@ const MovieUpcomingCard = memo(function MovieUpcomingCard({ item, navigation, th
 export default function MovieUpcoming({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
-  // react-native-element-dropdown metnini node_modules içinde çizer; font
-  // ancak stil nesnesine düz bir aile adı yazılarak uygulanır. Aile adı doğru
-  // ağırlık dosyasını gösterdiği için fontWeight'i 400'e sabitliyoruz.
-  const dropdownFontu = useFontFamilyForRole("body", { fontWeight: "500" });
-  const dropdownFontStili = dropdownFontu
-    ? { fontFamily: dropdownFontu, fontWeight: "400" }
-    : null;
   const {
     dateData,
     addTimeToDate,
     moviesUpcoming,
     loadingUpcoming,
-    isFocusUpcoming,
     setValueUpcoming,
     pageUpcoming,
     totalPagesUpcoming,
     loadMoreUpcoming,
     loadingMoreUpcoming,
-    setIsFocusUpcoming,
     valueUpcoming,
     RelaseCount,
     activateMovieSection,
@@ -113,63 +102,91 @@ export default function MovieUpcoming({ navigation }) {
     activateMovieSection("upcoming");
   }, [activateMovieSection]);
 
+  const handleSelectDate = (val) => {
+    if (val === valueUpcoming) return;
+    try { triggerHaptic("selection"); } catch (e) {}
+    setValueUpcoming?.(val);
+    addTimeToDate?.(val);
+  };
+
+  const renderDateFilterItem = ({ item }) => {
+    const isSelected = valueUpcoming === item.value;
+    return (
+      <TouchableOpacity
+        activeOpacity={0.75}
+        onPress={() => handleSelectDate(item.value)}
+        style={[
+          styles.chip,
+          {
+            backgroundColor: isSelected ? theme.accent : (theme.secondary || "rgba(255,255,255,0.06)"),
+            borderColor: isSelected ? theme.accent : (theme.border || "rgba(255,255,255,0.12)"),
+          },
+          isSelected && {
+            shadowColor: theme.accent,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.35,
+            shadowRadius: 4,
+            elevation: 3,
+          },
+        ]}
+      >
+        <Ionicons
+          name="calendar-outline"
+          size={13}
+          color={isSelected ? "#fff" : theme.text.muted}
+          style={{ marginRight: 5 }}
+        />
+        <Text
+          style={[
+            styles.chipText,
+            {
+              color: isSelected ? "#fff" : theme.text.secondary,
+              fontWeight: isSelected ? "700" : "500",
+            },
+          ]}
+        >
+          {item.label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const headerComponent = (
+    <View style={styles.headerContainer}>
+      <View style={styles.titleRow}>
+        <Text
+          allowFontScaling={false}
+          style={[styles.title, { color: theme.text.secondary }]}
+        >
+          {t.movieScreens.movieUpcaming.upcaming}
+        </Text>
+        <SeeAllButton
+          onPress={() =>
+            navigation.navigate("SeeAllScreen", {
+              mediaType: "movie",
+              section: "upcoming",
+              title: t.movieScreens.movieUpcaming.upcaming,
+            })
+          }
+        />
+      </View>
+
+      <FlatList
+        data={dateData}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        renderItem={renderDateFilterItem}
+        keyExtractor={(item) => item.value}
+        contentContainerStyle={styles.chipsContent}
+        style={styles.chipsList}
+      />
+    </View>
+  );
+
   if (loadingUpcoming) {
     return (
-      <View style={{ flex: 1, paddingVertical: 10 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <Text
-            allowFontScaling={false}
-            style={[styles.title, { color: theme.text.secondary }]}
-          >
-            {t.movieScreens.movieUpcaming.upcaming}
-          </Text>
-          <Dropdown
-            style={[
-              styles.dropdown,
-              isFocusUpcoming && { borderColor: "blue" },
-            ]}
-            placeholderStyle={[
-              styles.placeholderStyle,
-              { color: theme.text.primary },
-              dropdownFontStili,
-            ]}
-            selectedTextStyle={[
-              styles.selectedTextStyle,
-              { color: theme.text.secondary },
-              dropdownFontStili,
-            ]}
-            // RENK BİLEREK VERİLMİYOR: açılan listenin kabı kütüphanede sabit
-            // BEYAZ (react-native-element-dropdown styles.container) ve bu ekran
-            // containerStyle geçmiyor. Tema metin rengi (açık gri/mavi) beyaz
-            // zeminde okunmuyor; kütüphanenin siyah varsayılanı kalsın.
-            itemTextStyle={[styles.selectedTextStyle, dropdownFontStili]}
-            iconStyle={styles.iconStyle}
-            data={dateData}
-            maxHeight={200}
-            labelField="label"
-            valueField="value"
-            placeholder={!isFocusUpcoming ? i18nText("autoI18n.tarih_secin", "Tarih Seçin") : "..."}
-            value={valueUpcoming}
-            onFocus={() => setIsFocusUpcoming(true)}
-            onBlur={() => setIsFocusUpcoming(false)}
-            onChange={(item) => {
-              setValueUpcoming(item.value);
-              addTimeToDate(item.value);
-              setIsFocusUpcoming(false);
-            }}
-            renderLeftIcon={() => (
-              <Ionicons
-                name="calendar"
-                style={styles.icon}
-                color={
-                  isFocusUpcoming ? theme.text.primary : theme.text.secondary
-                }
-                size={20}
-              />
-            )}
-          />
-        </View>
-
+      <View style={styles.container}>
+        {headerComponent}
         <FlatList
           data={[1, 2, 3]}
           renderItem={() => <MovieUpComingSkeleton />}
@@ -180,6 +197,7 @@ export default function MovieUpcoming({ navigation }) {
       </View>
     );
   }
+
   const renderMovieItem = ({ item }) => {
     if (!item.poster_path) return null;
     return (
@@ -192,55 +210,10 @@ export default function MovieUpcoming({ navigation }) {
       />
     );
   };
+
   return (
     <View style={styles.container}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <Text
-          allowFontScaling={false}
-          style={[styles.title, { color: theme.text.secondary }]}
-        >
-          {t.movieScreens.movieUpcaming.upcaming}
-        </Text>
-        <Dropdown
-          style={[styles.dropdown, isFocusUpcoming && { borderColor: "blue" }]}
-          placeholderStyle={[
-            styles.placeholderStyle,
-            { color: theme.text.primary },
-            dropdownFontStili,
-          ]}
-          selectedTextStyle={[
-            styles.selectedTextStyle,
-            { color: theme.text.secondary },
-            dropdownFontStili,
-          ]}
-          // Renk için yukarıdaki nota bak: liste kabı kütüphanede sabit beyaz.
-          itemTextStyle={[styles.selectedTextStyle, dropdownFontStili]}
-          iconStyle={styles.iconStyle}
-          data={dateData}
-          maxHeight={200}
-          labelField="label"
-          valueField="value"
-          placeholder={!isFocusUpcoming ? i18nText("autoI18n.tarih_secin", "Tarih Seçin") : "..."}
-          value={valueUpcoming}
-          onFocus={() => setIsFocusUpcoming(true)}
-          onBlur={() => setIsFocusUpcoming(false)}
-          onChange={(item) => {
-            setValueUpcoming(item.value);
-            addTimeToDate(item.value);
-            setIsFocusUpcoming(false);
-          }}
-          renderLeftIcon={() => (
-            <Ionicons
-              name="calendar"
-              style={styles.icon}
-              color={
-                isFocusUpcoming ? theme.text.primary : theme.text.secondary
-              }
-              size={20}
-            />
-          )}
-        />
-      </View>
+      {headerComponent}
       <PaginatedRail
         data={moviesUpcoming}
         contentContainerStyle={{ paddingHorizontal: 15 }}
@@ -263,55 +236,40 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
   },
-  genreButton: {
-    marginVertical: 20,
-    paddingVertical: 10,
+  headerContainer: {
+    marginBottom: 12,
+  },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingRight: 15,
+    marginBottom: 10,
+  },
+  title: {
+    fontSize: 18,
+    uppercase: true,
+    marginLeft: 15,
+    fontWeight: "700",
+  },
+  chipsList: {
+    marginBottom: 4,
+  },
+  chipsContent: {
     paddingHorizontal: 15,
+    gap: 8,
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 7,
+    paddingHorizontal: 12,
     borderRadius: 20,
-    marginRight: 10,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
+    borderWidth: 1,
   },
-  genreText: {
-    color: "white",
-    fontWeight: "bold",
-  },
-  dropdown: {
-    width: 170,
-    height: 30,
-    paddingHorizontal: 8,
-  },
-  icon: {
-    marginRight: 10,
-  },
-  label: {
-    position: "absolute",
-    backgroundColor: "white",
-    left: 22,
-    top: 8,
-    zIndex: 999,
-    paddingHorizontal: 8,
-    fontSize: 14,
-  },
-  placeholderStyle: {
-    fontSize: 16,
-  },
-  selectedTextStyle: {
-    fontSize: 16,
-  },
-  iconStyle: {
-    width: 20,
-    height: 20,
-  },
-  inputSearchStyle: {
-    height: 40,
-    fontSize: 16,
+  chipText: {
+    fontSize: 12,
+    letterSpacing: 0.2,
   },
   similarItem: {
     width: width * 0.4,
@@ -332,46 +290,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.94,
     shadowRadius: 10.32,
     elevation: 5,
-  },
-  similarTitle: {
-    color: "#fff",
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  relaseDate: {
-    position: "absolute",
-    top: 5,
-    right: 5,
-    paddingHorizontal: 5,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  relaseDateCount: {
-    position: "absolute",
-    top: 5,
-    left: 5,
-    paddingHorizontal: 5,
-    //width: 40,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  similarRatingText: {
-    color: "#ffd700",
-    fontSize: 11,
-    marginBottom: 2,
-  },
-  errorText: {
-    color: "red",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  title: {
-    fontSize: 18,
-    uppercase: true,
-    marginBottom: 15,
-    marginLeft: 15,
-    fontWeight: "700",
   },
 });

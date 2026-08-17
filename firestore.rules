@@ -54,6 +54,12 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ─── Uygulama Genel Konfigürasyonları (Oscar Ödülleri vb.) ─────────
+    match /AppConfig/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // NOT: /featureRequests kuralı 26 Tem 2026'da kaldırıldı — landing
     // sayfasındaki "sen iste, biz yapalım" bölümü kaldırıldığı için okuyan ya
     // da yazan bir istemci kalmadı. Kural yokken koleksiyon varsayılan olarak

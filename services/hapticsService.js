@@ -74,3 +74,10 @@ export function notificationAsync(type = NotificationFeedbackType.Success) {
 export function performAndroidHapticsAsync(type) {
   return runIfEnabled(() => ExpoHaptics.performAndroidHapticsAsync(type));
 }
+
+export function triggerHaptic(type = "selection") {
+  if (type === "selection") return selectionAsync();
+  if (type === "impact") return impactAsync();
+  if (type === "notification") return notificationAsync();
+  return selectionAsync();
+}
