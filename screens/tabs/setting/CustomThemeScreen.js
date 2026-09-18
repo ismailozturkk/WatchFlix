@@ -28,6 +28,7 @@ import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
 import { clamp, hexToHsl, hslToHex, luminance } from "@utils/colorUtils";
 import ScreenDecor from "@components/ScreenDecor";
+import { usePremiumGate } from "@hooks/usePremiumGate";
 import {
   applyRelative,
   buildCustomTheme,
@@ -172,9 +173,13 @@ export default function CustomThemeScreen({ navigation, route }) {
   // Cross-fade bitene kadar ekran etkileşimli kaldığından ikinci bir dokunuş
   // yeni bir tema kaydı daha üretebilirdi; ilk dokunuşta kilitlenir.
   const savingRef = useRef(false);
+  // İkinci kapı: giriş noktası (SettingsTheme) zaten kontrol ediyor; ekran
+  // başka yoldan açılırsa özel tema kaydı Free'de sessizce geçmesin.
+  const customThemesGate = usePremiumGate("custom_themes");
 
   const save = () => {
     if (savingRef.current) return;
+    if (!customThemesGate.check()) return;
     savingRef.current = true;
     // Aktif temanın kendisi düzenleniyorsa token yazımı geçişin apply adımına
     // bırakılır: erken yazılırsa ekran görüntü alınmadan yeni renklere boyanır

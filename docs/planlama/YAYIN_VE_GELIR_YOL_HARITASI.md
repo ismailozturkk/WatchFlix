@@ -195,20 +195,31 @@ Kategori gerçeği: içerik takip uygulamalarında kullanıcılar çekirdek taki
 ödemez; **kimlik, statü, konfor ve derin içgörüye** öder (Letterboxd Pro/Patron,
 TV Time premium örnekleri). Bu yüzden:
 
-**ASLA kilitleme (büyüme motoru):** izleme takibi, listeler (makul limit), sosyal
-feed, arkadaş/chat, temel istatistikler, oyunun temel modu, turnuva oylaması.
-Sosyal özellik kilitlemek ağ etkisini öldürür.
+**ASLA kilitleme (büyüme motoru):** izleme takibi, sosyal feed, gönderi/yorum,
+birebir mesajlaşma, temel istatistikler, turnuva oylaması, not/hatırlatıcı/
+takvim, widget'lar, story paylaşımı, Letterboxd/IMDb içe aktarma.
 
-**Seelogd Premium içeriği:**
+**Kilitlenmez, LİMİTLENİR (18 Eylül 2026 kararı):** liste, arkadaş, sohbet
+grubu, oyun ve CineSwipe. Kural: işi BAŞLATAN sayılır — isteği kabul etmek,
+odaya/gruba/ortak listeye katılmak her planda serbest; böylece ağ etkisi
+korunur. Abonelik bitince veri silinmez, yalnız yenisi engellenir.
 
-| Kategori | Özellik                                                                 |
-| -------- | ----------------------------------------------------------------------- |
-| AI       | Free 5/gün–30/ay; Premium 20/gün–300/ay; Premium Max 50/gün–900/ay     |
-| Kimlik   | Premium ve Premium Max planlarına özel profil kimlik rozeti             |
+**Seelogd Premium içeriği** (tek kaynak `utils/premiumFeatures.js`; tam tablo
+ve kapı yerleri: `docs/kurulum/REVENUECAT_KURULUM.md` §6.1):
 
-Tema, istatistik, Wrapped, oyun, liste, not ve hatırlatıcılar bu sürümde ücretli
-plan vaadi değildir. İleride ücretli fark olarak eklenecekse önce gerçek yetki
-kapısı ve testi tamamlanmalı, ardından mağaza ve uygulama metnine eklenmelidir.
+| Kategori | Free | Premium | Premium Max |
+| --- | --- | --- | --- |
+| CineMatch AI | 5/gün–30/ay | 20/gün–300/ay | 50/gün–900/ay |
+| Kimlik rozeti (arkadaş profilinde de görünür) | — | Epik | Efsanevi |
+| Liste / ortak liste | 5 / 2 | 25 / 10 | Sınırsız |
+| Arkadaş / sohbet grubu kurma | 30 / 2 | 150 / 10 | Sınırsız |
+| Oyun / CineSwipe oda / CineSwipe kart (günlük) | 5 / 2 / 60 | 20 / 10 / 300 | Sınırsız |
+| Özel tema oluşturma, yazı tipi kataloğu | 8 hazır tema, 7 font | ✓, 56 font | ✓, 56 font |
+| Platform bildirimi, Wrapped arşivi | 10 başlık, bu yıl + geçen yıl | 100 başlık, tüm yıllar | 100 başlık, tüm yıllar |
+
+Pet'ler ücretsiz kalır: telifli karakterleri (Goku, Naruto, Grogu…) ücrete
+bağlamak mağaza (Apple 5.2) ve hukuk riskini büyütür. "Reklamsız" reklam
+olmadan vaat edilemez; AdMob gelirse kendiliğinden premium faydası olur.
 
 ### 2.2 Fiyatlandırma
 
@@ -467,9 +478,14 @@ aylığa bölünmüş, mağaza kesintisi düşülmüş).
       Firestore senkronunun kapsamı doğrulanacak)_
 - [x] Paywall ekranı _(`screens/premium/PremiumScreen.js`; mağaza bazlı
       deneme/fiyat testi ürünler Play'de tanımlanınca)_
-- [ ] Premium kapılar: AI kota farkı, temalar, pet kostümleri, oyun modları,
-      gelişmiş istatistik/Wrapped, liste limitleri _(kodda kısmen mevcut —
-      kapıların tam listesi çıkarılıp tek tek doğrulanacak)_
+- [x] Premium kapılar _(18 Eyl — `utils/premiumFeatures.js` tek kaynak +
+      `hooks/usePremiumGate.js`; AI kotası, rozet (arkadaş profilinde de),
+      liste/ortak liste/arkadaş/grup/oyun/CineSwipe limitleri, özel tema,
+      font kataloğu, platform bildirimi, Wrapped arşivi. Ödeme ekranı ve
+      Ayarlar kartı metni kayıttan üretiliyor. Sunucu: `syncPremiumStatus`,
+      abonelik ayrıntıları `private/entitlements`'a taşındı, `badges` alanı
+      istemciye kapandı. Pet kostümleri ve oyun modları BİLEREK kapı dışı.
+      Tam tablo: `docs/kurulum/REVENUECAT_KURULUM.md` §6.1)_
 
 **Hafta 7 (17–23 Ağu)**
 

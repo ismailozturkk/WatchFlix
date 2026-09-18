@@ -3,9 +3,22 @@
 1. **Push bildirim:** uygulama kapalı/arka plandayken bile sosyal bildirimleri
    (beğeni, yorum, mention, arkadaşlık, mesaj) push olarak gönderir.
 2. **`callGemini` (callable):** AI sohbet proxy'si — Gemini API anahtarı YALNIZ
-   burada durur (Secret Manager), kullanıcı başına günlük kota uygular
-   (free 5 / premium 100, `AiUsage/{uid}` sayacı). Yayın blokeri çözümü:
+   burada durur (Secret Manager), kullanıcı başına günlük + aylık kota uygular
+   (Free 5/30, Premium 20/300, Premium Max 50/900 — `aiQuota.js`,
+   `AiUsage/{uid}` sayacı). Yayın blokeri çözümü:
    `docs/planlama/YAYIN_VE_GELIR_YOL_HARITASI.md` §1.2 madde 1.
+3. **`revenueCatWebhook` (HTTP):** RevenueCat olaylarında aboneliği
+   RevenueCat'ten yeniden okur ve iki belgeye yazar: `Users/{uid}.entitlements`
+   (herkese açık, yalnız plan) + `Users/{uid}/private/entitlements` (ürün,
+   mağaza, bitiş — yalnız sahibi okur).
+4. **`syncPremiumStatus` (callable):** İstemci planı ile sunucu planı
+   ayrıştığında (satın alma webhook'tan önce geldi, webhook kaçtı, iade)
+   aynı okumayı kullanıcının isteğiyle yapar. İstemcinin iddiasına güvenmez;
+   kullanıcı başına 15 sn'de bir.
+
+Sunucuda zorlanan plan limitleri `planCapabilities.js`'tedir (platform
+bildirimi: Free 10 / Premium 100 başlık). İstemci aynası
+`utils/premiumFeatures.js`; eşitliği `__tests__/premiumFeatures.test.js` sınar.
 
 ## Gemini proxy kurulumu (Faz 0 — ZORUNLU)
 
@@ -23,9 +36,10 @@ Notlar:
   `.env`'den silebilirsin (eski anahtarın iptali yine de şart — eski APK'larda gömülü).
 - App Check (Play Integrity) istemcide kurulunca `functions/index.js` içindeki
   `enforceAppCheck: false` → `true` yapılmalı (Faz 0 Hafta 2).
-- Kota sabitleri: `AI_DAILY_LIMIT_FREE` / `AI_DAILY_LIMIT_PREMIUM`
-  (`functions/index.js`). Premium tespiti `Users/{uid}.entitlements.premium`
-  alanından — Faz 1'de RevenueCat webhook'u bu alanı dolduracak.
+- Kota sabitleri: `AI_PLAN_LIMITS` (`functions/aiQuota.js`, istemci aynası
+  `utils/premium.js`). Plan tespiti `Users/{uid}.entitlements` alanından;
+  alanı `revenueCatWebhook` ve `syncPremiumStatus` yazar, istemci yazamaz
+  (`firestore.rules`).
 
 ## Mimari
 

@@ -10,7 +10,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
 import { i18nText } from "@utils/i18nText";
 
-export default function GameErrorState({ theme, content, onRetry, onDismiss }) {
+// `content.upgrade`: günlük oyun hakkı bitti ve üst plan var → birincil buton
+// ödeme ekranına götürür (onUpgrade). Tekrar denemek o gün işe yaramaz.
+export default function GameErrorState({ theme, content, onRetry, onDismiss, onUpgrade }) {
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
       <SafeAreaView style={styles.errorStateRoot}>
@@ -19,6 +21,16 @@ export default function GameErrorState({ theme, content, onRetry, onDismiss }) {
         </View>
         <Text style={[styles.errorStateTitle, { color: theme.text.primary }]}>{content.title}</Text>
         <Text style={[styles.errorStateMessage, { color: theme.text.secondary }]}>{content.message}</Text>
+        {content.upgrade && onUpgrade && (
+          <TouchableOpacity
+            style={[styles.errorPrimaryBtn, { backgroundColor: theme.accent }]}
+            onPress={onUpgrade}
+            activeOpacity={0.8}
+          >
+            <AppIcon family="Ionicons" name="diamond" size={18} color="#fff" />
+            <Text style={styles.errorPrimaryText}>{content.upgradeLabel}</Text>
+          </TouchableOpacity>
+        )}
         {content.retryable && (
           <TouchableOpacity
             style={[styles.errorPrimaryBtn, { backgroundColor: theme.accent }]}

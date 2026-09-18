@@ -633,3 +633,96 @@ describe("birthDate kilidi", () => {
     );
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Premium yetkileri ve kimlik rozetleri yalnız sunucuya ait
+// (functions/index.js revenueCatWebhook + syncPremiumStatus yazar).
+// ─────────────────────────────────────────────────────────────────────────────
+describe("premium ve rozet alanlari", () => {
+  const profil = (extra = {}) => ({
+    uid: ALICE,
+    username: "alice",
+    usernameLower: "alice",
+    displayName: "Alice",
+    friendsCount: 0,
+    ...extra,
+  });
+
+  test("kullanici kendini premium yapamaz (create ve update)", async () => {
+    await assertFails(
+      setDoc(doc(alice, "Users", ALICE), profil({ entitlements: { premium: true } })),
+    );
+    await seed((db) => setDoc(doc(db, "Users", ALICE), profil()));
+    await assertFails(
+      updateDoc(doc(alice, "Users", ALICE), { "entitlements.premiumPlan": "unlimited" }),
+    );
+  });
+
+  test("kullanici kendine kurucu rozeti yazamaz (create ve update)", async () => {
+    await assertFails(
+      setDoc(doc(alice, "Users", ALICE), profil({ badges: { founder: true } })),
+    );
+    await seed((db) => setDoc(doc(db, "Users", ALICE), profil()));
+    await assertFails(
+      updateDoc(doc(alice, "Users", ALICE), { badges: { founder: true } }),
+    );
+  });
+
+  test("sunucunun yazdigi rozet ve plan dururken profil guncellenebilir", async () => {
+    await seed((db) =>
+      setDoc(
+        doc(db, "Users", ALICE),
+        profil({
+          badges: { founder: true },
+          entitlements: { premium: true, premiumPlan: "premium" },
+        }),
+      ),
+    );
+    await assertSucceeds(
+      updateDoc(doc(alice, "Users", ALICE), { displayName: "Alice B" }),
+    );
+  });
+
+  test("arkadasin plani rozet icin okunabilir", async () => {
+    await seed((db) =>
+      setDoc(
+        doc(db, "Users", ALICE),
+        profil({ entitlements: { premium: true, premiumPlan: "unlimited" } }),
+      ),
+    );
+    await assertSucceeds(getDoc(doc(bob, "Users", ALICE)));
+  });
+
+  test("private/entitlements: sahibi okur ve siler, yazamaz", async () => {
+    await seed((db) =>
+      setDoc(doc(db, "Users", ALICE, "private", "entitlements"), {
+        premiumPlan: "premium",
+        expiresAt: null,
+      }),
+    );
+    await assertSucceeds(getDoc(doc(alice, "Users", ALICE, "private", "entitlements")));
+    await assertFails(
+      setDoc(doc(alice, "Users", ALICE, "private", "entitlements"), {
+        premiumPlan: "unlimited",
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(alice, "Users", ALICE, "private", "entitlements"), {
+        premiumPlan: "unlimited",
+      }),
+    );
+    // Hesap silme (services/accountService.js) private alt koleksiyonunu siler.
+    await assertSucceeds(
+      deleteDoc(doc(alice, "Users", ALICE, "private", "entitlements")),
+    );
+  });
+
+  test("private/entitlements baskasina kapali", async () => {
+    await seed((db) =>
+      setDoc(doc(db, "Users", ALICE, "private", "entitlements"), {
+        premiumPlan: "premium",
+      }),
+    );
+    await assertFails(getDoc(doc(bob, "Users", ALICE, "private", "entitlements")));
+  });
+});

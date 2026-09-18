@@ -82,8 +82,12 @@ function parseRevenueCatPremiumState(payload, nowMs = Date.now()) {
   }
 
   const premium = parseEntitlement(entitlements[PREMIUM_ENTITLEMENT_ID]);
+  // Google Play kimliği "abonelikId:tabanPlan" biçiminde gelebilir.
+  const baseProductId = premium.productId
+    ? String(premium.productId).split(":")[0]
+    : null;
   const premiumUnlimited =
-    premium.active && UNLIMITED_PRODUCT_IDS.has(premium.productId);
+    premium.active && UNLIMITED_PRODUCT_IDS.has(baseProductId);
 
   return {
     premium: premium.active,
@@ -95,14 +99,65 @@ function parseRevenueCatPremiumState(payload, nowMs = Date.now()) {
       : "free",
     productId: premium.productId,
     expiresAt: premium.expiresAt,
+    store: findSubscriptionStore(payload, premium.productId),
   };
 }
 
+/** subscriber.subscriptions haritasından ürünün mağazası ("play_store"...). */
+function findSubscriptionStore(payload, productId) {
+  if (!productId) return null;
+  const subscriptions = payload?.subscriber?.subscriptions || {};
+  const direct = subscriptions[productId];
+  if (direct?.store) return direct.store;
+  const base = String(productId).split(":")[0];
+  const match = Object.keys(subscriptions).find(
+    (key) => key === base || key.startsWith(`${base}:`),
+  );
+  return match ? subscriptions[match]?.store || null : null;
+}
+
+/**
+ * Sunucunun yazdığı iki belge:
+ *   • Users/{uid}.entitlements (HERKESE AÇIK profil belgesi): yalnız plan.
+ *     AI kotası ve arkadaş profilindeki rozet bunu okur.
+ *   • Users/{uid}/private/entitlements (yalnız sahibi okur): ürün, mağaza,
+ *     bitiş tarihi. Başka kullanıcıların birinin aboneliğinin ne zaman
+ *     bittiğini görmesi gerekmez.
+ * Zaman damgaları ve eski alanların silinmesi çağıranda (FieldValue).
+ */
+function buildEntitlementDocuments(state, { store = null, source = "revenuecat" } = {}) {
+  return {
+    publicEntitlements: {
+      premium: Boolean(state.premium),
+      premiumUnlimited: Boolean(state.premiumUnlimited),
+      premiumPlan: state.premiumPlan || "free",
+      premiumSource: source,
+    },
+    privateEntitlements: {
+      premium: Boolean(state.premium),
+      premiumPlan: state.premiumPlan || "free",
+      productId: state.productId || null,
+      store: store || state.store || null,
+      expiresAt: state.expiresAt || null,
+      source,
+    },
+  };
+}
+
+// Eskiden herkese açık belgeye yazılan ayrıntı alanları (artık private'ta).
+const LEGACY_PUBLIC_ENTITLEMENT_FIELDS = Object.freeze([
+  "premiumProductId",
+  "premiumStore",
+  "premiumExpiresAt",
+]);
+
 module.exports = {
   PREMIUM_ENTITLEMENT_ID,
+  LEGACY_PUBLIC_ENTITLEMENT_FIELDS,
   isFirebaseUserId,
   resolveFirebaseUserId,
   resolvePremiumWebhookState,
   getTransferChanges,
   parseRevenueCatPremiumState,
+  buildEntitlementDocuments,
 };

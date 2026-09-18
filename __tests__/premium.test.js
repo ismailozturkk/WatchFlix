@@ -10,6 +10,9 @@ import {
   getPremiumPlanDisplayName,
   hasActivePremiumEntitlement,
   PREMIUM_PLAN,
+  baseProductIdentifier,
+  getStoreProductChange,
+  resolveServerPlan,
   selectPreferredPackage,
 } from "../utils/premium";
 
@@ -174,5 +177,70 @@ describe("premium helpers", () => {
     const monthlyEquivalent = getPackageMonthlyEquivalent(annual, "tr");
     expect(monthlyEquivalent).toContain("50");
     expect(getPackageMonthlyEquivalent(monthly, "tr")).toBeNull();
+  });
+});
+
+// Google Play abonelik kimlikleri "abonelikId:tabanPlan" biçiminde gelir; kademe
+// tespiti ve ürün değişimi bununla da doğru çalışmalı.
+describe("Play ürün kimlikleri ve ürün değişimi", () => {
+  const entitlementId = "com.smlztrk.seelogd Pro";
+  const pkg = (identifier, packageType) => ({
+    identifier: `pkg_${identifier}`,
+    packageType,
+    product: { identifier },
+  });
+  const activeOn = (productIdentifier, store = "PLAY_STORE") => ({
+    entitlements: {
+      active: { [entitlementId]: { productIdentifier, store } },
+    },
+  });
+
+  test("taban plan eki ayıklanır", () => {
+    expect(baseProductIdentifier("monthly:p1m")).toBe("monthly");
+    expect(baseProductIdentifier("yearly")).toBe("yearly");
+    expect(baseProductIdentifier(null)).toBe(null);
+  });
+
+  test("Play kimlikli paketler doğru kademeye düşer", () => {
+    expect(getPackageTierKey(pkg("monthly:p1m", "MONTHLY"))).toBe(PREMIUM_PLAN.UNLIMITED);
+    expect(getPackageTierKey(pkg("unlimited_yearly:p1y", "ANNUAL"))).toBe(PREMIUM_PLAN.UNLIMITED);
+    expect(getPackageTierKey(pkg("monthly_2:p1m", "MONTHLY"))).toBe(PREMIUM_PLAN.PREMIUM);
+    expect(getPackageTierKey(pkg("yearly:p1y", "ANNUAL"))).toBe(PREMIUM_PLAN.PREMIUM);
+  });
+
+  test("sunucu planı entitlements alanından çözülür", () => {
+    expect(resolveServerPlan(undefined)).toBe(PREMIUM_PLAN.FREE);
+    expect(resolveServerPlan({ premium: false, premiumPlan: "free" })).toBe(PREMIUM_PLAN.FREE);
+    expect(resolveServerPlan({ premium: true, premiumPlan: "premium" })).toBe(PREMIUM_PLAN.PREMIUM);
+    expect(resolveServerPlan({ premium: true, premiumUnlimited: true })).toBe(PREMIUM_PLAN.UNLIMITED);
+  });
+
+  test("iOS'ta ve aktif abonelik yokken değişim bilgisi verilmez", () => {
+    const target = pkg("monthly:p1m", "MONTHLY");
+    expect(getStoreProductChange({ customerInfo: activeOn("monthly_2"), entitlementId, aPackage: target, platform: "ios" })).toBe(null);
+    expect(getStoreProductChange({ customerInfo: { entitlements: { active: {} } }, entitlementId, aPackage: target, platform: "android" })).toBe(null);
+    // Test Store / App Store kaynaklı abonelik Play değişimi değildir.
+    expect(getStoreProductChange({ customerInfo: activeOn("monthly_2", "TEST_STORE"), entitlementId, aPackage: target, platform: "android" })).toBe(null);
+    // Aynı ürün: değişim yok.
+    expect(getStoreProductChange({ customerInfo: activeOn("monthly"), entitlementId, aPackage: target, platform: "android" })).toBe(null);
+  });
+
+  test("Premium → Premium Max anında, kalan süre orantılı iade", () => {
+    expect(
+      getStoreProductChange({
+        customerInfo: activeOn("monthly_2"),
+        entitlementId,
+        aPackage: pkg("monthly:p1m", "MONTHLY"),
+        platform: "android",
+      }),
+    ).toEqual({ oldProductIdentifier: "monthly_2", replacementMode: "WITH_TIME_PRORATION" });
+  });
+
+  test("aylıktan yıllığa anında; yıllıktan aylığa ve Max'ten Premium'a dönem sonunda", () => {
+    const change = (from, target) =>
+      getStoreProductChange({ customerInfo: activeOn(from), entitlementId, aPackage: target, platform: "android" });
+    expect(change("monthly_2", pkg("yearly:p1y", "ANNUAL")).replacementMode).toBe("WITH_TIME_PRORATION");
+    expect(change("yearly", pkg("monthly_2:p1m", "MONTHLY")).replacementMode).toBe("DEFERRED");
+    expect(change("monthly", pkg("monthly_2:p1m", "MONTHLY")).replacementMode).toBe("DEFERRED");
   });
 });

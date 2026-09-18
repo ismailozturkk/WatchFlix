@@ -39,188 +39,82 @@ import {
 import { SettingsSubScreen, buildUiColors } from "../tabs/settings/settingsUi";
 import { i18nText } from "../../utils/i18nText";
 import { openLegalPage } from "../../utils/legalLinks";
+import { useRoute } from "@react-navigation/native";
+import {
+  FONT_CATALOG_SIZE,
+  PLANS,
+  formatFeatureValue,
+  getComparisonSections,
+  getFeature,
+} from "../../utils/premiumFeatures";
+import { ANALYTICS_EVENTS, trackEvent } from "../../services/analytics";
 
-const CORE_VALUE_PROPS = [
-  {
-    icon: "sparkles",
-    color: "#8B5CF6",
-    badge: { tr: "10X DAHA FAZLA", en: "10X QUOTA" },
-    title: {
-      tr: "CineMatch AI",
-      en: "CineMatch AI",
+// ÖNE ÇIKAN FAYDALAR — seçili plana göre, utils/premiumFeatures.js
+// değerlerinden üretilir. Buradaki her cümlenin arkasında bir kapı var; yeni
+// bir fayda eklemek için önce registry'e girdi ve kapı ekle, sonra buraya.
+// (P0.2: elle yazılmış vaat listeleri uygulamada karşılığı olmayan
+// "reklamsız", "tüm Wrapped yılları" gibi iddialara dönüşmüştü.)
+function buildHighlights(tier, tr) {
+  const lang = tr ? "tr" : "en";
+  const ai = AI_PLAN_LIMITS[tier];
+  const multiplier = Math.round(ai.daily / AI_PLAN_LIMITS.free.daily);
+  const isMax = tier === PREMIUM_PLAN.UNLIMITED;
+  const value = (featureId) => formatFeatureValue(featureId, tier, lang);
+  return [
+    {
+      id: "ai",
+      icon: "sparkles",
+      color: "#8B5CF6",
+      badge: tr ? `${multiplier}X KOTA` : `${multiplier}X QUOTA`,
+      title: "CineMatch AI",
+      tagline: tr
+        ? `Günde ${ai.daily}, ayda ${ai.monthly} mesaj`
+        : `${ai.daily} per day, ${ai.monthly} per month`,
+      desc: tr
+        ? "Ruh haline ve izleme geçmişine göre nokta atışı film ve dizi önerileri."
+        : "Spot-on movie and TV picks based on your mood and watch history.",
     },
-    tagline: {
-      tr: "Günde 50 akıllı soru",
-      en: "Up to 50 daily questions",
+    {
+      id: "badge",
+      icon: "diamond",
+      color: "#F59E0B",
+      badge: isMax ? (tr ? "EFSANEVİ" : "LEGENDARY") : tr ? "EPİK" : "EPIC",
+      title: tr ? "Kimlik Rozeti" : "Identity Badge",
+      tagline: tr ? "Arkadaşların da görür" : "Your friends see it too",
+      desc: tr
+        ? "Profilinde ve arkadaşlarının gördüğü profil sayfanda parıldayan plan rozeti."
+        : "A plan badge on your profile and on the profile your friends see.",
     },
-    desc: {
-      tr: "Ruh haline, zevkine ve arkadaş ortamına özel anında nokta atışı film ve dizi tavsiyesi al.",
-      en: "Get spot-on movie and TV recommendations tailored to your mood, taste, and friends.",
+    {
+      id: "social",
+      icon: "people",
+      color: "#EC4899",
+      badge: isMax ? (tr ? "SINIRSIZ" : "UNLIMITED") : tr ? "DAHA FAZLA" : "MORE",
+      title: tr ? "Sosyal & Oyun" : "Social & Games",
+      tagline: isMax
+        ? tr
+          ? "Liste, arkadaş, grup ve oyun sınırsız"
+          : "Unlimited lists, friends, groups, games"
+        : `${value("custom_lists")} · ${value("friends")}`,
+      desc: tr
+        ? `Sohbet grubu: ${value("chat_groups")} · Oyun: ${value("games")} · CineSwipe odası: ${value("cineswipe_rooms")}.`
+        : `Group chats: ${value("chat_groups")} · Games: ${value("games")} · CineSwipe rooms: ${value("cineswipe_rooms")}.`,
     },
-  },
-  {
-    icon: "diamond",
-    color: "#F59E0B",
-    badge: { tr: "VIP STATÜ", en: "VIP STATUS" },
-    title: {
-      tr: "Kimlik Rozeti",
-      en: "Identity Badge",
+    {
+      id: "personal",
+      icon: "color-palette",
+      color: "#10B981",
+      badge: tr ? "KİŞİSEL" : "PERSONAL",
+      title: tr ? "Tema & Yazı Tipi" : "Themes & Fonts",
+      tagline: tr
+        ? `Kendi temanı oluştur · ${FONT_CATALOG_SIZE} yazı tipi`
+        : `Your own themes · ${FONT_CATALOG_SIZE} fonts`,
+      desc: tr
+        ? `Wrapped arşivinin tamamı ve ${value("streaming_alerts")} için platform bildirimi de dahil.`
+        : `Also includes your full Wrapped archive and streaming alerts for ${value("streaming_alerts")}.`,
     },
-    tagline: {
-      tr: "Profilinde ışıldasın",
-      en: "Glows on your profile",
-    },
-    desc: {
-      tr: "Profilinde, topluluk yorumlarında ve Story paylaşımlarında parıldayan prestij simgesi.",
-      en: "A prestigious status badge glowing on your profile, comments, and community Stories.",
-    },
-  },
-  {
-    icon: "stats-chart",
-    color: "#10B981",
-    badge: { tr: "TAM ARŞİV", en: "FULL ARCHIVE" },
-    title: {
-      tr: "Wrapped & Analiz",
-      en: "Wrapped & Analytics",
-    },
-    tagline: {
-      tr: "İzleme geçmişi röntgeni",
-      en: "Full watch history stats",
-    },
-    desc: {
-      tr: "Geçmiş tüm yılların sinema Wrapped raporları, tür dağılımları ve derinlemesine grafikler.",
-      en: "Comprehensive watch analytics, genre distribution charts, and archive of all Wrapped years.",
-    },
-  },
-  {
-    icon: "flash",
-    color: "#3B82F6",
-    badge: { tr: "VIP AYRICALIK", en: "VIP ACCESS" },
-    title: {
-      tr: "Erken & Kesintisiz",
-      en: "Early & Ad-Free",
-    },
-    tagline: {
-      tr: "İlk sen dene, kesintisiz yaşa",
-      en: "Be first to try new features",
-    },
-    desc: {
-      tr: "Tüm yeni keşif araçlarına, turnuva modlarına ve topluluk özelliklerine öncelikli erişim.",
-      en: "Priority access to all upcoming discovery tools, tournament modes, and community features.",
-    },
-  },
-];
-
-const EXPERIENCE_CATEGORIES = [
-  { id: "all", label: { tr: "✦ Tümü", en: "✦ All" }, icon: "sparkles", color: "#6366F1" },
-  { id: "ai", label: { tr: "CineMatch AI", en: "CineMatch AI" }, icon: "hardware-chip-outline", color: "#8B5CF6" },
-  { id: "library", label: { tr: "Kütüphane", en: "Library" }, icon: "albums-outline", color: "#10B981" },
-  { id: "insights", label: { tr: "İstatistik", en: "Insights" }, icon: "stats-chart-outline", color: "#F59E0B" },
-  { id: "community", label: { tr: "Topluluk", en: "Community" }, icon: "heart-outline", color: "#EC4899" },
-];
-
-const EXPERIENCE_GROUPS = [
-  {
-    id: "ai",
-    icon: "sparkles",
-    color: "#8B5CF6",
-    gradient: ["#8B5CF6", "#6366F1"],
-    tag: { tr: "YAPAY ZEKA", en: "AI ASSISTANT" },
-    badgeText: { tr: "Sınırsız Küratör", en: "Smart Curation" },
-    title: { tr: "CineMatch AI Asistanı", en: "CineMatch AI Assistant" },
-    summary: {
-      tr: "Ne izleyeceğine karar veremediğinde zevkini tanıyan yapay zeka yanında.",
-      en: "When you can't decide what to watch, AI that knows your taste has your back.",
-    },
-    bullets: {
-      tr: [
-        `Günde ${AI_PLAN_LIMITS.unlimited.daily}, ayda ${AI_PLAN_LIMITS.unlimited.monthly} mesaja varan CineMatch AI sohbeti`,
-        "Ruh haline, izleme sürene, yönetmen ve türe göre kişiselleştirilmiş film önerileri",
-        "İzleme geçmişinden beslenen ve seni tanıdıkça gelişen akıllı benzerlik algoritması",
-      ],
-      en: [
-        `Up to ${AI_PLAN_LIMITS.unlimited.daily} daily and ${AI_PLAN_LIMITS.unlimited.monthly} monthly CineMatch AI messages`,
-        "Personalized searches by mood, runtime, director, and genre",
-        "Smart similarity algorithms that learn from your unique watch history",
-      ],
-    },
-  },
-  {
-    id: "library",
-    icon: "albums",
-    color: "#10B981",
-    gradient: ["#10B981", "#059669"],
-    tag: { tr: "ORGANİZASYON", en: "ORGANIZATION" },
-    badgeText: { tr: "Sonsuz Arşiv", en: "Infinite Vault" },
-    title: { tr: "Listeler ve İzleme Günlüğü", en: "Lists and Watch Diary" },
-    summary: {
-      tr: "İzlediğin, planladığın ve sevdiğin her şey tek yerde organize.",
-      en: "Everything you watched, planned, and loved organized in one place.",
-    },
-    bullets: {
-      tr: [
-        "Sınırsız film, dizi ve özel temalı koleksiyon listesi oluşturma",
-        "İzleme geçmişi, favoriler ve devam eden dizileri anlık takip",
-        "Özel notlar, hatırlatıcılar ve yeni bölüm yayın takvimi entegrasyonu",
-      ],
-      en: [
-        "Create and organize unlimited custom movie and TV lists",
-        "Track watch history, favorites, and ongoing shows in real time",
-        "Custom notes, reminders, and release calendar integration",
-      ],
-    },
-  },
-  {
-    id: "insights",
-    icon: "stats-chart",
-    color: "#F59E0B",
-    gradient: ["#F59E0B", "#D97706"],
-    tag: { tr: "ANALİTİK", en: "ANALYTICS" },
-    badgeText: { tr: "Derin Raporlar", en: "Deep Reports" },
-    title: { tr: "İstatistikler ve Wrapped", en: "Insights and Wrapped" },
-    summary: {
-      tr: "İzleme alışkanlıklarını derinlemesine grafiklerle keşfet.",
-      en: "Explore your viewing habits with in-depth charts.",
-    },
-    bullets: {
-      tr: [
-        "Tüm Wrapped yıllarına ve kişisel izleme özetlerine sınırsız erişim",
-        "Tür dağılımı, toplam izlenen saat ve puanlama analiz grafikleri",
-        "En çok izlenen yönetmenler, oyuncu istatistikleri ve yapım yılları",
-      ],
-      en: [
-        "Unlimited access to every Wrapped year and discovery summary",
-        "Genre breakdown, total watch time, and rating analytics",
-        "Most watched directors, actor statistics, and release year trends",
-      ],
-    },
-  },
-  {
-    id: "community",
-    icon: "heart",
-    color: "#EC4899",
-    gradient: ["#EC4899", "#E11D48"],
-    tag: { tr: "STATÜ & TOPLULUK", en: "STATUS & COMMUNITY" },
-    badgeText: { tr: "Özel Profil", en: "Exclusive Identity" },
-    title: { tr: "Topluluk ve Kimlik", en: "Community and Identity" },
-    summary: {
-      tr: "Sinema zevkini profiline yansıt, toplulukta fark yarat.",
-      en: "Reflect your movie taste on your profile and stand out in the community.",
-    },
-    bullets: {
-      tr: [
-        "Profilinde, yorumlarında ve sohbetlerde parıldayan özel kimlik rozeti",
-        "Film ve dizilere detaylı incelemeler yazma ve 10 üzerinden puanlama",
-        "Instagram ve sosyal medyada paylaşabileceğin özel Story ve poster taslakları",
-      ],
-      en: [
-        "Exclusive identity badge shining on your profile and comments",
-        "Detailed reviews and 10-point ratings for movies and shows",
-        "Custom Story designs, posters, and draft exports for social sharing",
-      ],
-    },
-  },
-];
+  ];
+}
 
 function packageTitle(aPackage, tr) {
   const key = getPackagePeriodKey(aPackage);
@@ -262,10 +156,33 @@ export default function PremiumScreen() {
     openCustomerCenter,
   } = usePremium();
 
+  // Hangi kapı getirdi? (services/premiumUpsell.openPremiumScreen). Özellik
+  // kimliğiyse üstte o özelliğin plan değerleri gösterilir ve karşılaştırma
+  // o kategoriyle açılır.
+  const route = useRoute();
+  const source = route?.params?.source || "direct";
+  const sourceFeature = getFeature(source);
+  useEffect(() => {
+    trackEvent(ANALYTICS_EVENTS.PAYWALL_VIEW, {
+      source,
+      offering: "native_screen",
+      only_if_needed: false,
+    });
+  }, [source]);
+
   const [selectedTier, setSelectedTier] = useState(PREMIUM_PLAN.PREMIUM);
   const [selectedId, setSelectedId] = useState(null);
-  const [showDetailedSection, setShowDetailedSection] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [showDetailedSection, setShowDetailedSection] = useState(Boolean(sourceFeature));
+  const [categoryFilter, setCategoryFilter] = useState(sourceFeature?.category || "all");
+
+  const comparisonSections = useMemo(
+    () => getComparisonSections(localized),
+    [localized],
+  );
+  const comparisonRowCount = comparisonSections.reduce(
+    (total, section) => total + section.rows.length,
+    0,
+  );
 
   const ctaShimmer = useRef(new Animated.Value(0)).current;
 
@@ -353,6 +270,7 @@ export default function PremiumScreen() {
     selectedTier === PREMIUM_PLAN.UNLIMITED
       ? IDENTITY_BADGES.unlimited
       : IDENTITY_BADGES.premium;
+  const highlights = buildHighlights(selectedTier, tr);
 
   const handleSelectTier = (tier) => {
     if (isUnlimited && tier !== PREMIUM_PLAN.UNLIMITED) return;
@@ -478,6 +396,35 @@ export default function PremiumScreen() {
         </View>
       )}
 
+      {/* Kaynak özellik bandı: kullanıcı bir limitten/kilitten geldiyse */}
+      {sourceFeature ? (
+        <View
+          style={[
+            styles.sourceBanner,
+            { backgroundColor: C.card, borderColor: alpha(C.accent, 0.35) },
+          ]}
+        >
+          <View style={[styles.sourceBannerIcon, { backgroundColor: alpha(C.accent, 0.14) }]}>
+            <AppIcon name={sourceFeature.icon} size={16} color={C.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.sourceBannerTitle, { color: C.text }]}>
+              {sourceFeature.title[localized]}
+            </Text>
+            <Text style={[styles.sourceBannerValues, { color: C.muted }]}>
+              {PLANS.map(
+                (planId) =>
+                  `${getPremiumPlanDisplayName(planId)}: ${formatFeatureValue(
+                    source,
+                    planId,
+                    localized,
+                  )}`,
+              ).join("  ·  ")}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
       {/* Hero Card */}
       <View style={[styles.heroCard, { borderColor: alpha(C.accent, 0.28) }]}>
         <LinearGradient
@@ -529,8 +476,8 @@ export default function PremiumScreen() {
             </Text>
             <Text style={[styles.heroSubtitle, { color: C.muted }]}>
               {tr
-                ? "CineMatch AI film küratörlüğü, profilinde parıldayan statü rozetleri ve sınırsız arşiv analizleri ile sinema tutkunu özgürce yaşa."
-                : "Spot-on CineMatch AI curation, sparkling profile status badges, and unlimited insights to elevate your viewing passion."}
+                ? "CineMatch AI önerileri, arkadaşlarının da gördüğü kimlik rozeti, daha geniş sosyal limitler ve kişiselleştirme tek abonelikte."
+                : "CineMatch AI picks, an identity badge your friends can see, higher social limits and personalization in one subscription."}
             </Text>
           </View>
 
@@ -715,8 +662,8 @@ export default function PremiumScreen() {
             </View>
             <Text style={[styles.badgePreviewDesc, { color: C.muted }]}>
               {tr
-                ? "Profilinde, arkadaş sohbetlerinde ve topluluk yorumlarında statü sembolün olarak otomatik parıldar."
-                : "Automatically displayed on your profile, chat conversations, and community reviews."}
+                ? "Profilinde ve arkadaşlarının gördüğü profil sayfanda statü sembolün olarak parıldar."
+                : "Shown on your profile and on the profile page your friends see."}
             </Text>
           </View>
         </View>
@@ -784,7 +731,7 @@ export default function PremiumScreen() {
                       <View style={[styles.popularBadge, { backgroundColor: "#F59E0B" }]}>
                         <AppIcon name="flame" size={11} color="#fff" />
                         <Text style={styles.popularBadgeText}>
-                          {tr ? "EN ÇOK TERCİH EDİLEN" : "MOST POPULAR"}
+                          {tr ? "EN AVANTAJLI" : "BEST VALUE"}
                         </Text>
                       </View>
                     ) : (
@@ -1004,9 +951,9 @@ export default function PremiumScreen() {
         </View>
 
         <View style={styles.valueProps2x2Grid}>
-          {CORE_VALUE_PROPS.map((prop, idx) => (
+          {highlights.map((prop) => (
             <View
-              key={idx}
+              key={prop.id}
               style={[
                 styles.valueProp2x2Card,
                 { backgroundColor: C.card, borderColor: alpha(prop.color, 0.28) },
@@ -1024,19 +971,19 @@ export default function PremiumScreen() {
                 </View>
                 <View style={[styles.valuePropBadgeTag, { backgroundColor: alpha(prop.color, 0.16) }]}>
                   <Text style={[styles.valuePropBadgeTagText, { color: prop.color }]}>
-                    {prop.badge[localized]}
+                    {prop.badge}
                   </Text>
                 </View>
               </View>
 
               <Text style={[styles.valuePropTitle2x2, { color: C.text }]}>
-                {prop.title[localized]}
+                {prop.title}
               </Text>
               <Text style={[styles.valuePropTagline2x2, { color: prop.color }]}>
-                {prop.tagline[localized]}
+                {prop.tagline}
               </Text>
               <Text style={[styles.valuePropDesc2x2, { color: C.muted }]}>
-                {prop.desc[localized]}
+                {prop.desc}
               </Text>
             </View>
           ))}
@@ -1092,21 +1039,23 @@ export default function PremiumScreen() {
               <View style={[styles.accordionSmallBadge, { backgroundColor: alpha(C.accent, 0.14) }]}>
                 <View style={[styles.accordionDot, { backgroundColor: C.accent }]} />
                 <Text style={[styles.accordionSmallBadgeText, { color: C.accent }]}>
-                  {tr ? "ÖZELLİK REHBERİ" : "FEATURE GUIDE"}
+                  {tr ? "PLAN KARŞILAŞTIRMA" : "PLAN COMPARISON"}
                 </Text>
               </View>
               <Text style={[styles.accordionFeatureCount, { color: C.muted }]}>
-                {tr ? "4 Kategori · 12+ Yetenek" : "4 Categories · 12+ Perks"}
+                {tr
+                  ? `${comparisonSections.length} Kategori · ${comparisonRowCount} Özellik`
+                  : `${comparisonSections.length} Categories · ${comparisonRowCount} Features`}
               </Text>
             </View>
 
             <Text style={[styles.accordionToggleTitle, { color: C.text }]}>
-              {tr ? "Tüm Özellikleri Ayrıntılı İncele" : "Explore All Features in Detail"}
+              {tr ? "Planları Karşılaştır" : "Compare Plans"}
             </Text>
             <Text style={[styles.accordionToggleSub, { color: C.muted }]}>
               {tr
-                ? "Yapay zeka, arşiv, analitik ve profil ayrıcalıklarının tüm detayları"
-                : "Deep dive into AI, archive, analytics, and profile privileges"}
+                ? "Free, Premium ve Premium Max'te her özelliğin sınırı"
+                : "Every feature's limit on Free, Premium and Premium Max"}
             </Text>
           </View>
 
@@ -1128,13 +1077,16 @@ export default function PremiumScreen() {
 
         {showDetailedSection && (
           <View style={styles.categorySectionWrap}>
-            {/* Category Filter Pills */}
+            {/* Kategori hapları — utils/premiumFeatures.js FEATURE_CATEGORIES */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.categoryFilterRow}
             >
-              {EXPERIENCE_CATEGORIES.map((cat) => {
+              {[
+                { id: "all", title: tr ? "✦ Tümü" : "✦ All", icon: "sparkles", color: "#6366F1" },
+                ...comparisonSections,
+              ].map((cat) => {
                 const isCatActive = categoryFilter === cat.id;
                 const activeColor = cat.color || C.accent;
                 return (
@@ -1149,17 +1101,13 @@ export default function PremiumScreen() {
                       {
                         backgroundColor: isCatActive ? activeColor : C.card,
                         borderColor: isCatActive ? activeColor : C.border,
-                        shadowColor: isCatActive ? activeColor : "transparent",
-                        shadowOpacity: isCatActive ? 0.3 : 0,
-                        shadowRadius: 6,
-                        elevation: isCatActive ? 3 : 0,
                       },
                     ]}
                   >
                     <AppIcon
                       name={cat.icon}
                       size={13}
-                      color={isCatActive ? "#fff" : cat.color || C.accent}
+                      color={isCatActive ? "#fff" : activeColor}
                     />
                     <Text
                       style={[
@@ -1167,144 +1115,131 @@ export default function PremiumScreen() {
                         { color: isCatActive ? "#fff" : C.text },
                       ]}
                     >
-                      {cat.label[localized]}
+                      {cat.title}
                     </Text>
                   </Pressable>
                 );
               })}
             </ScrollView>
 
-            {/* Filtered Category Cards */}
+            {/* Kategori kartları: her özellik için Free / Premium / Max */}
             <View style={styles.categoryCardsList}>
-              {EXPERIENCE_GROUPS.filter(
-                (g) => categoryFilter === "all" || g.id === categoryFilter
-              ).map((group) => {
-                const groupColor = group.color || C.accent;
-                return (
+              {comparisonSections
+                .filter((section) => categoryFilter === "all" || section.id === categoryFilter)
+                .map((section) => (
                   <View
-                    key={group.id}
+                    key={section.id}
                     style={[
                       styles.detailedCard,
-                      {
-                        backgroundColor: C.card,
-                        borderColor: alpha(groupColor, 0.3),
-                      },
+                      { backgroundColor: C.card, borderColor: alpha(section.color, 0.3) },
                     ]}
                   >
-                    {/* Top ambient glow */}
                     <LinearGradient
-                      colors={[alpha(groupColor, 0.12), "transparent"]}
+                      colors={[alpha(section.color, 0.12), "transparent"]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 0.8, y: 0.8 }}
                       style={StyleSheet.absoluteFill}
                       pointerEvents="none"
                     />
-
-                    {/* Card Header */}
                     <View style={styles.detailedCardHeader}>
-                      <LinearGradient
-                        colors={group.gradient || [groupColor, groupColor]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.detailedCardIconWrap}
+                      <View
+                        style={[
+                          styles.detailedCardIconWrap,
+                          { backgroundColor: alpha(section.color, 0.9) },
+                        ]}
                       >
-                        <AppIcon name={group.icon} size={20} color="#fff" />
-                      </LinearGradient>
-
+                        <AppIcon name={section.icon} size={20} color="#fff" />
+                      </View>
                       <View style={styles.detailedCardCopy}>
-                        <View style={styles.detailedCardTagRow}>
-                          <View
-                            style={[
-                              styles.detailedCategoryTag,
-                              { backgroundColor: alpha(groupColor, 0.14) },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.detailedCategoryTagText,
-                                { color: groupColor },
-                              ]}
-                            >
-                              {group.tag[localized]}
-                            </Text>
-                          </View>
-                          <View
-                            style={[
-                              styles.detailedPerkBadge,
-                              {
-                                backgroundColor: alpha(C.cardAlt, 0.9),
-                                borderColor: alpha(groupColor, 0.22),
-                              },
-                            ]}
-                          >
-                            <Text style={[styles.detailedPerkBadgeText, { color: C.muted }]}>
-                              {group.badgeText[localized]}
-                            </Text>
-                          </View>
-                        </View>
-
                         <Text style={[styles.detailedCardTitle, { color: C.text }]}>
-                          {group.title[localized]}
-                        </Text>
-                        <Text style={[styles.detailedCardSummary, { color: C.muted }]}>
-                          {group.summary[localized]}
+                          {section.title}
                         </Text>
                       </View>
                     </View>
 
-                    {/* Bullets List */}
                     <View
                       style={[
                         styles.detailedCardBody,
                         {
-                          borderTopColor: alpha(groupColor, 0.16),
+                          borderTopColor: alpha(section.color, 0.16),
                           backgroundColor: alpha(C.cardAlt, 0.38),
                         },
                       ]}
                     >
-                      {group.bullets[localized].map((bullet, bIdx) => (
-                        <View
-                          key={bIdx}
-                          style={[
-                            styles.detailedBulletItem,
-                            {
-                              backgroundColor: alpha(C.card, 0.88),
-                              borderColor: alpha(groupColor, 0.14),
-                            },
-                          ]}
-                        >
+                      {section.rows.map((row) => {
+                        const highlighted = row.id === source;
+                        return (
                           <View
+                            key={row.id}
                             style={[
-                              styles.detailedBulletIconBadge,
-                              { backgroundColor: alpha(groupColor, 0.15) },
+                              styles.compareRow,
+                              {
+                                backgroundColor: alpha(C.card, 0.88),
+                                borderColor: highlighted
+                                  ? C.accent
+                                  : alpha(section.color, 0.14),
+                              },
                             ]}
                           >
-                            <AppIcon name="checkmark-done" size={13} color={groupColor} />
+                            <View style={styles.compareRowHead}>
+                              <AppIcon name={row.icon} size={14} color={section.color} />
+                              <Text style={[styles.compareRowTitle, { color: C.text }]}>
+                                {row.title}
+                              </Text>
+                            </View>
+                            {row.detail ? (
+                              <Text style={[styles.compareRowDetail, { color: C.muted }]}>
+                                {row.detail}
+                              </Text>
+                            ) : null}
+                            <View style={styles.compareValues}>
+                              {PLANS.map((planId) => {
+                                const isSelectedPlan = planId === selectedTier;
+                                return (
+                                  <View
+                                    key={planId}
+                                    style={[
+                                      styles.compareCell,
+                                      {
+                                        backgroundColor: isSelectedPlan
+                                          ? alpha(C.accent, 0.16)
+                                          : C.cardAlt,
+                                        borderColor: isSelectedPlan
+                                          ? alpha(C.accent, 0.5)
+                                          : "transparent",
+                                      },
+                                    ]}
+                                  >
+                                    <Text
+                                      numberOfLines={1}
+                                      style={[styles.compareCellPlan, { color: C.muted }]}
+                                    >
+                                      {getPremiumPlanDisplayName(planId)}
+                                    </Text>
+                                    <Text
+                                      numberOfLines={2}
+                                      style={[
+                                        styles.compareCellValue,
+                                        { color: isSelectedPlan ? C.accent : C.text },
+                                      ]}
+                                    >
+                                      {row.values[planId]}
+                                    </Text>
+                                  </View>
+                                );
+                              })}
+                            </View>
+                            {row.note ? (
+                              <Text style={[styles.compareRowNote, { color: C.muted }]}>
+                                {row.note}
+                              </Text>
+                            ) : null}
                           </View>
-                          <Text style={[styles.detailedBulletText, { color: C.text }]}>
-                            {bullet}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-
-                    {/* Card Footer Status */}
-                    <View
-                      style={[
-                        styles.detailedCardFooter,
-                        { borderTopColor: alpha(groupColor, 0.12) },
-                      ]}
-                    >
-                      <AppIcon name="shield-checkmark" size={13} color={groupColor} />
-                      <Text style={[styles.detailedCardFooterText, { color: C.muted }]}>
-                        {tr
-                          ? "Tüm Premium paketlerde anında aktif olur"
-                          : "Instantly available with all Premium tiers"}
-                      </Text>
+                        );
+                      })}
                     </View>
                   </View>
-                );
-              })}
+                ))}
             </View>
           </View>
         )}
@@ -2040,6 +1975,79 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     fontWeight: "600",
+  },
+  sourceBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 14,
+  },
+  sourceBannerIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sourceBannerTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  sourceBannerValues: {
+    fontSize: 10.5,
+    fontWeight: "600",
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  compareRow: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
+    gap: 6,
+  },
+  compareRowHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  compareRowTitle: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  compareRowDetail: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "500",
+  },
+  compareValues: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  compareCell: {
+    flex: 1,
+    borderRadius: 9,
+    borderWidth: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 6,
+  },
+  compareCellPlan: {
+    fontSize: 8.5,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+  compareCellValue: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  compareRowNote: {
+    fontSize: 9.5,
+    lineHeight: 13,
+    fontStyle: "italic",
   },
   detailedCardFooter: {
     borderTopWidth: 1,

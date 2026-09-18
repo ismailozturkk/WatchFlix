@@ -67,15 +67,87 @@ export function hasActivePremiumEntitlement(
   return getPremiumPlan(customerInfo, entitlementId) !== PREMIUM_PLAN.FREE;
 }
 
+/**
+ * Google Play abonelik kimliği "abonelikId:tabanPlanId" biçiminde gelebilir
+ * (StoreProduct.identifier). Karşılaştırma ve ürün değişimi için abonelik
+ * kimliği yeterli.
+ */
+export function baseProductIdentifier(identifier) {
+  if (typeof identifier !== "string" || !identifier) return null;
+  return identifier.split(":")[0];
+}
+
 export function isUnlimitedProductIdentifier(identifier) {
+  const base = baseProductIdentifier(identifier);
   return (
-    identifier === REVENUECAT_PRODUCT_IDS.UNLIMITED_MONTHLY ||
-    identifier === REVENUECAT_PRODUCT_IDS.UNLIMITED_YEARLY
+    base === REVENUECAT_PRODUCT_IDS.UNLIMITED_MONTHLY ||
+    base === REVENUECAT_PRODUCT_IDS.UNLIMITED_YEARLY
   );
 }
 
+/**
+ * Sunucunun yazdığı Users/{uid}.entitlements alanından plan
+ * (functions/aiQuota.js resolveAiPlan ile aynı kural).
+ */
+export function resolveServerPlan(entitlements) {
+  if (
+    entitlements?.premiumUnlimited === true ||
+    entitlements?.premiumPlan === PREMIUM_PLAN.UNLIMITED
+  ) {
+    return PREMIUM_PLAN.UNLIMITED;
+  }
+  if (entitlements?.premium === true) return PREMIUM_PLAN.PREMIUM;
+  return PREMIUM_PLAN.FREE;
+}
+
+const PLAN_RANK = Object.freeze({
+  [PREMIUM_PLAN.FREE]: 0,
+  [PREMIUM_PLAN.PREMIUM]: 1,
+  [PREMIUM_PLAN.UNLIMITED]: 2,
+});
+
+/**
+ * Android'de aktif Play aboneliğinden BAŞKA bir ürüne geçiş.
+ *
+ * Google Play, değişim bilgisi verilmeyen satın almayı ikinci ve bağımsız bir
+ * abonelik sayar: Premium → Premium Max geçen kullanıcı iki abonelik için
+ * birden ödeme yapar. iOS aynı abonelik grubundaki ürünlerde bunu kendisi
+ * yönetir; bu yüzden yalnız Android'de ve Play kaynaklı aboneliklerde döner.
+ *
+ * Üst plana ya da aylıktan yıllığa geçiş anında olur (kalan süre orantılı
+ * iade edilir); alt plana veya yıllıktan aylığa geçiş dönem sonunda işler.
+ *
+ * @returns {{ oldProductIdentifier: string, replacementMode: string } | null}
+ */
+export function getStoreProductChange({
+  customerInfo,
+  entitlementId = PREMIUM_ENTITLEMENT_ID,
+  aPackage,
+  platform,
+}) {
+  if (platform !== "android") return null;
+  const active = customerInfo?.entitlements?.active?.[entitlementId];
+  if (!active || active.store !== "PLAY_STORE") return null;
+
+  const oldId = baseProductIdentifier(active.productIdentifier);
+  const newId = baseProductIdentifier(aPackage?.product?.identifier);
+  if (!oldId || !newId || oldId === newId) return null;
+
+  const oldRank = PLAN_RANK[
+    isUnlimitedProductIdentifier(oldId) ? PREMIUM_PLAN.UNLIMITED : PREMIUM_PLAN.PREMIUM
+  ];
+  const newRank = PLAN_RANK[getPackageTierKey(aPackage)];
+  const toAnnual = getPackagePeriodKey(aPackage) === "annual";
+  const immediate = newRank > oldRank || (newRank === oldRank && toAnnual);
+
+  return {
+    oldProductIdentifier: oldId,
+    replacementMode: immediate ? "WITH_TIME_PRORATION" : "DEFERRED",
+  };
+}
+
 export function getPackageTierKey(aPackage) {
-  const productIdentifier = aPackage?.product?.identifier;
+  const productIdentifier = baseProductIdentifier(aPackage?.product?.identifier);
   if (isUnlimitedProductIdentifier(productIdentifier)) {
     return PREMIUM_PLAN.UNLIMITED;
   }

@@ -8,6 +8,7 @@ import { useTheme } from "@context/ThemeContext";
 import { buildWatchlistPool } from "@services/sceneGameService";
 import { loadSceneGamePreferences, saveSceneGamePreferences } from "@services/sceneGamePreferences";
 import { i18nText } from "@utils/i18nText";
+import { usePremiumDailyGate } from "@hooks/usePremiumGate";
 import { GameScreenShell, gameSharedStyles } from "./GameScreenShell";
 import {
   DEFAULT_DIFFICULTY_ID,
@@ -78,10 +79,14 @@ export default function SceneGameSetupScreen({ navigation, route }) {
   const selectedSource = useMemo(() => SCENE_GAME_SOURCES.find((s) => s.id === sourceId) || SCENE_GAME_SOURCES[0], [sourceId]);
 
   /* ── Start game ─────────────────────────────────────────────────────── */
+  // Günlük oyun hakkı: bittiyse oyun ekranı hiç açılmadan uyarılır. Asıl
+  // harcama oyun başladığında (hooks/useSceneGame).
+  const gamesGate = usePremiumDailyGate("games");
   const handleStartGame = useCallback(async () => {
+    if (!gamesGate.check()) return;
     await saveSceneGamePreferences(user?.uid, { modeId, difficultyId, sourceId });
     navigation.navigate("SceneGamePlayScreen", { gameId, modeId, difficultyId, sourceId });
-  }, [navigation, gameId, modeId, difficultyId, sourceId, user?.uid]);
+  }, [navigation, gameId, modeId, difficultyId, sourceId, user?.uid, gamesGate]);
 
   return (
     <GameScreenShell
@@ -181,6 +186,13 @@ export default function SceneGameSetupScreen({ navigation, route }) {
           {i18nText("autoI18n.oyunu_baslat", "Oyunu Başlat")}
         </Text>
       </TouchableOpacity>
+      {!gamesGate.unlimited && (
+        <Text style={[styles.dailyAllowance, { color: theme.text.muted }]} allowFontScaling={false}>
+          {language === "tr"
+            ? `Bugün ${gamesGate.remaining}/${gamesGate.limit} oyun hakkın kaldı`
+            : `${gamesGate.remaining}/${gamesGate.limit} games left today`}
+        </Text>
+      )}
     </GameScreenShell>
   );
 }
@@ -385,6 +397,14 @@ const styles = StyleSheet.create({
   summaryTitle: { fontSize: 12, fontWeight: "900" },
   summaryDetails: { fontSize: 9.5, fontWeight: "750", marginTop: 2 },
 
+  // Başlat butonunun hemen altında (butonun alt boşluğunu paylaşır).
+  dailyAllowance: {
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
+    marginTop: -10,
+    marginBottom: 20,
+  },
   startButton: {
     minHeight: 48,
     marginTop: 10,

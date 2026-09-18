@@ -70,6 +70,15 @@ const settingsKeys = {
     // migration.js'teki migrateCustomThemes hallediyor.
   },
   selectedAvatar: { key: "selectedAvatar", type: TYPES.json, default: null },
+  // Son çözülen premium planı. Tema ve yazı tipi store'ları açılışta SENKRON
+  // okur: RevenueCat cevabı gelene kadar (≈1 sn) premium kullanıcının özel
+  // teması/fontu varsayılana düşüp geri gelmesin (bkz. services/premiumState.js).
+  premiumLastPlan: {
+    key: "premiumLastPlan",
+    type: TYPES.string,
+    default: "free",
+    validate: oneOf("free", "premium", "unlimited"),
+  },
   adultContent: { key: "adultContent", type: TYPES.boolean, default: false },
   showOngoingTvShows: { key: "showOngoingTvShows", type: TYPES.boolean, default: true },
   showIconBackground: { key: "showIconBackground", type: TYPES.boolean, default: false },
@@ -361,6 +370,18 @@ const dataKeys = {
     default: null,
     scope: "user",
     keepOnLogout: true,
+  },
+
+  // Günlük premium hakları (oyun, CineSwipe) — { day, counts }. Çıkışta
+  // SİLİNMEZ: silinseydi çıkış/giriş yapmak günlük hakkı sıfırlamanın yolu
+  // olurdu (bkz. utils/dailyUsage.js).
+  premiumDailyUsage: {
+    key: "premium_daily_usage:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
   },
 
   // ---- Cihaz düzeyi -------------------------------------------------------

@@ -48,6 +48,10 @@ import CineLikedBasketModal from "../../components/cineswipe/CineLikedBasketModa
 import CineRoomConfigModal from "../../components/cineswipe/CineRoomConfigModal";
 import CineDuoResultsModal from "../../components/cineswipe/CineDuoResultsModal";
 import { triggerHaptic } from "../../services/hapticsService";
+import { useListStatusContext } from "../../context/ListStatusContext";
+import { useSharedLists } from "../../context/SharedListsContext";
+import { usePremiumDailyGate, usePremiumGate } from "../../hooks/usePremiumGate";
+import { getDailyUsed } from "../../services/premiumUsage";
 import Toast from "react-native-toast-message";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -70,6 +74,15 @@ export default function CineSwipeScreen({ route, navigation }) {
   const [savingSwipe, setSavingSwipe] = useState(false);
   const [swipeError, setSwipeError] = useState(false);
   const [cardRevision, setCardRevision] = useState(0);
+  // Premium hakları: oda KURMA ve tek başına kaydırma günlük; sonuçları yeni
+  // özel/ortak listeye kaydetmek liste limitlerine tabi. Odaya katılmak ve
+  // odadaki ortak kaydırmalar serbest (işi başlatan sayılır).
+  const roomsGate = usePremiumDailyGate("cineswipe_rooms");
+  const swipesGate = usePremiumDailyGate("cineswipe_swipes");
+  const customListsGate = usePremiumGate("custom_lists");
+  const sharedListsGate = usePremiumGate("shared_lists");
+  const { otherListKeys = [] } = useListStatusContext() || {};
+  const { sharedLists = [] } = useSharedLists() || {};
   const [result, setResult] = useState(null);
   const [cleanupError, setCleanupError] = useState(false);
   const [lastResult, setLastResult] = useState(() => user?.uid ? get(Keys.cineLastResult, { uid: user.uid }) : null);
@@ -302,8 +315,20 @@ export default function CineSwipeScreen({ route, navigation }) {
   };
 
   // Sağa Kaydırma (Beğen)
+  // Solo kaydırma hakkı: doluysa kart geri döner ve uyarı çıkar.
+  const consumeSoloSwipe = () => {
+    if (!swipesGate.allows(getDailyUsed("cineswipe_swipes"))) {
+      setCardRevision((value) => value + 1);
+      swipesGate.showUpsell();
+      return false;
+    }
+    swipesGate.consume();
+    return true;
+  };
+
   const handleSwipeRight = async (media) => {
     if (mode === "duo") return handleDuoSwipe(media, "like");
+    if (!consumeSoloSwipe()) return;
     const nextIdx = currentIndex + 1;
     setHistory((prev) => [...prev, { media, direction: "like", index: currentIndex }]);
     setCurrentIndex(nextIdx);
@@ -322,6 +347,7 @@ export default function CineSwipeScreen({ route, navigation }) {
   // Sola Kaydırma (Pas)
   const handleSwipeLeft = async (media) => {
     if (mode === "duo") return handleDuoSwipe(media, "pass");
+    if (!consumeSoloSwipe()) return;
     const nextIdx = currentIndex + 1;
     setHistory((prev) => [...prev, { media, direction: "pass", index: currentIndex }]);
     setCurrentIndex(nextIdx);
@@ -341,6 +367,8 @@ export default function CineSwipeScreen({ route, navigation }) {
     }
     setHistory((prev) => prev.slice(0, -1));
     setCurrentIndex((prev) => Math.max(0, prev - 1));
+    // Geri alınan kart yeniden kaydırılacak: hakkı iade et.
+    swipesGate.refund();
   };
 
   // Filtreleri Uygula
@@ -357,6 +385,8 @@ export default function CineSwipeScreen({ route, navigation }) {
       Toast.show({ type: "info", text1: "Oda kurmak için giriş yapmalısınız." });
       return;
     }
+    // Günlük oda kurma hakkı; harcama oda gerçekten kurulunca.
+    if (!roomsGate.check()) return;
     triggerHaptic("selection");
     setShowRoomConfig(true);
   };
@@ -397,6 +427,7 @@ export default function CineSwipeScreen({ route, navigation }) {
       setRoomCode(rCode);
       setDeck(freshDeck.slice(0, config.targetCardsCount || 20));
       setRoomState("created");
+      roomsGate.consume();
       triggerHaptic("notification");
     } catch (e) {
       if (session === roomSession.current) showRoomError(e);
@@ -494,9 +525,18 @@ export default function CineSwipeScreen({ route, navigation }) {
   // Solo: Kişisel Özel Liste Oluştur
   const handleSaveAsPersonalCustomList = async (items) => {
     if (!user?.uid || !items || items.length === 0) return;
+    const dateStr = new Date().toLocaleDateString("tr-TR");
+    const listName = `CineSwipe (${dateStr})`;
+    // Aynı günün listesi varsa ona eklenir (yeni liste açılmaz, limit dışı).
+    if (
+      !otherListKeys.includes(listName) &&
+      !customListsGate.check(otherListKeys.length, {
+        onUpgrade: () => setShowLikedBasket(false),
+      })
+    ) {
+      return;
+    }
     try {
-      const dateStr = new Date().toLocaleDateString("tr-TR");
-      const listName = `CineSwipe (${dateStr})`;
       const docRef = doc(db, "Lists", user.uid);
       const userRef = doc(db, "Users", user.uid);
 
@@ -534,6 +574,14 @@ export default function CineSwipeScreen({ route, navigation }) {
   // Duo: Ortak Liste Oluştur
   const handleSaveAsSharedList = async (items) => {
     if (!user?.uid || !items || items.length === 0) return;
+    const ownedSharedLists = sharedLists.filter((l) => l.ownerId === user.uid).length;
+    if (
+      !sharedListsGate.check(ownedSharedLists, {
+        onUpgrade: () => setShowDuoResults(false),
+      })
+    ) {
+      return;
+    }
     try {
       const partnerDisplayName = partnerName || "Arkadaş";
       const listName = `CineSwipe (${partnerDisplayName} & ${user.displayName || "Ben"})`;
@@ -909,7 +957,9 @@ export default function CineSwipeScreen({ route, navigation }) {
                 const isTop = i === visibleCards.length - 1;
                 return (
                   <SwipeCard
-                    key={`${cineMediaKey(media)}_${mode === "duo" ? cardRevision : 0}`}
+                    // Revizyon değişince kart yeniden kurulup ortaya döner:
+                    // duo'da yazma hatası, solo'da günlük kaydırma hakkı bitti.
+                    key={`${cineMediaKey(media)}_${cardRevision}`}
                     disabled={mode === "duo" && savingSwipe}
                     media={media}
                     isTop={isTop}

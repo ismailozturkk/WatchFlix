@@ -203,10 +203,15 @@ service cloud.firestore {
     }
     match /Users/{uid} {
       allow read: if isSignedIn();
-      // RevenueCat entitlement alanını yalnız Admin SDK webhook'u yazar.
-      // Kullanıcı profil oluştururken veya güncellerken kendini premium yapamaz.
+      // Sunucuya ait alanlar — istemci ne kendi belgesinde ne başkasınınkinde
+      // yazabilir:
+      //   • entitlements: RevenueCat planı (webhook + syncPremiumStatus).
+      //     Kullanıcı kendini premium yapamaz.
+      //   • badges: kimlik rozetleri (kurucu rozeti geri alınamaz bir kamu
+      //     vaadi; bkz. components/badges/badgeCatalog.js). Kural olmadan
+      //     herkes kendine "Kurucu" yazabiliyordu.
       allow create: if isOwner(uid)
-                    && !request.resource.data.keys().hasAny(['entitlements']);
+                    && !request.resource.data.keys().hasAny(['entitlements', 'badges']);
       // Sahibi her şeyi yazar; diğer signed-in kullanıcılar SADECE
       // counter/timestamp alanlarını günceller (friend req / like / comment
       // akışlarında karşı tarafın dokümanı güncellenir).
@@ -214,7 +219,7 @@ service cloud.firestore {
       // (troll'ün sayaç şişirmesi) kural düzeyinde engellenir.
       allow update: if (isOwner(uid)
                         && !request.resource.data.diff(resource.data)
-                          .affectedKeys().hasAny(['entitlements'])
+                          .affectedKeys().hasAny(['entitlements', 'badges'])
                         && birthDateKept())
                     || (isSignedIn()
                         && onlyUpdating([
@@ -299,8 +304,14 @@ service cloud.firestore {
     // orada duramaz. Expo push token'ları buraya taşındı: kökte dururken
     // herhangi bir kullanıcı tüm token'ları dökebiliyor ve Expo push ucundan
     // herkese sahte bildirim atabiliyordu (private/push).
+    //
+    // private/entitlements: abonelik ayrıntıları (ürün, mağaza, bitiş). Yalnız
+    // sunucu yazar; sahibi okur ve hesap silmede siler (accountService tüm
+    // private alt koleksiyonunu temizler). Hiçbir yetki kararı bu belgeden
+    // okunmaz — plan, Users/{uid}.entitlements'tadır.
     match /Users/{uid}/private/{docId} {
-      allow read, write: if isOwner(uid);
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && docId != 'entitlements';
     }
 
     // ─── Following / Followers / Liked / Bookmarks (Posts için) ─────────

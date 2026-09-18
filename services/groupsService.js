@@ -22,6 +22,7 @@ import {
   arrayRemove,
   deleteField,
   runTransaction,
+  getDocs,
 } from "firebase/firestore";
 
 // ─── Üye baloncuk rengi (uid'den deterministik) ──────────────────────────────
@@ -81,6 +82,18 @@ export async function createGroup({
     lastMessage: null,
   });
   return ref.id;
+}
+
+// ─── Kurduğun grup sayısı (premium limiti) ──────────────────────────────────
+// Kural okumayı üyeliğe bağladığı için `createdBy` ile sorgu reddedilir (kurup
+// ayrıldığın grup da sonuçta olurdu). Üyesi olunan gruplardan kurucusu
+// olunanlar sayılır — ayrıldığın grup limitten düşer.
+export async function countOwnedGroups(uid) {
+  if (!uid) return 0;
+  const snap = await getDocs(
+    query(collection(db, "groups"), where("members", "array-contains", uid))
+  );
+  return snap.docs.filter((d) => d.data()?.createdBy === uid).length;
 }
 
 // ─── Kullanıcının gruplarını dinle (liste ekranı) ────────────────────────────

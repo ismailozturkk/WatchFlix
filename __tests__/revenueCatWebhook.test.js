@@ -1,4 +1,6 @@
 const {
+  LEGACY_PUBLIC_ENTITLEMENT_FIELDS,
+  buildEntitlementDocuments,
   getTransferChanges,
   isFirebaseUserId,
   parseRevenueCatPremiumState,
@@ -158,5 +160,82 @@ describe("RevenueCat webhook helpers", () => {
       premiumUnlimited: true,
       premiumPlan: "unlimited",
     });
+  });
+});
+
+describe("abonelik belgeleri", () => {
+  const future = Date.parse("2029-01-01T00:00:00Z");
+
+  test("mağaza bilgisi abonelik haritasından okunur (Play taban planı dahil)", () => {
+    const payload = (productId, subscriptionKey) => ({
+      subscriber: {
+        entitlements: {
+          "com.smlztrk.seelogd Pro": {
+            product_identifier: productId,
+            expires_date: "2030-01-01T00:00:00Z",
+          },
+        },
+        subscriptions: { [subscriptionKey]: { store: "play_store" } },
+      },
+    });
+    expect(parseRevenueCatPremiumState(payload("yearly", "yearly"), future).store).toBe("play_store");
+    expect(parseRevenueCatPremiumState(payload("monthly", "monthly:p1m"), future)).toMatchObject({
+      premiumPlan: "unlimited",
+      store: "play_store",
+    });
+  });
+
+  test("Play taban planlı Premium Max ürünü Max sayılır", () => {
+    const state = parseRevenueCatPremiumState(
+      {
+        subscriber: {
+          entitlements: {
+            "com.smlztrk.seelogd Pro": {
+              product_identifier: "unlimited_yearly:p1y",
+              expires_date: "2030-01-01T00:00:00Z",
+            },
+          },
+        },
+      },
+      future,
+    );
+    expect(state.premiumPlan).toBe("unlimited");
+  });
+
+  test("herkese açık belgede yalnız plan, ayrıntılar özel belgede", () => {
+    const { publicEntitlements, privateEntitlements } = buildEntitlementDocuments(
+      {
+        premium: true,
+        premiumUnlimited: false,
+        premiumPlan: "premium",
+        productId: "yearly",
+        expiresAt: new Date("2030-01-01T00:00:00Z"),
+        store: "play_store",
+      },
+      { source: "revenuecat" },
+    );
+    expect(publicEntitlements).toEqual({
+      premium: true,
+      premiumUnlimited: false,
+      premiumPlan: "premium",
+      premiumSource: "revenuecat",
+    });
+    for (const field of LEGACY_PUBLIC_ENTITLEMENT_FIELDS) {
+      expect(publicEntitlements).not.toHaveProperty(field);
+    }
+    expect(privateEntitlements).toMatchObject({
+      premiumPlan: "premium",
+      productId: "yearly",
+      store: "play_store",
+      source: "revenuecat",
+    });
+  });
+
+  test("olay mağazası, ayrıştırılan mağazaya göre önceliklidir", () => {
+    const { privateEntitlements } = buildEntitlementDocuments(
+      { premium: false, premiumPlan: "free", store: "app_store" },
+      { store: "PLAY_STORE" },
+    );
+    expect(privateEntitlements.store).toBe("PLAY_STORE");
   });
 });

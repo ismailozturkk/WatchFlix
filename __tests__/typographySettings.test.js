@@ -9,6 +9,24 @@
 
 const { withSeededStorage } = require("./helpers/storageTestKit");
 
+// PREMIUM KATALOG: dosyanın çoğu seçim/kalıcılık sözleşmesini sınar, bu yüzden
+// varsayılan plan "premium" (katalog açık). Kilit davranışı en alttaki
+// describe'da "free" ile sınanır. (Gerçek modül son planı depodan okur;
+// burada plan doğrudan kontrol ediliyor.)
+let mockPlan = "premium";
+const mockPlanListeners = new Set();
+jest.mock("../services/premiumState", () => ({
+  getPremiumPlanSnapshot: () => mockPlan,
+  subscribePremiumPlan: (fn) => {
+    mockPlanListeners.add(fn);
+    return () => mockPlanListeners.delete(fn);
+  },
+}));
+const publishPlan = (plan) => {
+  mockPlan = plan;
+  for (const fn of mockPlanListeners) fn(plan);
+};
+
 const loadService = ({ roles = null } = {}) => {
   jest.resetModules();
   const service = withSeededStorage(
@@ -29,6 +47,8 @@ const loadServiceWithLegacyKey = async (legacyPresetId) => {
 };
 
 afterEach(() => {
+  mockPlan = "premium";
+  mockPlanListeners.clear();
   jest.resetModules();
 });
 
@@ -225,5 +245,59 @@ describe("abonelik", () => {
 
     service.setFontsLoaded(true);
     expect(dinleyici).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("premium katalog kapisi", () => {
+  test("Free'de premium font secilemez, ucretsiz font secilir", () => {
+    mockPlan = "free";
+    const { service, storage } = loadService();
+    expect(service.setFontRole("heading", "bebasNeue")).toBe(false);
+    expect(service.getTypographyState().heading).toBe("system");
+    expect(storage.has(storage.Keys.fontRoles)).toBe(false);
+
+    expect(service.setFontRole("heading", "oswald")).toBe(true);
+    expect(service.getTypographyState().heading).toBe("oswald");
+    expect(service.setAllFontRoles("bebasNeue")).toBe(false);
+  });
+
+  test("Free'ye dusen kullanicinin premium secimi saklanir, sistem fontu cizilir", () => {
+    mockPlan = "free";
+    const { service, storage } = loadService({
+      roles: { heading: "bebasNeue", body: "barlow", numeric: "spaceMono" },
+    });
+    const state = service.getTypographyState();
+    expect(state).toMatchObject({
+      heading: "system",
+      body: "barlow",
+      numeric: "spaceMono",
+      premiumFontsAllowed: false,
+    });
+    expect(state.selected.heading).toBe("bebasNeue");
+
+    // Baska bir rol degisince SAKLI secim diske geri yazilir, kaybolmaz.
+    service.setFontRole("body", "lexend");
+    expect(storage.get(storage.Keys.fontRoles)).toEqual({
+      heading: "bebasNeue",
+      body: "lexend",
+      numeric: "spaceMono",
+    });
+  });
+
+  test("abonelik yenilenince secim kendiliginden geri gelir", () => {
+    mockPlan = "free";
+    const { service } = loadService({
+      roles: { heading: "bebasNeue", body: "system", numeric: "system" },
+    });
+    const dinleyici = jest.fn();
+    service.subscribeTypography(dinleyici);
+
+    publishPlan("premium");
+    expect(service.getTypographyState().heading).toBe("bebasNeue");
+    expect(dinleyici).toHaveBeenCalledTimes(1);
+
+    publishPlan("free");
+    expect(service.getTypographyState().heading).toBe("system");
+    expect(service.getTypographyState().selected.heading).toBe("bebasNeue");
   });
 });

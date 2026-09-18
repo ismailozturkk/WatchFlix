@@ -70,6 +70,10 @@ export const ANALYTICS_EVENTS = {
   PAYWALL_VIEW: "paywall_view",
   TRIAL_START: "trial_start",
   PURCHASE: "purchase",
+  // Premium kapısına takılma (limit dolu / Premium'a özel). `feature` hangi
+  // kapı olduğunu söyler; paywall_view.source ile birlikte kapı başına
+  // dönüşüm oranı çıkar (utils/premiumFeatures.js).
+  PREMIUM_GATE_HIT: "premium_gate_hit",
 };
 
 /** Ölçüm hunisinde kullanılan kullanıcı özellikleri. */

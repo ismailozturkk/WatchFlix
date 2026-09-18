@@ -27,7 +27,12 @@
 • "Nerede izlenir?" — platform bilgisiyle aradığın yapımın yayın adresini bul
 
 ⭐ PREMIUM
-Free planda günde 5, ayda 30 CineMatch AI mesajı bulunur. Premium günde 20 ve ayda 300; Premium Max ise günde 50 ve ayda 900 mesaj limiti sunar. Ücretli planlarda plana özel profil kimlik rozeti de yer alır.
+Temel özellikler ücretsizdir. Ücretli planlar şunları ekler:
+• CineMatch AI: Free günde 5 / ayda 30, Premium günde 20 / ayda 300, Premium Max günde 50 / ayda 900 mesaj
+• Arkadaşlarının da gördüğü plana özel profil kimlik rozeti
+• Daha yüksek limitler: özel liste (Free 5 · Premium 25 · Max sınırsız), arkadaş (30 · 150 · sınırsız), sohbet grubu (2 · 10 · sınırsız), günlük oyun (5 · 20 · sınırsız) ve CineSwipe
+• Kendi temanı oluşturma ve 56 yazı tipinin tamamı
+• Tüm yılların Wrapped arşivi ve 100 başlığa kadar platform bildirimi (Free: 10)
 
 Türkçe ve İngilizce dil desteği. Karanlık tema. Ücretsiz kullanılabilir.
 

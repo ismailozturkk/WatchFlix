@@ -11,15 +11,24 @@
 // Font DOSYALARININ yüklenmesi hâlâ React tarafında (expo-font/useFonts,
 // bkz. context/TypographyContext.js); provider yükleme bitince buraya
 // `setFontsLoaded(true)` der. Böylece metin bileşeni tek bir kaynağa abone olur.
+//
+// PREMIUM KATALOG: kullanıcının SEÇTİĞİ roller (`selected`, diske yazılan)
+// ile ÇİZİLEN roller (`heading/body/numeric`) ayrıdır. Premium'a özel bir font
+// seçiliyken plan Free'ye düşerse o rol sistem fontuyla çizilir ama seçim
+// silinmez; abonelik yenilenince kendiliğinden geri gelir. Okuyucuların
+// (AppText, font yükleyici) hiçbiri bu ayrımı bilmek zorunda değil.
 import { useSyncExternalStore } from "react";
 import {
+  DEFAULT_FONT_PRESET,
   DEFAULT_FONT_ROLES,
   TEXT_ROLES,
   isPresetRecommendedFor,
   isValidPresetId,
   normalizeFontRoles,
 } from "../utils/typographyRoles";
+import { canUseFeature, isFontPresetFree } from "../utils/premiumFeatures";
 import { Keys, get, set, subscribe } from "./storage";
+import { getPremiumPlanSnapshot, subscribePremiumPlan } from "./premiumState";
 
 export const FONT_ROLES_STORAGE_KEY = Keys.fontRoles.key;
 /** Rol ayrımından önceki tek anahtar; göçte üç role birden taşınır. */
@@ -30,8 +39,25 @@ export const LEGACY_FONT_STORAGE_KEY = "appFontFamily";
 // kare boyunca göremeyen kullanıcı deneyimi buradan geliyordu. Hidrasyon
 // asenkron olmadığı için "kullanıcı seçimi geç gelen kayıtla ezilmesin"
 // koruması (kullaniciSecti) da gereksizleşti.
+const katalogAcik = (plan) => Boolean(canUseFeature("font_catalog", plan));
+
+// Kullanıcının seçimi (diske yazılan). Çizilen roller bundan türetilir.
+let secili = Object.freeze({ ...DEFAULT_FONT_ROLES });
+let premiumFontlar = katalogAcik(getPremiumPlanSnapshot());
+
+const cizilen = (presetId) =>
+  premiumFontlar || isFontPresetFree(presetId) ? presetId : DEFAULT_FONT_PRESET;
+
+const cizilenRoller = () => {
+  const roller = {};
+  for (const rol of TEXT_ROLES) roller[rol] = cizilen(secili[rol]);
+  return roller;
+};
+
 let durum = Object.freeze({
-  ...DEFAULT_FONT_ROLES,
+  ...cizilenRoller(),
+  selected: secili,
+  premiumFontsAllowed: premiumFontlar,
   fontsLoaded: false,
   catalogFontsLoaded: false,
 });
@@ -57,6 +83,28 @@ const uygula = (yama) => {
   yayinla();
 };
 
+// Seçim ya da premium izni değişince çizilen rolleri yeniden kurar. `secili`
+// yalnız gerçekten değişince yeni nesne olur (bkz. seciliGuncelle), bu yüzden
+// referans karşılaştırması yeterli.
+const yenidenKur = () => {
+  uygula({
+    ...cizilenRoller(),
+    selected: secili,
+    premiumFontsAllowed: premiumFontlar,
+  });
+};
+
+const seciliGuncelle = (yama) => {
+  const degisen = Object.keys(yama).some((rol) => secili[rol] !== yama[rol]);
+  if (degisen) secili = Object.freeze({ ...secili, ...yama });
+  yenidenKur();
+};
+
+subscribePremiumPlan((plan) => {
+  premiumFontlar = katalogAcik(plan);
+  yenidenKur();
+});
+
 // Kayıtlı rolleri uygular. HEM modül yüklenirken HEM de anahtar değiştiğinde
 // çalışır.
 //
@@ -75,38 +123,49 @@ const kayittanUygula = () => {
   if (!roller) return;
   const yama = {};
   for (const rol of TEXT_ROLES) yama[rol] = roller[rol];
-  uygula(yama);
+  seciliGuncelle(yama);
 };
 
 kayittanUygula();
 subscribe(Keys.fontRoles, kayittanUygula);
 
 const kalicilastir = () => {
-  const { fontsLoaded, catalogFontsLoaded, ...roller } = durum;
-  // Yazılamadıysa oturum içi seçim yine de geçerli — hata depolama katmanında
-  // raporlanır.
-  set(Keys.fontRoles, roller);
+  // ÇİZİLEN değil SEÇİLEN roller yazılır: Free'ye düşmüş kullanıcının premium
+  // seçimi diskte kalmalı ki abonelik yenilenince geri gelsin. Yazılamadıysa
+  // oturum içi seçim yine de geçerli — hata depolama katmanında raporlanır.
+  set(Keys.fontRoles, { ...secili });
 };
 
-/** Tek bir rolün fontunu değiştirir. Geçersiz rol/preset yok sayılır. */
+/** Font bu planda seçilebilir mi (ücretsiz set veya açık premium katalog)? */
+export const isFontSelectable = (presetId) =>
+  premiumFontlar || isFontPresetFree(presetId);
+
+/**
+ * Tek bir rolün fontunu değiştirir. Geçersiz rol/preset ve plana kapalı
+ * premium font yok sayılır; uygulandıysa true döner.
+ */
 export function setFontRole(role, presetId, { persist = true } = {}) {
   if (
     !TEXT_ROLES.includes(role) ||
     !isValidPresetId(presetId) ||
-    !isPresetRecommendedFor(presetId, role)
-  ) return;
-  uygula({ [role]: presetId });
+    !isPresetRecommendedFor(presetId, role) ||
+    !isFontSelectable(presetId)
+  ) return false;
+  seciliGuncelle({ [role]: presetId });
   if (persist) kalicilastir();
+  return true;
 }
 
-/** Üç rolü birden aynı fonta ayarlar ("Tümüne uygula"). */
+/** Üç rolü birden aynı fonta ayarlar ("Tümüne uygula"); uygulandıysa true. */
 export function setAllFontRoles(presetId, { persist = true } = {}) {
   if (
     !isValidPresetId(presetId) ||
-    !TEXT_ROLES.every((role) => isPresetRecommendedFor(presetId, role))
-  ) return;
-  uygula({ heading: presetId, body: presetId, numeric: presetId });
+    !TEXT_ROLES.every((role) => isPresetRecommendedFor(presetId, role)) ||
+    !isFontSelectable(presetId)
+  ) return false;
+  seciliGuncelle({ heading: presetId, body: presetId, numeric: presetId });
   if (persist) kalicilastir();
+  return true;
 }
 
 /**
@@ -138,7 +197,10 @@ export const subscribeTypography = (fn) => {
 
 const abone = subscribeTypography;
 
-/** {heading, body, numeric, fontsLoaded, catalogFontsLoaded} — tercih değişince abone yeniden çizilir. */
+/**
+ * {heading, body, numeric (ÇİZİLEN), selected (SEÇİLEN), premiumFontsAllowed,
+ *  fontsLoaded, catalogFontsLoaded} — tercih değişince abone yeniden çizilir.
+ */
 export function useTypographyState() {
   return useSyncExternalStore(abone, getTypographyState, getTypographyState);
 }

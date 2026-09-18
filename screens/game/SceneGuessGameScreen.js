@@ -39,6 +39,8 @@ import {
   loadGameData,
 } from "@services/sceneGameService";
 import useSceneGame from "@hooks/useSceneGame";
+import { usePremium } from "@context/PremiumContext";
+import { buildLimitCopy } from "@utils/premiumFeatures";
 import {
   DEFAULT_DIFFICULTY_ID,
   DEFAULT_MODE_ID,
@@ -74,6 +76,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
   // Oyun tokenlari (Part 20.1): mevcut temadan turetilir, yeni hex tanitmaz.
   const gameTokens = useMemo(() => buildGameTokens(theme), [theme]);
   const { language } = useLanguage();
+  const { plan: premiumPlan } = usePremium();
   const { API_KEY } = useApiSettings();
   const { getTmdbUrl } = useImageQualitySettings();
   const { user } = useAuth();
@@ -449,6 +452,18 @@ export default function SceneGuessGameScreen({ navigation, route }) {
   });
 
   const gameErrorContent = useMemo(() => {
+    // Günlük premium oyun hakkı bitti (hooks/useSceneGame → "daily_limit").
+    if (error?.code === "daily_limit") {
+      const copy = buildLimitCopy("games", premiumPlan, language);
+      return {
+        icon: "game-controller-outline",
+        title: copy.title,
+        message: copy.message,
+        retryable: false,
+        upgrade: copy.canUpgrade,
+        upgradeLabel: language === "tr" ? "Planları gör" : "See plans",
+      };
+    }
     if (error?.code === "insufficient_personal_source") {
       return {
         icon: "albums-outline",
@@ -483,7 +498,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
       message: i18nText("autoI18n.oyun_baglanti_kontrol", "Bağlantını kontrol edip yeniden dene."),
       retryable: true,
     };
-  }, [error]);
+  }, [error, language, premiumPlan]);
 
   if (phase === "error") {
     return (
@@ -492,6 +507,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
         content={gameErrorContent}
         onRetry={() => startGame(source)}
         onDismiss={dismissError}
+        onUpgrade={() => navigation.navigate("PremiumScreen", { source: "games" })}
       />
     );
   }

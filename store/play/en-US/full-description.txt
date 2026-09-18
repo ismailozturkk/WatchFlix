@@ -27,7 +27,12 @@ Every movie and show you watch, in one place — seelogd is your watch diary, so
 • "Where to watch?" — find which streaming platform carries what you're looking for
 
 ⭐ PREMIUM
-The Free plan includes 5 CineMatch AI messages per day and 30 per month. Premium includes 20 per day and 300 per month; Premium Max includes 50 per day and 900 per month. Paid plans also include a plan-specific profile identity badge.
+The core features are free. Paid plans add:
+• CineMatch AI: Free 5 per day / 30 per month, Premium 20 / 300, Premium Max 50 / 900 messages
+• A plan-specific profile identity badge your friends can see
+• Higher limits: custom lists (Free 5 · Premium 25 · Max unlimited), friends (30 · 150 · unlimited), group chats (2 · 10 · unlimited), daily games (5 · 20 · unlimited) and CineSwipe
+• Your own themes and all 56 fonts
+• The full Wrapped archive and streaming alerts for up to 100 titles (Free: 10)
 
 Available in English and Turkish. Dark theme included. Free to use.
 

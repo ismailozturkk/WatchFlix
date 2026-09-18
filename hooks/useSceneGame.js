@@ -16,6 +16,9 @@ import {
   MODE_SURVIVAL,
 } from "@screens/game/gameConfig";
 import { computeQuestionScore, computeSessionXp } from "@utils/gameScoring";
+import { usePremiumDailyGate } from "@hooks/usePremiumGate";
+import { getDailyUsed } from "@services/premiumUsage";
+import { ANALYTICS_EVENTS, trackEvent } from "@services/analytics";
 
 const PERSONAL_SOURCES = new Set([
   "watchlist",
@@ -56,6 +59,12 @@ export default function useSceneGame({
   const timerTotalSeconds = isSessionTimer ? modeConfig.totalSeconds : questionSeconds;
   const questionTotal = modeConfig.questionCount || null;
   const feedbackDelayMs = isSessionTimer ? 650 : 1400;
+
+  // Günlük oyun hakkı (Free 5 / Premium 20 / Max sınırsız). Hak, oyun GERÇEKTEN
+  // başlayınca (ilk soru hazır) harcanır: ağ/havuz hatasında hak yanmaz.
+  const gamesGate = usePremiumDailyGate("games");
+  const gamesGateRef = useRef(gamesGate);
+  gamesGateRef.current = gamesGate;
 
   const [phase, setPhaseState] = useState("source_select");
   const [source, setSource] = useState("popular");
@@ -645,6 +654,19 @@ export default function useSceneGame({
       const generation = generationRef.current + 1;
       generationRef.current = generation;
       const mode = modeConfigRef.current;
+      // Bugünkü hak bittiyse oyun ekranı tam sayfa "hak doldu" durumunu çizer
+      // (SceneGuessGameScreen → GameErrorState, "Planları gör").
+      if (!gamesGateRef.current.allows(getDailyUsed("games"))) {
+        trackEvent(ANALYTICS_EVENTS.PREMIUM_GATE_HIT, {
+          feature: "games",
+          plan: gamesGateRef.current.plan,
+          can_upgrade: !gamesGateRef.current.unlimited,
+        });
+        setSource(selectedSource);
+        setError({ code: "daily_limit" });
+        setPhase("error");
+        return;
+      }
       setSource(selectedSource);
       setError(null);
       setPhase("loading");
@@ -755,6 +777,7 @@ export default function useSceneGame({
         setRound(1);
         resetQuestionTimer();
         setPhase("playing");
+        gamesGateRef.current.consume();
         prepareNextQuestion(
           titlePool,
           new Set(usedIdsRef.current),

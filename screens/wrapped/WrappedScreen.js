@@ -48,6 +48,8 @@ import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { buildYearlyRecap, getAvailableYears } from "../../utils/wrapped";
 import { getWrappedStrings } from "../../utils/wrappedStrings";
 import { archiveWrapped, wrappedExists } from "../../services/wrappedService";
+import { canViewWrappedYear } from "../../utils/premiumFeatures";
+import { usePremiumGate } from "../../hooks/usePremiumGate";
 import WrappedShareCard, {
   DEFAULT_WRAPPED_CARD_OPTIONS,
   WRAPPED_CARD_THEMES,
@@ -109,9 +111,16 @@ export default function WrappedScreen({ route, navigation }) {
   );
 
   // ── Seçili yıl ──
+  // Wrapped arşivi: bu yıl + geçen yıl herkese, daha eskisi Premium. Parametre
+  // yoksa görülebilen en yeni yıl açılır.
+  const wrappedGate = usePremiumGate("wrapped_archive");
   const initialYear =
-    route?.params?.year ?? availableYears[0] ?? new Date().getFullYear();
+    route?.params?.year ??
+    availableYears.find((y) => canViewWrappedYear(y, wrappedGate.plan)) ??
+    availableYears[0] ??
+    new Date().getFullYear();
   const [year, setYear] = useState(initialYear);
+  const yearLocked = !canViewWrappedYear(year, wrappedGate.plan);
 
   const recap = useMemo(
     () => buildYearlyRecap({ movies, episodes, year, language }),
@@ -374,8 +383,30 @@ export default function WrappedScreen({ route, navigation }) {
     }
   }, [busy, capture, str, uid, recap]);
 
-  const onSelectYear = useCallback((y) => setYear(y), []);
+  const onSelectYear = useCallback(
+    (y) => {
+      if (!canViewWrappedYear(y, wrappedGate.plan)) {
+        wrappedGate.showUpsell();
+        return;
+      }
+      setYear(y);
+    },
+    [wrappedGate],
+  );
   const close = useCallback(() => navigation.goBack(), [navigation]);
+
+  // Kilitli bir yılla açıldıysa (eski yılın kartı) ekran içerik çizmeden
+  // kapanır ve Premium uyarısı çıkar.
+  useEffect(() => {
+    if (!yearLocked) return;
+    navigation.goBack();
+    wrappedGate.showUpsell();
+    // Yalnız açılışta: yıl seçici kilitli yıla zaten geçirmez.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Kilitli yıl: yukarıdaki efekt ekranı kapatıyor; o kareye içerik çizme.
+  if (yearLocked) return null;
 
   // ── Boş durum ──
   if (!hasData) {

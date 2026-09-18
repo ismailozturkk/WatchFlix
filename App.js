@@ -28,8 +28,8 @@ import {
   NavigationContainer,
   DefaultTheme,
   DarkTheme,
-  createNavigationContainerRef,
 } from "@react-navigation/native";
+import { rootNavigationRef } from "./services/rootNavigation";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
 import { LanguageProvider } from "./context/LanguageContext";
@@ -136,7 +136,8 @@ setSnapshotErrorReporter((error, label) =>
 setAnalyticsUserProperty(USER_PROPERTIES.DEVICE_TIER, deviceTier);
 
 // Bildirime dokunulduğunda yönlendirme için global navigation ref.
-const navigationRef = createNavigationContainerRef();
+// Kök ref services/rootNavigation'da: ekran olmayan yerler de yönlendirebilsin.
+const navigationRef = rootNavigationRef;
 // Modül seviyesinde: AppContent her render'da yeni bir navigator bileşeni
 // üretirse React ağacı ekran kimliklerini kaybedip stack'i remount edebilir.
 const Stack = createNativeStackNavigator();
@@ -948,8 +949,10 @@ export default wrapRoot(function App() {
               <ThemeProvider>
               <SnowProvider>
                 <AuthProvider>
-                  <PremiumProvider>
+                  {/* UserProfile DIŞTA: PremiumProvider sunucu planını
+                      (Users/{uid}.entitlements) profilden okur. */}
                   <UserProfileProvider>
+                  <PremiumProvider>
                   <FriendsProvider>
                   <NotificationsProvider>
                   <ListStatusProvider>
@@ -1002,8 +1005,8 @@ export default wrapRoot(function App() {
                   </ListStatusProvider>
                   </NotificationsProvider>
                   </FriendsProvider>
-                  </UserProfileProvider>
                   </PremiumProvider>
+                  </UserProfileProvider>
                 </AuthProvider>
               </SnowProvider>
               </ThemeProvider>

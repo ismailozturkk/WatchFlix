@@ -27,8 +27,13 @@ import Toast from "react-native-toast-message";
 import { db } from "../../firebase";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
-import { describeRenameTarget, MAX_LIST_NAME_LENGTH } from "@utils/listShare";
+import {
+  describeRenameTarget,
+  MAX_LIST_NAME_LENGTH,
+  RESERVED_LIST_NAMES,
+} from "@utils/listShare";
 import { getListAccent, getListIcon } from "@utils/listAppearance";
+import { usePremiumGate } from "@hooks/usePremiumGate";
 
 /**
  * @param {object} props
@@ -48,6 +53,7 @@ export default function CreateListModal({
   const { theme } = useTheme();
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
+  const customListsGate = usePremiumGate("custom_lists");
 
   const accent = getListAccent(null, theme.secondary);
 
@@ -78,6 +84,13 @@ export default function CreateListModal({
     try {
       const listsRef = doc(db, "Lists", uid);
       const listsSnap = await getDoc(listsRef);
+      // Premium limiti: sunucudaki güncel kök belgeden sayılır.
+      const ownedCustomLists = Object.entries(listsSnap.data() || {}).filter(
+        ([key, value]) => !RESERVED_LIST_NAMES.includes(key) && Array.isArray(value),
+      ).length;
+      if (!customListsGate.check(ownedCustomLists, { onUpgrade: onClose })) {
+        return;
+      }
       if (listsSnap.exists() && listsSnap.data()[finalName]) {
         Toast.show({
           type: "warning",

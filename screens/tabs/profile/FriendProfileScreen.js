@@ -68,6 +68,9 @@ import SaveSharedListModal from "../../../components/modals/SaveSharedListModal"
 import AvatarPreviewModal from "../../../components/profile/AvatarPreviewModal";
 import * as Haptics from "../../../services/hapticsService";
 import { i18nText } from "../../../utils/i18nText";
+import IdentityBadgesRow from "../../../components/badges/IdentityBadgesRow";
+import { getIdentityBadges } from "../../../components/badges/badgeCatalog";
+import { PREMIUM_PLAN, resolveServerPlan } from "../../../utils/premium";
 import { listItemToMedia } from "../../../utils/listShare";
 
 
@@ -693,6 +696,15 @@ export default function FriendProfileScreen({ route, navigation }) {
         : { label: i18nText("autoI18n.arkadas_ekle", "Arkadaş Ekle"), icon: "person-add-outline", color: theme.accent, onPress: () => sendRequest(friendUid) };
 
   const displayName = profile?.displayName || friendName || "";
+  // Kimlik rozetleri arkadaşın SUNUCU alanlarından: istemci ne
+  // entitlements'ı ne badges'ı yazabilir (firestore.rules), yani sahte rozet
+  // gösterilemez.
+  const friendPlan = resolveServerPlan(profile?.entitlements);
+  const identityBadges = getIdentityBadges({
+    founder: Boolean(profile?.badges?.founder),
+    isPremium: friendPlan !== PREMIUM_PLAN.FREE,
+    isUnlimited: friendPlan === PREMIUM_PLAN.UNLIMITED,
+  });
   const lastSeenText = formatLastSeen(presence);
   const memberSince = formatMemberSince(profile?.createdAt, language);
   const selectedListName = selectedSharedList?.[0] ?? "";
@@ -846,6 +858,12 @@ export default function FriendProfileScreen({ route, navigation }) {
                   </View>
                 )}
               </View>
+
+              <IdentityBadgesRow
+                badges={identityBadges}
+                theme={theme}
+                language={language}
+              />
 
               <View style={styles.compactActionsRow}>
                 <TouchableOpacity

@@ -32,6 +32,7 @@ import { useUserProfile } from "./UserProfileContext";
 import { getUserProfile } from "../services/userService";
 import { i18nText } from "../utils/i18nText";
 import useStartupGate from "../hooks/useStartupGate";
+import { usePremiumGate } from "../hooks/usePremiumGate";
 
 
 const FriendsContext = createContext();
@@ -135,10 +136,18 @@ export function FriendsProvider({ children }) {
   );
 
   // ── Actions ──────────────────────────────────────────────────────────────
+  // Premium limiti İSTEK GÖNDERENİ bağlar: mevcut arkadaşlar + bekleyen giden
+  // istekler sayılır (hepsi kabul edilse de limit aşılmasın). Gelen isteği
+  // kabul etmek her planda serbest — premium kullanıcı Free birini
+  // eklediğinde karşı taraf takılmamalı.
+  const friendsGate = usePremiumGate("friends");
+  const friendsInUse = friends.length + outgoingRequests.length;
+
   const sendRequest = useCallback(
     async (targetUid) => {
       if (!myProfile?.uid) return;
       if (targetUid === myProfile.uid) return;
+      if (!friendsGate.check(friendsInUse)) return;
       try {
         const targetProfile = await getUserProfile(targetUid);
         if (!targetProfile) throw new Error(i18nText("autoI18n.kullanici_bulunamadi_2", "Kullanıcı bulunamadı"));
@@ -148,7 +157,7 @@ export function FriendsProvider({ children }) {
         Toast.show({ type: "error", text1: e.message });
       }
     },
-    [myProfile],
+    [myProfile, friendsGate, friendsInUse],
   );
 
   const acceptRequest = useCallback(

@@ -20,6 +20,8 @@ import {
 } from "@context/AppSettingsContext";
 import { useDeviceNotifications } from "@context/DeviceNotificationsContext";
 import { i18nText } from "@utils/i18nText";
+import { getFeatureLimit } from "@utils/premiumFeatures";
+import { usePremiumGate } from "@hooks/usePremiumGate";
 import { SettingsSubScreen, SettingRow, buildUiColors } from "./settingsUi";
 
 const REMINDER_NOTIFICATION_TIMINGS = [
@@ -30,9 +32,26 @@ const REMINDER_NOTIFICATION_TIMINGS = [
 ];
 
 export default function ReminderNotificationsScreen() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { theme } = useTheme();
   const C = buildUiColors(theme);
+  // Platform bildirimi kapsamı plana bağlı; tavanı sunucu uygular
+  // (functions/planCapabilities.js). Kullanıcı hangi başlıkların takip
+  // edildiğini burada görür.
+  const streamingGate = usePremiumGate("streaming_alerts");
+  const premiumStreamingLimit = getFeatureLimit("streaming_alerts", "premium");
+  const streamingScope =
+    language === "tr"
+      ? `Son eklediğin ${streamingGate.limit} başlık takip edilir${
+          streamingGate.limit < premiumStreamingLimit
+            ? ` · Premium'da ${premiumStreamingLimit}`
+            : ""
+        }`
+      : `Your ${streamingGate.limit} latest titles are tracked${
+          streamingGate.limit < premiumStreamingLimit
+            ? ` · ${premiumStreamingLimit} with Premium`
+            : ""
+        }`;
   const { notificationSettings, changeNotificationSettings } =
     useNotificationSettings();
   const { reminderPreviewLimit, changeReminderPreviewLimit } =
@@ -160,10 +179,10 @@ export default function ReminderNotificationsScreen() {
           iconColor={C.blue}
           iconName="play-circle-outline"
           title={t.streamingNotifications || "Yayına gelince bildir"}
-          subtitle={
+          subtitle={`${
             t.streamingNotificationsSubtitle ||
             "İzleme listendeki yapım, abone olduğun platforma eklenince haber ver"
-          }
+          } · ${streamingScope}`}
           right={
             <SwitchToggle
               value={notificationsEnabled && notificationSettings.streamingEnabled}

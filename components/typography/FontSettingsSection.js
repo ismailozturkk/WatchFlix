@@ -31,6 +31,8 @@ import {
 } from "../../services/typographySettings";
 import { i18nText } from "../../utils/i18nText";
 import { alpha } from "../../theme/colors";
+import { isFontPresetFree } from "../../utils/premiumFeatures";
+import { usePremiumGate } from "../../hooks/usePremiumGate";
 
 const SISTEM_FONTU = Platform.select({
   ios: "System",
@@ -85,6 +87,15 @@ const ROLLER = [
 
 export default function FontSettingsSection({ colors, language }) {
   const durum = useTypographyState();
+  // Katalog Premium'da; ücretsiz set utils/premiumFeatures.js'te. `durum[rol]`
+  // ÇİZİLEN fonttur: Free'ye düşmüş kullanıcının premium seçimi `selected`'da
+  // saklı kalır ve burada notla belirtilir.
+  const fontGate = usePremiumGate("font_catalog");
+  const kilitli = (presetId) =>
+    !durum.premiumFontsAllowed && !isFontPresetFree(presetId);
+  const saklananSecimVar = TEXT_ROLES.some(
+    (rol) => durum.selected && durum.selected[rol] !== durum[rol],
+  );
   const locale = language === "en" ? "en" : "tr";
   const [aktifRol, setAktifRol] = useState("heading");
   const [aktifSayfa, setAktifSayfa] = useState(0);
@@ -439,11 +450,16 @@ export default function FontSettingsSection({ colors, language }) {
                         );
                       }
                       const aktif = durum[aktifRol] === preset.id;
+                      const premiumKilidi = kilitli(preset.id);
                       return (
                         <TouchableOpacity
                           key={preset.id}
                           activeOpacity={0.75}
-                          onPress={() => setFontRole(aktifRol, preset.id)}
+                          onPress={() =>
+                            premiumKilidi
+                              ? fontGate.showUpsell()
+                              : setFontRole(aktifRol, preset.id)
+                          }
                           accessibilityRole="radio"
                           accessibilityState={{ checked: aktif }}
                           accessibilityLabel={preset.names[locale]}
@@ -501,6 +517,17 @@ export default function FontSettingsSection({ colors, language }) {
                             </Text>
                           </View>
 
+                          {premiumKilidi ? (
+                            <View
+                              style={[
+                                styles.lockMark,
+                                { backgroundColor: alpha(colors.accent, 0.9) },
+                              ]}
+                            >
+                              <AppIcon name="diamond" size={7} color={colors.white} />
+                            </View>
+                          ) : null}
+
                           {aktif ? (
                             <View
                               style={[
@@ -545,6 +572,17 @@ export default function FontSettingsSection({ colors, language }) {
             );
           })}
         </View>
+      ) : null}
+
+      {saklananSecimVar ? (
+        <Text
+          allowFontScaling={false}
+          style={[styles.savedNote, { color: colors.muted }]}
+        >
+          {locale === "tr"
+            ? "Seçtiğin premium yazı tipleri saklı; Premium ile geri gelir."
+            : "Your premium font picks are saved and return with Premium."}
+        </Text>
       ) : null}
 
       {tumRollereUygun ? (
@@ -762,6 +800,25 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
     includeFontPadding: false,
+  },
+  // Premium kilidi: hücrenin sol üst köşesi (seçim işareti sağ üstte).
+  lockMark: {
+    position: "absolute",
+    top: 3,
+    left: 3,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 5,
+  },
+  savedNote: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "600",
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
   check: {
     position: "absolute",

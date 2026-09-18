@@ -10,6 +10,9 @@ import { Animated, Easing, Image, StyleSheet } from "react-native";
 import { captureScreen, releaseCapture } from "react-native-view-shot";
 import { buildCustomTheme, getThemeColors } from "../theme/colors";
 import { useThemeSettings } from "./AppSettingsContext";
+import { Keys } from "../services/storage";
+import { usePremiumPlanSnapshot } from "../services/premiumState";
+import { getFeatureLimit } from "../utils/premiumFeatures";
 
 const ThemeContext = createContext();
 
@@ -140,27 +143,47 @@ export const ThemeProvider = ({ children }) => {
   // düşüp tüm uygulamanın bir anlığına gri "flash" yapmasını önler.
   const lastThemeRef = useRef(null);
 
+  // Özel temalar Premium'da. Plan Free'ye düşünce seçim ve kayıtlı temalar
+  // SİLİNMEZ; yalnız varsayılan hazır tema çizilir. Abonelik yenilenince
+  // seçili özel tema kendiliğinden geri gelir. (ThemeProvider PremiumProvider'ın
+  // üstünde olduğu için plan React dışı store'dan okunur.)
+  const premiumPlan = usePremiumPlanSnapshot();
+  const customThemesAllowed = Boolean(getFeatureLimit("custom_themes", premiumPlan));
+
   const value = useMemo(() => {
+    const isCustomSelection =
+      typeof selectedTheme === "string" && selectedTheme.startsWith("custom");
+    const customLocked = isCustomSelection && !customThemesAllowed;
     // Bir özel tema seçiliyse token setinden tam tema üretilir; bulunamazsa
     // önce son bilinen temaya, o da yoksa yerleşik temaya geri düşülür.
-    const custom = findCustomTheme(selectedTheme, customThemes);
-    const theme = custom
-      ? buildCustomTheme(custom.tokens)
-      : typeof selectedTheme === "string" &&
-          selectedTheme.startsWith("custom") &&
-          lastThemeRef.current
-        ? lastThemeRef.current
-        : getThemeColors(selectedTheme);
+    const custom = customLocked ? null : findCustomTheme(selectedTheme, customThemes);
+    const theme = customLocked
+      ? getThemeColors(Keys.theme.default)
+      : custom
+        ? buildCustomTheme(custom.tokens)
+        : isCustomSelection && lastThemeRef.current
+          ? lastThemeRef.current
+          : getThemeColors(selectedTheme);
     lastThemeRef.current = theme;
     return {
       theme,
       selectedTheme,
+      // Çizilen temanın anahtarı: kilitli özel tema seçiliyken varsayılan tema.
+      appliedTheme: customLocked ? Keys.theme.default : selectedTheme,
+      customThemesAllowed,
       changeTheme,
       customThemes,
       saveCustomTheme,
       deleteCustomTheme,
     };
-  }, [selectedTheme, changeTheme, customThemes, saveCustomTheme, deleteCustomTheme]);
+  }, [
+    selectedTheme,
+    changeTheme,
+    customThemes,
+    customThemesAllowed,
+    saveCustomTheme,
+    deleteCustomTheme,
+  ]);
 
   return (
     <ThemeContext.Provider value={value}>

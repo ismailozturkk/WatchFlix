@@ -46,11 +46,18 @@ const {
   hasPatch,
 } = require("./profileIdentity");
 const {
+  LEGACY_PUBLIC_ENTITLEMENT_FIELDS,
+  buildEntitlementDocuments,
   getTransferChanges,
   parseRevenueCatPremiumState,
   resolveFirebaseUserId,
   resolvePremiumWebhookState,
 } = require("./revenueCatWebhook");
+const {
+  getStreamingAlertLimit,
+  pickTrackedTitles,
+  resolvePremiumPlan,
+} = require("./planCapabilities");
 const {
   revokeAppleAuthorizationCode,
   verifyAppleIdentityToken,
@@ -112,19 +119,39 @@ async function fetchRevenueCatPremiumState(uid) {
   return parseRevenueCatPremiumState(await response.json());
 }
 
-function premiumEntitlementPatch(event, state) {
-  return {
-    entitlements: {
-      premium: state.premium,
-      premiumUnlimited: state.premiumUnlimited,
-      premiumPlan: state.premiumPlan,
-      premiumProductId: state.productId,
-      premiumStore: event.store || null,
-      premiumExpiresAt: state.expiresAt,
-      premiumSyncedAt: FieldValue.serverTimestamp(),
-      premiumSource: "revenuecat",
+/**
+ * Abonelik durumunu iki belgeye yazar (bkz. buildEntitlementDocuments):
+ * herkese açık profil belgesinde yalnız plan, ayrıntılar sahibine özel
+ * Users/{uid}/private/entitlements'ta. `writer` bir transaction veya batch.
+ */
+function writeEntitlements(writer, uid, state, { store, source, extraPrivate } = {}) {
+  const { publicEntitlements, privateEntitlements } = buildEntitlementDocuments(
+    state,
+    { store, source },
+  );
+  const legacyCleanup = Object.fromEntries(
+    LEGACY_PUBLIC_ENTITLEMENT_FIELDS.map((field) => [field, FieldValue.delete()]),
+  );
+  writer.set(
+    db.doc(`Users/${uid}`),
+    {
+      entitlements: {
+        ...publicEntitlements,
+        ...legacyCleanup,
+        premiumSyncedAt: FieldValue.serverTimestamp(),
+      },
     },
-  };
+    { merge: true },
+  );
+  writer.set(
+    db.doc(`Users/${uid}/private/entitlements`),
+    {
+      ...privateEntitlements,
+      ...extraPrivate,
+      syncedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
 }
 
 exports.revenueCatWebhook = onRequest(
@@ -201,14 +228,20 @@ exports.revenueCatWebhook = onRequest(
         duplicate = true;
         return;
       }
+      // Silinmiş hesaba gecikmeli gelen olay (ör. EXPIRATION) sahipsiz bir
+      // Users belgesi YARATMASIN. Satın alma yalnız profil tamamlandıktan
+      // sonra mümkün (PremiumContext), yani gerçek kullanıcıda belge vardır.
+      const userSnaps = await Promise.all(
+        changes.map((change) => tx.get(db.doc(`Users/${change.uid}`))),
+      );
 
-      for (const change of changes) {
-        tx.set(
-          db.doc(`Users/${change.uid}`),
-          premiumEntitlementPatch(event, change.state),
-          { merge: true },
-        );
-      }
+      changes.forEach((change, index) => {
+        if (!userSnaps[index].exists) return;
+        writeEntitlements(tx, change.uid, change.state, {
+          store: event.store || null,
+          source: "revenuecat",
+        });
+      });
       tx.create(eventRef, {
         eventId: String(event.id),
         type: event.type,
@@ -218,6 +251,62 @@ exports.revenueCatWebhook = onRequest(
     });
 
     res.status(200).json({ received: true, duplicate });
+  },
+);
+
+// Tek kullanıcının RevenueCat okuma sıklığı: istemci ayrışma görünce çağırır;
+// kötü niyetli döngü RevenueCat REST kotasını tüketemesin.
+const PREMIUM_SYNC_MIN_INTERVAL_MS = 15 * 1000;
+
+/**
+ * İstemci planı ile sunucu planı ayrıştığında (satın alma webhook'tan önce
+ * geldi, webhook kaçtı, iade oldu) sunucuyu RevenueCat'ten yeniden okutur.
+ * İstemcinin iddia ettiği plan KULLANILMAZ: RevenueCat Customer Info tek
+ * kaynaktır. Böylece satın alan kullanıcı AI kotası gibi sunucu kapılarında
+ * yeni planını webhook'u beklemeden görür.
+ */
+exports.syncPremiumStatus = onCall(
+  { secrets: [REVENUECAT_SECRET_API_KEY] },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Sign-in required");
+    }
+    const uid = request.auth.uid;
+    const userRef = db.doc(`Users/${uid}`);
+    const privateRef = db.doc(`Users/${uid}/private/entitlements`);
+
+    const [userSnap, privateSnap] = await Promise.all([
+      userRef.get(),
+      privateRef.get(),
+    ]);
+    if (!userSnap.exists) {
+      // Profil tamamlanmadan satın alma yok; sahipsiz belge de yaratma.
+      throw new HttpsError("failed-precondition", "Profile required");
+    }
+
+    const lastSync = privateSnap.get("manualSyncAt")?.toMillis?.() || 0;
+    if (Date.now() - lastSync < PREMIUM_SYNC_MIN_INTERVAL_MS) {
+      return {
+        plan: resolvePremiumPlan(userSnap.get("entitlements")),
+        throttled: true,
+      };
+    }
+
+    let state;
+    try {
+      state = await fetchRevenueCatPremiumState(uid);
+    } catch (error) {
+      console.warn(`[syncPremiumStatus] uid=${uid}:`, error?.message);
+      throw new HttpsError("unavailable", "Subscription status unavailable");
+    }
+
+    const batch = db.batch();
+    writeEntitlements(batch, uid, state, {
+      source: "revenuecat_sync",
+      extraPrivate: { manualSyncAt: FieldValue.serverTimestamp() },
+    });
+    await batch.commit();
+    return { plan: state.premiumPlan, throttled: false };
   },
 );
 
@@ -1394,6 +1483,8 @@ exports.onTournamentVoteWritten = onDocumentWritten(
 // Kurulum: firebase functions:secrets:set TMDB_API_KEY  (TMDB v4 Read Access Token)
 // ───────────────────────────────────────────────────────────────────────────
 
+// Okuma tavanı; TAKİP edilen başlık sayısı plana bağlı (Free 10, Premium 100 —
+// functions/planCapabilities.js, istemci aynası utils/premiumFeatures.js).
 const STREAM_MAX_WATCHLIST_PER_USER = 100; // kullanıcı başına maliyet freni
 const STREAM_MAX_USERS = 3000;             // tek çalışmada güvenlik tavanı
 
@@ -1469,7 +1560,21 @@ async function processUserStreaming(userDoc, getProviders) {
   const nextItems = {};
   const messages = [];
 
-  for (const itemDoc of wlSnap.docs) {
+  // Plan tavanı (Free 10 / Premium 100): izleme listesine en son eklenen
+  // başlıklar takip edilir. Tavan dışında kalanlar snapshot'tan düşer; plan
+  // yükselince ilk görülmeleri taban sayılır (hasPrev=false) — bildirim
+  // seli olmaz.
+  const toMillis = (value) =>
+    value?.toMillis?.() ?? (typeof value === "string" ? Date.parse(value) || 0 : 0);
+  const trackedDocs = pickTrackedTitles(
+    wlSnap.docs.map((itemDoc) => ({
+      itemDoc,
+      updatedAtMs: toMillis(itemDoc.get("updatedAt")),
+    })),
+    getStreamingAlertLimit(u.entitlements),
+  ).map((entry) => entry.itemDoc);
+
+  for (const itemDoc of trackedDocs) {
     const it = itemDoc.data() || {};
     const type = it.type === "tv" ? "tv" : "movie";
     const tmdbId = Number(it.id);

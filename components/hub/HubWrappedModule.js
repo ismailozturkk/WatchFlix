@@ -23,6 +23,8 @@ import { useProfileStats } from "@context/ProfileStatsContext";
 import { countShows, getAvailableYears, toDate } from "@utils/wrapped";
 import { getWrappedStrings } from "@utils/wrappedStrings";
 import { i18nText } from "@utils/i18nText";
+import { canViewWrappedYear } from "@utils/premiumFeatures";
+import { usePremiumGate } from "@hooks/usePremiumGate";
 
 export default function HubWrappedModule({ navigation }) {
   const { theme } = useTheme();
@@ -37,6 +39,8 @@ export default function HubWrappedModule({ navigation }) {
   }, [listItems, flatEpisodesTv]);
 
   const latestWrappedYear = wrappedYears[0];
+  // Wrapped arşivi: bu yıl + geçen yıl herkese, daha eskisi Premium.
+  const wrappedGate = usePremiumGate("wrapped_archive");
   const [archiveModalVisible, setArchiveModalVisible] = useState(false);
 
   // Karta özel: Yalnızca seçili yılda (latestWrappedYear) izlenen film, dizi ve bölüm sayıları
@@ -315,6 +319,7 @@ export default function HubWrappedModule({ navigation }) {
         >
           {wrappedYears.map((yr) => {
             const isLatest = yr === latestWrappedYear;
+            const yearLocked = !canViewWrappedYear(yr, wrappedGate.plan);
             const mInYr = (listItems || []).filter(
               (m) => m?.type === "movie" && toDate(m?.dateAdded)?.getFullYear() === yr,
             ).length;
@@ -329,6 +334,10 @@ export default function HubWrappedModule({ navigation }) {
                 activeOpacity={0.8}
                 onPress={() => {
                   setArchiveModalVisible(false);
+                  if (yearLocked) {
+                    wrappedGate.showUpsell();
+                    return;
+                  }
                   navigation.navigate("WrappedScreen", {
                     year: yr,
                     hideYearPicker: true,
@@ -379,9 +388,9 @@ export default function HubWrappedModule({ navigation }) {
                 </View>
                 <View style={[styles.launchBtn, { backgroundColor: theme.accent }]}>
                   <Text style={styles.launchBtnText}>
-                    {language === "en" ? "Watch" : "İzle"}
+                    {yearLocked ? "Premium" : language === "en" ? "Watch" : "İzle"}
                   </Text>
-                  <Ionicons name="play" size={12} color="#FFFFFF" />
+                  <Ionicons name={yearLocked ? "diamond" : "play"} size={12} color="#FFFFFF" />
                 </View>
               </TouchableOpacity>
             );

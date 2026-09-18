@@ -39,7 +39,7 @@ import { i18nText } from "../../utils/i18nText";
 import * as Haptics from "../../services/hapticsService";
 import ProfileAvatarPickerModal from "../../components/profile/ProfileAvatarPickerModal";
 import AvatarPreviewModal from "../../components/profile/AvatarPreviewModal";
-import AppBadge from "../../components/badges/AppBadge";
+import IdentityBadgesRow from "../../components/badges/IdentityBadgesRow";
 import WatchBadgeStrip from "../../components/profile/WatchBadgeStrip";
 import { useWatchProgressContext } from "../../context/WatchProgressContext";
 import { odulAdi, odulBasligi } from "../../components/badges/badgeMeta";
@@ -47,10 +47,7 @@ import { PERDE_ADLARI } from "../../utils/watchScoring";
 import { toast } from "../../components/AppToast";
 import { appAlert } from "../../components/AppAlert";
 import StoryExportModal from "../../components/storyShare/StoryExportModal";
-import {
-  badgeLabel,
-  getIdentityBadges,
-} from "../../components/badges/badgeCatalog";
+import { getIdentityBadges } from "../../components/badges/badgeCatalog";
 import { usePremium } from "../../context/PremiumContext";
 
 const ProfileScreen = ({ navigation }) => {
@@ -385,40 +382,11 @@ const ProfileScreen = ({ navigation }) => {
                 </View>
               </View>
 
-              {identityBadges.length > 0 && (
-                <View style={styles.identityBadgesRow}>
-                  {identityBadges.map((badge) => (
-                    <View
-                      key={badge.id}
-                      style={[
-                        styles.identityBadgeChip,
-                        {
-                          backgroundColor: theme.accent + "12",
-                          borderColor: theme.border,
-                        },
-                      ]}
-                    >
-                      <AppBadge
-                        glyph={badge.glyph}
-                        glyphSolid={badge.glyphSolid}
-                        rarity={badge.rarity}
-                        ornate={badge.ornate}
-                        size={25}
-                        accessibilityLabel={badgeLabel(badge, language)}
-                      />
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          styles.identityBadgeLabel,
-                          { color: theme.text.primary },
-                        ]}
-                      >
-                        {badgeLabel(badge, language)}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )}
+              <IdentityBadgesRow
+                badges={identityBadges}
+                theme={theme}
+                language={language}
+              />
               <View style={styles.profileMetaRow}>
                 <Text
                   allowFontScaling={false}
@@ -880,25 +848,6 @@ const styles = StyleSheet.create({
     gap: 5,
     minWidth: 0,
   },
-  identityBadgesRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 5,
-    marginTop: 6,
-    marginBottom: 4,
-  },
-  identityBadgeChip: {
-    minHeight: 30,
-    maxWidth: "100%",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingLeft: 3,
-    paddingRight: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  identityBadgeLabel: { flexShrink: 1, fontSize: 9, fontWeight: "800" },
   textEmail: {
     flexShrink: 1,
     fontSize: 14,

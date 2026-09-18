@@ -30,6 +30,7 @@ import { RESERVED_LIST_NAMES } from "@utils/listShare";
 import ListCovers, { getNaturalCoverWidth } from "@components/lists/ListCovers";
 import ListManageSheet from "@components/lists/ListManageSheet";
 import { useSharedLists } from "../../context/SharedListsContext";
+import { usePremiumGate } from "../../hooks/usePremiumGate";
 import CreateSharedListModal from "../../components/modals/CreateSharedListModal";
 import { i18nText } from "@utils/i18nText";
 import ScreenDecor from "../../components/ScreenDecor";
@@ -338,6 +339,9 @@ export default function ListsViewScreen({ navigation }) {
   const { user } = useAuth();
   const { getTmdbUrl } = useImageQualitySettings();
   const { watchedTvMap, combinedLists } = useListStatusContext();
+  // Premium kapıları: özel liste ve kurulan ortak liste sayısı (Free 5 / 2).
+  const customListsGate = usePremiumGate("custom_lists");
+  const sharedListsGate = usePremiumGate("shared_lists");
   // Kapak düzeni profil rayıyla ORTAK ayar: kullanıcı orada ne seçtiyse burada
   // da o çizilir (ProfileUiContext, cihazda kalıcı).
   const { gridStyle, allCornersRounded } = useProfileUi();
@@ -371,6 +375,15 @@ export default function ListsViewScreen({ navigation }) {
     });
     return result;
   }, [rootLists, watchedTvMap, combinedLists]);
+  // Sahip olunan özel liste sayısı (kök doc'taki öntanımlı olmayan dizi
+  // anahtarları) — premium limitiyle karşılaştırılır.
+  const customListCount = useMemo(
+    () =>
+      rootLists.filter(
+        ([k, v]) => !RESERVED_LIST_NAMES.includes(k) && Array.isArray(v),
+      ).length,
+    [rootLists],
+  );
   // Uzun basılan liste — yönetim sayfası (ad değiştir / sil) buna bakar.
   const [selectedList, setSelectedList] = useState(null);
   const [listVisible, setListVisible] = useState({});
@@ -379,6 +392,11 @@ export default function ListsViewScreen({ navigation }) {
 
   // ── Ortak listeler ─────────────────────────────────────────────────────────
   const { sharedLists } = useSharedLists();
+  // Yalnız KURDUĞUN ortak listeler sayılır; davet edildiklerin serbest.
+  const ownedSharedListCount = useMemo(
+    () => sharedLists.filter((l) => l.ownerId === user?.uid).length,
+    [sharedLists, user?.uid],
+  );
   const [createSharedVisible, setCreateSharedVisible] = useState(false);
   // listId → ilk 3 öğe (kart destesi önizlemesi). updatedAt değişince tazelenir.
   const [sharedPreviews, setSharedPreviews] = useState({});
@@ -478,6 +496,9 @@ export default function ListsViewScreen({ navigation }) {
       Toast.show({ type: "warning", text1: i18nText("autoI18n.bu_isimde_bir_liste_zaten_var", "Bu isimde bir liste zaten var") });
       return;
     }
+    // Limit doluysa uyarır (mevcut listeler dokunulmadan kalır; yalnız
+    // yenisi engellenir).
+    if (!customListsGate.check(customListCount)) return;
     setIsLoading(true);
     try {
       const docRef = doc(db, "Lists", user.uid);
@@ -716,7 +737,11 @@ export default function ListsViewScreen({ navigation }) {
         {/* Ortak liste oluştur */}
         <TouchableOpacity
           style={[styles.addBtn, { backgroundColor: SHARED_LIST_ACCENT }]}
-          onPress={() => setCreateSharedVisible(true)}
+          onPress={() => {
+            if (sharedListsGate.check(ownedSharedListCount)) {
+              setCreateSharedVisible(true);
+            }
+          }}
         >
           <Ionicons name="people" size={18} color="#000" />
         </TouchableOpacity>

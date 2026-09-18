@@ -144,8 +144,8 @@ export default function AboutAppScreen() {
         ? "Seelogd Premium avantajları nelerdir?"
         : "What are Seelogd Premium benefits?",
       a: isTr
-        ? "Premium üyeliği CineMatch AI için günde 20, ayda 300 mesaj; Premium Max ise günde 50, ayda 900 mesaj ve plana özel profil kimlik rozeti sunar."
-        : "Premium includes 20 CineMatch AI messages per day and 300 per month; Premium Max includes 50 per day, 900 per month, and a plan-specific profile identity badge.",
+        ? "Premium; CineMatch AI için günde 20 / ayda 300 mesaj, arkadaşlarının da gördüğü kimlik rozeti, daha yüksek liste, arkadaş, grup ve oyun limitleri, kendi temanı oluşturma, tüm yazı tipleri, Wrapped arşivi ve 100 başlığa kadar platform bildirimi sunar. Premium Max günde 50 / ayda 900 AI mesajı, efsanevi rozet ve sınırsız liste, arkadaş, grup ve oyun ekler. Tüm limitler Premium ekranındaki karşılaştırmada listelenir."
+        : "Premium includes 20 CineMatch AI messages per day / 300 per month, an identity badge your friends can see, higher list, friend, group and game limits, your own themes, every font, the Wrapped archive and streaming alerts for up to 100 titles. Premium Max adds 50 AI messages per day / 900 per month, a legendary badge and unlimited lists, friends, groups and games. Every limit is listed in the comparison on the Premium screen.",
       icon: "star-outline",
     },
     {

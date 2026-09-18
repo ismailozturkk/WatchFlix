@@ -751,25 +751,51 @@ const UserBubble = memo(({ text, attachment, theme, t, getTmdbUrl, onTitlePress 
   </Reanimated.View>
 ));
 
-const ErrorBubble = memo(({ text, retry, onRetry, theme, t }) => (
+// `upsell`: kota dolduğunda üst planın limitini söyleyen metin. Varsa "Tekrar
+// dene" yerine ödeme ekranına götüren buton çizilir — hak yarına/gelecek aya
+// kadar dönmeyeceği için tekrar denemek bir işe yaramaz.
+const ErrorBubble = memo(({ text, retry, upsell, onRetry, onUpgrade, theme, t }) => (
   <Reanimated.View entering={FadeInUp.duration(200)} style={[s.row, { justifyContent: "flex-start" }]}>
     <View
       style={[
         s.errBubble,
-        { backgroundColor: theme.notesColor.redBackground, borderColor: alpha(theme.colors.red, 0.34) },
+        upsell
+          ? { backgroundColor: alpha(theme.accent, 0.1), borderColor: alpha(theme.accent, 0.34) }
+          : { backgroundColor: theme.notesColor.redBackground, borderColor: alpha(theme.colors.red, 0.34) },
       ]}
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <Ionicons name="alert-circle" size={16} color={theme.colors.red} />
+        <Ionicons
+          name={upsell ? "sparkles" : "alert-circle"}
+          size={16}
+          color={upsell ? theme.accent : theme.colors.red}
+        />
         <Text style={{ color: theme.text.primary, fontSize: 13, flex: 1 }}>{text}</Text>
       </View>
-      {!!retry && (
-        <TouchableOpacity onPress={() => onRetry(retry)} style={[s.retryBtn, { borderColor: alpha(theme.colors.red, 0.4) }]}>
-          <Ionicons name="refresh" size={13} color={theme.colors.red} />
-          <Text style={{ color: theme.colors.red, fontSize: 12, fontWeight: "700" }}>
-            {t?.AICineChat?.retry || "Tekrar dene"}
+      {!!upsell && (
+        <Text style={{ color: theme.text.secondary, fontSize: 12, marginTop: 6 }}>
+          {upsell.message}
+        </Text>
+      )}
+      {upsell && onUpgrade ? (
+        <TouchableOpacity
+          onPress={onUpgrade}
+          style={[s.retryBtn, { borderColor: alpha(theme.accent, 0.5), backgroundColor: alpha(theme.accent, 0.12) }]}
+        >
+          <Ionicons name="diamond" size={13} color={theme.accent} />
+          <Text style={{ color: theme.accent, fontSize: 12, fontWeight: "800" }}>
+            {upsell.cta}
           </Text>
         </TouchableOpacity>
+      ) : (
+        !!retry && (
+          <TouchableOpacity onPress={() => onRetry(retry)} style={[s.retryBtn, { borderColor: alpha(theme.colors.red, 0.4) }]}>
+            <Ionicons name="refresh" size={13} color={theme.colors.red} />
+            <Text style={{ color: theme.colors.red, fontSize: 12, fontWeight: "700" }}>
+              {t?.AICineChat?.retry || "Tekrar dene"}
+            </Text>
+          </TouchableOpacity>
+        )
       )}
     </View>
   </Reanimated.View>
@@ -779,7 +805,7 @@ const ErrorBubble = memo(({ text, retry, onRetry, theme, t }) => (
  * Mesajı role/type'a göre doğru bileşene yönlendirir.
  * msg: { id, role, text?, display?, attachment?, aiResponse?, posterMap?, status?, retry? }
  */
-export const ChatBubble = memo(({ msg, theme, t, getTmdbUrl, onTitlePress, onRetry }) => {
+export const ChatBubble = memo(({ msg, theme, t, getTmdbUrl, onTitlePress, onRetry, onUpgrade }) => {
   if (msg.role === "user") {
     return (
       <UserBubble
@@ -793,7 +819,17 @@ export const ChatBubble = memo(({ msg, theme, t, getTmdbUrl, onTitlePress, onRet
     );
   }
   if (msg.status === "error") {
-    return <ErrorBubble text={msg.text} retry={msg.retry} onRetry={onRetry} theme={theme} t={t} />;
+    return (
+      <ErrorBubble
+        text={msg.text}
+        retry={msg.retry}
+        upsell={msg.upsell}
+        onRetry={onRetry}
+        onUpgrade={onUpgrade}
+        theme={theme}
+        t={t}
+      />
+    );
   }
   const data = msg.aiResponse;
   if (!data) return null;

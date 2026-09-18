@@ -1,9 +1,12 @@
 import { Linking, Platform } from "react-native";
 import Purchases, { LOG_LEVEL } from "react-native-purchases";
 import RevenueCatUI, { PAYWALL_RESULT } from "react-native-purchases-ui";
+import { httpsCallable } from "firebase/functions";
+import { fns } from "../firebase";
 import {
   PREMIUM_ENTITLEMENT_ID,
   REVENUECAT_PRODUCT_IDS,
+  getStoreProductChange,
 } from "../utils/premium";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 
@@ -90,10 +93,32 @@ export async function loadRevenueCatState() {
 // value + item_id) — konsoldaki hazır gelir raporları bu alanları bekler.
 // Deneme (trial) başlangıcı AYRI olay: dönüşüm hunisinde "deneme başlattı" ile
 // "para ödedi" aynı şey değil; ikisini karıştırmak dönüşüm oranını şişirir.
-export async function purchaseRevenueCatPackage(aPackage) {
+//
+// `customerInfo` verilirse ve kullanıcının aktif bir Play aboneliği varsa
+// satın alma bir ÜRÜN DEĞİŞİMİ olarak gönderilir (bkz. getStoreProductChange);
+// aksi halde Google Play ikinci bir abonelik açar ve iki kez ücret keser.
+export async function purchaseRevenueCatPackage(
+  aPackage,
+  { customerInfo = null, entitlementId = PREMIUM_ENTITLEMENT_ID } = {},
+) {
+  const change = getStoreProductChange({
+    customerInfo,
+    entitlementId,
+    aPackage,
+    platform: Platform.OS,
+  });
+  const productChangeInfo = change
+    ? {
+        oldProductIdentifier: change.oldProductIdentifier,
+        replacementMode:
+          Purchases.STORE_REPLACEMENT_MODE?.[change.replacementMode] ??
+          change.replacementMode,
+      }
+    : null;
+
   const result = aPackage?.isStandaloneProduct
-    ? await Purchases.purchaseStoreProduct(aPackage.product)
-    : await Purchases.purchasePackage(aPackage);
+    ? await Purchases.purchaseStoreProduct(aPackage.product, productChangeInfo)
+    : await Purchases.purchasePackage(aPackage, null, productChangeInfo);
 
   const product = aPackage?.product || {};
   const params = {
@@ -116,6 +141,18 @@ export async function purchaseRevenueCatPackage(aPackage) {
 }
 
 export const restoreRevenueCatPurchases = () => Purchases.restorePurchases();
+
+/**
+ * Sunucudaki Users/{uid}.entitlements alanını RevenueCat'ten yeniden okutur
+ * (functions/index.js syncPremiumStatus). Sunucu istemcinin söylediği plana
+ * güvenmez; RevenueCat'e kendisi sorar. Satın alma ile webhook arasındaki
+ * boşlukta AI kotası gibi sunucu kapılarının yeni planı hemen görmesi için.
+ */
+export async function syncPremiumStatusOnServer() {
+  const call = httpsCallable(fns, "syncPremiumStatus");
+  const { data } = await call({});
+  return data;
+}
 
 export async function presentRevenueCatPaywall({
   offering,

@@ -15,6 +15,8 @@ import Toast from "react-native-toast-message";
 import { useTheme } from "@context/ThemeContext";
 import { useFriends } from "@context/FriendsContext";
 import { useUserProfile } from "@context/UserProfileContext";
+import { useSharedLists } from "@context/SharedListsContext";
+import { usePremiumGate } from "@hooks/usePremiumGate";
 import { createSharedList, addSharedListMembers } from "@services/sharedListsService";
 import UserAvatar from "../common/UserAvatar";
 import { i18nText } from "@utils/i18nText";
@@ -40,6 +42,13 @@ export default function CreateSharedListModal({
   const { theme } = useTheme();
   const { friends } = useFriends();
   const { uid, displayName, username, avatarIndex } = useUserProfile();
+  // Ortak liste KURMA premium limiti (üye ekleme ve katılma serbest).
+  const { sharedLists } = useSharedLists();
+  const sharedListsGate = usePremiumGate("shared_lists");
+  const ownedSharedListCount = useMemo(
+    () => sharedLists.filter((l) => l.ownerId === uid).length,
+    [sharedLists, uid],
+  );
 
   const [name, setName] = useState("");
   // uid → { canAdd } ; map'te olmak = seçili olmak
@@ -102,6 +111,14 @@ export default function CreateSharedListModal({
     }
     if (isAddMode && members.length === 0) {
       Toast.show({ type: "warning", text1: i18nText("autoI18n.arkadas_secin", "Arkadaş seçin") });
+      return;
+    }
+    // Açılış noktası da kontrol ediyor; bu ikinci kapı başka bir yerden
+    // açıldığında limitin sessizce delinmemesi için.
+    if (
+      !isAddMode &&
+      !sharedListsGate.check(ownedSharedListCount, { onUpgrade: onClose })
+    ) {
       return;
     }
 

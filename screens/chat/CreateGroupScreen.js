@@ -4,7 +4,7 @@
 // edilir (grup sohbetinde gönderen gösterimi için). Grup avatarı iconBacground
 // görsellerinden seçilip 0-based avatarIndex olarak kaydedilir.
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -30,7 +30,8 @@ import GroupAvatarPickerModal from "@components/chat/GroupAvatarPickerModal";
 import { i18nText } from "@utils/i18nText";
 import UserAvatar from "@components/common/UserAvatar";
 import { toast } from "@components/AppToast";
-import { createGroup } from "@services/groupsService";
+import { countOwnedGroups, createGroup } from "@services/groupsService";
+import { usePremiumGate } from "@hooks/usePremiumGate";
 import { ICON_BACKGROUND_COUNT } from "@components/IconBacground";
 import { randomInt, randomPick } from "@utils/randomPick";
 
@@ -58,6 +59,30 @@ export default function CreateGroupScreen({ navigation }) {
   );
   const [avatarPickerVisible, setAvatarPickerVisible] = useState(false);
   const [creating, setCreating] = useState(false);
+  // Grup KURMA premium limiti. Ekran açılır açılmaz bakılır: kullanıcı üye ve
+  // ad seçmeye emek harcadıktan sonra engellenmesin. (Gruplara katılmak ve
+  // birebir mesajlaşmak serbest.)
+  const groupsGate = usePremiumGate("chat_groups");
+  const groupsGateRef = useRef(groupsGate);
+  groupsGateRef.current = groupsGate;
+
+  useEffect(() => {
+    if (!user?.uid || groupsGate.unlimited) return;
+    let active = true;
+    countOwnedGroups(user.uid)
+      .then((owned) => {
+        if (!active) return;
+        groupsGateRef.current.check(owned, {
+          onDismiss: () => navigation.goBack(),
+          onUpgrade: () => navigation.goBack(),
+        });
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+    // Plan değişince (ör. ödeme ekranından dönüş) tekrar bakılır.
+  }, [user?.uid, groupsGate.plan, groupsGate.unlimited, navigation]);
 
   useEffect(() => {
     if (!user) return;
@@ -97,6 +122,12 @@ export default function CreateGroupScreen({ navigation }) {
     if (!canCreate || creating) return;
     setCreating(true);
     try {
+      // İkinci kapı: açılıştaki kontrolden bu yana başka cihazdan grup
+      // kurulmuş olabilir.
+      if (!groupsGate.unlimited && !groupsGate.check(await countOwnedGroups(user.uid))) {
+        setCreating(false);
+        return;
+      }
       const members = [user.uid, ...selectedList.map((f) => f.uid)];
       const memberInfo = {
         [user.uid]: {
@@ -142,7 +173,7 @@ export default function CreateGroupScreen({ navigation }) {
       );
       setCreating(false);
     }
-  }, [canCreate, creating, user, selectedList, name, color, avatarIndex, selectAvatarIndex, profileAvatarIndex, profilePhotoURL, displayName, username, navigation]);
+  }, [canCreate, creating, user, selectedList, name, color, avatarIndex, selectAvatarIndex, profileAvatarIndex, profilePhotoURL, displayName, username, navigation, groupsGate]);
 
   const renderFriend = ({ item }) => {
     const isSel = !!selected[item.uid];

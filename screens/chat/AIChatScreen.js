@@ -58,6 +58,8 @@ import { useProfileStats } from "@context/ProfileStatsContext";
 import { useListStatusContext } from "@context/ListStatusContext";
 import { usePremium } from "@context/PremiumContext";
 import { alpha } from "@theme/colors";
+import { buildLimitCopy } from "@utils/premiumFeatures";
+import { ANALYTICS_EVENTS, trackEvent } from "@services/analytics";
 
 import {
   askCineStructured,
@@ -629,12 +631,31 @@ export default function AIChatScreen({
           console.warn(i18nText("autoI18n.cinematch_pro_hata", "[CineMatch Pro] hata:"), code, err?.message);
           appAlert("CineMatch Pro (DEV)", `${code}\n\n${err?.message ?? ""}`);
         }
+        // Kota doldu: en güçlü satış anı. Üst plan varsa "Tekrar dene" yerine
+        // planları gösteren buton çıkar (ChatBubble → ErrorBubble).
+        const quotaHit = code === "QUOTA" || code === "MONTHLY_QUOTA";
+        const limitCopy = quotaHit
+          ? buildLimitCopy("ai_messages", err?.quota?.plan || premiumPlan, language)
+          : null;
+        if (quotaHit) {
+          trackEvent(ANALYTICS_EVENTS.PREMIUM_GATE_HIT, {
+            feature: "ai_messages",
+            plan: err?.quota?.plan || premiumPlan,
+            can_upgrade: Boolean(limitCopy?.canUpgrade),
+          });
+        }
         const errMsg = {
           id: makeId(),
           role: "assistant",
           status: "error",
           text: friendlyError(code, t),
           retry: userText,
+          upsell: limitCopy?.canUpgrade
+            ? {
+                message: limitCopy.message,
+                cta: language === "tr" ? "Planları gör" : "See plans",
+              }
+            : null,
         };
         const finalMessages = [...msgsIncludingUser, errMsg];
         setMessages(finalMessages);
@@ -644,7 +665,7 @@ export default function AIChatScreen({
         setLoading(false);
       }
     },
-    [language, movieGenres, tvGenres, t, API_KEY, adultContent, saveActive, scrollToEndSoon, library, prefs.mediaType, prefs.watched, selectedProviders, selectedGenreLabels, discoveryPreferences],
+    [language, movieGenres, tvGenres, t, API_KEY, adultContent, saveActive, scrollToEndSoon, library, prefs.mediaType, prefs.watched, selectedProviders, selectedGenreLabels, discoveryPreferences, premiumPlan],
   );
 
   // ── Gönder ──
@@ -768,6 +789,13 @@ export default function AIChatScreen({
     },
     [navigation, handleClose],
   );
+
+  // Kota doldu balonundaki "Planları gör": panel kapanır, ödeme ekranı açılır
+  // (başlık dokunuşuyla aynı sıra: önce yönlendir, sonra kapat).
+  const handleUpgrade = useCallback(() => {
+    navigation.navigate("PremiumScreen", { source: "ai_messages" });
+    handleClose();
+  }, [navigation, handleClose]);
 
   const origin = fabOrigin || FAB_ORIGIN;
 
@@ -1199,6 +1227,7 @@ export default function AIChatScreen({
                       getTmdbUrl={getTmdbUrl}
                       onTitlePress={handleTitlePress}
                       onRetry={handleRetry}
+                      onUpgrade={handleUpgrade}
                     />
                   ))
                 )}

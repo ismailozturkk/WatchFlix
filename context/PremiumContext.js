@@ -4,9 +4,11 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useAuth } from "./AuthContext";
+import { useUserProfile } from "./UserProfileContext";
 import {
   addRevenueCatCustomerInfoListener,
   configureRevenueCat,
@@ -18,22 +20,46 @@ import {
   presentRevenueCatPaywall,
   purchaseRevenueCatPackage,
   restoreRevenueCatPurchases,
+  syncPremiumStatusOnServer,
 } from "../services/revenueCatService";
 import {
+  baseProductIdentifier,
   getPremiumPlan,
   PREMIUM_PLAN,
   REVENUECAT_PRODUCT_IDS,
+  resolveServerPlan,
 } from "../utils/premium";
+import { higherPlan } from "../utils/premiumFeatures";
+import {
+  getPremiumPlanSnapshot,
+  publishPremiumPlan,
+} from "../services/premiumState";
 import { USER_PROPERTIES, setAnalyticsUserProperty } from "../services/analytics";
 
 const PremiumContext = createContext(null);
 
+// ETKİN PLAN — iki kaynağın yükseği:
+//   • RevenueCat CustomerInfo: satın almayı ANINDA bilir (cihazda önbellekli).
+//   • Sunucu (Users/{uid}.entitlements, webhook/syncPremiumStatus yazar):
+//     RevenueCat yapılandırılamasa bile ödeme yapmış kullanıcı kilitte kalmasın.
+// Sunucu alanını istemci yazamaz (firestore.rules), bu yüzden güvenilir.
+// RevenueCat henüz cevap vermediyse son bilinen plan (services/premiumState)
+// kullanılır; premium kullanıcı açılışta bir anlığına kilit görmesin.
+//
+// İki kaynak ayrışırsa (webhook gecikti, iade oldu) sunucu RevenueCat'ten
+// yeniden okutulur: istemcinin söylediğine değil RevenueCat'e güvenir.
+
 export function PremiumProvider({ children }) {
-  const { user, needsProfileCompletion } = useAuth();
+  const { user, needsProfileCompletion, loading: authLoading } = useAuth();
+  const { profile, loading: profileLoading } = useUserProfile() || {};
   const [customerInfo, setCustomerInfo] = useState(null);
   const [offerings, setOfferings] = useState(null);
   const [standaloneProducts, setStandaloneProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  // RevenueCat durumunun (başarılı ya da hatalı) çözüldüğü kullanıcı. Oturum
+  // değişince eski kullanıcının CustomerInfo'su yeni kullanıcıya sızmasın ve
+  // cevap gelene kadar son bilinen plan kullanılsın diye.
+  const [resolvedUid, setResolvedUid] = useState(null);
   const [busyAction, setBusyAction] = useState(null);
   const [configurationError, setConfigurationError] = useState(null);
   const config = getRevenueCatConfiguration();
@@ -66,6 +92,7 @@ export function PremiumProvider({ children }) {
         setOfferings(null);
         setStandaloneProducts([]);
         setConfigurationError(null);
+        setResolvedUid(null);
         setLoading(false);
         disconnectRevenueCatUser();
         return;
@@ -73,11 +100,13 @@ export function PremiumProvider({ children }) {
 
       if (!config.supported) {
         setConfigurationError("unsupported-platform");
+        setResolvedUid(user.uid);
         setLoading(false);
         return;
       }
       if (!config.apiKey) {
         setConfigurationError("missing-api-key");
+        setResolvedUid(user.uid);
         setLoading(false);
         return;
       }
@@ -100,7 +129,10 @@ export function PremiumProvider({ children }) {
           setConfigurationError(error?.message || "configuration-failed");
         }
       } finally {
-        if (active) setLoading(false);
+        if (active) {
+          setResolvedUid(user.uid);
+          setLoading(false);
+        }
       }
     };
 
@@ -111,17 +143,68 @@ export function PremiumProvider({ children }) {
     };
   }, [config.apiKey, config.supported, needsProfileCompletion, user]);
 
-  const purchasePackage = useCallback(async (aPackage) => {
-    if (!aPackage) throw new Error("purchase-package-required");
-    setBusyAction("purchase");
-    try {
-      const result = await purchaseRevenueCatPackage(aPackage);
-      setCustomerInfo(result.customerInfo);
-      return result;
-    } finally {
-      setBusyAction(null);
-    }
-  }, []);
+  const signedIn = Boolean(user?.uid && !needsProfileCompletion);
+  // RevenueCat bu kullanıcı için henüz cevap vermedi mi?
+  const awaitingStore = signedIn && (loading || resolvedUid !== user.uid);
+  const storePlan =
+    !awaitingStore && customerInfo
+      ? getPremiumPlan(customerInfo, config.entitlementId)
+      : null;
+  const serverPlan = resolveServerPlan(profile?.entitlements);
+  // RevenueCat cevabı beklenirken son bilinen plan; cevap hiç gelmediyse
+  // (hata, desteklenmeyen platform) yalnız sunucu.
+  const provisionalPlan = awaitingStore ? getPremiumPlanSnapshot() : PREMIUM_PLAN.FREE;
+  const plan = signedIn
+    ? higherPlan(storePlan ?? provisionalPlan, serverPlan)
+    : PREMIUM_PLAN.FREE;
+
+  // Tema / yazı tipi gibi React dışı tüketicilere yayın. Oturum ya da
+  // RevenueCat beklenirken YAYINLAMA: geçici "free" diske yazılırsa premium
+  // kullanıcının teması/fontu her açılışta bir an varsayılana düşer.
+  const planSettled = !authLoading && !awaitingStore;
+  useEffect(() => {
+    if (planSettled) publishPremiumPlan(plan);
+  }, [plan, planSettled]);
+
+  // Analytics segmentasyonu: her olay hangi katmandaki kullanıcıdan geldi?
+  // Bu özellik olmadan "premium kullanıcı daha çok mu oynuyor / daha az mı
+  // çıkıyor" sorularının hiçbiri cevaplanamaz.
+  useEffect(() => {
+    if (planSettled) setAnalyticsUserProperty(USER_PROPERTIES.PREMIUM_TIER, plan);
+  }, [plan, planSettled]);
+
+  // Uzlaştırma: RevenueCat ile sunucu ayrıştıysa sunucuya RevenueCat'i yeniden
+  // okut. Aynı ayrışma için oturumda bir kez; sunucu da kendi tarafında
+  // sıklığı sınırlar.
+  const reconciledRef = useRef(null);
+  useEffect(() => {
+    if (!signedIn || awaitingStore || !storePlan || profileLoading || !profile) return;
+    if (storePlan === serverPlan) return;
+    const key = `${user.uid}:${storePlan}:${serverPlan}`;
+    if (reconciledRef.current === key) return;
+    reconciledRef.current = key;
+    syncPremiumStatusOnServer().catch((error) => {
+      if (__DEV__) console.warn("syncPremiumStatus:", error?.message || error);
+    });
+  }, [awaitingStore, profile, profileLoading, serverPlan, signedIn, storePlan, user?.uid]);
+
+  const purchasePackage = useCallback(
+    async (aPackage) => {
+      if (!aPackage) throw new Error("purchase-package-required");
+      setBusyAction("purchase");
+      try {
+        const result = await purchaseRevenueCatPackage(aPackage, {
+          customerInfo,
+          entitlementId: config.entitlementId,
+        });
+        setCustomerInfo(result.customerInfo);
+        return result;
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [config.entitlementId, customerInfo],
+  );
 
   const restorePurchases = useCallback(async () => {
     setBusyAction("restore");
@@ -182,24 +265,17 @@ export function PremiumProvider({ children }) {
     }
   }, [customerInfo]);
 
-  // Analytics segmentasyonu: her olay hangi katmandaki kullanıcıdan geldi?
-  // Bu özellik olmadan "premium kullanıcı daha çok mu oynuyor / daha az mı
-  // çıkıyor" sorularının hiçbiri cevaplanamaz.
-  const currentPlan = getPremiumPlan(customerInfo, config.entitlementId);
-  useEffect(() => {
-    setAnalyticsUserProperty(USER_PROPERTIES.PREMIUM_TIER, currentPlan);
-  }, [currentPlan]);
-
   const value = useMemo(() => {
-    const plan = getPremiumPlan(customerInfo, config.entitlementId);
     const offeringPackages = offerings?.current?.availablePackages || [];
     const hasUnlimitedYearly = offeringPackages.some(
       (item) =>
-        item?.product?.identifier === REVENUECAT_PRODUCT_IDS.UNLIMITED_YEARLY
+        baseProductIdentifier(item?.product?.identifier) ===
+        REVENUECAT_PRODUCT_IDS.UNLIMITED_YEARLY
     );
     const unlimitedYearlyProduct = standaloneProducts.find(
       (product) =>
-        product?.identifier === REVENUECAT_PRODUCT_IDS.UNLIMITED_YEARLY
+        baseProductIdentifier(product?.identifier) ===
+        REVENUECAT_PRODUCT_IDS.UNLIMITED_YEARLY
     );
     const packages =
       !hasUnlimitedYearly && unlimitedYearlyProduct
@@ -215,6 +291,10 @@ export function PremiumProvider({ children }) {
         : offeringPackages;
     return {
       plan,
+      // Mağaza tarafındaki plan (yönetilebilir abonelik). Sunucudan gelen
+      // promosyon/yedek plan etkin plana dahildir ama "Aboneliği yönet"
+      // yalnız mağaza aboneliğinde anlamlıdır.
+      storePlan: storePlan ?? PREMIUM_PLAN.FREE,
       isPremium: plan !== PREMIUM_PLAN.FREE,
       isUnlimited: plan === PREMIUM_PLAN.UNLIMITED,
       customerInfo,
@@ -245,11 +325,13 @@ export function PremiumProvider({ children }) {
     manageSubscription,
     openCustomerCenter,
     offerings,
+    plan,
     purchasePackage,
     refresh,
     restorePurchases,
     showPaywall,
     standaloneProducts,
+    storePlan,
   ]);
 
   return (

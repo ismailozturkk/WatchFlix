@@ -25,6 +25,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { buildCustomTheme, themes, alpha } from "../../../theme/colors";
 import { i18nText } from "../../../utils/i18nText";
+import { usePremiumGate } from "../../../hooks/usePremiumGate";
 
 const THEME_CONFIGS = [
   { key: "gray", icon: "contrast", labelKey: "grayTheme" },
@@ -57,7 +58,10 @@ const isLightPalette = (p) => {
 };
 
 /* ── Tek tema kartı ─────────────────────────────────────────────────────── */
-const ThemeCard = ({ themeKey, isSelected, onPress, label, palette, onEdit }) => {
+// `locked`: Premium'a özel (plan Free'ye düşmüş kullanıcının özel teması).
+// Kart görünür kalır — kullanıcı neyin geri geleceğini görsün — ama soluk
+// çizilir ve köşesinde elmas rozeti durur.
+const ThemeCard = ({ themeKey, isSelected, onPress, label, palette, onEdit, locked = false }) => {
   const p = palette || themes[themeKey] || themes.gray;
 
   const scale = useSharedValue(isSelected ? 1.05 : 1);
@@ -94,7 +98,13 @@ const ThemeCard = ({ themeKey, isSelected, onPress, label, palette, onEdit }) =>
     >
       {/* Seçim halkası: karttan 3px açıkta duran accent çerçeve */}
       <Animated.View style={[styles.ring, { borderColor: p.accent }, ringStyle]}>
-        <View style={[styles.card, { backgroundColor: p.secondary, borderColor: p.border }]}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: p.secondary, borderColor: p.border },
+            locked && styles.cardLocked,
+          ]}
+        >
           {/* Üst accent şeridi */}
           <LinearGradient
             colors={[p.accent, p.bold || p.accent]}
@@ -166,6 +176,12 @@ const ThemeCard = ({ themeKey, isSelected, onPress, label, palette, onEdit }) =>
             <Ionicons name="checkmark" size={10} color="#fff" />
           </Animated.View>
 
+          {locked ? (
+            <View style={[styles.lockBadge, { backgroundColor: p.accent }]}>
+              <Ionicons name="diamond" size={10} color="#fff" />
+            </View>
+          ) : null}
+
           {/* Düzenleme rozeti (yalnızca özel temalar) */}
           {onEdit ? (
             <Pressable
@@ -185,7 +201,7 @@ const ThemeCard = ({ themeKey, isSelected, onPress, label, palette, onEdit }) =>
 };
 
 /* ── Yeni tema oluştur kartı ────────────────────────────────────────────── */
-const AddThemeCard = ({ theme, label, onPress }) => (
+const AddThemeCard = ({ theme, label, onPress, locked = false }) => (
   <Pressable
     onPress={onPress}
     accessibilityRole="button"
@@ -202,6 +218,11 @@ const AddThemeCard = ({ theme, label, onPress }) => (
         <View style={[styles.addIcon, { backgroundColor: theme.accent }]}>
           <Ionicons name="add" size={20} color="#fff" />
         </View>
+        {locked ? (
+          <View style={[styles.lockBadge, styles.addLockBadge, { backgroundColor: theme.accent }]}>
+            <Ionicons name="diamond" size={10} color="#fff" />
+          </View>
+        ) : null}
         <Text
           allowFontScaling={false}
           numberOfLines={2}
@@ -215,29 +236,51 @@ const AddThemeCard = ({ theme, label, onPress }) => (
 );
 
 export default function SettingsTheme() {
-  const { t } = useLanguage();
-  const { selectedTheme, changeTheme, theme, customThemes = [] } = useTheme();
+  const { t, language } = useLanguage();
+  const {
+    selectedTheme,
+    appliedTheme = selectedTheme,
+    customThemesAllowed = true,
+    changeTheme,
+    theme,
+    customThemes = [],
+  } = useTheme();
   const navigation = useNavigation();
+  // Özel tema oluşturma/uygulama Premium'da (utils/premiumFeatures.js).
+  const customThemesGate = usePremiumGate("custom_themes");
+  const customLocked = !customThemesAllowed;
 
-  const openEditor = (themeId) =>
+  const openEditor = (themeId) => {
+    if (customLocked) {
+      customThemesGate.showUpsell();
+      return;
+    }
     navigation.navigate("CustomThemeScreen", themeId ? { themeId } : undefined);
+  };
 
   const handleSelect = (key) => {
+    if (key.startsWith("custom") && customLocked) {
+      customThemesGate.showUpsell();
+      return;
+    }
     if (key === selectedTheme) return;
     Haptics.selectionAsync().catch(() => {});
     changeTheme(key);
   };
 
-  // Aktif temanın görünen adı (özet satırı için).
+  // ÇİZİLEN temanın görünen adı (özet satırı için). Kilitli özel tema
+  // seçiliyken varsayılan hazır tema çizilir; özet onu söyler.
   const activeLabel = useMemo(() => {
-    if (typeof selectedTheme === "string" && selectedTheme.startsWith("custom:")) {
-      const id = selectedTheme.slice("custom:".length);
+    if (typeof appliedTheme === "string" && appliedTheme.startsWith("custom:")) {
+      const id = appliedTheme.slice("custom:".length);
       const ct = customThemes.find((c) => c.id === id);
       return ct?.name || i18nText("autoI18n.ozel_tema", "Özel Tema");
     }
-    const cfg = THEME_CONFIGS.find((c) => c.key === selectedTheme);
-    return (cfg && (t[cfg.labelKey] || cfg.key)) || String(selectedTheme || "");
-  }, [selectedTheme, customThemes, t]);
+    const cfg = THEME_CONFIGS.find((c) => c.key === appliedTheme);
+    return (cfg && (t[cfg.labelKey] || cfg.key)) || String(appliedTheme || "");
+  }, [appliedTheme, customThemes, t]);
+  const lockedCustomSelected =
+    customLocked && typeof selectedTheme === "string" && selectedTheme.startsWith("custom");
 
   const lightActive = isLightPalette(theme);
 
@@ -294,7 +337,7 @@ export default function SettingsTheme() {
           <ThemeCard
             key={cfg.key}
             themeKey={cfg.key}
-            isSelected={selectedTheme === cfg.key}
+            isSelected={appliedTheme === cfg.key}
             onPress={() => handleSelect(cfg.key)}
             label={t[cfg.labelKey] || cfg.key}
           />
@@ -306,10 +349,11 @@ export default function SettingsTheme() {
             key={ct.id}
             themeKey={`custom:${ct.id}`}
             palette={buildCustomTheme(ct.tokens)}
-            isSelected={selectedTheme === `custom:${ct.id}`}
+            isSelected={appliedTheme === `custom:${ct.id}`}
             onPress={() => handleSelect(`custom:${ct.id}`)}
             onEdit={() => openEditor(ct.id)}
             label={ct.name || i18nText("autoI18n.ozel_tema", "Özel Tema")}
+            locked={customLocked}
           />
         ))}
 
@@ -318,8 +362,19 @@ export default function SettingsTheme() {
           theme={theme}
           label={i18nText("autoI18n.ct_olustur", "Tema Oluştur")}
           onPress={() => openEditor()}
+          locked={customLocked}
         />
       </ScrollView>
+      {lockedCustomSelected ? (
+        <Text
+          allowFontScaling={false}
+          style={[styles.lockedNote, { color: theme.text.muted }]}
+        >
+          {language === "tr"
+            ? "Özel temaların saklı; Premium ile geri gelir. Şimdilik varsayılan tema kullanılıyor."
+            : "Your custom themes are saved and return with Premium. The default theme is in use for now."}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -519,6 +574,34 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     textAlign: "center",
+  },
+
+  /* Premium kilidi (Free'deki özel temalar ve "Tema Oluştur") */
+  cardLocked: {
+    opacity: 0.62,
+  },
+  lockBadge: {
+    position: "absolute",
+    bottom: 34,
+    right: 6,
+    width: 19,
+    height: 19,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addLockBadge: {
+    top: 8,
+    right: 8,
+    bottom: undefined,
+  },
+  lockedNote: {
+    fontSize: 11,
+    fontWeight: "600",
+    lineHeight: 15,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 8,
   },
 
   /* Düzenleme rozeti (özel temalar) */

@@ -588,13 +588,10 @@ export default function SettingsScreen() {
   const { streamingProviderIds, changeStreamingProviderIds } =
     useStreamingProviderSettings();
   const { isPremium, isUnlimited, loading: premiumLoading } = usePremium();
-  const premiumLimits = AI_PLAN_LIMITS[
-    isUnlimited
-      ? PREMIUM_PLAN.UNLIMITED
-      : isPremium
-        ? PREMIUM_PLAN.PREMIUM
-        : PREMIUM_PLAN.FREE
-  ];
+  // Kartın tanıttığı plan: abone kendi planını, Free kullanıcı Premium'u görür
+  // (Free'nin kendi 5 mesajı bir "ayrıcalık" değil).
+  const showcasePlan = isUnlimited ? PREMIUM_PLAN.UNLIMITED : PREMIUM_PLAN.PREMIUM;
+  const premiumLimits = AI_PLAN_LIMITS[showcasePlan];
   const premiumMotion = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -1046,11 +1043,15 @@ export default function SettingsScreen() {
               </View>
 
               <View style={[s.premiumChip, { backgroundColor: alpha(C.cardAlt, 0.8), borderColor: alpha(C.green, 0.16) }]}>
-                <AppIcon name="stats-chart" size={13} color={C.green} />
+                <AppIcon name="people" size={13} color={C.green} />
                 <Text style={[s.premiumChipText, { color: C.text }]}>
-                  {language === "tr"
-                    ? "Tüm Wrapped yılları & izleme analizleri"
-                    : "Full Wrapped archive & viewing analytics"}
+                  {showcasePlan === PREMIUM_PLAN.UNLIMITED
+                    ? language === "tr"
+                      ? "Sınırsız liste, arkadaş ve oyun"
+                      : "Unlimited lists, friends and games"
+                    : language === "tr"
+                      ? "Daha fazla liste, arkadaş ve oyun"
+                      : "More lists, friends and games"}
                 </Text>
               </View>
             </View>
