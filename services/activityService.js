@@ -22,6 +22,7 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { trackFirestoreRead } from "./usageTrackerService";
 
 const subColumn = (uid, sub, orderField, cb) => {
   if (!uid) return () => {};
@@ -31,7 +32,10 @@ const subColumn = (uid, sub, orderField, cb) => {
   );
   return onSnapshot(
     q,
-    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (snap) => {
+      trackFirestoreRead(`Users/${sub}`, snap.docs.length);
+      cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    },
     (err) => {
       if (__DEV__) console.warn(`subscribe ${sub} error:`, err.message);
     },

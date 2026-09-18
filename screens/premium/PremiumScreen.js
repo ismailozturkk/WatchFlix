@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  InteractionManager,
   LayoutAnimation,
   Pressable,
   ScrollView,
@@ -11,21 +12,14 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import axios from "axios";
 import Toast from "react-native-toast-message";
 import AppIcon from "../../components/AppIcon";
-import BottomSheetModal from "@components/common/BottomSheetModal";
 import AppBadge from "../../components/badges/AppBadge";
 import {
   IDENTITY_BADGES,
   badgeDesc,
   badgeLabel,
 } from "../../components/badges/badgeCatalog";
-import PosterMarqueeBackground from "../../components/PosterMarqueeBackground";
-import {
-  useApiSettings,
-  useImageQualitySettings,
-} from "../../context/AppSettingsContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { usePremium } from "../../context/PremiumContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -33,6 +27,7 @@ import { alpha } from "../../theme/colors";
 import {
   getPackagesForTier,
   getPackageDisplayProduct,
+  getPackageMonthlyEquivalent,
   getPackagePeriodKey,
   getPackageSavings,
   getPackageTierKey,
@@ -45,204 +40,183 @@ import { SettingsSubScreen, buildUiColors } from "../tabs/settings/settingsUi";
 import { i18nText } from "../../utils/i18nText";
 import { openLegalPage } from "../../utils/legalLinks";
 
-const FEATURES = {
-  premium: [
-    {
-      icon: "sparkles",
-      tr: `Günde ${AI_PLAN_LIMITS.premium.daily} CineMatch AI mesajı`,
-      en: `${AI_PLAN_LIMITS.premium.daily} CineMatch AI messages per day`,
+const CORE_VALUE_PROPS = [
+  {
+    icon: "sparkles",
+    color: "#8B5CF6",
+    badge: { tr: "10X DAHA FAZLA", en: "10X QUOTA" },
+    title: {
+      tr: "CineMatch AI",
+      en: "CineMatch AI",
     },
-    {
-      icon: "calendar",
-      tr: `Ayda ${AI_PLAN_LIMITS.premium.monthly} CineMatch AI mesajı`,
-      en: `${AI_PLAN_LIMITS.premium.monthly} CineMatch AI messages per month`,
+    tagline: {
+      tr: "Günde 50 akıllı soru",
+      en: "Up to 50 daily questions",
     },
-    {
-      icon: "diamond",
-      tr: "Premium profil kimlik rozeti",
-      en: "Premium profile identity badge",
+    desc: {
+      tr: "Ruh haline, zevkine ve arkadaş ortamına özel anında nokta atışı film ve dizi tavsiyesi al.",
+      en: "Get spot-on movie and TV recommendations tailored to your mood, taste, and friends.",
     },
-  ],
-  unlimited: [
-    {
-      icon: "infinite",
-      tr: `Günde ${AI_PLAN_LIMITS.unlimited.daily} CineMatch AI mesajı`,
-      en: `${AI_PLAN_LIMITS.unlimited.daily} CineMatch AI messages per day`,
+  },
+  {
+    icon: "diamond",
+    color: "#F59E0B",
+    badge: { tr: "VIP STATÜ", en: "VIP STATUS" },
+    title: {
+      tr: "Kimlik Rozeti",
+      en: "Identity Badge",
     },
-    {
-      icon: "calendar",
-      tr: `Ayda ${AI_PLAN_LIMITS.unlimited.monthly} CineMatch AI mesajı`,
-      en: `${AI_PLAN_LIMITS.unlimited.monthly} CineMatch AI messages per month`,
+    tagline: {
+      tr: "Profilinde ışıldasın",
+      en: "Glows on your profile",
     },
-    {
-      icon: "diamond",
-      tr: "Premium Max profil kimlik rozeti",
-      en: "Premium Max profile identity badge",
+    desc: {
+      tr: "Profilinde, topluluk yorumlarında ve Story paylaşımlarında parıldayan prestij simgesi.",
+      en: "A prestigious status badge glowing on your profile, comments, and community Stories.",
     },
-  ],
-};
+  },
+  {
+    icon: "stats-chart",
+    color: "#10B981",
+    badge: { tr: "TAM ARŞİV", en: "FULL ARCHIVE" },
+    title: {
+      tr: "Wrapped & Analiz",
+      en: "Wrapped & Analytics",
+    },
+    tagline: {
+      tr: "İzleme geçmişi röntgeni",
+      en: "Full watch history stats",
+    },
+    desc: {
+      tr: "Geçmiş tüm yılların sinema Wrapped raporları, tür dağılımları ve derinlemesine grafikler.",
+      en: "Comprehensive watch analytics, genre distribution charts, and archive of all Wrapped years.",
+    },
+  },
+  {
+    icon: "flash",
+    color: "#3B82F6",
+    badge: { tr: "VIP AYRICALIK", en: "VIP ACCESS" },
+    title: {
+      tr: "Erken & Kesintisiz",
+      en: "Early & Ad-Free",
+    },
+    tagline: {
+      tr: "İlk sen dene, kesintisiz yaşa",
+      en: "Be first to try new features",
+    },
+    desc: {
+      tr: "Tüm yeni keşif araçlarına, turnuva modlarına ve topluluk özelliklerine öncelikli erişim.",
+      en: "Priority access to all upcoming discovery tools, tournament modes, and community features.",
+    },
+  },
+];
+
+const EXPERIENCE_CATEGORIES = [
+  { id: "all", label: { tr: "✦ Tümü", en: "✦ All" }, icon: "sparkles", color: "#6366F1" },
+  { id: "ai", label: { tr: "CineMatch AI", en: "CineMatch AI" }, icon: "hardware-chip-outline", color: "#8B5CF6" },
+  { id: "library", label: { tr: "Kütüphane", en: "Library" }, icon: "albums-outline", color: "#10B981" },
+  { id: "insights", label: { tr: "İstatistik", en: "Insights" }, icon: "stats-chart-outline", color: "#F59E0B" },
+  { id: "community", label: { tr: "Topluluk", en: "Community" }, icon: "heart-outline", color: "#EC4899" },
+];
 
 const EXPERIENCE_GROUPS = [
   {
-    id: "library",
-    icon: "albums",
-    title: {
-      tr: "Listelerin ve izleme günlüğün",
-      en: "Your lists and watch diary",
-    },
+    id: "ai",
+    icon: "sparkles",
+    color: "#8B5CF6",
+    gradient: ["#8B5CF6", "#6366F1"],
+    tag: { tr: "YAPAY ZEKA", en: "AI ASSISTANT" },
+    badgeText: { tr: "Sınırsız Küratör", en: "Smart Curation" },
+    title: { tr: "CineMatch AI Asistanı", en: "CineMatch AI Assistant" },
     summary: {
-      tr: "İzlediğin, planladığın ve sevdiğin her şey tek yerde.",
-      en: "Everything you watched, planned, and loved in one place.",
+      tr: "Ne izleyeceğine karar veremediğinde zevkini tanıyan yapay zeka yanında.",
+      en: "When you can't decide what to watch, AI that knows your taste has your back.",
     },
     bullets: {
       tr: [
-        "Film ve diziler için özel listeler oluştur, içerik ekle ve düzenle",
-        "İzleme geçmişini, favorilerini ve devam eden dizilerini takip et",
-        "Notlarını, hatırlatıcılarını ve yayın takvimini birlikte yönet",
+        `Günde ${AI_PLAN_LIMITS.unlimited.daily}, ayda ${AI_PLAN_LIMITS.unlimited.monthly} mesaja varan CineMatch AI sohbeti`,
+        "Ruh haline, izleme sürene, yönetmen ve türe göre kişiselleştirilmiş film önerileri",
+        "İzleme geçmişinden beslenen ve seni tanıdıkça gelişen akıllı benzerlik algoritması",
       ],
       en: [
-        "Create, organize, and fill custom movie and TV lists",
-        "Track your history, favorites, and ongoing shows",
-        "Manage notes, reminders, and your release calendar together",
+        `Up to ${AI_PLAN_LIMITS.unlimited.daily} daily and ${AI_PLAN_LIMITS.unlimited.monthly} monthly CineMatch AI messages`,
+        "Personalized searches by mood, runtime, director, and genre",
+        "Smart similarity algorithms that learn from your unique watch history",
+      ],
+    },
+  },
+  {
+    id: "library",
+    icon: "albums",
+    color: "#10B981",
+    gradient: ["#10B981", "#059669"],
+    tag: { tr: "ORGANİZASYON", en: "ORGANIZATION" },
+    badgeText: { tr: "Sonsuz Arşiv", en: "Infinite Vault" },
+    title: { tr: "Listeler ve İzleme Günlüğü", en: "Lists and Watch Diary" },
+    summary: {
+      tr: "İzlediğin, planladığın ve sevdiğin her şey tek yerde organize.",
+      en: "Everything you watched, planned, and loved organized in one place.",
+    },
+    bullets: {
+      tr: [
+        "Sınırsız film, dizi ve özel temalı koleksiyon listesi oluşturma",
+        "İzleme geçmişi, favoriler ve devam eden dizileri anlık takip",
+        "Özel notlar, hatırlatıcılar ve yeni bölüm yayın takvimi entegrasyonu",
+      ],
+      en: [
+        "Create and organize unlimited custom movie and TV lists",
+        "Track watch history, favorites, and ongoing shows in real time",
+        "Custom notes, reminders, and release calendar integration",
       ],
     },
   },
   {
     id: "insights",
     icon: "stats-chart",
-    title: {
-      tr: "İstatistikler ve CineMatch AI",
-      en: "Insights and CineMatch AI",
-    },
+    color: "#F59E0B",
+    gradient: ["#F59E0B", "#D97706"],
+    tag: { tr: "ANALİTİK", en: "ANALYTICS" },
+    badgeText: { tr: "Derin Raporlar", en: "Deep Reports" },
+    title: { tr: "İstatistikler ve Wrapped", en: "Insights and Wrapped" },
     summary: {
-      tr: "İzleme alışkanlıklarını gör, sana özel öneriler al.",
-      en: "Understand your viewing habits and get personal picks.",
+      tr: "İzleme alışkanlıklarını derinlemesine grafiklerle keşfet.",
+      en: "Explore your viewing habits with in-depth charts.",
     },
     bullets: {
       tr: [
-        "Film ve dizi istatistiklerini ayrıntılı grafiklerle incele",
-        "Tüm Wrapped yıllarına ve kişisel keşif özetlerine eriş",
-        "CineMatch AI ile ruh haline ve zevkine göre içerik keşfet",
+        "Tüm Wrapped yıllarına ve kişisel izleme özetlerine sınırsız erişim",
+        "Tür dağılımı, toplam izlenen saat ve puanlama analiz grafikleri",
+        "En çok izlenen yönetmenler, oyuncu istatistikleri ve yapım yılları",
       ],
       en: [
-        "Explore movie and TV stats with detailed charts",
-        "Access every Wrapped year and personalized discovery summary",
-        "Use CineMatch AI for picks shaped around your mood and taste",
-      ],
-    },
-    unlimited: {
-      tr: `Premium Max: günde ${AI_PLAN_LIMITS.unlimited.daily}, ayda ${AI_PLAN_LIMITS.unlimited.monthly} CineMatch AI mesajı.`,
-      en: `Premium Max: ${AI_PLAN_LIMITS.unlimited.daily} CineMatch AI messages per day and ${AI_PLAN_LIMITS.unlimited.monthly} per month.`,
-    },
-  },
-  {
-    id: "social",
-    icon: "chatbubbles",
-    title: { tr: "Arkadaşlar ve mesajlaşma", en: "Friends and messaging" },
-    summary: {
-      tr: "İzlediklerin hakkında yalnızca takip etme, birlikte konuş.",
-      en: "Do more than track what you watch—talk about it together.",
-    },
-    bullets: {
-      tr: [
-        "Arkadaş profillerini keşfet; birebir veya grup sohbeti başlat",
-        "Sohbette film, dizi, oyuncu, görsel ve bağlantı paylaş",
-        "Yanıtla, sabitle, düzenle ve sohbet içinde anket oluştur",
-      ],
-      en: [
-        "Discover friend profiles and start direct or group chats",
-        "Share movies, shows, people, images, and links in chat",
-        "Reply, pin, edit, and create polls inside conversations",
-      ],
-    },
-  },
-  {
-    id: "together",
-    icon: "people",
-    title: { tr: "Ortak listeler", en: "Shared lists" },
-    summary: {
-      tr: "Ne izleyeceğinize birlikte karar verin.",
-      en: "Decide what to watch together.",
-    },
-    bullets: {
-      tr: [
-        "Arkadaşlarınla ortak film ve dizi listeleri oluştur",
-        "Üye ekle, içerikleri birlikte biriktir ve listeyi düzenle",
-        "Ortak liste rozetlerini posterlerin üzerinde anında gör",
-      ],
-      en: [
-        "Build shared movie and TV lists with friends",
-        "Invite members, collect titles together, and organize the list",
-        "See shared-list badges directly on your posters",
+        "Unlimited access to every Wrapped year and discovery summary",
+        "Genre breakdown, total watch time, and rating analytics",
+        "Most watched directors, actor statistics, and release year trends",
       ],
     },
   },
   {
     id: "community",
     icon: "heart",
-    title: {
-      tr: "Yorumlar, puanlar ve Story",
-      en: "Comments, ratings, and Stories",
-    },
+    color: "#EC4899",
+    gradient: ["#EC4899", "#E11D48"],
+    tag: { tr: "STATÜ & TOPLULUK", en: "STATUS & COMMUNITY" },
+    badgeText: { tr: "Özel Profil", en: "Exclusive Identity" },
+    title: { tr: "Topluluk ve Kimlik", en: "Community and Identity" },
     summary: {
-      tr: "Fikrini puanla, anlat ve sana özgü bir tasarımla paylaş.",
-      en: "Rate it, talk about it, and share it in your own style.",
+      tr: "Sinema zevkini profiline yansıt, toplulukta fark yarat.",
+      en: "Reflect your movie taste on your profile and stand out in the community.",
     },
     bullets: {
       tr: [
-        "Film ve dizilere yorum yap, 10 üzerinden yıldızlı puan ver",
-        "Topluluk gönderilerini beğen, kaydet, yanıtla ve paylaş",
-        "Poster, puan ve metinlerle Story tasarla; taslaklarını sakla",
+        "Profilinde, yorumlarında ve sohbetlerde parıldayan özel kimlik rozeti",
+        "Film ve dizilere detaylı incelemeler yazma ve 10 üzerinden puanlama",
+        "Instagram ve sosyal medyada paylaşabileceğin özel Story ve poster taslakları",
       ],
       en: [
-        "Comment on movies and shows and rate them out of 10",
-        "Like, save, reply to, and share community posts",
-        "Design Stories with posters, ratings, and text; save drafts",
-      ],
-    },
-  },
-  {
-    id: "hub",
-    icon: "trophy",
-    title: { tr: "Hub, turnuva ve oyunlar", en: "Hub, tournaments, and games" },
-    summary: {
-      tr: "Keşfini rekabete ve paylaşılabilir anlara dönüştür.",
-      en: "Turn discovery into competition and shareable moments.",
-    },
-    bullets: {
-      tr: [
-        "Aylık film turnuvasında seçim yap ve şampiyonunu belirle",
-        "Sahne Tahmin oyununu farklı modlarla oyna",
-        "Skorlarını, başarımlarını ve Hub gönderilerini paylaş",
-      ],
-      en: [
-        "Vote through the monthly movie tournament and crown a winner",
-        "Play Scene Guess across different modes",
-        "Share scores, achievements, and posts from the Hub",
-      ],
-    },
-  },
-  {
-    id: "personalize",
-    icon: "color-palette",
-    title: {
-      tr: "Profil ve kişiselleştirme",
-      en: "Profile and personalization",
-    },
-    summary: {
-      tr: "Seelogd görünümünü ve deneyimini kendine göre şekillendir.",
-      en: "Shape Seelogd's look and feel around you.",
-    },
-    bullets: {
-      tr: [
-        "Özel temalarla uygulamanın renklerini kişiselleştir",
-        "Poster boyutu, köşeleri, sütunları ve durum rozetlerini ayarla",
-        "Profilini, gizliliğini ve bildirim tercihlerini yönet",
-      ],
-      en: [
-        "Personalize app colors with custom themes",
-        "Tune poster size, corners, columns, and status badges",
-        "Manage your profile, privacy, and notification preferences",
+        "Exclusive identity badge shining on your profile and comments",
+        "Detailed reviews and 10-point ratings for movies and shows",
+        "Custom Story designs, posters, and draft exports for social sharing",
       ],
     },
   },
@@ -250,11 +224,11 @@ const EXPERIENCE_GROUPS = [
 
 function packageTitle(aPackage, tr) {
   const key = getPackagePeriodKey(aPackage);
-  if (key === "annual") return tr ? "Yıllık" : "Annual";
-  if (key === "monthly") return tr ? "Aylık" : "Monthly";
-  if (key === "weekly") return tr ? "Haftalık" : "Weekly";
-  if (key === "lifetime") return tr ? "Ömür boyu" : "Lifetime";
-  return aPackage?.product?.title || aPackage?.identifier || "Premium";
+  if (key === "annual") return tr ? "Yıllık Plan" : "Annual Plan";
+  if (key === "monthly") return tr ? "Aylık Plan" : "Monthly Plan";
+  if (key === "weekly") return tr ? "Haftalık Plan" : "Weekly Plan";
+  if (key === "lifetime") return tr ? "Ömür Boyu" : "Lifetime";
+  return aPackage?.product?.title || aPackage?.identifier || "Plan";
 }
 
 function packagePeriodLabel(aPackage, tr) {
@@ -268,10 +242,10 @@ function packagePeriodLabel(aPackage, tr) {
 export default function PremiumScreen() {
   const { language } = useLanguage();
   const { theme } = useTheme();
-  const { API_KEY } = useApiSettings();
-  const { getTmdbUrl } = useImageQualitySettings();
   const C = buildUiColors(theme);
   const tr = language === "tr";
+  const localized = tr ? "tr" : "en";
+
   const {
     isPremium,
     isUnlimited,
@@ -287,14 +261,14 @@ export default function PremiumScreen() {
     showPaywall,
     openCustomerCenter,
   } = usePremium();
+
   const [selectedTier, setSelectedTier] = useState(PREMIUM_PLAN.PREMIUM);
-  const [backgroundPosters, setBackgroundPosters] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [expandedBenefitId, setExpandedBenefitId] = useState(null);
-  const [exploreVisible, setExploreVisible] = useState(false);
-  const [showBillingOptions, setShowBillingOptions] = useState(false);
-  const planTransition = useRef(new Animated.Value(0)).current;
+  const [showDetailedSection, setShowDetailedSection] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState("all");
+
   const ctaShimmer = useRef(new Animated.Value(0)).current;
+
   const displayPackages = useMemo(
     () =>
       [...packages].sort((left, right) => {
@@ -303,11 +277,12 @@ export default function PremiumScreen() {
           (getPackageTierKey(right) === PREMIUM_PLAN.UNLIMITED ? 1 : 0);
         if (tierOrder) return tierOrder;
         const periodRank = (item) =>
-          getPackagePeriodKey(item) === "monthly" ? 0 : 1;
+          getPackagePeriodKey(item) === "annual" ? 0 : 1;
         return periodRank(left) - periodRank(right);
       }),
     [packages]
   );
+
   const pricedPackages = useMemo(
     () =>
       displayPackages.map((item) => ({
@@ -319,19 +294,8 @@ export default function PremiumScreen() {
       })),
     [displayPackages, language, usingTestStore]
   );
-  const bestAnnualDiscount = useMemo(
-    () =>
-      pricedPackages.reduce(
-        (best, item) =>
-          Math.max(
-            best,
-            getPackageSavings(item, pricedPackages, language)?.percent || 0
-          ),
-        0
-      ),
-    [language, pricedPackages]
-  );
 
+  // Initialize selected tier and package
   useEffect(() => {
     if (selectedId && packages.some((item) => item.identifier === selectedId)) {
       return;
@@ -342,6 +306,7 @@ export default function PremiumScreen() {
         : plan === PREMIUM_PLAN.UNLIMITED
         ? PREMIUM_PLAN.UNLIMITED
         : PREMIUM_PLAN.PREMIUM;
+
     const initialPackage = selectPreferredPackage(
       getPackagesForTier(packages, targetTier)
     );
@@ -353,55 +318,28 @@ export default function PremiumScreen() {
     );
   }, [packages, plan, selectedId]);
 
+  // CTA Shimmer Animation (ekran geçiş animasyonu tamamlandıktan sonra başlar, kasılmayı önler)
   useEffect(() => {
-    let active = true;
-    const headers = { accept: "application/json", Authorization: API_KEY };
-    const tmdbLanguage = tr ? "tr-TR" : "en-US";
-
-    Promise.all([
-      axios.get("https://api.themoviedb.org/3/discover/movie", {
-        params: { sort_by: "vote_count.desc", language: tmdbLanguage, page: 1 },
-        headers,
-      }),
-      axios.get("https://api.themoviedb.org/3/discover/tv", {
-        params: { sort_by: "vote_count.desc", language: tmdbLanguage, page: 1 },
-        headers,
-      }),
-    ])
-      .then(([movies, shows]) => {
-        if (!active) return;
-        const items = [
-          ...(movies.data?.results || []),
-          ...(shows.data?.results || []),
-        ].filter((item) => item.poster_path);
-        const posterUris = items
-          .map((item) => getTmdbUrl(item.poster_path, "poster", 200))
-          .filter(Boolean);
-        setBackgroundPosters(posterUris);
-      })
-      .catch(() => {
-        // Poster ağı yüklenemezse paywall, tema gradyanıyla çalışmaya devam eder.
-      });
+    let animation;
+    const task = InteractionManager.runAfterInteractions(() => {
+      animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(ctaShimmer, {
+            toValue: 1,
+            duration: 2400,
+            easing: Easing.inOut(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.delay(800),
+        ])
+      );
+      animation.start();
+    });
 
     return () => {
-      active = false;
+      task?.cancel?.();
+      animation?.stop?.();
     };
-  }, [API_KEY, getTmdbUrl, tr]);
-
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(ctaShimmer, {
-          toValue: 1,
-          duration: 2200,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.delay(450),
-      ])
-    );
-    animation.start();
-    return () => animation.stop();
   }, [ctaShimmer]);
 
   const selectedPackage =
@@ -415,69 +353,23 @@ export default function PremiumScreen() {
     selectedTier === PREMIUM_PLAN.UNLIMITED
       ? IDENTITY_BADGES.unlimited
       : IDENTITY_BADGES.premium;
-  const localized = tr ? "tr" : "en";
-  const combinedBenefitGroups = [
-    {
-      id: "plan",
-      icon: selectedTier === PREMIUM_PLAN.UNLIMITED ? "infinite" : "diamond",
-      title: {
-        tr: `${selectedPlanName} ayrıcalıkları`,
-        en: `${selectedPlanName} benefits`,
-      },
-      summary: {
-        tr: "Seçtiğin planın CineMatch AI limitleri ve profil kimlik rozeti.",
-        en: "CineMatch AI limits and the profile identity badge for your selected plan.",
-      },
-      compactItems: FEATURES[selectedTier].map((feature) => ({
-        icon: feature.icon,
-        text: feature[localized],
-      })),
-    },
-    ...EXPERIENCE_GROUPS.map((group) => ({
-      ...group,
-      compactItems: group.bullets[localized].map((text) => ({
-        icon: group.icon,
-        text,
-      })),
-    })),
-  ];
 
-  const toggleBenefit = (id) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedBenefitId((current) => (current === id ? null : id));
-  };
-
-  const selectTier = (tier) => {
+  const handleSelectTier = (tier) => {
     if (isUnlimited && tier !== PREMIUM_PLAN.UNLIMITED) return;
-    const preferredPackage = selectPreferredPackage(
-      getPackagesForTier(packages, tier)
-    );
-    setSelectedTier(tier);
-    setSelectedId(preferredPackage?.identifier || null);
-    planTransition.setValue(0);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setShowBillingOptions(true);
-    requestAnimationFrame(() => {
-      Animated.spring(planTransition, {
-        toValue: 1,
-        damping: 16,
-        stiffness: 150,
-        mass: 0.8,
-        useNativeDriver: true,
-      }).start();
-    });
+    setSelectedTier(tier);
+    const tierPackages = getPackagesForTier(pricedPackages, tier);
+    const preferred = selectPreferredPackage(tierPackages);
+    if (preferred) {
+      setSelectedId(preferred.identifier);
+    } else if (tierPackages.length > 0) {
+      setSelectedId(tierPackages[0].identifier);
+    }
   };
 
-  const showTierSelection = () => {
-    Animated.timing(planTransition, {
-      toValue: 0,
-      duration: 180,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setShowBillingOptions(false);
-    });
+  const handleSelectPackage = (packageId) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSelectedId(packageId);
   };
 
   const buy = async () => {
@@ -486,15 +378,14 @@ export default function PremiumScreen() {
       await purchasePackage(selectedPackage);
       Toast.show({
         type: "success",
-        text1: tr ? "Seelogd Premium etkin" : "Seelogd Premium is active",
+        text1: tr ? "Seelogd Premium aktif edildi!" : "Seelogd Premium is active!",
+        text2: tr ? "Tüm ayrıcalıkların kullanıma hazır." : "All your benefits are ready.",
       });
     } catch (error) {
       if (error?.userCancelled) return;
       Toast.show({
         type: "error",
-        text1: tr
-          ? "Satın alma tamamlanamadı"
-          : "Purchase could not be completed",
+        text1: tr ? "Satın alma tamamlanamadı" : "Purchase could not be completed",
         text2: error?.message,
       });
     }
@@ -509,18 +400,16 @@ export default function PremiumScreen() {
         type: restored ? "success" : "info",
         text1: restored
           ? tr
-            ? "Premium satın alımı geri yüklendi"
-            : "Premium purchase restored"
+            ? "Satın alımın başarıyla geri yüklendi"
+            : "Purchase successfully restored"
           : tr
-          ? "Aktif satın alım bulunamadı"
-          : "No active purchase found",
+          ? "Aktif bir abonelik bulunamadı"
+          : "No active subscription found",
       });
     } catch (error) {
       Toast.show({
         type: "error",
-        text1: tr
-          ? "Satın alımlar geri yüklenemedi"
-          : "Purchases could not be restored",
+        text1: tr ? "Satın alımlar geri yüklenemedi" : "Purchases could not be restored",
         text2: error?.message,
       });
     }
@@ -533,9 +422,7 @@ export default function PremiumScreen() {
     } catch (error) {
       Toast.show({
         type: "error",
-        text1: tr
-          ? "Abonelik ayarları açılamadı"
-          : "Subscription settings could not be opened",
+        text1: tr ? "Abonelik ayarları açılamadı" : "Subscription settings could not be opened",
         text2: error?.message,
       });
     }
@@ -544,9 +431,6 @@ export default function PremiumScreen() {
   const openPaywall = async () => {
     if (busy) return;
     try {
-      // `source` = paywall'ı açan kapı. Bugün tek giriş burası; ileride
-      // AI kotası / tema kilidi gibi kapılar eklenince kendi adlarını geçsin
-      // ki hangi kapının dönüştüğü ölçülebilsin.
       const { result } = await showPaywall({ source: "premium_screen" });
       if (result === "PURCHASED" || result === "RESTORED") {
         Toast.show({
@@ -554,7 +438,7 @@ export default function PremiumScreen() {
           text1: tr ? "Premium erişimin güncellendi" : "Premium access updated",
         });
       } else if (result === "ERROR") {
-        throw new Error("RevenueCat paywall returned an error");
+        throw new Error("Paywall error");
       }
     } catch (error) {
       Toast.show({
@@ -569,1653 +453,1655 @@ export default function PremiumScreen() {
     <SettingsSubScreen
       title="Seelogd Premium"
       background={
-        backgroundPosters.length ? (
-          <View style={StyleSheet.absoluteFill} pointerEvents="none">
-            <PosterMarqueeBackground
-              posters={backgroundPosters}
-              style={styles.posterBackdrop}
-            />
-            <LinearGradient
-              colors={[
-                alpha(theme.primary, 0.64),
-                alpha(theme.primary, 0.82),
-                theme.primary,
-              ]}
-              locations={[0, 0.48, 1]}
-              style={StyleSheet.absoluteFill}
-            />
-            <LinearGradient
-              colors={[alpha(theme.accent, 0.15), "transparent"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0.65 }}
-              style={StyleSheet.absoluteFill}
-            />
-          </View>
-        ) : null
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <LinearGradient
+            colors={[
+              alpha(theme.colors?.purple || "#6366F1", 0.16),
+              alpha(theme.accent, 0.08),
+              theme.primary,
+            ]}
+            locations={[0, 0.38, 0.85]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
       }
     >
-      <LinearGradient
-        colors={["#11101A", theme.bold || "#2B1757", alpha(theme.accent, 0.9)]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}
-      >
-        <View style={styles.heroOrbTop} />
-        <View style={styles.heroOrbBottom} />
-        <View style={styles.heroTopRow}>
-          <View style={styles.heroBrandBadge}>
-            <View style={styles.heroBrandDot} />
-            <Text style={styles.heroBrandText}>SEELOGD PREMIUM</Text>
-          </View>
-          {isPremium && (
-            <View style={styles.heroActiveBadge}>
-              <AppIcon name="checkmark" size={12} color="#FFFFFF" />
-              <Text style={styles.heroActiveText}>
-                {isUnlimited ? "PREMIUM MAX" : tr ? "AKTİF" : "ACTIVE"}
-              </Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.heroContent}>
-          <View style={styles.crownOuter}>
-            <LinearGradient
-              colors={["rgba(255,255,255,0.28)", "rgba(255,255,255,0.08)"]}
-              style={styles.crown}
-            >
-              <AppIcon
-                family="Ionicons"
-                name="diamond"
-                size={28}
-                color="#fff"
-              />
-            </LinearGradient>
-          </View>
-          <Text style={styles.heroTitle}>
-            {isUnlimited
-              ? tr
-                ? "Premium Max deneyimin hazır."
-                : "Your Premium Max experience is ready."
-              : isPremium
-              ? tr
-                ? "Premium deneyimin hazır."
-                : "Your Premium experience is ready."
-              : tr
-              ? "İzlediklerin kadar sana özel."
-              : "As personal as what you watch."}
-          </Text>
-          <Text style={styles.heroSubtitle}>
-            {isUnlimited
-              ? tr
-                ? `CineMatch AI limitin günde ${AI_PLAN_LIMITS.unlimited.daily}, ayda ${AI_PLAN_LIMITS.unlimited.monthly} mesaj.`
-                : `Your CineMatch AI limit is ${AI_PLAN_LIMITS.unlimited.daily} messages per day and ${AI_PLAN_LIMITS.unlimited.monthly} per month.`
-              : isPremium
-              ? tr
-                ? `CineMatch AI limitin günde ${AI_PLAN_LIMITS.premium.daily}, ayda ${AI_PLAN_LIMITS.premium.monthly} mesaj. Dilersen Premium Max'e geç.`
-                : `Your CineMatch AI limit is ${AI_PLAN_LIMITS.premium.daily} messages per day and ${AI_PLAN_LIMITS.premium.monthly} per month. Upgrade to Premium Max anytime.`
-              : tr
-              ? `Free planda günde ${AI_PLAN_LIMITS.free.daily}, ayda ${AI_PLAN_LIMITS.free.monthly} CineMatch AI mesajı.`
-              : `The Free plan includes ${AI_PLAN_LIMITS.free.daily} CineMatch AI messages per day and ${AI_PLAN_LIMITS.free.monthly} per month.`}
-          </Text>
-        </View>
-        <View style={styles.heroTrustRow}>
-          {["shield-checkmark", "flash", "sync"].map((icon, index) => (
-            <View key={icon} style={styles.heroTrustItem}>
-              <AppIcon name={icon} size={12} color="rgba(255,255,255,0.8)" />
-              <Text style={styles.heroTrustText}>
-                {index === 0
-                  ? tr
-                    ? "Güvenli ödeme"
-                    : "Secure payment"
-                  : index === 1
-                  ? tr
-                    ? "Anında erişim"
-                    : "Instant access"
-                  : tr
-                  ? "İstediğin zaman iptal"
-                  : "Cancel anytime"}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </LinearGradient>
-
+      {/* Test Store Indicator */}
       {usingTestStore && (
-        <View style={[styles.testBadge, { backgroundColor: C.iconAmber }]}>
-          <AppIcon
-            family="Ionicons"
-            name="flask-outline"
-            size={14}
-            color={C.amber}
-          />
+        <View style={[styles.testBadge, { backgroundColor: C.iconAmber, borderColor: alpha(C.amber, 0.3) }]}>
+          <AppIcon family="Ionicons" name="flask-outline" size={13} color={C.amber} />
           <Text style={[styles.testBadgeText, { color: C.amber }]}>
-            REVENUECAT TEST STORE
+            REVENUECAT TEST STORE (SANAL MOD)
           </Text>
         </View>
       )}
 
-      <View style={styles.sectionHeadingCompact}>
-        <Text style={[styles.sectionKicker, { color: C.accent }]}>01</Text>
-        <Text style={[styles.sectionTitle, { color: C.text }]}>
-          {tr ? "Premium'u keşfet" : "Explore Premium"}
-        </Text>
-      </View>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={tr ? "Premium'u keşfet" : "Explore Premium"}
-        onPress={() => setExploreVisible(true)}
-        style={({ pressed }) => [
-          styles.exploreCard,
-          {
-            backgroundColor: C.card,
-            borderColor: alpha(C.accent, 0.3),
-            opacity: pressed ? 0.78 : 1,
-          },
-        ]}
-      >
+      {/* Hero Card */}
+      <View style={[styles.heroCard, { borderColor: alpha(C.accent, 0.28) }]}>
         <LinearGradient
-          pointerEvents="none"
-          colors={[alpha(C.accent, 0.17), "transparent"]}
+          colors={[
+            alpha(C.purple || "#6366F1", 0.45),
+            alpha(C.accent, 0.22),
+            C.card,
+          ]}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0.8 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={[styles.exploreIcon, { backgroundColor: C.accentDim }]}>
-          <AppIcon name="sparkles" size={20} color={C.accent} />
-        </View>
-        <View style={styles.exploreCopy}>
-          <Text style={[styles.exploreTitle, { color: C.text }]}>
-            {tr ? "Planları yakından incele" : "Explore the plans"}
-          </Text>
-          <Text style={[styles.exploreSubtitle, { color: C.muted }]}>
-            {tr
-              ? "CineMatch AI limitlerini ve plana özel kimlik rozetini karşılaştır."
-              : "Compare CineMatch AI limits and plan-specific identity badges."}
-          </Text>
-        </View>
-        <View style={[styles.exploreArrow, { backgroundColor: C.cardAlt }]}>
-          <AppIcon name="arrow-forward" size={17} color={C.accent} />
-        </View>
-      </Pressable>
+          end={{ x: 1, y: 1 }}
+          style={styles.heroGradient}
+        >
+          <View style={styles.heroTopRow}>
+            <View style={[styles.heroBrandPill, { backgroundColor: alpha("#fff", 0.12) }]}>
+              <View style={styles.heroBrandDot} />
+              <Text style={styles.heroBrandText}>SEELOGD PRO</Text>
+            </View>
 
-      <BottomSheetModal
-        visible={exploreVisible}
-        onClose={() => setExploreVisible(false)}
-        intensity={35}
-        dimColor="rgba(0,0,0,0.42)"
-        sheetStyle={[
-          styles.exploreModalSheet,
-          { backgroundColor: C.bg, borderColor: C.border },
-        ]}
-      >
-            <View
-              style={[styles.exploreModalHandle, { backgroundColor: C.border }]}
-            />
-            <View style={styles.exploreModalHeader}>
-              <View style={styles.exploreModalHeaderCopy}>
-                <Text style={[styles.exploreModalTitle, { color: C.text }]}>
-                  {tr ? "Premium'u keşfet" : "Explore Premium"}
-                </Text>
-                <Text style={[styles.exploreModalSubtitle, { color: C.muted }]}>
-                  {tr
-                    ? `${selectedPlanName} planının limitleri ve rozeti`
-                    : `${selectedPlanName} limits and identity badge`}
+            {isPremium ? (
+              <View style={[styles.heroStatusPill, { backgroundColor: C.iconGreen }]}>
+                <View style={[styles.statusDot, { backgroundColor: C.green }]} />
+                <Text style={[styles.heroStatusText, { color: C.green }]}>
+                  {isUnlimited ? "PREMIUM MAX" : tr ? "AKTİF" : "ACTIVE"}
                 </Text>
               </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={tr ? "Kapat" : "Close"}
-                onPress={() => setExploreVisible(false)}
-                style={[
-                  styles.exploreModalClose,
-                  { backgroundColor: C.cardAlt },
-                ]}
-              >
-                <AppIcon name="close" size={20} color={C.text} />
-              </Pressable>
-            </View>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.exploreModalContent}
-            >
-              <Text style={[styles.badgeSectionLabel, { color: C.accent }]}>
-                {tr ? "ÖZEL KİMLİK ROZETİ" : "EXCLUSIVE IDENTITY BADGE"}
-              </Text>
+            ) : (
+              <View style={[styles.heroStatusPill, { backgroundColor: alpha(C.accent, 0.15) }]}>
+                <AppIcon name="sparkles" size={11} color={C.accent} />
+                <Text style={[styles.heroStatusText, { color: C.accent }]}>
+                  {tr ? "AYRICALIKLARI AÇ" : "UNLOCK ALL"}
+                </Text>
+              </View>
+            )}
+          </View>
 
-              <LinearGradient
-                colors={[
-                  alpha(C.accent, 0.2),
-                  C.card,
-                  selectedTier === PREMIUM_PLAN.UNLIMITED
-                    ? alpha("#F5C518", 0.1)
-                    : alpha(C.accent, 0.08),
-                ]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+          <View style={styles.heroBody}>
+            <Text style={[styles.heroTitle, { color: C.text }]}>
+              {isUnlimited
+                ? tr
+                  ? "Premium Max ile sınırları kaldır."
+                  : "Boundless with Premium Max."
+                : isPremium
+                ? tr
+                  ? "Premium ayrıcalıkların seninle."
+                  : "Your Premium benefits are active."
+                : tr
+                ? "Sinema Deneyimini Zirveye Taşı."
+                : "Elevate Your Cinema Experience."}
+            </Text>
+            <Text style={[styles.heroSubtitle, { color: C.muted }]}>
+              {tr
+                ? "CineMatch AI film küratörlüğü, profilinde parıldayan statü rozetleri ve sınırsız arşiv analizleri ile sinema tutkunu özgürce yaşa."
+                : "Spot-on CineMatch AI curation, sparkling profile status badges, and unlimited insights to elevate your viewing passion."}
+            </Text>
+          </View>
+
+          {/* Quick Metrics Bar */}
+          <View style={styles.quickMetricsRow}>
+            <View style={[styles.quickMetricBox, { backgroundColor: alpha(C.cardAlt, 0.8), borderColor: alpha(C.accent, 0.15) }]}>
+              <AppIcon name="sparkles" size={15} color={C.accent} />
+              <View>
+                <Text fontRole="numeric" style={[styles.quickMetricNum, { color: C.text }]}>
+                  {AI_PLAN_LIMITS[selectedTier].daily}
+                </Text>
+                <Text style={[styles.quickMetricLabel, { color: C.muted }]}>
+                  {tr ? "AI / gün" : "AI / day"}
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.quickMetricBox, { backgroundColor: alpha(C.cardAlt, 0.8), borderColor: alpha(C.accent, 0.15) }]}>
+              <AppIcon name="calendar" size={15} color={C.purple} />
+              <View>
+                <Text fontRole="numeric" style={[styles.quickMetricNum, { color: C.text }]}>
+                  {AI_PLAN_LIMITS[selectedTier].monthly}
+                </Text>
+                <Text style={[styles.quickMetricLabel, { color: C.muted }]}>
+                  {tr ? "AI / ay" : "AI / month"}
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.quickMetricBox, { backgroundColor: alpha(C.cardAlt, 0.8), borderColor: alpha(C.accent, 0.15) }]}>
+              <AppIcon name="diamond" size={15} color="#F59E0B" />
+              <View>
+                <Text style={[styles.quickMetricNum, { color: C.text }]}>
+                  {selectedTier === PREMIUM_PLAN.UNLIMITED ? (tr ? "Efsanevi" : "Legend") : (tr ? "Epik" : "Epic")}
+                </Text>
+                <Text style={[styles.quickMetricLabel, { color: C.muted }]}>
+                  {tr ? "Rozet Statüsü" : "Badge Rarity"}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </LinearGradient>
+      </View>
+
+      {/* DIRECT PLAN & PRICING SECTION */}
+      <View style={styles.pricingSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: C.text }]}>
+            {tr ? "Planını ve Fiyatını Seç" : "Select Your Plan & Price"}
+          </Text>
+          <Text style={[styles.sectionSubtitle, { color: C.muted }]}>
+            {tr
+              ? "Tüm paketler doğrudan listelenir. İstediğin an iptal edebilirsin."
+              : "All packages listed transparently. Cancel anytime."}
+          </Text>
+        </View>
+
+        {/* Segmented Tier Switcher Tabs */}
+        <View style={[styles.tierSegmentWrap, { backgroundColor: C.card, borderColor: C.border }]}>
+          {[PREMIUM_PLAN.PREMIUM, PREMIUM_PLAN.UNLIMITED].map((tier) => {
+            const isSelected = selectedTier === tier;
+            const isMax = tier === PREMIUM_PLAN.UNLIMITED;
+            const disabled = isUnlimited && !isMax;
+
+            return (
+              <Pressable
+                key={tier}
+                disabled={disabled}
+                onPress={() => handleSelectTier(tier)}
                 style={[
-                  styles.badgeShowcase,
-                  { borderColor: alpha(C.accent, 0.32) },
+                  styles.tierSegmentTab,
+                  isSelected && styles.tierSegmentTabActive,
+                  disabled && { opacity: 0.4 },
                 ]}
               >
-                <View style={styles.badgeGlow} />
-                <View style={styles.badgeVisual}>
-                  <AppBadge
-                    glyph={selectedIdentityBadge.glyph}
-                    glyphSolid={selectedIdentityBadge.glyphSolid}
-                    rarity={selectedIdentityBadge.rarity}
-                    ornate={selectedIdentityBadge.ornate}
-                    size={78}
-                    accessibilityLabel={badgeLabel(
-                      selectedIdentityBadge,
-                      language
-                    )}
+                {isSelected && (
+                  <LinearGradient
+                    colors={[C.accent, C.purple || C.accent]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
                   />
-                  <View
-                    style={[
-                      styles.rarityPill,
-                      {
-                        backgroundColor:
-                          selectedTier === PREMIUM_PLAN.UNLIMITED
-                            ? alpha("#F5C518", 0.16)
-                            : C.accentDim,
-                      },
-                    ]}
-                  >
+                )}
+                <View style={styles.tierTabContent}>
+                  <View style={styles.tierTabTitleRow}>
                     <AppIcon
-                      name={
-                        selectedTier === PREMIUM_PLAN.UNLIMITED
-                          ? "sparkles"
-                          : "diamond"
-                      }
-                      size={10}
-                      color={
-                        selectedTier === PREMIUM_PLAN.UNLIMITED
-                          ? "#D8A900"
-                          : C.accent
-                      }
+                      name={isMax ? "infinite" : "diamond"}
+                      size={15}
+                      color={isSelected ? "#fff" : isMax ? "#F59E0B" : C.accent}
                     />
                     <Text
                       style={[
-                        styles.rarityText,
-                        {
-                          color:
-                            selectedTier === PREMIUM_PLAN.UNLIMITED
-                              ? "#D8A900"
-                              : C.accent,
-                        },
+                        styles.tierTabTitle,
+                        { color: isSelected ? "#fff" : C.text },
                       ]}
                     >
-                      {selectedTier === PREMIUM_PLAN.UNLIMITED
-                        ? tr
-                          ? "EFSANEVİ"
-                          : "LEGENDARY"
-                        : tr
-                        ? "EPİK"
-                        : "EPIC"}
+                      {getPremiumPlanDisplayName(tier)}
                     </Text>
+                    {isMax && (
+                      <View style={[styles.tierTabMiniBadge, { backgroundColor: isSelected ? "rgba(255,255,255,0.22)" : alpha("#F59E0B", 0.16) }]}>
+                        <Text style={[styles.tierTabMiniBadgeText, { color: isSelected ? "#fff" : "#F59E0B" }]}>
+                          {tr ? "EN GÜÇLÜ" : "MAX"}
+                        </Text>
+                      </View>
+                    )}
                   </View>
+                  <Text
+                    style={[
+                      styles.tierTabSub,
+                      { color: isSelected ? "rgba(255,255,255,0.85)" : C.muted },
+                    ]}
+                  >
+                    {isMax
+                      ? tr
+                        ? `Günde ${AI_PLAN_LIMITS.unlimited.daily} AI · Efsanevi Rozet`
+                        : `${AI_PLAN_LIMITS.unlimited.daily} AI/day · Legendary Badge`
+                      : tr
+                      ? `Günde ${AI_PLAN_LIMITS.premium.daily} AI · Epik Rozet`
+                      : `${AI_PLAN_LIMITS.premium.daily} AI/day · Epic Badge`}
+                  </Text>
                 </View>
+              </Pressable>
+            );
+          })}
+        </View>
 
-                <View style={styles.badgeShowcaseCopy}>
-                  <Text style={[styles.badgeShowcaseTitle, { color: C.text }]}>
-                    {badgeLabel(selectedIdentityBadge, language)}
-                  </Text>
-                  <Text style={[styles.badgeShowcaseDesc, { color: C.muted }]}>
-                    {badgeDesc(selectedIdentityBadge, language)}
-                  </Text>
-                  <View style={styles.badgePerks}>
-                    <View style={styles.badgePerk}>
-                      <AppIcon
-                        name="person-circle-outline"
-                        size={14}
-                        color={C.accent}
-                      />
-                      <Text style={[styles.badgePerkText, { color: C.text }]}>
-                        {tr ? "Profilinde görünür" : "Shown on your profile"}
-                      </Text>
-                    </View>
-                    <View style={styles.badgePerk}>
-                      <AppIcon name="sync" size={14} color={C.accent} />
-                      <Text style={[styles.badgePerkText, { color: C.text }]}>
-                        {tr
-                          ? "Planınla otomatik güncellenir"
-                          : "Updates automatically with your plan"}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </LinearGradient>
-
-              <View style={styles.experienceHeading}>
-                <View style={styles.experienceHeadingCopy}>
-                  <Text style={[styles.experienceTitle, { color: C.text }]}>
-                    {tr
-                      ? "Plan ayrıcalıkları ve Seelogd deneyimi"
-                      : "Plan benefits and the Seelogd experience"}
-                  </Text>
-                  <Text style={[styles.experienceSubtitle, { color: C.muted }]}>
-                    {tr
-                      ? "Bir başlığa dokunarak özellikleri kompakt görünümde incele."
-                      : "Tap a category to review its features in a compact view."}
-                  </Text>
-                </View>
-                <View
+        {/* Live Identity Badge Preview for selected tier */}
+        <View style={[styles.badgePreviewCard, { backgroundColor: C.card, borderColor: alpha(C.accent, 0.22) }]}>
+          <LinearGradient
+            colors={[alpha(C.accent, 0.12), "transparent"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0.8 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.badgePreviewLeft}>
+            <AppBadge
+              glyph={selectedIdentityBadge.glyph}
+              glyphSolid={selectedIdentityBadge.glyphSolid}
+              rarity={selectedIdentityBadge.rarity}
+              ornate={selectedIdentityBadge.ornate}
+              size={58}
+              accessibilityLabel={badgeLabel(selectedIdentityBadge, language)}
+            />
+          </View>
+          <View style={styles.badgePreviewRight}>
+            <View style={styles.badgePreviewHeader}>
+              <Text style={[styles.badgePreviewTitle, { color: C.text }]}>
+                {badgeLabel(selectedIdentityBadge, language)}
+              </Text>
+              <View
+                style={[
+                  styles.badgeRarityTag,
+                  {
+                    backgroundColor:
+                      selectedTier === PREMIUM_PLAN.UNLIMITED
+                        ? alpha("#F59E0B", 0.18)
+                        : C.accentDim,
+                  },
+                ]}
+              >
+                <AppIcon
+                  name={selectedTier === PREMIUM_PLAN.UNLIMITED ? "sparkles" : "diamond"}
+                  size={10}
+                  color={selectedTier === PREMIUM_PLAN.UNLIMITED ? "#D97706" : C.accent}
+                />
+                <Text
                   style={[
-                    styles.selectedPlanPill,
-                    { backgroundColor: C.accentDim },
+                    styles.badgeRarityText,
+                    {
+                      color:
+                        selectedTier === PREMIUM_PLAN.UNLIMITED
+                          ? "#D97706"
+                          : C.accent,
+                    },
                   ]}
                 >
-                  <AppIcon
-                    name={
-                      selectedTier === PREMIUM_PLAN.UNLIMITED
-                        ? "infinite"
-                        : "diamond"
-                    }
-                    size={12}
-                    color={C.accent}
-                  />
-                  <Text
-                    style={[styles.selectedPlanPillText, { color: C.accent }]}
-                  >
-                    {selectedPlanName}
-                  </Text>
-                </View>
+                  {selectedTier === PREMIUM_PLAN.UNLIMITED
+                    ? tr ? "EFSANEVİ ROZET" : "LEGENDARY"
+                    : tr ? "EPİK ROZET" : "EPIC"}
+                </Text>
               </View>
-
-              <View style={styles.experienceGroups}>
-                {combinedBenefitGroups.map((group) => {
-                  const expanded = expandedBenefitId === group.id;
-                  return (
-                    <View
-                      key={group.id}
-                      style={[
-                        styles.experienceCard,
-                        {
-                          backgroundColor: C.card,
-                          borderColor: expanded ? C.accent : C.border,
-                        },
-                      ]}
-                    >
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityState={{ expanded }}
-                        onPress={() => toggleBenefit(group.id)}
-                        style={({ pressed }) => [
-                          styles.experienceTrigger,
-                          pressed && { opacity: 0.72 },
-                        ]}
-                      >
-                        <View
-                          style={[
-                            styles.experienceIcon,
-                            {
-                              backgroundColor: expanded
-                                ? C.accentDim
-                                : C.cardAlt,
-                            },
-                          ]}
-                        >
-                          <AppIcon
-                            name={group.icon}
-                            size={18}
-                            color={expanded ? C.accent : C.muted}
-                          />
-                        </View>
-                        <View style={styles.experienceCopy}>
-                          <Text
-                            style={[
-                              styles.experienceCardTitle,
-                              { color: C.text },
-                            ]}
-                          >
-                            {group.title[localized]}
-                          </Text>
-                          <Text
-                            numberOfLines={expanded ? undefined : 1}
-                            style={[
-                              styles.experienceSummary,
-                              { color: C.muted },
-                            ]}
-                          >
-                            {group.summary[localized]}
-                          </Text>
-                        </View>
-                        <View
-                          style={[
-                            styles.expandButton,
-                            { backgroundColor: C.cardAlt },
-                          ]}
-                        >
-                          <AppIcon
-                            name={expanded ? "chevron-up" : "chevron-down"}
-                            size={15}
-                            color={expanded ? C.accent : C.muted}
-                          />
-                        </View>
-                      </Pressable>
-
-                      {expanded && (
-                        <View
-                          style={[
-                            styles.experienceDetails,
-                            { borderTopColor: C.border },
-                          ]}
-                        >
-                          <View style={styles.compactBenefitGrid}>
-                            {group.compactItems.map((item) => (
-                              <View
-                                key={item.text}
-                                style={[
-                                  styles.compactBenefitItem,
-                                  {
-                                    backgroundColor: C.cardAlt,
-                                    borderColor: alpha(C.accent, 0.1),
-                                  },
-                                ]}
-                              >
-                                <View
-                                  style={[
-                                    styles.compactBenefitIcon,
-                                    {
-                                      backgroundColor: C.accentDim,
-                                      borderColor: alpha(C.accent, 0.16),
-                                    },
-                                  ]}
-                                >
-                                  <AppIcon
-                                    name={item.icon}
-                                    size={12}
-                                    color={C.accent}
-                                  />
-                                </View>
-                                <Text
-                                  style={[
-                                    styles.compactBenefitText,
-                                    { color: C.text },
-                                  ]}
-                                >
-                                  {item.text}
-                                </Text>
-                              </View>
-                            ))}
-                          </View>
-                          {selectedTier === PREMIUM_PLAN.UNLIMITED &&
-                            group.unlimited && (
-                              <LinearGradient
-                                colors={[C.accentDim, alpha(C.accent, 0.04)]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={[
-                                  styles.unlimitedNote,
-                                  { borderColor: alpha(C.accent, 0.22) },
-                                ]}
-                              >
-                                <AppIcon
-                                  name="infinite"
-                                  size={15}
-                                  color={C.accent}
-                                />
-                                <Text
-                                  style={[
-                                    styles.unlimitedNoteText,
-                                    { color: C.accent },
-                                  ]}
-                                >
-                                  {group.unlimited[localized]}
-                                </Text>
-                              </LinearGradient>
-                            )}
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-              </View>
-            </ScrollView>
-      </BottomSheetModal>
-
-      <>
-        <View style={styles.sectionHeadingCompact}>
-          <View style={styles.planHeadingCopy}>
-            <Text style={[styles.sectionKicker, { color: C.accent }]}>02</Text>
-            <Text style={[styles.sectionTitle, { color: C.text }]}>
-              {tr ? "Ödeme ve plan seçimi" : "Payment and plan selection"}
-            </Text>
-            <Text style={[styles.planOfferHint, { color: C.muted }]}>
-              {bestAnnualDiscount > 0
-                ? tr
-                  ? `Yıllık planlarda aylık ödemeye göre %${bestAnnualDiscount} avantaj`
-                  : `${bestAnnualDiscount}% off annual plans compared with monthly billing`
-                : tr
-                ? "Yıllık planla aylık ödemeye göre daha avantajlı"
-                : "Save more with annual billing"}
+            </View>
+            <Text style={[styles.badgePreviewDesc, { color: C.muted }]}>
+              {tr
+                ? "Profilinde, arkadaş sohbetlerinde ve topluluk yorumlarında statü sembolün olarak otomatik parıldar."
+                : "Automatically displayed on your profile, chat conversations, and community reviews."}
             </Text>
           </View>
         </View>
-        {!showBillingOptions ? (
-          <View style={styles.tierGrid}>
-            {[PREMIUM_PLAN.PREMIUM, PREMIUM_PLAN.UNLIMITED].map((tier) => {
-              const selected = selectedTier === tier;
-              const unlimited = tier === PREMIUM_PLAN.UNLIMITED;
-              const disabled = isUnlimited && !unlimited;
-              const glowColor = unlimited ? "#F5C518" : C.accent;
+
+        {/* DIRECT PRICING PACKAGES */}
+        {loading ? (
+          <View style={styles.packagesLoader}>
+            <ActivityIndicator size="large" color={C.accent} />
+            <Text style={[styles.packagesLoaderText, { color: C.muted }]}>
+              {tr ? "Mağaza fiyatları alınıyor…" : "Loading store prices…"}
+            </Text>
+          </View>
+        ) : selectedTierPackages.length > 0 ? (
+          <View style={styles.packagesContainer}>
+            {selectedTierPackages.map((aPackage) => {
+              const isSelected = aPackage.identifier === selectedPackage?.identifier;
+              const isAnnual = getPackagePeriodKey(aPackage) === "annual";
+              const savings = getPackageSavings(aPackage, pricedPackages, language);
+              const monthlyEquivalent = getPackageMonthlyEquivalent(aPackage, language);
+              const cardBorderColor = isSelected
+                ? isAnnual
+                  ? "#F59E0B"
+                  : C.accent
+                : isAnnual
+                ? alpha("#F59E0B", 0.45)
+                : C.border;
+
               return (
                 <Pressable
-                  key={tier}
+                  key={aPackage.identifier}
                   accessibilityRole="button"
-                  accessibilityState={{ selected, disabled }}
-                  disabled={disabled}
-                  onPress={() => selectTier(tier)}
+                  accessibilityState={{ selected: isSelected }}
+                  onPress={() => handleSelectPackage(aPackage.identifier)}
                   style={[
-                    styles.tierCard,
+                    styles.pricingCard,
                     {
-                      // Keep the card surface opaque so Android elevation does
-                      // not remain visible through the selected accent wash.
                       backgroundColor: C.card,
-                      borderColor: selected ? glowColor : C.border,
+                      borderColor: cardBorderColor,
                     },
-                    selected && styles.tierCardSelected,
-                    selected && {
-                      shadowColor: glowColor,
-                      shadowOpacity: 0.5,
-                      shadowRadius: 18,
-                      shadowOffset: { width: 0, height: 10 },
-                      elevation: 12,
+                    isSelected && styles.pricingCardSelected,
+                    isSelected && {
+                      shadowColor: isAnnual ? "#F59E0B" : C.accent,
+                      shadowOpacity: 0.3,
+                      shadowRadius: 12,
+                      shadowOffset: { width: 0, height: 6 },
+                      elevation: 6,
                     },
-                    disabled && { opacity: 0.42 },
                   ]}
                 >
-                  {selected && (
-                    <>
-                      <LinearGradient
-                        pointerEvents="none"
-                        colors={[
-                          alpha(glowColor, 0.32),
-                          alpha(C.accent, 0.08),
-                          "transparent",
-                        ]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={[StyleSheet.absoluteFill, { borderRadius: 22 }]}
-                      />
-                      <LinearGradient
-                        pointerEvents="none"
-                        colors={["rgba(255,255,255,0.22)", "transparent"]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 0.85, y: 0.6 }}
-                        style={[StyleSheet.absoluteFill, { borderRadius: 22 }]}
-                      />
-                    </>
+                  {isSelected && (
+                    <LinearGradient
+                      pointerEvents="none"
+                      colors={[
+                        alpha(isAnnual ? "#F59E0B" : C.accent, 0.16),
+                        "transparent",
+                      ]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[StyleSheet.absoluteFill, { borderRadius: 19 }]}
+                    />
                   )}
-                  <View
-                    style={[
-                      styles.tierIcon,
-                      { backgroundColor: selected ? C.accent : C.cardAlt },
-                    ]}
-                  >
-                    {selected && (
-                      <LinearGradient
-                        pointerEvents="none"
-                        colors={["rgba(255,255,255,0.4)", "transparent"]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={[StyleSheet.absoluteFill, { borderRadius: 14 }]}
-                      />
+
+                  <View style={styles.pricingCardHeader}>
+                    {isAnnual ? (
+                      <View style={[styles.popularBadge, { backgroundColor: "#F59E0B" }]}>
+                        <AppIcon name="flame" size={11} color="#fff" />
+                        <Text style={styles.popularBadgeText}>
+                          {tr ? "EN ÇOK TERCİH EDİLEN" : "MOST POPULAR"}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.flexibleBadge, { backgroundColor: C.cardAlt }]}>
+                        <Text style={[styles.flexibleBadgeText, { color: C.muted }]}>
+                          {tr ? "ESNEK DÖNEM" : "FLEXIBLE"}
+                        </Text>
+                      </View>
                     )}
-                    <AppIcon
-                      name={unlimited ? "infinite" : "diamond-outline"}
-                      size={24}
-                      color={selected ? "#fff" : C.muted}
-                    />
-                  </View>
-                  <Text style={[styles.tierTitle, { color: C.text }]}>
-                    {getPremiumPlanDisplayName(tier)}
-                  </Text>
-                  <Text style={[styles.tierDescription, { color: C.muted }]}>
-                    {unlimited
-                      ? tr
-                        ? `${AI_PLAN_LIMITS.unlimited.daily}/gün · ${AI_PLAN_LIMITS.unlimited.monthly}/ay`
-                        : `${AI_PLAN_LIMITS.unlimited.daily}/day · ${AI_PLAN_LIMITS.unlimited.monthly}/month`
-                      : tr
-                      ? `${AI_PLAN_LIMITS.premium.daily}/gün · ${AI_PLAN_LIMITS.premium.monthly}/ay`
-                      : `${AI_PLAN_LIMITS.premium.daily}/day · ${AI_PLAN_LIMITS.premium.monthly}/month`}
-                  </Text>
-                  <View
-                    style={[
-                      styles.tierSelection,
-                      {
-                        backgroundColor: selected ? C.accent : C.cardAlt,
-                      },
-                    ]}
-                  >
-                    <AppIcon
-                      name={selected ? "checkmark" : "arrow-forward"}
-                      size={12}
-                      color={selected ? "#fff" : C.muted}
-                    />
-                    <Text
+
+                    <View
                       style={[
-                        styles.tierSelectionText,
-                        { color: selected ? "#fff" : C.muted },
+                        styles.pricingRadio,
+                        {
+                          borderColor: isSelected
+                            ? isAnnual
+                              ? "#F59E0B"
+                              : C.accent
+                            : C.muted,
+                          backgroundColor: isSelected
+                            ? isAnnual
+                              ? "#F59E0B"
+                              : C.accent
+                            : "transparent",
+                        },
                       ]}
                     >
-                      {selected
-                        ? tr
-                          ? "Seçildi"
-                          : "Selected"
-                        : tr
-                        ? "Seç"
-                        : "Select"}
-                    </Text>
+                      {isSelected && <AppIcon name="checkmark" size={12} color="#fff" />}
+                    </View>
                   </View>
+
+                  <View style={styles.pricingContentRow}>
+                    <View style={styles.pricingTitleWrap}>
+                      <Text style={[styles.pricingPeriodTitle, { color: C.text }]}>
+                        {packageTitle(aPackage, tr)}
+                      </Text>
+                      <Text style={[styles.pricingPeriodSub, { color: C.muted }]}>
+                        {isAnnual
+                          ? tr ? "Yıllık tek faturalandırma" : "Billed annually"
+                          : tr ? "Aylık yenilenir, dilediğinde iptal" : "Renews monthly, cancel anytime"}
+                      </Text>
+                    </View>
+
+                    <View style={styles.pricingNumbersWrap}>
+                      {savings && (
+                        <View style={[styles.savingsPill, { backgroundColor: C.iconGreen }]}>
+                          <Text style={[styles.savingsText, { color: C.green }]}>
+                            {tr ? `%${savings.percent} TASARRUF` : `SAVE ${savings.percent}%`}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.priceRow}>
+                        <Text fontRole="numeric" style={[styles.priceString, { color: C.text }]}>
+                          {aPackage.product?.priceString}
+                        </Text>
+                        <Text style={[styles.pricePeriod, { color: C.muted }]}>
+                          {packagePeriodLabel(aPackage, tr)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {isAnnual && monthlyEquivalent && (
+                    <View style={[styles.monthlyEquivalentCallout, { backgroundColor: alpha(C.accent, 0.08), borderColor: alpha(C.accent, 0.16) }]}>
+                      <AppIcon name="calculator-outline" size={13} color={C.accent} />
+                      <Text style={[styles.monthlyEquivalentText, { color: C.text }]}>
+                        {tr ? "Sadece " : "Only "}
+                        <Text style={{ color: C.accent, fontWeight: "900" }}>
+                          {monthlyEquivalent}
+                        </Text>
+                        {tr ? " / aya denk gelir" : " / month equivalent"}
+                      </Text>
+                    </View>
+                  )}
                 </Pressable>
               );
             })}
           </View>
         ) : (
-          <Animated.View
-            style={[
-              styles.billingStage,
-              {
-                opacity: planTransition,
-                transform: [
-                  {
-                    translateX: planTransition.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [28, 0],
-                    }),
-                  },
-                  {
-                    scale: planTransition.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.94, 1],
-                    }),
-                  },
-                ],
-              },
-            ]}
+          <View style={[styles.noticeBox, { backgroundColor: C.card, borderColor: C.border }]}>
+            <AppIcon family="Ionicons" name="construct-outline" size={20} color={C.amber} />
+            <Text style={[styles.noticeText, { color: C.muted }]}>
+              {configurationError === "missing-api-key"
+                ? tr
+                  ? "RevenueCat API anahtarı bekleniyor."
+                  : "RevenueCat API key is missing."
+                : tr
+                ? `${selectedPlanName} mağaza paketleri henüz hazır değil.`
+                : `${selectedPlanName} packages not loaded yet.`}
+            </Text>
+          </View>
+        )}
+
+        {/* PRIMARY CTA BUTTON */}
+        <Pressable
+          disabled={(selectedTier !== plan && !selectedPackage) || busy}
+          onPress={selectedTier === plan ? manage : buy}
+          style={({ pressed }) => [
+            styles.ctaButton,
+            {
+              opacity: (selectedTier !== plan && !selectedPackage) || busy ? 0.45 : pressed ? 0.85 : 1,
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={[C.accent, C.purple || C.accent]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.ctaGradient}
           >
-            <View style={styles.billingHeading}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={tr ? "Planlara geri dön" : "Back to plans"}
-                onPress={showTierSelection}
-                style={({ pressed }) => [
-                  styles.billingBack,
-                  { backgroundColor: C.card, borderColor: C.border },
-                  pressed && { opacity: 0.65 },
-                ]}
-              >
-                <AppIcon name="arrow-back" size={18} color={C.text} />
-              </Pressable>
-              <View style={styles.billingHeadingCopy}>
-                <Text style={[styles.billingTitle, { color: C.text }]}>
-                  {tr ? "Ödeme dönemi" : "Billing period"}
-                </Text>
-                <Text style={[styles.billingSubtitle, { color: C.muted }]}>
-                  {tr
-                    ? `${selectedPlanName} için planını seç`
-                    : `Choose a plan for ${selectedPlanName}`}
-                </Text>
-              </View>
-              <AppIcon name="calendar-outline" size={18} color={C.accent} />
-            </View>
-
-            {loading ? (
-              <ActivityIndicator style={styles.loader} color={C.accent} />
-            ) : selectedTierPackages.length > 0 ? (
-              <View style={styles.billingGrid}>
-                {selectedTierPackages.map((aPackage) => {
-                  const selected =
-                    aPackage.identifier === selectedPackage?.identifier;
-                  const savings = getPackageSavings(
-                    aPackage,
-                    pricedPackages,
-                    language
-                  );
-                  const annual = getPackagePeriodKey(aPackage) === "annual";
-                  const glowColor = annual ? "#F5C518" : C.accent;
-                  return (
-                    <Pressable
-                      key={aPackage.identifier}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected }}
-                      onPress={() => setSelectedId(aPackage.identifier)}
-                      style={[
-                        styles.billingCard,
-                        {
-                          // Accent is painted by the clipped gradient below;
-                          // the solid surface prevents the shadow bleeding
-                          // through translucent selected cards.
-                          backgroundColor: C.card,
-                          borderColor: selected
-                            ? glowColor
-                            : annual
-                            ? alpha(glowColor, 0.5)
-                            : C.border,
-                        },
-                        selected && styles.billingCardSelected,
-                        selected && {
-                          shadowColor: glowColor,
-                          shadowOpacity: 0.36,
-                          shadowRadius: 16,
-                          shadowOffset: { width: 0, height: 8 },
-                          elevation: 8,
-                        },
-                      ]}
-                    >
-                      {(selected || annual) && (
-                        <>
-                          <LinearGradient
-                            pointerEvents="none"
-                            colors={[
-                              alpha(glowColor, selected ? 0.34 : 0.16),
-                              alpha(C.accent, 0.06),
-                              "transparent",
-                            ]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={[
-                              StyleSheet.absoluteFill,
-                              { borderRadius: 20 },
-                            ]}
-                          />
-                          {selected && (
-                            <LinearGradient
-                              pointerEvents="none"
-                              colors={["rgba(255,255,255,0.2)", "transparent"]}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 0.85, y: 0.6 }}
-                              style={[
-                                StyleSheet.absoluteFill,
-                                { borderRadius: 20 },
-                              ]}
-                            />
-                          )}
-                        </>
-                      )}
-                      <View style={styles.billingCardTop}>
-                        <View
-                          style={[
-                            styles.periodIcon,
-                            {
-                              backgroundColor: selected ? C.accent : C.cardAlt,
-                            },
-                          ]}
-                        >
-                          {selected && (
-                            <LinearGradient
-                              pointerEvents="none"
-                              colors={["rgba(255,255,255,0.4)", "transparent"]}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 1 }}
-                              style={[
-                                StyleSheet.absoluteFill,
-                                { borderRadius: 11 },
-                              ]}
-                            />
-                          )}
-                          <AppIcon
-                            name={annual ? "calendar" : "calendar-outline"}
-                            size={16}
-                            color={selected ? "#fff" : C.muted}
-                          />
-                        </View>
-                        <View
-                          style={[
-                            styles.radio,
-                            { borderColor: selected ? C.accent : C.muted },
-                          ]}
-                        >
-                          {selected && (
-                            <View
-                              style={[
-                                styles.radioDot,
-                                { backgroundColor: C.accent },
-                              ]}
-                            />
-                          )}
-                        </View>
-                      </View>
-                      <Text style={[styles.billingPeriod, { color: C.text }]}>
-                        {packageTitle(aPackage, tr)}
-                      </Text>
-                      {savings ? (
-                        <>
-                          <View
-                            style={[
-                              styles.discountBadge,
-                              { backgroundColor: C.iconGreen },
-                            ]}
-                          >
-                            <Text
-                              style={[styles.discountText, { color: C.green }]}
-                            >
-                              {tr
-                                ? `%${savings.percent} İNDİRİM`
-                                : `${savings.percent}% OFF`}
-                            </Text>
-                          </View>
-                          <Text
-                            style={[styles.originalPrice, { color: C.muted }]}
-                          >
-                            {savings.originalPrice}
-                          </Text>
-                        </>
-                      ) : (
-                        <View style={styles.discountPlaceholder} />
-                      )}
-                      <Text
-                        // "₺149,99" — para birimi yüzünden saf rakam sayılmaz,
-                        // ama rolü fiyattır: rakam fontunu kullanmalı.
-                        fontRole="numeric"
-                        style={[
-                          styles.billingPrice,
-                          { color: savings ? C.green : C.text },
-                        ]}
-                      >
-                        {aPackage.product?.priceString}
-                      </Text>
-                      <Text style={[styles.periodSuffix, { color: C.muted }]}>
-                        {packagePeriodLabel(aPackage, tr)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : (
-              <View
-                style={[
-                  styles.notice,
-                  { backgroundColor: C.card, borderColor: C.border },
-                ]}
-              >
-                <AppIcon
-                  family="Ionicons"
-                  name="construct-outline"
-                  size={20}
-                  color={C.amber}
-                />
-                <Text style={[styles.noticeText, { color: C.muted }]}>
-                  {configurationError === "missing-api-key"
-                    ? tr
-                      ? "RevenueCat API anahtarı bekleniyor. Kurulum adımları docs/kurulum/REVENUECAT_KURULUM.md dosyasında."
-                      : "RevenueCat API key is missing. See docs/kurulum/REVENUECAT_KURULUM.md."
-                    : tr
-                    ? `${selectedPlanName} mağaza paketleri henüz yayında değil.`
-                    : `${selectedPlanName} store packages are not available yet.`}
-                </Text>
-              </View>
-            )}
-
-            <Pressable
-              disabled={(selectedTier !== plan && !selectedPackage) || busy}
-              onPress={selectedTier === plan ? manage : buy}
-              style={({ pressed }) => [
-                styles.cta,
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.ctaShimmerBar,
                 {
-                  opacity:
-                    (selectedTier !== plan && !selectedPackage) || busy
-                      ? 0.48
-                      : pressed
-                      ? 0.82
-                      : 1,
+                  transform: [
+                    {
+                      translateX: ctaShimmer.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-250, 420],
+                      }),
+                    },
+                    { rotate: "-20deg" },
+                  ],
                 },
               ]}
             >
               <LinearGradient
-                colors={[C.accent, C.purple || C.accent]}
+                colors={[
+                  "transparent",
+                  "rgba(255,255,255,0.06)",
+                  "rgba(255,255,255,0.38)",
+                  "rgba(255,255,255,0.06)",
+                  "transparent",
+                ]}
                 start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.ctaFill}
-              >
-                <Animated.View
-                  pointerEvents="none"
-                  style={[
-                    styles.ctaShimmer,
-                    {
-                      transform: [
-                        {
-                          translateX: ctaShimmer.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [-210, 390],
-                          }),
-                        },
-                        { rotate: "-16deg" },
-                      ],
-                    },
-                  ]}
-                >
-                  <LinearGradient
-                    colors={[
-                      "transparent",
-                      "rgba(255,255,255,0.08)",
-                      "rgba(255,255,255,0.34)",
-                      "rgba(255,255,255,0.08)",
-                      "transparent",
-                    ]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={StyleSheet.absoluteFill}
+                end={{ x: 1, y: 0 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </Animated.View>
+
+            {busyAction === "purchase" || busyAction === "customer-center" ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <View style={styles.ctaIconContainer}>
+                  <AppIcon
+                    name={selectedTier === PREMIUM_PLAN.UNLIMITED ? "infinite" : "diamond"}
+                    size={18}
+                    color="#fff"
                   />
-                </Animated.View>
-                {busyAction === "purchase" ||
-                busyAction === "customer-center" ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <View style={styles.ctaIconWrap}>
-                      <AppIcon
-                        name={
-                          selectedTier === PREMIUM_PLAN.UNLIMITED
-                            ? "infinite"
-                            : "diamond"
-                        }
-                        size={17}
-                        color="#fff"
-                      />
-                    </View>
-                    <View style={styles.ctaCopy}>
-                      <Text style={styles.ctaText}>
-                        {selectedTier === plan
-                          ? tr
-                            ? "Aboneliği yönet"
-                            : "Manage subscription"
-                          : selectedTier === PREMIUM_PLAN.UNLIMITED
-                          ? tr
-                            ? "Premium Max'e geç"
-                            : "Upgrade to Premium Max"
-                          : tr
-                          ? "Premium'a geç"
-                          : "Upgrade to Premium"}
-                      </Text>
-                      {selectedTier !== plan && selectedDisplayPackage && (
-                        <Text style={styles.ctaSubtext}>
-                          {selectedDisplayPackage.product?.priceString}{" "}
-                          {packagePeriodLabel(selectedDisplayPackage, tr)}
-                        </Text>
-                      )}
-                    </View>
-                    <AppIcon name="arrow-forward" size={19} color="#fff" />
-                  </>
-                )}
-              </LinearGradient>
-            </Pressable>
-          </Animated.View>
-        )}
-      </>
+                </View>
+                <View style={styles.ctaTextContainer}>
+                  <Text style={styles.ctaMainText}>
+                    {selectedTier === plan
+                      ? tr ? "Aboneliği Yönet" : "Manage Subscription"
+                      : isPremium
+                      ? tr ? `${selectedPlanName}'e Yükselt` : `Upgrade to ${selectedPlanName}`
+                      : tr ? "Hemen Başla" : "Get Started Now"}
+                  </Text>
+                  {selectedTier !== plan && selectedDisplayPackage && (
+                    <Text style={styles.ctaSubText}>
+                      {selectedDisplayPackage.product?.priceString}{" "}
+                      {packagePeriodLabel(selectedDisplayPackage, tr)}
+                      {tr ? " · İstediğin an iptal et" : " · Cancel anytime"}
+                    </Text>
+                  )}
+                </View>
+                <AppIcon name="arrow-forward" size={19} color="#fff" />
+              </>
+            )}
+          </LinearGradient>
+        </Pressable>
 
-      <Pressable
-        disabled={busy || loading || !packages.length}
-        onPress={openPaywall}
-        style={({ pressed }) => [
-          styles.paywallButton,
-          {
-            backgroundColor: C.card,
-            borderColor: C.border,
-            opacity:
-              busy || loading || !packages.length ? 0.48 : pressed ? 0.78 : 1,
-          },
-        ]}
-      >
-        {busyAction === "paywall" ? (
-          <ActivityIndicator color={C.accent} />
-        ) : (
-          <>
-            <View style={[styles.secureIcon, { backgroundColor: C.accentDim }]}>
-              <AppIcon name="shield-checkmark" size={16} color={C.accent} />
-            </View>
-            <Text style={[styles.paywallButtonText, { color: C.text }]}>
-              {tr
-                ? "Güvenli ödeme seçeneklerini aç"
-                : "Open secure checkout options"}
+        {/* TRUST BADGES ROW */}
+        <View style={styles.trustBadgesRow}>
+          <View style={styles.trustBadgeItem}>
+            <AppIcon name="shield-checkmark" size={13} color={C.green} />
+            <Text style={[styles.trustBadgeText, { color: C.muted }]}>
+              {tr ? "Güvenli Ödeme" : "Secure Payment"}
             </Text>
-            <AppIcon name="open-outline" size={15} color={C.muted} />
-          </>
-        )}
-      </Pressable>
+          </View>
+          <View style={styles.trustBadgeItem}>
+            <AppIcon name="flash" size={13} color={C.accent} />
+            <Text style={[styles.trustBadgeText, { color: C.muted }]}>
+              {tr ? "Anında Aktivasyon" : "Instant Access"}
+            </Text>
+          </View>
+          <View style={styles.trustBadgeItem}>
+            <AppIcon name="sync" size={13} color={C.purple} />
+            <Text style={[styles.trustBadgeText, { color: C.muted }]}>
+              {tr ? "Kolay İptal" : "Easy Cancel"}
+            </Text>
+          </View>
+        </View>
+      </View>
 
-      <Pressable disabled={busy} onPress={restore} style={styles.restore}>
-        {busyAction === "restore" ? (
-          <ActivityIndicator size="small" color={C.accent} />
-        ) : (
-          <Text style={[styles.restoreText, { color: C.accent }]}>
-            {tr ? "Satın alımları geri yükle" : "Restore purchases"}
+      {/* 2X2 MODERN VALUE PROPOSITIONS GRID */}
+      <View style={styles.featuresSection}>
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={[styles.sectionBadgePill, { backgroundColor: alpha(C.accent, 0.14) }]}>
+              <AppIcon name="sparkles" size={11} color={C.accent} />
+              <Text style={[styles.sectionBadgeText, { color: C.accent }]}>
+                {tr ? "AYRICALIKLAR" : "HIGHLIGHTS"}
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.sectionTitle, { color: C.text }]}>
+            {tr ? "Neler Kazanacaksın?" : "What You Will Get"}
           </Text>
-        )}
-      </Pressable>
+          <Text style={[styles.sectionSubtitle, { color: C.muted }]}>
+            {tr
+              ? "Seelogd Premium ile film ve dizi dünyanı bir üst seviyeye taşı."
+              : "Elevate your cinema journey with Seelogd Premium privileges."}
+          </Text>
+        </View>
 
-      <Text style={[styles.legal, { color: C.muted }]}>
-        {tr
-          ? "Satın alma mağaza hesabından tahsil edilir. Abonelik, mevcut dönem bitmeden en az 24 saat önce iptal edilmezse otomatik yenilenir. Aboneliğini mağaza hesap ayarlarından yönetebilirsin."
-          : "Payment is charged to your store account. The subscription renews automatically unless canceled at least 24 hours before the current period ends. You can manage it in your store account settings."}
-      </Text>
+        <View style={styles.valueProps2x2Grid}>
+          {CORE_VALUE_PROPS.map((prop, idx) => (
+            <View
+              key={idx}
+              style={[
+                styles.valueProp2x2Card,
+                { backgroundColor: C.card, borderColor: alpha(prop.color, 0.28) },
+              ]}
+            >
+              <LinearGradient
+                colors={[alpha(prop.color, 0.12), "transparent"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0.9 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={styles.valueProp2x2Top}>
+                <View style={[styles.valuePropIconWrap2x2, { backgroundColor: alpha(prop.color, 0.18) }]}>
+                  <AppIcon name={prop.icon} size={18} color={prop.color} />
+                </View>
+                <View style={[styles.valuePropBadgeTag, { backgroundColor: alpha(prop.color, 0.16) }]}>
+                  <Text style={[styles.valuePropBadgeTagText, { color: prop.color }]}>
+                    {prop.badge[localized]}
+                  </Text>
+                </View>
+              </View>
 
-      {/* Apple 3.1.2: abonelik SATIN ALMA NOKTASINDA Kullanım Koşulları (EULA)
-          ve Gizlilik Politikası bağlantıları zorunlu. Eksikliği tek başına ret
-          sebebi. RevenueCat panelindeki hazır paywall'un footer linkleri de
-          ayrıca açık olmalı (yol haritası C2). */}
-      <View style={styles.legalLinks}>
+              <Text style={[styles.valuePropTitle2x2, { color: C.text }]}>
+                {prop.title[localized]}
+              </Text>
+              <Text style={[styles.valuePropTagline2x2, { color: prop.color }]}>
+                {prop.tagline[localized]}
+              </Text>
+              <Text style={[styles.valuePropDesc2x2, { color: C.muted }]}>
+                {prop.desc[localized]}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* EXPANDABLE CATEGORY BREAKDOWN */}
+      <View style={styles.detailedSection}>
         <Pressable
-          onPress={() => openLegalPage("terms", tr ? "tr" : "en")}
-          hitSlop={8}
+          accessibilityRole="button"
+          onPress={() => {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            setShowDetailedSection(!showDetailedSection);
+          }}
+          style={({ pressed }) => [
+            styles.accordionToggle,
+            {
+              backgroundColor: C.card,
+              borderColor: showDetailedSection ? alpha(C.accent, 0.42) : C.border,
+              opacity: pressed ? 0.88 : 1,
+            },
+          ]}
         >
-          <Text style={[styles.legalLink, { color: C.accent }]}>
-            {i18nText("autoI18n.kullanim_kosullari", "Kullanım Koşulları")}
-          </Text>
+          {showDetailedSection && (
+            <LinearGradient
+              colors={[alpha(C.accent, 0.12), "transparent"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[StyleSheet.absoluteFill, { borderRadius: 18 }]}
+              pointerEvents="none"
+            />
+          )}
+
+          <View
+            style={[
+              styles.accordionToggleLeadingIcon,
+              {
+                backgroundColor: showDetailedSection
+                  ? alpha(C.accent, 0.22)
+                  : alpha(C.accent, 0.12),
+              },
+            ]}
+          >
+            <AppIcon
+              name="layers-outline"
+              size={20}
+              color={C.accent}
+            />
+          </View>
+
+          <View style={styles.accordionToggleCopy}>
+            <View style={styles.accordionBadgeRow}>
+              <View style={[styles.accordionSmallBadge, { backgroundColor: alpha(C.accent, 0.14) }]}>
+                <View style={[styles.accordionDot, { backgroundColor: C.accent }]} />
+                <Text style={[styles.accordionSmallBadgeText, { color: C.accent }]}>
+                  {tr ? "ÖZELLİK REHBERİ" : "FEATURE GUIDE"}
+                </Text>
+              </View>
+              <Text style={[styles.accordionFeatureCount, { color: C.muted }]}>
+                {tr ? "4 Kategori · 12+ Yetenek" : "4 Categories · 12+ Perks"}
+              </Text>
+            </View>
+
+            <Text style={[styles.accordionToggleTitle, { color: C.text }]}>
+              {tr ? "Tüm Özellikleri Ayrıntılı İncele" : "Explore All Features in Detail"}
+            </Text>
+            <Text style={[styles.accordionToggleSub, { color: C.muted }]}>
+              {tr
+                ? "Yapay zeka, arşiv, analitik ve profil ayrıcalıklarının tüm detayları"
+                : "Deep dive into AI, archive, analytics, and profile privileges"}
+            </Text>
+          </View>
+
+          <View
+            style={[
+              styles.accordionToggleIcon,
+              {
+                backgroundColor: showDetailedSection ? C.accent : C.cardAlt,
+              },
+            ]}
+          >
+            <AppIcon
+              name={showDetailedSection ? "chevron-up" : "chevron-down"}
+              size={16}
+              color={showDetailedSection ? "#fff" : C.accent}
+            />
+          </View>
         </Pressable>
-        <Text style={[styles.legal, { color: C.muted }]}>·</Text>
+
+        {showDetailedSection && (
+          <View style={styles.categorySectionWrap}>
+            {/* Category Filter Pills */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryFilterRow}
+            >
+              {EXPERIENCE_CATEGORIES.map((cat) => {
+                const isCatActive = categoryFilter === cat.id;
+                const activeColor = cat.color || C.accent;
+                return (
+                  <Pressable
+                    key={cat.id}
+                    onPress={() => {
+                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                      setCategoryFilter(cat.id);
+                    }}
+                    style={[
+                      styles.categoryFilterPill,
+                      {
+                        backgroundColor: isCatActive ? activeColor : C.card,
+                        borderColor: isCatActive ? activeColor : C.border,
+                        shadowColor: isCatActive ? activeColor : "transparent",
+                        shadowOpacity: isCatActive ? 0.3 : 0,
+                        shadowRadius: 6,
+                        elevation: isCatActive ? 3 : 0,
+                      },
+                    ]}
+                  >
+                    <AppIcon
+                      name={cat.icon}
+                      size={13}
+                      color={isCatActive ? "#fff" : cat.color || C.accent}
+                    />
+                    <Text
+                      style={[
+                        styles.categoryFilterPillText,
+                        { color: isCatActive ? "#fff" : C.text },
+                      ]}
+                    >
+                      {cat.label[localized]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {/* Filtered Category Cards */}
+            <View style={styles.categoryCardsList}>
+              {EXPERIENCE_GROUPS.filter(
+                (g) => categoryFilter === "all" || g.id === categoryFilter
+              ).map((group) => {
+                const groupColor = group.color || C.accent;
+                return (
+                  <View
+                    key={group.id}
+                    style={[
+                      styles.detailedCard,
+                      {
+                        backgroundColor: C.card,
+                        borderColor: alpha(groupColor, 0.3),
+                      },
+                    ]}
+                  >
+                    {/* Top ambient glow */}
+                    <LinearGradient
+                      colors={[alpha(groupColor, 0.12), "transparent"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 0.8, y: 0.8 }}
+                      style={StyleSheet.absoluteFill}
+                      pointerEvents="none"
+                    />
+
+                    {/* Card Header */}
+                    <View style={styles.detailedCardHeader}>
+                      <LinearGradient
+                        colors={group.gradient || [groupColor, groupColor]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.detailedCardIconWrap}
+                      >
+                        <AppIcon name={group.icon} size={20} color="#fff" />
+                      </LinearGradient>
+
+                      <View style={styles.detailedCardCopy}>
+                        <View style={styles.detailedCardTagRow}>
+                          <View
+                            style={[
+                              styles.detailedCategoryTag,
+                              { backgroundColor: alpha(groupColor, 0.14) },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.detailedCategoryTagText,
+                                { color: groupColor },
+                              ]}
+                            >
+                              {group.tag[localized]}
+                            </Text>
+                          </View>
+                          <View
+                            style={[
+                              styles.detailedPerkBadge,
+                              {
+                                backgroundColor: alpha(C.cardAlt, 0.9),
+                                borderColor: alpha(groupColor, 0.22),
+                              },
+                            ]}
+                          >
+                            <Text style={[styles.detailedPerkBadgeText, { color: C.muted }]}>
+                              {group.badgeText[localized]}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Text style={[styles.detailedCardTitle, { color: C.text }]}>
+                          {group.title[localized]}
+                        </Text>
+                        <Text style={[styles.detailedCardSummary, { color: C.muted }]}>
+                          {group.summary[localized]}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Bullets List */}
+                    <View
+                      style={[
+                        styles.detailedCardBody,
+                        {
+                          borderTopColor: alpha(groupColor, 0.16),
+                          backgroundColor: alpha(C.cardAlt, 0.38),
+                        },
+                      ]}
+                    >
+                      {group.bullets[localized].map((bullet, bIdx) => (
+                        <View
+                          key={bIdx}
+                          style={[
+                            styles.detailedBulletItem,
+                            {
+                              backgroundColor: alpha(C.card, 0.88),
+                              borderColor: alpha(groupColor, 0.14),
+                            },
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.detailedBulletIconBadge,
+                              { backgroundColor: alpha(groupColor, 0.15) },
+                            ]}
+                          >
+                            <AppIcon name="checkmark-done" size={13} color={groupColor} />
+                          </View>
+                          <Text style={[styles.detailedBulletText, { color: C.text }]}>
+                            {bullet}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+
+                    {/* Card Footer Status */}
+                    <View
+                      style={[
+                        styles.detailedCardFooter,
+                        { borderTopColor: alpha(groupColor, 0.12) },
+                      ]}
+                    >
+                      <AppIcon name="shield-checkmark" size={13} color={groupColor} />
+                      <Text style={[styles.detailedCardFooterText, { color: C.muted }]}>
+                        {tr
+                          ? "Tüm Premium paketlerde anında aktif olur"
+                          : "Instantly available with all Premium tiers"}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+      </View>
+
+      {/* SECONDARY ACTIONS & STORE PAYWALL FALLBACK */}
+      <View style={styles.secondaryActions}>
         <Pressable
-          onPress={() => openLegalPage("privacy", tr ? "tr" : "en")}
-          hitSlop={8}
+          disabled={busy || loading || !packages.length}
+          onPress={openPaywall}
+          style={({ pressed }) => [
+            styles.secondaryButton,
+            {
+              backgroundColor: C.card,
+              borderColor: C.border,
+              opacity: busy || loading || !packages.length ? 0.45 : pressed ? 0.78 : 1,
+            },
+          ]}
         >
-          <Text style={[styles.legalLink, { color: C.accent }]}>
-            {i18nText("autoI18n.gizlilik_politikasi", "Gizlilik Politikası")}
-          </Text>
+          {busyAction === "paywall" ? (
+            <ActivityIndicator color={C.accent} size="small" />
+          ) : (
+            <>
+              <AppIcon name="shield-checkmark-outline" size={15} color={C.accent} />
+              <Text style={[styles.secondaryButtonText, { color: C.text }]}>
+                {tr ? "Alternatif Güvenli Ödeme Ekranı" : "Alternative Secure Checkout"}
+              </Text>
+              <AppIcon name="open-outline" size={14} color={C.muted} />
+            </>
+          )}
         </Pressable>
+
+        <Pressable disabled={busy} onPress={restore} style={styles.restoreBtn}>
+          {busyAction === "restore" ? (
+            <ActivityIndicator size="small" color={C.accent} />
+          ) : (
+            <Text style={[styles.restoreBtnText, { color: C.accent }]}>
+              {tr ? "Önceki Satın Alımları Geri Yükle" : "Restore Previous Purchases"}
+            </Text>
+          )}
+        </Pressable>
+      </View>
+
+      {/* LEGAL FOOTER */}
+      <View style={styles.legalSection}>
+        <Text style={[styles.legalDisclaimer, { color: C.muted }]}>
+          {tr
+            ? "Satın alma tutarı uygulama mağazası hesabınızdan tahsil edilir. Abonelik, geçerli dönemin bitiminden en az 24 saat önce iptal edilmediği sürece otomatik olarak yenilenir. İstediğiniz zaman mağaza hesap ayarlarınızdan iptal edebilir veya yönetebilirsiniz."
+            : "Payment will be charged to your store account. The subscription automatically renews unless canceled at least 24 hours before the end of the current period. You can manage or cancel anytime in your store account settings."}
+        </Text>
+
+        <View style={styles.legalLinksRow}>
+          <Pressable onPress={() => openLegalPage("terms", tr ? "tr" : "en")} hitSlop={8}>
+            <Text style={[styles.legalLink, { color: C.accent }]}>
+              {i18nText("autoI18n.kullanim_kosullari", "Kullanım Koşulları")}
+            </Text>
+          </Pressable>
+          <Text style={[styles.legalBullet, { color: C.muted }]}>•</Text>
+          <Pressable onPress={() => openLegalPage("privacy", tr ? "tr" : "en")} hitSlop={8}>
+            <Text style={[styles.legalLink, { color: C.accent }]}>
+              {i18nText("autoI18n.gizlilik_politikasi", "Gizlilik Politikası")}
+            </Text>
+          </Pressable>
+        </View>
       </View>
     </SettingsSubScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  posterBackdrop: { opacity: 0.48 },
-  hero: {
-    borderRadius: 28,
-    padding: 20,
-    overflow: "hidden",
-    minHeight: 306,
-  },
-  heroOrbTop: {
-    position: "absolute",
-    width: 230,
-    height: 230,
-    borderRadius: 115,
-    backgroundColor: "rgba(255,255,255,0.10)",
-    right: -82,
-    top: -112,
-  },
-  heroOrbBottom: {
-    position: "absolute",
-    width: 170,
-    height: 170,
-    borderRadius: 85,
+  testBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.11)",
-    left: -80,
-    bottom: -108,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    marginBottom: 12,
+  },
+  testBadgeText: {
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  heroCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: "hidden",
+    marginBottom: 20,
+  },
+  heroGradient: {
+    padding: 18,
   },
   heroTopRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  heroBrandBadge: {
-    minHeight: 28,
-    borderRadius: 10,
-    paddingHorizontal: 10,
+  heroBrandPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
-    backgroundColor: "rgba(255,255,255,0.10)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    gap: 6,
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
   },
   heroBrandDot: {
     width: 5,
     height: 5,
-    borderRadius: 3,
-    backgroundColor: "#FFFFFF",
+    borderRadius: 2.5,
+    backgroundColor: "#fff",
   },
   heroBrandText: {
-    color: "rgba(255,255,255,0.88)",
-    fontSize: 8.5,
+    color: "#fff",
+    fontSize: 9,
     fontWeight: "900",
-    letterSpacing: 1.15,
+    letterSpacing: 1.2,
   },
-  heroActiveBadge: {
-    minHeight: 27,
-    borderRadius: 10,
-    paddingHorizontal: 9,
+  heroStatusPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(255,255,255,0.16)",
+    gap: 5,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
-  heroActiveText: {
-    color: "#FFFFFF",
-    fontSize: 8,
+  statusDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
+  heroStatusText: {
+    fontSize: 9,
     fontWeight: "900",
     letterSpacing: 0.6,
   },
-  heroContent: { flex: 1, justifyContent: "center", paddingTop: 17 },
-  crownOuter: {
-    width: 62,
-    height: 62,
-    borderRadius: 22,
-    padding: 1,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    marginBottom: 18,
-  },
-  crown: {
-    flex: 1,
-    borderRadius: 21,
-    alignItems: "center",
-    justifyContent: "center",
+  heroBody: {
+    marginTop: 14,
+    marginBottom: 16,
   },
   heroTitle: {
-    color: "#fff",
-    fontSize: 28,
-    lineHeight: 32,
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: "900",
-    letterSpacing: -0.9,
-    maxWidth: "92%",
+    letterSpacing: -0.6,
   },
   heroSubtitle: {
-    color: "rgba(255,255,255,0.74)",
-    fontSize: 12.5,
-    lineHeight: 18,
-    marginTop: 9,
-    maxWidth: "94%",
+    fontSize: 11.5,
+    lineHeight: 17,
+    marginTop: 6,
+    fontWeight: "500",
   },
-  heroTrustRow: {
+  quickMetricsRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.12)",
-  },
-  heroTrustItem: { flexDirection: "row", alignItems: "center", gap: 4 },
-  heroTrustText: {
-    color: "rgba(255,255,255,0.7)",
-    fontSize: 8.5,
-    fontWeight: "600",
-  },
-  sectionHeadingCompact: {
-    marginTop: 23,
-    marginBottom: 10,
-    flexDirection: "row",
-    alignItems: "center",
     gap: 8,
   },
-  sectionKicker: { fontSize: 9, fontWeight: "900", letterSpacing: 1 },
+  quickMetricBox: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    paddingVertical: 8,
+  },
+  quickMetricNum: {
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  quickMetricLabel: {
+    fontSize: 7.5,
+    fontWeight: "600",
+    marginTop: 1,
+  },
+  pricingSection: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    marginBottom: 12,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    marginBottom: 5,
+  },
+  sectionBadgePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 7,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  sectionBadgeText: {
+    fontSize: 8.5,
+    fontWeight: "900",
+    letterSpacing: 0.6,
+  },
   sectionTitle: {
     fontSize: 17,
-    fontWeight: "800",
-    letterSpacing: -0.35,
+    fontWeight: "900",
+    letterSpacing: -0.4,
+  },
+  sectionSubtitle: {
+    fontSize: 11,
+    lineHeight: 15,
     marginTop: 2,
+    fontWeight: "500",
   },
-  testBadge: {
-    alignSelf: "flex-start",
+  tierSegmentWrap: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 9,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    marginTop: 12,
-  },
-  testBadgeText: { fontSize: 9, fontWeight: "900", letterSpacing: 0.6 },
-  exploreCard: {
-    minHeight: 92,
+    borderRadius: 16,
     borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    overflow: "hidden",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
+    padding: 4,
+    gap: 4,
+    marginBottom: 12,
   },
-  exploreIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  exploreCopy: { flex: 1, minWidth: 0 },
-  exploreTitle: { fontSize: 14, fontWeight: "850", letterSpacing: -0.25 },
-  exploreSubtitle: {
-    fontSize: 10,
-    lineHeight: 14,
-    fontWeight: "550",
-    marginTop: 4,
-  },
-  exploreArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  exploreModalRoot: {
+  tierSegmentTab: {
     flex: 1,
-    justifyContent: "flex-end",
-  },
-  exploreModalBackdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0,0,0,0.64)",
-  },
-  exploreModalSheet: {
-    maxHeight: "92%",
-    minHeight: "72%",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderWidth: 1,
-    borderBottomWidth: 0,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
     overflow: "hidden",
   },
-  exploreModalHandle: {
-    width: 42,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: "center",
-    marginTop: 9,
+  tierSegmentTabActive: {
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
-  exploreModalHeader: {
-    minHeight: 70,
-    paddingHorizontal: 16,
+  tierTabContent: {
+    alignItems: "center",
+    gap: 2,
+  },
+  tierTabTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  tierTabTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    letterSpacing: -0.2,
+  },
+  tierTabMiniBadge: {
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+  },
+  tierTabMiniBadgeText: {
+    fontSize: 7.5,
+    fontWeight: "900",
+    letterSpacing: 0.4,
+  },
+  tierTabSub: {
+    fontSize: 9,
+    fontWeight: "600",
+  },
+  badgePreviewCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    overflow: "hidden",
+    marginBottom: 14,
   },
-  exploreModalHeaderCopy: { flex: 1 },
-  exploreModalTitle: { fontSize: 20, fontWeight: "900", letterSpacing: -0.5 },
-  exploreModalSubtitle: { fontSize: 10.5, lineHeight: 15, marginTop: 3 },
-  exploreModalClose: {
-    width: 38,
-    height: 38,
+  badgePreviewLeft: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgePreviewRight: {
+    flex: 1,
+  },
+  badgePreviewHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  badgePreviewTitle: {
+    fontSize: 13.5,
+    fontWeight: "900",
+  },
+  badgeRarityTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  badgeRarityText: {
+    fontSize: 7.5,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  badgePreviewDesc: {
+    fontSize: 9.5,
+    lineHeight: 14,
+    marginTop: 3,
+    fontWeight: "500",
+  },
+  packagesLoader: {
+    paddingVertical: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  packagesLoaderText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  packagesContainer: {
+    gap: 10,
+  },
+  pricingCard: {
+    borderRadius: 20,
+    borderWidth: 1.5,
+    padding: 14,
+    overflow: "hidden",
+  },
+  pricingCardSelected: {
+    borderWidth: 2,
+  },
+  pricingCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  popularBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 7,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  popularBadgeText: {
+    color: "#fff",
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  flexibleBadge: {
+    borderRadius: 7,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  flexibleBadgeText: {
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+  },
+  pricingRadio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pricingContentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  pricingTitleWrap: {
+    flex: 1,
+  },
+  pricingPeriodTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  pricingPeriodSub: {
+    fontSize: 9.5,
+    marginTop: 2,
+    fontWeight: "500",
+  },
+  pricingNumbersWrap: {
+    alignItems: "flex-end",
+    gap: 3,
+  },
+  savingsPill: {
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  savingsText: {
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 0.4,
+  },
+  priceRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 3,
+  },
+  priceString: {
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  pricePeriod: {
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  monthlyEquivalentCallout: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    marginTop: 10,
+  },
+  monthlyEquivalentText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  noticeBox: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  noticeText: {
+    flex: 1,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  ctaButton: {
+    borderRadius: 18,
+    overflow: "hidden",
+    marginTop: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 6,
+  },
+  ctaGradient: {
+    minHeight: 58,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  ctaShimmerBar: {
+    position: "absolute",
+    top: -40,
+    bottom: -40,
+    width: 140,
+  },
+  ctaIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ctaTextContainer: {
+    flex: 1,
+  },
+  ctaMainText: {
+    color: "#fff",
+    fontSize: 14.5,
+    fontWeight: "900",
+  },
+  ctaSubText: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 9,
+    fontWeight: "600",
+    marginTop: 1,
+  },
+  trustBadgesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 14,
+    paddingHorizontal: 4,
+  },
+  trustBadgeItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  trustBadgeText: {
+    fontSize: 9.5,
+    fontWeight: "600",
+  },
+  featuresSection: {
+    marginBottom: 24,
+  },
+  valueProps2x2Grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  valueProp2x2Card: {
+    width: "48.4%",
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 13,
+    overflow: "hidden",
+  },
+  valueProp2x2Top: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  valuePropIconWrap2x2: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  valuePropBadgeTag: {
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2.5,
+  },
+  valuePropBadgeTagText: {
+    fontSize: 7.5,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  valuePropTitle2x2: {
+    fontSize: 13.5,
+    fontWeight: "900",
+    letterSpacing: -0.2,
+  },
+  valuePropTagline2x2: {
+    fontSize: 9.5,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  valuePropDesc2x2: {
+    fontSize: 9.5,
+    lineHeight: 14,
+    marginTop: 4,
+    fontWeight: "500",
+  },
+  detailedSection: {
+    marginBottom: 24,
+  },
+  accordionToggle: {
+    borderRadius: 18,
+    borderWidth: 1.2,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    overflow: "hidden",
+    position: "relative",
+  },
+  accordionToggleLeadingIcon: {
+    width: 42,
+    height: 42,
     borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
   },
-  exploreModalContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 34,
+  accordionToggleCopy: {
+    flex: 1,
   },
-  paywallButton: {
-    minHeight: 50,
-    borderWidth: 1,
-    borderRadius: 16,
-    marginTop: 11,
-    paddingHorizontal: 13,
+  accordionBadgeRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 9,
+    justifyContent: "space-between",
+    marginBottom: 4,
   },
-  secureIcon: {
+  accordionSmallBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  accordionDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
+  accordionSmallBadgeText: {
+    fontSize: 8.5,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  accordionFeatureCount: {
+    fontSize: 9,
+    fontWeight: "600",
+  },
+  accordionToggleTitle: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    letterSpacing: -0.2,
+  },
+  accordionToggleSub: {
+    fontSize: 10,
+    marginTop: 2,
+    lineHeight: 14,
+    fontWeight: "500",
+  },
+  accordionToggleIcon: {
     width: 30,
     height: 30,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  paywallButtonText: { flex: 1, fontSize: 11, fontWeight: "700" },
-  badgeSectionLabel: {
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 1.15,
-    marginBottom: 9,
+  categorySectionWrap: {
+    marginTop: 12,
   },
-  experienceHeading: {
-    marginTop: 17,
-    marginBottom: 10,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
+  categoryFilterRow: {
+    gap: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
   },
-  experienceHeadingCopy: { flex: 1 },
-  experienceTitle: { fontSize: 14, fontWeight: "800", letterSpacing: -0.2 },
-  experienceSubtitle: {
-    fontSize: 10,
-    lineHeight: 14,
-    fontWeight: "500",
-    marginTop: 4,
-  },
-  selectedPlanPill: {
-    minHeight: 27,
-    maxWidth: 116,
-    borderRadius: 9,
-    paddingHorizontal: 8,
+  categoryFilterPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-  },
-  selectedPlanPillText: { fontSize: 8.5, fontWeight: "900" },
-  experienceGroups: { gap: 8 },
-  experienceCard: {
-    borderWidth: 1,
-    borderRadius: 18,
-    overflow: "hidden",
-  },
-  experienceTrigger: {
-    minHeight: 72,
-    paddingHorizontal: 13,
-    paddingVertical: 11,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-  },
-  experienceIcon: {
-    width: 38,
-    height: 38,
+    gap: 6,
     borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
+    borderWidth: 1.2,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
-  experienceCopy: { flex: 1 },
-  experienceCardTitle: { fontSize: 12.5, fontWeight: "800", lineHeight: 17 },
-  experienceSummary: {
-    fontSize: 9.5,
-    fontWeight: "500",
-    lineHeight: 14,
-    marginTop: 3,
-  },
-  expandButton: {
-    width: 29,
-    height: 29,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  experienceDetails: {
-    borderTopWidth: 1,
-    paddingHorizontal: 11,
-    paddingTop: 11,
-    paddingBottom: 12,
-    gap: 9,
-  },
-  compactBenefitGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 7,
-  },
-  compactBenefitItem: {
-    width: "48.8%",
-    minHeight: 58,
-    borderWidth: 1,
-    borderRadius: 13,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-  },
-  compactBenefitIcon: {
-    width: 27,
-    height: 27,
-    borderWidth: 1,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  compactBenefitText: {
-    flex: 1,
-    fontSize: 9.25,
-    lineHeight: 13,
+  categoryFilterPillText: {
+    fontSize: 11,
     fontWeight: "700",
   },
-  unlimitedNote: {
-    minHeight: 40,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 2,
+  categoryCardsList: {
+    gap: 12,
+    marginTop: 12,
   },
-  unlimitedNoteText: {
-    flex: 1,
-    fontSize: 9.5,
-    lineHeight: 14,
-    fontWeight: "800",
-  },
-  badgeShowcase: {
-    minHeight: 152,
-    borderWidth: 1,
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    paddingVertical: 17,
+  detailedCard: {
+    borderRadius: 18,
+    borderWidth: 1.2,
     overflow: "hidden",
+    position: "relative",
+  },
+  detailedCardHeader: {
+    padding: 14,
     flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  badgeGlow: {
-    position: "absolute",
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    left: -42,
-    top: -48,
-    backgroundColor: "rgba(255,255,255,0.05)",
-  },
-  badgeVisual: { width: 92, alignItems: "center", gap: 7 },
-  rarityPill: {
-    minHeight: 22,
-    borderRadius: 8,
-    paddingHorizontal: 7,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  rarityText: { fontSize: 7.5, fontWeight: "900", letterSpacing: 0.6 },
-  badgeShowcaseCopy: { flex: 1 },
-  badgeShowcaseTitle: { fontSize: 17, fontWeight: "900", letterSpacing: -0.35 },
-  badgeShowcaseDesc: {
-    fontSize: 10,
-    lineHeight: 15,
-    fontWeight: "600",
-    marginTop: 3,
-  },
-  badgePerks: { marginTop: 11, gap: 7 },
-  badgePerk: { flexDirection: "row", alignItems: "center", gap: 7 },
-  badgePerkText: { flex: 1, fontSize: 9.5, lineHeight: 13, fontWeight: "700" },
-  planHeadingCopy: { flex: 1 },
-  planOfferHint: {
-    fontSize: 10.5,
-    lineHeight: 15,
-    fontWeight: "600",
-    marginTop: 4,
-  },
-  tierGrid: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  tierCard: {
-    flex: 1,
-    aspectRatio: 1,
-    borderWidth: 1,
-    borderRadius: 22,
-    padding: 13,
     alignItems: "flex-start",
+    gap: 12,
   },
-  tierCardSelected: { borderWidth: 2 },
-  tierIcon: {
-    width: 43,
-    height: 43,
+  detailedCardIconWrap: {
+    width: 44,
+    height: 44,
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
-  tierTitle: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: "900",
-    letterSpacing: -0.2,
-    marginTop: 12,
+  detailedCardCopy: {
+    flex: 1,
   },
-  tierDescription: {
-    fontSize: 9.5,
-    lineHeight: 13,
-    fontWeight: "600",
-    marginTop: 3,
-  },
-  tierSelection: {
-    minHeight: 25,
-    borderRadius: 9,
-    paddingHorizontal: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: "auto",
-  },
-  tierSelectionText: { fontSize: 8.5, fontWeight: "900" },
-  billingHeading: {
-    marginTop: 2,
-    marginBottom: 9,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  billingStage: { marginTop: 15 },
-  billingBack: {
-    width: 36,
-    height: 36,
-    borderWidth: 1,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  billingHeadingCopy: { flex: 1 },
-  billingTitle: { fontSize: 13.5, fontWeight: "900", letterSpacing: -0.15 },
-  billingSubtitle: {
-    fontSize: 9.5,
-    lineHeight: 13,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  billingGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  billingCard: {
-    width: "48.5%",
-    aspectRatio: 1,
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 12,
-  },
-  billingCardSelected: { borderWidth: 2 },
-  billingCardTop: {
+  detailedCardTagRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginBottom: 6,
   },
-  periodIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  radioDot: { width: 10, height: 10, borderRadius: 5 },
-  billingPeriod: { fontSize: 14, fontWeight: "900", marginTop: 12 },
-  discountBadge: {
-    alignSelf: "flex-start",
-    minHeight: 21,
-    borderRadius: 7,
+  detailedCategoryTag: {
+    borderRadius: 6,
     paddingHorizontal: 6,
-    alignItems: "center",
-    justifyContent: "center",
+    paddingVertical: 2.5,
   },
-  discountText: { fontSize: 7.5, fontWeight: "900", letterSpacing: 0.3 },
-  originalPrice: {
-    fontSize: 10,
-    fontWeight: "700",
-    textDecorationLine: "line-through",
-    textDecorationStyle: "solid",
-    marginTop: "auto",
+  detailedCategoryTagText: {
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 0.6,
   },
-  discountPlaceholder: { flex: 1 },
-  billingPrice: { fontSize: 20, lineHeight: 23, fontWeight: "900" },
-  periodSuffix: { fontSize: 8.5, fontWeight: "600", marginTop: 2 },
-  loader: { marginVertical: 28 },
-  notice: {
-    marginTop: 18,
-    padding: 14,
+  detailedPerkBadge: {
+    borderRadius: 6,
     borderWidth: 1,
-    borderRadius: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
-  noticeText: { flex: 1, fontSize: 12, lineHeight: 17 },
-  cta: {
-    minHeight: 60,
-    borderRadius: 19,
-    marginTop: 18,
-    overflow: "hidden",
-    shadowColor: "#000000",
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
-  },
-  ctaFill: {
-    flex: 1,
-    minHeight: 60,
-    paddingHorizontal: 17,
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ctaShimmer: {
-    position: "absolute",
-    top: -32,
-    bottom: -32,
-    width: 130,
-  },
-  ctaIconWrap: {
-    width: 31,
-    height: 31,
-    borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.13)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ctaCopy: { flex: 1 },
-  ctaText: { color: "#fff", fontSize: 14, fontWeight: "900" },
-  ctaSubtext: {
-    color: "rgba(255,255,255,0.72)",
-    fontSize: 9,
+  detailedPerkBadgeText: {
+    fontSize: 8.5,
     fontWeight: "600",
-    marginTop: 2,
   },
-  restore: { minHeight: 48, alignItems: "center", justifyContent: "center" },
-  restoreText: { fontSize: 12, fontWeight: "700" },
-  legal: {
-    fontSize: 9.5,
-    lineHeight: 14,
-    textAlign: "center",
-    paddingHorizontal: 8,
-    marginBottom: 8,
+  detailedCardTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    letterSpacing: -0.2,
   },
-  legalLinks: {
+  detailedCardSummary: {
+    fontSize: 10.5,
+    marginTop: 3,
+    lineHeight: 15,
+    fontWeight: "500",
+  },
+  detailedCardBody: {
+    borderTopWidth: 1,
+    padding: 12,
+    gap: 8,
+  },
+  detailedBulletItem: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginBottom: 14,
+    borderRadius: 11,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 9,
   },
-  legalLink: {
+  detailedBulletIconBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailedBulletText: {
+    flex: 1,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: "600",
+  },
+  detailedCardFooter: {
+    borderTopWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  detailedCardFooterText: {
+    fontSize: 10,
+    fontWeight: "500",
+  },
+  secondaryActions: {
+    gap: 8,
+    marginBottom: 20,
+  },
+  secondaryButton: {
+    borderRadius: 14,
+    borderWidth: 1,
+    minHeight: 46,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  secondaryButtonText: {
+    flex: 1,
     fontSize: 11,
     fontWeight: "700",
+  },
+  restoreBtn: {
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  restoreBtnText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+  },
+  legalSection: {
+    paddingHorizontal: 8,
+    paddingBottom: 24,
+    alignItems: "center",
+    gap: 10,
+  },
+  legalDisclaimer: {
+    fontSize: 9,
+    lineHeight: 14,
+    textAlign: "center",
+  },
+  legalLinksRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  legalLink: {
+    fontSize: 10.5,
+    fontWeight: "700",
     textDecorationLine: "underline",
+  },
+  legalBullet: {
+    fontSize: 9,
   },
 });

@@ -1,3 +1,4 @@
+import { isLightSurface } from "@utils/colorUtils";
 import {
   StyleSheet,
   Text,
@@ -9,10 +10,10 @@ import {
   Keyboard,
   Animated,
   Dimensions,
-  StatusBar
+  StatusBar,
 } from "react-native";
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { doc, getDoc, onSnapshot, setDoc, writeBatch } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc, writeBatch, collection, getDocs, limit, query } from "firebase/firestore";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
@@ -25,32 +26,43 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { useListStatusContext } from "../../context/ListStatusContext";
 import { PREDEFINED_MOVIE_LISTS } from "../../services/listItemsService";
-// Rezerve adlar utils/listShare'den: kopya liste sessizce ayrışırsa kök
-// dokümanda öntanımlı bir alanı ezen liste oluşur ve hiç görünmez.
 import { RESERVED_LIST_NAMES } from "@utils/listShare";
-import ListCovers from "@components/lists/ListCovers";
+import ListCovers, { getNaturalCoverWidth } from "@components/lists/ListCovers";
 import ListManageSheet from "@components/lists/ListManageSheet";
 import { useSharedLists } from "../../context/SharedListsContext";
 import CreateSharedListModal from "../../components/modals/CreateSharedListModal";
-import { collection, getDocs, limit, query } from "firebase/firestore";
 import { i18nText } from "@utils/i18nText";
 import ScreenDecor from "../../components/ScreenDecor";
-// İkon/vurgu eşlemesi profil rayı ve Android widget'ı ile ORTAK.
 import {
   getListAccent,
   getListIcon,
+  getSharedListAccent,
   SHARED_LIST_ACCENT,
 } from "@utils/listAppearance";
-
+import { trackFirestoreRead } from "../../services/usageTrackerService";
 
 const { width } = Dimensions.get("window");
-const CARD_W = (width - 48) / 2;
-const CARD_H = CARD_W * 1.05;
-// Kapak bloğu: kart genişliğinden iç dolgu düşülür, yükseklik karttan pay alır.
-// Düzeni (yığın/büyük/küçük/karışık) ListCovers seçer — profil rayıyla ORTAK.
+// 2 sütunlu ızgaranın TABAN kart genişliği/yüksekliği — kart yüksekliği her
+// düzende SABİT kalır (yalnız genişlik düzene göre değişir, bkz. aşağıda).
+const CARD_W_BASE = (width - 48) / 2;
+const CARD_H = CARD_W_BASE * 1.05;
 const CARD_PADDING = 10;
-const COVER_W = CARD_W - CARD_PADDING * 2;
 const COVER_H = CARD_H * 0.58;
+// Izgara satırındaki toplam yatay dolgu (listContent.paddingHorizontal × 2) —
+// kart bunun ötesine büyürse 2 sütun ekranı taşar.
+const ROW_PADDING = 24;
+const SAFE_MAX_CARD_W = (width - ROW_PADDING) / 2;
+
+// Karışık/Yığın'da afişler küçültülmez (bkz. ListCovers.getNaturalCoverWidth) —
+// kart bu doğal genişliğe göre büyütülür, TABAN'dan darsa TABAN'a, ekrana
+// sığmayacak kadar genişse (küçük cihaz) güvenli tavana geri döner; o durumda
+// ListCovers kendi içindeki güvenlik sınırıyla afişleri nazikçe küçültür.
+const getCardWidthForStyle = (gridStyle) => {
+  const natural = getNaturalCoverWidth(gridStyle, COVER_H);
+  if (natural == null) return CARD_W_BASE;
+  const needed = natural + CARD_PADDING * 2;
+  return Math.min(Math.max(CARD_W_BASE, needed), SAFE_MAX_CARD_W);
+};
 
 // ── Korunan liste adlarını Türkçe'ye çevir ──────────────────────────────────
 const getDisplayName = (listName) => {
@@ -68,13 +80,11 @@ const getDisplayName = (listName) => {
   }
 };
 
-// ── Kart kapağı ──────────────────────────────────────────────────────────────
-// Düzen artık burada değil, ORTAK ListCovers'ta: kullanıcının profil rayından
-// seçtiği görünüm (Büyük/Küçük/Karışık/Yığın) bu ekranda da uygulanır.
-const CardCovers = (props) => (
+const CardCovers = ({ gridStyle, ...rest }) => (
   <ListCovers
-    {...props}
-    width={COVER_W}
+    {...rest}
+    gridStyle={gridStyle}
+    width={getCardWidthForStyle(gridStyle) - CARD_PADDING * 2}
     height={COVER_H}
     style={styles.coverBlock}
   />
@@ -94,9 +104,11 @@ const ListCard = ({
   gridStyle,
   allCornersRounded,
 }) => {
-  const accent = getListAccent(listName);
+  const accent = getListAccent(listName, theme.secondary);
   const icon = getListIcon(listName);
   const displayName = getDisplayName(listName);
+  // Karışık/Yığın'da kart, küçültülmemiş afişlere göre TABAN'dan geniş olabilir.
+  const cardW = getCardWidthForStyle(gridStyle);
 
   const scale = useRef(new Animated.Value(1)).current;
   const enterAnim = useRef(new Animated.Value(0)).current;
@@ -149,17 +161,23 @@ const ListCard = ({
         onPressOut={onPressOut}
         onPress={onPress}
         onLongPress={onLongPress}
-        style={styles.cardWrapper}
+        style={[styles.cardWrapper, { width: cardW }]}
       >
-        {/* Aksan gölgesi */}
+        {/* 1) Arka plan — kartın taban rengi, en arkada */}
         <View
+          pointerEvents="none"
+          style={[styles.cardBg, { width: cardW, backgroundColor: theme.secondary }]}
+        />
+        {/* 2) Aksan yüzeyi — arka planın ÜSTÜNDE, kart dışına (alta) taşar */}
+        <View
+          pointerEvents="none"
           style={[
             styles.cardGlow,
             { backgroundColor: accent + "18", borderColor: accent + "25" },
           ]}
         />
-
-        <View style={styles.card}>
+        {/* 3) İçerikler — en üstte, kart şekliyle kırpılır */}
+        <View style={[styles.card, { width: cardW }]}>
           {/* Üst alan: seçili görünüme göre kapaklar */}
           <CardCovers
             items={items}
@@ -180,7 +198,7 @@ const ListCard = ({
               >
                 <Ionicons name={icon} size={12} color={accent} />
               </View>
-              <Text style={styles.cardName} numberOfLines={1}>
+              <Text style={[styles.cardName, { color: theme.text.primary }]} numberOfLines={1}>
                 {displayName}
               </Text>
             </View>
@@ -192,7 +210,7 @@ const ListCard = ({
                 <Ionicons
                   name={isVisible ? "eye" : "eye-off-outline"}
                   size={16}
-                  color={isVisible ? accent : "rgba(255,255,255,0.25)"}
+                  color={isVisible ? accent : theme.text.muted}
                 />
               </TouchableOpacity>
               <Text style={[styles.countBadge, { color: accent }]}>
@@ -208,7 +226,7 @@ const ListCard = ({
 
 // ── Ortak liste kartı ────────────────────────────────────────────────────────
 // ListCard ile aynı çerçeve; isim yerine üye sayısı çipi ve "people" ikonu.
-const SHARED_ACCENT = SHARED_LIST_ACCENT;
+
 
 const SharedListCard = ({
   list,
@@ -220,6 +238,9 @@ const SharedListCard = ({
   gridStyle,
   allCornersRounded,
 }) => {
+  const SHARED_ACCENT = getSharedListAccent(theme.secondary);
+  // Karışık/Yığın'da kart, küçültülmemiş afişlere göre TABAN'dan geniş olabilir.
+  const cardW = getCardWidthForStyle(gridStyle);
   const enterAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.spring(enterAnim, {
@@ -248,9 +269,16 @@ const SharedListCard = ({
       <TouchableOpacity
         activeOpacity={0.85}
         onPress={onPress}
-        style={styles.cardWrapper}
+        style={[styles.cardWrapper, { width: cardW }]}
       >
+        {/* 1) Arka plan — kartın taban rengi, en arkada */}
         <View
+          pointerEvents="none"
+          style={[styles.cardBg, { width: cardW, backgroundColor: theme.secondary }]}
+        />
+        {/* 2) Aksan yüzeyi — arka planın ÜSTÜNDE, kart dışına (alta) taşar */}
+        <View
+          pointerEvents="none"
           style={[
             styles.cardGlow,
             {
@@ -259,7 +287,8 @@ const SharedListCard = ({
             },
           ]}
         />
-        <View style={styles.card}>
+        {/* 3) İçerikler — en üstte, kart şekliyle kırpılır */}
+        <View style={[styles.card, { width: cardW }]}>
           <CardCovers
             items={previewItems}
             gridStyle={gridStyle}
@@ -280,7 +309,7 @@ const SharedListCard = ({
               >
                 <Ionicons name="people" size={12} color={SHARED_ACCENT} />
               </View>
-              <Text style={styles.cardName} numberOfLines={1}>
+              <Text style={[styles.cardName, { color: theme.text.primary }]} numberOfLines={1}>
                 {list.name}
               </Text>
             </View>
@@ -288,7 +317,7 @@ const SharedListCard = ({
               <Ionicons
                 name="person"
                 size={11}
-                color="rgba(255,255,255,0.4)"
+                color={theme.text.muted}
               />
               <Text style={[styles.countBadge, { color: SHARED_ACCENT }]}>
                 {list.memberIds?.length ?? 1}
@@ -304,6 +333,8 @@ const SharedListCard = ({
 // ── Ana Bileşen ──────────────────────────────────────────────────────────────
 export default function ListsViewScreen({ navigation }) {
   const { theme } = useTheme();
+  const SHARED_ACCENT = getSharedListAccent(theme.primary);
+  const customAccent = getListAccent(null, theme.secondary);
   const { user } = useAuth();
   const { getTmdbUrl } = useImageQualitySettings();
   const { watchedTvMap, combinedLists } = useListStatusContext();
@@ -464,11 +495,11 @@ export default function ListsViewScreen({ navigation }) {
         batch.set(docRef, { [name]: [] }, { merge: true });
         batch.set(
           doc(db, "Users", user.uid),
-          { listVisible: { [name]: false } },
+          { listVisible: { [name]: true } },
           { merge: true },
         );
         await batch.commit();
-        setListVisible((prev) => ({ ...prev, [name]: false }));
+        setListVisible((prev) => ({ ...prev, [name]: true }));
         setNewListName("");
         Keyboard.dismiss();
         Toast.show({ type: "success", text1: i18nText("autoI18n.liste_olusturuldu", "Liste oluşturuldu") });
@@ -560,7 +591,7 @@ export default function ListsViewScreen({ navigation }) {
     >
       {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
       <ScreenDecor iconOpacity={0.3} />
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
 
       {/* ── Başlık ──────────────────────────────────────────────────────── */}
       <Animated.View
@@ -635,14 +666,14 @@ export default function ListsViewScreen({ navigation }) {
             styles.inputWrapper,
             {
               backgroundColor: theme.secondary,
-              borderColor: inputFocused ? "#fbbf24" + "60" : "transparent",
+              borderColor: inputFocused ? customAccent + "60" : "transparent",
             },
           ]}
         >
           <Ionicons
             name="add-circle-outline"
             size={18}
-            color={inputFocused ? "#fbbf24" : (theme.text?.muted ?? "#555")}
+            color={inputFocused ? customAccent : (theme.text?.muted ?? "#555")}
           />
           <TextInput
             style={[styles.input, { color: theme.text?.primary ?? "#fff" }]}
@@ -684,7 +715,7 @@ export default function ListsViewScreen({ navigation }) {
         </TouchableOpacity>
         {/* Ortak liste oluştur */}
         <TouchableOpacity
-          style={[styles.addBtn, { backgroundColor: SHARED_ACCENT }]}
+          style={[styles.addBtn, { backgroundColor: SHARED_LIST_ACCENT }]}
           onPress={() => setCreateSharedVisible(true)}
         >
           <Ionicons name="people" size={18} color="#000" />
@@ -757,7 +788,7 @@ export default function ListsViewScreen({ navigation }) {
                   ))}
                 </View>
                 <View style={styles.sharedSectionHeader}>
-                  <Ionicons name="albums" size={13} color="#fbbf24" />
+                  <Ionicons name="albums" size={13} color={customAccent} />
                   <Text
                     style={[
                       styles.sharedSectionTitle,
@@ -890,7 +921,19 @@ const styles = StyleSheet.create({
   },
 
   // ── Kart ──────────────────────────────────────────────────────────────────
-  cardWrapper: { width: CARD_W },
+  // Genişlik (CARD_W_BASE veya düzene göre büyütülmüş hâli) her kullanım
+  // yerinde INLINE verilir — bkz. getCardWidthForStyle. Yükseklik (CARD_H) her
+  // düzende sabit kalır.
+  cardWrapper: {},
+  // 1) Arka plan — kartla birebir aynı kutu, en arkada durur.
+  cardBg: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    height: CARD_H,
+    borderRadius: 20,
+  },
+  // 2) Aksan yüzeyi — arka planın üstünde; kart dışına (alta) 4px taşar.
   cardGlow: {
     position: "absolute",
     top: 4,
@@ -900,12 +943,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
   },
+  // 3) İçerik kapsayıcısı — en üstte, kendi arka planı YOK (alttaki katmanlar görünsün diye).
   card: {
-    width: CARD_W,
     height: CARD_H,
     borderRadius: 20,
     overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.05)",
     paddingTop: 16,
     paddingHorizontal: CARD_PADDING,
     paddingBottom: 12,
@@ -933,7 +975,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cardName: {
-    color: "#fff",
     fontSize: 13,
     fontWeight: "700",
     flex: 1,

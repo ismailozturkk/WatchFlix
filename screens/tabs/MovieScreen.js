@@ -13,13 +13,15 @@ import MovieNowPlaying from "../movie/MovieNowPlaying";
 import MovieGenres from "../movie/MovieGenres";
 import MovieUpcoming from "../movie/MovieUpcoming";
 import { useTheme } from "../../context/ThemeContext";
+import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import MovieBests from "../movie/MovieBests";
 import MovieTrends from "../movie/MovieTrends";
 import MovieCollection from "../movie/MovieCollection";
 import { useLanguage } from "../../context/LanguageContext";
+import { useMovie } from "../../context/MovieContex";
 import ScreenDecor from "../../components/ScreenDecor";
 import DiscoverSearchButton from "../../components/home/DiscoverSearchButton";
-import usePullToSearch from "../../hooks/usePullToSearch";
+import usePullToRefresh from "../../hooks/usePullToRefresh";
 import DiscoveryMediaRail from "../../components/DiscoveryMediaRail";
 import {
   useDiscoveryPreferenceSettings,
@@ -31,8 +33,10 @@ import { resolveOnboardingGenreIds } from "../../utils/onboardingPreferences";
 const INITIAL_SECTION_COUNT = 2;
 
 export default function MovieScreen({ navigation }) {
+  const { contentBottom } = useTabBarLayout();
   const { theme } = useTheme();
   const { t } = useLanguage();
+  const { refreshAllMovies } = useMovie();
 
   const { streamingProviderIds } = useStreamingProviderSettings();
   const { onboardingGenreKeys } = useDiscoveryPreferenceSettings();
@@ -60,8 +64,8 @@ export default function MovieScreen({ navigation }) {
 
     navigateToSearch(undefined);
   }, [navigation]);
-  const { animatedSearchStyle, onScroll, triggerSearch } =
-    usePullToSearch(openSearch);
+  const { refreshing, animatedSearchStyle, onScroll, handleRefresh } =
+    usePullToRefresh(refreshAllMovies);
 
   const sections = useMemo(
     () => [
@@ -139,7 +143,7 @@ export default function MovieScreen({ navigation }) {
         renderItem={renderSection}
         ListHeaderComponent={renderHeader}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, { paddingBottom: contentBottom }]}
         initialNumToRender={INITIAL_SECTION_COUNT}
         onEndReached={revealNextSection}
         onEndReachedThreshold={0.6}
@@ -147,11 +151,10 @@ export default function MovieScreen({ navigation }) {
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
-            refreshing={false}
-            onRefresh={triggerSearch}
-            colors={["transparent"]}
-            progressBackgroundColor="transparent"
-            tintColor="transparent"
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[theme.accent || "#E50914"]}
+            tintColor={theme.accent || "#E50914"}
           />
         }
       />

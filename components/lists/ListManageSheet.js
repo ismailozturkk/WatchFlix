@@ -80,7 +80,7 @@ export default function ListManageSheet({
     if (listName) setShown({ name: listName, count: itemCount });
   }, [listName, itemCount]);
 
-  const accent = getListAccent(shown.name);
+  const accent = getListAccent(shown.name, theme.secondary);
 
   // Her açılış menü adımından başlar, ad kutusu güncel adla dolar.
   useEffect(() => {

@@ -51,7 +51,7 @@ export function FriendsProvider({ children }) {
   // Açılış yolundaki hiçbir ekran bu context'i okumuyor (sekmeler + ilk
   // raylar); 3 listener'ı splash sonrası pencerenin dışına ertele. Kademeler
   // için bkz. hooks/useStartupGate.js.
-  const startupReady = useStartupGate(3000);
+  const startupReady = useStartupGate(1400);
 
   // ── Realtime listeners ───────────────────────────────────────────────────
   useEffect(() => {

@@ -45,6 +45,7 @@ import {
   useStreamingProviderSettings,
 } from "@context/AppSettingsContext";
 import { useLanguage } from "@context/LanguageContext";
+import { useMediaQuickActions } from "@context/MediaQuickActionsContext";
 import AppIcon from "../../components/AppIcon";
 import { LinearGradient } from "expo-linear-gradient";
 import { toast } from "../../components/AppToast";
@@ -78,6 +79,7 @@ const PosterCard = React.memo(function PosterCard({
   navigation,
 }) {
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
     Animated.timing(scale, { toValue: 0.92, duration: 150, useNativeDriver: true }).start();
@@ -91,12 +93,17 @@ const PosterCard = React.memo(function PosterCard({
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         onPress={() => {
-          toast(
-            i18nText("autoI18n.oscar_pending_toast", "{year} yılı Oscar kazananı henüz açıklanmadı.").replace(
-              "{year}",
-              String(item.year || 2027),
-            ),
-          );
+          const pendingToastMsg =
+            mediaType === "tv"
+              ? i18nText("autoI18n.emmy_pending_toast", "{year} yılı Emmy kazananı henüz açıklanmadı.").replace(
+                  "{year}",
+                  String(item.year || 2027),
+                )
+              : i18nText("autoI18n.oscar_pending_toast", "{year} yılı Oscar kazananı henüz açıklanmadı.").replace(
+                  "{year}",
+                  String(item.year || 2027),
+                );
+          toast(pendingToastMsg);
         }}
         style={[styles.item, { width: itemW }]}
       >
@@ -147,7 +154,9 @@ const PosterCard = React.memo(function PosterCard({
                 fontWeight: "600",
               }}
             >
-              {i18nText("autoI18n.oscar_pending_title", "Oscar En İyi Film")}
+              {mediaType === "tv"
+                ? i18nText("autoI18n.emmy_pending_title", "Emmy Ödülleri")
+                : i18nText("autoI18n.oscar_pending_title", "Oscar En İyi Film")}
             </Text>
           </LinearGradient>
         </Animated.View>
@@ -166,6 +175,8 @@ const PosterCard = React.memo(function PosterCard({
           { id: item.id },
         )
       }
+      onLongPress={() => openQuickActions({ item, mediaType, navigation })}
+      delayLongPress={350}
       style={[styles.item, { width: itemW }]}
     >
       <Animated.View style={{ transform: [{ scale }] }}>
@@ -178,7 +189,7 @@ const PosterCard = React.memo(function PosterCard({
             { width: itemW, height: itemH, borderRadius: radius, shadowColor: theme.shadow },
           ]}
           cachePolicy="memory-disk"
-          recyclingKey={`seeall-${mediaType}-${item.year ? `oscar-${item.year}-${item.categoryKey || ""}-` : ""}${item.id}`}
+          recyclingKey={`seeall-${mediaType}-${item.year ? `award-${item.year}-${item.categoryKey || ""}-` : ""}${item.id}`}
           transition={120}
         />
         {item?.year ? (
@@ -199,7 +210,8 @@ const PosterCard = React.memo(function PosterCard({
           mediaId={item.id}
           mediaType={mediaType}
           theme={theme}
-          style={{ position: "absolute", left: 2, bottom: 8 }}
+          posterWidth={itemW}
+          style={styles.listBadges}
         />
       </Animated.View>
     </TouchableOpacity>
@@ -582,11 +594,71 @@ function TvSeeAll({ section, title, navigation }) {
       loadingMore: ctx.loadingMoreOnTheAir,
       hasMore: ctx.pageOnTheAir < ctx.totalPagesOnTheAir,
     },
+    emmy: {
+      data: ctx.tvShowsEmmy,
+      loadMore: ctx.loadMoreEmmy,
+      loadingMore: ctx.loadingMoreEmmy,
+      hasMore: ctx.hasMoreEmmy,
+    },
   }[section];
+
+  const { theme } = useTheme();
 
   const onActivate = useCallback(() => {
     ctx.activateTvSection?.(section);
   }, [ctx.activateTvSection, section]);
+
+  const headerExtra = useMemo(() => {
+    if (section !== "emmy" || !ctx.EMMY_CATEGORIES) return null;
+    return (
+      <FlatList
+        data={ctx.EMMY_CATEGORIES}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(item) => item.key}
+        contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
+        renderItem={({ item }) => {
+          const isSelected = ctx.selectedEmmyCategory === item.key;
+          return (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                ctx.changeEmmyCategory?.(item.key);
+              }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 14,
+                borderWidth: 1,
+                backgroundColor: isSelected ? theme.accent : theme.secondary,
+                borderColor: isSelected ? theme.accent : theme.border,
+              }}
+            >
+              <AppIcon
+                family="MaterialCommunityIcons"
+                name={item.icon || "trophy"}
+                size={13}
+                color={isSelected ? "#ffffff" : theme.text.secondary}
+              />
+              <Text
+                allowFontScaling={false}
+                style={{
+                  fontSize: 11,
+                  color: isSelected ? "#ffffff" : theme.text.secondary,
+                  fontWeight: isSelected ? "700" : "500",
+                }}
+              >
+                {i18nText(item.labelKey, item.tr)}
+              </Text>
+            </TouchableOpacity>
+          );
+        }}
+      />
+    );
+  }, [section, ctx.EMMY_CATEGORIES, ctx.selectedEmmyCategory, ctx.changeEmmyCategory, theme]);
 
   return (
     <SeeAllGrid
@@ -598,6 +670,7 @@ function TvSeeAll({ section, title, navigation }) {
       loadingMore={cfg?.loadingMore}
       hasMore={!!cfg?.hasMore}
       onActivate={onActivate}
+      headerExtra={headerExtra}
     />
   );
 }
@@ -890,10 +963,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 0.5,
     borderColor: "rgba(255, 215, 0, 0.5)",
+    zIndex: 2,
   },
   oscarYearBadgeText: {
     color: "#ffd700",
     fontSize: 10,
     fontWeight: "800",
+  },
+  listBadges: {
+    position: "absolute",
+    left: 4,
+    bottom: 6,
+    zIndex: 2,
   },
 });

@@ -7,7 +7,6 @@ import {
   Animated,
   StyleSheet,
   Dimensions,
-  Modal,
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -17,6 +16,7 @@ import Toast from "react-native-toast-message";
 import Reminder from "../../components/Reminder";
 import { markSeason, removeTvWatchEvent } from "../../services/watchedTvService";
 import WatchHistorySheet from "@components/modals/WatchHistorySheet";
+import WatchedDateSheet from "@components/detail/WatchedDateSheet";
 import {
   getWatchState,
   isAired,
@@ -33,9 +33,6 @@ import {
   useImageQualitySettings,
 } from "../../context/AppSettingsContext";
 import { LinearGradient } from "expo-linear-gradient";
-import DrumDatePickerModal from "@components/modals/DatePickerModal";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import Entypo from "@expo/vector-icons/Entypo";
 import { i18nText } from "../../utils/i18nText";
 
 const { width } = Dimensions.get("window");
@@ -47,202 +44,6 @@ const getRatingColor = (r) => {
   if (r >= 4) return "#ff6400";
   return "#e33";
 };
-
-// ─── Tarih Modal (ayrı memoize bileşen) ──────────────────────────────────────
-const DatePickerModal = memo(
-  ({
-    visible,
-    onClose,
-    onDatePicker,
-    onNow,
-    onRelease,
-    selectedDate,
-    releaseDate,
-    formatDate,
-    theme,
-    isDatePickerVisible,
-    onConfirm,
-    onCancelPicker,
-    formatDateSave,
-  }) => (
-    <Modal
-      visible={visible}
-      onRequestClose={onClose}
-      animationType="slide"
-      transparent
-    >
-      <TouchableOpacity
-        style={styles.backdrop}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.75)"]}
-          style={StyleSheet.absoluteFill}
-        />
-      </TouchableOpacity>
-
-      <View style={[styles.sheet, { backgroundColor: theme.secondary }]}>
-        <View
-          style={[
-            styles.handle,
-            { backgroundColor: theme.border ?? "rgba(255,255,255,0.15)" },
-          ]}
-        />
-
-        <Text
-          style={[styles.sheetTitle, { color: theme.text?.primary ?? "#fff" }]}
-        >
-          {i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}
-        </Text>
-        <Text
-          style={[
-            styles.sheetSubtitle,
-            { color: theme.text?.secondary ?? "#aaa" },
-          ]}
-        >
-          {i18nText("autoI18n.bu_sezonu_ne_zaman_izlediniz", "Bu sezonu ne zaman izlediniz?")}
-        </Text>
-
-        <View style={styles.optionsRow}>
-          {/* Tarih Seç */}
-          <TouchableOpacity
-            style={[styles.optionCard, { backgroundColor: theme.primary }]}
-            onPress={onDatePicker}
-            activeOpacity={0.75}
-          >
-            <View
-              style={[
-                styles.optionIconBg,
-                { backgroundColor: "rgba(100,180,255,0.15)" },
-              ]}
-            >
-              <Ionicons name="calendar-outline" size={26} color="#64b4ff" />
-            </View>
-            <Text
-              style={[
-                styles.optionLabel,
-                { color: theme.text?.primary ?? "#fff" },
-              ]}
-            >
-              {i18nText("autoI18n.tarih_sec", "Tarih Seç")}
-            </Text>
-            <Text
-              style={[
-                styles.optionDate,
-                { color: theme.text?.secondary ?? "#aaa" },
-              ]}
-            >
-              {selectedDate
-                ? formatDate(selectedDate)
-                : i18nText("autoI18n.gun_seciniz", "Gün seçiniz")}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Şimdi */}
-          <TouchableOpacity
-            style={[styles.optionCard, { backgroundColor: theme.primary }]}
-            onPress={onNow}
-            activeOpacity={0.75}
-          >
-            <View
-              style={[
-                styles.optionIconBg,
-                { backgroundColor: "rgba(41,184,100,0.15)" },
-              ]}
-            >
-              <Entypo name="stopwatch" size={26} color="#29b864" />
-            </View>
-            <Text
-              style={[
-                styles.optionLabel,
-                { color: theme.text?.primary ?? "#fff" },
-              ]}
-            >
-              {i18nText("autoI18n.simdi", "Şimdi")}
-            </Text>
-            <Text
-              style={[
-                styles.optionDate,
-                { color: theme.text?.secondary ?? "#aaa" },
-              ]}
-            >
-              {formatDate(new Date())}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Yayın Tarihi */}
-          <TouchableOpacity
-            style={[styles.optionCard, { backgroundColor: theme.primary }]}
-            onPress={onRelease}
-            activeOpacity={0.75}
-          >
-            <View
-              style={[
-                styles.optionIconBg,
-                { backgroundColor: "rgba(255,165,0,0.15)" },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name="movie-play-outline"
-                size={26}
-                color="#ffa500"
-              />
-            </View>
-            <Text
-              style={[
-                styles.optionLabel,
-                { color: theme.text?.primary ?? "#fff" },
-              ]}
-            >
-              {i18nText("autoI18n.yayin_tarihi", "Yayın Tarihi")}
-            </Text>
-            <Text
-              style={[
-                styles.optionDate,
-                { color: theme.text?.secondary ?? "#aaa" },
-              ]}
-            >
-              {formatDate(releaseDate)}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.cancelBtn,
-            { borderColor: theme.border ?? "rgba(255,255,255,0.1)" },
-          ]}
-          onPress={onClose}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={[
-              styles.cancelBtnText,
-              { color: theme.text?.secondary ?? "#aaa" },
-            ]}
-          >
-            {i18nText("autoI18n.iptal", "İptal")}
-          </Text>
-        </TouchableOpacity>
-
-        <DrumDatePickerModal
-          visible={isDatePickerVisible}
-          value={
-            selectedDate || (formatDateSave ? formatDateSave(new Date()) : "")
-          }
-          onConfirm={(iso) => onConfirm(iso)}
-          onClose={onCancelPicker}
-          title={i18nText("autoI18n.izleme_tarihi", "İzleme Tarihi")}
-          subtitle={i18nText("autoI18n.bu_sezonu_ne_zaman_izlediniz", "Bu sezonu ne zaman izlediniz?")}
-          confirmLabel={i18nText("autoI18n.tarihi_onayla", "Tarihi Onayla")}
-          minDate={releaseDate}
-          maxDate={new Date()}
-        />
-      </View>
-    </Modal>
-  )
-);
 
 // ─── Ana Bileşen ──────────────────────────────────────────────────────────────
 const SeasonItem = ({
@@ -262,11 +63,9 @@ const SeasonItem = ({
   const [isLoading, setIsLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [watchHistoryVisible, setWatchHistoryVisible] = useState(false);
-  const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(null);
 
   const scaleValue = React.useRef(new Animated.Value(1)).current;
-  const showReleaseDateTime = new Date(season.air_date);
+  const showReleaseDateTime = season.air_date || null;
 
   // İzlenme durumu — üstteki tek abonelikten gelen watchedCount'tan TÜRETİLİR.
   const totalEpisodes = season.episode_count || 0;
@@ -300,23 +99,7 @@ const SeasonItem = ({
 
   // ── Modal ─────────────────────────────────────────────────────────────────
   const openModal = useCallback(() => setModalVisible(true), []);
-  const closeModal = useCallback(() => {
-    setModalVisible(false);
-    setSelectedDate(null);
-  }, []);
-  const showDatePicker = useCallback(() => setDatePickerVisibility(true), []);
-  const hideDatePicker = useCallback(() => setDatePickerVisibility(false), []);
-
-  // ── Tarih yardımcıları ────────────────────────────────────────────────────
-  const formatDate = useCallback(
-    (timestamp) =>
-      new Intl.DateTimeFormat(language, {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }).format(new Date(timestamp)),
-    [language]
-  );
+  const closeModal = useCallback(() => setModalVisible(false), []);
 
   // Kart başlığının yanında kullanılan kısa tarih ("5 Oca 2020") — uzun ay
   // adları tek satırlık başlık satırını taşırıyordu.
@@ -333,23 +116,12 @@ const SeasonItem = ({
     [language]
   );
 
-  const formatDateSave = useCallback((timestamp) => {
-    const date = new Date(timestamp);
-    if (isNaN(date.getTime())) return "";
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-      2,
-      "0"
-    )}-${String(date.getDate()).padStart(2, "0")}`;
-  }, []);
-
   // ── Firestore: sezon ekle / sil — kanonik servis (race-free) ─────────────
   const addSeasonToFirestore = useCallback(
     async (_isDelete = false, date = null) => {
       if (!user?.uid) return;
       try {
         setIsLoading(true);
-        setModalVisible(false);
-
         if (!date) return;
         const response = await axios.get(
           `https://api.themoviedb.org/3/tv/${details.id}/season/${season.season_number}`,
@@ -358,13 +130,13 @@ const SeasonItem = ({
             headers: { accept: "application/json", Authorization: API_KEY },
           }
         );
-        const episodeDate = formatDateSave(date);
         const episodesData = response.data.episodes.map((ep) => ({
           episodeNumber: ep.episode_number,
           episodePosterPath: ep.still_path,
           episodeName: ep.name,
           episodeRatings: parseFloat(ep.vote_average?.toFixed(1)) || 0,
           episodeMinutes: ep.runtime,
+          releaseDate: ep.air_date || null,
         }));
         await markSeason(
           user.uid,
@@ -382,8 +154,16 @@ const SeasonItem = ({
             seasonEpisodes: season.episode_count,
           },
           episodesData,
-          episodeDate
+          date
         );
+        setModalVisible(false);
+        Toast.show({
+          type: "success",
+          text1: i18nText(
+            "autoI18n.sezon_izlendi_olarak_isaretlendi",
+            "Sezon izlendi olarak işaretlendi.",
+          ),
+        });
       } catch (e) {
         if (__DEV__)
           console.error(
@@ -403,21 +183,7 @@ const SeasonItem = ({
         setIsLoading(false);
       }
     },
-    [user, details, season, language, API_KEY, formatDateSave]
-  );
-
-  // NOT: handleConfirm, addSeasonToFirestore'dan SONRA tanımlı olmalı —
-  // bağımlılık dizisi render sırasında değerlendiği için yukarıda tanımlanırsa
-  // deps'teki fonksiyonlar okunamaz ve callback ilk render'ın closure'ında donar.
-  const handleConfirm = useCallback(
-    (date) => {
-      // date artık ISO string ("YYYY-MM-DD") veya Date objesi olabilir
-      const isoDate = typeof date === "string" ? date : formatDateSave(date);
-      setSelectedDate(isoDate);
-      addSeasonToFirestore(false, isoDate);
-      hideDatePicker();
-    },
-    [hideDatePicker, formatDateSave, addSeasonToFirestore]
+    [user, details, season, language, API_KEY]
   );
 
   // ── İzlenme buton rengi & ilerleme ────────────────────────────────────────
@@ -699,7 +465,7 @@ const SeasonItem = ({
         busy={isLoading}
         onAddAgain={() => {
           setWatchHistoryVisible(false);
-          setTimeout(openModal, 180);
+          setTimeout(openModal, 300);
         }}
         onDeleteEvent={async (event) => {
           if (!user?.uid || !event?.id) return;
@@ -719,20 +485,20 @@ const SeasonItem = ({
         }}
       />
 
-      <DatePickerModal
+      <WatchedDateSheet
         visible={modalVisible}
         onClose={closeModal}
-        onDatePicker={showDatePicker}
-        onNow={() => addSeasonToFirestore(false, new Date())}
-        onRelease={() => addSeasonToFirestore(false, showReleaseDateTime)}
-        selectedDate={selectedDate}
+        subtitle={`${details?.name || ""} · ${season.season_number}. ${i18nText("autoI18n.sezon", "Sezon")}`}
+        pickerSubtitle={i18nText(
+          "autoI18n.bu_sezonu_ne_zaman_izlediniz",
+          "Bu sezonu ne zaman izlediniz?",
+        )}
         releaseDate={showReleaseDateTime}
-        formatDate={formatDate}
-        theme={theme}
-        isDatePickerVisible={isDatePickerVisible}
-        onConfirm={handleConfirm}
-        onCancelPicker={hideDatePicker}
-        formatDateSave={formatDateSave}
+        minDate={showReleaseDateTime}
+        mediaType="tv"
+        scope="season"
+        busy={isLoading}
+        onConfirm={(date) => addSeasonToFirestore(false, date)}
       />
     </>
   );
@@ -900,77 +666,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
-  // ── Modal / Bottom Sheet ───────────────────────────────────────────────────
-  backdrop: {
-    flex: 1,
-  },
-  sheet: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 36,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 20,
-  },
-  sheetTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 4,
-    letterSpacing: -0.3,
-  },
-  sheetSubtitle: {
-    fontSize: 13,
-    marginBottom: 20,
-  },
-  optionsRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 16,
-  },
-  optionCard: {
-    flex: 1,
-    borderRadius: 16,
-    padding: 14,
-    alignItems: "center",
-    gap: 8,
-  },
-  optionIconBg: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  optionLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  optionDate: {
-    fontSize: 10,
-    textAlign: "center",
-    lineHeight: 14,
-  },
-  cancelBtn: {
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  cancelBtnText: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
 });
 
 // memo: TvShowsDetails her re-render olduğunda tüm sezon kartlarının

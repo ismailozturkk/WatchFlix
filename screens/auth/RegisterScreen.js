@@ -1,3 +1,4 @@
+import { isLightSurface } from "../../utils/colorUtils";
 // Kayıt ekranı — IslamicGuide auth tasarım diline göre sadeleştirildi:
 // dikeyde ortalanmış düzen, rozetli başlık bloğu, solid yüzeyli tek kart,
 // dolgulu input kabukları ve solid accent ana buton. Blur/gradyan yok.
@@ -65,11 +66,11 @@ const ERROR = "rgb(189, 8, 28)";
 const buzz = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
 export default function RegisterScreen({ navigation }) {
-  const { theme, selectedTheme } = useTheme();
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const accent = theme.accent;
   const hairline = theme.border;
-  const isLightTheme = selectedTheme === "light" || selectedTheme === "green";
+  const isLightTheme = isLightSurface(theme.primary);
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [usernameAvailable, setUsernameAvailable] = useState(null);

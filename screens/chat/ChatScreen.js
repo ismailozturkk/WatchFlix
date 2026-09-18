@@ -1,3 +1,5 @@
+import { isLightSurface } from "@utils/colorUtils";
+import ComposerBlur, { ComposerBlurTarget, useComposerBlurTarget } from "../../components/chat/ComposerBlur";
 import { Image } from "expo-image";
 import React, {
   useEffect,
@@ -7,6 +9,7 @@ import React, {
   useCallback,
   memo,
 } from "react";
+import UserAvatar from "../../components/common/UserAvatar";
 
 import {
   View,
@@ -53,7 +56,9 @@ import {
   deleteField,
   increment,
 } from "firebase/firestore";
+import { trackFirestoreRead, trackFirestoreWrite } from "../../services/usageTrackerService";
 import { useTheme } from "@context/ThemeContext";
+import { alpha } from "../../theme/colors";
 import LottieView from "lottie-react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -79,6 +84,7 @@ import {
   setTyping,
   subscribeChatMeta,
 } from "@services/chatRtdb";
+import { setActiveChatId } from "@services/activeChatTracker";
 import {
   subscribeGroup,
   memberColor,
@@ -264,6 +270,7 @@ const MessageBubble = memo(
     const senderName = minfo?.name || item.senderName || "";
     const senderAvatarIndex =
       typeof minfo?.avatarIndex === "number" ? minfo.avatarIndex : item.senderAvatarIndex;
+    const senderPhotoURL = minfo?.photoURL || item.senderPhotoURL || null;
     // Gönderen başlığı yalnızca ardışık bloğun İLK mesajında (groupTop yokken).
     const showSenderHeader = isGroup && !isMe && !groupTop;
     const scaleAnim = useRef(new Animated.Value(0.88)).current;
@@ -286,8 +293,9 @@ const MessageBubble = memo(
     }, []);
 
     const getStatusIcon = () => {
+      const iconMuted = isMe ? "rgba(255,255,255,0.7)" : (theme?.text?.muted ?? "rgba(255,255,255,0.38)");
       if (item.status === "sending")
-        return <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.3)" />;
+        return <Ionicons name="time-outline" size={12} color={iconMuted} />;
       if (item.status === "seen")
         return <Ionicons name="checkmark-done" size={13} color={SEEN_COLOR} />;
       if (item.status === "delivered")
@@ -295,11 +303,11 @@ const MessageBubble = memo(
           <Ionicons
             name="checkmark-done"
             size={13}
-            color="rgba(255,255,255,0.38)"
+            color={iconMuted}
           />
         );
       return (
-        <Ionicons name="checkmark" size={13} color="rgba(255,255,255,0.28)" />
+        <Ionicons name="checkmark" size={13} color={iconMuted} />
       );
     };
 
@@ -327,8 +335,24 @@ const MessageBubble = memo(
           { justifyContent: isMe ? "flex-end" : "flex-start" },
         ]}
       >
-        {item.edited && <Text style={styles.editedTag}>{i18nText("autoI18n.duzenlendi", "düzenlendi")}</Text>}
-        <Text style={styles.timestamp}>{formatTime(item.timestamp)}</Text>
+        {item.edited && (
+          <Text
+            style={[
+              styles.editedTag,
+              { color: isMe ? "rgba(255,255,255,0.75)" : (theme?.text?.muted ?? "rgba(255,255,255,0.4)") },
+            ]}
+          >
+            {i18nText("autoI18n.duzenlendi", "düzenlendi")}
+          </Text>
+        )}
+        <Text
+          style={[
+            styles.timestamp,
+            { color: isMe ? "rgba(255,255,255,0.75)" : (theme?.text?.muted ?? "rgba(255,255,255,0.4)") },
+          ]}
+        >
+          {formatTime(item.timestamp)}
+        </Text>
         {isMe && getStatusIcon()}
       </View>
     );
@@ -337,11 +361,20 @@ const MessageBubble = memo(
       <View>
         {dateLabel ? (
           <View style={styles.dateSep}>
-            <View style={styles.dateSepLine} />
-            <Text allowFontScaling={false} style={styles.dateSepText}>
+            <View style={[styles.dateSepLine, { backgroundColor: theme?.border ?? "rgba(255,255,255,0.12)" }]} />
+            <Text
+              allowFontScaling={false}
+              style={[
+                styles.dateSepText,
+                {
+                  color: theme?.text?.muted ?? "rgba(255,255,255,0.6)",
+                  backgroundColor: theme?.between ?? "rgba(255,255,255,0.07)",
+                },
+              ]}
+            >
               {dateLabel}
             </Text>
-            <View style={styles.dateSepLine} />
+            <View style={[styles.dateSepLine, { backgroundColor: theme?.border ?? "rgba(255,255,255,0.12)" }]} />
           </View>
         ) : null}
         <SwipeReplyContainer onReply={() => onReply(item)}>
@@ -357,15 +390,12 @@ const MessageBubble = memo(
         {/* Grupta gönderen başlığı (avatar + ad) */}
         {showSenderHeader && (
           <View style={styles.senderHeader}>
-            {avatars?.[senderAvatarIndex] ? (
-              <Image source={avatars[senderAvatarIndex]} style={styles.senderAvatar} />
-            ) : (
-              <View style={[styles.senderAvatar, styles.senderAvatarPh, { backgroundColor: senderColor }]}>
-                <Text style={styles.senderAvatarInitial}>
-                  {(senderName || "?").charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            )}
+            <UserAvatar
+              avatarIndex={senderAvatarIndex}
+              photoURL={senderPhotoURL}
+              isCustomPhoto
+              size={20}
+            />
             <Text style={[styles.senderName, { color: senderColor }]} numberOfLines={1}>
               {senderName || i18nText("autoI18n.uye", "Üye")}
             </Text>
@@ -375,7 +405,15 @@ const MessageBubble = memo(
           style={[
             styles.message,
             (item.media || hasItems || hasPoll) && styles.mediaMessage,
-            isMe ? styles.myMsg : styles.friendMsg,
+            isMe
+              ? [styles.myMsg, { backgroundColor: theme?.accent ?? "#17245cff" }]
+              : [
+                  styles.friendMsg,
+                  {
+                    backgroundColor: theme?.secondary ?? "rgba(68, 68, 68, 1)",
+                    borderColor: theme?.border ?? "rgba(255,255,255,0.2)",
+                  },
+                ],
             highlighted && styles.highlightedMessage,
             // Grupta gelen baloncukta gönderen renginde ince sol vurgu.
             senderColor && { borderColor: senderColor + "66" },
@@ -396,15 +434,17 @@ const MessageBubble = memo(
             <PollMessage
               poll={item.poll}
               currentUid={currentUser.uid}
-              accent={ACCENT}
+              accent={theme?.accent ?? ACCENT}
               getTmdbUrl={getTmdbUrl}
+              theme={theme}
+              isOutgoing={isMe}
               onVote={(optionId) => onVote?.(item, optionId)}
             />
           ) : hasItems ? (
             <SharedMediaCollection
               items={item.items}
               listTitle={item.listTitle}
-              accent={ACCENT}
+              accent={theme?.accent ?? ACCENT}
               getTmdbUrl={getTmdbUrl}
               isOutgoing={isMe}
               onOpenItem={(it) => openMediaDetail(navigation, it)}
@@ -412,16 +452,17 @@ const MessageBubble = memo(
           ) : item.media ? (
             /* ── Tekli media kartı (eğik poster + çipler) ── */
             <SharedMediaMessage
+              item={item}
               media={item.media}
               text={item.text}
-              accent={ACCENT}
+              accent={theme?.accent ?? ACCENT}
               getTmdbUrl={getTmdbUrl}
               onOpenTrailer={() => onOpenTrailer?.(item.media)}
               isOutgoing={isMe}
             />
           ) : (
             /* ── Düz metin ── */
-            <View>{renderMessageText(item.text)}</View>
+            <View>{renderMessageText(item.text, isMe)}</View>
           )}
 
           {/* ── Alt meta ── */}
@@ -520,7 +561,13 @@ const SearchResultCard = memo(({ item, onPress, getTmdbUrl, theme, selected }) =
           )}
         </View>
 
-        <Text style={styles.searchCardTitle} numberOfLines={2}>
+        <Text
+          style={[
+            styles.searchCardTitle,
+            { color: theme?.text?.primary ?? "#fff" },
+          ]}
+          numberOfLines={2}
+        >
           {item.title || item.name}
         </Text>
       </TouchableOpacity>
@@ -557,6 +604,7 @@ export default function ChatScreen({ route, navigation }) {
     displayName: profileDisplayName,
     username: profileUsername,
     avatarIndex: profileAvatarIndex,
+    photoURL: profilePhotoURL,
   } = useUserProfile();
   const [groupData, setGroupData] = useState(null); // grup modunda doc
   const [friendIdentity, setFriendIdentity] = useState(() => ({
@@ -564,6 +612,7 @@ export default function ChatScreen({ route, navigation }) {
     username: "",
     avatarIndex:
       typeof friendAvatarIndex === "number" ? friendAvatarIndex : 0,
+    photoURL: null,
   }));
   const { getTmdbUrl } = useImageQualitySettings();
   const [editingMessage, setEditingMessage] = useState(null);
@@ -650,6 +699,7 @@ export default function ChatScreen({ route, navigation }) {
   const [composerTransitioning, setComposerTransitioning] = useState(false);
   const [showLatestMessageButton, setShowLatestMessageButton] = useState(false);
   const [composerHeight, setComposerHeight] = useState(76);
+  const composerBlur = useComposerBlurTarget();
   const latestButtonVisibleRef = useRef(false);
   const handledInitialMediaRef = useRef(null);
   const { theme } = useTheme();
@@ -897,6 +947,14 @@ export default function ChatScreen({ route, navigation }) {
     return () => leaveChat(chatId, currentUser.uid);
   }, [isGroup, chatId, currentUser.uid]);
 
+  // Bu sohbet ekranda açıkken chatId'yi bellekte işaretle (grup + 1-1 ikisinde
+  // de) — foreground bildirim gösterimi zaten açık olan sohbet için gereksiz
+  // banner basmasın diye (bkz. DeviceNotificationsContext).
+  useEffect(() => {
+    setActiveChatId(chatId);
+    return () => setActiveChatId(null);
+  }, [chatId]);
+
   // Sohbet açıkken gelen kutusu index'imdeki okunmamış sayacını sıfır tut:
   // girişte birikmiş sayacı, sohbet açıkken de yeni gelen artışları temizler
   // (profildeki rozet ve Mesajlar ekranındaki renkli border bu alana bakar).
@@ -928,7 +986,8 @@ export default function ChatScreen({ route, navigation }) {
     const unsubscribeMessages = onSnapshot(
       q,
       (snapshot) => {
-      const msgs = snapshot.docs.map((docSnap) => {
+        trackFirestoreRead("messages", snapshot.docs.length);
+        const msgs = snapshot.docs.map((docSnap) => {
         const data = docSnap.data();
         return {
           id: docSnap.id,
@@ -1019,6 +1078,7 @@ export default function ChatScreen({ route, navigation }) {
       unsubFriendProfile = onSnapshot(
         doc(db, "Users", friendUid),
         (snap) => {
+          trackFirestoreRead("Users", 1);
           const data = snap.data() || {};
           friendPrivacy = data.privacy || null;
           setFriendIdentity((prev) => ({
@@ -1028,6 +1088,7 @@ export default function ChatScreen({ route, navigation }) {
               typeof data.avatarIndex === "number"
                 ? data.avatarIndex
                 : prev.avatarIndex,
+            photoURL: data.photoURL || null,
           }));
           privacyReady = true;
           applyPresence();
@@ -1125,9 +1186,10 @@ export default function ChatScreen({ route, navigation }) {
                 : typeof selectAvatarIndex === "number"
                   ? selectAvatarIndex
                   : 0,
+            senderPhotoURL: profilePhotoURL || currentUser?.photoURL || null,
           }
         : {},
-    [isGroup, currentUser.displayName, profileDisplayName, profileUsername, profileAvatarIndex, selectAvatarIndex],
+    [isGroup, currentUser.displayName, currentUser?.photoURL, profileDisplayName, profileUsername, profileAvatarIndex, selectAvatarIndex, profilePhotoURL],
   );
 
   const resolveSenderName = useCallback(
@@ -1602,7 +1664,7 @@ export default function ChatScreen({ route, navigation }) {
   );
 
   const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
-  const renderMessageText = useCallback((msgText) => {
+  const renderMessageText = useCallback((msgText, isMe = false) => {
     const parts = msgText.split(urlRegex).filter(Boolean);
     return parts.map((part, index) => {
       const isUrl = urlRegex.test(part);
@@ -1611,7 +1673,10 @@ export default function ChatScreen({ route, navigation }) {
         return (
           <Text
             key={index}
-            style={styles.linkText}
+            style={[
+              styles.linkText,
+              { color: isMe ? "#fff" : (theme.accent || "#82B4FF") },
+            ]}
             onPress={() => Linking.openURL(url)}
           >
             {part}
@@ -1619,12 +1684,18 @@ export default function ChatScreen({ route, navigation }) {
         );
       }
       return (
-        <Text key={index} style={[styles.messageText, { color: "#fff" }]}>
+        <Text
+          key={index}
+          style={[
+            styles.messageText,
+            { color: isMe ? "#fff" : theme.text.primary },
+          ]}
+        >
           {part}
         </Text>
       );
     });
-  }, []);
+  }, [theme.accent, theme.text.primary]);
 
   const memoizedMessages = useMemo(
     () => chatData.messages,
@@ -2107,15 +2178,15 @@ export default function ChatScreen({ route, navigation }) {
         { backgroundColor: theme.primary || "#0F0F1A" },
       ]}
     >
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
 
       {/* ── HEADER ── */}
       <View
         style={[
           styles.header,
           {
-            backgroundColor: theme.secondaryt || "rgba(255,255,255,0.04)",
-            borderBottomColor: "rgba(255,255,255,0.06)",
+            backgroundColor: theme.secondary || "rgba(255,255,255,0.04)",
+            borderBottomColor: theme.border || "rgba(255,255,255,0.06)",
           },
         ]}
       >
@@ -2124,7 +2195,11 @@ export default function ChatScreen({ route, navigation }) {
           style={styles.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="chevron-back" size={26} color="#fff" />
+          <Ionicons
+            name="chevron-back"
+            size={26}
+            color={theme.text.primary || "#fff"}
+          />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -2138,33 +2213,22 @@ export default function ChatScreen({ route, navigation }) {
           {isGroup ? (
             <GroupAvatar
               avatarIndex={groupData?.avatarIndex ?? groupAvatarIndex}
-              color={groupData?.color || ACCENT}
+              color={groupData?.color || theme.accent || ACCENT}
               size={42}
               iconSize={29}
-              style={{ borderWidth: 1.5, borderColor: "rgba(255,255,255,0.2)" }}
+              style={{ borderWidth: 1.5, borderColor: theme.border }}
             />
           ) : (
-            avatars?.[resolvedFriendAvatarIndex] ? (
-              <Image
-                source={avatars[resolvedFriendAvatarIndex]}
-                style={[styles.avatar, { borderColor: ACCENT + "55" }]}
-              />
-            ) : (
-              <View
-                style={[
-                  styles.avatar,
-                  { backgroundColor: ACCENT_SOFT, borderColor: ACCENT + "55" },
-                ]}
-              >
-                <Text allowFontScaling={false} style={styles.avatarText}>
-                  {friendInitial}
-                </Text>
-              </View>
-            )
-          )}
-          {!isGroup && (chatData.friendIsOnline || chatData.friendInChat) && (
-            <View
-              style={[styles.onlineDot, { backgroundColor: statusColor }]}
+            <UserAvatar
+              avatarIndex={resolvedFriendAvatarIndex}
+              photoURL={friendIdentity?.photoURL || chatData?.friendPhotoURL}
+              isCustomPhoto
+              size={42}
+              borderWidth={1.5}
+              borderColor={(theme.accent || ACCENT) + "55"}
+              online={chatData.friendIsOnline || chatData.friendInChat}
+              onlineColor={statusColor}
+              onlineBorderColor="#0F0F1A"
             />
           )}
         </View>
@@ -2172,7 +2236,7 @@ export default function ChatScreen({ route, navigation }) {
         <View style={styles.headerInfo}>
           <Text
             allowFontScaling={false}
-            style={styles.headerName}
+            style={[styles.headerName, { color: theme.text.primary || "#fff" }]}
             numberOfLines={1}
           >
             {isGroup ? groupData?.name || groupName || i18nText("autoI18n.grup", "Grup") : resolvedFriendName}
@@ -2180,7 +2244,7 @@ export default function ChatScreen({ route, navigation }) {
           {isGroup ? (
             <Text
               allowFontScaling={false}
-              style={[styles.headerStatus, { color: "rgba(255,255,255,0.5)" }]}
+              style={[styles.headerStatus, { color: theme.text.muted || "rgba(255,255,255,0.5)" }]}
               numberOfLines={1}
             >
               {i18nText("autoI18n.n_uye", "{{n}} üye", { n: groupData?.members?.length || 0 })}
@@ -2212,7 +2276,7 @@ export default function ChatScreen({ route, navigation }) {
           <Ionicons
             name={isGroup ? "people-outline" : "person-outline"}
             size={21}
-            color="rgba(255,255,255,0.75)"
+            color={theme.text.secondary || "rgba(255,255,255,0.75)"}
           />
         </TouchableOpacity>
       </View>
@@ -2225,44 +2289,82 @@ export default function ChatScreen({ route, navigation }) {
         ]}
       >
           {/* ── MESAJ LİSTESİ ── */}
-          {/* Arka plan dekor ikonu */}
-          <View style={styles.iconBgWrapper} pointerEvents="none">
-            <IconBacground opacity={0.5} />
-          </View>
           {pinnedMessages.length > 0 && (
             <TouchableOpacity
               onPress={() => setPinnedModalVisible(true)}
               activeOpacity={0.82}
-              style={styles.pinnedBanner}
+              style={[
+                styles.pinnedBanner,
+                {
+                  backgroundColor: theme.secondary,
+                  borderColor: theme.border,
+                },
+              ]}
               accessibilityRole="button"
               accessibilityLabel={i18nText("autoI18n.sabitlenmis_mesajlar", "Sabitlenmiş mesajlar")}
             >
-              <View style={styles.pinnedBannerIcon}>
-                <Ionicons name="pin" size={15} color="#B6B2FF" />
+              <View
+                style={[
+                  styles.pinnedBannerIcon,
+                  { backgroundColor: alpha(theme.accent, 0.16) },
+                ]}
+              >
+                <Ionicons name="pin" size={15} color={theme.accent} />
               </View>
               <View style={styles.pinnedBannerCopy}>
-                <Text style={styles.pinnedBannerTitle} numberOfLines={1}>
+                <Text
+                  style={[styles.pinnedBannerTitle, { color: theme.accent }]}
+                  numberOfLines={1}
+                >
                   {pinnedMessages[0].senderName || i18nText("autoI18n.sohbet_mesaji", "Mesaj")}
                 </Text>
-                <Text style={styles.pinnedBannerText} numberOfLines={1}>
+                <Text
+                  style={[
+                    styles.pinnedBannerText,
+                    { color: theme.text.secondary },
+                  ]}
+                  numberOfLines={1}
+                >
                   {pinnedMessages[0].preview}
                 </Text>
               </View>
               {pinnedMessages.length > 1 && (
-                <View style={styles.pinnedCountBadge}>
-                  <Text style={styles.pinnedCountText}>+{pinnedMessages.length - 1}</Text>
+                <View
+                  style={[
+                    styles.pinnedCountBadge,
+                    { backgroundColor: alpha(theme.accent, 0.18) },
+                  ]}
+                >
+                  <Text
+                    style={[styles.pinnedCountText, { color: theme.accent }]}
+                  >
+                    +{pinnedMessages.length - 1}
+                  </Text>
                 </View>
               )}
-              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.3)" />
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={theme.text.muted}
+              />
             </TouchableOpacity>
           )}
+          <View style={styles.messageViewport}>
+          <ComposerBlurTarget attach={composerBlur.attach} backgroundColor={theme.primary} style={{ flex: 1 }}>
+          {/* Arka plan dekor ikonu — hedef View'ın OPAK arka planının ÜSTÜNDE,
+              mesaj listesinin ALTINDA: Android'de blur bu görünümü fotoğrafladığı
+              için desen buraya, hedefin İÇİNE girmeli (dışına konursa opak katman
+              onu görünmez kılar ve blur'a hiç yansımaz). */}
+          <View style={styles.iconBgWrapper} pointerEvents="none">
+            <IconBacground opacity={0.5} />
+          </View>
           <FlatList
             ref={flatListRef}
             style={styles.chatList}
             data={memoizedMessages}
             keyExtractor={(item) => item.clientId || item.id}
             renderItem={renderItem}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[styles.listContent, { paddingTop: composerHeight + 14 }]}
             inverted
             onScroll={handleMessageListScroll}
             scrollEventThrottle={32}
@@ -2290,6 +2392,8 @@ export default function ChatScreen({ route, navigation }) {
               ) : null
             }
           />
+
+          </ComposerBlurTarget>
 
           {showLatestMessageButton && (
             <TouchableOpacity
@@ -2326,6 +2430,7 @@ export default function ChatScreen({ route, navigation }) {
           {/* ── INPUT ALANI ── */}
           <View
             style={styles.inputContainer}
+            pointerEvents="box-none"
             onLayout={(event) => setComposerHeight(event.nativeEvent.layout.height)}
           >
               {/* Düzenleme banner */}
@@ -2369,7 +2474,13 @@ export default function ChatScreen({ route, navigation }) {
               {attachMenuVisible && (
                 <View style={styles.attachMenuRow}>
                   <TouchableOpacity
-                    style={styles.attachAction}
+                    style={[
+                      styles.attachAction,
+                      {
+                        backgroundColor: theme.between,
+                        borderColor: theme.border,
+                      },
+                    ]}
                     onPress={() => handleAttachOption("poll")}
                     disabled={composerTransitioning}
                     activeOpacity={0.75}
@@ -2377,18 +2488,30 @@ export default function ChatScreen({ route, navigation }) {
                     <View
                       style={[
                         styles.attachActionIcon,
-                        { backgroundColor: ACCENT_SOFT },
+                        { backgroundColor: alpha(theme.accent, 0.15) },
                       ]}
                     >
-                      <Ionicons name="stats-chart" size={15} color={ACCENT} />
+                      <Ionicons name="stats-chart" size={15} color={theme.accent} />
                     </View>
-                    <Text style={styles.attachActionText} numberOfLines={1}>
+                    <Text
+                      style={[
+                        styles.attachActionText,
+                        { color: theme.text.primary },
+                      ]}
+                      numberOfLines={1}
+                    >
                       {i18nText("autoI18n.metin_anketi", "Metin Anketi")}
                     </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.attachAction}
+                    style={[
+                      styles.attachAction,
+                      {
+                        backgroundColor: theme.between,
+                        borderColor: theme.border,
+                      },
+                    ]}
                     onPress={() => handleAttachOption("search")}
                     disabled={composerTransitioning}
                     activeOpacity={0.75}
@@ -2401,7 +2524,13 @@ export default function ChatScreen({ route, navigation }) {
                     >
                       <Feather name="search" size={14} color={SEEN_COLOR} />
                     </View>
-                    <Text style={styles.attachActionText} numberOfLines={1}>
+                    <Text
+                      style={[
+                        styles.attachActionText,
+                        { color: theme.text.primary },
+                      ]}
+                      numberOfLines={1}
+                    >
                       {i18nText("autoI18n.film_dizi_ara", "Film & Dizi Ara")}
                     </Text>
                   </TouchableOpacity>
@@ -2413,13 +2542,13 @@ export default function ChatScreen({ route, navigation }) {
                   Engellenen kullanıcılar'dan. Grup sohbetinde uygulanmıyor;
                   orada engel yalnız görünürlüğü etkiliyor. */}
               {!isGroup && isBlocked(friendUid) ? (
-                <View style={[styles.composerPill, styles.composerBlocked]}>
+                <View style={[styles.composerPill, styles.composerBlocked, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
                   <MaterialCommunityIcons
                     name="account-cancel-outline"
                     size={18}
-                    color="rgba(255,255,255,0.6)"
+                    color={theme.text.muted}
                   />
-                  <Text style={styles.composerBlockedText}>
+                  <Text style={[styles.composerBlockedText, { color: theme.text.muted }]}>
                     {i18nText(
                       "autoI18n.engellendi_mesaj_gonderilemez",
                       "Bu kullanıcıyı engelledin",
@@ -2430,20 +2559,24 @@ export default function ChatScreen({ route, navigation }) {
               <Animated.View
                 style={[
                   styles.composerPill,
-                  { borderColor: searchOption ? ACCENT : inputBorderColor },
+                  {
+                    backgroundColor: "transparent",
+                    borderColor: searchOption ? theme.accent : inputBorderColor,
+                  },
                 ]}
               >
+                <ComposerBlur target={composerBlur.target} theme={theme} />
                 {/* Üst glow şeridi */}
                 <View
                   style={[
                     styles.inputInnerGlow,
-                    { opacity: searchOption ? 1 : 0 },
+                    { backgroundColor: theme.accent, opacity: searchOption ? 1 : 0 },
                   ]}
                 />
 
                 {/* FAB — menüyü açar/kapatır */}
                 <TouchableOpacity
-                  style={styles.composerFab}
+                  style={[styles.composerFab, { backgroundColor: theme.accent }]}
                   onPress={toggleAttachMenu}
                   activeOpacity={0.8}
                   accessibilityRole="button"
@@ -2459,17 +2592,17 @@ export default function ChatScreen({ route, navigation }) {
 
                 <TextInput
                   ref={messageInputRef}
-                  style={styles.input}
+                  style={[styles.input, { color: theme.text.primary }]}
                   value={text}
                   multiline
                   numberOfLines={6}
                   onChangeText={handleTyping}
                   maxLength={2000}
                   placeholder={i18nText("autoI18n.mesaj_yazin", "Mesaj yazın...")}
-                  placeholderTextColor="rgba(255,255,255,0.2)"
+                  placeholderTextColor={theme.text.muted}
                   onFocus={handleInputFocus}
                   onBlur={handleInputBlur}
-                  selectionColor={ACCENT}
+                  selectionColor={theme.accent}
                 />
 
                 {/* Bağlantı algılandı göstergesi */}
@@ -2489,7 +2622,7 @@ export default function ChatScreen({ route, navigation }) {
                   disabled={!text.trim()}
                   style={[
                     styles.composerSend,
-                    { opacity: text.trim() ? 1 : 0.32 },
+                    { backgroundColor: theme.accent, opacity: text.trim() ? 1 : 0.32 },
                   ]}
                 >
                   {editingMessage ? (
@@ -2506,6 +2639,8 @@ export default function ChatScreen({ route, navigation }) {
               </Animated.View>
               )}
             </View>
+
+          </View>
 
         {/* ── # ARAMA MODALİ ── */}
         <BottomSheetModal
@@ -2529,34 +2664,60 @@ export default function ChatScreen({ route, navigation }) {
           }}
         >
             <Reanimated.View style={modalKeyboardStyle}>
-                <View style={styles.searchModal}>
+                <View
+                  style={[
+                    styles.searchModal,
+                    {
+                      backgroundColor: theme.secondary,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
                   {/* Tutamaç */}
-                  <View style={styles.dragHandle} />
+                  <View style={[styles.dragHandle, { backgroundColor: theme.border }]} />
 
                   {/* Başlık */}
                   <View style={styles.searchModalHeader}>
-                    <View style={styles.searchHashBadge}>
-                      <Feather name="search" size={15} color={ACCENT} />
+                    <View
+                      style={[
+                        styles.searchHashBadge,
+                        {
+                          backgroundColor: alpha(theme.accent, 0.15),
+                          borderColor: alpha(theme.accent, 0.35),
+                        },
+                      ]}
+                    >
+                      <Feather name="search" size={15} color={theme.accent} />
                     </View>
-                    <Text style={styles.searchModalTitle}>{i18nText("autoI18n.film_dizi_ara", "Film & Dizi Ara")}</Text>
+                    <Text style={[styles.searchModalTitle, { color: theme.text.primary }]}>
+                      {i18nText("autoI18n.film_dizi_ara", "Film & Dizi Ara")}
+                    </Text>
                     <TouchableOpacity
                       onPress={() => closeSearchModal()}
-                      style={styles.searchCloseBtn}
+                      style={[styles.searchCloseBtn, { backgroundColor: theme.between }]}
                     >
                       <Ionicons
                         name="close"
                         size={20}
-                        color="rgba(255,255,255,0.5)"
+                        color={theme.text.primary}
                       />
                     </TouchableOpacity>
                   </View>
 
                   {/* Arama girişi (modaldaki) */}
-                  <View style={styles.searchInputWrapper}>
+                  <View
+                    style={[
+                      styles.searchInputWrapper,
+                      {
+                        backgroundColor: theme.between,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
                     <Feather
                       name="search"
                       size={16}
-                      color="rgba(255,255,255,0.35)"
+                      color={theme.text.muted}
                       style={{ marginLeft: 12 }}
                     />
                     <TextInput
@@ -2568,9 +2729,9 @@ export default function ChatScreen({ route, navigation }) {
                       }}
                       maxLength={80}
                       placeholder={i18nText("autoI18n.bir_seyler_yazin", "Bir şeyler yazın...")}
-                      placeholderTextColor="rgba(255,255,255,0.25)"
-                      selectionColor={ACCENT}
-                      style={[styles.searchInput, { color: "#fff" }]}
+                      placeholderTextColor={theme.text.muted}
+                      selectionColor={theme.accent}
+                      style={[styles.searchInput, { color: theme.text.primary }]}
                     />
                     {loadingSearch && (
                       <LottieView
@@ -2587,14 +2748,22 @@ export default function ChatScreen({ route, navigation }) {
                     <TouchableOpacity
                       style={[
                         styles.catBtn,
-                        searchChoise === null && styles.catBtnActive,
+                        {
+                          backgroundColor: theme.between,
+                          borderColor: theme.border,
+                        },
+                        searchChoise === null && {
+                          backgroundColor: alpha(theme.accent, 0.15),
+                          borderColor: alpha(theme.accent, 0.4),
+                        },
                       ]}
                       onPress={() => handleCategoryChange(null)}
                     >
                       <Text
                         style={[
                           styles.catBtnText,
-                          searchChoise === null && styles.catBtnTextActive,
+                          { color: theme.text.muted },
+                          searchChoise === null && { color: theme.accent, fontWeight: "700" },
                         ]}
                       >{i18nText("autoI18n.tumu", "Tümü")}</Text>
                     </TouchableOpacity>
@@ -2603,6 +2772,10 @@ export default function ChatScreen({ route, navigation }) {
                         key={cat.key}
                         style={[
                           styles.catBtn,
+                          {
+                            backgroundColor: theme.between,
+                            borderColor: theme.border,
+                          },
                           searchChoise === cat.key && {
                             backgroundColor: cat.color + "22",
                             borderColor: cat.color + "66",
@@ -2616,13 +2789,14 @@ export default function ChatScreen({ route, navigation }) {
                           color={
                             searchChoise === cat.key
                               ? cat.color
-                              : "rgba(255,255,255,0.45)"
+                              : theme.text.muted
                           }
                         />
                         <Text
                           style={[
                             styles.catBtnText,
-                            searchChoise === cat.key && { color: cat.color },
+                            { color: theme.text.muted },
+                            searchChoise === cat.key && { color: cat.color, fontWeight: "700" },
                           ]}
                         >
                           {cat.label}
@@ -2675,19 +2849,27 @@ export default function ChatScreen({ route, navigation }) {
 
                   {/* ── COMPOSE TEPSİSİ (seçilenler + gönder) ── */}
                   {selectedItems.length > 0 && (
-                    <View style={styles.composeTray}>
+                    <View style={[styles.composeTray, { borderTopColor: theme.border }]}>
                       {/* Aktif liste tipi rozeti (tek tip: oyuncu | dizi/film) */}
                       <View style={styles.composeTypeRow}>
                         {(() => {
                           const isPerson = categoryOf(selectedItems[0].media_type) === "person";
                           return (
-                            <View style={styles.composeTypeBadge}>
+                            <View
+                              style={[
+                                styles.composeTypeBadge,
+                                {
+                                  backgroundColor: alpha(theme.accent, 0.15),
+                                  borderColor: alpha(theme.accent, 0.35),
+                                },
+                              ]}
+                            >
                               <Ionicons
                                 name={isPerson ? "people-outline" : "film-outline"}
                                 size={12}
-                                color={ACCENT}
+                                color={theme.accent}
                               />
-                              <Text style={styles.composeTypeText}>
+                              <Text style={[styles.composeTypeText, { color: theme.accent }]}>
                                 {isPerson
                                   ? i18nText("autoI18n.oyuncu_listesi", "Oyuncu listesi")
                                   : i18nText("autoI18n.dizifilm_listesi", "Dizi/Film listesi")}
@@ -2695,7 +2877,9 @@ export default function ChatScreen({ route, navigation }) {
                             </View>
                           );
                         })()}
-                        <Text style={styles.composeCountText}>{selectedItems.length}/{MAX_SELECT}</Text>
+                        <Text style={[styles.composeCountText, { color: theme.text.muted }]}>
+                          {selectedItems.length}/{MAX_SELECT}
+                        </Text>
                       </View>
 
                       {/* Seçilen küçük posterler */}
@@ -2710,15 +2894,15 @@ export default function ChatScreen({ route, navigation }) {
                             {it.poster_path ? (
                               <Image
                                 source={{ uri: getTmdbUrl(it.poster_path, "poster", 200) }}
-                                style={styles.composeThumbImg}
+                                style={[styles.composeThumbImg, { backgroundColor: theme.between }]}
                               />
                             ) : (
-                              <View style={[styles.composeThumbImg, styles.searchCardPlaceholder]}>
-                                <FontAwesome name="image" size={16} color="rgba(255,255,255,0.25)" />
+                              <View style={[styles.composeThumbImg, styles.searchCardPlaceholder, { backgroundColor: theme.between }]}>
+                                <FontAwesome name="image" size={16} color={theme.text.muted} />
                               </View>
                             )}
                             <TouchableOpacity
-                              style={styles.composeThumbRemove}
+                              style={[styles.composeThumbRemove, { borderColor: theme.secondary }]}
                               onPress={() => toggleSelectItem(it)}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                             >
@@ -2731,20 +2915,42 @@ export default function ChatScreen({ route, navigation }) {
                       {/* Liste / Anket modu (2+ dizi/film; oyuncuda anket yok) */}
                       {selectedItems.length >= 2 &&
                         categoryOf(selectedItems[0].media_type) === "media" && (
-                          <View style={styles.modeRow}>
+                          <View style={[styles.modeRow, { backgroundColor: theme.between }]}>
                             <TouchableOpacity
-                              style={[styles.modeBtn, !pollMode && styles.modeBtnActive]}
+                              style={[
+                                styles.modeBtn,
+                                !pollMode && [
+                                  styles.modeBtnActive,
+                                  {
+                                    backgroundColor: alpha(theme.accent, 0.15),
+                                    borderColor: alpha(theme.accent, 0.4),
+                                  },
+                                ],
+                              ]}
                               onPress={() => { easeLayout(); setPollMode(false); }}
                             >
-                              <Ionicons name="albums-outline" size={14} color={!pollMode ? ACCENT : "rgba(255,255,255,0.5)"} />
-                              <Text style={[styles.modeBtnText, !pollMode && { color: ACCENT }]}>{i18nText("autoI18n.liste", "Liste")}</Text>
+                              <Ionicons name="albums-outline" size={14} color={!pollMode ? theme.accent : theme.text.muted} />
+                              <Text style={[styles.modeBtnText, { color: !pollMode ? theme.accent : theme.text.muted }]}>
+                                {i18nText("autoI18n.liste", "Liste")}
+                              </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                              style={[styles.modeBtn, pollMode && styles.modeBtnActive]}
+                              style={[
+                                styles.modeBtn,
+                                pollMode && [
+                                  styles.modeBtnActive,
+                                  {
+                                    backgroundColor: alpha(theme.accent, 0.15),
+                                    borderColor: alpha(theme.accent, 0.4),
+                                  },
+                                ],
+                              ]}
                               onPress={() => { easeLayout(); setPollMode(true); setShowTitleInput(true); }}
                             >
-                              <Ionicons name="stats-chart" size={14} color={pollMode ? ACCENT : "rgba(255,255,255,0.5)"} />
-                              <Text style={[styles.modeBtnText, pollMode && { color: ACCENT }]}>{i18nText("autoI18n.anket", "Anket")}</Text>
+                              <Ionicons name="stats-chart" size={14} color={pollMode ? theme.accent : theme.text.muted} />
+                              <Text style={[styles.modeBtnText, { color: pollMode ? theme.accent : theme.text.muted }]}>
+                                {i18nText("autoI18n.anket", "Anket")}
+                              </Text>
                             </TouchableOpacity>
                           </View>
                         )}
@@ -2752,28 +2958,44 @@ export default function ChatScreen({ route, navigation }) {
                       {/* Başlık (liste) veya soru (anket) */}
                       {selectedItems.length >= 2 &&
                         (pollMode ? (
-                          <View style={[styles.composeTitleWrap, { borderColor: ACCENT + "66" }]}>
-                            <Ionicons name="help-circle-outline" size={16} color={ACCENT} />
+                          <View
+                            style={[
+                              styles.composeTitleWrap,
+                              {
+                                backgroundColor: theme.between,
+                                borderColor: alpha(theme.accent, 0.4),
+                              },
+                            ]}
+                          >
+                            <Ionicons name="help-circle-outline" size={16} color={theme.accent} />
                             <TextInput
                               value={composeTitle}
                               onChangeText={setComposeTitle}
                               placeholder={i18nText("autoI18n.anket_sorusu", "Anket sorusu (örn. Hangisini izleyelim?)")}
-                              placeholderTextColor="rgba(255,255,255,0.3)"
-                              style={styles.composeTitleInput}
-                              selectionColor={ACCENT}
+                              placeholderTextColor={theme.text.muted}
+                              style={[styles.composeTitleInput, { color: theme.text.primary }]}
+                              selectionColor={theme.accent}
                               maxLength={80}
                             />
                           </View>
                         ) : showTitleInput ? (
-                          <View style={styles.composeTitleWrap}>
-                            <Ionicons name="list" size={15} color={ACCENT} />
+                          <View
+                            style={[
+                              styles.composeTitleWrap,
+                              {
+                                backgroundColor: theme.between,
+                                borderColor: theme.border,
+                              },
+                            ]}
+                          >
+                            <Ionicons name="list" size={15} color={theme.accent} />
                             <TextInput
                               value={composeTitle}
                               onChangeText={setComposeTitle}
                               placeholder={i18nText("autoI18n.liste_basligi_ops", "Liste başlığı (örn. Bu akşam ne izlesek?)")}
-                              placeholderTextColor="rgba(255,255,255,0.3)"
-                              style={styles.composeTitleInput}
-                              selectionColor={ACCENT}
+                              placeholderTextColor={theme.text.muted}
+                              style={[styles.composeTitleInput, { color: theme.text.primary }]}
+                              selectionColor={theme.accent}
                               maxLength={60}
                             />
                           </View>
@@ -2785,17 +3007,31 @@ export default function ChatScreen({ route, navigation }) {
                               setShowTitleInput(true);
                             }}
                           >
-                            <Ionicons name="add-circle-outline" size={15} color="rgba(255,255,255,0.6)" />
-                            <Text style={styles.composeAddTitleText}>{i18nText("autoI18n.liste_adi_ekle", "Liste adı ekle")}</Text>
+                            <Ionicons name="add-circle-outline" size={15} color={theme.text.secondary} />
+                            <Text style={[styles.composeAddTitleText, { color: theme.text.secondary }]}>
+                              {i18nText("autoI18n.liste_adi_ekle", "Liste adı ekle")}
+                            </Text>
                           </TouchableOpacity>
                         ))}
 
                       {/* Aksiyon satırı */}
                       <View style={styles.composeActions}>
                         <TouchableOpacity onPress={resetCompose} style={styles.composeClearBtn}>
-                          <Text style={styles.composeClearText}>{i18nText("autoI18n.temizle", "Temizle")}</Text>
+                          <Text style={[styles.composeClearText, { color: theme.text.muted }]}>
+                            {i18nText("autoI18n.temizle", "Temizle")}
+                          </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={sendComposed} style={styles.composeSendBtn} activeOpacity={0.85}>
+                        <TouchableOpacity
+                          onPress={sendComposed}
+                          style={[
+                            styles.composeSendBtn,
+                            {
+                              backgroundColor: theme.accent,
+                              shadowColor: theme.accent,
+                            },
+                          ]}
+                          activeOpacity={0.85}
+                        >
                           <Ionicons name={pollMode ? "stats-chart" : "send"} size={15} color="#fff" />
                           <Text style={styles.composeSendText}>
                             {pollMode
@@ -2817,13 +3053,27 @@ export default function ChatScreen({ route, navigation }) {
             onClose={() => setOptionsVisible(false)}
             intensity={35}
             dimColor="rgba(0,0,0,0.4)"
-            sheetStyle={styles.modalSheet}
+            sheetStyle={[
+              styles.modalSheet,
+              {
+                backgroundColor: theme.secondary,
+                borderColor: theme.border,
+              },
+            ]}
           >
                 {/* Tutamaç */}
-                <View style={styles.dragHandle} />
+                <View style={[styles.dragHandle, { backgroundColor: theme.border }]} />
 
                 {/* Mesaj önizleme kartı */}
-                <View style={styles.previewCard}>
+                <View
+                  style={[
+                    styles.previewCard,
+                    {
+                      backgroundColor: theme.between,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
                   {selectedMessage.media?.poster_path && (
                     <Image
                       source={{
@@ -2834,7 +3084,7 @@ export default function ChatScreen({ route, navigation }) {
                   )}
                   <View style={styles.previewTextCol}>
                     {selectedMessage.media && (
-                      <Text style={styles.previewMediaType}>
+                      <Text style={[styles.previewMediaType, { color: theme.text.muted }]}>
                         {selectedMessage.media.media_type === "movie"
                           ? i18nText("autoI18n.film", "Film")
                           : selectedMessage.media.media_type === "tv"
@@ -2844,7 +3094,7 @@ export default function ChatScreen({ route, navigation }) {
                     )}
                     <Text
                       allowFontScaling={false}
-                      style={styles.previewMsgText}
+                      style={[styles.previewMsgText, { color: theme.text.primary }]}
                       numberOfLines={3}
                     >
                       {selectedMessage.text}
@@ -2861,7 +3111,7 @@ export default function ChatScreen({ route, navigation }) {
                 </View>
 
                 {/* Zaman damgası */}
-                <Text style={styles.modalTimestamp}>
+                <Text style={[styles.modalTimestamp, { color: theme.text.muted }]}>
                   {selectedMessage.timestamp
                     ? (() => {
                         const d =
@@ -2882,24 +3132,36 @@ export default function ChatScreen({ route, navigation }) {
                 </Text>
 
                 {/* Aksiyon listesi */}
-                <View style={styles.actionList}>
+                <View
+                  style={[
+                    styles.actionList,
+                    {
+                      backgroundColor: theme.between,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
                   <TouchableOpacity
-                    style={styles.actionRowL}
+                    style={[styles.actionRowL, { backgroundColor: theme.secondary }]}
                     onPress={() => beginReply(selectedMessage)}
                     activeOpacity={0.7}
                   >
-                    <View style={[styles.actionIconBox, { backgroundColor: "rgba(108,99,255,0.16)" }]}>
-                      <Ionicons name="arrow-undo" size={20} color="#A9A5FF" />
+                    <View style={[styles.actionIconBox, { backgroundColor: alpha(theme.accent, 0.16) }]}>
+                      <Ionicons name="arrow-undo" size={20} color={theme.accent} />
                     </View>
                     <View style={styles.actionRowText}>
-                      <Text style={styles.actionRowTitle}>{i18nText("autoI18n.yanitla", "Yanıtla")}</Text>
-                      <Text style={styles.actionRowSub}>{i18nText("autoI18n.mesaji_alintila", "Mesajı alıntılayarak yanıtla")}</Text>
+                      <Text style={[styles.actionRowTitle, { color: theme.text.primary }]}>
+                        {i18nText("autoI18n.yanitla", "Yanıtla")}
+                      </Text>
+                      <Text style={[styles.actionRowSub, { color: theme.text.muted }]}>
+                        {i18nText("autoI18n.mesaji_alintila", "Mesajı alıntılayarak yanıtla")}
+                      </Text>
                     </View>
                   </TouchableOpacity>
 
                   {(canPinSelected || canUnpinSelected) && (
                     <TouchableOpacity
-                      style={styles.actionRowL}
+                      style={[styles.actionRowL, { backgroundColor: theme.secondary }]}
                       onPress={() =>
                         canUnpinSelected
                           ? unpinMessage(selectedPin)
@@ -2916,12 +3178,12 @@ export default function ChatScreen({ route, navigation }) {
                         />
                       </View>
                       <View style={styles.actionRowText}>
-                        <Text style={styles.actionRowTitle}>
+                        <Text style={[styles.actionRowTitle, { color: theme.text.primary }]}>
                           {canUnpinSelected
                             ? i18nText("autoI18n.sabitlemeyi_kaldir", "Sabitlemeyi kaldır")
                             : i18nText("autoI18n.mesaji_sabitle", "Mesajı sabitle")}
                         </Text>
-                        <Text style={styles.actionRowSub}>
+                        <Text style={[styles.actionRowSub, { color: theme.text.muted }]}>
                           {canUnpinSelected
                             ? i18nText("autoI18n.sabitlerden_cikar", "Sabitlenmiş mesajlardan çıkar")
                             : i18nText("autoI18n.sohbetin_ustunde_goster", "Sohbetin üstünde göster")}
@@ -2935,7 +3197,7 @@ export default function ChatScreen({ route, navigation }) {
                       düzenlenmesi anlamsızdır. */}
                   {canEditSelected && (
                     <TouchableOpacity
-                      style={styles.actionRowL}
+                      style={[styles.actionRowL, { backgroundColor: theme.secondary }]}
                       onPress={() => {
                         setReplyingTo(null);
                         setEditingMessage(selectedMessage);
@@ -2957,15 +3219,19 @@ export default function ChatScreen({ route, navigation }) {
                         />
                       </View>
                       <View style={styles.actionRowText}>
-                        <Text style={[styles.actionRowTitle, { color: "#fff" }]}>{i18nText("autoI18n.duzenle", "Düzenle")}</Text>
-                        <Text style={styles.actionRowSub}>{i18nText("autoI18n.mesaji_degistir", "Mesajı değiştir")}</Text>
+                        <Text style={[styles.actionRowTitle, { color: theme.text.primary }]}>
+                          {i18nText("autoI18n.duzenle", "Düzenle")}
+                        </Text>
+                        <Text style={[styles.actionRowSub, { color: theme.text.muted }]}>
+                          {i18nText("autoI18n.mesaji_degistir", "Mesajı değiştir")}
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   )}
 
                   {canDeleteSelected && (
                     <TouchableOpacity
-                      style={styles.actionRowR}
+                      style={[styles.actionRowR, { backgroundColor: theme.secondary }]}
                       onPress={() => deleteMessage(selectedMessage)}
                       activeOpacity={0.7}
                     >
@@ -2979,7 +3245,7 @@ export default function ChatScreen({ route, navigation }) {
                       </View>
                       <View style={styles.actionRowText}>
                         <Text style={[styles.actionRowTitle, { color: DANGER }]}>{i18nText("autoI18n.sil", "Sil")}</Text>
-                        <Text style={styles.actionRowSub}>{i18nText("autoI18n.bu_mesaji_kaldir", "Bu mesajı kaldır")}</Text>
+                        <Text style={[styles.actionRowSub, { color: theme.text.muted }]}>{i18nText("autoI18n.bu_mesaji_kaldir", "Bu mesajı kaldır")}</Text>
                       </View>
                     </TouchableOpacity>
                   )}
@@ -2988,7 +3254,7 @@ export default function ChatScreen({ route, navigation }) {
                       Mağaza şartı: her UGC yüzeyinde bildirme yolu olmalı. */}
                   {canModerateSelected && (
                     <TouchableOpacity
-                      style={styles.actionRowL}
+                      style={[styles.actionRowL, { backgroundColor: theme.secondary }]}
                       onPress={() => {
                         setOptionsVisible(false);
                         setReportTarget(selectedMessage);
@@ -3004,10 +3270,10 @@ export default function ChatScreen({ route, navigation }) {
                         <Feather name="flag" size={20} color="#FFA726" />
                       </View>
                       <View style={styles.actionRowText}>
-                        <Text style={[styles.actionRowTitle, { color: "#fff" }]}>
+                        <Text style={[styles.actionRowTitle, { color: theme.text.primary }]}>
                           {i18nText("autoI18n.sikayet_et", "Şikayet et")}
                         </Text>
-                        <Text style={styles.actionRowSub}>
+                        <Text style={[styles.actionRowSub, { color: theme.text.muted }]}>
                           {i18nText("autoI18n.mesaji_sikayet_et", "Mesajı şikâyet et")}
                         </Text>
                       </View>
@@ -3016,7 +3282,7 @@ export default function ChatScreen({ route, navigation }) {
 
                   {canModerateSelected && (
                     <TouchableOpacity
-                      style={styles.actionRowR}
+                      style={[styles.actionRowR, { backgroundColor: theme.secondary }]}
                       onPress={() => {
                         setOptionsVisible(false);
                         confirmBlockUser(selectedMessage.senderId);
@@ -3039,7 +3305,7 @@ export default function ChatScreen({ route, navigation }) {
                         <Text style={[styles.actionRowTitle, { color: DANGER }]}>
                           {i18nText("autoI18n.kullaniciyi_engelle", "Kullanıcıyı engelle")}
                         </Text>
-                        <Text style={styles.actionRowSub}>
+                        <Text style={[styles.actionRowSub, { color: theme.text.muted }]}>
                           {i18nText("autoI18n.engelle", "Engelle")}
                         </Text>
                       </View>
@@ -3049,11 +3315,19 @@ export default function ChatScreen({ route, navigation }) {
 
                 {/* İptal butonu */}
                 <TouchableOpacity
-                  style={styles.cancelBtn}
+                  style={[
+                    styles.cancelBtn,
+                    {
+                      backgroundColor: theme.between,
+                      borderColor: theme.border,
+                    },
+                  ]}
                   onPress={() => setOptionsVisible(false)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.cancelBtnText}>{i18nText("autoI18n.iptal", "İptal")}</Text>
+                  <Text style={[styles.cancelBtnText, { color: theme.text.primary }]}>
+                    {i18nText("autoI18n.iptal", "İptal")}
+                  </Text>
                 </TouchableOpacity>
           </BottomSheetModal>
         )}
@@ -3084,6 +3358,7 @@ export default function ChatScreen({ route, navigation }) {
           mediaType={trailerMedia?.media_type}
           id={trailerMedia?.id}
           apiKey={API_KEY}
+          originalLanguage={trailerMedia?.original_language}
           onClose={() => setTrailerMedia(null)}
         />
 
@@ -3439,10 +3714,15 @@ const styles = StyleSheet.create({
   },
 
   // ── Input alanı ────────────────────────────────────────
-  // Şeridin kendisi tamamen saydam; gölge yalnızca composerPill üzerinde.
-  // (Android'de saydam bg + elevation kombinasyonu tüm şeride dikdörtgen
-  // gölge düşürdüğünden elevation burada kullanılmıyor.)
+  // Liste alt kenara kadar uzanır; yalnız mesaj kutusu dolguludur.
+  // Ters listede paddingTop, son mesajı ölçülen kutunun üstünde tutar.
+  messageViewport: { flex: 1 },
   inputContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "transparent",
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: Platform.OS === "ios" ? 8 : 12,
@@ -3465,13 +3745,8 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     borderWidth: 1.5,
     borderRadius: 28,
-    backgroundColor: "rgba(26,26,42,0.97)",
+    backgroundColor: "transparent",
     padding: 5,
-    shadowColor: "#000",
-    shadowOpacity: 0.35,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 14,
-    elevation: 10,
   },
   // Engel bilgisi hapın yerini alıyor: aynı yükseklikte durur ki sohbet
   // listesi engelleme anında zıplamasın.
@@ -3517,6 +3792,7 @@ const styles = StyleSheet.create({
   // Android'de çok satırlı input metni tepeye yapışır, ortalamayı açıkça
   // istiyoruz; iOS textAlignVertical desteklemiyor, simetrik padding yetiyor.
   input: {
+    backgroundColor: "transparent",
     flex: 1,
     minHeight: 42,
     paddingHorizontal: 12,

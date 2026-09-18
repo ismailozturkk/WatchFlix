@@ -89,6 +89,34 @@ describe("resolveUpNextEpisode", () => {
     expect(resolved.nextUp.nextUp.nextUp).toBeNull();
   });
 
+  test("gömülü yeni modelde aradaki izlenmemiş bölümü sıradaki seçer", async () => {
+    mockTmdb();
+    const sparseShow = {
+      ...show,
+      watchedEpisodeCount: 2,
+      seasons: [
+        {
+          seasonNumber: 1,
+          seasonEpisodes: 6,
+          episodes: [
+            { episodeNumber: 1, episodeWatchTime: "2026-07-01" },
+            { episodeNumber: 3, episodeWatchTime: "2026-07-03" },
+          ],
+        },
+      ],
+    };
+
+    const resolved = await resolveUpNextEpisode(sparseShow, options);
+
+    expect(resolved).toMatchObject({
+      id: "42:1:2",
+      seasonNumber: 1,
+      episodeNumber: 2,
+      isAired: true,
+    });
+    expect(resolved.nextUp).toMatchObject({ id: "42:1:4", episodeNumber: 4 });
+  });
+
   test("aynı sezonda kalırken ek istek atmaz", async () => {
     mockTmdb();
 

@@ -33,7 +33,7 @@ export default function JokerBar({
         hitSlop={10}
         accessibilityRole="button"
         accessibilityLabel={i18nText("autoI18n.joker_yuzde_elli", "Yüzde 50 joker")}
-        style={[styles.jokerBtn, { opacity: fiftyDisabled ? 0.3 : 1 }]}
+        style={[styles.jokerBtn, { backgroundColor: gameTokens.surface, opacity: fiftyDisabled ? 0.3 : 1 }]}
       >
         <Text style={[styles.jokerBtnText, { color: gold }]}>%50</Text>
       </TouchableOpacity>
@@ -58,6 +58,6 @@ const styles = StyleSheet.create({
   jokerBar: { flexDirection: "row", alignItems: "center", gap: 8 },
   jokerCountWrap: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(255,215,0,0.15)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
   jokerCountText: { fontSize: 12, fontWeight: "800" },
-  jokerBtn: { backgroundColor: "rgba(255,255,255,0.1)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, justifyContent: "center", alignItems: "center" },
+  jokerBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, justifyContent: "center", alignItems: "center" },
   jokerBtnText: { fontSize: 12, fontWeight: "800" },
 });

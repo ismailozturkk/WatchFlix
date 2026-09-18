@@ -13,13 +13,13 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/lists_widget_item_root"
     android:layout_width="match_parent"
-    android:layout_height="112dp"
-    android:background="@drawable/lists_widget_poster_bg">
+    android:layout_height="108dp">
 
     <ImageView
         android:id="@+id/lists_widget_item_poster"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:clipToOutline="true"
         android:importantForAccessibility="no"
         android:scaleType="fitCenter" />
 

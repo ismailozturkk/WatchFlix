@@ -2,6 +2,7 @@ import {
   AI_PLAN_LIMITS,
   getPackagesForTier,
   getPackageDisplayProduct,
+  getPackageMonthlyEquivalent,
   getPackagePeriodKey,
   getPackageSavings,
   getPackageTierKey,
@@ -159,5 +160,19 @@ describe("premium helpers", () => {
         language: "tr",
       })
     ).toBe(aPackage.product);
+  });
+
+  test("calculates monthly equivalent price for annual packages", () => {
+    const annual = {
+      packageType: "ANNUAL",
+      product: { identifier: "yearly", price: 599.99, currencyCode: "TRY" },
+    };
+    const monthly = {
+      packageType: "MONTHLY",
+      product: { identifier: "monthly_2", price: 79.99, currencyCode: "TRY" },
+    };
+    const monthlyEquivalent = getPackageMonthlyEquivalent(annual, "tr");
+    expect(monthlyEquivalent).toContain("50");
+    expect(getPackageMonthlyEquivalent(monthly, "tr")).toBeNull();
   });
 });

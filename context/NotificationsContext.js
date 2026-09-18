@@ -37,7 +37,7 @@ export function NotificationsProvider({ children }) {
   // snapshot gelince "mevcutları bilinen say" tohumlaması normal işliyor —
   // erteleme geriye dönük (backfill) bildirim ÜRETMEZ. Kademeler:
   // hooks/useStartupGate.js.
-  const startupReady = useStartupGate(3400);
+  const startupReady = useStartupGate(2800);
 
   useEffect(() => {
     if (!startupReady) return undefined;

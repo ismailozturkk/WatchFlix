@@ -282,6 +282,7 @@ async function fetchSeasonsForShow({ showId, details, apiKey, language }) {
         episodeName: episode.name || "Unknown",
         episodeRatings: parseFloat(episode.vote_average?.toFixed(1)) || 0,
         episodeMinutes: episode.runtime || 0,
+        releaseDate: episode.air_date || null,
       })),
     };
   });

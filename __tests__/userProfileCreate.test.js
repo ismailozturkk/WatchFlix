@@ -188,10 +188,10 @@ describe("createUserProfile", () => {
       friendsCount: 0,
       createdAt: "TS",
       listVisible: {
-        watchedMovies: false,
-        watchedTv: false,
-        watchList: false,
-        favorites: false,
+        watchedMovies: true,
+        watchedTv: true,
+        watchList: true,
+        favorites: true,
       },
     });
   });

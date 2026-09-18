@@ -11,7 +11,12 @@ import { Keys, get, set, has } from "../services/storage";
 import Toast from "react-native-toast-message";
 import { useAuth } from "./AuthContext";
 import { useUserProfile } from "./UserProfileContext";
-import { AVATARS as avatars, clampAvatarIndex } from "../utils/avatars";
+import {
+  AVATARS as avatars,
+  clampAvatarIndex,
+  getAvatarSource,
+  CUSTOM_AVATAR_INDEX,
+} from "../utils/avatars";
 import { i18nText } from "../utils/i18nText";
 
 const ProfileUiContext = createContext();
@@ -21,6 +26,7 @@ export const ProfileUiProvider = ({ children }) => {
   const { user } = useAuth();
   const { profile, changeAvatarIndex } = useUserProfile();
   const uid = user?.uid;
+  const socialPhotoURL = profile?.photoURL || user?.photoURL || null;
 
   const [selectAvatarIndex, setSelectAvatarIndex] = useState(0);
   const [avatarHydrating, setAvatarHydrating] = useState(false);
@@ -63,11 +69,6 @@ export const ProfileUiProvider = ({ children }) => {
   };
 
   // Yerel kayıt yalnız hızlı başlangıç önbelleğidir; gerçek kaynak Firestore.
-  //
-  // MMKV GEÇİŞİ: okuma senkron olduğu için "geç gelen local okuma güncel server
-  // index'ini ezmesin" koruması (cancelled bayrağı + firestoreAvatarUidRef
-  // kontrolü) gereksizleşti — local okuma Firestore snapshot'ından ÖNCE bitiyor.
-  // Kullanıcı ayrıca avatarını bir kare gecikmeyle değil, ilk render'da görüyor.
   useEffect(() => {
     firestoreAvatarUidRef.current = null;
     if (!uid) {
@@ -113,7 +114,7 @@ export const ProfileUiProvider = ({ children }) => {
       setAvatarSaving(true);
       setSelectAvatarIndex(index);
       try {
-        await changeAvatarIndex(index);
+        await changeAvatarIndex(index, socialPhotoURL);
         set(Keys.avatarIndex, index, { uid });
         setModalVisible(false);
         return true;
@@ -134,10 +135,10 @@ export const ProfileUiProvider = ({ children }) => {
         setAvatarSaving(false);
       }
     },
-    [uid, selectAvatarIndex, changeAvatarIndex]
+    [uid, selectAvatarIndex, changeAvatarIndex, socialPhotoURL]
   );
 
-  const avatar = avatars[selectAvatarIndex] || avatars[0];
+  const avatar = getAvatarSource(selectAvatarIndex, socialPhotoURL);
   const isloadingAvatar = avatarHydrating || avatarSaving;
 
   const value = useMemo(
@@ -156,6 +157,8 @@ export const ProfileUiProvider = ({ children }) => {
       allCornersRounded,
       setAllCornersRounded,
       saveAllCornersRounded,
+      socialPhotoURL,
+      hasSocialPhoto: Boolean(socialPhotoURL),
     }),
     [
       avatar,
@@ -165,6 +168,7 @@ export const ProfileUiProvider = ({ children }) => {
       modalVisible,
       gridStyle,
       allCornersRounded,
+      socialPhotoURL,
     ]
   );
 

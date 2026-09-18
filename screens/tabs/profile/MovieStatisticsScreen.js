@@ -113,7 +113,8 @@ const MovieStatisticsScreen = ({ navigation }) => {
         posters: s.items.map((item) => ({
           key: String(item.historyId || item.watchEventId || item.id),
           imageUri: item.imagePath ? getTmdbUrl(item.imagePath, "poster", 200) : null,
-          title: item.name,
+          mediaId: item.id,
+          mediaType: "movie",
           minutes: item.minutes,
           onPress: () => navigation.navigate("MovieDetails", { id: item.id }),
         })),
@@ -129,11 +130,12 @@ const MovieStatisticsScreen = ({ navigation }) => {
         genres={section.genres}
         totalMinutes={section.totalMinutes}
         minutesLabel={t.minutes}
+        posterMinutesLabel={t.profileScreen?.minutesShort}
         formatDate={formatDate}
         rankColor={borderColorMovie}
       />
     ),
-    [theme, t.minutes, formatDate, borderColorMovie],
+    [theme, t.minutes, t.profileScreen?.minutesShort, formatDate, borderColorMovie],
   );
 
   const onToggleSearch = useCallback(() => setSearchVisible((v) => !v), []);

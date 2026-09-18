@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import { isLightSurface } from "@utils/colorUtils";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -19,9 +20,15 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
+import { useAuth } from "../../../context/AuthContext";
 import { useUserProfile } from "../../../context/UserProfileContext";
 import { useProfileUi } from "../../../context/ProfileUiContext";
-import { AVATARS, getAvatarSource, clampAvatarIndex } from "../../../utils/avatars";
+import {
+  AVATARS,
+  clampAvatarIndex,
+  CUSTOM_AVATAR_INDEX,
+} from "../../../utils/avatars";
+import UserAvatar from "../../../components/common/UserAvatar";
 import {
   formatUsernameInput,
   isValidUsername,
@@ -54,8 +61,11 @@ export default function EditProfileScreen({ navigation }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const tr = language === "tr";
+  const { user } = useAuth();
   const { profile, loading, updateField, changeUsername } = useUserProfile();
   const { selectAvatarIndex, selectAvatar } = useProfileUi();
+
+  const socialPhotoURL = profile?.photoURL || user?.photoURL || null;
 
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
@@ -66,6 +76,16 @@ export default function EditProfileScreen({ navigation }) {
   const [avatarIndex, setAvatarIndex] = useState(0);
   const [usernameStatus, setUsernameStatus] = useState("idle"); // idle|same|invalid|checking|available|taken
   const [saving, setSaving] = useState(false);
+
+  const avatarOptions = useMemo(() => {
+    if (socialPhotoURL) {
+      return [
+        { index: CUSTOM_AVATAR_INDEX, source: { uri: socialPhotoURL }, isSocial: true },
+        ...AVATARS.map((source, i) => ({ index: i, source, isSocial: false })),
+      ];
+    }
+    return AVATARS.map((source, i) => ({ index: i, source, isSocial: false }));
+  }, [socialPhotoURL]);
 
   // Hesap silme
   const [showDelete, setShowDelete] = useState(false);
@@ -395,7 +415,7 @@ export default function EditProfileScreen({ navigation }) {
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
       <ScreenDecor iconOpacity={0.25} />
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         {/* Başlık */}
         <View style={styles.header}>
@@ -442,37 +462,37 @@ export default function EditProfileScreen({ navigation }) {
             {/* Avatar önizleme */}
             <View style={styles.avatarPreviewWrap}>
               <View style={[styles.avatarRing, { borderColor: theme.accent }]}>
-                <Image
-                  source={getAvatarSource(avatarIndex)}
-                  style={styles.avatarPreview}
-                  contentFit="cover"
+                <UserAvatar
+                  avatarIndex={avatarIndex}
+                  photoURL={socialPhotoURL}
+                  isCustomPhoto
+                  size={90}
                 />
               </View>
-              <Text style={[styles.avatarHint, { color: theme.text.muted }]}>{i18nText("autoI18n.avatar_sec", "Avatar seç")}</Text>
+              <Text style={[styles.avatarHint, { color: theme.text.muted }]}>
+                {socialPhotoURL && avatarIndex === CUSTOM_AVATAR_INDEX
+                  ? "Sosyal Profil Fotoğrafı"
+                  : i18nText("autoI18n.avatar_sec", "Avatar seç")}
+              </Text>
             </View>
 
             {/* Avatar seçici */}
             <FlatList
-              data={AVATARS}
-              keyExtractor={(_, i) => String(i)}
+              data={avatarOptions}
+              keyExtractor={(item) => String(item.index)}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.avatarList}
-              initialNumToRender={10}
+              initialNumToRender={12}
               maxToRenderPerBatch={8}
               windowSize={4}
               removeClippedSubviews={Platform.OS === "android"}
-              getItemLayout={(_, index) => ({
-                length: 70,
-                offset: 70 * index,
-                index,
-              })}
-              renderItem={({ item, index }) => {
-                const selected = index === avatarIndex;
+              renderItem={({ item }) => {
+                const selected = item.index === avatarIndex;
                 return (
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    onPress={() => setAvatarIndex(index)}
+                    onPress={() => setAvatarIndex(item.index)}
                     style={[
                       styles.avatarThumbWrap,
                       {
@@ -482,11 +502,16 @@ export default function EditProfileScreen({ navigation }) {
                     ]}
                   >
                     <Image
-                      source={item}
+                      source={item.source}
                       style={styles.avatarThumb}
                       contentFit="cover"
                       cachePolicy="memory-disk"
                     />
+                    {item.isSocial && (
+                      <View style={[styles.socialBadge, { backgroundColor: theme.accent }]}>
+                        <Ionicons name="sparkles" size={8} color="#fff" />
+                      </View>
+                    )}
                   </TouchableOpacity>
                 );
               }}
@@ -838,15 +863,12 @@ const styles = StyleSheet.create({
 
   avatarList: { paddingHorizontal: 16, gap: 10, paddingVertical: 4 },
   avatarThumbWrap: {
-    width: 60,
-    height: 60,
-    borderRadius: 14,
+    padding: 2,
+    borderRadius: 16,
     borderWidth: 2,
-    padding: 3,
-    justifyContent: "center",
-    alignItems: "center",
+    borderColor: "transparent",
   },
-  avatarThumb: { width: "100%", height: "100%", borderRadius: 11 },
+  avatarThumb: { width: 56, height: 56, borderRadius: 13 },
 
   field: { paddingHorizontal: 16, marginTop: 18 },
   labelRow: {
@@ -946,4 +968,16 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   verifyBtnText: { fontSize: 15, fontWeight: "700" },
+  socialBadge: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#fff",
+  },
 });

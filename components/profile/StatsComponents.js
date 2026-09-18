@@ -24,6 +24,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import AdaptiveBlurView from "../common/AdaptiveBlurView";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import { MyPosterActivityBadge } from "@components/PosterActivityBadge";
 import { i18nText } from "../../utils/i18nText";
 
 import {
@@ -1298,8 +1299,8 @@ const CARD_H = CARD_W * 1.5;
 export const StatsPosterCard = memo(function StatsPosterCard({
   theme,
   imageUri,
-  title,
-  subtitle,
+  mediaId,
+  mediaType,
   minutes,
   minutesLabel = "dk",
   onPress,
@@ -1349,39 +1350,23 @@ export const StatsPosterCard = memo(function StatsPosterCard({
             </View>
           )}
 
-          {/* Bottom gradient for text readability */}
-          <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.85)"]}
-            style={cardStyles.bottomGrad}
-          />
-
           {/* Minutes badge (top-right) */}
           {minutes > 0 && (
-            <AdaptiveBlurView intensity={20} tint="dark" style={cardStyles.minBadge}>
+            <AdaptiveBlurView
+              intensity={45}
+              tint="dark"
+              style={[cardStyles.minBadge, { backgroundColor: "rgba(0,0,0,0.45)" }]}
+            >
               <MaterialCommunityIcons name="clock-time-four" size={9} color="#fff" />
               <Text style={cardStyles.minText}>
                 {minutes} {minutesLabel}
               </Text>
             </AdaptiveBlurView>
           )}
-
-          {/* Title overlay */}
-          {title ? (
-            <Text style={cardStyles.title} numberOfLines={2}>
-              {title}
-            </Text>
-          ) : null}
         </View>
 
-        {/* Subtitle altta */}
-        {subtitle ? (
-          <Text
-            style={[cardStyles.subtitle, { color: theme.text.secondary }]}
-            numberOfLines={1}
-          >
-            {subtitle}
-          </Text>
-        ) : null}
+        {/* Kişisel puan (yıldız) + yorum ikonu — posterin ALTINDA, içerik adı yerine */}
+        <MyPosterActivityBadge mediaId={mediaId} mediaType={mediaType} posterWidth={CARD_W} />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -1408,13 +1393,6 @@ const cardStyles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  bottomGrad: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: "55%",
-  },
   minBadge: {
     position: "absolute",
     top: 5,
@@ -1428,23 +1406,6 @@ const cardStyles = StyleSheet.create({
     overflow: "hidden",
   },
   minText: { color: "#fff", fontSize: 9, fontWeight: "700" },
-  title: {
-    position: "absolute",
-    left: 6,
-    right: 6,
-    bottom: 6,
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 13,
-  },
-  subtitle: {
-    fontSize: 10,
-    marginTop: 4,
-    textAlign: "center",
-    width: CARD_W,
-    fontWeight: "600",
-  },
 });
 
 // ─── DATE SECTION ────────────────────────────────────────────────────────────
@@ -1470,6 +1431,9 @@ export const StatsDateSection = memo(function StatsDateSection({
   genres = [],
   totalMinutes = 0,
   minutesLabel = "dk",
+  // Poster üzerindeki küçük dakika rozeti başlığın tam kelimesini değil
+  // ("Dakika") kısaltmasını kullanır ("dk") — dar rozette yer kazanır.
+  posterMinutesLabel = "dk",
   formatDate,
   rankColor,
   isFirst,
@@ -1480,14 +1444,14 @@ export const StatsDateSection = memo(function StatsDateSection({
         theme={theme}
         rankColor={rankColor}
         imageUri={item.imageUri}
-        title={item.title}
-        subtitle={item.subtitle}
+        mediaId={item.mediaId}
+        mediaType={item.mediaType}
         minutes={item.minutes}
-        minutesLabel={minutesLabel}
+        minutesLabel={posterMinutesLabel}
         onPress={item.onPress}
       />
     ),
-    [theme, rankColor, minutesLabel],
+    [theme, rankColor, posterMinutesLabel],
   );
 
   return (

@@ -33,6 +33,7 @@ import Toast from "react-native-toast-message";
 import { Octicons } from "@expo/vector-icons";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
+import UserAvatar from "@components/common/UserAvatar";
 import { useUserProfile } from "@context/UserProfileContext";
 import { appAlert } from "@components/AppAlert";
 import { i18nText } from "@utils/i18nText";
@@ -627,6 +628,8 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
           : typeof selectAvatarIndex === "number"
             ? selectAvatarIndex
             : 0,
+      authorPhotoURL: user?.photoURL || null,
+      authorAvatar: user?.photoURL || null,
     };
     if (postType === "poll") {
       payload.poll = buildPollObject({
@@ -867,7 +870,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                       {/* Draft header */}
                       <View style={s.draftHeader}>
                         {avatar ? (
-                          <Image source={avatar} style={[s.draftAvatar, { backgroundColor: theme.border }]} />
+                          <UserAvatar source={avatar} isCustomPhoto size={40} style={{ backgroundColor: theme.border }} />
                         ) : (
                           <View style={[s.draftAvatar, { backgroundColor: theme.border }]}>
                             <Ionicons name="person" size={20} color={theme.text.muted} />

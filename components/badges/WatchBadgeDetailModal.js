@@ -39,7 +39,11 @@ import { withAlpha } from "@components/profile/StatsComponents";
 import { i18nText } from "@utils/i18nText";
 
 const { height: EKRAN_H } = Dimensions.get("window");
-const SHEET_ORAN = 0.66;
+// Sabit oran YOK: sheet İÇERİĞİNE göre boyutlanır (tek kademeli kısa rozet ↔
+// 5 kademeli yol uzun rozet aynı yüksekliği paylaşmamalı). Üst sınır sadece
+// ekranın tepesine yapışmasını / çentiğe girmesini önler; içerik bunu aşarsa
+// ScrollView devreye girip kaydırılabilir hale gelir.
+const MAX_SHEET_ORAN = 0.86;
 
 // Nadirlik adları katalog emsaliyle INLINE tutulur (81 rozet metni de öyle):
 // beş kademe × iki dil = 10 dize için autoI18n anahtarı açmaya değmez.
@@ -59,8 +63,12 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
   const lang = language === "en" ? "en" : "tr";
   const tr = lang === "tr";
 
-  const SHEET_H = EKRAN_H * SHEET_ORAN;
-  const slide = useRef(new Animated.Value(SHEET_H)).current;
+  const MAX_SHEET_H = EKRAN_H * MAX_SHEET_ORAN;
+  // Kayma başlangıcı sheet'in KENDİ yüksekliği değil, tüm ekran yüksekliği:
+  // sheet artık içeriğe göre boyutlanıp önceden bilinmiyor, ama translateY
+  // olarak EKRAN_H vermek — sheet hangi boyda olursa olsun — onu ekranın
+  // tamamen altına iter (kök View zaten justifyContent:"flex-end").
+  const slide = useRef(new Animated.Value(EKRAN_H)).current;
   const backdrop = useRef(new Animated.Value(0)).current;
 
   // SÜRE ÇEVİRİCİSİ. Ekran süresi rozetlerinin ham değeri dakikadır; hangi
@@ -92,14 +100,14 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
     } else {
       // Kapanış animasyonu yalnızca GÖRÜNÜRKEN anlamlı; kapalıyken değerleri
       // sıfırlamak bir sonraki açılışın alttan gelmesini garantiler.
-      slide.setValue(SHEET_H);
+      slide.setValue(EKRAN_H);
       backdrop.setValue(0);
     }
-  }, [visible, SHEET_H, slide, backdrop]);
+  }, [visible, slide, backdrop]);
 
   const kapat = () => {
     Animated.parallel([
-      Animated.timing(slide, { toValue: SHEET_H, duration: 240, useNativeDriver: true }),
+      Animated.timing(slide, { toValue: EKRAN_H, duration: 240, useNativeDriver: true }),
       Animated.timing(backdrop, { toValue: 0, duration: 200, useNativeDriver: true }),
     ]).start(() => onClose?.());
   };
@@ -157,14 +165,23 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
         <TouchableOpacity style={styles.backdropTouchable} activeOpacity={1} onPress={kapat} />
 
         <Animated.View
-          style={[styles.sheet, { height: SHEET_H, backgroundColor: theme.secondary, transform: [{ translateY: slide }] }]}
+          style={[styles.sheet, { maxHeight: MAX_SHEET_H, backgroundColor: theme.secondary, transform: [{ translateY: slide }] }]}
         >
           <View style={[styles.topGlow, { backgroundColor: vurgu }]} />
           <View style={styles.handleWrap}>
             <View style={[styles.handle, { backgroundColor: withAlpha(theme.text.muted, 0.35) }]} />
           </View>
 
-          <ScrollView contentContainerStyle={styles.icerik} showsVerticalScrollIndicator={false}>
+          {/* flexShrink: sheet'in kendi yüksekliği içeriğe göre belirlenir;
+              içerik MAX_SHEET_H'ı aşarsa Yoga bu alanı sıkıştırır ve
+              ScrollView burada gerçek anlamda kaydırılabilir olur. Aşmazsa
+              (tek kademeli kısa rozet) ScrollView sade bir View gibi kendi
+              içeriği kadar yer kaplar — sheet fazladan boşluk taşımaz. */}
+          <ScrollView
+            style={styles.icerikScroll}
+            contentContainerStyle={styles.icerik}
+            showsVerticalScrollIndicator={false}
+          >
             {/* ── Kimlik ── */}
             <AppBadge
               glyph={gizliKilitli ? "help-outline" : badge.icon}
@@ -369,11 +386,12 @@ const styles = StyleSheet.create({
   backdropTouchable: { ...StyleSheet.absoluteFill },
   sheet: {
     borderTopLeftRadius: 26, borderTopRightRadius: 26, overflow: "hidden",
-    paddingBottom: 14,
+    paddingBottom: 26,
   },
   topGlow: { height: 3, opacity: 0.9 },
   handleWrap: { alignItems: "center", paddingTop: 9, paddingBottom: 3 },
   handle: { width: 40, height: 4, borderRadius: 2 },
+  icerikScroll: { flexShrink: 1 },
   icerik: { alignItems: "center", paddingHorizontal: 22, paddingTop: 12, paddingBottom: 18 },
   baslik: { fontSize: 21, fontWeight: "900", marginTop: 13, textAlign: "center" },
   pillSatir: { flexDirection: "row", gap: 7, marginTop: 9 },

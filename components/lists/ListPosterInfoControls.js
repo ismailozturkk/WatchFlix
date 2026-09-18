@@ -34,6 +34,20 @@ const OPTIONS = [
     defaultValue: true,
     sharedOnly: true,
   },
+  {
+    key: "rating",
+    icon: "star-outline",
+    labelKey: "autoI18n.poster_puan_bilgisi",
+    fallback: "Puanım (yıldız)",
+    defaultValue: true,
+  },
+  {
+    key: "comment",
+    icon: "chatbubble-ellipses-outline",
+    labelKey: "autoI18n.poster_yorum_ikonu",
+    fallback: "Yorum ikonu",
+    defaultValue: true,
+  },
 ];
 
 export default function ListPosterInfoControls({

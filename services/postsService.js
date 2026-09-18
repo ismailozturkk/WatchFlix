@@ -58,7 +58,12 @@ import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 import {
   createSocialNotification,
   notifyOnComment,
-} from "./socialNotificationsService";
+} from "./notificationsService";
+import {
+  trackFirestoreRead,
+  trackFirestoreWrite,
+  trackFirestoreDelete,
+} from "./usageTrackerService";
 
 const PAGE = 15;
 
@@ -109,11 +114,15 @@ export async function createPost(user, payload) {
     payload.authorAvatarIndex ?? DEFAULT_AVATAR_INDEX,
   );
 
+  const authorPhotoURL = payload.authorPhotoURL || user.photoURL || null;
+
   const base = {
     authorId: user.uid,
     authorName: payload.authorName || user.displayName || i18nText("autoI18n.kullanici", "Kullanıcı"),
     authorUsername: payload.authorUsername || "",
     authorAvatarIndex,
+    authorPhotoURL,
+    authorAvatar: authorPhotoURL,
     type: payload.type,
     title: payload.title.trim(),
     content: (payload.content || "").trim(),
@@ -137,7 +146,8 @@ export async function createPost(user, payload) {
       votes: {},
     };
   }
-  const postRef = await addDoc(collection(db, "Posts"), base);
+  const docRef = await addDoc(collection(db, "Posts"), base);
+  trackFirestoreWrite("Posts", 1);
 
   // Kullanıcı dokümanını "denormalize cache" olarak güncelle: postsCount artır
   // ve avatarIndex'i son hâle senkronla (post'tan dolaylı olarak gelir).
@@ -156,7 +166,7 @@ export async function createPost(user, payload) {
     visibility: base.visibility,
   });
 
-  return postRef.id;
+  return docRef.id;
 }
 
 export async function deletePost(postId, uid) {
@@ -227,6 +237,7 @@ export async function fetchFeed({ filter = "all", sort = "recent", lastDoc = nul
   }
 
   const snap = await getDocs(q);
+  trackFirestoreRead("Posts", snap.docs.length);
   return {
     posts: snap.docs.map(serializePost),
     lastDoc: snap.docs[snap.docs.length - 1] || null,
@@ -241,6 +252,7 @@ export async function fetchPost(postId) {
   if (!postId) return null;
   try {
     const snap = await getDoc(doc(db, "Posts", postId));
+    trackFirestoreRead("Posts", 1);
     if (!snap.exists()) return null;
     return serializePost(snap);
   } catch (e) {

@@ -10,6 +10,8 @@ function normalizeIdentity(profile = {}) {
       typeof profile.username === "string" ? profile.username.trim() : "",
     avatarIndex:
       typeof profile.avatarIndex === "number" ? profile.avatarIndex : 0,
+    photoURL:
+      typeof profile.photoURL === "string" ? profile.photoURL.trim() : null,
   };
 }
 
@@ -21,7 +23,9 @@ function buildProfileIdentityChanges(beforeProfile = {}, afterProfile = {}) {
     after,
     nameChanged: before.displayName !== after.displayName,
     usernameChanged: before.username !== after.username,
-    avatarChanged: before.avatarIndex !== after.avatarIndex,
+    avatarChanged:
+      before.avatarIndex !== after.avatarIndex ||
+      before.photoURL !== after.photoURL,
   };
 }
 
@@ -35,6 +39,9 @@ function mappedPatch(changes, mapping) {
   }
   if (changes.avatarChanged && mapping.avatarIndex) {
     patch[mapping.avatarIndex] = changes.after.avatarIndex;
+    if (mapping.photoURL) {
+      patch[mapping.photoURL] = changes.after.photoURL;
+    }
   }
   return patch;
 }

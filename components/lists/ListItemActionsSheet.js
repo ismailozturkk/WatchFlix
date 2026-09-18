@@ -14,8 +14,58 @@ import PosterImage from "@components/PosterImage";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
 import * as Haptics from "@services/hapticsService";
+import { buildGenreMap } from "@utils/genreLabels";
 
 const DANGER = "#ef4444";
+
+function formatItemDuration(item) {
+  if (!item) return null;
+  const mins = Number(item.minutes);
+  if (mins > 0) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h > 0 ? `${h} sa ${m > 0 ? `${m} dk` : ""}` : `${mins} dk`;
+  }
+  let totalMins = Number(item.totalMinutes) || 0;
+  if (!totalMins && Array.isArray(item.seasons)) {
+    item.seasons.forEach((s) => {
+      (s.episodes || []).forEach((ep) => {
+        if (ep && typeof ep.episodeMinutes === "number") {
+          totalMins += ep.episodeMinutes;
+        }
+      });
+    });
+  }
+  if (totalMins > 0) {
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    return h > 0 ? `${h} sa ${m > 0 ? `${m} dk` : ""}` : `${totalMins} dk`;
+  }
+  if (item.showEpisodeCount) {
+    return `${item.showEpisodeCount} ${i18nText("autoI18n.bolum", "bölüm")}`;
+  }
+  return null;
+}
+
+function formatItemGenres(item) {
+  if (!item) return [];
+  const genreMap = buildGenreMap();
+  const raw = item.genres || item.genre_ids || [];
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+
+  return raw
+    .map((g) => {
+      if (typeof g === "number") return genreMap[g] || null;
+      if (typeof g === "string") {
+        const num = Number(g);
+        if (!isNaN(num) && genreMap[num]) return genreMap[num];
+        return g;
+      }
+      if (typeof g === "object" && g && g.name) return g.name;
+      return null;
+    })
+    .filter(Boolean);
+}
 
 export default function ListItemActionsSheet({
   visible,
@@ -46,6 +96,9 @@ export default function ListItemActionsSheet({
   const validTarget =
     Number.isInteger(target) && target >= 1 && target <= itemCount;
   const moveDisabled = busy || !validTarget || target === currentIndex + 1;
+
+  const durationText = formatItemDuration(item);
+  const genres = formatItemGenres(item);
 
   const stepPosition = (delta) => {
     const base = validTarget ? target : currentIndex + 1;
@@ -112,6 +165,33 @@ export default function ListItemActionsSheet({
               <Text numberOfLines={2} style={[styles.itemName, { color: theme.text.primary }]}>
                 {item?.name}
               </Text>
+
+              {/* Süre ve Türler */}
+              <View style={styles.metaRow}>
+                {durationText ? (
+                  <View style={[styles.infoChip, { backgroundColor: accent + "18", borderColor: accent + "44" }]}>
+                    <Ionicons name="time-outline" size={11} color={accent} />
+                    <Text style={[styles.infoChipText, { color: accent }]}>{durationText}</Text>
+                  </View>
+                ) : null}
+
+                {genres.slice(0, 3).map((g, idx) => (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.infoChip,
+                      {
+                        backgroundColor: theme.notesColor?.blueBackground || "rgba(75, 105, 255, 0.15)",
+                        borderColor: (theme.notesColor?.blue || accent) + "44",
+                      },
+                    ]}
+                  >
+                    <Ionicons name="film-outline" size={11} color={theme.notesColor?.blue || accent} />
+                    <Text style={[styles.infoChipText, { color: theme.notesColor?.blue || accent }]}>{g}</Text>
+                  </View>
+                ))}
+              </View>
+
               <Text style={[styles.positionText, { color: theme.text.muted }]}>
                 {i18nText("autoI18n.mevcut_sira", "Mevcut sıra")}: {currentIndex + 1}/{itemCount}
               </Text>
@@ -288,6 +368,9 @@ const styles = StyleSheet.create({
   poster: { width: 48, height: 72, borderRadius: 9 },
   previewCopy: { flex: 1, marginLeft: 12 },
   itemName: { fontSize: 15, fontWeight: "800", lineHeight: 20 },
+  metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 },
+  infoChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8, borderWidth: 0.8 },
+  infoChipText: { fontSize: 11, fontWeight: "700" },
   positionText: { fontSize: 11.5, marginTop: 7, fontWeight: "600" },
   actionRow: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 15, padding: 12, marginTop: 9 },
   actionIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },

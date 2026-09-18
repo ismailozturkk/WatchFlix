@@ -25,11 +25,10 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useTheme } from "../../../context/ThemeContext";
 import { useFriends } from "../../../context/FriendsContext";
 import { getUserProfile } from "../../../services/userService";
-import { clampAvatarIndex, getAvatarSource } from "../../../utils/avatars";
+import UserAvatar from "../../../components/common/UserAvatar";
 import { appAlert } from "../../../components/AppAlert";
 import ScreenDecor from "../../../components/ScreenDecor";
 import { i18nText } from "../../../utils/i18nText";
-import { Image } from "expo-image";
 
 export default function BlockedUsersScreen({ navigation }) {
   const { theme } = useTheme();
@@ -103,11 +102,7 @@ export default function BlockedUsersScreen({ navigation }) {
       i18nText("autoI18n.kullanici", "Kullanıcı");
     return (
       <View style={[styles.row, { borderColor: theme.border }]}>
-        <Image
-          source={getAvatarSource(clampAvatarIndex(profile?.avatarIndex))}
-          style={styles.avatar}
-          contentFit="cover"
-        />
+        <UserAvatar avatarIndex={profile?.avatarIndex} photoURL={profile?.photoURL} isCustomPhoto size={42} />
         <View style={styles.rowText}>
           <Text numberOfLines={1} style={[styles.name, { color: theme.text.primary }]}>
             {name}

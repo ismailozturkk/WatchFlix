@@ -604,6 +604,7 @@ export default function UpNextScreen({ navigation }) {
         releaseDate={dateItem?.airDate || undefined}
         minDate={dateItem?.airDate || undefined}
         mediaType="tv"
+        scope="episode"
         onConfirm={(date) => {
           const selectedItem = dateItem;
           if (!selectedItem) return;

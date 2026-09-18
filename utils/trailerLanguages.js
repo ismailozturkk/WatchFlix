@@ -35,14 +35,13 @@ export const trailerLanguageOf = (code) => {
 };
 
 export const buildTrailerLanguageOrder = ({ originalLanguage, appLanguage, selectedLanguage }) => {
-  const original = normalizeTrailerLanguageCode(originalLanguage);
   const app = normalizeTrailerLanguageCode(appLanguage);
-  const selected = normalizeTrailerLanguageCode(selectedLanguage, original);
-  // Hızlı seçimlerin sabit anlamı:
-  //   1. yapımın özgün dili (ilk açılışta seçili),
+  const original = normalizeTrailerLanguageCode(originalLanguage);
+  const selected = normalizeTrailerLanguageCode(selectedLanguage, app);
+  // Sıralama kuralı:
+  //   1. Seçili dil (uygulama dili / seçilen dil),
   //   2. İngilizce,
-  //   3. uygulama dili.
-  // Aynı dil iki role denk gelirse yinelenmez; dil sayfasından seçilmiş farklı
-  // bir dil de kullanıcı geri dönebilsin diye en sona eklenir.
-  return [...new Set([original, "en", app, selected])];
+  //   3. İçeriğin ana dili.
+  // Diğer diller modalından seçilen farklı bir dil varsa en sona eklenir.
+  return [...new Set([app, "en", original, selected])];
 };

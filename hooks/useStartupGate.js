@@ -8,21 +8,20 @@
 // arkasına alınır, her biri farklı gecikmeyle sırayla devreye girer.
 //
 // KADEME TABLOSU — yeni bir kapı eklerken çakışmayan bir dilim seç:
-//   1200  İkon fontları: FontAwesome/Feather/Octicons/MaterialIcons (App.js,
-//         bu hook'u kullanmaz; Ionicons+MaterialCommunityIcons splash'te)
-//   1600  PetContext (kendi InteractionManager+setTimeout'u, bu hook'u kullanmaz)
-//   1800  MediaActivityContext   (puan/yorum listener'ları; rozetler tohumdan)
-//   2000  SharedListsContext     (ortak liste üyelik + item listener'ları)
-//   2200  PostsContext           (feed fetch + realtime listener)
-//   2400  ProfileRemindersContext(2+N hatırlatıcı listener'ı; widget tohumdan)
-//   2600  ProfileNotesContext    (not listener'ı)
-//   2800  UserProfileContext     (migration + profil listener'ı; ChatModal 3800'den önce)
-//   3000  FriendsContext         (3 istek/arkadaş listener'ı)
-//   3200  ProfileStatsContext    (Lists kök + watched listener'ları)
-//   3400  NotificationsContext   (bildirim listener'ı; OS rozeti bundan türer)
-//   3800  ChatModal mount'u (App.js, bu hook'u kullanmaz)
-//   4200  DeviceNotificationsContext (izin + push token + hatırlatıcı zamanlama)
-//   5000  Font kataloğu (context/TypographyContext.js, kendi zamanlayıcısı)
+//   800   İkon fontları: FontAwesome/Feather/Octicons/MaterialIcons (App.js)
+//   1000  MediaActivityContext   (puan/yorum listener'ları; rozetler tohumdan)
+//   1200  UserProfileContext     (migration + profil listener'ı)
+//   1400  FriendsContext         (3 istek/arkadaş listener'ı)
+//   1600  ProfileStatsContext    (Lists kök + watched listener'ları)
+//   1800  SharedListsContext     (ortak liste üyelik + item listener'ları)
+//   2000  PostsContext           (feed fetch + realtime listener)
+//   2200  ProfileRemindersContext(2+N hatırlatıcı listener'ı; widget tohumdan)
+//   2400  ProfileNotesContext    (not listener'ı)
+//   2600  MediaNotesContext      (film/dizi notu listener'ı)
+//   2800  NotificationsContext   (bildirim listener'ı; OS rozeti bundan türer)
+//   3200  ChatModal mount'u (App.js, bu hook'u kullanmaz)
+//   3600  DeviceNotificationsContext (izin + push token + hatırlatıcı zamanlama)
+//   4000  Font kataloğu (context/TypographyContext.js, kendi zamanlayıcısı)
 //
 // Kapı SADECE ertelenebilir işleri korumalı: açılış karesinin çizdiği veri ya
 // senkron tohumdan gelmeli (snapshotCache/MMKV) ya da hiç kapılanmamalı

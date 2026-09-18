@@ -16,7 +16,7 @@ import { useTheme } from "@context/ThemeContext";
 import { useFriends } from "@context/FriendsContext";
 import { useUserProfile } from "@context/UserProfileContext";
 import { createSharedList, addSharedListMembers } from "@services/sharedListsService";
-import { getAvatarSource } from "@utils/avatars";
+import UserAvatar from "../common/UserAvatar";
 import { i18nText } from "@utils/i18nText";
 
 // Ortak liste oluşturma / mevcut ortak listeye üye ekleme sayfası (bottom sheet).
@@ -58,6 +58,7 @@ export default function CreateSharedListModal({
         name: f.friendName || "",
         username: f.friendUsername || "",
         avatarIndex: f.friendAvatarIndex ?? 0,
+        photoURL: f.friendPhotoURL || f.photoURL || null,
       }))
       .filter((f) => f.uid && !existing.has(f.uid));
   }, [friends, addToList?.memberIds]);
@@ -141,7 +142,7 @@ export default function CreateSharedListModal({
           },
         ]}
       >
-        <Image source={getAvatarSource(item.avatarIndex)} style={styles.avatar} />
+        <UserAvatar avatarIndex={item.avatarIndex} photoURL={item.photoURL} isCustomPhoto size={34} />
         <View style={styles.friendInfo}>
           <Text
             numberOfLines={1}

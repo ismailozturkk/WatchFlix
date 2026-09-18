@@ -34,7 +34,7 @@ const CORNER_EDGES = {
 };
 
 // Ölçeğe göre köşe konumu (kenar boşluğu poster boyutuyla küçülür).
-function cornerStyle(corner, s) {
+export function cornerStyle(corner, s) {
   const edges = CORNER_EDGES[corner];
   if (!edges) return null;
   const inset = Math.max(4, Math.round(6 * s));
@@ -83,7 +83,9 @@ function formatReleaseDate(dateStr, variant, isEn) {
 }
 
 // Ortak: poster boyutuna ve genişliğine göre ölçek + ölçekli taban hap stilleri.
-function usePillMetrics(scale, posterWidth) {
+// PosterActivityBadge (kişisel puan/yorum rozeti) de bu ölçek matematiğini
+// paylaşır — poster boyutuna göre orantılı büyüsün diye export edilir.
+export function usePillMetrics(scale, posterWidth) {
   const { railPosterSize, listsGridColumns } = useListLayoutSettings();
   let s = 1;
   if (scale != null) {

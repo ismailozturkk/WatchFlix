@@ -8,6 +8,7 @@
 import {
   assertWatchable,
   canMarkWatched,
+  filterWatchableEpisodes,
   getReleaseState,
   RELEASE_STATE,
   WATCH_BLOCKED,
@@ -72,5 +73,24 @@ describe("canMarkWatched / assertWatchable", () => {
     } catch (error) {
       expect(error.code).toBe(WATCH_BLOCKED.UNKNOWN_DATE);
     }
+  });
+});
+
+describe("filterWatchableEpisodes", () => {
+  test("toplu işaretlemede gelecek bölümü dışarıda bırakır", () => {
+    const episodes = [
+      { episodeNumber: 1, releaseDate: gecmis },
+      { episodeNumber: 2, releaseDate: ileri() },
+      { episodeNumber: 3 }, // eski çağıranlarla geriye uyumlu
+      { episodeNumber: 4, releaseDate: null },
+    ];
+    expect(filterWatchableEpisodes(episodes).map((ep) => ep.episodeNumber)).toEqual([
+      1,
+      3,
+    ]);
+  });
+
+  test("geçersiz girdi güvenle boş liste döndürür", () => {
+    expect(filterWatchableEpisodes(null)).toEqual([]);
   });
 });

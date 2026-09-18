@@ -35,6 +35,7 @@ const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getDatabase } = require("firebase-admin/database");
 const { Expo } = require("expo-server-sdk");
 const { createHash, timingSafeEqual } = require("node:crypto");
 const { extractRegionProviders, computeNewlyAvailable } = require("./streamingDiff");
@@ -58,6 +59,15 @@ const {
 initializeApp();
 const db = getFirestore();
 const expo = new Expo();
+// RTDB'ye erişim yalnızca "alıcı zaten bu sohbeti ekranda açık tutuyor mu"
+// kontrolü için (bkz. onSocialNotificationCreated) — RTDB yoksa (proje
+// database.rules.json'suz kurulmuşsa) null kalır, kontrol sessizce atlanır.
+let rtdb = null;
+try {
+  rtdb = getDatabase();
+} catch (e) {
+  console.warn("RTDB başlatılamadı (inChat kontrolü atlanacak):", e.message);
+}
 
 // Aynı anda çok fazla instance açıp maliyeti şişirmemek için tavan.
 setGlobalOptions({ maxInstances: 10 });
@@ -816,6 +826,28 @@ exports.onSocialNotificationCreated = onDocumentCreated(
       return;
     }
 
+    // Alıcı, gönderenle olan bu 1-1 sohbeti tam o an ekranda açık tutuyorsa
+    // (chatRtdb.js'nin inChat bayrağı) push gereksiz — mesajı zaten sohbette
+    // canlı görüyor. Yalnızca 1-1 mesajlar için: gruplarda inChat izlenmiyor
+    // (bkz. chatRtdb.js — enterChat/leaveChat yalnızca 1-1 modunda çağrılır).
+    if (rtdb && n.type === "message" && !n.groupId && n.fromUid) {
+      const chatId =
+        n.fromUid > recipientUid
+          ? `${n.fromUid}_${recipientUid}`
+          : `${recipientUid}_${n.fromUid}`;
+      try {
+        const inChatSnap = await rtdb
+          .ref(`chatMeta/${chatId}/inChat/${recipientUid}`)
+          .get();
+        if (inChatSnap.val() === true) {
+          console.log(`Alıcı sohbette, push atlandı: ${recipientUid}`);
+          return;
+        }
+      } catch (e) {
+        console.warn("inChat kontrolü başarısız (push yine de gönderilecek):", e.message);
+      }
+    }
+
     // Token'lar Users/{uid}/private/push'ta (+ geçiş süresince kök alanlar).
     const { tokens, priv } = await loadPushTokens(recipientUid, userData);
     if (tokens.length === 0) {
@@ -941,53 +973,62 @@ exports.onUserProfileUpdated = onDocumentUpdated(
   const { nameChanged, usernameChanged, avatarChanged } = changes;
   if (!nameChanged && !usernameChanged && !avatarChanged) return;
 
-  const { displayName: name, username, avatarIndex } = changes.after;
+  const { displayName: name, username, avatarIndex, photoURL } = changes.after;
 
   // Hedefe gore yalniz DEGISEN alanlar (gereksiz yazma yok).
   const patchAuthor = mappedPatch(changes, {
     displayName: "authorName",
     username: "authorUsername",
     avatarIndex: "authorAvatarIndex",
+    photoURL: "authorPhotoURL",
   });
   const patchMediaComment = mappedPatch(changes, {
     displayName: "username",
     username: "userHandle",
     avatarIndex: "avatarIndex",
+    photoURL: "authorPhotoURL",
   });
   const patchFriend = mappedPatch(changes, {
     displayName: "friendName",
     username: "friendUsername",
     avatarIndex: "friendAvatarIndex",
+    photoURL: "friendPhotoURL",
   });
   const patchFrom = mappedPatch(changes, {
     displayName: "fromName",
     username: "fromUsername",
     avatarIndex: "fromAvatarIndex",
+    photoURL: "fromPhotoURL",
   });
   const patchTo = mappedPatch(changes, {
     displayName: "toName",
     username: "toUsername",
     avatarIndex: "toAvatarIndex",
+    photoURL: "toPhotoURL",
   });
   const patchNotif = mappedPatch(changes, {
     displayName: "fromName",
     username: "fromUsername",
     avatarIndex: "fromAvatarIndex",
+    photoURL: "fromPhotoURL",
   });
   const patchConversation = mappedPatch(changes, {
     displayName: "withName",
     username: "withUsername",
     avatarIndex: "withAvatarIndex",
+    photoURL: "withPhotoURL",
   });
   const patchMessage = mappedPatch(changes, {
     displayName: "senderName",
     username: "senderUsername",
     avatarIndex: "senderAvatarIndex",
+    photoURL: "senderPhotoURL",
   });
   const patchLeaderboard = mappedPatch(changes, {
     displayName: "displayNameSnapshot",
     username: "usernameSnapshot",
     avatarIndex: "avatarIndexSnapshot",
+    photoURL: "photoURLSnapshot",
   });
 
   const log = (k, c) => console.log(`profil fan-out [${k}] uid=${uid}: ${c}`);
@@ -1110,7 +1151,10 @@ exports.onUserProfileUpdated = onDocumentUpdated(
         const patch = {};
         if (nameChanged) patch[`memberInfo.${uid}.name`] = name;
         if (usernameChanged) patch[`memberInfo.${uid}.username`] = username;
-        if (avatarChanged) patch[`memberInfo.${uid}.avatarIndex`] = avatarIndex;
+        if (avatarChanged) {
+          patch[`memberInfo.${uid}.avatarIndex`] = avatarIndex;
+          patch[`memberInfo.${uid}.photoURL`] = photoURL || null;
+        }
         if (data.lastMessage?.senderId === uid && nameChanged) {
           patch["lastMessage.senderName"] = name;
         }
@@ -1136,7 +1180,10 @@ exports.onUserProfileUpdated = onDocumentUpdated(
       const replyPatch = {};
       if (nameChanged) replyPatch["reply.senderName"] = name;
       if (usernameChanged) replyPatch["reply.senderUsername"] = username;
-      if (avatarChanged) replyPatch["reply.senderAvatarIndex"] = avatarIndex;
+      if (avatarChanged) {
+        replyPatch["reply.senderAvatarIndex"] = avatarIndex;
+        replyPatch["reply.senderPhotoURL"] = photoURL || null;
+      }
       log("message-replies", await commitRefs(s.docs.map((d) => d.ref), replyPatch));
     } catch (e) {
       console.error("fan-out message replies:", e);
@@ -1160,10 +1207,16 @@ exports.onUserProfileUpdated = onDocumentUpdated(
       const patch = {};
       if (nameChanged) patch[`members.${uid}.name`] = name;
       if (usernameChanged) patch[`members.${uid}.username`] = username;
-      if (avatarChanged) patch[`members.${uid}.avatarIndex`] = avatarIndex;
+      if (avatarChanged) {
+        patch[`members.${uid}.avatarIndex`] = avatarIndex;
+        patch[`members.${uid}.photoURL`] = photoURL || null;
+      }
       if (data.ownerId === uid && nameChanged) patch.ownerName = name;
       if (data.ownerId === uid && usernameChanged) patch.ownerUsername = username;
-      if (data.ownerId === uid && avatarChanged) patch.ownerAvatarIndex = avatarIndex;
+      if (data.ownerId === uid && avatarChanged) {
+        patch.ownerAvatarIndex = avatarIndex;
+        patch.ownerPhotoURL = photoURL || null;
+      }
       return { ref: d.ref, patch };
     });
     log("shared-lists", await commitUpdates(items));
@@ -1174,6 +1227,7 @@ exports.onUserProfileUpdated = onDocumentUpdated(
     displayName: "addedByName",
     username: "addedByUsername",
     avatarIndex: "addedByAvatarIndex",
+    photoURL: "addedByPhotoURL",
   });
   if (hasPatch(patchSharedItem)) {
     try {
@@ -1707,5 +1761,26 @@ exports.archiveTournamentWinners = onSchedule(
     console.log(
       `[turnuva-arşiv] tamam — bekleyen dönem: ${pending.length}, yeni kayıt: ${written}, arşivde: ${archived.size}.`,
     );
+  },
+);
+
+
+// CineSwipe: wait until both devices have saved the final result locally.
+const { resultsDelivered, deleteDeliveredRoom, deleteExpiredRooms } = require("./cineRoomCleanup");
+exports.cleanupDeliveredCineRoom = onDocumentUpdated(
+  { document: "CineRooms/{roomId}", retry: true },
+  async (event) => {
+    if (event.data?.after && resultsDelivered(event.data.after.data())) {
+      await deleteDeliveredRoom(db, event.data.after.ref);
+    }
+  },
+);
+
+// Fallback for disconnected/abandoned clients (including legacy rooms).
+exports.cleanupExpiredCineRooms = onSchedule(
+  { schedule: "every 15 minutes", timeoutSeconds: 300, maxInstances: 1 },
+  async () => {
+    const { Timestamp } = require("firebase-admin/firestore");
+    await deleteExpiredRooms(db, Timestamp);
   },
 );

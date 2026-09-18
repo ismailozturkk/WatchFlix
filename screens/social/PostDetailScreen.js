@@ -23,7 +23,7 @@ import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
-import { getAvatarSource } from "@utils/avatars";
+import UserAvatar from "@components/common/UserAvatar";
 import { i18nText } from "@utils/i18nText";
 import { postTypeBadge } from "@utils/postComposer";
 import AppIcon from "@components/AppIcon";
@@ -53,7 +53,7 @@ export default function PostDetailScreen({ route, navigation }) {
   const { postId, openComments = false } = route.params || {};
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { selectAvatarIndex } = useProfileUi();
+  const { selectAvatarIndex, avatar } = useProfileUi();
   const { getTmdbUrl } = useImageQualitySettings();
 
   const [post, setPost] = useState(null);
@@ -205,10 +205,16 @@ export default function PostDetailScreen({ route, navigation }) {
         >
           {/* Yazar satırı */}
           <View style={styles.authorRow}>
-            <Image
-              source={getAvatarSource(post.authorAvatarIndex ?? 0)}
-              style={styles.avatar}
-            />
+            {post.authorId === user?.uid && avatar ? (
+              <UserAvatar source={avatar} isCustomPhoto size={44} />
+            ) : (
+              <UserAvatar
+                avatarIndex={post.authorAvatarIndex}
+                photoURL={post.authorPhotoURL || post.authorAvatar}
+                isCustomPhoto
+                size={44}
+              />
+            )}
             <View style={{ flex: 1 }}>
               <Text style={[styles.authorName, { color: theme.text.primary }]} numberOfLines={1}>
                 {post.authorName || i18nText("autoI18n.kullanici", "Kullanıcı")}

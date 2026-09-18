@@ -84,21 +84,6 @@ private class ListsRemoteViewsFactory(
   override fun getViewAt(position: Int): RemoteViews {
     val rv = RemoteViews(context.packageName, R.layout.lists_widget_item)
     val url = posters.getOrNull(position) ?: return rv
-    WidgetThemeViews.tintBackground(
-      rv,
-      R.id.lists_widget_item_root,
-      preferences.listsAppearance.surfaceAlt,
-    )
-    val density = context.resources.displayMetrics.density
-    val padding = ((if (preferences.listsCompact) 2 else 5) * density).toInt()
-    rv.setViewPadding(
-      R.id.lists_widget_item_root,
-      padding,
-      padding,
-      padding,
-      padding,
-    )
-
     val bitmap = loadPoster(url)
     if (bitmap != null) {
       rv.setViewVisibility(R.id.lists_widget_item_poster, View.VISIBLE)
@@ -181,9 +166,9 @@ private class ListsRemoteViewsFactory(
     // hücre başına ~235 KB tutar. Bir RemoteViews nesnesi binder üzerinden
     // geçerken 1 MB sınırına takılabildiği için hücre başına tek bitmap ve bu
     // boy bilinçli seçildi.
-    private const val POSTER_W_PX = 198
-    private const val POSTER_H_PX = 297
-    private const val CORNER_PX = 22f
+    private const val POSTER_W_PX = 192
+    private const val POSTER_H_PX = 288
+    private const val CORNER_PX = 24f
 
     // Bayt tabanlı cache: sabit sayı yerine bütçe, çünkü tek hücre ~235 KB.
     // 8 MB ≈ 34 poster — görünür alan artı kaydırma tamponu için yeterli;

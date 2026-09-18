@@ -52,7 +52,7 @@ export const SharedListsProvider = ({ children }) => {
   // tohum/cache olmadığı için rozet kapı+snapshot kadar geç görünür (kayıp
   // yok, kozmetik). Üyelik listesi gelmeden item listener'ları da açılmıyor —
   // ikinci effect'i ayrıca kapılamaya gerek yok. Kademeler: hooks/useStartupGate.js.
-  const startupReady = useStartupGate(2000);
+  const startupReady = useStartupGate(1800);
 
   useEffect(() => {
     if (!startupReady) return undefined;

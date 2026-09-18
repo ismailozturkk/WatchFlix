@@ -277,6 +277,7 @@ export default function TournamentScreen() {
   const [searchVisible, setSearchVisible] = useState(false);   // aday arama modalı
   const [pendingNom, setPendingNom] = useState(null);          // 2 adımlı hype onayı
   const [treeMatchId, setTreeMatchId] = useState(null);        // ağaçtan seçilen maç
+  const [infoVisible, setInfoVisible] = useState(false);       // liste/ağaç kullanım ipucu modalı
   const nomTimer = useRef(null);
 
   // Canlı saat (geri sayım + tur geçişleri için). Dakika hassasiyeti yeterli.
@@ -572,6 +573,21 @@ export default function TournamentScreen() {
   const theTheme = lang === "tr" ? entry.tr : entry.en;
   const phaseMeta = PHASE_META[phaseInfo.phase] || PHASE_META.selection;
 
+  // ── Geçen ayın kazananı (ilk 3 + oy sayıları) — küçük kupa ikonu, podyum
+  // modalını açar. Başlık/alt yazı kaldırıldı; tüm bilgi accessibilityLabel'da.
+  // Header'ın en sağında yer alır.
+  const PodiumButton = (
+    <TouchableOpacity
+      onPress={() => setPodiumVisible(true)}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={`${i18nText("autoI18n.tournament_last_winner", "Geçen Ayın Kazananı")} — ${i18nText("autoI18n.tournament_podium_sub", "İlk 3 · oy sayıları · geçmiş kazananlar")}`}
+      style={[styles.podiumBtn, { backgroundColor: theme.secondary, borderColor: "#F5C51855" }]}
+    >
+      <AppIcon family="Ionicons" name="trophy" size={17} color="#F5C518" />
+    </TouchableOpacity>
+  );
+
   // ── Header ──────────────────────────────────────────────────────────────────
   const Header = (
     <View style={styles.headerRow}>
@@ -590,6 +606,7 @@ export default function TournamentScreen() {
           {lang === "tr" ? phaseMeta.tr : phaseMeta.en}
         </Text>
       </View>
+      {PodiumButton}
     </View>
   );
 
@@ -615,13 +632,12 @@ export default function TournamentScreen() {
     setViewMode("list");
   }, []);
 
-  // 2x2 bilgi gridi: Tür / Ortam / Ay / Aşama — her kart o fazın paletinden bir
-  // renk alır (grid[0..3]), böylece hero her fazda görsel olarak farklılaşır.
+  // Tek satırlık bilgi şeridi: Tür / Ortam / Ay — eşit genişlikte 3 sütun.
+  // Aşama zaten Header'daki phaseChip'te gösteriliyor, burada tekrar etmiyor.
   const heroGridItems = [
     { key: "theme", icon: "pricetag", label: i18nText("autoI18n.tournament_genre", "Tür"), value: theTheme },
     { key: "media", icon: entry.mediaType === "tv" ? "tv" : "film", label: i18nText("autoI18n.tournament_format", "Ortam"), value: mediaLabel(entry.mediaType, lang) },
     { key: "month", icon: "calendar", label: i18nText("autoI18n.tournament_month", "Ay"), value: monthLabel(monthIndex, lang) },
-    { key: "phase", icon: phaseMeta.icon, label: i18nText("autoI18n.tournament_stage", "Aşama"), value: lang === "tr" ? phaseMeta.tr : phaseMeta.en },
   ];
 
   const Hero = (
@@ -634,15 +650,16 @@ export default function TournamentScreen() {
       <View pointerEvents="none" style={styles.heroGlow} />
       <Text style={styles.heroTheme} numberOfLines={1}>{theTheme}</Text>
 
-      {/* Bilgi gridi — tür/ortam/ay/aşama, faza özgü renklerle */}
+      {/* Bilgi şeridi — tür/ortam/ay, eşit genişlikte 3 sütun; her sütunda ikon
+          solda, etiket+değer sağında YATAY (kompakt, dikey yer kaplamasın). */}
       <View style={styles.heroGrid}>
         {heroGridItems.map((item, i) => (
           <View key={item.key} style={styles.heroGridCell}>
             <View style={[styles.heroGridIcon, { backgroundColor: phaseMeta.grid[i] }]}>
-              <AppIcon family="Ionicons" name={item.icon} size={13} color="#1a1a1a" />
+              <AppIcon family="Ionicons" name={item.icon} size={12} color="#1a1a1a" />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.heroGridLabel}>{item.label}</Text>
+            <View style={styles.heroGridTextWrap}>
+              <Text style={styles.heroGridLabel} numberOfLines={1}>{item.label}</Text>
               <Text style={styles.heroGridValue} numberOfLines={1}>{item.value}</Text>
             </View>
           </View>
@@ -662,28 +679,6 @@ export default function TournamentScreen() {
       {/* İnteraktif aşama çizelgesi — düğüme bas: o turun listesine git */}
       <StageTimeline periodId={periodId} nowMs={nowMs} lang={lang} onStagePress={handleStagePress} />
     </LinearGradient>
-  );
-
-  // ── Geçen ayın kazananı (ilk 3 + oy sayıları) — podyum modal butonu ─────────
-  const PodiumButton = (
-    <TouchableOpacity
-      onPress={() => setPodiumVisible(true)}
-      activeOpacity={0.85}
-      style={[styles.podiumBtn, { backgroundColor: theme.secondary, borderColor: "#F5C51855" }]}
-    >
-      <View style={styles.podiumIconWrap}>
-        <AppIcon family="Ionicons" name="trophy" size={16} color="#F5C518" />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.podiumBtnTitle, { color: theme.text.primary }]}>
-          {i18nText("autoI18n.tournament_last_winner", "Geçen Ayın Kazananı")}
-        </Text>
-        <Text style={[styles.podiumBtnSub, { color: theme.text.muted }]}>
-          {i18nText("autoI18n.tournament_podium_sub", "İlk 3 · oy sayıları · geçmiş kazananlar")}
-        </Text>
-      </View>
-      <AppIcon family="Ionicons" name="chevron-forward" size={16} color={theme.text.muted} />
-    </TouchableOpacity>
   );
 
   // ── Tur çipleri ───────────────────────────────────────────────────────────────
@@ -755,17 +750,6 @@ export default function TournamentScreen() {
           </Text>
         </View>
       )}
-      {selectedRound.votable && (
-        <View style={[styles.notice, { backgroundColor: theme.accent + "1A", borderColor: theme.accent + "44" }]}>
-          <AppIcon family="Ionicons" name="hand-left" size={16} color={theme.accent} />
-          <Text style={[styles.noticeText, { color: theme.text.secondary }]}>
-            {i18nText(
-              "autoI18n.tournament_vote_hint_final",
-              "Postere iki kez bas: ilk basış onay ister, ikinci basış oyunu KESİN kaydeder. Her maçta tek oy hakkın var, sonradan değiştirilemez.",
-            )}
-          </Text>
-        </View>
-      )}
       {selectedRound.matches.map((m) => (
         <MatchCard
           key={m.matchId}
@@ -787,22 +771,21 @@ export default function TournamentScreen() {
     <View>
       {RoundChips}
       <View style={styles.browserHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>
+        <Text style={[styles.sectionTitle, { color: theme.text.muted, marginBottom: 0 }]}>
           {selectedRound ? roundLabel(selectedRound.def, lang) : ""}
         </Text>
-        {ViewToggle}
-      </View>
-      {viewMode === "tree" && (
-        <View style={[styles.notice, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-          <AppIcon family="Ionicons" name="finger-print" size={16} color={theme.accent} />
-          <Text style={[styles.noticeText, { color: theme.text.secondary }]}>
-            {i18nText(
-              "autoI18n.tournament_tree_hint",
-              "Bir maça dokun: detayını gör ve (tur açıksa) oyunu buradan ver.",
-            )}
-          </Text>
+        <View style={styles.browserHeaderRight}>
+          <TouchableOpacity
+            onPress={() => setInfoVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel={i18nText("autoI18n.tournament_info", "Bilgi")}
+            style={[styles.infoBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+          >
+            <AppIcon family="Ionicons" name="information" size={13} color={theme.text.secondary} />
+          </TouchableOpacity>
+          {ViewToggle}
         </View>
-      )}
+      </View>
       {viewMode === "list"
         ? roundList
         : (
@@ -816,6 +799,52 @@ export default function TournamentScreen() {
           />
         )}
     </View>
+  );
+
+  // ── Liste/ağaç kullanım ipucu — eskiden her zaman açık bant olarak
+  // görünürdü; artık üstteki "!" ikonuna basınca açılan bir kart.
+  const infoModal = (
+    <Modal
+      visible={infoVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setInfoVisible(false)}
+    >
+      <Pressable style={styles.matchModalOverlay} onPress={() => setInfoVisible(false)}>
+        <Pressable onPress={() => {}} style={[styles.matchModalCard, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+          <View style={styles.matchModalHeader}>
+            <Text style={[styles.matchModalTitle, { color: theme.text.primary }]}>
+              {i18nText("autoI18n.tournament_info", "Bilgi")}
+            </Text>
+            <Pressable
+              onPress={() => setInfoVisible(false)}
+              style={[styles.matchModalClose, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+            >
+              <AppIcon family="Ionicons" name="close" size={16} color={theme.text.secondary} />
+            </Pressable>
+          </View>
+
+          <View style={[styles.notice, { backgroundColor: theme.accent + "1A", borderColor: theme.accent + "44" }]}>
+            <AppIcon family="Ionicons" name="hand-left" size={16} color={theme.accent} />
+            <Text style={[styles.noticeText, { color: theme.text.secondary }]}>
+              {i18nText(
+                "autoI18n.tournament_vote_hint_final",
+                "Postere iki kez bas: ilk basış onay ister, ikinci basış oyunu KESİN kaydeder. Her maçta tek oy hakkın var, sonradan değiştirilemez.",
+              )}
+            </Text>
+          </View>
+          <View style={[styles.notice, { backgroundColor: theme.secondary, borderColor: theme.border, marginBottom: 0 }]}>
+            <AppIcon family="Ionicons" name="finger-print" size={16} color={theme.accent} />
+            <Text style={[styles.noticeText, { color: theme.text.secondary }]}>
+              {i18nText(
+                "autoI18n.tournament_tree_hint",
+                "Bir maça dokun: detayını gör ve (tur açıksa) oyunu buradan ver.",
+              )}
+            </Text>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 
   // ── Ağaçtan seçilen maçın oy modalı ─────────────────────────────────────────
@@ -1054,7 +1083,6 @@ export default function TournamentScreen() {
     body = (
       <View>
         {Hero}
-        {PodiumButton}
 
         {/* Aday hype başlığı + kişisel hak durumu.
             Başlık ve çip TEK satırda (dikeyde ortalı), alt metin altlarında tam
@@ -1180,7 +1208,6 @@ export default function TournamentScreen() {
     body = (
       <View>
         {Hero}
-        {PodiumButton}
         {RoundsBrowser}
       </View>
     );
@@ -1191,7 +1218,6 @@ export default function TournamentScreen() {
         {bracket.champion
           ? ChampionHero({ champion: bracket.champion, stats: championStats })
           : Hero}
-        {PodiumButton}
         {RoundsBrowser}
       </View>
     );
@@ -1253,6 +1279,9 @@ export default function TournamentScreen() {
 
       {/* Ağaçtan seçilen maçın detay/oy modalı */}
       {treeMatchModal}
+
+      {/* Liste/ağaç kullanım ipucu — "!" ikonuna basınca açılır */}
+      {infoModal}
     </SafeAreaView>
   );
 }
@@ -1282,45 +1311,41 @@ const styles = StyleSheet.create({
   },
   phaseChipText: { fontSize: 11, fontWeight: "800" },
 
-  hero: { borderRadius: 20, padding: 18, marginTop: 6, overflow: "hidden" },
+  hero: { borderRadius: 20, padding: 14, marginTop: 6, overflow: "hidden" },
   heroGlow: {
     position: "absolute", width: 190, height: 190, borderRadius: 95,
     right: -60, top: -80, backgroundColor: "rgba(255,255,255,0.10)",
   },
-  heroTheme: { color: "#fff", fontSize: 22, fontWeight: "900" },
+  heroTheme: { color: "#fff", fontSize: 19, fontWeight: "900" },
 
   heroGrid: {
-    flexDirection: "row", flexWrap: "wrap",
-    marginTop: 12, marginHorizontal: -4,
+    flexDirection: "row",
+    marginTop: 8, marginHorizontal: -4,
   },
   heroGridCell: {
-    width: "50%", flexDirection: "row", alignItems: "center", gap: 8,
-    paddingHorizontal: 4, paddingVertical: 6,
+    flex: 1, flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 4, paddingVertical: 3,
   },
   heroGridIcon: {
-    width: 28, height: 28, borderRadius: 9,
+    width: 21, height: 21, borderRadius: 7,
     alignItems: "center", justifyContent: "center",
   },
-  heroGridLabel: { color: "rgba(255,255,255,0.75)", fontSize: 9.5, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.4 },
-  heroGridValue: { color: "#fff", fontSize: 13, fontWeight: "800", marginTop: 1 },
+  heroGridTextWrap: { flex: 1, minWidth: 0 },
+  heroGridLabel: { color: "rgba(255,255,255,0.75)", fontSize: 8.5, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.3 },
+  heroGridValue: { color: "#fff", fontSize: 11.5, fontWeight: "800" },
 
   heroCountdownRow: {
-    marginTop: 10, paddingTop: 12,
+    marginTop: 6, paddingTop: 8,
     borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.18)",
   },
-  heroSub: { color: "rgba(255,255,255,0.92)", fontSize: 13, fontWeight: "700" },
-  heroDeadline: { color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: "700", marginTop: 6 },
+  heroSub: { color: "rgba(255,255,255,0.92)", fontSize: 12, fontWeight: "700" },
+  heroDeadline: { color: "rgba(255,255,255,0.75)", fontSize: 10.5, fontWeight: "700", marginTop: 4 },
 
   podiumBtn: {
-    flexDirection: "row", alignItems: "center", gap: 10,
-    borderRadius: 15, borderWidth: 1, padding: 11, marginTop: 12,
-  },
-  podiumIconWrap: {
-    width: 34, height: 34, borderRadius: 11, backgroundColor: "#F5C51822",
+    width: 34, height: 34, borderRadius: 12,
+    borderWidth: 1,
     alignItems: "center", justifyContent: "center",
   },
-  podiumBtnTitle: { fontSize: 13.5, fontWeight: "900" },
-  podiumBtnSub: { fontSize: 11, fontWeight: "600", marginTop: 1 },
 
   nomHeader: { marginTop: 18 },
   // Başlık ile çip dikeyde ORTALANIR (flex-start'ta çip başlığa göre kayıyordu).
@@ -1354,7 +1379,12 @@ const styles = StyleSheet.create({
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#EF4444" },
 
   browserHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  browserHeaderRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   sectionTitle: { fontSize: 13, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 },
+  infoBtn: {
+    width: 28, height: 28, borderRadius: 9, borderWidth: 1,
+    alignItems: "center", justifyContent: "center",
+  },
   toggle: { flexDirection: "row", borderRadius: 11, borderWidth: 1, padding: 3, gap: 2 },
   toggleBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   toggleText: { fontSize: 12, fontWeight: "800" },

@@ -17,11 +17,13 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
+import { alpha } from "../../theme/colors";
 
-const POSTER_WIDTH = 108;
-const POSTER_HEIGHT = 162;
-const MEDIA_GAP = 10;
+const POSTER_WIDTH = 70;
+const POSTER_HEIGHT = 105;
+const MEDIA_GAP = 12;
 
 if (
   Platform.OS === "android" &&
@@ -39,40 +41,38 @@ const typeLabel = (mt) =>
         ? i18nText("autoI18n.oyuncu", "Oyuncu")
         : "";
 
-const formatReleaseDate = (value) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("tr-TR", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-};
-
 export default function SharedMediaMessage({
-  media,
-  text,
-  accent,
+  item,
   getTmdbUrl,
+  accent: propAccent,
   onOpenTrailer,
   isOutgoing = false,
 }) {
+  const { theme } = useTheme();
+  const accent = propAccent || theme.accent || "#6C63FF";
   const [summaryOpen, setSummaryOpen] = useState(false);
-  const isPerson = media?.media_type === "person";
+
+  const media = item?.media;
   const poster = media?.poster_path || media?.profile_path;
-  const summary =
-    media?.overview || (isPerson ? media?.known_for_department : "") || "";
-  const releaseDateText = formatReleaseDate(media?.release_date);
+  const isPerson = media?.media_type === "person";
+  const text = item?.text || media?.title || media?.name || "";
+  const summary = media?.overview;
+
+  const rawDate = media?.release_date || media?.first_air_date;
+  const releaseDateText = rawDate ? String(rawDate).slice(0, 4) : "";
   const releaseDateLabel =
-    media?.media_type === "tv"
-      ? i18nText("autoI18n.ilk_yayin", "İlk yayın")
+    media?.media_type === "movie"
+      ? i18nText("autoI18n.vizyon", "Vizyon")
       : i18nText("autoI18n.yayin", "Yayın");
 
   const toggleSummary = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSummaryOpen((o) => !o);
   };
+
+  const primaryTextColor = isOutgoing ? "#fff" : theme.text.primary;
+  const secondaryTextColor = isOutgoing ? "rgba(255,255,255,0.75)" : theme.text.secondary;
+  const mutedTextColor = isOutgoing ? "rgba(255,255,255,0.65)" : theme.text.muted;
 
   return (
     <View style={styles.wrap}>
@@ -88,11 +88,24 @@ export default function SharedMediaMessage({
               transition={120}
             />
           ) : (
-            <View style={[styles.poster, styles.posterPlaceholder]}>
+            <View
+              style={[
+                styles.poster,
+                styles.posterPlaceholder,
+                {
+                  backgroundColor: isOutgoing
+                    ? "rgba(255,255,255,0.1)"
+                    : theme.between,
+                  borderColor: isOutgoing
+                    ? "rgba(255,255,255,0.2)"
+                    : theme.border,
+                },
+              ]}
+            >
               <Ionicons
                 name={isPerson ? "person" : "film-outline"}
                 size={26}
-                color="rgba(255,255,255,0.35)"
+                color={mutedTextColor}
               />
             </View>
           )}
@@ -108,7 +121,7 @@ export default function SharedMediaMessage({
 
           {isPerson && (
             <Text
-              style={styles.personPosterName}
+              style={[styles.personPosterName, { color: primaryTextColor }]}
               numberOfLines={2}
             >
               {text}
@@ -117,18 +130,26 @@ export default function SharedMediaMessage({
         </View>
 
         {/* Sağ sütun: tür + başlık + çipler */}
-        <View style={[styles.side, isOutgoing && styles.sideOutgoing]}>
+        <View style={[styles.side, !isPerson && styles.sideWithActions, isOutgoing && styles.sideOutgoing, !isPerson && isOutgoing && styles.sideOutgoingWithActions]}>
           {!!typeLabel(media?.media_type) && (
             <Text
               allowFontScaling={false}
-              style={[styles.type, isOutgoing && styles.textOutgoing]}
+              style={[
+                styles.type,
+                { color: mutedTextColor },
+                isOutgoing && styles.textOutgoing,
+              ]}
             >
               {typeLabel(media?.media_type)}
             </Text>
           )}
           {!isPerson && (
             <Text
-              style={[styles.title, isOutgoing && styles.textOutgoing]}
+              style={[
+                styles.title,
+                { color: primaryTextColor },
+                isOutgoing && styles.textOutgoing,
+              ]}
               numberOfLines={3}
             >
               {text}
@@ -140,11 +161,11 @@ export default function SharedMediaMessage({
               <Ionicons
                 name="calendar-outline"
                 size={12}
-                color="rgba(255,255,255,0.56)"
+                color={mutedTextColor}
               />
               <Text
                 allowFontScaling={false}
-                style={styles.releaseText}
+                style={[styles.releaseText, { color: secondaryTextColor }]}
                 numberOfLines={1}
               >
                 {releaseDateLabel}: {releaseDateText}
@@ -161,12 +182,12 @@ export default function SharedMediaMessage({
               style={[
                 styles.chip,
                 styles.chipPrimary,
-                { backgroundColor: accent },
-                summaryOpen && styles.chipExpanded,
+                { backgroundColor: isOutgoing ? "rgba(255,255,255,0.2)" : accent },
                 summaryOpen && styles.chipPrimaryActive,
               ]}
               accessibilityRole="button"
               accessibilityLabel={i18nText("autoI18n.ozet", "Özet")}
+              accessibilityState={{ expanded: summaryOpen }}
             >
               <Ionicons
                 name={summaryOpen ? "chevron-up-outline" : "document-text-outline"}
@@ -174,11 +195,7 @@ export default function SharedMediaMessage({
                 color="#fff"
                 style={styles.chipIcon}
               />
-              {summaryOpen && (
-                <Text allowFontScaling={false} style={styles.chipText}>
-                  {i18nText("autoI18n.ozet", "Özet")}
-                </Text>
-              )}
+
             </TouchableOpacity>
 
               <TouchableOpacity
@@ -188,26 +205,25 @@ export default function SharedMediaMessage({
                 style={[
                   styles.chip,
                   styles.chipOutline,
-                  { borderColor: accent + "88" },
-                  summaryOpen && styles.chipExpanded,
-                ]}
+                  {
+                    backgroundColor: isOutgoing
+                      ? "rgba(255,255,255,0.12)"
+                      : theme.between,
+                    borderColor: isOutgoing
+                      ? "rgba(255,255,255,0.3)"
+                      : alpha(accent, 0.45),
+                  },
+                  ]}
                 accessibilityRole="button"
                 accessibilityLabel={i18nText("autoI18n.fragman", "Fragman")}
               >
                 <Ionicons
                   name="play-circle-outline"
                   size={14}
-                  color={accent}
+                  color={isOutgoing ? "#fff" : accent}
                   style={styles.chipIcon}
                 />
-                {summaryOpen && (
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.chipText, { color: accent }]}
-                  >
-                    {i18nText("autoI18n.fragman", "Fragman")}
-                  </Text>
-                )}
+
               </TouchableOpacity>
             </View>
           )}
@@ -220,10 +236,17 @@ export default function SharedMediaMessage({
         <View
           style={[
             styles.summaryBox,
-            { borderColor: accent + "55", backgroundColor: "rgba(255,255,255,0.06)" },
+            {
+              borderColor: isOutgoing
+                ? "rgba(255,255,255,0.3)"
+                : alpha(accent, 0.4),
+              backgroundColor: isOutgoing
+                ? "rgba(255,255,255,0.1)"
+                : theme.between,
+            },
           ]}
         >
-          <Text style={styles.summaryText}>
+          <Text style={[styles.summaryText, { color: primaryTextColor }]}>
             {summary || i18nText("autoI18n.ozet_yok", "Özet bulunmuyor.")}
           </Text>
         </View>
@@ -236,7 +259,7 @@ const styles = StyleSheet.create({
   wrap: { width: "100%", marginBottom: 9 },
   row: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "stretch",
     gap: MEDIA_GAP,
   },
   rowOutgoing: {
@@ -302,9 +325,18 @@ const styles = StyleSheet.create({
   side: {
     flex: 1,
     flexShrink: 1,
+    minWidth: 0,
+    minHeight: POSTER_HEIGHT + 4,
     justifyContent: "flex-start",
     paddingTop: 2,
     gap: 4,
+  },
+  sideWithActions: {
+    paddingLeft: 36,
+  },
+  sideOutgoingWithActions: {
+    paddingLeft: 0,
+    paddingRight: 36,
   },
   sideOutgoing: {
     alignItems: "stretch",
@@ -337,16 +369,19 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
 
+  // Aksiyonlar metnin altına eklenmez; sütunun alt kenarına sabitlenir.
+  // Metinde ayrılan yan boşluk uzun başlıklarla çakışmayı önler.
   chips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    flexDirection: "column",
     alignItems: "center",
-    columnGap: 4,
-    rowGap: 4,
-    marginTop: 6,
+    gap: 6,
   },
   chipsOutgoing: {
-    justifyContent: "flex-end",
+    left: "auto",
+    right: 0,
   },
   chip: {
     flexDirection: "row",
@@ -354,14 +389,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignSelf: "flex-start",
     gap: 3,
-    minHeight: 28,
-    minWidth: 28,
+    height: 28,
+    width: 28,
     borderRadius: 14,
     flexShrink: 0,
-  },
-  chipExpanded: {
-    paddingHorizontal: 8,
-    paddingVertical: 5,
   },
   // Birincil aksiyon (Özet): dolu accent + hafif gölge
   chipPrimary: {
@@ -381,14 +412,6 @@ const styles = StyleSheet.create({
   },
   chipIcon: {
     flexShrink: 0,
-  },
-  chipText: {
-    color: "#fff",
-    fontSize: 11.5,
-    fontWeight: "800",
-    lineHeight: 14,
-    includeFontPadding: false,
-    textAlignVertical: "center",
   },
   summaryBox: {
     marginTop: 9,

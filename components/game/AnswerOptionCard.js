@@ -1,3 +1,4 @@
+import { alpha } from "@theme/colors";
 // components/game/AnswerOptionCard.js
 //
 // Tek bir cevap sikki karti (Part 12.3 / Part 19). Dogru/yanlis renk ve ikon
@@ -32,15 +33,15 @@ function AnswerOptionCard({
   const isWrongSelected = isAnswered && isSelected && !isCorrectOption;
   const showCorrect = isAnswered && isCorrectOption;
 
-  let borderColor = "rgba(255,255,255,0.15)";
-  let bgColor = "rgba(255,255,255,0.06)";
+  let borderColor = theme.border;
+  let bgColor = theme.secondary;
   if (showCorrect) {
     borderColor = gameTokens.correct;
-    bgColor = "rgba(0,230,118,0.15)";
+    bgColor = alpha(gameTokens.correct, 0.15);
   }
   if (isWrongSelected) {
     borderColor = gameTokens.incorrect;
-    bgColor = "rgba(255,23,68,0.15)";
+    bgColor = alpha(gameTokens.incorrect, 0.15);
   }
 
   // Part 21.1: secilen sikkin sonucu (dogru/yanlis) screen reader'a
@@ -93,7 +94,7 @@ function AnswerOptionCard({
             {item.title}
           </Text>
           {showTypeBadge && (
-            <View style={styles.optionTypeBadge}>
+            <View style={[styles.optionTypeBadge, { backgroundColor: theme.between }]}>
               <Text style={[styles.optionType, { color: theme.text.muted }]}>
                 {item.type === "movie" ? i18nText("autoI18n.film_2", "Film") : i18nText("autoI18n.dizi_2", "Dizi")}
               </Text>
@@ -123,7 +124,7 @@ const styles = StyleSheet.create({
   optionCard: { flexDirection: "row", alignItems: "center", minHeight: 56, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, gap: 14 },
   optionTextWrap: { flex: 1, gap: 6 },
   optionTitle: { fontSize: 15, fontWeight: "800", lineHeight: 20, letterSpacing: 0.2 },
-  optionTypeBadge: { alignSelf: "flex-start", backgroundColor: "rgba(255,255,255,0.1)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  optionTypeBadge: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   optionType: { fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.8 },
   resultTag: { flexDirection: "row", alignItems: "center", gap: 4 },
   resultTagText: { fontSize: 12, fontWeight: "900" },

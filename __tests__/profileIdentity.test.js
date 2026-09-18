@@ -43,13 +43,33 @@ describe("profile identity fan-out patches", () => {
   test("identity values are trimmed and invalid legacy values get safe defaults", () => {
     const changes = buildProfileIdentityChanges(
       { displayName: null, username: null, avatarIndex: null },
-      { displayName: "  Ada  ", username: "  ada_1 ", avatarIndex: 4 },
+      { displayName: "  Ada  ", username: "  ada_1 ", avatarIndex: 4, photoURL: " https://photo.com/123 " },
     );
 
     expect(changes.after).toEqual({
       displayName: "Ada",
       username: "ada_1",
       avatarIndex: 4,
+      photoURL: "https://photo.com/123",
+    });
+  });
+
+  test("photoURL is included in mappedPatch when avatarChanged", () => {
+    const changes = buildProfileIdentityChanges(
+      { displayName: "Ali", username: "ali", avatarIndex: 1, photoURL: null },
+      { displayName: "Ali", username: "ali", avatarIndex: -1, photoURL: "https://photo.com/me" },
+    );
+
+    expect(
+      mappedPatch(changes, {
+        displayName: "authorName",
+        username: "authorUsername",
+        avatarIndex: "authorAvatarIndex",
+        photoURL: "authorPhotoURL",
+      }),
+    ).toEqual({
+      authorAvatarIndex: -1,
+      authorPhotoURL: "https://photo.com/me",
     });
   });
 });

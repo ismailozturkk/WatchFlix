@@ -28,10 +28,11 @@ import { i18nText } from "../../../utils/i18nText";
 
 const THEME_CONFIGS = [
   { key: "gray", icon: "contrast", labelKey: "grayTheme" },
-  { key: "blue", icon: "water", labelKey: "blueTheme" },
-  { key: "green", icon: "leaf", labelKey: "greenTheme" },
   { key: "dark", icon: "moon", labelKey: "darkTheme" },
   { key: "light", icon: "sunny", labelKey: "lightTheme" },
+  { key: "sky", icon: "cloud", labelKey: "skyTheme" },
+  { key: "blue", icon: "water", labelKey: "blueTheme" },
+  { key: "green", icon: "leaf", labelKey: "greenTheme" },
   { key: "purple", icon: "planet", labelKey: "purpleTheme" },
   { key: "amber", icon: "film", labelKey: "amberTheme" },
 ];

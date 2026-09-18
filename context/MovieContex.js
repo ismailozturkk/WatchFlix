@@ -68,6 +68,7 @@ const loadPage = async ({
   setLoadingMore,
   isStale,
   startupSnapshot = false,
+  forceRefresh = false,
 }) => {
   // `arkaPlan`: ekranda zaten (bayat) veri var, tazeleme sessizce yapılıyor.
   // TMDB aynı listeyi her istekte biraz farklı `popularity` ondalığıyla
@@ -81,15 +82,15 @@ const loadPage = async ({
     else setIfChanged(setData, results);
   };
 
-  // BAYAT GÖSTER, ARKA PLANDA TAZELE. Eskiden TTL dolunca cache "yok" sayılır,
-  // ray iskelete düşer ve ağ beklenirdi; trend TTL'i 1 saat olduğu için bu
-  // pratikte her açılış demekti.
+  // BAYAT GÖSTER, ARKA PLANDA TAZELE. TTL 24 saat olduğu için gün içinde
+  // cache hep taze sayılır ve ağ isteği yapılmaz. forceRefresh (pull-to-refresh)
+  // bu kontrolü bypass eder ve ağdan yeniden çeker.
   const cached = getSwr(cacheKey, { maxAge: ttl });
   const cachedData = cached.data;
   if (cachedData) {
     apply(cachedData.results ?? cachedData, cachedData.total_pages ?? 1);
     (append ? setLoadingMore : setLoading)(false);
-    if (cached.fresh) return;
+    if (cached.fresh && !forceRefresh) return;
   } else {
     (append ? setLoadingMore : setLoading)(true);
   }
@@ -180,13 +181,14 @@ export const MovieProvider = ({ children }) => {
     }
   };
 
-  const fetchMoviesBests = (page = 1, append = false) => {
+  const fetchMoviesBests = (page = 1, append = false, forceRefresh = false) => {
     const lang = language === "tr" ? "tr-TR" : "en-US";
     const gen = append ? currentGen("bests") : beginFreshRequest("bests");
     return loadPage({
       cacheKey: `movie_bests_${lang}_${selectedCategoryBests}_page_${page}`,
       ttl: TTL.TREND,
       append,
+      forceRefresh,
       isStale: () => currentGen("bests") !== gen,
       setData: setMoviesBests,
       setTotal: setTotalPagesBest,
@@ -255,7 +257,7 @@ export const MovieProvider = ({ children }) => {
   const [selectedCategoryTrendsMovie, setSelectedCategoryTrendsMovie] =
     useState("trending");
 
-  const fetchSeriesTrends = async (page = 1, append = false) => {
+  const fetchSeriesTrends = async (page = 1, append = false, forceRefresh = false) => {
     const lang = language === "tr" ? "tr-TR" : "en-US";
     const gen = append ? currentGen("trends") : beginFreshRequest("trends");
     const isStale = () => currentGen("trends") !== gen;
@@ -277,7 +279,7 @@ export const MovieProvider = ({ children }) => {
         // toplam sayfa önbellekte yok → loadMore'a izin vermek için üst sınır
         setTotalPagesTrends((p) => (p > 1 ? p : 1000));
       }
-      if (swr.fresh) return;
+      if (swr.fresh && !forceRefresh) return;
     } else {
       (append ? setLoadingMoreTrends : setLoadingTrends)(true);
     }
@@ -341,6 +343,26 @@ export const MovieProvider = ({ children }) => {
   const [errorOscar, setErrorOscar] = useState(null);
   const oscarConfigRef = useRef(null);
   const oscarPageRef = useRef(0);
+  const loadingMoreOscarRef = useRef(false);
+
+  const mergeOscarItems = (prev, next) => {
+    if (!Array.isArray(next)) return prev;
+    const seen = new Set(
+      (Array.isArray(prev) ? prev : [])
+        .map((x) => (x ? `${x.year}-${x.categoryKey || "best_picture"}` : null))
+        .filter(Boolean),
+    );
+    return [
+      ...(Array.isArray(prev) ? prev : []),
+      ...next.filter((x) => {
+        if (!x) return false;
+        const key = `${x.year}-${x.categoryKey || "best_picture"}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }),
+    ];
+  };
 
   const fetchMoviesOscar = useCallback(async (catKey = selectedOscarCategory, forceRefresh = false) => {
     setLoadingOscar(true);
@@ -370,20 +392,28 @@ export const MovieProvider = ({ children }) => {
   }, [selectedOscarCategory, language, API_KEY]);
 
   const loadMoreOscar = useCallback(async () => {
-    if (loadingMoreOscar || !hasMoreOscar || !oscarConfigRef.current) return;
+    if (
+      loadingMoreOscarRef.current ||
+      !hasMoreOscar ||
+      !oscarConfigRef.current
+    ) {
+      return;
+    }
+    loadingMoreOscarRef.current = true;
     setLoadingMoreOscar(true);
+    const nextPage = oscarPageRef.current;
     try {
       const res = await fetchOscarByCategory({
         configItems: oscarConfigRef.current,
         categoryKey: selectedOscarCategory,
-        page: oscarPageRef.current,
+        page: nextPage,
         pageSize: 10,
         language,
         apiKey: API_KEY,
       });
 
       if (res.items?.length) {
-        setMoviesOscar((prev) => [...prev, ...res.items]);
+        setMoviesOscar((prev) => mergeOscarItems(prev, res.items));
         setHasMoreOscar(res.hasMore);
         oscarPageRef.current = res.nextPage;
       } else {
@@ -392,9 +422,10 @@ export const MovieProvider = ({ children }) => {
     } catch (err) {
       if (__DEV__) console.warn("loadMoreOscar error:", err?.message);
     } finally {
+      loadingMoreOscarRef.current = false;
       setLoadingMoreOscar(false);
     }
-  }, [loadingMoreOscar, hasMoreOscar, selectedOscarCategory, language, API_KEY]);
+  }, [hasMoreOscar, selectedOscarCategory, language, API_KEY]);
 
   const fetchMoviesOscarByYear = useCallback(async (year = selectedOscarYear, forceRefresh = false) => {
     setLoadingOscarYear(true);
@@ -420,15 +451,13 @@ export const MovieProvider = ({ children }) => {
   const changeOscarCategory = useCallback((catKey) => {
     if (catKey === selectedOscarCategory) return;
     setSelectedOscarCategory(catKey);
-    fetchMoviesOscar(catKey);
-  }, [selectedOscarCategory, fetchMoviesOscar]);
+  }, [selectedOscarCategory]);
 
   const changeOscarYear = useCallback((year) => {
     const numYear = Number(year);
     if (numYear === selectedOscarYear) return;
     setSelectedOscarYear(numYear);
-    fetchMoviesOscarByYear(numYear);
-  }, [selectedOscarYear, fetchMoviesOscarByYear]);
+  }, [selectedOscarYear]);
 
   const changeOscarMode = useCallback((mode) => {
     setOscarMode(mode);
@@ -661,12 +690,13 @@ export const MovieProvider = ({ children }) => {
     fetchMoviNowPlaying(1, false);
   }, [activeSections.nowPlaying, language]);
 
-  const fetchMoviNowPlaying = (page = 1, append = false) => {
+  const fetchMoviNowPlaying = (page = 1, append = false, forceRefresh = false) => {
     const gen = append ? currentGen("nowPlaying") : beginFreshRequest("nowPlaying");
     return loadPage({
       cacheKey: `movie_now_playing_${tmdbLanguage}_${tmdbRegion}_p${page}`,
       ttl: TTL.NOW_PLAYING,
       append,
+      forceRefresh,
       isStale: () => currentGen("nowPlaying") !== gen,
       setData: setMoviesNowPlaying,
       setTotal: setTotalPagesNowPlaying,
@@ -718,13 +748,14 @@ export const MovieProvider = ({ children }) => {
       setLoadingGenres(false);
     }
   };
-  const fetchMoviesByGenres = (page = 1, append = false) => {
+  const fetchMoviesByGenres = (page = 1, append = false, forceRefresh = false) => {
     const genresKey = [...selectedGenres].sort().join(",");
     const gen = append ? currentGen("genres") : beginFreshRequest("genres");
     return loadPage({
       cacheKey: `movie_genres_content_${tmdbLanguage}_p${page}_g${genresKey}`,
       ttl: TTL.TREND,
       append,
+      forceRefresh,
       isStale: () => currentGen("genres") !== gen,
       setData: setMoviesGenres,
       setTotal: setTotalPagesGenres,
@@ -830,13 +861,14 @@ export const MovieProvider = ({ children }) => {
   };
 
   // Film türlerini API'den almak
-  const fetchMovieUpcoming = (page = 1, append = false) => {
+  const fetchMovieUpcoming = (page = 1, append = false, forceRefresh = false) => {
     if (!calculatedDate) return;
     const gen = append ? currentGen("upcoming") : beginFreshRequest("upcoming");
     return loadPage({
       cacheKey: `movie_upcoming_${tmdbLanguage}_${tmdbRegion}_${calculatedDate}_p${page}`,
       ttl: TTL.NOW_PLAYING,
       append,
+      forceRefresh,
       isStale: () => currentGen("upcoming") !== gen,
       setData: setMoviesUpcoming,
       setTotal: setTotalPagesUpcoming,
@@ -882,6 +914,35 @@ export const MovieProvider = ({ children }) => {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
   };
+
+  // ── PULL-TO-REFRESH: Tüm aktif bölümleri zorla yenile ──────────────────
+  const refreshAllMovies = useCallback(async () => {
+    const jobs = [];
+    if (activeSections.trends)     jobs.push(fetchSeriesTrends(1, false, true));
+    if (activeSections.bests)      jobs.push(fetchMoviesBests(1, false, true));
+    if (activeSections.nowPlaying) jobs.push(fetchMoviNowPlaying(1, false, true));
+    if (activeSections.upcoming)   jobs.push(fetchMovieUpcoming(1, false, true));
+    if (activeSections.genres)     jobs.push(fetchMoviesByGenres(1, false, true));
+    if (activeSections.oscar) {
+      if (oscarMode === "category") jobs.push(fetchMoviesOscar(selectedOscarCategory, true));
+      else jobs.push(fetchMoviesOscarByYear(selectedOscarYear, true));
+    }
+    if (activeSections.collection) jobs.push(fetchMoviesCollection());
+    await Promise.allSettled(jobs);
+  }, [
+    activeSections,
+    fetchSeriesTrends,
+    fetchMoviesBests,
+    fetchMoviNowPlaying,
+    fetchMovieUpcoming,
+    fetchMoviesByGenres,
+    oscarMode,
+    selectedOscarCategory,
+    selectedOscarYear,
+    fetchMoviesOscar,
+    fetchMoviesOscarByYear,
+    fetchMoviesCollection,
+  ]);
 
   const contextValue = useMemo(() => ({
     pageBest,
@@ -987,6 +1048,7 @@ export const MovieProvider = ({ children }) => {
     fetchMoviNowPlaying,
     fetchMovieUpcoming,
     fetchMoviesByGenres,
+    refreshAllMovies,
   }), [
     pageBest, loadingBests, movieBests, selectedCategoryTrends,
     categoriesTrends, categorieBests, movieTrends, loadingTrends,
@@ -1005,6 +1067,7 @@ export const MovieProvider = ({ children }) => {
     loadingMoreNowPlaying, pageNowPlaying, totalPagesNowPlaying,
     loadingMoreProvider, pageProvider, totalPagesProvider,
     loadingMoreTrends, pageTrends, totalPagesTrends,
+    refreshAllMovies,
   ]);
 
   return (

@@ -1,3 +1,4 @@
+import { isLightSurface } from "@utils/colorUtils";
 import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
@@ -112,7 +113,7 @@ export default function StoryDraftsScreen({ navigation }) {
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
       <ScreenDecor iconOpacity={0.3} />
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}

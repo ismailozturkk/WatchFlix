@@ -15,17 +15,15 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <!-- Uygulama logosu: monochrome ikon, accent gradyan rozet üstünde beyaz -->
+        <!-- Ana uygulamayla aynı launcher ikonu. Monochrome kaynak, widget'ta
+             yalnız bir "S" gibi görünüyordu; burada gerçek Seelogd logosu var. -->
         <ImageView
             android:id="@+id/reminder_widget_logo"
             android:layout_width="28dp"
             android:layout_height="28dp"
-            android:background="@drawable/reminder_widget_logo_badge"
             android:importantForAccessibility="no"
-            android:padding="4dp"
             android:scaleType="fitCenter"
-            android:src="@mipmap/ic_launcher_monochrome"
-            android:tint="#FFFFFF" />
+            android:src="@mipmap/ic_launcher" />
 
         <TextView
             android:id="@+id/reminder_widget_title"

@@ -20,39 +20,64 @@ import { useSharedLists } from "../../../context/SharedListsContext";
 import SwitchToggle from "../../../components/SwitchToggle";
 import { i18nText } from "../../../utils/i18nText";
 import { sortItemsByListOrder } from "../../../utils/listOrder";
-import ListCovers from "../../../components/lists/ListCovers";
+import ListCovers, { getNaturalCoverWidth } from "../../../components/lists/ListCovers";
 import ListManageSheet from "../../../components/lists/ListManageSheet";
+import CreateListModal from "../../../components/lists/CreateListModal";
 import { useAuth } from "../../../context/AuthContext";
 import {
   getListAccent,
   getListIcon,
-  SHARED_LIST_ACCENT,
+  getSharedListAccent,
 } from "../../../utils/listAppearance";
 import { collection, getDocs, limit, query } from "firebase/firestore";
 import { db } from "../../../firebase";
+import { trackFirestoreRead } from "../../../services/usageTrackerService";
 
 // Kart yüksekliği tüm düzenlerde sabit (poster bloğu 112 + ayırıcı/alt bilgi).
-const CARD_H = 171;
+// FriendProfileScreen'in paylaşılan listeler rayı da AYNI ölçüleri kullanır
+// (bkz. RAIL_CARD_H/RAIL_COVER_H/RAIL_CARD_PADDING/getRailCardWidth export'u) —
+// iki yüzey kopya sabitlerle sessizce ayrışmasın diye tek kaynak burası.
+export const RAIL_CARD_H = 171;
+const CARD_H = RAIL_CARD_H;
 // Kapak bloğunun yüksekliği ve kart iç dolgusu — genişlikler bunlardan türer.
-const COVER_H = 112;
-const CARD_PADDING = 10;
+export const RAIL_COVER_H = 112;
+const COVER_H = RAIL_COVER_H;
+export const RAIL_CARD_PADDING = 10;
+const CARD_PADDING = RAIL_CARD_PADDING;
+
+// Karışık/Yığın'da afişler küçültülmez (bkz. ListCovers.getNaturalCoverWidth) —
+// kart bu doğal genişliğe göre büyütülür, aksi halde eklenen afişler eskileri
+// sıkıştırırdı.
+const NATURAL_W_3 = getNaturalCoverWidth(3, COVER_H); // Karışık: büyük + 2×küçük çifti
+const NATURAL_W_4 = getNaturalCoverWidth(4, COVER_H); // Yığın: 5'li yelpaze
 
 // Kart genişliği aktif poster düzenine orantılı: poster alanı + 2×10 dolgu.
 // Aynı anda tek düzen aktif olduğundan raydaki tüm kartlar yine eşit kalır.
-const getCardWidth = (gridStyle) => {
+export const getRailCardWidth = (gridStyle) => {
   switch (gridStyle) {
     case 1:
       return 204; // Büyük Kapaklar: 3×60 + 2×2 boşluk
     case 2:
       return 176; // Küçük Kapaklar: 4×37.5 + 3×2 boşluk
     case 3:
-      return 134.5; // Karışık: 75 + 2 + 37.5
+      return NATURAL_W_3 + CARD_PADDING * 2;
     default:
-      return 158; // Yığın: 138 sabit blok
+      return NATURAL_W_4 + CARD_PADDING * 2;
   }
 };
+const getCardWidth = getRailCardWidth;
 
-const SHARED_ACCENT = SHARED_LIST_ACCENT;
+// ── "Liste Görünümü Seçin" modalındaki önizlemeler ──────────────────────────
+// Gerçek ListCovers bileşeni boş bir listeyle (items=[]) çizilir: her afiş
+// otomatik olarak yer tutucu kutuya düşer, oranlar/köşe mantığı/kenarlıklar
+// gerçek karttakiyle BİREBİR aynı kalır — burada ayrıca kopyalanmaz.
+const PREVIEW_H = 101;
+const PREVIEW_W_1 = 166; // Büyük Kapaklar: 3 eşit afiş
+const PREVIEW_W_2 = 142; // Küçük Kapaklar: 4×2 afiş
+const PREVIEW_W_3 = getNaturalCoverWidth(3, PREVIEW_H); // Karışık
+const PREVIEW_W_4 = getNaturalCoverWidth(4, PREVIEW_H); // Yığın
+const noPreviewTmdbUrl = () => undefined;
+
 const SHARED_KEY_PREFIX = "shared:";
 
 export default function ProfileLists({ navigation }) {
@@ -63,6 +88,7 @@ export default function ProfileLists({ navigation }) {
   const { gridStyle, setGridStyle, saveListGridStyle, allCornersRounded, saveAllCornersRounded } = useProfileUi();
   const cardW = getCardWidth(gridStyle);
   const [layoutModalVisible, setLayoutModalVisible] = useState(false);
+  const [createListVisible, setCreateListVisible] = useState(false);
   // Uzun basılan özel liste — yönetim sayfası (ad değiştir / sil) buna bakar.
   // Sayfa Listelerim ekranıyla ORTAK; iki yüzeyde aynı akış, aynı yazma yolu.
   const [manageList, setManageList] = useState(null);
@@ -94,6 +120,7 @@ export default function ProfileLists({ navigation }) {
             const snap = await getDocs(
               query(collection(db, "SharedLists", l.id, "items"), limit(8)),
             );
+            trackFirestoreRead("SharedLists/items", snap.docs.length);
             previews[l.id] = snap.docs.map((d) => d.data());
           } catch {
             previews[l.id] = [];
@@ -158,6 +185,15 @@ export default function ProfileLists({ navigation }) {
               styles.addButton,
               { backgroundColor: theme.secondary, borderColor: theme.border },
             ]}
+            onPress={() => setCreateListVisible(true)}
+          >
+            <Ionicons name="add" size={18} color={theme.text.primary ?? "white"} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.addButton,
+              { backgroundColor: theme.secondary, borderColor: theme.border },
+            ]}
             onPress={() => setLayoutModalVisible(true)}
           >
             <MaterialCommunityIcons
@@ -211,7 +247,7 @@ export default function ProfileLists({ navigation }) {
                   )
                 : null;
               const orderedItems = sortItemsByListOrder(items);
-              const accent = shared ? SHARED_ACCENT : getListAccent(listName);
+              const accent = shared ? getSharedListAccent(theme.secondary) : getListAccent(listName, theme.secondary);
               const icon = shared ? "people" : getListIcon(listName);
               const displayName = shared
                 ? shared.name
@@ -251,13 +287,20 @@ export default function ProfileLists({ navigation }) {
                       transform: [{ scale: scaleValues[listName] || 1 }],
                     }}
                   >
-                    {/* Aksan gölgesi — ListsViewScreen.cardGlow ile aynı çerçeve */}
+                    {/* 1) Arka plan — kartın taban rengi, en arkada */}
                     <View
+                      pointerEvents="none"
+                      style={[styles.cardBg, { width: cardW, backgroundColor: theme.secondary }]}
+                    />
+                    {/* 2) Aksan yüzeyi — arka planın ÜSTÜNDE, kart dışına (alta) taşabilir */}
+                    <View
+                      pointerEvents="none"
                       style={[
                         styles.cardGlow,
                         { backgroundColor: accent + "18", borderColor: accent + "25" },
                       ]}
                     />
+                    {/* 3) İçerikler — en üstte, kart şekliyle kırpılır */}
                     <View style={[styles.card, { width: cardW }]}>
                     <ListCovers
                       items={orderedItems}
@@ -281,7 +324,7 @@ export default function ProfileLists({ navigation }) {
                       </View>
                       <Text
                         allowFontScaling={false}
-                        style={styles.cardName}
+                        style={[styles.cardName, { color: theme.text.primary }]}
                         numberOfLines={1}
                       >
                         {displayName}
@@ -291,7 +334,7 @@ export default function ProfileLists({ navigation }) {
                           <Ionicons
                             name="person"
                             size={11}
-                            color="rgba(255,255,255,0.4)"
+                            color={theme.text.muted}
                           />
                           <Text
                             allowFontScaling={false}
@@ -320,6 +363,17 @@ export default function ProfileLists({ navigation }) {
           />
         </View>
       )}
+      {/* Artı butonu: yeni özel liste oluşturma */}
+      <CreateListModal
+        visible={createListVisible}
+        onClose={() => setCreateListVisible(false)}
+        existingNames={existingListNames}
+        uid={user?.uid}
+        onCreated={(listName) => {
+          navigation.navigate("ListsScreen", { listName });
+        }}
+      />
+
       {/* Uzun basış: liste yönetim sayfası (ad değiştir / sil) — Listelerim
           ekranıyla ORTAK bileşen. */}
       <ListManageSheet
@@ -366,19 +420,15 @@ export default function ProfileLists({ navigation }) {
                       },
                     ]}
                   >
-                    <View style={{ flexDirection: "row", gap: 2, justifyContent: "center", width: "100%" }}>
-                      {[0, 1, 2].map((index) => (
-                        <View
-                          key={index}
-                          style={[
-                            styles.placeholder,
-                            { width: 54, height: 101 },
-                            allCornersRounded ? { borderRadius: 10 } : [index === 0 && { borderTopLeftRadius: 10, borderBottomLeftRadius: 10 }, index === 2 && { borderTopRightRadius: 10, borderBottomRightRadius: 10 }],
-                            { backgroundColor: theme.primary },
-                          ]}
-                        />
-                      ))}
-                    </View>
+                    <ListCovers
+                      items={[]}
+                      gridStyle={1}
+                      allCornersRounded={allCornersRounded}
+                      width={PREVIEW_W_1}
+                      height={PREVIEW_H}
+                      getTmdbUrl={noPreviewTmdbUrl}
+                      theme={theme}
+                    />
                     <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 5 }}>
                       <MaterialCommunityIcons name="movie" size={16} color={theme.colors.green} />
                       <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>
@@ -408,13 +458,15 @@ export default function ProfileLists({ navigation }) {
                       },
                     ]}
                   >
-                    <View style={{ flexDirection: "row", gap: 2, justifyContent: "center", width: "100%" }}>
-                      <View style={[styles.placeholder, { width: 68, height: 101 }, allCornersRounded ? { borderRadius: 10 } : { borderTopLeftRadius: 10, borderBottomLeftRadius: 10 }, { backgroundColor: theme.primary }]} />
-                      <View style={{ gap: 2, justifyContent: "center" }}>
-                        <View style={[styles.placeholder, { width: 34, height: 49.5 }, allCornersRounded ? { borderRadius: 10 } : { borderTopRightRadius: 10 }, { backgroundColor: theme.primary }]} />
-                        <View style={[styles.placeholder, { width: 34, height: 49.5 }, allCornersRounded ? { borderRadius: 10 } : { borderBottomRightRadius: 10 }, { backgroundColor: theme.primary }]} />
-                      </View>
-                    </View>
+                    <ListCovers
+                      items={[]}
+                      gridStyle={3}
+                      allCornersRounded={allCornersRounded}
+                      width={PREVIEW_W_3}
+                      height={PREVIEW_H}
+                      getTmdbUrl={noPreviewTmdbUrl}
+                      theme={theme}
+                    />
                     <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 5 }}>
                       <MaterialCommunityIcons name="view-dashboard" size={16} color={theme.colors.blue} />
                       <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>
@@ -447,35 +499,15 @@ export default function ProfileLists({ navigation }) {
                       },
                     ]}
                   >
-                    <View style={{ width: 124, height: 101, alignItems: "center", justifyContent: "center" }}>
-                      {[2, 1, 0].map((i) => {
-                        const angles = [0, -6, 6];
-                        const offsets = [0, -20, 20];
-                        const zIndexes = [3, 2, 1];
-                        return (
-                          <View
-                            key={i}
-                            style={[
-                              styles.placeholder,
-                              {
-                                position: "absolute",
-                                transform: [
-                                  { rotate: `${angles[i]}deg` },
-                                  { translateX: offsets[i] },
-                                ],
-                                zIndex: zIndexes[i],
-                                width: 68,
-                                height: 101,
-                                borderRadius: 10,
-                                backgroundColor: theme.primary,
-                                borderWidth: 1,
-                                borderColor: "rgba(255,255,255,0.1)",
-                              }
-                            ]}
-                          />
-                        );
-                      })}
-                    </View>
+                    <ListCovers
+                      items={[]}
+                      gridStyle={4}
+                      allCornersRounded={allCornersRounded}
+                      width={PREVIEW_W_4}
+                      height={PREVIEW_H}
+                      getTmdbUrl={noPreviewTmdbUrl}
+                      theme={theme}
+                    />
                     <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 5 }}>
                       <MaterialCommunityIcons name="layers" size={16} color={theme.colors.purple || "#a78bfa"} />
                       <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>
@@ -505,34 +537,15 @@ export default function ProfileLists({ navigation }) {
                       },
                     ]}
                   >
-                    <View style={{ gap: 2, alignItems: "center", width: "100%" }}>
-                      <View style={{ flexDirection: "row", gap: 2 }}>
-                        {[0, 1, 2, 3].map((index) => (
-                          <View
-                            key={index}
-                            style={[
-                              styles.placeholder,
-                              { width: 34, height: 49.5 },
-                              allCornersRounded ? { borderRadius: 10 } : [index === 0 && { borderTopLeftRadius: 10 }, index === 3 && { borderTopRightRadius: 10 }],
-                              { backgroundColor: theme.primary },
-                            ]}
-                          />
-                        ))}
-                      </View>
-                      <View style={{ flexDirection: "row", gap: 2 }}>
-                        {[4, 5, 6, 7].map((index) => (
-                          <View
-                            key={index}
-                            style={[
-                              styles.placeholder,
-                              { width: 34, height: 49.5 },
-                              allCornersRounded ? { borderRadius: 10 } : [index === 4 && { borderBottomLeftRadius: 10 }, index === 7 && { borderBottomRightRadius: 10 }],
-                              { backgroundColor: theme.primary },
-                            ]}
-                          />
-                        ))}
-                      </View>
-                    </View>
+                    <ListCovers
+                      items={[]}
+                      gridStyle={2}
+                      allCornersRounded={allCornersRounded}
+                      width={PREVIEW_W_2}
+                      height={PREVIEW_H}
+                      getTmdbUrl={noPreviewTmdbUrl}
+                      theme={theme}
+                    />
                     <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 5 }}>
                       <Ionicons name="grid" size={16} color={theme.colors.orange} />
                       <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>
@@ -603,6 +616,15 @@ const styles = StyleSheet.create({
   },
 
   // ── Raydaki liste kartı çerçevesi — ListsViewScreen kartlarıyla aynı ──────
+  // 1) Arka plan — kartla birebir aynı kutu, en arkada durur.
+  cardBg: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    height: CARD_H,
+    borderRadius: 20,
+  },
+  // 2) Aksan yüzeyi — arka planın üstünde; kart dışına (alta) 4px taşar.
   cardGlow: {
     position: "absolute",
     top: 4,
@@ -612,11 +634,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
   },
+  // 3) İçerik kapsayıcısı — en üstte, kendi arka planı YOK (alttaki katmanlar görünsün diye).
   card: {
     height: CARD_H,
     borderRadius: 20,
     overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.05)",
     padding: CARD_PADDING,
     alignItems: "center",
     gap: 2,
@@ -642,7 +664,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cardName: {
-    color: "#fff",
     fontSize: 13,
     fontWeight: "700",
     letterSpacing: -0.2,
@@ -660,9 +681,6 @@ const styles = StyleSheet.create({
     gap: 3,
     marginLeft: "auto",
   },
-  // Kart kapakları artık ListCovers'ta; bu ölçü yalnız görünüm modalındaki
-  // önizleme kutuları için duruyor.
-  placeholder: { width: 37.5, height: 55 },
   sectionView: {
     justifyContent: "center",
     alignItems: "center",

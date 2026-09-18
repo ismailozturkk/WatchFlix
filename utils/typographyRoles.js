@@ -47,16 +47,6 @@ export const FONT_PRESETS = Object.freeze([
     },
   },
   {
-    id: "inter",
-    previewFontFamily: "Inter_700Bold",
-    bestFor: ["heading", "body", "numeric"],
-    names: { tr: "Inter", en: "Inter" },
-    descriptions: {
-      tr: "Nötr ve çok okunaklı",
-      en: "Neutral and highly legible",
-    },
-  },
-  {
     id: "bebasNeue",
     previewFontFamily: "BebasNeue_400Regular",
     bestFor: ["heading", "numeric"],
@@ -167,16 +157,6 @@ export const FONT_PRESETS = Object.freeze([
     },
   },
   {
-    id: "syncopate",
-    previewFontFamily: "Syncopate_700Bold",
-    bestFor: ["heading"],
-    names: { tr: "Syncopate", en: "Syncopate" },
-    descriptions: {
-      tr: "Geometrik ve geniş",
-      en: "Geometric and extended",
-    },
-  },
-  {
     id: "audiowide",
     previewFontFamily: "Audiowide_400Regular",
     bestFor: ["heading", "numeric"],
@@ -189,21 +169,21 @@ export const FONT_PRESETS = Object.freeze([
   {
     id: "barlow",
     previewFontFamily: "Barlow_700Bold",
-    bestFor: ["heading", "body", "numeric"],
+    bestFor: ["body"],
     names: { tr: "Barlow", en: "Barlow" },
     descriptions: { tr: "Dar ve şehirli", en: "Condensed and urban" },
   },
   {
     id: "alegreya",
     previewFontFamily: "Alegreya_700Bold",
-    bestFor: ["heading", "body"],
+    bestFor: ["body"],
     names: { tr: "Alegreya", en: "Alegreya" },
     descriptions: { tr: "Akıcı ve edebî serif", en: "Flowing literary serif" },
   },
   {
     id: "bitter",
     previewFontFamily: "Bitter_700Bold",
-    bestFor: ["heading", "body", "numeric"],
+    bestFor: ["body"],
     names: { tr: "Bitter", en: "Bitter" },
     descriptions: { tr: "Tok ve köşeli slab serif", en: "Solid angular slab serif" },
   },
@@ -217,7 +197,7 @@ export const FONT_PRESETS = Object.freeze([
   {
     id: "comfortaa",
     previewFontFamily: "Comfortaa_700Bold",
-    bestFor: ["heading", "body", "numeric"],
+    bestFor: ["heading", "body"],
     names: { tr: "Comfortaa", en: "Comfortaa" },
     descriptions: { tr: "Tam yuvarlak ve oyuncu", en: "Fully rounded and playful" },
   },
@@ -231,23 +211,16 @@ export const FONT_PRESETS = Object.freeze([
   {
     id: "lexend",
     previewFontFamily: "Lexend_700Bold",
-    bestFor: ["heading", "body", "numeric"],
+    bestFor: ["heading", "body"],
     names: { tr: "Lexend", en: "Lexend" },
     descriptions: { tr: "Geniş ve yüksek okunaklı", en: "Wide and highly legible" },
   },
   {
     id: "quicksand",
     previewFontFamily: "Quicksand_700Bold",
-    bestFor: ["heading", "body", "numeric"],
+    bestFor: ["heading", "body"],
     names: { tr: "Quicksand", en: "Quicksand" },
     descriptions: { tr: "Hafif, yuvarlak ve modern", en: "Light, rounded and modern" },
-  },
-  {
-    id: "spectral",
-    previewFontFamily: "Spectral_700Bold",
-    bestFor: ["heading", "body"],
-    names: { tr: "Spectral", en: "Spectral" },
-    descriptions: { tr: "Dramatik editoryal serif", en: "Dramatic editorial serif" },
   },
   {
     id: "vollkorn",
@@ -266,14 +239,14 @@ export const FONT_PRESETS = Object.freeze([
   {
     id: "robotoMono",
     previewFontFamily: "RobotoMono_700Bold",
-    bestFor: ["heading", "body", "numeric"],
+    bestFor: ["heading"],
     names: { tr: "Roboto Mono", en: "Roboto Mono" },
     descriptions: { tr: "Dengeli sabit aralıklı", en: "Balanced monospaced" },
   },
   {
     id: "ibmPlexMono",
     previewFontFamily: "IBMPlexMono_700Bold",
-    bestFor: ["heading", "body", "numeric"],
+    bestFor: ["heading"],
     names: { tr: "IBM Plex Mono", en: "IBM Plex Mono" },
     descriptions: { tr: "Teknik sabit aralıklı", en: "Technical monospaced" },
   },
@@ -287,7 +260,7 @@ export const FONT_PRESETS = Object.freeze([
   {
     id: "exo2",
     previewFontFamily: "Exo2_700Bold",
-    bestFor: ["heading", "body", "numeric"],
+    bestFor: ["heading", "body"],
     names: { tr: "Exo 2", en: "Exo 2" },
     descriptions: { tr: "Fütüristik ama okunaklı", en: "Futuristic yet legible" },
   },
@@ -325,7 +298,7 @@ export const FONT_PRESETS = Object.freeze([
   {
     id: "blaka",
     previewFontFamily: "Blaka_400Regular",
-    bestFor: ["heading", "body", "numeric"],
+    bestFor: ["heading", "body"],
     featured: true,
     names: { tr: "Blaka", en: "Blaka" },
     descriptions: { tr: "Keskin ve yoğun display", en: "Sharp dense display" },
@@ -333,7 +306,7 @@ export const FONT_PRESETS = Object.freeze([
   {
     id: "novaSquare",
     previewFontFamily: "NovaSquare_400Regular",
-    bestFor: ["heading", "body", "numeric"],
+    bestFor: ["heading", "numeric"],
     featured: true,
     names: { tr: "Nova Square", en: "Nova Square" },
     descriptions: { tr: "Kare ve teknolojik", en: "Squared and technical" },
@@ -341,7 +314,7 @@ export const FONT_PRESETS = Object.freeze([
   {
     id: "bitcountSingle",
     previewFontFamily: "BitcountSingle_700Bold",
-    bestFor: ["heading", "body", "numeric"],
+    bestFor: ["heading", "body"],
     featured: true,
     names: { tr: "Bitcount Single", en: "Bitcount Single" },
     descriptions: { tr: "Piksel sayaç estetiği", en: "Pixel counter aesthetic" },
@@ -349,7 +322,7 @@ export const FONT_PRESETS = Object.freeze([
   {
     id: "kablammo",
     previewFontFamily: "Kablammo_400Regular",
-    bestFor: ["heading", "body", "numeric"],
+    bestFor: ["heading", "numeric"],
     featured: true,
     names: { tr: "Kablammo", en: "Kablammo" },
     descriptions: { tr: "Patlayan çizgi roman stili", en: "Explosive comic style" },
@@ -371,14 +344,6 @@ export const FONT_PRESETS = Object.freeze([
     descriptions: { tr: "Mücevher dokulu display", en: "Gem-textured display" },
   },
   {
-    id: "smokum",
-    previewFontFamily: "Smokum_400Regular",
-    bestFor: ["heading", "body", "numeric"],
-    featured: true,
-    names: { tr: "Smokum", en: "Smokum" },
-    descriptions: { tr: "Vahşi batı afişi", en: "Wild west poster" },
-  },
-  {
     id: "tourney",
     previewFontFamily: "Tourney_700Bold",
     bestFor: ["heading", "body", "numeric"],
@@ -389,7 +354,7 @@ export const FONT_PRESETS = Object.freeze([
   {
     id: "butcherman",
     previewFontFamily: "Butcherman_400Regular",
-    bestFor: ["heading", "body", "numeric"],
+    bestFor: ["numeric"],
     featured: true,
     names: { tr: "Butcherman", en: "Butcherman" },
     descriptions: { tr: "Korku filmi afişi", en: "Horror movie poster" },
@@ -401,14 +366,6 @@ export const FONT_PRESETS = Object.freeze([
     featured: true,
     names: { tr: "Chakra Petch", en: "Chakra Petch" },
     descriptions: { tr: "Köşeli dijital sans", en: "Angular digital sans" },
-  },
-  {
-    id: "pressStart2P",
-    previewFontFamily: "PressStart2P_400Regular",
-    bestFor: ["heading"],
-    featured: true,
-    names: { tr: "Press Start 2P", en: "Press Start 2P" },
-    descriptions: { tr: "Sekiz bit oyun başlığı", en: "Eight-bit game heading" },
   },
   {
     id: "fascinateInline",
@@ -576,25 +533,7 @@ const dualWeightFamily = (regular, bold) => ({
   },
 });
 
-const INTER_FAMILY = Object.freeze({
-  normal: {
-    400: "Inter_400Regular",
-    500: "Inter_500Medium",
-    600: "Inter_600SemiBold",
-    700: "Inter_700Bold",
-    800: "Inter_800ExtraBold",
-  },
-  italic: {
-    400: "Inter_400Regular_Italic",
-    500: "Inter_500Medium_Italic",
-    600: "Inter_600SemiBold_Italic",
-    700: "Inter_700Bold_Italic",
-    800: "Inter_800ExtraBold_Italic",
-  },
-});
-
 export const FONT_FAMILY_MAP = Object.freeze({
-  inter: INTER_FAMILY,
   bebasNeue: singleWeightFamily("BebasNeue_400Regular"),
   playfairDisplay: {
     normal: {
@@ -652,15 +591,6 @@ export const FONT_FAMILY_MAP = Object.freeze({
   tiltWarp: singleWeightFamily("TiltWarp_400Regular"),
   righteous: singleWeightFamily("Righteous_400Regular"),
   bungee: singleWeightFamily("Bungee_400Regular"),
-  syncopate: {
-    normal: {
-      400: "Syncopate_400Regular",
-      500: "Syncopate_400Regular",
-      600: "Syncopate_700Bold",
-      700: "Syncopate_700Bold",
-      800: "Syncopate_700Bold",
-    },
-  },
   audiowide: singleWeightFamily("Audiowide_400Regular"),
   barlow: dualWeightFamily("Barlow_400Regular", "Barlow_700Bold"),
   alegreya: dualWeightFamily("Alegreya_400Regular", "Alegreya_700Bold"),
@@ -670,7 +600,6 @@ export const FONT_FAMILY_MAP = Object.freeze({
   josefinSans: dualWeightFamily("JosefinSans_400Regular", "JosefinSans_700Bold"),
   lexend: dualWeightFamily("Lexend_400Regular", "Lexend_700Bold"),
   quicksand: dualWeightFamily("Quicksand_400Regular", "Quicksand_700Bold"),
-  spectral: dualWeightFamily("Spectral_400Regular", "Spectral_700Bold"),
   vollkorn: dualWeightFamily("Vollkorn_400Regular", "Vollkorn_700Bold"),
   zillaSlab: dualWeightFamily("ZillaSlab_400Regular", "ZillaSlab_700Bold"),
   robotoMono: dualWeightFamily("RobotoMono_400Regular", "RobotoMono_700Bold"),
@@ -693,14 +622,12 @@ export const FONT_FAMILY_MAP = Object.freeze({
   kablammo: singleWeightFamily("Kablammo_400Regular"),
   denkOne: singleWeightFamily("DenkOne_400Regular"),
   rubikGemstones: singleWeightFamily("RubikGemstones_400Regular"),
-  smokum: singleWeightFamily("Smokum_400Regular"),
   tourney: dualWeightFamily("Tourney_400Regular", "Tourney_700Bold"),
   butcherman: singleWeightFamily("Butcherman_400Regular"),
   chakraPetch: dualWeightFamily(
     "ChakraPetch_400Regular",
     "ChakraPetch_700Bold",
   ),
-  pressStart2P: singleWeightFamily("PressStart2P_400Regular"),
   fascinateInline: singleWeightFamily("FascinateInline_400Regular"),
   rubikDoodleShadow: singleWeightFamily("RubikDoodleShadow_400Regular"),
   brunoAceSC: singleWeightFamily("BrunoAceSC_400Regular"),

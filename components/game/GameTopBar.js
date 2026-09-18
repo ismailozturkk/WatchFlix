@@ -27,7 +27,7 @@ export default function GameTopBar({
       <TouchableOpacity
         onPress={onClose}
         activeOpacity={0.7}
-        style={styles.quitBtn}
+        style={[styles.quitBtn, { backgroundColor: theme.secondary }]}
         accessibilityRole="button"
         accessibilityLabel={i18nText("autoI18n.oyundan_cik", "Oyundan çık")}
         hitSlop={8}
@@ -63,7 +63,7 @@ export default function GameTopBar({
 
 const styles = StyleSheet.create({
   topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 8 },
-  quitBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.08)", justifyContent: "center", alignItems: "center" },
+  quitBtn: { width: 38, height: 38, borderRadius: 19, justifyContent: "center", alignItems: "center" },
   topBarCenter: { flexDirection: "row", alignItems: "center", gap: 8 },
   scoreBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,215,0,0.15)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,215,0,0.3)" },
   scoreText: { fontSize: 16, fontWeight: "800" },

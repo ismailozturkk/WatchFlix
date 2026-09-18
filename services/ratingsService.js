@@ -1,3 +1,4 @@
+import { nestedSummaryFields } from "../utils/firestoreNestedFields";
 // services/ratingsService.js
 //
 // Film / dizi için uygulama-içi yıldız derecelendirme katmanı (Firestore) +
@@ -34,6 +35,7 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { trackFirestoreWrite, trackFirestoreDelete, trackFirestoreRead } from "./usageTrackerService";
 
 export const mediaKey = (mediaType, mediaId) => `${mediaType}_${mediaId}`;
 
@@ -131,6 +133,7 @@ export async function setMyRating({ mediaType, mediaId, uid, rating, title = "",
   // Kullanıcı için denormalize kopya — "Puanladıklarım" sayfası bunu okur
   // (poster/başlık dahil, ekstra TMDB isteği gerekmez).
   const mirrorRef = doc(db, "Users", uid, "myRatings", key);
+  const rootListsRef = doc(db, "Lists", uid);
 
   await runTransaction(db, async (tx) => {
     const aggSnap = await tx.get(aggRef);
@@ -168,7 +171,18 @@ export async function setMyRating({ mediaType, mediaId, uid, rating, title = "",
       poster: poster || null,
       updatedAt: serverTimestamp(),
     });
+    tx.set(
+      rootListsRef,
+      nestedSummaryFields({
+        [`activityIndex.ratings.${key}`]: value,
+        updatedAt: serverTimestamp(),
+        _schemaVersion: 3,
+      }),
+      { merge: true },
+    );
   });
+  trackFirestoreWrite("Ratings", 2);
+  trackFirestoreWrite("Lists/activityIndex", 1);
 
   return value;
 }
@@ -182,6 +196,7 @@ export async function removeMyRating({ mediaType, mediaId, uid }) {
   const aggRef = doc(db, "Ratings", key);
   const userRef = doc(db, "Ratings", key, "userRatings", uid);
   const mirrorRef = doc(db, "Users", uid, "myRatings", key);
+  const rootListsRef = doc(db, "Lists", uid);
 
   await runTransaction(db, async (tx) => {
     const userSnap = await tx.get(userRef);
@@ -207,7 +222,18 @@ export async function removeMyRating({ mediaType, mediaId, uid }) {
       },
       { merge: true },
     );
+    tx.set(
+      rootListsRef,
+      nestedSummaryFields({
+        [`activityIndex.ratings.${key}`]: null,
+        updatedAt: serverTimestamp(),
+        _schemaVersion: 3,
+      }),
+      { merge: true },
+    );
   });
+  trackFirestoreDelete("Ratings", 1);
+  trackFirestoreWrite("Lists/activityIndex", 1);
 }
 
 // ─── "Puanladıklarım" listesi (kullanıcı mirror'ı) ─────────────────────────────

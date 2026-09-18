@@ -70,7 +70,7 @@ export function PostsProvider({ children }) {
   // Feed açılışta hiçbir ekranda görünmüyor (Hub sekmesi lazy mount).
   // Cache parse + ilk fetch + realtime listener'ı splash sonrası donma
   // penceresinin dışına ertele; kapı açılana dek loading=true kalır.
-  const startupReady = useStartupGate(2200);
+  const startupReady = useStartupGate(2000);
 
   const [posts, setPosts] = useState([]);
   const [filter, setFilter] = useState("all");

@@ -1,3 +1,4 @@
+import { isLightSurface } from "@utils/colorUtils";
 import React from "react";
 import {
   View,
@@ -28,7 +29,7 @@ export default function RemindersScreen({ navigation }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
       <ScreenDecor iconOpacity={0.25} />
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         {/* Başlık */}

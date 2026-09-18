@@ -657,50 +657,50 @@ export default function SceneGuessGameScreen({ navigation, route }) {
 
         {/* History Modal */}
         <Modal visible={historyModalVisible} transparent animationType="slide" onRequestClose={() => setHistoryModalVisible(false)}>
-          <View style={styles.historyModalRoot}>
+          <View style={[styles.historyModalRoot, { backgroundColor: theme.primary }]}>
             <ModalBlurBackdrop intensity={80} />
             <SafeAreaView style={styles.flex1}>
               <View style={styles.historyHeader}>
-                <Text style={[styles.historyTitle, { color: "#fff" }]}>{i18nText("autoI18n.oyun_istatistikleri", "Oyun İstatistikleri")}</Text>
+                <Text style={[styles.historyTitle, { color: theme.text.primary }]}>{i18nText("autoI18n.oyun_istatistikleri", "Oyun İstatistikleri")}</Text>
                 <TouchableOpacity
                   onPress={() => setHistoryModalVisible(false)}
                   accessibilityRole="button"
                   accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
                   hitSlop={8}
                 >
-                  <AppIcon family="Ionicons" name="close" size={24} color="#fff" />
+                  <AppIcon family="Ionicons" name="close" size={24} color={theme.text.primary} />
                 </TouchableOpacity>
               </View>
               {gameStats ? (
                 <View style={styles.historyContent}>
-                  <View style={styles.historyStatRow}>
-                    <Text style={styles.historyStatLabel}>{i18nText("autoI18n.en_iyi_skor", "En İyi Skor")}</Text>
+                  <View style={[styles.historyStatRow, { borderBottomColor: theme.border }]}>
+                    <Text style={[styles.historyStatLabel, { color: theme.text.secondary }]}>{i18nText("autoI18n.en_iyi_skor", "En İyi Skor")}</Text>
                     <Text style={[styles.historyStatVal, { color: "#FFD700" }]}>{gameStats.bestScore || 0}</Text>
                   </View>
-                  <View style={styles.historyStatRow}>
-                    <Text style={styles.historyStatLabel}>{i18nText("autoI18n.en_iyi_seri", "En İyi Seri")}</Text>
+                  <View style={[styles.historyStatRow, { borderBottomColor: theme.border }]}>
+                    <Text style={[styles.historyStatLabel, { color: theme.text.secondary }]}>{i18nText("autoI18n.en_iyi_seri", "En İyi Seri")}</Text>
                     <Text style={[styles.historyStatVal, { color: "#FF6B6B" }]}>🔥 {gameStats.bestStreak || 0}</Text>
                   </View>
-                  <View style={styles.historyStatRow}>
-                    <Text style={styles.historyStatLabel}>{i18nText("autoI18n.toplam_dogru", "Toplam Doğru")}</Text>
+                  <View style={[styles.historyStatRow, { borderBottomColor: theme.border }]}>
+                    <Text style={[styles.historyStatLabel, { color: theme.text.secondary }]}>{i18nText("autoI18n.toplam_dogru", "Toplam Doğru")}</Text>
                     <Text style={[styles.historyStatVal, { color: "#5BFF6B" }]}>{gameStats.totalCorrect || 0}</Text>
                   </View>
-                  <View style={styles.historyStatRow}>
-                    <Text style={styles.historyStatLabel}>{i18nText("autoI18n.toplam_yanlis", "Toplam Yanlış")}</Text>
+                  <View style={[styles.historyStatRow, { borderBottomColor: theme.border }]}>
+                    <Text style={[styles.historyStatLabel, { color: theme.text.secondary }]}>{i18nText("autoI18n.toplam_yanlis", "Toplam Yanlış")}</Text>
                     <Text style={[styles.historyStatVal, { color: "#FF5555" }]}>{gameStats.totalWrong || 0}</Text>
                   </View>
-                  <View style={styles.historyStatRow}>
-                    <Text style={styles.historyStatLabel}>{i18nText("autoI18n.toplam_oyun", "Toplam Oyun")}</Text>
-                    <Text style={[styles.historyStatVal, { color: "#fff" }]}>{gameStats.totalPlayed || 0}</Text>
+                  <View style={[styles.historyStatRow, { borderBottomColor: theme.border }]}>
+                    <Text style={[styles.historyStatLabel, { color: theme.text.secondary }]}>{i18nText("autoI18n.toplam_oyun", "Toplam Oyun")}</Text>
+                    <Text style={[styles.historyStatVal, { color: theme.text.primary }]}>{gameStats.totalPlayed || 0}</Text>
                   </View>
-                  <View style={styles.historyStatRow}>
-                    <Text style={styles.historyStatLabel}>{i18nText("autoI18n.cozulen_soru", "Çözülen Soru")}</Text>
+                  <View style={[styles.historyStatRow, { borderBottomColor: theme.border }]}>
+                    <Text style={[styles.historyStatLabel, { color: theme.text.secondary }]}>{i18nText("autoI18n.cozulen_soru", "Çözülen Soru")}</Text>
                     <Text style={[styles.historyStatVal, { color: "#64b4ff" }]}>{(gameStats.totalCorrect || 0) + (gameStats.totalWrong || 0)}</Text>
                   </View>
                 </View>
               ) : (
                 <View style={styles.historyContent}>
-                  <Text style={{ color: "#aaa", textAlign: "center", marginTop: 40, fontSize: 14 }}>
+                  <Text style={{ color: theme.text.muted, textAlign: "center", marginTop: 40, fontSize: 14 }}>
                     {i18nText("autoI18n.henuz_oyun_oynanmadi", "Henüz oyun oynanmadı")}
                   </Text>
                 </View>
@@ -711,7 +711,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
 
         {/* Leaderboard Modal */}
         <Modal visible={leaderboardModalVisible} transparent animationType="slide" onRequestClose={() => setLeaderboardModalVisible(false)}>
-          <View style={styles.historyModalRoot}>
+          <View style={[styles.historyModalRoot, { backgroundColor: theme.primary }]}>
             <ModalBlurBackdrop intensity={80} />
             <SafeAreaView style={styles.flex1}>
               <View style={styles.historyHeader}>
@@ -722,7 +722,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
                   accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
                   hitSlop={8}
                 >
-                  <AppIcon family="Ionicons" name="close" size={24} color="#fff" />
+                  <AppIcon family="Ionicons" name="close" size={24} color={theme.text.primary} />
                 </TouchableOpacity>
               </View>
               <ScrollView contentContainerStyle={styles.historyContent} showsVerticalScrollIndicator={false}>
@@ -730,32 +730,32 @@ export default function SceneGuessGameScreen({ navigation, route }) {
                   <ActivityIndicator size="large" color="#FFD700" style={{ marginTop: 40 }} />
                 ) : leaderboardStatus === "error" ? (
                   <View style={styles.leaderboardState}>
-                    <AppIcon family="Ionicons" name="cloud-offline-outline" size={32} color="#aaa" />
-                    <Text style={styles.leaderboardStateText}>{i18nText("autoI18n.liderlik_yuklenemedi", "Liderlik tablosu yüklenemedi")}</Text>
-                    <TouchableOpacity style={styles.leaderboardRetryBtn} onPress={loadLeaderboard}>
+                    <AppIcon family="Ionicons" name="cloud-offline-outline" size={32} color={theme.text.muted} />
+                    <Text style={[styles.leaderboardStateText, { color: theme.text.muted }]}>{i18nText("autoI18n.liderlik_yuklenemedi", "Liderlik tablosu yüklenemedi")}</Text>
+                    <TouchableOpacity style={[styles.leaderboardRetryBtn, { borderColor: theme.border }]} onPress={loadLeaderboard}>
                       <Text style={styles.leaderboardRetryText}>{i18nText("autoI18n.tekrar_dene", "Tekrar Dene")}</Text>
                     </TouchableOpacity>
                   </View>
                 ) : leaderboardData.length > 0 ? (
                   leaderboardData.map((lbUser, idx) => (
-                    <View key={lbUser.uid} style={[styles.historyStatRow, { borderBottomColor: "rgba(255,255,255,0.05)" }]}>
+                    <View key={lbUser.uid} style={[styles.historyStatRow, { borderBottomColor: theme.border }]}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                        <Text style={{ color: idx < 3 ? "#FFD700" : "#aaa", fontSize: 16, fontWeight: "800", width: 24 }}>
+                        <Text style={{ color: idx < 3 ? "#FFD700" : theme.text.muted, fontSize: 16, fontWeight: "800", width: 24 }}>
                           #{idx + 1}
                         </Text>
-                        <Text style={[styles.historyStatLabel, { color: "#fff" }]}>
+                        <Text style={[styles.historyStatLabel, { color: theme.text.primary }]}>
                           {lbUser.displayName || i18nText("autoI18n.anonim_oyuncu", "Anonim Oyuncu")}
                         </Text>
                       </View>
-                      <Text style={[styles.historyStatVal, { color: idx === 0 ? "#FFD700" : "#fff" }]}>
+                      <Text style={[styles.historyStatVal, { color: idx === 0 ? "#FFD700" : theme.text.primary }]}>
                         {lbUser.bestScore}
                       </Text>
                     </View>
                   ))
                 ) : (
                   <View style={styles.leaderboardState}>
-                    <AppIcon family="Ionicons" name="trophy-outline" size={32} color="#aaa" />
-                    <Text style={styles.leaderboardStateText}>{i18nText("autoI18n.liderlik_henuz_bos", "Henüz sıralamaya giren oyuncu yok")}</Text>
+                    <AppIcon family="Ionicons" name="trophy-outline" size={32} color={theme.text.muted} />
+                    <Text style={[styles.leaderboardStateText, { color: theme.text.muted }]}>{i18nText("autoI18n.liderlik_henuz_bos", "Henüz sıralamaya giren oyuncu yok")}</Text>
                   </View>
                 )}
               </ScrollView>

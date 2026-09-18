@@ -40,6 +40,7 @@ import { auth, db } from "../firebase";
 import { clampAvatarIndex, DEFAULT_AVATAR_INDEX } from "../utils/avatars";
 import { parseBirthDate } from "../utils/ageGate";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
+import { propagateProfileChange } from "./profilePropagation";
 
 export const SCHEMA_VERSION = 2;
 
@@ -67,10 +68,10 @@ export const DEFAULT_PRIVACY = {
 };
 
 export const DEFAULT_LIST_VISIBLE = {
-  watchedMovies: false,
-  watchedTv: false,
-  watchList: false,
-  favorites: false,
+  watchedMovies: true,
+  watchedTv: true,
+  watchList: true,
+  favorites: true,
 };
 
 // ── Username helpers ────────────────────────────────────────────────────────
@@ -381,13 +382,20 @@ export async function changeUsername(uid, newUsername) {
 }
 
 /**
- * Avatar değiştir — Users.avatarIndex'i set et.
+ * Avatar değiştir — Users.avatarIndex'i set et (-1 ise photoURL ile birlikte).
  * (Eski post'lardaki authorAvatarIndex değişmez — bilinçli snapshot davranışı.)
  */
-export async function setAvatarIndex(uid, avatarIndex) {
-  await updateUserProfile(uid, {
-    avatarIndex: clampAvatarIndex(avatarIndex),
-  });
+export async function setAvatarIndex(uid, avatarIndex, photoURL = null) {
+  const clamped = clampAvatarIndex(avatarIndex);
+  const patch = { avatarIndex: clamped };
+  if (clamped === -1 && photoURL) {
+    patch.photoURL = photoURL;
+  }
+  await updateUserProfile(uid, patch);
+  propagateProfileChange(uid, {
+    avatarIndex: clamped,
+    photoURL: clamped === -1 ? photoURL : null,
+  }).catch(() => {});
 }
 
 /**

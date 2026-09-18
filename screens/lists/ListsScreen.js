@@ -42,13 +42,14 @@ import ListSearchBar from "@components/lists/ListSearchBar";
 import GlobalSearchResults from "@components/lists/GlobalSearchResults";
 import ListItemActionsSheet from "@components/lists/ListItemActionsSheet";
 import ListPosterInfoControls from "@components/lists/ListPosterInfoControls";
+import { MyPosterActivityBadge } from "@components/PosterActivityBadge";
 import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "@services/hapticsService";
 import { i18nText } from "@utils/i18nText";
 import { captureError } from "@services/crashReporting";
 import { buildGenreMap } from "@utils/genreLabels";
-import { todayListDate } from "@utils/mediaFacts";
+import { todayListDate, formatMinutes } from "@utils/mediaFacts";
 import {
   buildListKeySet,
   GLOBAL_SEARCH_MIN_CHARS,
@@ -63,6 +64,8 @@ import {
   searchForList,
 } from "@services/listQuickAdd";
 import { reorderWatchedShows, unmarkShow } from "../../services/watchedTvService";
+import { refreshShowMeta } from "../../services/refreshShowMeta";
+import { cachedTmdb } from "../../utils/cachedRead";
 import ScreenDecor from "@components/ScreenDecor";
 import {
   reorderList,
@@ -238,6 +241,53 @@ export default function ListsScreen({ route, navigation }) {
     if (tvShowStatus === false) toValue = 2;
     slideAnim.setValue(toValue);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // watchedTv modalı açıldığında, TMDB'deki güncel sezon/bölüm sayısını kontrol et
+  // ve yeni sezonlar çıkmışsa modalı, listeyi ve Firestore kaydını sessizce güncelle.
+  useEffect(() => {
+    if (!modalVisible || !listModalItems?.length || listName !== "watchedTv") return;
+    const item = listModalItems[0];
+    if (!item?.id || !API_KEY || !user?.uid) return;
+
+    let active = true;
+    (async () => {
+      try {
+        const { data } = await cachedTmdb(
+          `https://api.themoviedb.org/3/tv/${item.id}?language=${language === "tr" ? "tr-TR" : "en-US"}`,
+          { headers: { accept: "application/json", Authorization: API_KEY } },
+          { maxAge: 6 * 60 * 60 * 1000, category: "tvContent" },
+        );
+        if (!active || !data) return;
+        const newEpCount = data.number_of_episodes || 0;
+        const newSeasonCount = data.number_of_seasons || 0;
+        if (
+          newEpCount > (item.showEpisodeCount || 0) ||
+          newSeasonCount > (item.showSeasonCount || 0)
+        ) {
+          await refreshShowMeta(user.uid, item.id, data, item);
+          if (!active) return;
+          const updatedFields = {
+            showEpisodeCount: Math.max(item.showEpisodeCount || 0, newEpCount),
+            showSeasonCount: Math.max(item.showSeasonCount || 0, newSeasonCount),
+          };
+          setListModalItems((prev) => {
+            if (!prev?.length || String(prev[0].id) !== String(item.id)) return prev;
+            return [{ ...prev[0], ...updatedFields }];
+          });
+          setListItems((prev) =>
+            prev.map((i) =>
+              String(i.id) === String(item.id) ? { ...i, ...updatedFields } : i,
+            ),
+          );
+        }
+      } catch (err) {
+        if (__DEV__) console.log("[ListsScreen] modal refreshShowMeta error:", err?.message);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [modalVisible, listModalItems, listName, API_KEY, user?.uid, language]);
 
   const handleTvTabPress = useCallback(
     (status) => {
@@ -873,28 +923,6 @@ export default function ListsScreen({ route, navigation }) {
       </View>
     </SkeletonPlaceholder>
   );
-  function calculateTotalDuration(item) {
-    let totalMinutes = 0;
-
-    const seasons = item.seasons;
-
-    for (const seasonKey in seasons) {
-      const season = seasons[seasonKey];
-      const episodes = season.episodes;
-
-      for (const episodeKey in episodes) {
-        const episode = episodes[episodeKey];
-        if (episode && typeof episode.episodeMinutes === "number") {
-          totalMinutes += episode.episodeMinutes;
-        }
-      }
-    }
-
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-
-    return `${hours} saat ${minutes} dakika`;
-  }
   const chooseRandomly = (selectedType) => {
     const pool =
       selectedType === "mixed"
@@ -926,6 +954,19 @@ export default function ListsScreen({ route, navigation }) {
     [filteredItems],
   );
 
+  // Süre etiketleri saf mediaFacts fonksiyonlarına PARAMETRE geçilir
+  // (o modül i18nText import etmiyor).
+  const durationLabels = useMemo(
+    () => ({
+      hourLabel: i18nText("autoI18n.saat_kisa_birim", "sa"),
+      minuteLabel: i18nText("autoI18n.dakika_kisa_birim", "dk"),
+      seasonLabel: i18nText("autoI18n.sezon_birim", "sezon"),
+      episodeLabel: i18nText("autoI18n.bolum_birim", "bölüm"),
+      perEpisodeLabel: i18nText("autoI18n.dk_bolum", "dk/bölüm"),
+    }),
+    [language],
+  );
+
   // İzlenen bölüm sayısı ve toplam süre: renderItem içinde her çizimde
   // reduce/loop çalıştırmak yerine öğe başına bir kez hesaplanır.
   const { watchedCountById, durationTextById } = useMemo(() => {
@@ -938,10 +979,11 @@ export default function ListsScreen({ route, navigation }) {
             0,
           )
         : 0;
-      durations[item.id] = calculateTotalDuration(item);
+      durations[item.id] = formatMinutes(getItemMinutes(item), durationLabels);
     });
     return { watchedCountById: counts, durationTextById: durations };
-  }, [listItems]);
+  }, [listItems, durationLabels]);
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.primary }]}
@@ -1211,20 +1253,21 @@ export default function ListsScreen({ route, navigation }) {
             </View>
           )}
           {listName == "watchedTv" && (
-            <View
-              style={{
-                flexDirection: "row",
-                marginHorizontal: 15,
-                marginBottom: 12,
-                borderRadius: 14,
-                borderWidth: 1,
-                overflow: "hidden",
-                position: "relative",
-                padding: TAB_PADDING,
-                height: 40,
-                backgroundColor: theme.secondary,
-                borderColor: theme.border,
-              }}
+            <>
+              <View
+                style={{
+                  flexDirection: "row",
+                  marginHorizontal: 15,
+                  marginBottom: 12,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  overflow: "hidden",
+                  position: "relative",
+                  padding: TAB_PADDING,
+                  height: 40,
+                  backgroundColor: theme.secondary,
+                  borderColor: theme.border,
+                }}
               onLayout={(e) => {
                 const w = e.nativeEvent.layout.width - TAB_PADDING * 2;
                 if (tabPillWidth !== w) setTabPillWidth(w);
@@ -1315,6 +1358,7 @@ export default function ListsScreen({ route, navigation }) {
                 </Text>
               </TouchableOpacity>
             </View>
+            </>
           )}
           <FlatList
             data={gridRows}
@@ -1438,22 +1482,26 @@ export default function ListsScreen({ route, navigation }) {
                     ) : null}
                     {listPosterInfo.mediaType ? (
                       <Text
+                        allowFontScaling={false}
+                        numberOfLines={1}
                         style={[
                           styles.typeBadge,
                           {
                             backgroundColor:
-                              item.type == "movie"
+                              item.type === "movie"
                                 ? theme.notesColor.blueBackground
                                 : theme.notesColor.greenBackground,
                           },
                         ]}
                       >
-                        {item.type == "movie" ? t.typeMovies : t.typeTvSeries}
+                        {item.type === "movie" ? t.typeMovies : t.typeTvSeries}
                       </Text>
                     ) : null}
                     {listPosterInfo.duration && (listName !== "watchedTv" ? (
                       item.minutes ? (
                         <Text
+                          allowFontScaling={false}
+                          numberOfLines={1}
                           style={[
                             styles.minutesBadge,
                             {
@@ -1467,6 +1515,8 @@ export default function ListsScreen({ route, navigation }) {
                       ) : null
                     ) : durationTextById[item.id] ? (
                       <Text
+                        allowFontScaling={false}
+                        numberOfLines={1}
                         style={[
                           styles.nameBadge,
                           { backgroundColor: theme.secondaryt },
@@ -1475,17 +1525,29 @@ export default function ListsScreen({ route, navigation }) {
                         {durationTextById[item.id]}
                       </Text>
                     ) : null)}
+                    {/* Kişisel puan (yıldız) + yorum ikonu — posterin ÜZERİNDE,
+                        alt kısmına yaslı (kapalıysa hiç yer kaplamaz) */}
+                    <MyPosterActivityBadge
+                      mediaId={item.id}
+                      mediaType={item.type}
+                      posterWidth={posterW}
+                      showRating={listPosterInfo.rating}
+                      showComment={listPosterInfo.comment}
+                      layout="overlay"
+                      corner="bottomLeft"
+                    />
                   </Animated.View>
                 </SwipeCard>
-                  {listPosterInfo.title ? (
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.posterTitle, { color: theme.text.secondary }]}
-                    >
-                      {item.name}
-                    </Text>
-                  ) : null}
-                  </TouchableOpacity>
+                {listPosterInfo.title ? (
+                  <Text
+                    allowFontScaling={false}
+                    numberOfLines={1}
+                    style={[styles.posterTitle, { color: theme.text.secondary }]}
+                  >
+                    {item.name}
+                  </Text>
+                ) : null}
+              </TouchableOpacity>
                 ))}
                 {row.length < gridColumns
                   ? Array.from({ length: gridColumns - row.length }).map((_, i) => (
@@ -2855,7 +2917,6 @@ const styles = StyleSheet.create({
     width: 68,
     height: 102,
     borderRadius: 12,
-    backgroundColor: "#252525",
   },
   imageSelected: {
     width: 100,
@@ -2943,7 +3004,6 @@ const styles = StyleSheet.create({
     width: 96,
     height: 144,
     borderRadius: 14,
-    backgroundColor: "#2a2a2a",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
   },

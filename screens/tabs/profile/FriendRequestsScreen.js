@@ -22,12 +22,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../../components/BackButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { i18nText } from "../../../utils/i18nText";
-
+import UserAvatar from "../../../components/common/UserAvatar";
 
 export default function FriendRequestsScreen() {
   const [tab, setTab] = useState("received");
   const { theme } = useTheme();
-  const { avatars } = useProfileUi();
   const {
     incomingRequests,
     outgoingRequests,
@@ -37,7 +36,7 @@ export default function FriendRequestsScreen() {
   } = useFriends();
 
   // Context (alt koleksiyon modeli) verisini kartın beklediği
-  // {id, uid, displayName, username, avatarIndex} şekline normalize et.
+  // {id, uid, displayName, username, avatarIndex, photoURL} şekline normalize et.
   const requests = useMemo(
     () =>
       incomingRequests.map((r) => ({
@@ -46,6 +45,7 @@ export default function FriendRequestsScreen() {
         displayName: r.fromName,
         username: r.fromUsername,
         avatarIndex: r.fromAvatarIndex,
+        photoURL: r.fromPhotoURL || null,
       })),
     [incomingRequests],
   );
@@ -57,6 +57,7 @@ export default function FriendRequestsScreen() {
         displayName: r.toName,
         username: r.toUsername,
         avatarIndex: r.toAvatarIndex,
+        photoURL: r.toPhotoURL || null,
       })),
     [outgoingRequests],
   );
@@ -95,34 +96,18 @@ export default function FriendRequestsScreen() {
         ]}
       >
         {/* Avatar */}
-        <View
-          style={[
-            styles.avatarWrapper,
-            {
-              borderColor:
-                tab === "received"
-                  ? (theme.colors?.green ?? "#29b864") + "88"
-                  : "#ff965088",
-            },
-          ]}
-        >
-          {avatars?.[item?.avatarIndex] ? (
-            <Image source={avatars[item.avatarIndex]} style={styles.avatar} />
-          ) : (
-            <View
-              style={[
-                styles.avatarPlaceholder,
-                { backgroundColor: theme.primary },
-              ]}
-            >
-              <Ionicons
-                name="person"
-                size={22}
-                color={theme.text?.muted ?? "#555"}
-              />
-            </View>
-          )}
-        </View>
+        <UserAvatar
+          avatarIndex={item?.avatarIndex}
+          photoURL={item?.photoURL}
+          isCustomPhoto
+          size={52}
+          borderWidth={2}
+          borderColor={
+            tab === "received"
+              ? (theme.colors?.green ?? "#29b864") + "88"
+              : "#ff965088"
+          }
+        />
 
         {/* Bilgiler */}
         <View style={styles.userInfo}>

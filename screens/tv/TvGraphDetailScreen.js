@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Animated,
+  InteractionManager,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../components/BackButton";
@@ -36,9 +37,8 @@ import ScreenSnow from "../../components/ScreenSnow";
 // Ortak katmanlar utils/ratingColors.js'te — story "Bölüm Graph" bloğu da kullanır.
 
 // ─── Izgara Boyutları ─────────────────────────────────────────────────────────
-// default: mevcut boyutlar; compact: panel sağ üstündeki düğmeyle açılan
-// küçük görünüm. Hücre, yazı ve etiket konumları birlikte ölçeklenir —
-// yapı bozulmadan küçülür. Sütun genişliği = cell + 2×margin.
+// default/compact: bilgileri hücre içinde gösterir. heatmap: yalnız renk;
+// sezonlar üstte, bölümler solda. Sütun genişliği = cell + 2×margin.
 //
 // BOŞLUK ORANA BAĞLI: `margin` sabit 2 dp yazılıydı, yani kompakt görünümde
 // kareler %28 küçülürken aralarındaki boşluk aynı kalıyor ve ızgara
@@ -55,7 +55,7 @@ const EpisodeCell = React.memo(
     isSelected,
     onPress,
     borderColor,
-    grid, // GRID_SIZES.default | GRID_SIZES.compact (modül sabiti → memo bozulmaz)
+    grid,
   }) => {
     const { bg, text } = getRatingColors(episode.vote_average);
     const rating = episode.vote_average
@@ -72,6 +72,9 @@ const EpisodeCell = React.memo(
     return (
       <TouchableOpacity
         onPress={handlePress}
+        accessibilityRole="button"
+        accessibilityLabel={`${i18nText("season", "Sezon")} ${seasonNumber}, ${i18nText("episode", "Bölüm")} ${episodeIndex + 1}, ${i18nText("rating", "Puan")} ${rating}`}
+        accessibilityState={{ selected: isSelected }}
         activeOpacity={0.75}
         style={[
           styles.cell,
@@ -88,6 +91,7 @@ const EpisodeCell = React.memo(
           },
         ]}
       >
+        {!grid.colorOnly && <>
         <Text
           style={[
             styles.cellSeasonLabel,
@@ -119,6 +123,7 @@ const EpisodeCell = React.memo(
         >
           E{episodeIndex + 1}
         </Text>
+        </>}
       </TouchableOpacity>
     );
   },
@@ -190,10 +195,12 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
   const [error, setError] = useState(null);
   const [selectedEpisode, setSelectedEpisode] = useState(null);
   // { season: number, index: number } | null
-  // Kompakt ızgara — varsayılan mevcut boyutlar; düğmeyle küçük görünüme geçilir.
-  const [compactGrid, setCompactGrid] = useState(false);
-  const grid = compactGrid ? GRID_SIZES.compact : GRID_SIZES.default;
+  const [gridMode, setGridMode] = useState("default");
+  const [renderGridMode, setRenderGridMode] = useState("default");
+  const grid = GRID_SIZES[renderGridMode];
   const colWidth = grid.cell + grid.margin * 2; // hücre + iki yandaki boşluk
+  const autoGridRef = useRef(false);
+  const gridChangeHandleRef = useRef(null);
 
   const { t, language } = useLanguage();
   const { theme } = useTheme();
@@ -265,6 +272,17 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
         (s) => s.season_number !== 0,
       );
 
+      // ── Otomatik ızgara boyutu (ilk yükleme) ──
+      // ≤7 sezon → default, 8–11 → compact, >11 → heatmap
+      if (!autoGridRef.current) {
+        autoGridRef.current = true;
+        const count = validSeasons.length;
+        const autoMode =
+          count <= 7 ? "default" : count <= 11 ? "compact" : "heatmap";
+        setGridMode(autoMode);
+        setRenderGridMode(autoMode);
+      }
+
       const seasonPromises = validSeasons.map(async (season) => {
         const tmdbRes = await axios.get(
           `https://api.themoviedb.org/3/tv/${id}/season/${season.season_number}`,
@@ -318,6 +336,11 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
     // Dil/id değişince ya da ekran kapanınca süren zinciri bayatlat.
     return () => {
       runIdRef.current++;
+      // Bekleyen boyut değişimini iptal et
+      if (gridChangeHandleRef.current) {
+        gridChangeHandleRef.current.cancel();
+        gridChangeHandleRef.current = null;
+      }
     };
   }, [fetchAllSeasons]);
 
@@ -361,6 +384,12 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
     () => Math.max(...tvShows.map((s) => s.episodes.length), 0),
     [tvShows],
   );
+  const rowLabelWidth = grid.showAxes ? Math.max(30, 12 + String(maxEpisodes).length * 6) : 0;
+  const gridOptions = [
+    { key: "default", icon: "expand-outline", label: t.tvGraphGrid.standard },
+    { key: "compact", icon: "contract-outline", label: t.tvGraphGrid.compact },
+    { key: "heatmap", icon: "grid-outline", label: t.tvGraphGrid.heatmap },
+  ];
 
   // ── Render Koşulları ──────────────────────────────────────────────────────
   if (loading) return <SkeletonLoading theme={theme} />;
@@ -546,18 +575,37 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
             )}
           </View>
 
-          {/* Izgara boyutu: varsayılan ↔ kompakt (bölüm seçiliyken ✕'in soluna kayar) */}
-          <TouchableOpacity
-            style={[styles.gridSizeBtn, selectedEpisode && { right: 44 }]}
-            onPress={() => setCompactGrid((v) => !v)}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          >
-            <Ionicons
-              name={compactGrid ? "expand-outline" : "contract-outline"}
-              size={14}
-              color="#fff"
-            />
-          </TouchableOpacity>
+          <View style={[styles.gridSizeControls, selectedEpisode && { top: 44 }]}>
+            {gridOptions.map((option) => (
+              <TouchableOpacity
+                key={option.key}
+                style={[
+                  styles.gridSizeBtn,
+                  gridMode === option.key && {
+                    backgroundColor: theme.accent,
+                    borderColor: "rgba(255,255,255,0.8)",
+                  },
+                ]}
+                onPress={() => {
+                  if (gridChangeHandleRef.current) {
+                    gridChangeHandleRef.current.cancel();
+                  }
+                  setGridMode(option.key);
+                  gridChangeHandleRef.current =
+                    InteractionManager.runAfterInteractions(() => {
+                      setRenderGridMode(option.key);
+                      gridChangeHandleRef.current = null;
+                    });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={option.label}
+                accessibilityState={{ selected: gridMode === option.key }}
+                hitSlop={3}
+              >
+                <Ionicons name={option.icon} size={16} color="#fff" />
+              </TouchableOpacity>
+            ))}
+          </View>
 
           {/* Seçili bölümü kapat */}
           {selectedEpisode && (
@@ -595,9 +643,11 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
           contentContainerStyle={{ paddingHorizontal: 12 }}
           showsHorizontalScrollIndicator={false}
         >
-          <View style={{ minWidth: tvShows.length * colWidth }}>
+          <View style={{ minWidth: rowLabelWidth + tvShows.length * colWidth }}>
             {/* Sezon Başlık Satırı */}
+            {grid.showAxes && (
             <View style={[styles.row, { marginBottom: grid.margin * 2 }]}>
+              <View style={{ width: rowLabelWidth }} />
               {tvShows.map((season) => (
                 <View
                   key={season.season_number}
@@ -606,18 +656,29 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                   <Text
                     style={[
                       styles.seasonHeaderText,
-                      { fontSize: grid.headerFont },
+                      { fontSize: grid.headerFont, color: theme.text.secondary },
                     ]}
                   >
-                    S{season.season_number}
+                    {t.season[0]}{season.season_number}
                   </Text>
                 </View>
               ))}
             </View>
+            )}
 
             {/* Bölüm Hücreleri */}
             {[...Array(maxEpisodes)].map((_, epIndex) => (
               <View key={epIndex} style={styles.row}>
+                {grid.showAxes && (
+                  <View style={[styles.episodeHeader, { width: rowLabelWidth, height: colWidth }]}>
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.seasonHeaderText, { fontSize: grid.headerFont, color: theme.text.secondary }]}
+                    >
+                      {t.episode[0]}{epIndex + 1}
+                    </Text>
+                  </View>
+                )}
                 {tvShows.map((season) =>
                   season.episodes[epIndex] ? (
                     <EpisodeCell
@@ -646,11 +707,11 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                         },
                       ]}
                     >
-                      <Text
+                      {!grid.colorOnly && <Text
                         style={[styles.emptyCellDot, { fontSize: grid.dot }]}
                       >
                         ·
-                      </Text>
+                      </Text>}
                     </View>
                   ),
                 )}
@@ -699,8 +760,9 @@ const styles = StyleSheet.create({
   infoPanelContainer: {
     flexDirection: "row",
     padding: 14,
+    paddingRight: 52,
     alignItems: "center",
-    minHeight: 140,
+    minHeight: 154,
   },
   panelPoster: {
     width: 82,
@@ -799,14 +861,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  // Izgara boyut düğmesi — closeBtn ile aynı görünüm, panel sağ üstünde
-  gridSizeBtn: {
+  gridSizeControls: {
     position: "absolute",
     top: 10,
     right: 10,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    gap: 6,
+  },
+  gridSizeBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
     backgroundColor: "rgba(255,255,255,0.15)",
     justifyContent: "center",
     alignItems: "center",
@@ -826,6 +892,11 @@ const styles = StyleSheet.create({
     width: 54,
     paddingVertical: 2,
     alignItems: "center",
+  },
+  episodeHeader: {
+    justifyContent: "center",
+    alignItems: "flex-end",
+    paddingRight: 5,
   },
   seasonHeaderText: {
     color: "rgba(255,255,255,0.35)",

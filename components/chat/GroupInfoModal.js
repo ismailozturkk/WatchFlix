@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   SectionList,
   StyleSheet,
   Text,
@@ -16,6 +15,7 @@ import BottomSheetModal from "@components/common/BottomSheetModal";
 import { db } from "../../firebase";
 import { useTheme } from "@context/ThemeContext";
 import { useProfileUi } from "@context/ProfileUiContext";
+import { useUserProfile } from "@context/UserProfileContext";
 import {
   addGroupMember,
   removeGroupMember,
@@ -34,26 +34,10 @@ import { toast } from "@components/AppToast";
 import GroupAvatar from "@components/chat/GroupAvatar";
 import GroupAvatarGrid from "@components/chat/GroupAvatarGrid";
 import { appAlert } from "@components/AppAlert";
+import UserAvatar from "@components/common/UserAvatar";
 
 const ACCENT = "#6C63FF";
 const DANGER = "#FF6B6B";
-
-const Avatar = ({ avatarIndex, name, avatars, color }) =>
-  avatars?.[avatarIndex] ? (
-    <Image source={avatars[avatarIndex]} style={styles.avatar} />
-  ) : (
-    <View
-      style={[
-        styles.avatar,
-        styles.avatarFallback,
-        { backgroundColor: color + "33" },
-      ]}
-    >
-      <Text style={[styles.avatarLetter, { color }]}>
-        {(name || "?").charAt(0).toUpperCase()}
-      </Text>
-    </View>
-  );
 
 export default function GroupInfoModal({
   visible,
@@ -65,6 +49,7 @@ export default function GroupInfoModal({
 }) {
   const { theme } = useTheme();
   const { avatars } = useProfileUi();
+  const { profile } = useUserProfile();
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState("members");
   const [friends, setFriends] = useState([]);
@@ -95,6 +80,7 @@ export default function GroupInfoModal({
               displayName: data.friendName || "",
               username: data.friendUsername || "",
               avatarIndex: data.friendAvatarIndex ?? 0,
+              photoURL: data.friendPhotoURL || null,
             };
           })
         );
@@ -106,17 +92,31 @@ export default function GroupInfoModal({
 
   const members = useMemo(
     () =>
-      sortMembersByRole(memberIds.map((uid) => ({
-        uid,
-        displayName:
-          groupData?.memberInfo?.[uid]?.name ||
-          (uid === currentUid
-            ? i18nText("autoI18n.sen", "Sen")
-            : i18nText("autoI18n.isimsiz_kullanici", "İsimsiz kullanıcı")),
-        username: groupData?.memberInfo?.[uid]?.username || "",
-        avatarIndex: groupData?.memberInfo?.[uid]?.avatarIndex ?? 0,
-      })), groupData),
-    [memberIds, groupData?.memberInfo, currentUid]
+      sortMembersByRole(
+        memberIds.map((uid) => {
+          const isMe = uid === currentUid;
+          const minfo = groupData?.memberInfo?.[uid];
+          return {
+            uid,
+            displayName: isMe
+              ? profile?.displayName || minfo?.name || i18nText("autoI18n.sen", "Sen")
+              : minfo?.name || i18nText("autoI18n.isimsiz_kullanici", "İsimsiz kullanıcı"),
+            username: isMe
+              ? profile?.username || minfo?.username || ""
+              : minfo?.username || "",
+            avatarIndex: isMe
+              ? typeof profile?.avatarIndex === "number"
+                ? profile.avatarIndex
+                : minfo?.avatarIndex ?? 0
+              : minfo?.avatarIndex ?? 0,
+            photoURL: isMe
+              ? profile?.photoURL || minfo?.photoURL || null
+              : minfo?.photoURL || null,
+          };
+        }),
+        groupData
+      ),
+    [memberIds, groupData, currentUid, profile]
   );
 
   const memberSections = useMemo(() => {
@@ -289,11 +289,11 @@ export default function GroupInfoModal({
           { borderBottomColor: theme.border || "rgba(255,255,255,0.08)" },
         ]}
       >
-        <Avatar
+        <UserAvatar
           avatarIndex={item.avatarIndex}
-          name={item.displayName}
-          avatars={avatars}
-          color={groupData?.color || ACCENT}
+          photoURL={item.photoURL}
+          isCustomPhoto
+          size={43}
         />
         <View style={styles.memberCopy}>
           <View style={styles.nameRow}>

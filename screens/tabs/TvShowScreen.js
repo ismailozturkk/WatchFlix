@@ -5,6 +5,7 @@ import {
 } from "react-native";
 import Animated from "react-native-reanimated";
 import { useTheme } from "../../context/ThemeContext";
+import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import TvShowsOnTheAir from "../tv/TvShowsOnTheAir";
 import TvShowsAiringToday from "../tv/TvShowsAiringToday";
 import TvShowsGenres from "../tv/TvShowsGenres";
@@ -12,6 +13,7 @@ import TvShowsProvders from "../tv/TvShowsProvders";
 import TvShowsTrends from "../tv/TvShowsTrends";
 import TvShowBests from "../tv/TvShowBests";
 import TvOngoingSection from "../tv/TvOngoingSection";
+import TvShowsEmmy from "../tv/TvShowsEmmy";
 import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { useTvShow } from "../../context/TvShowContex";
 import { DeviceEventEmitter } from "react-native";
@@ -21,7 +23,7 @@ import {
 import { useLanguage } from "../../context/LanguageContext";
 import ScreenDecor from "../../components/ScreenDecor";
 import DiscoverSearchButton from "../../components/home/DiscoverSearchButton";
-import usePullToSearch from "../../hooks/usePullToSearch";
+import usePullToRefresh from "../../hooks/usePullToRefresh";
 import DiscoveryMediaRail from "../../components/DiscoveryMediaRail";
 import { useStreamingProviderSettings } from "../../context/AppSettingsContext";
 import { useDiscoveryPreferenceSettings } from "../../context/AppSettingsContext";
@@ -31,6 +33,7 @@ import { resolveOnboardingGenreIds } from "../../utils/onboardingPreferences";
 const INITIAL_SECTION_COUNT = 2;
 
 export default function TvShowScreen({ navigation }) {
+  const { contentBottom } = useTabBarLayout();
   const { theme } = useTheme();
   const { showOngoingTvShows } = useOngoingTvShowsSettings();
   const { streamingProviderIds } = useStreamingProviderSettings();
@@ -41,7 +44,7 @@ export default function TvShowScreen({ navigation }) {
   );
   const { topTvGenres } = useProfileStats();
   const { t } = useLanguage();
-  const { loadingTrend } = useTvShow();
+  const { loadingTrend, refreshAllTvShows } = useTvShow();
   const searchInputRef = useRef(null);
   const openSearch = useCallback(() => {
     const navigateToSearch = (searchOrigin) => {
@@ -61,8 +64,8 @@ export default function TvShowScreen({ navigation }) {
 
     navigateToSearch(undefined);
   }, [navigation]);
-  const { animatedSearchStyle, onScroll, triggerSearch } =
-    usePullToSearch(openSearch);
+  const { refreshing, animatedSearchStyle, onScroll, handleRefresh } =
+    usePullToRefresh(refreshAllTvShows);
 
   useEffect(() => {
     if (!loadingTrend) {
@@ -87,6 +90,7 @@ export default function TvShowScreen({ navigation }) {
           : []),
       { key: "recentFavorites", Component: DiscoveryMediaRail, preset: "recentFavorites" },
       { key: "hiddenGems", Component: DiscoveryMediaRail, preset: "hiddenGems" },
+      { key: "emmy", Component: TvShowsEmmy },
       { key: "providers", Component: TvShowsProvders },
       { key: "genres", Component: TvShowsGenres },
       { key: "onTheAir", Component: TvShowsOnTheAir },
@@ -148,7 +152,7 @@ export default function TvShowScreen({ navigation }) {
         renderItem={renderSection}
         ListHeaderComponent={renderHeader}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, { paddingBottom: contentBottom }]}
         initialNumToRender={INITIAL_SECTION_COUNT}
         onEndReached={revealNextSection}
         onEndReachedThreshold={0.6}
@@ -156,11 +160,10 @@ export default function TvShowScreen({ navigation }) {
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
-            refreshing={false}
-            onRefresh={triggerSearch}
-            colors={["transparent"]}
-            progressBackgroundColor="transparent"
-            tintColor="transparent"
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[theme.accent || "#E50914"]}
+            tintColor={theme.accent || "#E50914"}
           />
         }
       />

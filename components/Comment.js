@@ -20,13 +20,21 @@ import {
   onSnapshot,
   serverTimestamp,
   query,
+  getDocs,
+  where,
   orderBy,
   doc,
   updateDoc,
   deleteDoc,
   deleteField,
   increment,
+  arrayUnion,
+  arrayRemove,
 } from "firebase/firestore";
+import {
+  trackFirestoreWrite,
+  trackFirestoreDelete,
+} from "../services/usageTrackerService";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { useUserProfile } from "../context/UserProfileContext";
@@ -34,9 +42,11 @@ import { useFriends } from "../context/FriendsContext";
 import { getUserProfile } from "../services/userService";
 import { reportComment } from "../services/reportService";
 import ReportReasonSheet from "./moderation/ReportReasonSheet";
-import { clampAvatarIndex, getAvatarSource } from "../utils/avatars";
+import { clampAvatarIndex } from "../utils/avatars";
 import { alpha } from "../theme/colors";
 import AdaptiveBlurView from "./common/AdaptiveBlurView";
+import ComposerBlur, { ComposerBlurTarget, useComposerBlurTarget } from "./chat/ComposerBlur";
+import UserAvatar from "./common/UserAvatar";
 import { MaterialCommunityIcons, Ionicons, Feather } from "@expo/vector-icons";
 import * as Haptics from "@services/hapticsService";
 import LottieView from "lottie-react-native";
@@ -59,7 +69,7 @@ import CommentScopeBar from "./comments/CommentScopeBar";
 import CommentScopeSheet from "./comments/CommentScopeSheet";
 import CommentScopeBadge, { scopeVisual } from "./comments/CommentScopeBadge";
 import { scopeLong } from "./comments/scopeTexts";
-import ScreenDecor from "./ScreenDecor";
+import IconBacground from "./IconBacground";
 
 
 const { height: SCREEN_H } = Dimensions.get("window");
@@ -189,7 +199,9 @@ const CommentItem = memo(
     handleDeleteReply,
     isVisible,
     theme,
-    avatarIndex, // yazarın güncel avatarı (uid → Users doc'tan); null ise legacy fallback
+    liveAuthor,
+    myAvatarIndex,
+    myPhotoURL,
     // Dizi yorumlarında "Topluluk" rozetinin yerini kapsam rozeti alır
     // (S2·B5); kapsam bilgisi kaynak bilgisinden çok daha ayırt edicidir.
     scopeEnabled = false,
@@ -235,6 +247,12 @@ const CommentItem = memo(
     const totalReplies = Math.max(0, item.replyCount ?? 0) || replies.length;
 
     const isOwn = item.userId === currentUser?.uid;
+    const resolvedAvatarIndex = isOwn
+      ? (typeof myAvatarIndex === "number" ? myAvatarIndex : (typeof item.avatarIndex === "number" ? item.avatarIndex : 0))
+      : (typeof liveAuthor?.avatarIndex === "number" ? liveAuthor.avatarIndex : (typeof item.avatarIndex === "number" ? item.avatarIndex : null));
+    const resolvedPhotoURL = isOwn
+      ? (myPhotoURL || currentUser?.photoURL || null)
+      : (liveAuthor?.photoURL || item.authorPhotoURL || item.avatar || null);
 
     // Kendi yorumu: "..." menüsü → Düzenle / Sil (satır içi ikonlar yerine)
     const openOwnMenu = () => {
@@ -318,25 +336,11 @@ const CommentItem = memo(
 
         <View style={styles.threadAvatarColumn}>
           <View style={[styles.avatarFrame, isReply && styles.replyAvatarFrame]}>
-            {avatarIndex != null ? (
-              // Güncel avatar sistemi: avatarIndex → local asset
-              <Image
-                source={getAvatarSource(avatarIndex)}
-                style={[
-                  styles.avatar,
-                  styles.roundAvatar,
-                  isReply && styles.replyAvatar,
-                ]}
-              />
-            ) : item.avatar ? (
-              // Legacy: yorumda saklanan photoURL (profil henüz yüklenmediyse)
-              <Image
-                source={{ uri: item.avatar }}
-                style={[
-                  styles.avatar,
-                  styles.roundAvatar,
-                  isReply && styles.replyAvatar,
-                ]}
+            {resolvedAvatarIndex != null || resolvedPhotoURL ? (
+              <UserAvatar
+                avatarIndex={resolvedAvatarIndex}
+                photoURL={resolvedPhotoURL}
+                size={isReply ? 26 : 34}
               />
             ) : (
               <View
@@ -526,6 +530,12 @@ const Comment = ({
   tmdbReviews = [],
   seasons = null,
   initialScope = null,
+  // Sheet'i saran modal (CommentSheetModal), yükseklik hesabı için görünen
+  // yorum sayısını bilmek istiyor — bkz. hooks/useAdaptiveSheetHeight.js.
+  onCommentCountChange = null,
+  // Sheet açılış animasyonu (kayma + yükseklik) oturana kadar false —
+  // bkz. CommentSheetModal.js'teki blurReady notu.
+  blurReady = true,
 }) => {
   const { theme } = useTheme();
   const styles = getStyles(theme);
@@ -534,6 +544,7 @@ const Comment = ({
     displayName: myDisplayName,
     username: myUsername,
     avatarIndex: myAvatarIndex,
+    photoURL: myPhotoURL,
   } = useUserProfile();
   const { isBlocked, block } = useFriends();
   const [comments, setComments] = useState([]);
@@ -544,6 +555,7 @@ const Comment = ({
   const [commentInputState, setCommentInputState] = useState({ ...EMPTY_INPUT });
   // Şikâyet sayfasının hedefi; null ise sayfa kapalı.
   const [reportTarget, setReportTarget] = useState(null);
+  const composerBlur = useComposerBlurTarget();
 
   const isTv = collectionName === "TvComment";
   const scopeEnabled = isTv;
@@ -567,7 +579,7 @@ const Comment = ({
   // One ref per comment — stores its active onSnapshot unsubscribe fn
   const replyUnsubsRef = useRef({});
 
-  // ── Yazarların GÜNCEL avatarları (uid → avatarIndex) ─────────────────────
+  // ── Yazarların GÜNCEL avatarları (uid → { avatarIndex, photoURL }) ─────────────────────
   // Yorumlar eskiden photoURL saklıyordu; artık profil avatar sistemi
   // (avatarIndex → local asset) kullanılır. Yazar başına tek getDoc,
   // bileşen açık kaldığı sürece cache'lenir — avatar değiştiren kullanıcı
@@ -589,7 +601,13 @@ const Comment = ({
         missing.map(async (uid) => {
           try {
             const profile = await getUserProfile(uid);
-            return [uid, clampAvatarIndex(profile?.avatarIndex)];
+            return [
+              uid,
+              {
+                avatarIndex: clampAvatarIndex(profile?.avatarIndex),
+                photoURL: profile?.photoURL || null,
+              },
+            ];
           } catch {
             avatarFetchRef.current.delete(uid); // sonraki snapshot'ta tekrar dene
             return null;
@@ -700,6 +718,11 @@ const Comment = ({
       return a.source === "community" ? -1 : 1;
     });
   }, [scopedComments, visibleTmdbReviews, sourceFilter]);
+
+  // Sheet yüksekliği bu sayıya göre büyüyüp küçülüyor (bkz. onCommentCountChange).
+  useEffect(() => {
+    onCommentCountChange?.(feedItems.length);
+  }, [feedItems.length, onCommentCountChange]);
 
   const sourceFilters = [
     {
@@ -925,17 +948,18 @@ const Comment = ({
         newRef = await addDoc(
           collection(db, collectionName, cid, "comments", parentId, "replies"),
           {
-            userId:      currentUser.uid,
-            username:    myDisplayName || currentUser.displayName || "Anonim",
-            userHandle:  myUsername || "",
-            avatar:      currentUser.photoURL,
-            avatarIndex: clampAvatarIndex(myAvatarIndex),
-            text:        text.trim(),
+            userId:          currentUser.uid,
+            username:        myDisplayName || currentUser.displayName || "Anonim",
+            userHandle:      myUsername || "",
+            avatar:          myPhotoURL || currentUser.photoURL || null,
+            authorPhotoURL:  myPhotoURL || currentUser.photoURL || null,
+            avatarIndex:     clampAvatarIndex(myAvatarIndex),
+            text:            text.trim(),
             isSpoiler,
             parentId,
-            likeCount:   0,
-            likedBy:     {},
-            timestamp:   serverTimestamp(),
+            likeCount:       0,
+            likedBy:         {},
+            timestamp:       serverTimestamp(),
             ...(scopeFields || {}),
           },
         );
@@ -947,18 +971,19 @@ const Comment = ({
         newRef = await addDoc(
           collection(db, collectionName, cid, "comments"),
           {
-            userId:      currentUser.uid,
-            username:    myDisplayName || currentUser.displayName || "Anonim",
-            userHandle:  myUsername || "",
-            avatar:      currentUser.photoURL,
-            avatarIndex: clampAvatarIndex(myAvatarIndex),
-            text:        text.trim(),
+            userId:          currentUser.uid,
+            username:        myDisplayName || currentUser.displayName || "Anonim",
+            userHandle:      myUsername || "",
+            avatar:          myPhotoURL || currentUser.photoURL || null,
+            authorPhotoURL:  myPhotoURL || currentUser.photoURL || null,
+            avatarIndex:     clampAvatarIndex(myAvatarIndex),
+            text:            text.trim(),
             isSpoiler,
-            parentId:    null,
-            likeCount:   0,
-            likedBy:     {},
-            replyCount:  0,
-            timestamp:   serverTimestamp(),
+            parentId:        null,
+            likeCount:       0,
+            likedBy:         {},
+            replyCount:      0,
+            timestamp:       serverTimestamp(),
             ...(scopeFields || {}),
           },
         );
@@ -985,12 +1010,26 @@ const Comment = ({
           // "Etkinliklerim → Yorumlarım" satırındaki S2·B5 rozeti buradan gelir.
           ...(scopeFields || {}),
         }).catch(() => {});
+        setDoc(
+          doc(db, "Lists", currentUser.uid),
+          {
+            activityIndex: {
+              comments: arrayUnion(`${collectionName === "TvComment" ? "tv" : "movie"}_${cid}`),
+            },
+            updatedAt: serverTimestamp(),
+            _schemaVersion: 3,
+          },
+          { merge: true },
+        ).catch(() => {});
+        trackFirestoreWrite("Comments", 1);
+        trackFirestoreWrite("Lists/activityIndex", 1);
       } else if (editId && scopeFields) {
         // Kapsam düzenlemede değişmiş olabilir — mirror'ı da hizala.
         updateDoc(doc(db, "Users", currentUser.uid, "myComments", editId), {
           text: text.trim(),
           ...scopeFields,
         }).catch(() => {});
+        trackFirestoreWrite("Comments", 1);
       }
 
       // Yazılan yorum aktif süzgeçte görünmüyorsa (ör. "Tümü"yü gezerken S2·B5
@@ -1045,7 +1084,23 @@ const Comment = ({
     updateDoc(doc(db, "Users", currentUser.uid), {
       mediaCommentCount: increment(-1),
     }).catch(() => {});
-    deleteDoc(doc(db, "Users", currentUser.uid, "myComments", id)).catch(() => {});
+    try {
+      await deleteDoc(doc(db, "Users", currentUser.uid, "myComments", id));
+      const kind = collectionName === "TvComment" ? "tv" : "movie";
+      const remaining = await getDocs(query(
+        collection(db, "Users", currentUser.uid, "myComments"),
+        where("targetId", "==", cid),
+      ));
+      if (!remaining.docs.some((entry) => entry.data()?.kind === kind)) {
+        await updateDoc(doc(db, "Lists", currentUser.uid), {
+          "activityIndex.comments": arrayRemove(`${kind}_${cid}`, cid),
+        });
+      }
+    } catch (error) {
+      if (__DEV__) console.warn("[Comment] activity index sync:", error?.message);
+    }
+    trackFirestoreDelete("Comments", 1);
+    trackFirestoreWrite("Lists/activityIndex", 1);
   };
 
   return (
@@ -1054,8 +1109,9 @@ const Comment = ({
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       style={styles.container}
     >
-      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
-      <ScreenDecor iconOpacity={0.25} />
+      {/* Arka plan dekoru — yalnız ikon deseni; kar animasyonu yorum modalında
+          İSTENMİYOR (dar/kaydırmalı alanda dikkat dağıtıyordu). */}
+      <IconBacground opacity={0.25} />
       {scopeEnabled && (
         <CommentScopeBar
           theme={theme}
@@ -1104,6 +1160,7 @@ const Comment = ({
         </View>
       )}
 
+      <ComposerBlurTarget attach={composerBlur.attach} backgroundColor={theme.primary} style={{ flex: 1 }}>
       <FlatList
         style={styles.commentList}
         data={feedItems}
@@ -1159,7 +1216,9 @@ const Comment = ({
               currentUser={currentUser}
               contextId={contextId}
               theme={theme}
-              avatarIndex={authorAvatars[item.userId] ?? item.avatarIndex ?? null}
+              liveAuthor={authorAvatars[item.userId]}
+              myAvatarIndex={myAvatarIndex}
+              myPhotoURL={myPhotoURL}
               replies={repliesMap[item.id] || []}
               isVisible={replyVisibility[item.id]}
               toggleReplyVisibility={toggleReplyVisibility}
@@ -1204,7 +1263,9 @@ const Comment = ({
                   isReply
                   isLastReply={repIndex === repArr.length - 1}
                   theme={theme}
-                  avatarIndex={authorAvatars[rep.userId] ?? rep.avatarIndex ?? null}
+                  liveAuthor={authorAvatars[rep.userId]}
+                  myAvatarIndex={myAvatarIndex}
+                  myPhotoURL={myPhotoURL}
                   setCommentInputState={setCommentInputState}
                   handleDeleteReply={(pid, id) => handleDelete(id, pid)}
                   handleLikeToggle={(id, liked) => {
@@ -1233,6 +1294,7 @@ const Comment = ({
           )
         }
       />
+      </ComposerBlurTarget>
 
       {/* Input Section */}
       <View style={styles.inputWrapper}>
@@ -1293,13 +1355,16 @@ const Comment = ({
 
         {/* Girdi hapı — AI sohbetindeki (screens/chat/AIChatScreen.js) composer
             ile aynı yapı: [input][spoiler][gönder] tek parça, üçü de 42px.
-            Sarmalayıcı saydam ve ayırıcı çizgisiz; ekranda yalnız hap görünür. */}
+            Sarmalayıcı saydam ve ayırıcı çizgisiz; ekranda yalnız hap görünür.
+            Hap arka planı da o composer gibi camsı blur — CommentSheetModal
+            backdrop'ının intensity'siyle karışmasın diye ayrı bir hedefi var. */}
         <View
           style={[
             styles.composerPill,
             commentInputState.isSpoiler && styles.composerPillSpoiler,
           ]}
         >
+          <ComposerBlur target={blurReady ? composerBlur.target : null} theme={theme} />
           {commentInputState.isSpoiler && (
             <Text
               allowFontScaling={false}
@@ -1314,7 +1379,7 @@ const Comment = ({
           <TextInput
             style={styles.input}
             placeholder={i18nText("autoI18n.yorum_yap", "Yorum yap...")}
-            placeholderTextColor="rgba(255,255,255,0.3)"
+            placeholderTextColor={theme.text.muted}
             value={commentInputState.text}
             onChangeText={(t) =>
               setCommentInputState((p) => ({ ...p, text: t }))
@@ -1679,7 +1744,7 @@ const getStyles = (theme) =>
       right: 0,
       paddingHorizontal: 12,
       paddingTop: 10,
-      paddingBottom: Platform.OS === "ios" ? 8 : 12,
+      paddingBottom: Platform.OS === "ios" ? 28 : 20,
       // zIndex VERME: sezon/bölüm seçici (components/comments/CommentScopeSheet.js)
       // bu ekranın içinde, kardeş olarak açılıyor. Buraya zIndex konursa seçici
       // girdi alanının altında kalıyor. Sarmalayıcı listeden sonra render
@@ -1691,7 +1756,7 @@ const getStyles = (theme) =>
       borderWidth: 1.5,
       borderRadius: 28,
       borderColor: theme.border,
-      backgroundColor: theme.secondary,
+      backgroundColor: "transparent",
       padding: 5,
       shadowColor: "#000",
       shadowOpacity: 0.35,

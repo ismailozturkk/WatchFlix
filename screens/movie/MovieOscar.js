@@ -184,15 +184,16 @@ const MovieOscarCard = memo(function MovieOscarCard({
                 style={POSTER_BADGE_POS.bottomRight}
               />
             )}
+
+            <ListBadges
+              mediaId={item.id}
+              mediaType="movie"
+              theme={theme}
+              posterWidth={rp.posterWidth}
+              style={{ position: "absolute", left: 4, bottom: 8 }}
+            />
           </View>
         </View>
-
-        <ListBadges
-          mediaId={item.id}
-          mediaType="movie"
-          theme={theme}
-          style={{ position: "absolute", left: mode === "category" ? 24 : 4, bottom: 8 }}
-        />
       </Animated.View>
     </TouchableOpacity>
   );
@@ -431,7 +432,11 @@ export default function MovieOscar({ navigation }) {
         contentContainerStyle={{ paddingHorizontal: 15 }}
         showsHorizontalScrollIndicator={false}
         renderItem={renderMovieItem}
-        keyExtractor={(item, index) => `oscar-${item.year}-${item.categoryKey || index}`}
+        keyExtractor={(item, index) =>
+          item?.year
+            ? `oscar-${item.year}-${item.categoryKey || oscarMode || "cat"}-${item.id || index}`
+            : `oscar-${item?.id || index}`
+        }
         horizontal
         initialNumToRender={4}
         maxToRenderPerBatch={5}

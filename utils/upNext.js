@@ -57,7 +57,7 @@ export function findNextEpisodeInSeason({
   const watched = getWatchedEpisodeKeys(show);
   const floor = Number.isFinite(afterOrder)
     ? afterOrder
-    : getFurthestWatchedPosition(show).order;
+    : 0;
   let firstUpcoming = null;
 
   for (const episode of [...(episodes || [])].sort(
@@ -98,9 +98,46 @@ export function advanceUpNextItem(item, { watchedAt = Date.now() } = {}) {
 
 export function getUpNextSeasonNumbers(show, showDetails) {
   const furthest = getFurthestWatchedPosition(show);
-  const start = Math.max(1, furthest.seasonNumber || 1);
-  return (showDetails?.seasons || [])
+  const watchedBySeason = new Map();
+  (show?.seasons || []).forEach((season) => {
+    const seasonNumber = toNumber(season?.seasonNumber);
+    if (seasonNumber <= 0) return;
+    watchedBySeason.set(
+      seasonNumber,
+      new Set(
+        (season?.episodes || [])
+          .map((episode) => toNumber(episode?.episodeNumber))
+          .filter(Boolean),
+      ).size,
+    );
+  });
+
+  const catalog = (showDetails?.seasons || [])
     .map((season) => toNumber(season?.season_number))
-    .filter((seasonNumber) => seasonNumber >= start)
+    .filter((seasonNumber) => seasonNumber > 0)
     .sort((a, b) => a - b);
+
+  // Yeni model tek tek ve sırasız bölüm işaretlemeye izin verir. İlk eksik
+  // sezonu bulup oradan başlamak, S1B1 + S1B3 izlenmişken S1B2'nin atlanmasını
+  // engeller. TMDB toplamı yoksa gömülü seasonEpisodes geriye dönüş olur.
+  const embeddedTotals = new Map(
+    (show?.seasons || []).map((season) => [
+      toNumber(season?.seasonNumber),
+      toNumber(season?.seasonEpisodes),
+    ]),
+  );
+  const firstIncomplete = (showDetails?.seasons || [])
+    .map((season) => ({
+      seasonNumber: toNumber(season?.season_number),
+      total: toNumber(season?.episode_count),
+    }))
+    .filter(({ seasonNumber }) => seasonNumber > 0)
+    .sort((a, b) => a.seasonNumber - b.seasonNumber)
+    .find(({ seasonNumber, total }) => {
+      const knownTotal = total || embeddedTotals.get(seasonNumber) || 0;
+      return knownTotal > 0 && (watchedBySeason.get(seasonNumber) || 0) < knownTotal;
+    })?.seasonNumber;
+
+  const start = Math.max(1, firstIncomplete || furthest.seasonNumber || 1);
+  return catalog.filter((seasonNumber) => seasonNumber >= start);
 }

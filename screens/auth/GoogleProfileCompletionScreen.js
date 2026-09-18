@@ -1,3 +1,4 @@
+import { isLightSurface } from "../../utils/colorUtils";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -42,7 +43,7 @@ import BirthDateField from "../../components/auth/BirthDateField";
 import LegalConsentNotice from "../../components/auth/LegalConsentNotice";
 
 export default function GoogleProfileCompletionScreen({ navigation }) {
-  const { theme, selectedTheme } = useTheme();
+  const { theme } = useTheme();
   const { language } = useLanguage();
   const { markProfileCompleted } = useAuth();
   const insets = useSafeAreaInsets();
@@ -60,7 +61,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
   const [birthDate, setBirthDate] = useState(null);
   const checkId = useRef(0);
   const tr = language === "tr";
-  const isLight = selectedTheme === "light" || selectedTheme === "green";
+  const isLight = isLightSurface(theme.primary);
 
   useEffect(() => {
     const normalized = normalizeUsername(username);

@@ -1,3 +1,4 @@
+import { isLightSurface } from "../../utils/colorUtils";
 // Şifremi unuttum ekranı — IslamicGuide auth tasarım diline göre sadeleştirildi:
 // dikeyde ortalanmış düzen, rozetli başlık bloğu, solid yüzeyli tek kart,
 // dolgulu input kabuğu ve solid accent ana buton. Blur/gradyan yok.
@@ -32,7 +33,7 @@ const SUCCESS = "rgb(37, 211, 102)";
 const buzz = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
 export default function ForgotPasswordScreen({ navigation }) {
-  const { theme, selectedTheme } = useTheme();
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [isloading, setIsloading] = useState(false);
@@ -42,7 +43,7 @@ export default function ForgotPasswordScreen({ navigation }) {
 
   const accent = theme.accent;
   const hairline = theme.border;
-  const isLightTheme = selectedTheme === "light" || selectedTheme === "green";
+  const isLightTheme = isLightSurface(theme.primary);
   const fieldSurface = theme.between;
 
   // Basit e-posta biçim kontrolü — geçersizken gönderim kapalı

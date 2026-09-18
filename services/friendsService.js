@@ -27,6 +27,7 @@ import {
 import { db } from "../firebase";
 import { clampAvatarIndex } from "../utils/avatars";
 import { snapshotErrorHandler } from "../utils/firestoreError";
+import { trackFirestoreRead, trackFirestoreWrite, trackFirestoreDelete } from "./usageTrackerService";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,7 @@ const snapshotUserMeta = (userDoc) => ({
   displayName: userDoc.displayName || "",
   username: userDoc.username || "",
   avatarIndex: clampAvatarIndex(userDoc.avatarIndex),
+  photoURL: userDoc.photoURL || null,
 });
 
 // İstek dokümanlarını createdAt'e göre yeniden→eskiye sıralar (client-side).
@@ -56,7 +58,10 @@ export function subscribeToFriends(uid, callback) {
   if (!uid) return () => {};
   return onSnapshot(
     collection(db, "Users", uid, "friends"),
-    (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (snap) => {
+      trackFirestoreRead("Users/friends", snap.docs.length);
+      callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    },
     snapshotErrorHandler("friends"),
   );
 }
@@ -76,7 +81,10 @@ export function subscribeToIncomingRequests(uid, callback) {
   );
   return onSnapshot(
     q,
-    (snap) => callback(sortByCreatedAtDesc(snap.docs)),
+    (snap) => {
+      trackFirestoreRead("Users/friendRequests", snap.docs.length);
+      callback(sortByCreatedAtDesc(snap.docs));
+    },
     snapshotErrorHandler("incomingRequests"),
   );
 }
@@ -93,7 +101,10 @@ export function subscribeToOutgoingRequests(uid, callback) {
   );
   return onSnapshot(
     q,
-    (snap) => callback(sortByCreatedAtDesc(snap.docs)),
+    (snap) => {
+      trackFirestoreRead("Users/sentRequests", snap.docs.length);
+      callback(sortByCreatedAtDesc(snap.docs));
+    },
     snapshotErrorHandler("outgoingRequests"),
   );
 }
@@ -165,6 +176,7 @@ export async function sendFriendRequest(fromUser, toUser, message = "") {
     fromName: fromMeta.displayName,
     fromUsername: fromMeta.username,
     fromAvatarIndex: fromMeta.avatarIndex,
+    fromPhotoURL: fromMeta.photoURL,
     status: "pending",
     seen: false,
     message,
@@ -176,6 +188,7 @@ export async function sendFriendRequest(fromUser, toUser, message = "") {
     toName: toMeta.displayName,
     toUsername: toMeta.username,
     toAvatarIndex: toMeta.avatarIndex,
+    toPhotoURL: toMeta.photoURL,
     status: "pending",
     createdAt: serverTimestamp(),
   });
@@ -195,6 +208,7 @@ export async function sendFriendRequest(fromUser, toUser, message = "") {
     fromUid: fromUser.uid,
     fromName: fromMeta.displayName,
     fromAvatarIndex: fromMeta.avatarIndex,
+    fromPhotoURL: fromMeta.photoURL,
     requestId: reqId,
     read: false,
     createdAt: serverTimestamp(),
@@ -226,6 +240,7 @@ export async function acceptFriendRequest(currentUser, fromUser) {
     friendName: fromMeta.displayName,
     friendUsername: fromMeta.username,
     friendAvatarIndex: fromMeta.avatarIndex,
+    friendPhotoURL: fromMeta.photoURL,
     friendsSince: serverTimestamp(),
   });
   batch.set(doc(db, "Users", fromUser.uid, "friends", currentUser.uid), {
@@ -233,6 +248,7 @@ export async function acceptFriendRequest(currentUser, fromUser) {
     friendName: meMeta.displayName,
     friendUsername: meMeta.username,
     friendAvatarIndex: meMeta.avatarIndex,
+    friendPhotoURL: meMeta.photoURL,
     friendsSince: serverTimestamp(),
   });
 
@@ -257,6 +273,7 @@ export async function acceptFriendRequest(currentUser, fromUser) {
     fromUid: currentUser.uid,
     fromName: meMeta.displayName,
     fromAvatarIndex: meMeta.avatarIndex,
+    fromPhotoURL: meMeta.photoURL,
     read: false,
     createdAt: serverTimestamp(),
   });

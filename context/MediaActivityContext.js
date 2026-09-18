@@ -1,3 +1,4 @@
+import { buildActivityFromRoot } from "../utils/mediaActivityIndex";
 import React, {
   createContext,
   useContext,
@@ -6,75 +7,27 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
 import { Keys, get, set, getActiveUser } from "../services/storage";
-import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
-import { snapshotErrorHandler } from "../utils/firestoreError";
-import { sameJson } from "../utils/sameData";
-import useStartupGate from "../hooks/useStartupGate";
+import { useListStatusContext } from "./ListStatusContext";
 
 // Kullanıcının içerik-bazlı ETKİNLİK durumu (puan verdi mi / yorum yaptı mı).
-// ListStatusContext'in kardeşi: o "hangi listede" sorusuna, bu "ne yaptı"
-// sorusuna cevap verir. ListBadges ikisini birleştirip poster rozetlerini çizer.
+// Artık Lists/{uid}.activityIndex üzerinden tek bir dokümandan 0 ek okuma ile beslenir.
 //
-// Kaynaklar (denormalize mirror'lar, yazma ilgili yerlerde):
-//   Users/{uid}/myRatings/{mediaKey}   → ratingsService.setMyRating
-//                                        { mediaType, mediaId, rating, ... }
-//   Users/{uid}/myComments/{commentId} → components/Comment.js (film/dizi)
-//                                        { kind:'movie'|'tv'|'post', targetId, ... }
-//                                        (kind:'post' burada sayılmaz)
-//
-// Index şekli statusIndex ile aynı desen:
+// Index formatı:
 //   { movie: { [id]: { hasRating, hasComment } }, tv: { ... } }
 
-// Anahtar öneki artık registry'de (Keys.mediaActivity, cache deposu).
 const EMPTY_INDEX = Object.freeze({ movie: {}, tv: {} });
 
 const MediaActivityContext = createContext();
 
 export const useMediaActivityContext = () => useContext(MediaActivityContext);
 
-// `sameJson` utils/sameData.js'e taşındı: aynı satır bu dosyada, TvShowContex,
-// MovieContex ve ListStatusContext'te ayrı ayrı yazılıydı.
-
-const buildActivityIndex = ({ ratingsMap, commentsMap }) => {
-  const index = { movie: {}, tv: {} };
-
-  const mark = (rawType, id, field) => {
-    if (id == null) return;
-    const bucket = rawType === "tv" ? index.tv : index.movie;
-    if (!bucket[id]) {
-      bucket[id] = { hasRating: false, hasComment: false };
-    }
-    bucket[id][field] = true;
-  };
-
-  Object.values(ratingsMap).forEach(({ mediaType, mediaId }) =>
-    mark(mediaType, mediaId, "hasRating"),
-  );
-  Object.values(commentsMap).forEach(({ kind, targetId }) => {
-    if (kind !== "movie" && kind !== "tv") return; // post yorumları içerik rozeti değil
-    // Kapsam (dizi/sezon/bölüm) burada BİLEREK yok sayılır: rozet "bu içeriğe
-    // yorum yaptım" demektir, bir sezona yazmak da diziye yorum yapmaktır.
-    mark(kind, targetId, "hasComment");
-  });
-
-  return index;
-};
-
 export const MediaActivityProvider = ({ children }) => {
   const { user } = useAuth();
-  const [ratingsMap, setRatingsMap] = useState({});
-  const [commentsMap, setCommentsMap] = useState({});
-  const [ratingsLoaded, setRatingsLoaded] = useState(false);
-  const [commentsLoaded, setCommentsLoaded] = useState(false);
-  // AÇILIŞ TOHUMU — rozetler auth/snapshot beklemeden görünsün.
-  //
-  // Eskiden bu okuma bir `useEffect` içindeydi, yani önbellek DOLU olsa bile
-  // ilk kare rozetsiz çiziliyordu. MMKV senkron olduğu için okuma doğrudan
-  // başlangıç değeri olabiliyor. `uid` ilk render'da genelde null (Firebase
-  // oturumu asenkron çözülüyor); son aktif kullanıcı depodan senkron okunuyor.
+  const { activityIndex: rootActivity } = useListStatusContext() || {};
+
+  // AÇILIŞ TOHUMU — MMKV'den senkron okuma
   const ilkTohum = useMemo(
     () => {
       const uid = user?.uid ?? getActiveUser();
@@ -87,7 +40,6 @@ export const MediaActivityProvider = ({ children }) => {
   const [cachedIndex, setCachedIndex] = useState(ilkTohum ?? EMPTY_INDEX);
   const cacheHydratedForUid = useRef(null);
 
-  // uid DEĞİŞİMİ (hesap geçişi) için; ilk render'ı yukarıdaki tohum karşılıyor.
   useEffect(() => {
     const uid = user?.uid ?? getActiveUser();
     if (!uid || cacheHydratedForUid.current === uid) return;
@@ -97,75 +49,22 @@ export const MediaActivityProvider = ({ children }) => {
     if (parsed?.activityIndex) setCachedIndex(parsed.activityIndex);
   }, [user?.uid]);
 
-  // Poster rozetleri ilk kareyi yukarıdaki senkron tohumdan (cachedIndex)
-  // çiziyor; canlı listener'lar tazeleme işi — splash penceresinin dışına.
-  // Kademeler: hooks/useStartupGate.js.
-  const startupReady = useStartupGate(1800);
-
-  useEffect(() => {
-    if (!startupReady) return undefined;
-    if (!user?.uid) {
-      setRatingsMap({});
-      setCommentsMap({});
-      setCachedIndex(EMPTY_INDEX);
-      setRatingsLoaded(false);
-      setCommentsLoaded(false);
-      return undefined;
-    }
-
-    const uid = user.uid;
-    const snap2map = (snap) => {
-      const m = {};
-      snap.docs.forEach((d) => {
-        m[d.id] = d.data();
-      });
-      return m;
-    };
-    const updateMap = (setter, setDone) => (snap) => {
-      const next = snap2map(snap);
-      setter((current) => (sameJson(current, next) ? current : next));
-      setDone(true);
-    };
-
-    const unsubRatings = onSnapshot(
-      collection(db, "Users", uid, "myRatings"),
-      updateMap(setRatingsMap, setRatingsLoaded),
-      snapshotErrorHandler("Users/myRatings"),
-    );
-    const unsubComments = onSnapshot(
-      collection(db, "Users", uid, "myComments"),
-      updateMap(setCommentsMap, setCommentsLoaded),
-      snapshotErrorHandler("Users/myComments"),
-    );
-
-    return () => {
-      unsubRatings();
-      unsubComments();
-    };
-  }, [user?.uid, startupReady]);
-
-  const firestoreIndex = useMemo(
-    () => buildActivityIndex({ ratingsMap, commentsMap }),
-    [ratingsMap, commentsMap],
+  const liveIndex = useMemo(
+    () => (rootActivity ? buildActivityFromRoot(rootActivity) : null),
+    [rootActivity],
   );
 
-  // İKİ snapshot da gelene kadar cache'teki index gösterilir (ListStatus
-  // deseni) — tek koleksiyon erken gelirse diğerinin rozetleri anlık kaybolmasın.
-  const loaded = ratingsLoaded && commentsLoaded;
-  const activityIndex = loaded ? firestoreIndex : cachedIndex;
+  const activityIndex = liveIndex || cachedIndex;
 
-  // Debounce'lu cache yazımı — iki listener art arda tetiklenince tek yazım.
+  // Debounce'lu cache yazımı
   useEffect(() => {
-    if (!user?.uid || !loaded) return undefined;
-
-    // "Verileri indir" ayarına bilerek TABİ DEĞİL: o ayar TMDB içeriği içindir,
-    // buradaki veri kullanıcının kendi puan/yorum etkinliği.
+    if (!user?.uid || !liveIndex) return undefined;
     const uid = user.uid;
     const timer = setTimeout(() => {
-      set(Keys.mediaActivity, { activityIndex: firestoreIndex, ts: Date.now() }, { uid });
+      set(Keys.mediaActivity, { activityIndex: liveIndex, ts: Date.now() }, { uid });
     }, 2500);
     return () => clearTimeout(timer);
-  }, [firestoreIndex, loaded, user?.uid]);
+  }, [liveIndex, user?.uid]);
 
   const value = useMemo(() => ({ activityIndex }), [activityIndex]);
 

@@ -1,4 +1,3 @@
-import { Image } from "expo-image";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
@@ -9,6 +8,8 @@ import {
   Animated,
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
+import { useTabBarLayout } from "../../context/TabBarLayoutContext";
+import useTabBarScrollSync from "../../hooks/useTabBarScrollSync";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLanguage } from "../../context/LanguageContext";
 import AppIcon from "../../components/AppIcon";
@@ -18,6 +19,7 @@ import ProfileLists from "./profile/ProfileLists";
 import { useAuth } from "../../context/AuthContext";
 import { useFriends } from "../../context/FriendsContext";
 import { AvatarSkeleton } from "../../components/Skeleton";
+import UserAvatar from "../../components/common/UserAvatar";
 import { useProfileStats } from "../../context/ProfileStatsContext";
 import { useProfileUi } from "../../context/ProfileUiContext";
 import NotesCard from "./profile/NotesCard";
@@ -34,7 +36,9 @@ import StatisticsSection from "./profile/StatisticsSection";
 import { useUserProfile } from "../../context/UserProfileContext";
 import { propagateProfileChange } from "../../services/profilePropagation";
 import { i18nText } from "../../utils/i18nText";
+import * as Haptics from "../../services/hapticsService";
 import ProfileAvatarPickerModal from "../../components/profile/ProfileAvatarPickerModal";
+import AvatarPreviewModal from "../../components/profile/AvatarPreviewModal";
 import AppBadge from "../../components/badges/AppBadge";
 import WatchBadgeStrip from "../../components/profile/WatchBadgeStrip";
 import { useWatchProgressContext } from "../../context/WatchProgressContext";
@@ -42,6 +46,7 @@ import { odulAdi, odulBasligi } from "../../components/badges/badgeMeta";
 import { PERDE_ADLARI } from "../../utils/watchScoring";
 import { toast } from "../../components/AppToast";
 import { appAlert } from "../../components/AppAlert";
+import StoryExportModal from "../../components/storyShare/StoryExportModal";
 import {
   badgeLabel,
   getIdentityBadges,
@@ -49,6 +54,8 @@ import {
 import { usePremium } from "../../context/PremiumContext";
 
 const ProfileScreen = ({ navigation }) => {
+  const { contentBottom } = useTabBarLayout();
+  const onTabBarScroll = useTabBarScrollSync();
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -70,6 +77,8 @@ const ProfileScreen = ({ navigation }) => {
     isloadingAvatar,
     selectAvatar,
   } = useProfileUi();
+  const [showStoryExport, setShowStoryExport] = useState(false);
+  const [showAvatarPreview, setShowAvatarPreview] = useState(false);
   const {
     watchedMovieCount,
     totalWatchedTime,
@@ -86,14 +95,16 @@ const ProfileScreen = ({ navigation }) => {
     formatTotalDurationTime,
     borderColorTv,
     shadowColorTv,
-    borderColor2Tv,
     borderColorMovie,
     shadowColorMovie,
-    borderColor2Movie,
     rankNameTv,
     rankLevelTv,
     rankNameMovie,
     rankLevelMovie,
+    // Film+dizi dakikalarının TOPLAMINDAN türeyen birleşik renk — avatarın
+    // etrafındaki TEK halkayı besler.
+    borderColor,
+    borderColor2,
   } = useProfileStats();
   // İzleme puanı (Kare) + Perde + 81 rozet. Yeni Firestore listener AÇMAZ —
   // yukarıdaki useProfileStats verisinden türetilir (hooks/useWatchProgress.js).
@@ -174,21 +185,18 @@ const ProfileScreen = ({ navigation }) => {
     }).start();
   };
   const props = {
-    activeStrokeWidth: 10,
-    inActiveStrokeWidth: 10,
+    activeStrokeWidth: 11,
+    inActiveStrokeWidth: 11,
     inActiveStrokeOpacity: 0.05,
   };
-  const totalTime = totalMinutesTime ?? 0;
-  const totalTimeTv = totalMinutesTimeTv ?? 0;
-  const rawProgressTv = (totalTimeTv % 10080) / 10080;
-  const rawProgressMovie = (totalTime % 10080) / 10080;
-  const safeProgressTv = parseInt(
-    Math.min(Math.max(rawProgressTv, 0), 1).toFixed(3) * 100
+  // Film + dizi izleme dakikaları TEK bir toplamda birleşiyor — avatarın
+  // etrafında artık film/dizi için ayrı iki halka değil, ikisinin toplamına
+  // göre dolan TEK bir halka var (bkz. ProfileStatsContext.rankInfo).
+  const totalMinutesCombined = (totalMinutesTime ?? 0) + (totalMinutesTimeTv ?? 0);
+  const rawProgress = (totalMinutesCombined % 10080) / 10080;
+  const safeProgress = parseInt(
+    Math.min(Math.max(rawProgress, 0), 1).toFixed(3) * 100
   );
-  const safeProgressMovie = parseInt(
-    Math.min(Math.max(rawProgressMovie, 0), 1).toFixed(3) * 100
-  );
-  //console.log("safeProgressTv:", safeProgressMovie);
   const friendsState = useFriends();
   const friendCount =
     friendsState?.friends?.length ?? profile?.friendsCount ?? 0;
@@ -242,8 +250,11 @@ const ProfileScreen = ({ navigation }) => {
       <ScreenDecor iconOpacity={0.3} />
 
       <ScrollView
+        contentContainerStyle={{ paddingBottom: contentBottom }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        onScroll={onTabBarScroll}
+        scrollEventThrottle={16}
       >
         <SafeAreaView
           style={[styles.container, { backgroundColor: "transparent" }]}
@@ -253,78 +264,103 @@ const ProfileScreen = ({ navigation }) => {
               onPress={() => {
                 setModalVisible(true);
               }}
-              style={[
-                styles.profilImageTouch,
-                {
-                  borderColor: borderColorMovie || "#000",
-                  shadowColor: shadowColorMovie || "#000",
-                  padding: 9,
-                },
-              ]}
+              onLongPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setShowAvatarPreview(true);
+              }}
+              delayLongPress={220}
+              activeOpacity={0.85}
+              style={styles.profilImageTouch}
             >
               {isloadingAvatar ? (
                 <AvatarSkeleton />
               ) : (
-                <View
-                  style={{
-                    shadowColor: shadowColorTv,
-                    //borderColor: borderColor,
-                    borderWidth: 0,
-                    borderRadius: 75,
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowRadius: 5,
-                    elevation: 15, // Android için gölge
-                  }}
-                >
+                <View style={styles.avatarProgressWrapper}>
                   <View style={styles.circularProgress}>
                     {!modalVisible && (
                       <CircularProgressBase
                         {...props}
-                        value={safeProgressMovie}
+                        value={safeProgress}
                         maxValue={100}
-                        radius={70}
-                        inActiveStrokeColor={borderColor2Movie || "#C25AFF"}
-                        activeStrokeColor={borderColorMovie || "#C25AFF"}
-                        activeStrokeSecondaryColor={
-                          borderColor2Movie || "#C25AFF"
-                        }
+                        radius={78}
+                        inActiveStrokeColor={borderColor2 || "#C25AFF"}
+                        activeStrokeColor={borderColor || "#C25AFF"}
+                        activeStrokeSecondaryColor={borderColor2 || "#C25AFF"}
                         duration={500}
                         showProgressValue={false}
-                      >
-                        <CircularProgressBase
-                          {...props}
-                          value={safeProgressTv}
-                          maxValue={100}
-                          radius={80}
-                          duration={500}
-                          showProgressValue={false}
-                          inActiveStrokeColor={borderColor2Tv || "#C25AFF"}
-                          activeStrokeColor={borderColorTv || "#C25AFF"}
-                          activeStrokeSecondaryColor={
-                            borderColor2Tv || "#C25AFF"
-                          }
-                        />
-                      </CircularProgressBase>
+                      />
                     )}
                   </View>
                   <View
-                    style={{
-                      overflow: "hidden",
-                      borderRadius: 100,
-                      padding: 10,
-                      margin: 10,
-                      backgroundColor: theme.primary,
-                    }}
+                    style={[
+                      styles.avatarShadowWrapper,
+                      {
+                        backgroundColor: theme.primary,
+                      },
+                    ]}
                   >
-                    <Image
-                      source={avatar || require("../../assets/avatar/3.png")}
-                      style={[styles.profilImage]}
+                    <UserAvatar
+                      source={avatar}
+                      fallbackSource={require("../../assets/avatar/3.png")}
+                      isCustomPhoto={selectAvatarIndex === -1}
+                      size={128}
+                      style={{ backgroundColor: theme.primary }}
+                      priority="high"
+                      cachePolicy="memory-disk"
                     />
                   </View>
                 </View>
               )}
             </TouchableOpacity>
             <View style={styles.profileInfo}>
+              {/* Avatarın yan tarafında, ismin üst sağ köşesindeki butonlar */}
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate("EditProfileScreen")}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={i18nText(
+                    "autoI18n.profili_duzenle",
+                    "Profili Düzenle"
+                  )}
+                  style={[
+                    styles.actionBtn,
+                    {
+                      backgroundColor: theme.accent + "18",
+                      borderColor: theme.accent + "66",
+                    },
+                  ]}
+                >
+                  <AppIcon
+                    family="Ionicons"
+                    name="create-outline"
+                    size={16}
+                    color={theme.accent}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setShowStoryExport(true)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel="Hikayede Paylaş"
+                  style={[
+                    styles.actionBtn,
+                    {
+                      backgroundColor: theme.accent + "18",
+                      borderColor: theme.accent + "66",
+                    },
+                  ]}
+                >
+                  <AppIcon
+                    family="Ionicons"
+                    name="share-social-outline"
+                    size={16}
+                    color={theme.accent}
+                  />
+                </TouchableOpacity>
+              </View>
+
               <View style={styles.profileNameRow}>
                 <View style={styles.profileNameBlock}>
                   <Text
@@ -347,29 +383,6 @@ const ProfileScreen = ({ navigation }) => {
                     </Text>
                   )}
                 </View>
-                <TouchableOpacity
-                  onPress={() => navigation.navigate("EditProfileScreen")}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel={i18nText(
-                    "autoI18n.profili_duzenle",
-                    "Profili Düzenle"
-                  )}
-                  style={[
-                    styles.editProfileButton,
-                    {
-                      backgroundColor: theme.accent + "18",
-                      borderColor: theme.accent + "66",
-                    },
-                  ]}
-                >
-                  <AppIcon
-                    family="Ionicons"
-                    name="create-outline"
-                    size={17}
-                    color={theme.accent}
-                  />
-                </TouchableOpacity>
               </View>
 
               {identityBadges.length > 0 && (
@@ -662,7 +675,6 @@ const ProfileScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {/* todo <Avatar /> */}
           <StatisticsSection
             theme={theme}
             isloadingShowInfo={isloadingShowInfo}
@@ -702,6 +714,20 @@ const ProfileScreen = ({ navigation }) => {
             saving={isloadingAvatar}
             onSelect={handleAvatarSelect}
             onClose={() => setModalVisible(false)}
+          />
+          <AvatarPreviewModal
+            visible={showAvatarPreview}
+            onClose={() => setShowAvatarPreview(false)}
+            source={avatar || require("../../assets/avatar/3.png")}
+            isCustomPhoto={selectAvatarIndex === -1}
+            displayName={profile?.name || user?.displayName || ""}
+            username={profileUsername}
+          />
+          <StoryExportModal
+            visible={showStoryExport}
+            onClose={() => setShowStoryExport(false)}
+            user={user}
+            topMovies={[]}
           />
         </SafeAreaView>
       </ScrollView>
@@ -790,7 +816,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     //paddingTop: 0,
-    marginBottom: 100,
     alignItems: "center",
     backgroundColor: "#000",
   },
@@ -801,6 +826,21 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: -2,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  actionsRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+  },
+  actionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -876,21 +916,56 @@ const styles = StyleSheet.create({
     color: "#000",
   },
   profilImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 0,
+    width: "100%",
+    height: "100%",
+    borderRadius: 58,
+  },
+  profilImageCover: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 64,
+  },
+  profilImageIcon: {
+    width: 88,
+    height: 88,
+  },
+  // Halka radius=78 (SVG'de dış çap = radius*2, bkz.
+  // react-native-circular-progress-indicator/progressCircle) → 156x156.
+  // Avatar fotoğrafı 128x128'e büyüdü, aradaki boşluk (156-128)/2 = 14px —
+  // eskisi gibi dar bir boşluk, halka artık avatara çok daha yakın oturuyor.
+  avatarProgressWrapper: {
+    width: 156,
+    height: 156,
+    borderRadius: 78,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarShadowWrapper: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  avatarInnerContainer: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
   },
   profilImageTouch: {
-    borderRadius: 100,
-    //borderWidth: 5,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 25,
+    width: 156,
+    height: 156,
+    borderRadius: 78,
+    justifyContent: "center",
+    alignItems: "center",
   },
   images: {
     width: "100%",
@@ -923,11 +998,11 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: 3,
     },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
   },
   sectionTitle: {
     fontSize: 14,
@@ -945,25 +1020,22 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginBottom: 10,
     shadowColor: "#000",
-    //borderWidth: 1,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
     shadowRadius: 5,
-    elevation: 10, // Android için güçlü gölge efekti
+    elevation: 3,
   },
   watchStatsView: {
     width: "43%",
     justifyContent: "center",
     alignItems: "center",
-
-    //borderWidth: 1,
     padding: 5,
     borderRadius: 10,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 5,
-    elevation: 10, // Android için güçlü gölge efekti
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
   },
   textSecondary: {
     textAlign: "center",
@@ -976,15 +1048,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-
-    //borderWidth: 1,
     padding: 5,
     borderRadius: 10,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 5,
-    elevation: 10, // Android için güçlü gölge efekti
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
   },
   settingText: {
     fontSize: 16,

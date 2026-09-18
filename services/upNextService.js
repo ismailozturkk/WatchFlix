@@ -104,7 +104,7 @@ export async function resolveUpNextEpisode(
     airDate: candidate.air_date || null,
     overview: candidate.overview || "",
     isAired: candidate.isAired,
-    watchedEpisodeCount: show.watchedEpisodeCount || 0,
+    watchedEpisodeCount: getWatchedEpisodeCount(show),
     // Kart sırası belge eklenme tarihine değil, gerçek son izleme olayına
     // dayanır. Timestamp/string ayrımını ortak watchState yardımcısı çözer.
     activityTime: getWatchedShowActivityTime(show),

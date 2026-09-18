@@ -45,10 +45,11 @@ const BASE_THEMES = [
   { key: "gray", labelKey: "grayTheme", fallback: "Gri" },
   { key: "dark", labelKey: "darkTheme", fallback: "Karanlık" },
   { key: "light", labelKey: "lightTheme", fallback: "Açık" },
+  { key: "sky", labelKey: "skyTheme", fallback: "Açık Mavi" },
   { key: "blue", labelKey: "blueTheme", fallback: "Lacivert" },
   { key: "green", labelKey: "greenTheme", fallback: "Yeşil" },
   { key: "purple", labelKey: "purpleTheme", fallback: "Gece Moru" },
-  { key: "amber", labelKey: "amberTheme", fallback: "Kehribar" },
+  { key: "amber", labelKey: "amberTheme", fallback: "Kızıl Sinema" },
 ];
 
 // Hazır vurgu renkleri — tek dokunuşla accent + bold güncellenir.

@@ -227,6 +227,7 @@ export default function TvOngoingSection({ navigation }) {
         releaseDate={dateItem?.airDate || undefined}
         minDate={dateItem?.airDate || undefined}
         mediaType="tv"
+        scope="episode"
         onConfirm={(date) => {
           const selected = dateItem;
           if (!selected) return;

@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Runtime'da appearance.surface ile SRC_IN tint'lenir; RGB önemsiz, ALFA
+     korunur. reminder_widget_row_bg.xml (#3D/#42) ile aynı orana göre
+     bugünkü satır daha belirgin kalsın diye biraz daha yüksek tutuldu. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-  <solid android:color="#2A6C63FF" />
+  <solid android:color="#59FFFFFF" />
   <corners android:radius="13dp" />
-  <stroke android:width="1dp" android:color="#4D6C63FF" />
+  <stroke android:width="1dp" android:color="#63FFFFFF" />
 </shape>

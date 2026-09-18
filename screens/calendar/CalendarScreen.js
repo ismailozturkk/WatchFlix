@@ -1,3 +1,4 @@
+import { isLightSurface } from "@utils/colorUtils";
 import { Image } from "expo-image";
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
@@ -805,7 +806,7 @@ export default function CalendarScreen({ navigation }) {
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
       <ScreenDecor iconOpacity={0.25} />
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
 
       {/* Header */}
       <LinearGradient

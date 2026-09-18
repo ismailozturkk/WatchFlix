@@ -209,6 +209,7 @@ export async function addItemToSharedList({ listId, user, item }) {
     addedByName: user.displayName || "",
     addedByUsername: user.username || "",
     addedByAvatarIndex: clampAvatarIndex(user.avatarIndex),
+    addedByPhotoURL: user.photoURL || null,
     addedAt: serverTimestamp(),
   });
   // Liste kartı önizlemeleri "son eklenen" görünsün diye updatedAt tazele

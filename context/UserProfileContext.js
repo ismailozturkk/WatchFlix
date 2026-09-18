@@ -38,6 +38,7 @@ import {
   isAgeRestrictedProfile,
   syncAgeRestriction,
 } from "../utils/ageGate";
+import { trackFirestoreRead } from "../services/usageTrackerService";
 
 const UserProfileContext = createContext();
 export const useUserProfile = () => useContext(UserProfileContext);
@@ -76,9 +77,8 @@ export function UserProfileProvider({ children }) {
 
   // Açılış karesi profili tohumdan çiziyor (yukarıdaki ilkTohum, senkron);
   // migration round-trip'i ve canlı listener splash penceresinin dışına
-  // ertelenebilir. ChatModal ~3,8 sn'de kurulduğu için kapı ondan önce açılır.
-  // Kademeler: hooks/useStartupGate.js.
-  const startupReady = useStartupGate(2800);
+  // ertelenebilir. Kademeler: hooks/useStartupGate.js.
+  const startupReady = useStartupGate(1200);
 
   // ── 1) Login sonrası migration (yalnızca bir kez per uid) ────────────────
   useEffect(() => {
@@ -121,6 +121,7 @@ export function UserProfileProvider({ children }) {
     const unsub = onSnapshot(
       doc(db, "Users", uid),
       (snap) => {
+        trackFirestoreRead("Users", 1);
         if (snap.exists()) {
           const p = { uid: snap.id, ...snap.data() };
           setProfile(p);
@@ -181,9 +182,9 @@ export function UserProfileProvider({ children }) {
   );
 
   const changeAvatarIndex = useCallback(
-    async (index) => {
+    async (index, photoURL = null) => {
       if (!uid) return;
-      await setAvatarIndexService(uid, index);
+      await setAvatarIndexService(uid, index, photoURL);
     },
     [uid],
   );
@@ -208,6 +209,7 @@ export function UserProfileProvider({ children }) {
 
   const privacy = profile?.privacy || DEFAULT_PRIVACY;
   const avatarIndex = typeof profile?.avatarIndex === "number" ? profile.avatarIndex : 0;
+  const photoURL = profile?.photoURL || user?.photoURL || null;
   // Yaş her okumada doğum tarihinden türetilir — 18'ine giren kullanıcının
   // kısıtı doğru günde kendiliğinden kalkar (bkz. utils/ageGate.js).
   const age = calculateAge(birthDate);
@@ -224,6 +226,7 @@ export function UserProfileProvider({ children }) {
       username: profile?.username || "",
       displayName: profile?.displayName || "",
       avatarIndex,
+      photoURL,
       privacy,
       birthDate,
       age,

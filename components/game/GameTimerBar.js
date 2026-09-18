@@ -1,3 +1,4 @@
+import { useTheme } from "@context/ThemeContext";
 // components/game/GameTimerBar.js
 //
 // Aktif oyun zamanlayici cubugu (Part 12.1 / Part 19). Saf gosterim bileseni;
@@ -7,9 +8,10 @@ import React from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 
 export default function GameTimerBar({ timeLeft, timerRunning, timerWidth, timerColor }) {
+  const { theme } = useTheme();
   return (
     <View style={styles.timerWrap}>
-      <View style={[styles.timerTrack, { backgroundColor: "rgba(255,255,255,0.1)" }]}>
+      <View style={[styles.timerTrack, { backgroundColor: theme.border }]}>
         <Animated.View style={[styles.timerFill, { width: timerWidth, backgroundColor: timerColor }]} />
       </View>
       <Text style={[styles.timerText, { color: timerColor }]}>{timerRunning ? `${timeLeft}s` : "..."}</Text>

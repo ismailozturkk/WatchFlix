@@ -129,7 +129,7 @@ export function getPackagePeriodKey(aPackage) {
   return "other";
 }
 
-function formatStorePrice(price, currency, language) {
+export function formatStorePrice(price, currency, language) {
   if (!Number.isFinite(price) || price <= 0 || !currency) return null;
   try {
     return new Intl.NumberFormat(language === "tr" ? "tr-TR" : "en-US", {
@@ -141,6 +141,15 @@ function formatStorePrice(price, currency, language) {
   } catch {
     return null;
   }
+}
+
+export function getPackageMonthlyEquivalent(aPackage, language = "en") {
+  if (getPackagePeriodKey(aPackage) !== "annual") return null;
+  const annualPrice = Number(aPackage?.product?.price);
+  const currency = aPackage?.product?.currencyCode;
+  if (!Number.isFinite(annualPrice) || annualPrice <= 0 || !currency) return null;
+  const monthly = annualPrice / 12;
+  return formatStorePrice(monthly, currency, language);
 }
 
 /**

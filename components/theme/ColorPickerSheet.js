@@ -8,12 +8,13 @@
 // Kendi UI'si aktif uygulama temasını kullanır; düzenlenen renk bundan bağımsızdır.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import { useTheme } from "@context/ThemeContext";
+import * as Haptics from "@services/hapticsService";
 import { clamp, hexToHsl, hslToHex, normalizeHex, readableTextOn } from "@utils/colorUtils";
 
 const HUE_GRADIENT = ["#FF0000", "#FFFF00", "#00FF00", "#00FFFF", "#0000FF", "#FF00FF", "#FF0000"];
@@ -34,36 +35,152 @@ const applyRel = (baseHex, l, s) => {
 function ColorSlider({ value, max, onChange, gradient, thumbColor, theme }) {
   const [trackW, setTrackW] = useState(0);
   const widthRef = useRef(0);
+  const dragStartXRef = useRef(0);
+  const isDraggingRef = useRef(false);
+  const latestValRef = useRef(value);
+  latestValRef.current = value;
+  const rafIdRef = useRef(null);
+
   const changeRef = useRef(onChange);
   changeRef.current = onChange;
+
+  const maxRef = useRef(max);
+  maxRef.current = max;
+
+  const thumbAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const lastBoundaryHitRef = useRef(null);
+
+  // Prop veya önayarlı renk değiştiğinde (sürükleme yapılmıyorsa) animasyonlu pozisyonu güncelle
+  useEffect(() => {
+    if (!isDraggingRef.current && trackW > 0) {
+      const m = max || 1;
+      const r = clamp(value / m, 0, 1);
+      const maxTravel = Math.max(0, trackW - 24);
+      thumbAnim.setValue(r * maxTravel);
+    }
+  }, [value, max, trackW, thumbAnim]);
+
+  const updatePosition = useCallback(
+    (x, isImmediateCommit = false) => {
+      const w = widthRef.current;
+      if (!w) return;
+      const maxTravel = Math.max(0, w - 24);
+      const clampedRatio = clamp((x - 12) / Math.max(1, maxTravel), 0, 1);
+      const targetX = clampedRatio * maxTravel;
+
+      // 1) Anlık 120 FPS native görsel güncelleme (0ms gecikme)
+      thumbAnim.setValue(targetX);
+
+      // 2) Sınır haptikleri
+      if (clampedRatio === 0 && lastBoundaryHitRef.current !== "min") {
+        lastBoundaryHitRef.current = "min";
+        Haptics.selectionAsync();
+      } else if (clampedRatio === 1 && lastBoundaryHitRef.current !== "max") {
+        lastBoundaryHitRef.current = "max";
+        Haptics.selectionAsync();
+      } else if (clampedRatio > 0.02 && clampedRatio < 0.98) {
+        lastBoundaryHitRef.current = null;
+      }
+
+      const m = maxRef.current || 1;
+      const val = clampedRatio * m;
+      latestValRef.current = val;
+
+      if (isImmediateCommit) {
+        if (rafIdRef.current) {
+          cancelAnimationFrame(rafIdRef.current);
+          rafIdRef.current = null;
+        }
+        changeRef.current?.(val);
+      } else if (!rafIdRef.current) {
+        rafIdRef.current = requestAnimationFrame(() => {
+          rafIdRef.current = null;
+          changeRef.current?.(latestValRef.current);
+        });
+      }
+    },
+    [thumbAnim],
+  );
 
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => emit(e.nativeEvent.locationX),
-      onPanResponderMove: (e) => emit(e.nativeEvent.locationX),
+      onPanResponderGrant: (e) => {
+        isDraggingRef.current = true;
+        dragStartXRef.current = e.nativeEvent.locationX;
+        updatePosition(e.nativeEvent.locationX, true);
+        Animated.spring(scaleAnim, {
+          toValue: 1.25,
+          useNativeDriver: true,
+          friction: 7,
+          tension: 250,
+        }).start();
+      },
+      onPanResponderMove: (_, g) => {
+        updatePosition(dragStartXRef.current + g.dx, false);
+      },
+      onPanResponderRelease: (_, g) => {
+        isDraggingRef.current = false;
+        updatePosition(dragStartXRef.current + g.dx, true);
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          friction: 7,
+          tension: 250,
+        }).start();
+      },
+      onPanResponderTerminate: () => {
+        isDraggingRef.current = false;
+        if (rafIdRef.current) {
+          cancelAnimationFrame(rafIdRef.current);
+          rafIdRef.current = null;
+        }
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          friction: 7,
+          tension: 250,
+        }).start();
+      },
     }),
   ).current;
-
-  function emit(x) {
-    const w = widthRef.current;
-    if (!w) return;
-    changeRef.current(clamp(x / w, 0, 1) * max);
-  }
-
-  const ratio = max ? clamp(value / max, 0, 1) : 0;
-  const thumbLeft = clamp(ratio * trackW - 12, 0, Math.max(0, trackW - 24));
 
   return (
     <View
       {...pan.panHandlers}
-      onLayout={(e) => { const w = e.nativeEvent.layout.width; widthRef.current = w; setTrackW(w); }}
-      style={styles.sliderTrack}
-      hitSlop={{ top: 10, bottom: 10 }}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width;
+        widthRef.current = w;
+        setTrackW(w);
+      }}
+      style={styles.sliderContainer}
+      hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
     >
-      <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-      <View style={[styles.sliderThumb, { left: thumbLeft, backgroundColor: thumbColor, borderColor: theme.text.primary }]} />
+      <View style={styles.sliderTrackBg} pointerEvents="none">
+        <LinearGradient
+          pointerEvents="none"
+          colors={gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </View>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.sliderThumb,
+          {
+            backgroundColor: thumbColor,
+            borderColor: theme.text.primary,
+            transform: [
+              { translateX: thumbAnim },
+              { scale: scaleAnim },
+            ],
+          },
+        ]}
+      />
     </View>
   );
 }
@@ -265,8 +382,21 @@ const styles = StyleSheet.create({
   hexInput: { flex: 1, fontSize: 15, fontWeight: "800", letterSpacing: 1, paddingVertical: 10 },
   channel: { marginTop: 13 },
   channelLabel: { fontSize: 11, fontWeight: "800", marginBottom: 7 },
-  sliderTrack: { height: 26, borderRadius: 13, overflow: "hidden", justifyContent: "center" },
-  sliderThumb: { position: "absolute", width: 24, height: 24, borderRadius: 12, borderWidth: 3, top: 1 },
+  sliderContainer: { height: 32, justifyContent: "center" },
+  sliderTrackBg: { height: 24, borderRadius: 12, overflow: "hidden", justifyContent: "center" },
+  sliderThumb: {
+    position: "absolute",
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 3,
+    top: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 4,
+  },
   presetsWrap: { marginTop: 16, marginHorizontal: -18, flexGrow: 0 },
   presets: { flexDirection: "row", gap: 9, paddingHorizontal: 18 },
   presetSwatch: { width: 34, height: 34, borderRadius: 10 },

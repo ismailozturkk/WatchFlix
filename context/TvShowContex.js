@@ -14,6 +14,13 @@ import { getCachedValue, getSwr, seedList, setCachedValue, TTL } from "../utils/
 import { setIfChanged, setListIfChanged } from "../utils/sameData";
 import { i18nText } from "../utils/i18nText";
 import { getWatchedShowActivityTime } from "../utils/watchState";
+import {
+  getEmmyConfig,
+  fetchEmmyByCategory,
+  fetchEmmyByYear,
+  EMMY_CATEGORIES,
+  DEFAULT_EMMY_CATEGORY,
+} from "../services/emmyService";
 
 
 const TvShowContext = createContext();
@@ -55,6 +62,7 @@ const loadPage = async ({
   setLoadingMore,
   isStale,
   startupSnapshot = false,
+  forceRefresh = false,
 }) => {
   // `arkaPlan`: ekranda zaten (bayat) veri var, tazeleme sessizce yapılıyor.
   // Böyle durumda listeyi KİMLİK bazında karşılaştırıyoruz — TMDB aynı listeyi
@@ -69,16 +77,15 @@ const loadPage = async ({
     else setIfChanged(setData, results);
   };
 
-  // BAYAT GÖSTER, ARKA PLANDA TAZELE. Eskiden TTL dolunca cache "yok" sayılır,
-  // ray iskelete düşer ve ağ beklenirdi; trend TTL'i 1 saat olduğu için bu
-  // pratikte her açılış demekti. Artık bayat kayıt hemen çiziliyor, tazeleme
-  // arka planda ve "yükleniyor" göstermeden yapılıyor.
+  // BAYAT GÖSTER, ARKA PLANDA TAZELE. TTL 24 saat olduğu için gün içinde
+  // cache hep taze sayılır ve ağ isteği yapılmaz. forceRefresh (pull-to-refresh)
+  // bu kontrolü bypass eder ve ağdan yeniden çeker.
   const cached = getSwr(cacheKey, { maxAge: ttl });
   const cachedData = cached.data;
   if (cachedData) {
     apply(cachedData.results ?? cachedData, cachedData.total_pages ?? 1);
     (append ? setLoadingMore : setLoading)(false);
-    if (cached.fresh) return;
+    if (cached.fresh && !forceRefresh) return;
   } else {
     (append ? setLoadingMore : setLoading)(true);
   }
@@ -199,7 +206,7 @@ export const TvShowProvider = ({ children }) => {
     }
   };
 
-  const fetchSeriesTrends = async (page = 1, append = false) => {
+  const fetchSeriesTrends = async (page = 1, append = false, forceRefresh = false) => {
     const lang = language === "tr" ? "tr-TR" : "en-US";
     const gen = append ? currentGen("trends") : beginFreshRequest("trends");
     const isStale = () => currentGen("trends") !== gen;
@@ -220,7 +227,7 @@ export const TvShowProvider = ({ children }) => {
         setLoadingTren(false);
         setTotalPagesTrend((p) => (p > 1 ? p : 1000));
       }
-      if (swr.fresh) return;
+      if (swr.fresh && !forceRefresh) return;
     } else {
       (append ? setLoadingMoreTrend : setLoadingTren)(true);
     }
@@ -292,13 +299,14 @@ export const TvShowProvider = ({ children }) => {
     }
   };
 
-  const fetchSeriesBest = (page = 1, append = false) => {
+  const fetchSeriesBest = (page = 1, append = false, forceRefresh = false) => {
     const lang = language === "tr" ? "tr-TR" : "en-US";
     const gen = append ? currentGen("best") : beginFreshRequest("best");
     return loadPage({
       cacheKey: `tv_bests_${lang}_${selectedCategoryBestShow}_${selectedCategoryBest}_page_${page}`,
       ttl: TTL.TREND,
       append,
+      forceRefresh,
       isStale: () => currentGen("best") !== gen,
       setData: setSeriesBest,
       setTotal: setTotalPagesBest,
@@ -344,12 +352,13 @@ export const TvShowProvider = ({ children }) => {
   const [loadingMoreAiringToday, setLoadingMoreAiringToday] = useState(false);
   const [pageAiringToday, setPageAiringToday] = useState(1);
 
-  const fetchAiringToday = (page = 1, append = false) => {
+  const fetchAiringToday = (page = 1, append = false, forceRefresh = false) => {
     const gen = append ? currentGen("airingToday") : beginFreshRequest("airingToday");
     return loadPage({
       cacheKey: `tv_airing_today_${tmdbLanguage}_${tmdbRegion}_page_${page}`,
       ttl: TTL.NOW_PLAYING,
       append,
+      forceRefresh,
       isStale: () => currentGen("airingToday") !== gen,
       setData: setMoviesAiringToday,
       setTotal: setTotalPagesAiringToday,
@@ -504,13 +513,14 @@ export const TvShowProvider = ({ children }) => {
 
   // Seçilen türlere göre filmleri almak
 
-  const fetchTvByGenres = (page = 1, append = false) => {
+  const fetchTvByGenres = (page = 1, append = false, forceRefresh = false) => {
     const genresKey = [...selectedGenres].sort().join(",");
     const gen = append ? currentGen("genres") : beginFreshRequest("genres");
     return loadPage({
       cacheKey: `tv_genres_content_${tmdbLanguage}_p${page}_g${genresKey}`,
       ttl: TTL.TREND,
       append,
+      forceRefresh,
       isStale: () => currentGen("genres") !== gen,
       setData: setMoviesGenres,
       setTotal: setTotalPagesGenres,
@@ -547,12 +557,13 @@ export const TvShowProvider = ({ children }) => {
   const [loadingMoreOnTheAir, setLoadingMoreOnTheAir] = useState(false);
   const [pageOnTheAir, setPageOnTheAir] = useState(1);
 
-  const fetchOnTheAir = (page = 1, append = false) => {
+  const fetchOnTheAir = (page = 1, append = false, forceRefresh = false) => {
     const gen = append ? currentGen("onTheAir") : beginFreshRequest("onTheAir");
     return loadPage({
       cacheKey: `tv_on_the_air_${tmdbLanguage}_${tmdbRegion}_page_${page}`,
       ttl: TTL.NOW_PLAYING,
       append,
+      forceRefresh,
       isStale: () => currentGen("onTheAir") !== gen,
       setData: setMoviesOnTheAir,
       setTotal: setTotalPagesOnTheAir,
@@ -580,6 +591,178 @@ export const TvShowProvider = ({ children }) => {
     setPageOnTheAir(next);
     fetchOnTheAir(next, true);
   };
+
+  // ── DİZİ EMMY ÖDÜLLERİ ───────────────────────────────────────────────
+  const [emmyMode, setEmmyMode] = useState("category"); // "category" | "year"
+  const [selectedEmmyCategory, setSelectedEmmyCategory] = useState(DEFAULT_EMMY_CATEGORY);
+  const [selectedEmmyYear, setSelectedEmmyYear] = useState(2026);
+  const [tvShowsEmmy, setTvShowsEmmy] = useState([]);
+  const [tvShowsEmmyYear, setTvShowsEmmyYear] = useState([]);
+  const [loadingEmmy, setLoadingEmmy] = useState(true);
+  const [loadingEmmyYear, setLoadingEmmyYear] = useState(false);
+  const [loadingMoreEmmy, setLoadingMoreEmmy] = useState(false);
+  const [hasMoreEmmy, setHasMoreEmmy] = useState(true);
+  const [errorEmmy, setErrorEmmy] = useState(null);
+  const emmyConfigRef = useRef(null);
+  const emmyPageRef = useRef(0);
+  const loadingMoreEmmyRef = useRef(false);
+
+  const mergeEmmyItems = (prev, next) => {
+    if (!Array.isArray(next)) return prev;
+    const seen = new Set(
+      (Array.isArray(prev) ? prev : [])
+        .map((x) => (x ? `${x.year}-${x.categoryKey || "drama_series"}` : null))
+        .filter(Boolean),
+    );
+    return [
+      ...(Array.isArray(prev) ? prev : []),
+      ...next.filter((x) => {
+        if (!x) return false;
+        const key = `${x.year}-${x.categoryKey || "drama_series"}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }),
+    ];
+  };
+
+  const fetchTvShowsEmmy = useCallback(async (catKey = selectedEmmyCategory, forceRefresh = false) => {
+    setLoadingEmmy(true);
+    setErrorEmmy(null);
+    emmyPageRef.current = 0;
+    try {
+      const config = await getEmmyConfig({ forceRefresh });
+      emmyConfigRef.current = config?.items || [];
+
+      const res = await fetchEmmyByCategory({
+        configItems: emmyConfigRef.current,
+        categoryKey: catKey,
+        page: 0,
+        pageSize: 10,
+        language,
+        apiKey: API_KEY,
+      });
+
+      setIfChanged(setTvShowsEmmy, res.items);
+      setHasMoreEmmy(res.hasMore);
+      emmyPageRef.current = res.nextPage;
+    } catch (err) {
+      setErrorEmmy(err.message);
+    } finally {
+      setLoadingEmmy(false);
+    }
+  }, [selectedEmmyCategory, language, API_KEY]);
+
+  const loadMoreEmmy = useCallback(async () => {
+    if (
+      loadingMoreEmmyRef.current ||
+      !hasMoreEmmy ||
+      !emmyConfigRef.current
+    ) {
+      return;
+    }
+    loadingMoreEmmyRef.current = true;
+    setLoadingMoreEmmy(true);
+    const nextPage = emmyPageRef.current;
+    try {
+      const res = await fetchEmmyByCategory({
+        configItems: emmyConfigRef.current,
+        categoryKey: selectedEmmyCategory,
+        page: nextPage,
+        pageSize: 10,
+        language,
+        apiKey: API_KEY,
+      });
+
+      if (res.items?.length) {
+        setTvShowsEmmy((prev) => mergeEmmyItems(prev, res.items));
+        setHasMoreEmmy(res.hasMore);
+        emmyPageRef.current = res.nextPage;
+      } else {
+        setHasMoreEmmy(false);
+      }
+    } catch (err) {
+      if (__DEV__) console.warn("loadMoreEmmy error:", err?.message);
+    } finally {
+      loadingMoreEmmyRef.current = false;
+      setLoadingMoreEmmy(false);
+    }
+  }, [hasMoreEmmy, selectedEmmyCategory, language, API_KEY]);
+
+  const fetchTvShowsEmmyByYear = useCallback(async (year = selectedEmmyYear, forceRefresh = false) => {
+    setLoadingEmmyYear(true);
+    try {
+      const config = await getEmmyConfig({ forceRefresh });
+      emmyConfigRef.current = config?.items || [];
+
+      const results = await fetchEmmyByYear({
+        configItems: emmyConfigRef.current,
+        year,
+        language,
+        apiKey: API_KEY,
+      });
+
+      setIfChanged(setTvShowsEmmyYear, results);
+    } catch (err) {
+      if (__DEV__) console.warn("fetchTvShowsEmmyByYear error:", err?.message);
+    } finally {
+      setLoadingEmmyYear(false);
+    }
+  }, [selectedEmmyYear, language, API_KEY]);
+
+  const changeEmmyCategory = useCallback((catKey) => {
+    if (catKey === selectedEmmyCategory) return;
+    setSelectedEmmyCategory(catKey);
+  }, [selectedEmmyCategory]);
+
+  const changeEmmyYear = useCallback((year) => {
+    const numYear = Number(year);
+    if (numYear === selectedEmmyYear) return;
+    setSelectedEmmyYear(numYear);
+  }, [selectedEmmyYear]);
+
+  const changeEmmyMode = useCallback((mode) => {
+    setEmmyMode(mode);
+    if (mode === "year" && (!tvShowsEmmyYear || tvShowsEmmyYear.length === 0)) {
+      fetchTvShowsEmmyByYear(selectedEmmyYear);
+    }
+  }, [tvShowsEmmyYear, selectedEmmyYear, fetchTvShowsEmmyByYear]);
+
+  useEffect(() => {
+    if (!activeSections.emmy) return;
+    if (emmyMode === "category") {
+      fetchTvShowsEmmy(selectedEmmyCategory);
+    } else {
+      fetchTvShowsEmmyByYear(selectedEmmyYear);
+    }
+  }, [activeSections.emmy, language, emmyMode, selectedEmmyCategory, selectedEmmyYear, fetchTvShowsEmmy, fetchTvShowsEmmyByYear]);
+
+  // ── PULL-TO-REFRESH: Tüm aktif bölümleri zorla yenile ──────────────────
+  const refreshAllTvShows = useCallback(async () => {
+    const jobs = [];
+    if (activeSections.trends)     jobs.push(fetchSeriesTrends(1, false, true));
+    if (activeSections.best)       jobs.push(fetchSeriesBest(1, false, true));
+    if (activeSections.airingToday)jobs.push(fetchAiringToday(1, false, true));
+    if (activeSections.onTheAir)   jobs.push(fetchOnTheAir(1, false, true));
+    if (activeSections.genres)     jobs.push(fetchTvByGenres(1, false, true));
+    if (activeSections.emmy) {
+      if (emmyMode === "category") jobs.push(fetchTvShowsEmmy(selectedEmmyCategory, true));
+      else jobs.push(fetchTvShowsEmmyByYear(selectedEmmyYear, true));
+    }
+    await Promise.allSettled(jobs);
+  }, [
+    activeSections,
+    fetchSeriesTrends,
+    fetchSeriesBest,
+    fetchAiringToday,
+    fetchOnTheAir,
+    fetchTvByGenres,
+    emmyMode,
+    selectedEmmyCategory,
+    selectedEmmyYear,
+    fetchTvShowsEmmy,
+    fetchTvShowsEmmyByYear,
+  ]);
 
   const contextValue = useMemo(() => ({
     seriesTrend,
@@ -645,6 +828,29 @@ export const TvShowProvider = ({ children }) => {
     getCategoryTitleTrends,
     watchedTvShows,
     loadingWatchedTv,
+
+    // Emmy
+    emmyMode,
+    setEmmyMode,
+    changeEmmyMode,
+    selectedEmmyCategory,
+    setSelectedEmmyCategory,
+    changeEmmyCategory,
+    EMMY_CATEGORIES,
+    selectedEmmyYear,
+    setSelectedEmmyYear,
+    changeEmmyYear,
+    tvShowsEmmy,
+    tvShowsEmmyYear,
+    loadingEmmy,
+    loadingEmmyYear,
+    loadingMoreEmmy,
+    hasMoreEmmy,
+    errorEmmy,
+    fetchTvShowsEmmy,
+    loadMoreEmmy,
+    fetchTvShowsEmmyByYear,
+
     //!
     fetchSeriesTrends,
     fetchSeriesBest,
@@ -652,6 +858,7 @@ export const TvShowProvider = ({ children }) => {
     fetchProviders,
     fetchTvByGenres,
     fetchOnTheAir,
+    refreshAllTvShows,
   }), [
     seriesTrend, seriesBest, loadingTrend, loadingBest, selectedCategoryTrend,
     selectedCategoryBest, totalPagesBest, pageBest, moviesAiringToday,
@@ -664,6 +871,10 @@ export const TvShowProvider = ({ children }) => {
     loadingMoreOnTheAir,
     loadingMoreProvider, pageProvider, totalPagesProvider,
     loadingMoreTrend, pageTrend, totalPagesTrend,
+    emmyMode, selectedEmmyCategory, selectedEmmyYear, tvShowsEmmy, tvShowsEmmyYear,
+    loadingEmmy, loadingEmmyYear, loadingMoreEmmy, hasMoreEmmy, errorEmmy,
+    changeEmmyMode, changeEmmyCategory, changeEmmyYear, fetchTvShowsEmmy, loadMoreEmmy, fetchTvShowsEmmyByYear,
+    refreshAllTvShows,
   ]);
 
   return (

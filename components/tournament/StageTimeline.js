@@ -142,11 +142,11 @@ function StageTimeline({ periodId, nowMs, lang = "tr", onStagePress }) {
   );
 }
 
-const NODE = 26;
-const NODE_ACTIVE = 32;
+const NODE = 21;
+const NODE_ACTIVE = 26;
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", marginTop: 14 },
+  row: { flexDirection: "row", marginTop: 8 },
   stage: { flex: 1, alignItems: "center" },
 
   lineTrack: {
@@ -191,9 +191,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
 
-  label: { color: "#fff", fontSize: 10, fontWeight: "800", marginTop: 5 },
-  labelActive: { fontSize: 10.5 },
-  days: { color: "#fff", fontSize: 8.5, fontWeight: "600", marginTop: 1 },
+  label: { color: "#fff", fontSize: 9.5, fontWeight: "800", marginTop: 3 },
+  labelActive: { fontSize: 10 },
+  days: { color: "#fff", fontSize: 8, fontWeight: "600", marginTop: 1 },
 });
 
 export default memo(StageTimeline);

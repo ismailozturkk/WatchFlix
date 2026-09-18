@@ -6,14 +6,18 @@
 // Her yapı için: poster, sıra madalyası, aldığı TOPLAM oy, final/yarı final
 // skoru (+%). Üstte ay/tür etiketi, altta katılım özeti (oy veren + toplam oy).
 // Veri butona basılınca BİR KEZ yüklenir (doc + votes) ve state'te tutulur.
+//
+// Kabuk: BottomSheetModal — diğer tüm alt sayfalarla aynı blur+kayma davranışı
+// (blur YERİNDE solar, sayfa TAM OPAKLIKTA aşağıdan yukarı kayar).
 
 import React, { memo, useEffect, useState } from "react";
-import {
-  View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, ScrollView,
-} from "react-native";
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
+import BottomSheetModal from "@components/common/BottomSheetModal";
+import { alpha } from "@theme/colors";
 import { i18nText } from "@utils/i18nText";
 import {
   buildBracket, tallyVotes, tallyNominations, selectFinalists, parsePeriodId,
@@ -29,6 +33,10 @@ const MEDAL = [
   { color: "#C0C4CE", icon: "medal" },    // 2 — gümüş
   { color: "#CD7F32", icon: "medal" },    // 3 — bronz
 ];
+
+// Yapının poster+madalya bloğu altındaki kaide yüksekliği (görsel podyum
+// basamağı) — büyüklük farkı zaten posterde var, kaide sadece hafif destekler.
+const PEDESTAL_HEIGHT = { 1: 34, 2: 24, 3: 18 };
 
 // Önceki ay verisinden podyumu türet (saf hesap — motorla aynı determinizm).
 // Sayımlar agg dokümanından (tercih) veya ham oy dokümanlarından gelir —
@@ -76,11 +84,12 @@ function computePodium(docData, { nomTally, tallies, voters }) {
   };
 }
 
-// Tek podyum sütunu. 1. sıra ortada ve daha büyük.
+// Tek podyum sütunu. 1. sıra ortada ve daha büyük; altındaki renkli kaide
+// gerçek bir podyum basamağı hissi verir (sıraya göre yükseklik farkı).
 const PodiumColumn = memo(({ item, big, theme, getTmdbUrl, lang }) => {
   const medal = MEDAL[item.place - 1];
   const uri = item.c.posterPath ? getTmdbUrl(item.c.posterPath, "poster", big ? 342 : 185) : null;
-  const w = big ? 108 : 82;
+  const w = big ? 104 : 80;
   const scoreLabel =
     item.place === 3
       ? i18nText("autoI18n.tournament_semifinal", "Yarı final")
@@ -91,19 +100,28 @@ const PodiumColumn = memo(({ item, big, theme, getTmdbUrl, lang }) => {
         <AppIcon family="Ionicons" name={medal.icon} size={big ? 15 : 12} color="#3b3b3b" />
         <Text style={styles.medalText}>{item.place}</Text>
       </View>
-      <View style={[styles.posterWrap, { width: w, height: w * 1.5, borderColor: medal.color }]}>
-        {uri ? (
-          <Image source={{ uri }} style={styles.poster} contentFit="cover" transition={140} />
-        ) : (
-          <View style={[styles.poster, { backgroundColor: theme.between, alignItems: "center", justifyContent: "center" }]}>
-            <AppIcon family="Ionicons" name="image-outline" size={20} color={theme.text.muted} />
-          </View>
-        )}
+
+      <View style={[styles.posterHalo, { backgroundColor: alpha(medal.color, 0.16) }]}>
+        <View style={[styles.posterWrap, { width: w, height: w * 1.5, borderColor: medal.color }]}>
+          {uri ? (
+            <Image source={{ uri }} style={styles.poster} contentFit="cover" transition={140} />
+          ) : (
+            <View style={[styles.poster, { backgroundColor: theme.between, alignItems: "center", justifyContent: "center" }]}>
+              <AppIcon family="Ionicons" name="image-outline" size={20} color={theme.text.muted} />
+            </View>
+          )}
+          <LinearGradient
+            colors={["transparent", alpha(medal.color, 0.4)]}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+        </View>
       </View>
+
       <Text numberOfLines={2} style={[styles.title, { color: theme.text.primary }, big && styles.titleBig]}>
         {item.c.title}
       </Text>
-      <View style={[styles.statPill, { backgroundColor: medal.color + "26", borderColor: medal.color + "66" }]}>
+      <View style={[styles.statPill, { backgroundColor: alpha(medal.color, 0.16), borderColor: alpha(medal.color, 0.4) }]}>
         <AppIcon family="Ionicons" name="flame" size={10} color={medal.color} />
         <Text style={[styles.statPillText, { color: theme.text.primary }]}>
           {item.total} {i18nText("autoI18n.tournament_votes", "oy")}
@@ -112,6 +130,13 @@ const PodiumColumn = memo(({ item, big, theme, getTmdbUrl, lang }) => {
       <Text style={[styles.scoreText, { color: theme.text.muted }]}>
         {scoreLabel}: {item.score.v}/{item.score.t} (%{item.score.pct})
       </Text>
+
+      <LinearGradient
+        colors={[alpha(medal.color, 0.95), alpha(medal.color, 0.55)]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={[styles.pedestal, { height: PEDESTAL_HEIGHT[item.place] }]}
+      />
     </View>
   );
 });
@@ -163,6 +188,7 @@ const WinnerRow = memo(({ w, theme, getTmdbUrl, lang }) => {
 });
 
 function PodiumModal({ visible, onClose, periodId, theme, getTmdbUrl, lang = "tr" }) {
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const [podium, setPodium] = useState(null);
   const [meta, setMeta] = useState(null);
@@ -230,135 +256,158 @@ function PodiumModal({ visible, onClose, periodId, theme, getTmdbUrl, lang = "tr
     : [];
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.sheet, { backgroundColor: theme.primary, borderColor: theme.border }]}>
-        <View style={[styles.grabber, { backgroundColor: theme.border }]} />
-        <LinearGradient
-          colors={["#F5C51833", "transparent"]}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFill}
-          pointerEvents="none"
-        />
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      intensity={40}
+      dimColor="rgba(0,0,0,0.35)"
+      sheetStyle={[
+        styles.sheet,
+        {
+          backgroundColor: theme.primary,
+          borderColor: theme.border,
+          paddingBottom: Math.max(insets.bottom + 18, 26),
+          maxHeight: "88%",
+        },
+      ]}
+    >
+      <View style={[styles.grabber, { backgroundColor: theme.border }]} />
+      <LinearGradient
+        colors={["#F5C51833", "transparent"]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
 
-        <View style={styles.headerRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.headerTitle, { color: theme.text.primary }]}>
-              🏆 {i18nText("autoI18n.tournament_last_winner", "Geçen Ayın Kazananı")}
-            </Text>
-            {meta && entry && (
-              <Text style={[styles.headerSub, { color: theme.text.muted }]}>
-                {monthLabel(meta.monthIndex, lang)} · {themeLabel(entry, lang)} {mediaLabel(meta.mediaType, lang)}
-              </Text>
-            )}
-          </View>
-          <Pressable onPress={onClose} hitSlop={10} style={[styles.closeBtn, { backgroundColor: theme.secondary }]}>
-            <AppIcon family="Ionicons" name="close" size={18} color={theme.text.secondary} />
-          </Pressable>
+      <View style={styles.headerRow}>
+        <View style={[styles.headerIconBadge, { backgroundColor: alpha("#F5C518", 0.16) }]}>
+          <AppIcon family="Ionicons" name="trophy" size={19} color="#F5C518" />
         </View>
-
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 26 }}>
-          {loading ? (
-            <View style={styles.center}>
-              <ActivityIndicator color={theme.accent} size="large" />
-            </View>
-          ) : !podium ? (
-            <View style={styles.center}>
-              <AppIcon family="Ionicons" name="trophy-outline" size={34} color={theme.text.muted} />
-              <Text style={[styles.emptyText, { color: theme.text.muted }]}>
-                {i18nText("autoI18n.tournament_no_prev", "Geçen ayın turnuva sonucu bulunamadı.")}
-              </Text>
-            </View>
-          ) : (
-            <>
-              <View style={styles.podiumRow}>
-                {ordered.map((item) => (
-                  <PodiumColumn
-                    key={item.place}
-                    item={item}
-                    big={item.place === 1}
-                    theme={theme}
-                    getTmdbUrl={getTmdbUrl}
-                    lang={lang}
-                  />
-                ))}
-              </View>
-
-              <View style={[styles.summary, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-                <View style={styles.summaryItem}>
-                  <AppIcon family="Ionicons" name="people" size={14} color={theme.accent} />
-                  <Text style={[styles.summaryText, { color: theme.text.secondary }]}>
-                    {podium.voters} {i18nText("autoI18n.tournament_voters", "katılımcı")}
-                  </Text>
-                </View>
-                <View style={[styles.summaryDivider, { backgroundColor: theme.border }]} />
-                <View style={styles.summaryItem}>
-                  <AppIcon family="Ionicons" name="stats-chart" size={14} color={theme.accent} />
-                  <Text style={[styles.summaryText, { color: theme.text.secondary }]}>
-                    {podium.totalVotes} {i18nText("autoI18n.tournament_total_votes", "toplam oy")}
-                  </Text>
-                </View>
-              </View>
-            </>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.headerTitle, { color: theme.text.primary }]}>
+            {i18nText("autoI18n.tournament_last_winner", "Geçen Ayın Kazananı")}
+          </Text>
+          {meta && entry && (
+            <Text style={[styles.headerSub, { color: theme.text.muted }]}>
+              {monthLabel(meta.monthIndex, lang)} · {themeLabel(entry, lang)} {mediaLabel(meta.mediaType, lang)}
+            </Text>
           )}
+        </View>
+        <Pressable
+          onPress={onClose}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
+          style={[styles.closeBtn, { backgroundColor: theme.between }]}
+        >
+          <AppIcon family="Ionicons" name="close" size={18} color={theme.text.secondary} />
+        </Pressable>
+      </View>
 
-          {/* ── Geçmiş kazananlar (yıl-ay şeridi) ─────────────────────────── */}
-          {archive !== null && (
-            <View style={styles.archive}>
-              <View style={styles.archiveHeader}>
-                <AppIcon family="Ionicons" name="albums" size={13} color={theme.text.muted} />
-                <Text style={[styles.archiveTitle, { color: theme.text.muted }]}>
-                  {i18nText("autoI18n.tournament_past_winners", "Geçmiş Kazananlar")}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 6 }}>
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={theme.accent} size="large" />
+          </View>
+        ) : !podium ? (
+          <View style={styles.center}>
+            <AppIcon family="Ionicons" name="trophy-outline" size={34} color={theme.text.muted} />
+            <Text style={[styles.emptyText, { color: theme.text.muted }]}>
+              {i18nText("autoI18n.tournament_no_prev", "Geçen ayın turnuva sonucu bulunamadı.")}
+            </Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.podiumRow}>
+              {ordered.map((item) => (
+                <PodiumColumn
+                  key={item.place}
+                  item={item}
+                  big={item.place === 1}
+                  theme={theme}
+                  getTmdbUrl={getTmdbUrl}
+                  lang={lang}
+                />
+              ))}
+            </View>
+
+            <View style={[styles.summary, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+              <View style={styles.summaryItem}>
+                <View style={[styles.summaryIcon, { backgroundColor: alpha(theme.accent, 0.14) }]}>
+                  <AppIcon family="Ionicons" name="people" size={13} color={theme.accent} />
+                </View>
+                <Text style={[styles.summaryText, { color: theme.text.secondary }]}>
+                  {podium.voters} {i18nText("autoI18n.tournament_voters", "katılımcı")}
                 </Text>
-                {pastWinners.length > 0 && (
-                  <Text style={[styles.archiveCount, { color: theme.text.muted }]}>
-                    {pastWinners.length}
-                  </Text>
-                )}
               </View>
-
-              {pastWinners.length === 0 ? (
-                <Text style={[styles.archiveEmpty, { color: theme.text.muted }]}>
-                  {i18nText(
-                    "autoI18n.tournament_past_winners_empty",
-                    "Henüz arşivlenmiş bir ay yok — turnuvalar tamamlandıkça buraya eklenecek.",
-                  )}
+              <View style={[styles.summaryDivider, { backgroundColor: theme.border }]} />
+              <View style={styles.summaryItem}>
+                <View style={[styles.summaryIcon, { backgroundColor: alpha(theme.accent, 0.14) }]}>
+                  <AppIcon family="Ionicons" name="stats-chart" size={13} color={theme.accent} />
+                </View>
+                <Text style={[styles.summaryText, { color: theme.text.secondary }]}>
+                  {podium.totalVotes} {i18nText("autoI18n.tournament_total_votes", "toplam oy")}
                 </Text>
-              ) : (
-                pastWinners.map((w) => (
-                  <WinnerRow key={w.periodId} w={w} theme={theme} getTmdbUrl={getTmdbUrl} lang={lang} />
-                ))
+              </View>
+            </View>
+          </>
+        )}
+
+        {/* ── Geçmiş kazananlar (yıl-ay şeridi) ─────────────────────────── */}
+        {archive !== null && (
+          <View style={styles.archive}>
+            <View style={styles.archiveHeader}>
+              <AppIcon family="Ionicons" name="albums" size={13} color={theme.text.muted} />
+              <Text style={[styles.archiveTitle, { color: theme.text.muted }]}>
+                {i18nText("autoI18n.tournament_past_winners", "Geçmiş Kazananlar")}
+              </Text>
+              {pastWinners.length > 0 && (
+                <Text style={[styles.archiveCount, { color: theme.text.muted, backgroundColor: theme.between }]}>
+                  {pastWinners.length}
+                </Text>
               )}
             </View>
-          )}
-        </ScrollView>
-      </View>
-    </Modal>
+
+            {pastWinners.length === 0 ? (
+              <Text style={[styles.archiveEmpty, { color: theme.text.muted }]}>
+                {i18nText(
+                  "autoI18n.tournament_past_winners_empty",
+                  "Henüz arşivlenmiş bir ay yok — turnuvalar tamamlandıkça buraya eklenecek.",
+                )}
+              </Text>
+            ) : (
+              pastWinners.map((w) => (
+                <WinnerRow key={w.periodId} w={w} theme={theme} getTmdbUrl={getTmdbUrl} lang={lang} />
+              ))
+            )}
+          </View>
+        )}
+      </ScrollView>
+    </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)" },
   sheet: {
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
     borderWidth: 1,
     paddingHorizontal: 18,
     paddingTop: 8,
-    maxHeight: "82%",
     overflow: "hidden",
   },
   grabber: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, marginBottom: 10 },
 
-  headerRow: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
-  headerTitle: { fontSize: 17, fontWeight: "900" },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 11, marginBottom: 16 },
+  headerIconBadge: { width: 38, height: 38, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  headerTitle: { fontSize: 17, fontWeight: "900", letterSpacing: -0.2 },
   headerSub: { fontSize: 12, fontWeight: "600", marginTop: 2 },
-  closeBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  closeBtn: { width: 32, height: 32, borderRadius: 11, alignItems: "center", justifyContent: "center" },
 
   podiumRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "center", gap: 10 },
   col: { flex: 1, alignItems: "center" },
-  colBig: { marginBottom: 14 },
+  colBig: { marginBottom: 0 },
 
   medal: {
     flexDirection: "row", alignItems: "center", gap: 3,
@@ -366,10 +415,11 @@ const styles = StyleSheet.create({
   },
   medalText: { fontSize: 11, fontWeight: "900", color: "#3b3b3b" },
 
-  posterWrap: { borderRadius: 12, overflow: "hidden", borderWidth: 2.5 },
+  posterHalo: { borderRadius: 17, padding: 4 },
+  posterWrap: { borderRadius: 13, overflow: "hidden", borderWidth: 2.5 },
   poster: { width: "100%", height: "100%" },
 
-  title: { fontSize: 12, fontWeight: "800", textAlign: "center", marginTop: 7, minHeight: 30 },
+  title: { fontSize: 12, fontWeight: "800", textAlign: "center", marginTop: 8, minHeight: 30 },
   titleBig: { fontSize: 13.5 },
 
   statPill: {
@@ -379,26 +429,31 @@ const styles = StyleSheet.create({
   statPillText: { fontSize: 11, fontWeight: "800" },
   scoreText: { fontSize: 10, fontWeight: "600", marginTop: 3 },
 
+  pedestal: { width: "82%", marginTop: 10, borderTopLeftRadius: 8, borderTopRightRadius: 8 },
+
   summary: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 14, marginTop: 18, paddingVertical: 11, borderRadius: 14, borderWidth: 1,
+    gap: 14, marginTop: 20, paddingVertical: 12, borderRadius: 16, borderWidth: 1,
   },
-  summaryItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  summaryDivider: { width: 1, height: 16 },
+  summaryItem: { flexDirection: "row", alignItems: "center", gap: 7 },
+  summaryIcon: { width: 24, height: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  summaryDivider: { width: 1, height: 18 },
   summaryText: { fontSize: 12, fontWeight: "700" },
 
   archive: { marginTop: 22 },
-  archiveHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 9 },
+  archiveHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
   archiveTitle: { fontSize: 11.5, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.4 },
-  archiveCount: { fontSize: 11, fontWeight: "800", opacity: 0.75 },
+  archiveCount: {
+    fontSize: 10.5, fontWeight: "800", paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 7, overflow: "hidden",
+  },
   archiveEmpty: { fontSize: 11.5, fontWeight: "600", lineHeight: 16, paddingVertical: 6 },
 
   wRow: {
     flexDirection: "row", alignItems: "center", gap: 10,
-    borderRadius: 13, borderWidth: 1, padding: 8, marginBottom: 7,
+    borderRadius: 15, borderWidth: 1, padding: 9, marginBottom: 8,
   },
-  wPosterWrap: { borderRadius: 7, overflow: "visible" },
-  wPoster: { width: 34, height: 51, borderRadius: 7 },
+  wPosterWrap: { borderRadius: 8, overflow: "visible" },
+  wPoster: { width: 36, height: 53, borderRadius: 8 },
   wPosterEmpty: { alignItems: "center", justifyContent: "center" },
   wCrown: {
     position: "absolute", top: -5, right: -5,

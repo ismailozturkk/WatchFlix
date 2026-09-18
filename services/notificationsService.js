@@ -30,6 +30,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { snapshotErrorHandler } from "../utils/firestoreError";
+import { trackFirestoreRead, trackFirestoreWrite } from "./usageTrackerService";
 
 const PAGE = 30;
 
@@ -46,7 +47,10 @@ export function subscribeToNotifications(uid, callback) {
   );
   return onSnapshot(
     q,
-    (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (snap) => {
+      trackFirestoreRead("notifications", snap.docs.length);
+      callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    },
     snapshotErrorHandler("notifications"),
   );
 }

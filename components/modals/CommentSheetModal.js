@@ -32,7 +32,7 @@ import { Image } from "expo-image";
  *   </Modal>
  */
 
-import React, { useEffect, useRef, useCallback } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -43,6 +43,7 @@ import {
   Platform,
   KeyboardAvoidingView
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -51,17 +52,19 @@ import Comment from "@components/Comment"; // kendi Comment bileşenin
 import { useTheme } from "@context/ThemeContext";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { i18nText } from "@utils/i18nText";
+import useAdaptiveSheetHeight from "@hooks/useAdaptiveSheetHeight";
 
 
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get("window");
 
-// Sheet içeriğe göre boyutlanır; bu iki sınır dengeyi kurar. Üst sınır dolu
-// listede ekranın tamamını kaplamasını engeller. Alt sınırın boş listede
-// gerekenden yüksek durmasının bir nedeni daha var: dizi kapsamındaki
-// sezon/bölüm seçici (components/comments/CommentScopeSheet.js) bu sheet'in
-// İÇİNDE açılıyor ve overflow:hidden ile kırpılıyor — sheet kısalırsa seçici
-// de kısalır.
-const SHEET_MAX_H = SCREEN_H * 0.82;
+// Sheet artık İÇERİĞE göre canlı büyüyüp küçülüyor (bkz. useAdaptiveSheetHeight):
+// hiç yorum yoksa SHEET_MIN_H, yorum sayısı arttıkça SHEET_MAX_H'a doğru büyür.
+// Üst sınır neredeyse tam ekran — çok yorumlu içerikte sheet ekranı kaplar.
+// Alt sınırın boş listede gerekenden yüksek durmasının bir nedeni daha var:
+// dizi kapsamındaki sezon/bölüm seçici (components/comments/CommentScopeSheet.js)
+// bu sheet'in İÇİNDE açılıyor ve overflow:hidden ile kırpılıyor — sheet kısalırsa
+// seçici de kısalır.
+const SHEET_MAX_H = SCREEN_H * 0.94;
 const SHEET_MIN_H = SCREEN_H * 0.5;
 
 // ── Renk sabitleri ───────────────────────────────────────
@@ -86,18 +89,38 @@ export default function CommentSheetModal({
 }) {
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
 
   // Sheet slide-up animasyonu.
-  // Yükseklik artık sabit değil, içerikten geliyor (bkz. styles.sheet:
-  // minHeight/maxHeight). Bu yüzden kapanışta ne kadar aşağı kaydırılacağı
-  // ölçümden okunuyor; ilk açılışta ölçüm yokken üst sınır kullanılıyor
-  // (sheet'i ekranın altında tutar, tek etkisi biraz uzun yol).
+  // Yükseklik artık sabit değil, içerikten geliyor (bkz. useAdaptiveSheetHeight
+  // + styles.sheet). Bu yüzden kapanışta ne kadar aşağı kaydırılacağı ölçümden
+  // okunuyor; ilk açılışta ölçüm yokken üst sınır kullanılıyor (sheet'i
+  // ekranın altında tutar, tek etkisi biraz uzun yol).
   const slideAnim = useRef(new Animated.Value(SHEET_MAX_H)).current;
   const sheetHRef = useRef(SHEET_MAX_H);
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
+  // Görünen yorum sayısı Comment.js'den yükselir; sheet yüksekliği buna göre
+  // canlı büyüyüp küçülür, klavye açıkken de ekrana sığacak şekilde küçülür.
+  const [commentCount, setCommentCount] = useState(0);
+  const { heightAnim } = useAdaptiveSheetHeight({
+    visible,
+    count: commentCount,
+    minHeight: SHEET_MIN_H,
+    maxHeight: SHEET_MAX_H,
+    topInset: insets.top + 12,
+  });
+
+  // Gerçek blur hedefi sheet açılış kayması + yükseklik animasyonu OTURANA
+  // kadar devreye girmiyor (AIChatScreen'deki blurReady ile aynı önlem):
+  // Android'de RenderNode yakalaması hâlâ boyut değiştiren bir görünüme
+  // bağlanırsa kalıcı olarak düz katmana düşebiliyor. Sabit bir süre yerine
+  // animasyonun gerçek bitişini beklemek gerekir; yavaş cihazda 500ms yetmez.
+  const [blurReady, setBlurReady] = useState(false);
+
   useEffect(() => {
     if (visible) {
+      setBlurReady(false);
       Animated.parallel([
         Animated.spring(slideAnim, {
           toValue: 0,
@@ -111,8 +134,11 @@ export default function CommentSheetModal({
           duration: 280,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]).start(({ finished }) => {
+        if (finished) setBlurReady(true);
+      });
     } else {
+      setBlurReady(false);
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: sheetHRef.current,
@@ -129,6 +155,7 @@ export default function CommentSheetModal({
   }, [visible]);
 
   const handleClose = useCallback(() => {
+    setBlurReady(false);
     Animated.parallel([
       Animated.timing(slideAnim, {
         toValue: sheetHRef.current,
@@ -168,7 +195,13 @@ export default function CommentSheetModal({
         onPress={handleClose}
       />
 
-      {/* ── Bottom Sheet ── */}
+      {/* ── Bottom Sheet ──
+          İKİ AYRI Animated.View ŞART: transform (native driver) ve height
+          (native driver DESTEKLEMİYOR — JS driver) aynı düğümde birleşirse
+          RN "Style property 'height' is not supported by native animated
+          module" hatası atıyor. Dış katman yalnız kaymayı (native) taşır,
+          iç katman yalnız yüksekliği (JS) — birbirlerinden bağımsız düğümler. */}
+      <Animated.View style={{ transform: [{ translateY: slideAnim }] }}>
       <Animated.View
         onLayout={(e) => {
           sheetHRef.current = e.nativeEvent.layout.height;
@@ -176,7 +209,7 @@ export default function CommentSheetModal({
         style={[
           styles.sheet,
           {
-            transform: [{ translateY: slideAnim }],
+            height: heightAnim,
             backgroundColor: theme.secondary,
           },
         ]}
@@ -188,13 +221,21 @@ export default function CommentSheetModal({
 
         {/* Tutamaç */}
         <View style={styles.handleWrapper}>
-          <View style={styles.handle} />
+          <View style={[styles.handle, { backgroundColor: theme.border }]} />
         </View>
 
         {/* ── Header ── */}
         <View style={styles.header}>
           {/* Film küçük kartı */}
-          <View style={styles.moviePill}>
+          <View
+            style={[
+              styles.moviePill,
+              {
+                backgroundColor: theme.between,
+                borderColor: theme.border,
+              },
+            ]}
+          >
             {details?.poster_path ? (
               <Image
                 source={{
@@ -203,18 +244,23 @@ export default function CommentSheetModal({
                 style={styles.moviePillPoster}
               />
             ) : (
-              <View style={styles.moviePillPosterPlaceholder}>
+              <View
+                style={[
+                  styles.moviePillPosterPlaceholder,
+                  { backgroundColor: theme.secondary },
+                ]}
+              >
                 <Ionicons
                   name="film-outline"
                   size={14}
-                  color="rgba(255,255,255,0.4)"
+                  color={theme.text.muted}
                 />
               </View>
             )}
             <View style={styles.moviePillTextGroup}>
               <Text
                 allowFontScaling={false}
-                style={styles.moviePillTitle}
+                style={[styles.moviePillTitle, { color: theme.text.primary }]}
                 numberOfLines={1}
               >
                 {details?.title ||
@@ -254,22 +300,31 @@ export default function CommentSheetModal({
                 size={18}
                 color={theme.text.secondary}
               />
-              <Text allowFontScaling={false} style={styles.headerTitle}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.headerTitle, { color: theme.text.primary }]}
+              >
                 {i18nText("comments", "Yorumlar")}
               </Text>
             </View>
             <TouchableOpacity
-              style={styles.closeBtn}
+              style={[
+                styles.closeBtn,
+                {
+                  backgroundColor: theme.between,
+                  borderColor: theme.border,
+                },
+              ]}
               onPress={handleClose}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Ionicons name="close" size={18} color="rgba(255,255,255,0.55)" />
+              <Ionicons name="close" size={18} color={theme.text.primary} />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* İnce ayırıcı */}
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
         {/* ── Comment bileşeni ── */}
         <View style={styles.commentArea}>
@@ -285,8 +340,11 @@ export default function CommentSheetModal({
             }
             seasons={seasons ?? details?.seasons ?? null}
             initialScope={initialScope}
+            onCommentCountChange={setCommentCount}
+            blurReady={blurReady}
           />
         </View>
+      </Animated.View>
       </Animated.View>
     </KeyboardAvoidingView>
   );
@@ -310,9 +368,10 @@ const styles = StyleSheet.create({
   },
 
   // ── Sheet ──────────────────────────────────────────────
+  // height artık sabit değil: useAdaptiveSheetHeight'ın Animated değeri
+  // (bkz. JSX'teki inline `height: heightAnim`) burada SHEET_MIN_H/MAX_H
+  // arasında canlı olarak veriliyor.
   sheet: {
-    maxHeight: SHEET_MAX_H,
-    minHeight: SHEET_MIN_H,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     overflow: "hidden",

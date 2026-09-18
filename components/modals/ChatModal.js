@@ -1,3 +1,4 @@
+import ComposerBlur, { ComposerBlurTarget, useComposerBlurTarget } from "../chat/ComposerBlur";
 import React, {
   useEffect,
   useRef,
@@ -557,6 +558,8 @@ export const ChatModal = () => {
     [fontCoz, theme],
   );
 
+  const [composerHeight, setComposerHeight] = useState(76);
+  const composerBlur = useComposerBlurTarget();
   const threadMaxHeight = isKeyboardVisible ? SCREEN_H * 0.34 : SCREEN_H * 0.56;
 
   const scrollToEndSoon = useCallback(() => {
@@ -844,38 +847,6 @@ export const ChatModal = () => {
     [navigation],
   );
 
-  // ── FAB animasyonlu çerçeve ─────────────────────────────────────────────────
-  const animation = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    let loop;
-    if (modalVisible) {
-      animation.setValue(0);
-      loop = Animated.loop(
-        Animated.timing(animation, {
-          toValue: 1,
-          duration: 5000,
-          useNativeDriver: false,
-        }),
-      );
-      loop.start();
-    }
-    return () => loop && loop.stop();
-  }, [modalVisible]);
-
-  const interpolateColor = animation.interpolate({
-    inputRange: [0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1],
-    outputRange: [
-      "#00FF0030",
-      "#0000FF30",
-      "#4B008230",
-      "#EE82EE30",
-      "#FF000030",
-      "#FFA50030",
-      "#FFFF0030",
-      "#00FF0030",
-    ],
-  });
-
   const closeModal = () => {
     animateLayout();
     setModalVisible(false);
@@ -952,11 +923,13 @@ export const ChatModal = () => {
                   </TouchableOpacity>
                 </View>
 
+                <View>
                 {/* ── Mesaj akışı ── */}
+                <ComposerBlurTarget attach={composerBlur.attach} backgroundColor={theme.primary}>
                 <ScrollView
                   ref={scrollRef}
                   style={{ maxHeight: threadMaxHeight }}
-                  contentContainerStyle={{ paddingVertical: 12, paddingHorizontal: 12 }}
+                  contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 12, paddingBottom: composerHeight + 12 }}
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                   onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
@@ -989,7 +962,13 @@ export const ChatModal = () => {
                   )}
                   {loading && <TypingBubble theme={theme} label={t?.ChatModal?.typing} />}
                 </ScrollView>
+                </ComposerBlurTarget>
 
+                <View
+                  pointerEvents="box-none"
+                  style={{ position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "transparent" }}
+                  onLayout={(event) => setComposerHeight(event.nativeEvent.layout.height)}
+                >
                 {/* ── Ayarlar (minimalist) ── */}
                 {settingsVisible && (
                   <Reanimated.View
@@ -1112,7 +1091,8 @@ export const ChatModal = () => {
                 )}
 
                 {/* ── Giriş çubuğu ── */}
-                <Animated.View style={{ borderRadius: 20, margin: 8, backgroundColor: interpolateColor }}>
+                <Animated.View style={{ borderRadius: 20, margin: 8, backgroundColor: "transparent" }}>
+                  <ComposerBlur target={composerBlur.target} theme={theme} radius={20} />
                   <View style={styles.inputRow}>
                     <TouchableOpacity
                       onPress={() => {
@@ -1185,6 +1165,8 @@ export const ChatModal = () => {
                     </TouchableOpacity>
                   </View>
                 </Animated.View>
+                </View>
+                </View>
               </View>
             ) : (
               // ── Geçmiş görünümü ──
@@ -1426,6 +1408,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   input: {
+    backgroundColor: "transparent",
     maxHeight: 90,
     paddingVertical: 8,
     paddingHorizontal: 6,

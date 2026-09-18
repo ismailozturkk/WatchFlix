@@ -40,6 +40,30 @@ test("ilk yayınlanmış izlenmemiş bölümü seçer", () => {
   expect(next).toMatchObject({ episodeNumber: 3, name: "Üç", isAired: true });
 });
 
+test("sırasız izleme kaydında aradaki ilk eksik bölümü atlamaz", () => {
+  const sparseShow = {
+    seasons: [
+      {
+        seasonNumber: 1,
+        seasonEpisodes: 4,
+        episodes: [{ episodeNumber: 1 }, { episodeNumber: 3 }],
+      },
+    ],
+  };
+  const next = findNextEpisodeInSeason({
+    show: sparseShow,
+    seasonNumber: 1,
+    episodes: [
+      { episode_number: 1, air_date: "2026-01-01" },
+      { episode_number: 2, air_date: "2026-01-08", name: "Eksik" },
+      { episode_number: 3, air_date: "2026-01-15" },
+      { episode_number: 4, air_date: "2026-01-22" },
+    ],
+    now: new Date("2026-08-01T12:00:00"),
+  });
+  expect(next).toMatchObject({ episodeNumber: 2, name: "Eksik" });
+});
+
 test("yalnız gelecek bölüm varsa yakında olarak döndürür", () => {
   const next = findNextEpisodeInSeason({
     show,
@@ -93,6 +117,32 @@ test("ilerlemenin bulunduğu sezondan sonraki sezonları sıralar", () => {
         { season_number: 2 },
       ],
     })
+  ).toEqual([1, 2, 3]);
+});
+
+test("önceki sezonda boşluk varsa çözümlemeyi o sezondan başlatır", () => {
+  const sparseShow = {
+    seasons: [
+      {
+        seasonNumber: 1,
+        seasonEpisodes: 3,
+        episodes: [{ episodeNumber: 1 }, { episodeNumber: 3 }],
+      },
+      {
+        seasonNumber: 2,
+        seasonEpisodes: 2,
+        episodes: [{ episodeNumber: 1 }],
+      },
+    ],
+  };
+  expect(
+    getUpNextSeasonNumbers(sparseShow, {
+      seasons: [
+        { season_number: 1, episode_count: 3 },
+        { season_number: 2, episode_count: 2 },
+        { season_number: 3, episode_count: 1 },
+      ],
+    }),
   ).toEqual([1, 2, 3]);
 });
 

@@ -1,3 +1,4 @@
+import { alpha } from "@theme/colors";
 import React, { useEffect, useState, useMemo, useCallback, useRef, memo } from "react";
 import {
   StyleSheet,
@@ -26,9 +27,11 @@ import { getDoc, doc, updateDoc, setDoc, deleteDoc, onSnapshot } from "firebase/
 import { db } from "../../firebase";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
 import WatchHistorySheet from "@components/modals/WatchHistorySheet";
+import MediaNoteSheet from "@components/detail/MediaNoteSheet";
 import ListView from "../../components/ListView";
 import PosterImage from "../../components/PosterImage";
 import { useAppSettings, useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
+import { useMediaNotes, mediaNoteItemKey } from "../../context/MediaNotesContext";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import SwipeCard from "@components/SwipeCard";
@@ -120,7 +123,7 @@ const RecommendedMovieItem = memo(function RecommendedMovieItem({
           type="movie"
           size={200}
           iconSize={46}
-          style={[styles.railPoster, { borderColor: theme.border + "55" }]}
+          style={[styles.railPoster, { borderColor: alpha(theme.border, 0.3333333333333333) }]}
         />
         {/* Rating pill */}
         {posterBadges?.tmdbRating !== false && (
@@ -184,7 +187,7 @@ const CollectionMovieItem = memo(function CollectionMovieItem({
           style={[
             styles.railPoster,
             {
-              borderColor: isCurrent ? theme.accent : theme.border + "55",
+              borderColor: isCurrent ? theme.accent : alpha(theme.border, 0.3333333333333333),
               borderWidth: isCurrent ? 2 : 1,
             },
           ]}
@@ -278,6 +281,9 @@ export default function MovieDetails({ navigation, route }) {
   const [showFullCast, setShowFullCast] = useState(false);
   const [commandModalVisible, setCommentModalVisible] = useState(!!openComments);
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [noteSheetVisible, setNoteSheetVisible] = useState(false);
+  const { mediaNotes } = useMediaNotes();
+  const myMediaNote = mediaNotes.find((n) => n.id === mediaNoteItemKey("movie", id)) || null;
   const [headerScale] = useState(new Animated.Value(1));
 
   // Overview accordion (sadece özet, tam genişlik)
@@ -973,7 +979,7 @@ export default function MovieDetails({ navigation, route }) {
                 source={{
                   uri: getTmdbUrl(details.poster_path, 'poster', 200),
                 }}
-                style={[styles.poster, { borderColor: theme.border + "80" }]}
+                style={[styles.poster, { borderColor: alpha(theme.border, 0.5019607843137255) }]}
               />
             ) : (
               <View
@@ -1321,6 +1327,48 @@ export default function MovieDetails({ navigation, route }) {
               </View>
             </TouchableOpacity>
           </SwipeCard>
+
+          {/* ── NOTUM KARTI ── */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => setNoteSheetVisible(true)}
+            style={[
+              styles.commentsBtn,
+              { backgroundColor: theme.secondary, borderColor: theme.border },
+            ]}
+          >
+            <View
+              style={[
+                styles.commentsIconWrap,
+                { backgroundColor: theme.accent + "20" },
+              ]}
+            >
+              <Ionicons
+                name={myMediaNote ? "document-text" : "document-text-outline"}
+                size={18}
+                color={theme.accent}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.commentsBtnText, { color: theme.text.primary }]}
+              >
+                {i18nText("autoI18n.notum", "Notum")}
+              </Text>
+              <Text
+                allowFontScaling={false}
+                numberOfLines={1}
+                style={{ fontSize: 12, marginTop: 2, color: theme.text.muted }}
+              >
+                {myMediaNote?.text ||
+                  i18nText("autoI18n.bu_film_hakkinda_bir_not_ekle", "Bu film hakkında bir not ekle")}
+              </Text>
+            </View>
+            <View style={styles.commentsRight}>
+              <Ionicons name="chevron-forward" size={16} color={theme.text.muted} />
+            </View>
+          </TouchableOpacity>
 
           {/* ── EKSTERNAl LİNKLER ── */}
           {details.external_ids && (
@@ -1689,6 +1737,16 @@ export default function MovieDetails({ navigation, route }) {
         />
       </Modal>
 
+      {/* Notum */}
+      <MediaNoteSheet
+        visible={noteSheetVisible}
+        onClose={() => setNoteSheetVisible(false)}
+        type="movie"
+        mediaId={id}
+        title={details?.title}
+        posterPath={details?.poster_path}
+      />
+
       {/* İzleme tarihi */}
       <WatchHistorySheet
         visible={watchHistoryVisible}
@@ -1698,7 +1756,7 @@ export default function MovieDetails({ navigation, route }) {
         busy={isLoading}
         onAddAgain={() => {
           setWatchHistoryVisible(false);
-          setTimeout(openModal, 180);
+          setTimeout(openModal, 300);
         }}
         onDeleteEvent={async (event) => {
           if (!user?.uid || !details?.id) return;
@@ -1732,6 +1790,10 @@ export default function MovieDetails({ navigation, route }) {
         releaseDate={details?.release_date}
         minDate={details?.release_date}
         mediaType="movie"
+        scope="movie"
+        mediaId={id}
+        mediaTitle={details?.title}
+        posterPath={details?.poster_path}
         busy={isLoading}
         onConfirm={handleConfirm}
       />

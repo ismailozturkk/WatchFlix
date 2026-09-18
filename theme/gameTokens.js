@@ -1,3 +1,4 @@
+import { readableOn } from "../utils/colorUtils";
 // theme/gameTokens.js
 //
 // Oyun (Sahne Tahmin ve sonrasi) icin "game.*" token namespace'i (Part 20.1).
@@ -40,7 +41,7 @@ export function buildGameTokens(theme) {
     correct: theme.colors?.green || "#2ECC71",
     incorrect: theme.colors?.red || "#E74C3C",
     warning: theme.colors?.orange || "#F1C40F",
-    gold: GOLD,
+    gold: readableOn(GOLD, theme.secondary),
 
     // ── Overlay: tema shadow'undan (zaten alpha-black) ──────────────────────
     overlay: theme.shadow || alpha("#000000", 0.6),

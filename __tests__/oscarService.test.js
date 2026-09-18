@@ -33,9 +33,12 @@ import {
   FALLBACK_OSCAR_CONFIG,
   fetchOscarByCategory,
   fetchOscarByYear,
+  getOscarConfig,
+  isValidOscarConfig,
   OSCAR_CATEGORIES,
   DEFAULT_OSCAR_CATEGORY,
 } from "../services/oscarService";
+import { getDoc } from "firebase/firestore";
 
 describe("Oscar Ödülleri Servisi (oscarService)", () => {
   it("6 Oscar kategorisi ve varsayılan kategori 'best_picture' tanımlıdır", () => {
@@ -50,6 +53,34 @@ describe("Oscar Ödülleri Servisi (oscarService)", () => {
     expect(keys).toContain("best_visual_effects");
     expect(keys).toContain("best_documentary_feature");
     expect(keys).toContain("best_cinematography");
+  });
+
+  it("isValidOscarConfig yalnızca geçerli 6 kategorili konfigürasyonu doğrular", () => {
+    expect(isValidOscarConfig(FALLBACK_OSCAR_CONFIG)).toBe(true);
+
+    // Eksik veya kategorisiz eski şema geçersiz olmalıdır
+    const oldSchema = {
+      items: [
+        { year: 2026, tmdbId: 1054867, isConfirmed: true },
+        { year: 2025, tmdbId: 1064213, isConfirmed: true },
+      ],
+    };
+    expect(isValidOscarConfig(oldSchema)).toBe(false);
+    expect(isValidOscarConfig(null)).toBeFalsy();
+    expect(isValidOscarConfig({})).toBeFalsy();
+  });
+
+  it("getOscarConfig Firestore'da kategorisiz eski veri olduğunda FALLBACK_OSCAR_CONFIG'e düşer", async () => {
+    getDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({
+        items: new Array(58).fill({ year: 2026, tmdbId: 1054867, isConfirmed: true }),
+      }),
+    });
+
+    const config = await getOscarConfig({ forceRefresh: true });
+    expect(config).toEqual(FALLBACK_OSCAR_CONFIG);
+    expect(config.items[1].categories.best_picture).toBeDefined();
   });
 
   it("FALLBACK_OSCAR_CONFIG 1970 ile 2027 arasındaki tüm 58 yılı 6 kategorili içerir", () => {

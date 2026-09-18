@@ -9,7 +9,7 @@
 //     16:9 oranını taşmadan sığdırır ve YouTube dışa açma/kapatma kontrollerini
 //     videodan bağımsız sabit tutar.
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -280,43 +280,104 @@ export default function TrailerSection({ mediaType, id, apiKey, originalLanguage
   const appLangCode = language === "tr" ? "tr" : "en";
 
   const normalizedOriginalLanguage = normalizeTrailerLanguageCode(originalLanguage);
-  const [selectedLang, setSelectedLang] = useState(normalizedOriginalLanguage);
+  const [selectedLang, setSelectedLang] = useState(appLangCode);
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState(null);
 
-  useEffect(() => {
-    setSelectedLang(normalizedOriginalLanguage);
-  }, [id, mediaType, normalizedOriginalLanguage]);
+  // Dil başına çekilen videoları önbelleğe alır; çipler arası geçişte aynı dil
+  // için tekrar ağ isteği atılmaz.
+  const videoCacheRef = useRef({});
+  const runIdRef = useRef(0);
 
+  const fetchVideosForLang = useCallback(
+    async (langCode) => {
+      const code = normalizeTrailerLanguageCode(langCode);
+      if (videoCacheRef.current[code] !== undefined) {
+        return videoCacheRef.current[code];
+      }
+      try {
+        const res = await axios.request({
+          method: "GET",
+          url: `https://api.themoviedb.org/3/${mediaType}/${id}/videos`,
+          params: { language: trailerLanguageOf(code).region },
+          headers: { accept: "application/json", Authorization: apiKey },
+        });
+        const yt = (res.data?.results || []).filter((v) => v.site === "YouTube");
+        const sorted = sortVideos(yt);
+        videoCacheRef.current[code] = sorted;
+        return sorted;
+      } catch (err) {
+        videoCacheRef.current[code] = [];
+        return [];
+      }
+    },
+    [mediaType, id, apiKey],
+  );
+
+  // ── İlk açılış ve dizi/film değişiminde dil öncelik sıralaması ──
+  // Kural:
+  //   1. Varsa ilk başta seçili dil (uygulama dili) için gösterilsin,
+  //   2. Yoksa İngilizce olsun,
+  //   3. O da yoksa içeriğin ana dilinde var ise o şekilde fragman gösterilsin.
   useEffect(() => {
     let cancelled = false;
+    const runId = ++runIdRef.current;
+    videoCacheRef.current = {};
     setLoading(true);
-    axios
-      .request({
-        method: "GET",
-        url: `https://api.themoviedb.org/3/${mediaType}/${id}/videos`,
-        params: { language: trailerLanguageOf(selectedLang).region },
-        headers: { accept: "application/json", Authorization: apiKey },
-      })
-      .then((res) => {
-        if (cancelled) return;
-        const yt = (res.data?.results || []).filter((v) => v.site === "YouTube");
-        setVideos(sortVideos(yt));
-      })
-      .catch(() => {
-        if (!cancelled) setVideos([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+
+    const fallbackCandidates = [
+      ...new Set([
+        appLangCode,
+        "en",
+        normalizedOriginalLanguage,
+      ]),
+    ].filter(Boolean);
+
+    (async () => {
+      let resolvedLang = fallbackCandidates[0] || "en";
+      let resolvedVideos = [];
+
+      for (const candidate of fallbackCandidates) {
+        if (cancelled || runId !== runIdRef.current) return;
+        const list = await fetchVideosForLang(candidate);
+        if (list.length > 0) {
+          resolvedLang = candidate;
+          resolvedVideos = list;
+          break;
+        }
+      }
+
+      if (cancelled || runId !== runIdRef.current) return;
+      setSelectedLang(resolvedLang);
+      setVideos(resolvedVideos);
+      setLoading(false);
+    })();
+
     return () => {
       cancelled = true;
     };
-  }, [mediaType, id, selectedLang, apiKey]);
+  }, [id, mediaType, appLangCode, normalizedOriginalLanguage, fetchVideosForLang]);
 
-  // Hızlı çipler: özgün dil (ilk seçili) → İngilizce → uygulama dili.
+  // Kullanıcı çiplere veya diğer diller modalına dokunduğunda
+  const handleSelectLang = useCallback(
+    async (code) => {
+      const normalized = normalizeTrailerLanguageCode(code);
+      setSelectedLang(normalized);
+      if (videoCacheRef.current[normalized] !== undefined) {
+        setVideos(videoCacheRef.current[normalized]);
+        return;
+      }
+      setLoading(true);
+      const list = await fetchVideosForLang(normalized);
+      setVideos(list);
+      setLoading(false);
+    },
+    [fetchVideosForLang],
+  );
+
+  // Hızlı çipler: seçili dil → İngilizce → özgün dil
   const chipCodes = useMemo(() => {
     return buildTrailerLanguageOrder({
       originalLanguage: normalizedOriginalLanguage,
@@ -343,7 +404,7 @@ export default function TrailerSection({ mediaType, id, apiKey, originalLanguage
           return (
             <TouchableOpacity
               key={code}
-              onPress={() => setSelectedLang(code)}
+              onPress={() => handleSelectLang(code)}
               style={[
                 styles.chip,
                 {
@@ -393,10 +454,6 @@ export default function TrailerSection({ mediaType, id, apiKey, originalLanguage
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingVertical: 4, gap: 14 }}
-          initialNumToRender={3}
-          maxToRenderPerBatch={3}
-          windowSize={5}
-          removeClippedSubviews
         />
       )}
 
@@ -407,7 +464,7 @@ export default function TrailerSection({ mediaType, id, apiKey, originalLanguage
         theme={theme}
         onClose={() => setSheetVisible(false)}
         onSelect={(code) => {
-          setSelectedLang(code);
+          handleSelectLang(code);
           setSheetVisible(false);
         }}
       />

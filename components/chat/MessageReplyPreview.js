@@ -1,10 +1,13 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
+import { alpha } from "../../theme/colors";
 
 export default function MessageReplyPreview({ reply, onPress, composer = false }) {
   if (!reply) return null;
+  const { theme } = useTheme();
   const Wrapper = onPress ? Pressable : View;
 
   return (
@@ -19,18 +22,36 @@ export default function MessageReplyPreview({ reply, onPress, composer = false }
             accessibilityLabel: i18nText("autoI18n.alintilanan_mesaja_git", "Alıntılanan mesaja git"),
           }
         : {})}
-      style={[styles.container, composer && styles.composer]}
+      style={[
+        styles.container,
+        {
+          backgroundColor: composer
+            ? alpha(theme.accent, 0.12)
+            : alpha(theme.primary, 0.35),
+          borderColor: composer ? alpha(theme.accent, 0.25) : "transparent",
+        },
+        composer && styles.composer,
+      ]}
     >
-      <View style={styles.accent} />
+      <View style={[styles.accent, { backgroundColor: theme.accent }]} />
       <View style={styles.copy}>
-        <Text allowFontScaling={false} style={styles.sender} numberOfLines={1}>
+        <Text allowFontScaling={false} style={[styles.sender, { color: theme.accent }]} numberOfLines={1}>
           {reply.senderName || i18nText("autoI18n.sohbet_mesaji", "Mesaj")}
         </Text>
-        <Text allowFontScaling={false} style={styles.preview} numberOfLines={composer ? 2 : 1}>
+        <Text
+          allowFontScaling={false}
+          style={[
+            styles.preview,
+            { color: composer ? theme.text.secondary : "rgba(255,255,255,0.8)" },
+          ]}
+          numberOfLines={composer ? 2 : 1}
+        >
           {reply.preview || i18nText("autoI18n.sohbet_mesaji", "Mesaj")}
         </Text>
       </View>
-      {composer ? <Ionicons name="return-up-back" size={16} color="rgba(255,255,255,0.42)" /> : null}
+      {composer ? (
+        <Ionicons name="return-up-back" size={16} color={theme.text.muted} />
+      ) : null}
     </Wrapper>
   );
 }
@@ -40,7 +61,6 @@ const styles = StyleSheet.create({
     minWidth: 150,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.22)",
     borderRadius: 11,
     overflow: "hidden",
     marginBottom: 7,
@@ -48,13 +68,11 @@ const styles = StyleSheet.create({
   },
   composer: {
     flex: 1,
-    backgroundColor: "rgba(108,99,255,0.09)",
     borderWidth: 1,
-    borderColor: "rgba(108,99,255,0.2)",
     marginBottom: 9,
   },
-  accent: { alignSelf: "stretch", width: 3, backgroundColor: "#8A83FF" },
+  accent: { alignSelf: "stretch", width: 3 },
   copy: { flex: 1, paddingHorizontal: 9, paddingVertical: 7 },
-  sender: { color: "#A9A5FF", fontSize: 11, fontWeight: "800", marginBottom: 2 },
-  preview: { color: "rgba(255,255,255,0.62)", fontSize: 11.5, lineHeight: 16 },
+  sender: { fontSize: 11, fontWeight: "800", marginBottom: 2 },
+  preview: { fontSize: 11.5, lineHeight: 16 },
 });

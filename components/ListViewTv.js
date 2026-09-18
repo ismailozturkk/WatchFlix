@@ -37,12 +37,16 @@ const ActionButton = ({
   children,
   label,
   theme,
+  compact = false,
 }) => (
-  <View style={styles.iconCol}>
+  <View style={[styles.iconCol, compact && styles.iconColCompact]}>
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={1}
-      style={styles.actionButtonWrapper}
+      style={[
+        styles.actionButtonWrapper,
+        compact && styles.actionButtonWrapperCompact,
+      ]}
     >
       <Animated.View
         style={{
@@ -56,7 +60,11 @@ const ActionButton = ({
     {label ? (
       <Text
         allowFontScaling={false}
-        style={[styles.iconLabel, { color: theme?.text?.muted || "#999" }]}
+        style={[
+          styles.iconLabel,
+          compact && styles.iconLabelCompact,
+          { color: theme?.text?.muted || "#999" },
+        ]}
       >
         {label}
       </Text>
@@ -139,6 +147,7 @@ const ListViewTv = ({
   onUnmarkWatched,
   watchedOverride = null,
   sharedItem, // ortak listeler için medya payload'ı ({id,type,name,imagePath,...})
+  compact = false,
 }) => {
   const { t } = useLanguage();
   const { theme } = useTheme();
@@ -264,6 +273,7 @@ const ListViewTv = ({
     <View
       style={[
         styles.container,
+        compact && styles.containerCompact,
         { backgroundColor: theme.secondary, shadowColor: theme.shadow },
       ]}
     >
@@ -271,6 +281,7 @@ const ListViewTv = ({
       <ActionButton
         scale={scaleValuesRef.current["watchList"]}
         opacity={opacityValuesRef.current["watchList"]}
+        compact={compact}
         onPress={() => handleOptimisticPress("watchList", () => updateList("watchList", type))}
         label={getIsActive("watchList")
           ? i18nText("autoI18n.listede", "Listede")
@@ -283,17 +294,29 @@ const ListViewTv = ({
           inactiveName="bookmark-outline"
           activeColor={theme.colors.blue}
           inactiveColor={theme.text.secondary}
+          size={compact ? 24 : 30}
         />
       </ActionButton>
 
       {/* İzlendi / İzleniyor / İzle / Hatırlat (4 durum) */}
       {watchedOverride ? (
         // Yayınlanmadı → çan / Hatırlat (Reminder bileşeni dışarıdan gelir)
-        <View style={styles.iconCol}>
-          <View style={styles.actionButtonWrapper}>{watchedOverride}</View>
+        <View style={[styles.iconCol, compact && styles.iconColCompact]}>
+          <View
+            style={[
+              styles.actionButtonWrapper,
+              compact && styles.actionButtonWrapperCompact,
+            ]}
+          >
+            {watchedOverride}
+          </View>
           <Text
             allowFontScaling={false}
-            style={[styles.iconLabel, { color: theme?.text?.muted || "#999" }]}
+            style={[
+              styles.iconLabel,
+              compact && styles.iconLabelCompact,
+              { color: theme?.text?.muted || "#999" },
+            ]}
           >
             {t.remind || i18nText("autoI18n.hatirlat", "Hatırlat")}
           </Text>
@@ -302,6 +325,7 @@ const ListViewTv = ({
         <ActionButton
           scale={scaleValuesRef.current["watchedTv"]}
           opacity={opacityValuesRef.current["watchedTv"]}
+          compact={compact}
           onPress={() =>
             handleOptimisticPress(
               "watchedTv",
@@ -315,7 +339,7 @@ const ListViewTv = ({
           {isLoading && !isWatchedActive ? (
             <LottieView
               source={require("@lottie/loading15.json")}
-              style={{ width: 30, height: 30 }}
+              style={{ width: compact ? 24 : 30, height: compact ? 24 : 30 }}
               autoPlay
               loop
             />
@@ -330,6 +354,7 @@ const ListViewTv = ({
               activeColor={watchedColor}
               inactiveColor={theme.text.secondary}
               pulseKey={showWatchState}
+              size={compact ? 24 : 30}
             />
           )}
         </ActionButton>
@@ -339,6 +364,7 @@ const ListViewTv = ({
       <ActionButton
         scale={scaleValuesRef.current["favorites"]}
         opacity={opacityValuesRef.current["favorites"]}
+        compact={compact}
         onPress={() => handleOptimisticPress("favorites", () => updateList("favorites", type))}
         label={getIsActive("favorites")
           ? i18nText("autoI18n.favorim", "Favorim")
@@ -351,6 +377,7 @@ const ListViewTv = ({
           inactiveName="heart-outline"
           activeColor={theme.colors.red}
           inactiveColor={theme.text.secondary}
+          size={compact ? 24 : 30}
         />
       </ActionButton>
 
@@ -358,6 +385,7 @@ const ListViewTv = ({
       <ActionButton
         scale={scaleValuesRef.current["apps"]}
         opacity={opacityValuesRef.current["apps"]}
+        compact={compact}
         onPress={() => { animateBounce("apps"); openSheet(); }}
         label={i18nText("autoI18n.digerleri", "Diğerleri")}
         theme={theme}
@@ -365,6 +393,7 @@ const ListViewTv = ({
         <View
           style={[
             styles.appsIconWrap,
+            compact && styles.appsIconWrapCompact,
             {
               backgroundColor:
                 trueCount > 0
@@ -383,7 +412,7 @@ const ListViewTv = ({
         >
           <Ionicons
             name="apps-outline"
-            size={22}
+            size={compact ? 18 : 22}
             color={
               trueCount > 0
                 ? theme.colors.orange
@@ -396,13 +425,17 @@ const ListViewTv = ({
             <View
               style={[
                 styles.badge,
+                compact && styles.badgeCompact,
                 {
                   backgroundColor:
                     trueCount > 0 ? theme.colors.orange : theme.accent,
                 },
               ]}
             >
-              <Text allowFontScaling={false} style={styles.badgeText}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.badgeText, compact && styles.badgeTextCompact]}
+              >
                 {trueCount > 0 ? trueCount : otherListKeys.length}
               </Text>
             </View>
@@ -557,6 +590,15 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 6,
   },
+  containerCompact: {
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRadius: 14,
+    marginBottom: 0,
+    elevation: 2,
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+  },
 
   /* İkon kolonları */
   iconCol: {
@@ -564,16 +606,27 @@ const styles = StyleSheet.create({
     gap: 5,
     flex: 1,
   },
+  iconColCompact: {
+    gap: 2,
+  },
   iconLabel: {
     fontSize: 10,
     fontWeight: "600",
     letterSpacing: 0.2,
+  },
+  iconLabelCompact: {
+    fontSize: 9,
+    letterSpacing: 0.1,
   },
   actionButtonWrapper: {
     alignItems: "center",
     justifyContent: "center",
     width: 44,
     height: 44,
+  },
+  actionButtonWrapperCompact: {
+    width: 36,
+    height: 36,
   },
 
   /* Diğer listeler butonu */
@@ -584,6 +637,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
+  },
+  appsIconWrapCompact: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
   },
 
   /* Badge */
@@ -598,10 +656,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 3,
   },
+  badgeCompact: {
+    top: -3,
+    right: -3,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
+  },
   badgeText: {
     color: "#fff",
     fontSize: 9,
     fontWeight: "800",
+  },
+  badgeTextCompact: {
+    fontSize: 8,
   },
 
   /* ── MODAL ── */

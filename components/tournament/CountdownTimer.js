@@ -25,10 +25,11 @@ function Unit({ value, label, dims, textColor, boxColor, labelColor }) {
     color: textColor,
     fontWeight: "900",
     textAlign: "center",
+    fontVariant: ["tabular-nums"],
   };
   return (
     <View style={{ alignItems: "center" }}>
-      <View style={[styles.box, { backgroundColor: boxColor }]}>
+      <View style={[styles.box, { backgroundColor: boxColor, gap: dims.gap, paddingHorizontal: dims.pad }]}>
         <RollingDigit
           value={s[0]}
           height={dims.h}
@@ -82,8 +83,8 @@ export default function CountdownTimer({
 
   const dims =
     size === "lg"
-      ? { h: 30, w: 17, font: 25, label: 10 }
-      : { h: 19, w: 11, font: 15, label: 7 };
+      ? { h: 30, w: 20, font: 25, label: 10, gap: 3, pad: 6 }
+      : { h: 19, w: 14, font: 15, label: 7, gap: 2, pad: 5 };
   const labels =
     lang === "tr" ? ["GÜN", "SAAT", "DK", "SN"] : ["DAY", "HR", "MIN", "SEC"];
   const values = [d, h, m, s];

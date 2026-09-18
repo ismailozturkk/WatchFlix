@@ -11,9 +11,19 @@
  */
 
 // Ortak (paylaşılan) listelerin sabit aksanı.
+import { readableOn } from "./colorUtils";
+
 export const SHARED_LIST_ACCENT = "#38bdf8";
 
-export const getListAccent = (listName) => {
+export const getSharedListAccent = (surface) =>
+  surface ? readableOn(SHARED_LIST_ACCENT, surface) : SHARED_LIST_ACCENT;
+
+export const getListAccent = (listName, surface) => {
+  const color = getBaseListAccent(listName);
+  return surface ? readableOn(color, surface) : color;
+};
+
+const getBaseListAccent = (listName) => {
   switch (listName) {
     case "watchedMovies":
       return "#4fc3f7";

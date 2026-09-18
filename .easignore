@@ -26,8 +26,9 @@ firestore.indexes.json
 firebase.json
 .firebaserc
 
-# Dokümantasyon & Proje Notları
+# Dokümantasyon, Store Varlıkları & Proje Notları
 docs/
+store/
 README.md
 
 # Testler ve Mock'lar
@@ -39,7 +40,8 @@ jest.config.js
 jest.rules.config.js
 
 # Yerel Yardımcı Scriptler (Migration, fix vb.)
-scripts/
+scripts/*
+!scripts/babel-transform-app-text.js
 
 # AI Agent & IDE Araçları
 .claude/

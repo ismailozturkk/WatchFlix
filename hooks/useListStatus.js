@@ -1,15 +1,9 @@
 import { useListStatusContext } from "@context/ListStatusContext";
-
-const EMPTY = Object.freeze({
-  inWatchList: false,
-  inFavorites: false,
-  isWatched: false,
-  isInOtherLists: false,
-});
+import { EMPTY_LIST_STATUS } from "../utils/listStatusIndex";
 
 export const useListStatus = (mediaId, mediaType) => {
-  const { statusIndex, loading } = useListStatusContext();
-  const bucket = mediaType === "tv" ? statusIndex.tv : statusIndex.movie;
-  const status = mediaId != null ? (bucket[mediaId] ?? EMPTY) : EMPTY;
-  return { ...status, loading };
+  const { statusIndex, loading = false } = useListStatusContext() || {};
+  const bucket = mediaType === "tv" ? statusIndex?.tv : statusIndex?.movie;
+  const status = mediaId != null ? bucket?.[mediaId] : null;
+  return { ...EMPTY_LIST_STATUS, ...status, loading };
 };

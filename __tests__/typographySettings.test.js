@@ -54,21 +54,21 @@ describe("varsayilan durum", () => {
 
   test("tanimsiz preset id'si yok sayilir", () => {
     const { service } = loadService({
-      roles: { heading: "yokBoyleFont", body: "inter" },
+      roles: { heading: "yokBoyleFont", body: "barlow" },
     });
     expect(service.getTypographyState().heading).toBe("system");
-    expect(service.getTypographyState().body).toBe("inter");
+    expect(service.getTypographyState().body).toBe("barlow");
   });
 });
 
 describe("kayitli tercih", () => {
   test("uc rol bagimsiz olarak ILK OKUMADA geri yuklenir", () => {
     const { service } = loadService({
-      roles: { heading: "bebasNeue", body: "inter", numeric: "spaceMono" },
+      roles: { heading: "bebasNeue", body: "barlow", numeric: "spaceMono" },
     });
     expect(service.getTypographyState()).toMatchObject({
       heading: "bebasNeue",
-      body: "inter",
+      body: "barlow",
       numeric: "spaceMono",
     });
   });
@@ -97,11 +97,11 @@ describe("kayitli tercih", () => {
     AsyncStorage.__store.set("appFontFamily", "monoton");
     AsyncStorage.__store.set(
       "appFontRoles",
-      JSON.stringify({ heading: "inter", body: "inter", numeric: "inter" }),
+      JSON.stringify({ heading: "oswald", body: "oswald", numeric: "oswald" }),
     );
     await require("../services/storage").runStorageMigration();
     const service = require("../services/typographySettings");
-    expect(service.getTypographyState().heading).toBe("inter");
+    expect(service.getTypographyState().heading).toBe("oswald");
   });
 });
 
@@ -114,7 +114,7 @@ describe("goc sirasi", () => {
     AsyncStorage.__reset();
     AsyncStorage.__store.set(
       "appFontRoles",
-      JSON.stringify({ heading: "bebasNeue", body: "inter", numeric: "spaceMono" }),
+      JSON.stringify({ heading: "bebasNeue", body: "barlow", numeric: "spaceMono" }),
     );
 
     // Depo hala bos: sistem fontuyla baslar.
@@ -125,7 +125,7 @@ describe("goc sirasi", () => {
 
     expect(service.getTypographyState()).toMatchObject({
       heading: "bebasNeue",
-      body: "inter",
+      body: "barlow",
       numeric: "spaceMono",
     });
   });
@@ -149,7 +149,7 @@ describe("secim", () => {
 
   test("gecersiz rol veya preset yok sayilir", () => {
     const { service, storage } = loadService();
-    service.setFontRole("baslik", "inter");
+    service.setFontRole("baslik", "oswald");
     service.setFontRole("heading", "yokBoyleFont");
     expect(service.getTypographyState().heading).toBe("system");
     expect(storage.has(storage.Keys.fontRoles)).toBe(false);
@@ -164,11 +164,11 @@ describe("secim", () => {
 
   test("tumune uygula uc rolu birden ayarlar", () => {
     const { service } = loadService();
-    service.setAllFontRoles("inter");
+    service.setAllFontRoles("oswald");
     expect(service.getTypographyState()).toMatchObject({
-      heading: "inter",
-      body: "inter",
-      numeric: "inter",
+      heading: "oswald",
+      body: "oswald",
+      numeric: "oswald",
     });
   });
 
@@ -197,18 +197,18 @@ describe("abonelik", () => {
     const dinleyici = jest.fn();
     const birak = service.subscribeTypography(dinleyici);
 
-    service.setFontRole("heading", "inter");
+    service.setFontRole("heading", "oswald");
     expect(dinleyici).toHaveBeenCalledTimes(1);
 
     // Ayni deger -> yeni anlik goruntu URETILMEMELI (useSyncExternalStore
     // sonsuz donguye girer).
     const oncekiDurum = service.getTypographyState();
-    service.setFontRole("heading", "inter");
+    service.setFontRole("heading", "oswald");
     expect(dinleyici).toHaveBeenCalledTimes(1);
     expect(service.getTypographyState()).toBe(oncekiDurum);
 
     birak();
-    service.setFontRole("heading", "oswald");
+    service.setFontRole("heading", "bebasNeue");
     expect(dinleyici).toHaveBeenCalledTimes(1);
   });
 

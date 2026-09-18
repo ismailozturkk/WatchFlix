@@ -353,6 +353,11 @@ service cloud.firestore {
     match /Notes/{uid}/{document=**} {
       allow read, write: if isOwner(uid);
     }
+    // Film/dizi detay sayfasından yazılan, tek medya öğesine bağlı kişisel
+    // notlar — genel Notlar (Notes) koleksiyonundan ayrı, aynı sahiplik kuralı.
+    match /MediaNotes/{uid}/{document=**} {
+      allow read, write: if isOwner(uid);
+    }
     match /Reminders/{uid}/{document=**} {
       allow read, write: if isOwner(uid);
     }
@@ -1014,6 +1019,20 @@ service cloud.firestore {
         allow read: if isSignedIn();
         allow write: if false;
       }
+    }
+
+    // ─── CineSwipe (Birlikte Ne İzlesek? Odaları) ─────────────────────────
+    match /CineRooms/{roomId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.hostUid == request.auth.uid;
+      allow update: if isSignedIn()
+                    && (
+                      (resource.data.status == 'waiting' && request.resource.data.guestUid == request.auth.uid)
+                      || resource.data.hostUid == request.auth.uid
+                      || resource.data.guestUid == request.auth.uid
+                    );
+      allow delete: if isSignedIn() && resource.data.hostUid == request.auth.uid;
     }
   }
 }

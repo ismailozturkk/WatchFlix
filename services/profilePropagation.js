@@ -66,17 +66,23 @@ async function filterExistingRefs(items) {
  * @param {string} [change.displayName] verilirse isim güncellenir
  * @param {string} [change.username] verilirse kullanıcı adı güncellenir
  * @param {number} [change.avatarIndex] verilirse avatar güncellenir
+ * @param {string} [change.photoURL] verilirse sosyal profil fotoğrafı güncellenir
  */
-export async function propagateProfileChange(uid, { displayName, username, avatarIndex } = {}) {
+export async function propagateProfileChange(
+  uid,
+  { displayName, username, avatarIndex, photoURL } = {},
+) {
   if (!uid) return;
   const nameSet = typeof displayName === "string" && displayName.trim().length > 0;
   const usernameSet = typeof username === "string" && username.trim().length > 0;
   const avaSet = typeof avatarIndex === "number";
-  if (!nameSet && !usernameSet && !avaSet) return;
+  const photoSet = typeof photoURL === "string";
+  if (!nameSet && !usernameSet && !avaSet && !photoSet) return;
 
   const name = nameSet ? displayName.trim() : null;
   const handle = usernameSet ? username.trim() : null;
   const idx = avaSet ? clampAvatarIndex(avatarIndex) : null;
+  const photo = photoSet ? (photoURL.trim() || null) : null;
 
   // 1) Kullanıcının postları
   try {
@@ -87,7 +93,17 @@ export async function propagateProfileChange(uid, { displayName, username, avata
       const patch = {};
       if (nameSet) patch.authorName = name;
       if (usernameSet) patch.authorUsername = handle;
-      if (avaSet) patch.authorAvatarIndex = idx;
+      if (avaSet) {
+        patch.authorAvatarIndex = idx;
+        if (idx !== -1) {
+          patch.authorAvatar = null;
+          patch.authorPhotoURL = null;
+        }
+      }
+      if (photoSet && idx === -1) {
+        patch.authorAvatar = photo;
+        patch.authorPhotoURL = photo;
+      }
       return { ref: d.ref, patch };
     });
     await commitInChunks(items);
@@ -103,11 +119,69 @@ export async function propagateProfileChange(uid, { displayName, username, avata
       const patch = {};
       if (nameSet) patch.friendName = name;
       if (usernameSet) patch.friendUsername = handle;
-      if (avaSet) patch.friendAvatarIndex = idx;
+      if (avaSet) {
+        patch.friendAvatarIndex = idx;
+        if (idx !== -1) {
+          patch.friendPhotoURL = null;
+        }
+      }
+      if (photoSet && idx === -1) {
+        patch.friendPhotoURL = photo;
+      }
       return { ref: doc(db, "Users", friendUid, "friends", uid), patch };
     });
     await commitInChunks(await filterExistingRefs(items));
   } catch (e) {
     if (__DEV__) console.warn("propagateProfileChange friends:", e?.message);
+  }
+
+  // 3) Ortak Listeler — üyesi olduğum paylaşılan listeler (members.{uid})
+  try {
+    const sharedSnap = await getDocs(
+      query(collection(db, "SharedLists"), where("memberIds", "array-contains", uid)),
+    );
+    const items = sharedSnap.docs.map((d) => {
+      const patch = {};
+      if (nameSet) patch[`members.${uid}.name`] = name;
+      if (usernameSet) patch[`members.${uid}.username`] = handle;
+      if (avaSet) {
+        patch[`members.${uid}.avatarIndex`] = idx;
+        if (idx !== -1) {
+          patch[`members.${uid}.photoURL`] = null;
+        }
+      }
+      if (photoSet && idx === -1) {
+        patch[`members.${uid}.photoURL`] = photo;
+      }
+      return { ref: d.ref, patch };
+    });
+    await commitInChunks(items);
+  } catch (e) {
+    if (__DEV__) console.warn("propagateProfileChange shared lists:", e?.message);
+  }
+
+  // 4) Gruplar — dahil olduğum gruplar (memberInfo.{uid})
+  try {
+    const groupsSnap = await getDocs(
+      query(collection(db, "groups"), where("members", "array-contains", uid)),
+    );
+    const items = groupsSnap.docs.map((d) => {
+      const patch = {};
+      if (nameSet) patch[`memberInfo.${uid}.name`] = name;
+      if (usernameSet) patch[`memberInfo.${uid}.username`] = handle;
+      if (avaSet) {
+        patch[`memberInfo.${uid}.avatarIndex`] = idx;
+        if (idx !== -1) {
+          patch[`memberInfo.${uid}.photoURL`] = null;
+        }
+      }
+      if (photoSet && idx === -1) {
+        patch[`memberInfo.${uid}.photoURL`] = photo;
+      }
+      return { ref: d.ref, patch };
+    });
+    await commitInChunks(items);
+  } catch (e) {
+    if (__DEV__) console.warn("propagateProfileChange groups:", e?.message);
   }
 }

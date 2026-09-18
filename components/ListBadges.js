@@ -41,6 +41,8 @@ const FALLBACK = {
   purple: "#c060e0",
 };
 
+const EMPTY_HIDE = Object.freeze([]);
+
 const ListBadges = memo(function ListBadges({
   mediaId,
   mediaType,
@@ -55,6 +57,11 @@ const ListBadges = memo(function ListBadges({
   style,
   scale: scaleProp,
   posterWidth,
+  // Çağıran taraf bu rozetin işlevini BAŞKA bir görsel öğeyle (ör. arama
+  // kartlarındaki hızlı ekleme butonları) zaten karşılıyorsa, kullanıcının
+  // genel "Poster görünümü" ayarından bağımsız olarak belirli anahtarları
+  // burada gizleyebilir. Global ayarı ETKİLEMEZ — yalnız bu çağrı yerini.
+  hide = EMPTY_HIDE,
 }) {
   const ctx = useTheme();
   const theme = themeProp ?? ctx?.theme;
@@ -83,7 +90,7 @@ const ListBadges = memo(function ListBadges({
   const isInSharedLists = mediaId != null && !!sharedBucket?.[String(mediaId)];
 
   const c = theme?.colors ?? {};
-  const isBadgeEnabled = (key) => posterBadges?.[key] !== false;
+  const isBadgeEnabled = (key) => posterBadges?.[key] !== false && !hide.includes(key);
   const items = [
     inWatchList && isBadgeEnabled("watchlist") && { key: "watchlist", icon: "bookmark", color: c.blue ?? FALLBACK.blue },
     isWatched && isBadgeEnabled("watched") && { key: "watched", icon: watchedIcon, color: c.green ?? FALLBACK.green },

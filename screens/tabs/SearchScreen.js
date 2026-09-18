@@ -138,9 +138,12 @@ export default function SearchScreen({ navigation, route }) {
     new Animated.Value(hasSearchOrigin ? 0 : 1),
   ).current;
 
+  const hasAutoFocusedRef = useRef(false);
+
   useFocusEffect(
     useCallback(() => {
-      if (route?.params?.autoFocus) {
+      if (route?.params?.autoFocus && !hasAutoFocusedRef.current) {
+        hasAutoFocusedRef.current = true;
         setTimeout(() => inputRef.current?.focus(), hasSearchOrigin ? 320 : 100);
       }
       if (route?.params?.initialType) {

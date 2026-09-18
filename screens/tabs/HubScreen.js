@@ -12,6 +12,8 @@
 //   • Oyunlar: taşınan ProfileGamesModule (öne çıkan oyun + istatistik)
 
 import React, { useMemo } from "react";
+import { useTabBarLayout } from "../../context/TabBarLayoutContext";
+import useTabBarScrollSync from "../../hooks/useTabBarScrollSync";
 import {
   View,
   Text,
@@ -32,27 +34,32 @@ import ScreenDecor from "@components/ScreenDecor";
 import ProfileGamesModule from "@components/profile/ProfileGamesModule";
 import TournamentWidget from "@components/hub/TournamentWidget";
 import HubWrappedModule from "@components/hub/HubWrappedModule";
+import CineSwipeWidget from "@components/hub/CineSwipeWidget";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import { usePosts } from "@context/PostsContext";
 import { getAvatarSource } from "@utils/avatars";
+import UserAvatar from "@components/common/UserAvatar";
 import { i18nText } from "@utils/i18nText";
+import { alpha } from "../../theme/colors";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const SPRING = { mass: 0.4, damping: 12, stiffness: 180 };
 
 // ─── Feed yönlendirme widget'ı (interaktif) ─────────────────────────────────
-const getPostAvatar = (post) => {
-  if (typeof post?.authorAvatarIndex === "number") {
-    return getAvatarSource(post.authorAvatarIndex);
+const getPostAvatar = (post, currentUid, currentAvatar) => {
+  if (currentUid && post?.authorId === currentUid && currentAvatar) {
+    return currentAvatar;
   }
-  if (typeof post?.authorAvatar === "string") return { uri: post.authorAvatar };
-  return post?.authorAvatar || getAvatarSource(0);
+  return getAvatarSource(
+    post?.authorAvatarIndex,
+    post?.authorPhotoURL || (typeof post?.authorAvatar === "string" ? post.authorAvatar : null)
+  );
 };
 
-function FeedWidget({ navigation, theme, posts, avatar }) {
+function FeedWidget({ navigation, theme, posts, avatar, currentUid }) {
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
@@ -130,10 +137,14 @@ function FeedWidget({ navigation, theme, posts, avatar }) {
           {recentAuthors.length > 0 && (
             <View style={styles.recentAvatars}>
               {recentAuthors.map((post, index) => (
-                <Image
+                <UserAvatar
                   key={post.authorId}
-                  source={getPostAvatar(post)}
-                  style={[styles.recentAvatar, { marginLeft: index === 0 ? 0 : -8 }]}
+                  source={getPostAvatar(post, currentUid, avatar)}
+                  isCustomPhoto
+                  size={25}
+                  borderWidth={2}
+                  borderColor="rgba(255,255,255,0.72)"
+                  style={{ marginLeft: index === 0 ? 0 : -8 }}
                 />
               ))}
             </View>
@@ -199,6 +210,8 @@ function FeedWidget({ navigation, theme, posts, avatar }) {
 }
 
 export default function HubScreen({ navigation }) {
+  const { contentBottom } = useTabBarLayout();
+  const onTabBarScroll = useTabBarScrollSync();
   const { theme } = useTheme();
   const { language } = useLanguage();
   const { user } = useAuth();
@@ -218,8 +231,10 @@ export default function HubScreen({ navigation }) {
       <ScreenDecor iconOpacity={0.15} />
       <SafeAreaView edges={["top"]} style={styles.container}>
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, { paddingBottom: contentBottom }]}
           showsVerticalScrollIndicator={false}
+          onScroll={onTabBarScroll}
+          scrollEventThrottle={16}
         >
         {/* Başlık */}
         <View style={styles.headerRow}>
@@ -258,7 +273,14 @@ export default function HubScreen({ navigation }) {
           theme={theme}
           posts={posts}
           avatar={avatar}
+          currentUid={user?.uid}
         />
+
+        {/* CineSwipe (Birlikte Ne İzlesek?) */}
+        <Text style={[styles.sectionTitle, { color: theme.text.muted, marginTop: 18 }]}>
+          CINESWIPE
+        </Text>
+        <CineSwipeWidget navigation={navigation} theme={theme} />
 
         {/* Turnuva */}
         <Text style={[styles.sectionTitle, { color: theme.text.muted, marginTop: 18 }]}>

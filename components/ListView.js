@@ -44,11 +44,15 @@ const ActionButton = ({
   opacity,
   children,
   badge,
+  compact = false,
 }) => (
   <TouchableOpacity
     onPress={onPress}
     activeOpacity={1}
-    style={styles.actionButtonWrapper}
+    style={[
+      styles.actionButtonWrapper,
+      compact && styles.actionButtonWrapperCompact,
+    ]}
   >
     <Animated.View
       style={{
@@ -58,8 +62,11 @@ const ActionButton = ({
     >
       {children}
       {badge != null && badge > 0 && (
-        <View style={styles.badgeWrap}>
-          <Text allowFontScaling={false} style={styles.badgeText}>
+        <View style={[styles.badgeWrap, compact && styles.badgeWrapCompact]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.badgeText, compact && styles.badgeTextCompact]}
+          >
             {badge}
           </Text>
         </View>
@@ -152,6 +159,7 @@ const ListView = ({
   listStates,
   isLoading,
   sharedItem, // ortak listeler için medya payload'ı ({id,type,name,imagePath,...})
+  compact = false,
 }) => {
   const { t } = useLanguage();
   const { theme } = useTheme();
@@ -300,6 +308,7 @@ const ListView = ({
     <View
       style={[
         styles.container,
+        compact && styles.containerCompact,
         { backgroundColor: theme.secondary, shadowColor: theme.shadow },
       ]}
     >
@@ -326,10 +335,11 @@ const ListView = ({
           const isWatchBlocked =
             !isReminderMode && watchLocked && !getIsActive("watchedMovies");
           return (
-            <View key={key} style={styles.iconCol}>
+            <View key={key} style={[styles.iconCol, compact && styles.iconColCompact]}>
               <ActionButton
                 scale={scaleValuesRef.current[key]}
                 opacity={opacityValuesRef.current[key]}
+                compact={compact}
                 onPress={
                   isWatchBlocked
                     ? () =>
@@ -359,6 +369,7 @@ const ListView = ({
                     inactiveName="lock-closed-outline"
                     activeColor={theme.text.muted}
                     inactiveColor={theme.text.muted}
+                    size={compact ? 24 : 30}
                   />
                 ) : isReminderMode ? (
                   <ListActionIcon
@@ -372,6 +383,7 @@ const ListView = ({
                       isReleasedReminder ? theme.colors.green : theme.colors.orange
                     }
                     inactiveColor={theme.text.secondary}
+                    size={compact ? 24 : 30}
                   />
                 ) : /* Yükleme göstergesi YALNIZ henüz işaretlenmemişken çıkar.
                        Eskiden `isLoading` tek başına kontrol ediyordu: kullanıcı
@@ -382,7 +394,7 @@ const ListView = ({
                 isLoading && !getIsActive("watchedMovies") ? (
                   <LottieView
                     source={require("@lottie/loading15.json")}
-                    style={{ width: 30, height: 30 }}
+                    style={{ width: compact ? 24 : 30, height: compact ? 24 : 30 }}
                     autoPlay
                     loop
                   />
@@ -393,10 +405,18 @@ const ListView = ({
                     inactiveName="eye-outline"
                     activeColor={theme.colors.green}
                     inactiveColor={theme.text.secondary}
+                    size={compact ? 24 : 30}
                   />
                 )}
               </ActionButton>
-              <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>
+              <Text
+                allowFontScaling={false}
+                style={[
+                  styles.iconLabel,
+                  compact && styles.iconLabelCompact,
+                  { color: theme.text.muted },
+                ]}
+              >
                 {isReminderMode
                   ? isReleasedReminder
                     ? i18nText("autoI18n.yayinlandi", "Yayınlandı")
@@ -409,10 +429,11 @@ const ListView = ({
           );
         }
         return (
-          <View key={key} style={styles.iconCol}>
+          <View key={key} style={[styles.iconCol, compact && styles.iconColCompact]}>
             <ActionButton
               scale={scaleValuesRef.current[key]}
               opacity={opacityValuesRef.current[key]}
+              compact={compact}
               onPress={onPress}
             >
               <ListActionIcon
@@ -421,9 +442,17 @@ const ListView = ({
                 inactiveName={inactiveName}
                 activeColor={activeColor}
                 inactiveColor={inactiveColor}
+                size={compact ? 24 : 30}
               />
             </ActionButton>
-            <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>
+            <Text
+              allowFontScaling={false}
+              style={[
+                styles.iconLabel,
+                compact && styles.iconLabelCompact,
+                { color: theme.text.muted },
+              ]}
+            >
               {label}
             </Text>
           </View>
@@ -431,16 +460,18 @@ const ListView = ({
       })}
 
       {/* ── Diğer listeler butonu ── */}
-      <View style={styles.iconCol}>
+      <View style={[styles.iconCol, compact && styles.iconColCompact]}>
         <ActionButton
           onPress={() => { animateBounce("apps"); openModal(); }}
           scale={scaleValuesRef.current["apps"]}
           opacity={opacityValuesRef.current["apps"]}
           badge={trueCount > 0 ? trueCount : null}
+          compact={compact}
         >
           <View
             style={[
               styles.appsIconWrap,
+              compact && styles.appsIconWrapCompact,
               {
                 backgroundColor:
                   trueCount > 0
@@ -459,7 +490,7 @@ const ListView = ({
           >
             <Ionicons
               name={trueCount > 0 ? "grid" : "grid-outline"}
-              size={22}
+              size={compact ? 18 : 22}
               color={
                 trueCount > 0
                   ? theme.colors.orange
@@ -470,7 +501,14 @@ const ListView = ({
             />
           </View>
         </ActionButton>
-        <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>
+        <Text
+          allowFontScaling={false}
+          style={[
+            styles.iconLabel,
+            compact && styles.iconLabelCompact,
+            { color: theme.text.muted },
+          ]}
+        >
           {i18nText("autoI18n.digerleri", "Diğerleri")}
         </Text>
       </View>
@@ -627,6 +665,15 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 6,
   },
+  containerCompact: {
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRadius: 14,
+    marginBottom: 0,
+    elevation: 2,
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+  },
 
   /* İkon kolonları */
   iconCol: {
@@ -634,10 +681,17 @@ const styles = StyleSheet.create({
     gap: 5,
     flex: 1,
   },
+  iconColCompact: {
+    gap: 2,
+  },
   iconLabel: {
     fontSize: 10,
     fontWeight: "600",
     letterSpacing: 0.2,
+  },
+  iconLabelCompact: {
+    fontSize: 9,
+    letterSpacing: 0.1,
   },
   actionButtonWrapper: {
     position: "relative",
@@ -645,6 +699,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 44,
     height: 44,
+  },
+  actionButtonWrapperCompact: {
+    width: 36,
+    height: 36,
   },
 
   /* Badge */
@@ -660,10 +718,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 3,
   },
+  badgeWrapCompact: {
+    top: -2,
+    right: -3,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
+  },
   badgeText: {
     color: "#fff",
     fontSize: 9,
     fontWeight: "800",
+  },
+  badgeTextCompact: {
+    fontSize: 8,
   },
 
   /* Diğer listeler butonu */
@@ -674,6 +742,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
+  },
+  appsIconWrapCompact: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
   },
 
   /* ── MODAL ── */

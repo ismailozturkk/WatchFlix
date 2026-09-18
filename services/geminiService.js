@@ -15,7 +15,7 @@
 //   - Yanıttan film/dizi başlıklarını ayıklamak ve markdown'a hazırlamak
 //
 // Bu modül React'tan bağımsızdır (saf JS) — test edilebilir ve UI'dan ayrıktır.
-// (firebase bağımlılığı yalnız çağrı anında lazy-require edilir.)
+import { trackFunctionCall, trackGeminiUsage } from "./usageTrackerService";
 
 export const GEMINI_MODEL = "gemini-2.5-flash";
 export const GEMINI_TIMEOUT_MS = 30000;
@@ -305,9 +305,12 @@ export async function callGeminiProxy({
   }
 
   let result;
+  const startTime = Date.now();
   try {
     result = await call({ mode, history, userMessage, systemInstruction });
+    trackFunctionCall("callGemini", Date.now() - startTime);
   } catch (err) {
+    trackFunctionCall("callGemini (Error)", Date.now() - startTime);
     throw mapCallableError(err);
   }
 
@@ -391,6 +394,17 @@ export function estimateCost({ promptTokens = 0, outputTokens = 0, thoughtsToken
 export function logUsage(data) {
   const usage = extractUsage(data);
   const cost = estimateCost(usage);
+  try {
+    trackGeminiUsage({
+      model: GEMINI_MODEL,
+      promptTokens: usage.promptTokens,
+      outputTokens: usage.outputTokens,
+      thoughtsTokens: usage.thoughtsTokens,
+      costUsd: cost.totalCost,
+    });
+  } catch (e) {
+    console.warn("[Gemini] Telemetry logging error:", e);
+  }
   console.log(
     `[CineMatch/Gemini] 🎯 Token — giriş: ${usage.promptTokens} | ` +
       `çıkış: ${usage.outputTokens}` +

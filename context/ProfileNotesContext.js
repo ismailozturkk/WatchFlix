@@ -86,9 +86,9 @@ export const ProfileNotesProvider = ({ children }) => {
   };
 
   // İlk kare tohumdan çiziliyor; listener DeviceNotifications'ın not
-  // hatırlatıcı zamanlayıcısını (4200+800 ms'de koşuyor) beslediği için kapı
-  // ondan önce açılacak şekilde seçildi. Kademeler: hooks/useStartupGate.js.
-  const startupReady = useStartupGate(2600);
+  // hatırlatıcı zamanlayıcısını beslediği için kapı ondan önce açılacak şekilde seçildi.
+  // Kademeler: hooks/useStartupGate.js.
+  const startupReady = useStartupGate(2400);
 
   useEffect(() => {
     if (!startupReady) return;

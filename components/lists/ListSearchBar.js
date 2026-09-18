@@ -1,3 +1,5 @@
+import { readableTextOn } from "@utils/colorUtils";
+import { alpha } from "@theme/colors";
 // components/lists/ListSearchBar.js
 //
 // Liste ekranının arama başlığı: arama kutusu + KİP SEÇİCİ + sırala/filtrele
@@ -42,6 +44,7 @@ const placeholderFor = (mode, listName) => {
 };
 
 function ModeButton({ active, accent, theme, icon, label, count, onPress }) {
+  const foreground = readableTextOn(accent);
   return (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -54,14 +57,14 @@ function ModeButton({ active, accent, theme, icon, label, count, onPress }) {
       <Ionicons
         name={icon}
         size={14}
-        color={active ? "#fff" : theme.text.muted}
+        color={active ? foreground : theme.text.muted}
       />
       <Text
         numberOfLines={1}
         allowFontScaling={false}
         style={[
           styles.modeText,
-          { color: active ? "#fff" : theme.text.muted },
+          { color: active ? foreground : theme.text.muted },
         ]}
       >
         {label}
@@ -71,7 +74,7 @@ function ModeButton({ active, accent, theme, icon, label, count, onPress }) {
           style={[
             styles.modeCount,
             {
-              backgroundColor: active ? "rgba(255,255,255,0.22)" : theme.primary,
+              backgroundColor: active ? alpha(foreground, 0.12) : theme.primary,
             },
           ]}
         >
@@ -79,7 +82,7 @@ function ModeButton({ active, accent, theme, icon, label, count, onPress }) {
             allowFontScaling={false}
             style={[
               styles.modeCountText,
-              { color: active ? "#fff" : theme.text.muted },
+              { color: active ? foreground : theme.text.muted },
             ]}
           >
             {count > 999 ? "999+" : count}
@@ -175,7 +178,7 @@ function ListSearchBar({
           )}
           {!filtering && activeFilterCount > 0 ? (
             <View style={[styles.filterDot, { backgroundColor: accent }]}>
-              <Text allowFontScaling={false} style={styles.filterDotText}>
+              <Text allowFontScaling={false} style={[styles.filterDotText, { color: readableTextOn(accent) }]}>
                 {activeFilterCount}
               </Text>
             </View>

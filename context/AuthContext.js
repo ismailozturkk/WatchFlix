@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import { onAuthStateChanged } from "firebase/auth";
@@ -67,20 +68,33 @@ async function resolveInitialRoute(user) {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [initialRoute, setInitialRoute] = useState("LoginScreen");
+
+  // AÇILIŞ TOHUMU: Önceki oturumdan bilinen başlangıç rotasını senkron oku.
+  // Bu sayede ilk karede doğru rota çizilir, flash yaşanmaz.
+  const cachedSeedRoute = useMemo(() => {
+    const cachedUid = get(Keys.cachedUserId);
+    if (cachedUid) return get(Keys.cachedInitialRoute) || "TabScreen";
+    const seenOnboarding = get(Keys.hasSeenOnboarding);
+    return seenOnboarding ? "LoginScreen" : "OnboardingScreen";
+  }, []);
+
+  const [initialRoute, setInitialRoute] = useState(cachedSeedRoute);
   // "Girişli ama profilsiz" gerçek bir durum: Google kullanıcısı tamamlama
   // ekranındayken oturum açıktır. Bu bayrak, o aradaki kullanıcı için hesaba
   // bağlı doküman yazılmasını engeller — profil hiç oluşmadan hesap silinirse
   // (bkz. cancelGoogleRegistration) o dokümanlar sahipsiz kalır ve kural
   // isOwner(uid) bir daha asla doğru olamayacağı için kalıcı olarak erişilemez
   // hale gelir.
-  const [needsProfileCompletion, setNeedsProfileCompletion] = useState(false);
+  const [needsProfileCompletion, setNeedsProfileCompletion] = useState(
+    cachedSeedRoute === "GoogleProfileCompletionScreen",
+  );
 
   // Profil tamamlandığında onAuthStateChanged yeniden tetiklenmez; ekran bunu
   // çağırarak kapıyı açar.
   const markProfileCompleted = useCallback(() => {
     setNeedsProfileCompletion(false);
     setInitialRoute("TabScreen");
+    set(Keys.cachedInitialRoute, "TabScreen");
   }, []);
 
   useEffect(() => {
@@ -90,24 +104,29 @@ export const AuthProvider = ({ children }) => {
         // hangi kovaya yazılacağını bu belirler — resolveInitialRoute'tan da
         // ÖNCE kurulmalı, o yol depolamayı okuyor.
         setActiveUser(user.uid);
-        let route = "TabScreen";
-        try {
-          route = await resolveInitialRoute(user);
-        } catch {
-          route = "TabScreen";
-        }
-        setInitialRoute(route);
-        setNeedsProfileCompletion(route === "GoogleProfileCompletionScreen");
+        const cachedRoute = get(Keys.cachedInitialRoute) || "TabScreen";
+        setInitialRoute(cachedRoute);
+        setNeedsProfileCompletion(cachedRoute === "GoogleProfileCompletionScreen");
         setUser(user);
         setLoading(false);
         set(Keys.cachedUserId, user.uid);
+
+        try {
+          const freshRoute = await resolveInitialRoute(user);
+          if (freshRoute !== cachedRoute) {
+            setInitialRoute(freshRoute);
+            setNeedsProfileCompletion(freshRoute === "GoogleProfileCompletionScreen");
+          }
+          set(Keys.cachedInitialRoute, freshRoute);
+        } catch {
+          set(Keys.cachedInitialRoute, "TabScreen");
+        }
       } else {
         // İlk açılışta (onboarding görülmediyse) tanıtım akışına, sonrasında
         // doğrudan giriş ekranına yönlendir.
         const seenOnboarding = get(Keys.hasSeenOnboarding);
-        setInitialRoute(
-          seenOnboarding ? "LoginScreen" : "OnboardingScreen",
-        );
+        const unauthRoute = seenOnboarding ? "LoginScreen" : "OnboardingScreen";
+        setInitialRoute(unauthRoute);
         setUser(null);
         setNeedsProfileCompletion(false);
         setLoading(false);

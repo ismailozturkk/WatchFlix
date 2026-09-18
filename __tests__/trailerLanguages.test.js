@@ -5,14 +5,14 @@ import {
 } from "../utils/trailerLanguages";
 
 describe("trailer language ordering", () => {
-  test("puts original first, English second and app language third", () => {
+  test("puts app/selected language first, English second and original language third", () => {
     expect(
       buildTrailerLanguageOrder({
         originalLanguage: "de",
         appLanguage: "tr",
-        selectedLanguage: "de",
+        selectedLanguage: "tr",
       }),
-    ).toEqual(["de", "en", "tr"]);
+    ).toEqual(["tr", "en", "de"]);
   });
 
   test("deduplicates the original and app language", () => {
@@ -25,14 +25,44 @@ describe("trailer language ordering", () => {
     ).toEqual(["en", "fr"]);
   });
 
-  test("keeps a manually selected language after the three quick choices", () => {
+  test("handles Turkish app with English movie correctly", () => {
+    expect(
+      buildTrailerLanguageOrder({
+        originalLanguage: "en",
+        appLanguage: "tr",
+        selectedLanguage: "tr",
+      }),
+    ).toEqual(["tr", "en"]);
+  });
+
+  test("handles Turkish app with Turkish movie correctly", () => {
+    expect(
+      buildTrailerLanguageOrder({
+        originalLanguage: "tr",
+        appLanguage: "tr",
+        selectedLanguage: "tr",
+      }),
+    ).toEqual(["tr", "en"]);
+  });
+
+  test("handles English app with foreign movie correctly", () => {
+    expect(
+      buildTrailerLanguageOrder({
+        originalLanguage: "ko",
+        appLanguage: "en",
+        selectedLanguage: "en",
+      }),
+    ).toEqual(["en", "ko"]);
+  });
+
+  test("keeps a manually selected language after the primary choices", () => {
     expect(
       buildTrailerLanguageOrder({
         originalLanguage: "ja",
         appLanguage: "tr",
         selectedLanguage: "de",
       }),
-    ).toEqual(["ja", "en", "tr", "de"]);
+    ).toEqual(["tr", "en", "ja", "de"]);
   });
 
   test("keeps an otherwise unsupported ISO language selectable", () => {

@@ -208,6 +208,11 @@ const settingsKeys = {
     default: [],
     validate: Array.isArray,
   },
+  usageStats: {
+    key: "dev_usage_tracker_stats_v2",
+    type: TYPES.json,
+    default: null,
+  },
 
   listGridStyle: {
     key: "listGridStyle",
@@ -265,6 +270,12 @@ const settingsKeys = {
 /* ================================================================== */
 
 const dataKeys = {
+  cineLastResult: {
+    key: "cineswipe_last_result_",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+  },
   // ---- Kullanıcıya bağlı içerik ------------------------------------------
   //
   // GİZLİLİK DÜZELTMESİ: bu beş anahtar geçiş öncesinde uid'SİZ globaldi
@@ -403,6 +414,11 @@ const sessionKeys = {
     key: "googleProfilePendingUid",
     type: TYPES.string,
     default: null,
+  },
+  cachedInitialRoute: {
+    key: "cachedInitialRoute",
+    type: TYPES.string,
+    default: "TabScreen",
   },
 };
 

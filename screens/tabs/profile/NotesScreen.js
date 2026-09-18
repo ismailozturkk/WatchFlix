@@ -1,3 +1,4 @@
+import { isLightSurface } from "@utils/colorUtils";
 /**
  * NotesScreen — Notların tam ekran yönetimi (IslamicGuide NotesScreen düzeni).
  *
@@ -9,6 +10,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
+  Image,
   Modal,
   Platform,
   ScrollView,
@@ -20,12 +22,15 @@ import {
   View,
 } from "react-native";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import MediaNoteSheet from "@components/detail/MediaNoteSheet";
 import * as Clipboard from "expo-clipboard";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useProfileNotes } from "../../../context/ProfileNotesContext";
+import { useMediaNotes } from "../../../context/MediaNotesContext";
+import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 import { useDeviceNotifications } from "../../../context/DeviceNotificationsContext";
 import ScreenDecor from "../../../components/ScreenDecor";
 import DatePickerModal from "@components/modals/DatePickerModal";
@@ -126,28 +131,44 @@ const DeleteModal = ({ visible, onConfirm, onClose, theme }) => (
 );
 
 // ─── Boş Durum ────────────────────────────────────────────────────────────────
-const EmptyState = ({ tab, theme }) => (
-  <View style={{ alignItems: "center", marginTop: 80, gap: 12 }}>
-    <Ionicons
-      name={tab === "note" ? "document-text-outline" : "checkbox-outline"}
-      size={56}
-      color={theme.text.muted}
-    />
-    <Text allowFontScaling={false} style={{ color: theme.text.secondary, fontSize: 16, fontWeight: "600" }}>
-      {tab === "note"
-        ? i18nText("autoI18n.henuz_not_yok", "Henüz not yok")
-        : i18nText("autoI18n.henuz_yapilacak_yok", "Henüz yapılacak yok")}
-    </Text>
-    <Text
-      allowFontScaling={false}
-      style={{ color: theme.text.muted, fontSize: 13, textAlign: "center", paddingHorizontal: 40 }}
-    >
-      {tab === "note"
-        ? i18nText("autoI18n.yeni_not_ekle_ipucu", "Sağ alttaki + butonuyla yeni bir not ekle")
-        : i18nText("autoI18n.yeni_yapilacak_ekle_ipucu", "Sağ alttaki + butonuyla yeni bir yapılacak listesi ekle")}
-    </Text>
-  </View>
-);
+const EMPTY_STATE_META = {
+  note: {
+    icon: "document-text-outline",
+    title: () => i18nText("autoI18n.henuz_not_yok", "Henüz not yok"),
+    hint: () => i18nText("autoI18n.yeni_not_ekle_ipucu", "Sağ alttaki + butonuyla yeni bir not ekle"),
+  },
+  todo: {
+    icon: "checkbox-outline",
+    title: () => i18nText("autoI18n.henuz_yapilacak_yok", "Henüz yapılacak yok"),
+    hint: () => i18nText("autoI18n.yeni_yapilacak_ekle_ipucu", "Sağ alttaki + butonuyla yeni bir yapılacak listesi ekle"),
+  },
+  media: {
+    icon: "film-outline",
+    title: () => i18nText("autoI18n.henuz_film_dizi_notu_yok", "Henüz film/dizi notu yok"),
+    hint: () => i18nText(
+      "autoI18n.film_dizi_notu_ipucu",
+      "Bir film veya dizinin detay sayfasındaki \"Notum\" kartından not ekleyebilirsin",
+    ),
+  },
+};
+
+const EmptyState = ({ tab, theme }) => {
+  const meta = EMPTY_STATE_META[tab] || EMPTY_STATE_META.note;
+  return (
+    <View style={{ alignItems: "center", marginTop: 80, gap: 12 }}>
+      <Ionicons name={meta.icon} size={56} color={theme.text.muted} />
+      <Text allowFontScaling={false} style={{ color: theme.text.secondary, fontSize: 16, fontWeight: "600" }}>
+        {meta.title()}
+      </Text>
+      <Text
+        allowFontScaling={false}
+        style={{ color: theme.text.muted, fontSize: 13, textAlign: "center", paddingHorizontal: 40 }}
+      >
+        {meta.hint()}
+      </Text>
+    </View>
+  );
+};
 
 // ─── Not Kartı ────────────────────────────────────────────────────────────────
 const NoteCard = ({ note, theme, language, onPress, onCopy, onDelete }) => {
@@ -265,6 +286,70 @@ const NoteCard = ({ note, theme, language, onPress, onCopy, onDelete }) => {
     </TouchableOpacity>
   );
 };
+
+// ─── Film/Dizi Not Kartı ────────────────────────────────────────────────────
+// Düz NoteCard'dan farklı şema (`text`, `posterPath`, `mediaId`, `type`) taşıdığı
+// için ayrı bir kart: poster küçük resmi + tür rozeti + "git" (ilgili detay
+// sayfasına git) ve sil aksiyonları. Düzenleme, MediaNoteSheet'i (detay
+// sayfalarındaki "Notum" kartıyla AYNI bileşen) açarak yapılır.
+const MediaNoteCard = ({ note, theme, language, getTmdbUrl, onPress, onGoTo, onDelete }) => (
+  <TouchableOpacity
+    style={[styles.mediaCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+    onPress={onPress}
+    activeOpacity={0.78}
+  >
+    {note.posterPath ? (
+      <Image source={{ uri: getTmdbUrl(note.posterPath, "poster", 200) }} style={styles.mediaPoster} />
+    ) : (
+      <View style={[styles.mediaPosterFallback, { backgroundColor: theme.between }]}>
+        <Ionicons name={note.type === "tv" ? "tv-outline" : "film-outline"} size={20} color={theme.text.muted} />
+      </View>
+    )}
+    <View style={styles.mediaCardBody}>
+      <View style={[styles.cardHeader, { paddingTop: 0, marginBottom: 4 }]}>
+        <Text
+          allowFontScaling={false}
+          fontRole="body"
+          style={[styles.cardTitle, { color: theme.text.primary }]}
+          numberOfLines={1}
+        >
+          {note.title || i18nText("autoI18n.basliksiz_yapim", "Başlıksız Yapım")}
+        </Text>
+        <View style={styles.cardActions}>
+          <TouchableOpacity onPress={onGoTo} hitSlop={ICON_HIT_SLOP}>
+            <Ionicons name="arrow-redo-outline" size={16} color={theme.text.muted} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onDelete} hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}>
+            <Ionicons name="trash-outline" size={16} color={theme.text.muted} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={[styles.mediaTypeBadge, { backgroundColor: theme.accent + "22" }]}>
+        <Ionicons name={note.type === "tv" ? "tv-outline" : "film-outline"} size={10} color={theme.accent} />
+        <Text allowFontScaling={false} style={[styles.mediaTypeBadgeText, { color: theme.accent }]}>
+          {note.type === "tv" ? i18nText("autoI18n.dizi", "Dizi") : i18nText("autoI18n.film", "Film")}
+        </Text>
+      </View>
+
+      <Text
+        allowFontScaling={false}
+        style={[styles.cardContent, { color: theme.text.secondary }]}
+        numberOfLines={2}
+      >
+        {note.text || i18nText("autoI18n.icerik_yok", "İçerik yok")}
+      </Text>
+
+      <Text allowFontScaling={false} style={[styles.cardDate, { color: theme.text.muted, paddingBottom: 0, marginTop: 4 }]}>
+        {new Date(note.updatedAt).toLocaleDateString(language === "tr" ? "tr-TR" : "en-US", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })}
+      </Text>
+    </View>
+  </TouchableOpacity>
+);
 
 // ─── Ekle / Düzenle Modalı ────────────────────────────────────────────────────
 const EditModal = ({ visible, initialNote, defaultType, theme, colorPairs, language, onSave, onClose }) => {
@@ -838,6 +923,8 @@ export default function NotesScreen({ navigation }) {
   const { theme } = useTheme();
   const { t, language } = useLanguage();
   const { notes, loadingNotes, saveNote, handleDeleteNote } = useProfileNotes();
+  const { mediaNotes, loadingMediaNotes, deleteMediaNote } = useMediaNotes();
+  const { getTmdbUrl } = useImageQualitySettings();
   const { primeNotificationPermission } = useDeviceNotifications();
 
   const colorPairs = useMemo(() => buildColorPairs(theme.notesColor), [theme.notesColor]);
@@ -846,20 +933,31 @@ export default function NotesScreen({ navigation }) {
   const [tab, setTab] = useState("note");
   const [modalVisible, setModalVisible] = useState(false);
   const [editingNote, setEditingNote] = useState(null);
+  const [mediaSheetVisible, setMediaSheetVisible] = useState(false);
+  const [editingMediaNote, setEditingMediaNote] = useState(null);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
+  const [deleteTargetKind, setDeleteTargetKind] = useState("note");
 
   const allNotes = notes || [];
+  const allMediaNotes = mediaNotes || [];
   const filtered = allNotes.filter((n) =>
-    tab === "note" ? n.type !== "todo" : n.type === "todo",
+    tab === "todo" ? n.type === "todo" : n.type !== "todo",
   );
+  // Sekmeye göre FlatList'e giden veri: "media" tam ayrı bir koleksiyondan
+  // (MediaNotesContext) geliyor, düz not/todo şemasıyla karışmıyor.
+  const listData = tab === "media" ? allMediaNotes : filtered;
+  const isListLoading = tab === "media" ? loadingMediaNotes : loadingNotes;
 
   const handleSave = useCallback(
     async (note) => {
       const saved = await saveNote(note);
       if (saved === false) return false;
       setModalVisible(false);
-      setEditingNote(null);
+      // `editingNote` burada temizlenMEZ: BottomSheetModal kapanış animasyonu
+      // boyunca (~260ms) sayfayı çizmeye devam ediyor; initialNote null'a
+      // düşerse tip seçici (Not/Yapılacak) o sırada yeniden belirip kayboluyor.
+      // openNew/openEdit zaten bir sonraki açılışta doğru değeri set ediyor.
       // Tarihli not = hatırlatma; OS izni yoksa bildirim ASLA düşmez. İzin
       // sayfası da bir alt sayfa, düzenleme sayfasının kapanışını bekliyor —
       // iki alt sayfa üst üste binmesin.
@@ -871,17 +969,33 @@ export default function NotesScreen({ navigation }) {
     [saveNote, primeNotificationPermission],
   );
 
-  const requestDelete = (id) => {
+  const requestDelete = (id, kind = "note") => {
     setDeleteTargetId(id);
+    setDeleteTargetKind(kind);
     setDeleteModalVisible(true);
   };
   const confirmDelete = () => {
     if (deleteTargetId) {
-      handleDeleteNote(deleteTargetId);
-      removeNoteTodoDraft(todoDraftKey(deleteTargetId));
+      if (deleteTargetKind === "media") {
+        const target = allMediaNotes.find((n) => n.id === deleteTargetId);
+        if (target) deleteMediaNote(target.type, target.mediaId);
+      } else {
+        handleDeleteNote(deleteTargetId);
+        removeNoteTodoDraft(todoDraftKey(deleteTargetId));
+      }
     }
     setDeleteModalVisible(false);
     setDeleteTargetId(null);
+  };
+
+  const openMediaEdit = (note) => {
+    setEditingMediaNote(note);
+    setMediaSheetVisible(true);
+  };
+  const goToMedia = (note) => {
+    navigation.navigate(note.type === "tv" ? "TvShowsDetails" : "MovieDetails", {
+      id: note.mediaId,
+    });
   };
 
   /* Panoya kopyala: not = başlık + içerik, todo = başlık + ☐/☑ maddeler */
@@ -913,7 +1027,7 @@ export default function NotesScreen({ navigation }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
       <ScreenDecor iconOpacity={0.25} />
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         {/* Header */}
@@ -940,20 +1054,25 @@ export default function NotesScreen({ navigation }) {
           {[
             { key: "note", label: i18nText("autoI18n.notlar", "Notlar"), icon: "document-text" },
             { key: "todo", label: i18nText("autoI18n.yapilacaklar", "Yapılacaklar"), icon: "checkbox" },
+            { key: "media", label: i18nText("autoI18n.film_dizi", "Film/Dizi"), icon: "film" },
           ].map((tabItem) => {
             const isActive = tab === tabItem.key;
-            const count = allNotes.filter((n) =>
-              tabItem.key === "note" ? n.type !== "todo" : n.type === "todo",
-            ).length;
+            const count =
+              tabItem.key === "media"
+                ? allMediaNotes.length
+                : allNotes.filter((n) =>
+                    tabItem.key === "todo" ? n.type === "todo" : n.type !== "todo",
+                  ).length;
             return (
               <TouchableOpacity
                 key={tabItem.key}
                 style={[styles.tabBtn, isActive && { backgroundColor: theme.accent }]}
                 onPress={() => setTab(tabItem.key)}
               >
-                <Ionicons name={tabItem.icon} size={16} color={isActive ? "#fff" : theme.text.secondary} />
+                <Ionicons name={tabItem.icon} size={15} color={isActive ? "#fff" : theme.text.secondary} />
                 <Text
                   allowFontScaling={false}
+                  numberOfLines={1}
                   style={[styles.tabBtnText, { color: isActive ? "#fff" : theme.text.secondary }]}
                 >
                   {tabItem.label}
@@ -980,46 +1099,74 @@ export default function NotesScreen({ navigation }) {
 
         {/* Liste */}
         <FlatList
-          data={filtered}
+          data={listData}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={loadingNotes ? null : <EmptyState tab={tab} theme={theme} />}
-          renderItem={({ item }) => (
-            <NoteCard
-              note={item}
-              theme={theme}
-              language={language}
-              onPress={() => openEdit(item)}
-              onCopy={() => copyNote(item)}
-              onDelete={() => requestDelete(item.id)}
-            />
-          )}
+          ListEmptyComponent={isListLoading ? null : <EmptyState tab={tab} theme={theme} />}
+          renderItem={({ item }) =>
+            tab === "media" ? (
+              <MediaNoteCard
+                note={item}
+                theme={theme}
+                language={language}
+                getTmdbUrl={getTmdbUrl}
+                onPress={() => openMediaEdit(item)}
+                onGoTo={() => goToMedia(item)}
+                onDelete={() => requestDelete(item.id, "media")}
+              />
+            ) : (
+              <NoteCard
+                note={item}
+                theme={theme}
+                language={language}
+                onPress={() => openEdit(item)}
+                onCopy={() => copyNote(item)}
+                onDelete={() => requestDelete(item.id, "note")}
+              />
+            )
+          }
         />
 
-        {/* FAB */}
-        <TouchableOpacity
-          style={[styles.fab, { backgroundColor: theme.accent }]}
-          onPress={openNew}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="add" size={28} color="#fff" />
-        </TouchableOpacity>
+        {/* FAB — "media" sekmesinde yok: bu notlar buradan değil, ilgili film/dizi
+            detay sayfasındaki "Notum" kartından oluşturulur. */}
+        {tab !== "media" && (
+          <TouchableOpacity
+            style={[styles.fab, { backgroundColor: theme.accent }]}
+            onPress={openNew}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="add" size={28} color="#fff" />
+          </TouchableOpacity>
+        )}
       </SafeAreaView>
 
       <EditModal
         visible={modalVisible}
         initialNote={editingNote}
-        defaultType={tab}
+        defaultType={tab === "media" ? "note" : tab}
         theme={theme}
         colorPairs={colorPairs}
         language={language}
         onSave={handleSave}
         onClose={() => {
           setModalVisible(false);
-          setEditingNote(null);
+          // Kapanış animasyonu boyunca initialNote'un dolu kalması gerekiyor,
+          // bkz. handleSave içindeki açıklama.
         }}
+      />
+
+      <MediaNoteSheet
+        visible={mediaSheetVisible}
+        onClose={() => {
+          setMediaSheetVisible(false);
+          setEditingMediaNote(null);
+        }}
+        type={editingMediaNote?.type}
+        mediaId={editingMediaNote?.mediaId}
+        title={editingMediaNote?.title}
+        posterPath={editingMediaNote?.posterPath}
       />
 
       <DeleteModal
@@ -1070,11 +1217,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 4,
     paddingVertical: 10,
+    paddingHorizontal: 2,
     borderRadius: 12,
   },
-  tabBtnText: { fontSize: 13, fontWeight: "700" },
+  tabBtnText: { fontSize: 12, fontWeight: "700" },
   badge: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8 },
   badgeText: { fontSize: 10, fontWeight: "800" },
 
@@ -1100,6 +1248,36 @@ const styles = StyleSheet.create({
   todoPreviewText: { fontSize: 13, flex: 1 },
   progressTrack: { height: 3, borderRadius: 2, marginTop: 6, marginBottom: 2, overflow: "hidden" },
   progressFill: { height: 3, borderRadius: 2 },
+
+  // Film/Dizi kartı
+  mediaCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    overflow: "hidden",
+    padding: 10,
+    gap: 10,
+  },
+  mediaPoster: { width: 54, height: 78, borderRadius: 10 },
+  mediaPosterFallback: {
+    width: 54,
+    height: 78,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mediaCardBody: { flex: 1, minWidth: 0 },
+  mediaTypeBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginBottom: 5,
+  },
+  mediaTypeBadgeText: { fontSize: 9.5, fontWeight: "800" },
 
   // FAB
   fab: {

@@ -38,12 +38,23 @@ import { db } from "../../../firebase";
 import Toast from "react-native-toast-message";
 import { useTheme } from "../../../context/ThemeContext";
 import { useAuth } from "../../../context/AuthContext";
+import { getAvatarSource } from "../../../utils/avatars";
+import UserAvatar from "../../../components/common/UserAvatar";
 import { useFriends } from "../../../context/FriendsContext";
 import { appAlert } from "../../../components/AppAlert";
 import ReportReasonSheet from "../../../components/moderation/ReportReasonSheet";
 import { reportUser } from "../../../services/reportService";
 import { useProfileUi } from "../../../context/ProfileUiContext";
-import { useImageQualitySettings } from "../../../context/AppSettingsContext";
+import {
+  useImageQualitySettings,
+  useListLayoutSettings,
+} from "../../../context/AppSettingsContext";
+import ListCovers from "../../../components/lists/ListCovers";
+import { getRailCardWidth, RAIL_CARD_H, RAIL_COVER_H, RAIL_CARD_PADDING } from "./ProfileLists";
+import { sortItemsByListOrder } from "../../../utils/listOrder";
+import { getListAccent, getListIcon } from "../../../utils/listAppearance";
+import { PosterActivityBadge } from "@components/PosterActivityBadge";
+import { buildActivityFromRoot } from "../../../utils/mediaActivityIndex";
 import { useLanguage } from "../../../context/LanguageContext";
 import { DEFAULT_PRIVACY } from "../../../services/userService";
 import {
@@ -54,11 +65,23 @@ import {
 import ScreenDecor from "../../../components/ScreenDecor";
 import BackButton from "../../../components/BackButton";
 import SaveSharedListModal from "../../../components/modals/SaveSharedListModal";
+import AvatarPreviewModal from "../../../components/profile/AvatarPreviewModal";
+import * as Haptics from "../../../services/hapticsService";
 import { i18nText } from "../../../utils/i18nText";
 import { listItemToMedia } from "../../../utils/listShare";
 
 
 const PROTECTED_LISTS = ["watchedMovies", "watchedTv", "watchList", "favorites"];
+// Bu sayı ve üzeri içerikte liste modalı sabit yükseklik yerine ekranı
+// kaplayacak şekilde büyür (bkz. FriendProfileScreen liste modalı).
+const FULLSCREEN_LIST_THRESHOLD = 12;
+
+// Subcollection (yeni format) öncelikli, root-doc array'inde (eski format)
+// olup subcollection'da olmayanlar eklenir — ProfileStatsContext ile aynı mantık.
+const mergeById = (subItems, legacyItems) => {
+  const subIds = new Set((subItems || []).map((i) => i.id));
+  return [...(subItems || []), ...(legacyItems || []).filter((i) => !subIds.has(i.id))];
+};
 
 const LIST_META = {
   watchedMovies: { icon: "movie-outline", iconLib: "mci", color: "#29b864", label: i18nText("autoI18n.izlenen_filmler", "İzlenen Filmler") },
@@ -184,141 +207,117 @@ const WatchMetricTile = ({ icon, iconLib, label, value, detail, color, theme }) 
 
 
 
+// Kapak düzeni (gridStyle/allCornersRounded) profil rayıyla (ProfileLists) ve
+// Listelerim ekranıyla (ListsViewScreen) BİREBİR aynı görünmek zorunda —
+// kullanıcı "Liste Görünümü Seçin" modalından tek bir tercih seçiyor, o tercih
+// burada da (arkadaş profilindeki paylaşılan listeler rayında) uygulanır.
 const SharedListGridCard = memo(function SharedListGridCard({
   listName,
   items,
   theme,
   getTmdbUrl,
-  compact = false,
+  gridStyle,
+  allCornersRounded,
   onPress,
   style,
 }) {
   const meta = LIST_META[listName];
-  const accentColor = meta?.color ?? theme.colors?.orange ?? theme.accent;
-  const posterItems = [items?.[0], items?.[1], items?.[2]];
+  const accent = getListAccent(listName, theme.secondary);
+  const icon = getListIcon(listName);
+  const displayName = meta?.label ?? listName;
+  const orderedItems = useMemo(() => sortItemsByListOrder(items), [items]);
+  const cardW = getRailCardWidth(gridStyle);
   const Container = onPress ? TouchableOpacity : View;
-  const containerProps = onPress ? { activeOpacity: 0.88, onPress } : {};
-
-  const renderPosterSlot = (item, idx, extraStyle) => (
-    <View
-      key={`${listName}-poster-${idx}`}
-      style={[
-        styles.sharedPosterSlot,
-        compact && styles.sharedPosterSlotCompact,
-        extraStyle,
-        { backgroundColor: theme.primary ?? "#111" },
-      ]}
-    >
-      {item?.imagePath ? (
-        <Image
-          source={{ uri: getTmdbUrl(item.imagePath, "poster", compact ? 154 : 200) }}
-          style={styles.sharedPosterImage}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          recyclingKey={`shared-${listName}-${item.type}-${item.id}-${idx}`}
-        />
-      ) : (
-        <Ionicons name="image-outline" size={compact ? 14 : 17} color={theme.text?.muted ?? "#555"} />
-      )}
-    </View>
-  );
+  const containerProps = onPress ? { activeOpacity: 0.8, onPress } : {};
 
   return (
-    <Container
-      {...containerProps}
-      style={[
-        styles.sharedListGridCard,
-        compact && styles.sharedListGridCardCompact,
-        style,
-        {
-          backgroundColor: theme.secondary,
-          borderColor: theme.border ?? "rgba(255,255,255,0.08)",
-        },
-      ]}
-    >
-      <View style={[styles.sharedPosterStrip, compact && styles.sharedPosterStripCompact]}>
-        {renderPosterSlot(posterItems[0], 0, styles.sharedPosterMainSlot)}
-        <View style={styles.sharedPosterSideColumn}>
-          {renderPosterSlot(posterItems[1], 1)}
-          {renderPosterSlot(posterItems[2], 2)}
+    <Container {...containerProps} style={[{ paddingBottom: 4 }, style]}>
+      <View
+        pointerEvents="none"
+        style={[styles.railCardBg, { width: cardW, backgroundColor: theme.secondary }]}
+      />
+      <View
+        pointerEvents="none"
+        style={[styles.railCardGlow, { backgroundColor: accent + "18", borderColor: accent + "25" }]}
+      />
+      <View style={[styles.railCard, { width: cardW }]}>
+        <ListCovers
+          items={orderedItems}
+          gridStyle={gridStyle}
+          allCornersRounded={allCornersRounded}
+          width={cardW - RAIL_CARD_PADDING * 2}
+          height={RAIL_COVER_H}
+          getTmdbUrl={getTmdbUrl}
+          theme={theme}
+        />
+        <View style={[styles.railDivider, { backgroundColor: accent + "30" }]} />
+        <View style={styles.railCardFooter}>
+          <View style={[styles.railIconDot, { backgroundColor: accent + "20" }]}>
+            <Ionicons name={icon} size={12} color={accent} />
+          </View>
+          <Text
+            allowFontScaling={false}
+            numberOfLines={1}
+            style={[styles.railCardName, { color: theme.text?.primary ?? "#fff" }]}
+          >
+            {displayName}
+          </Text>
+          <Text allowFontScaling={false} style={[styles.railCountBadge, { color: accent }]}>
+            {orderedItems.length}
+          </Text>
         </View>
       </View>
-
-      <View style={styles.sharedListInfoRow}>
-        <View style={[styles.sharedListIcon, { backgroundColor: accentColor + "20" }]}>
-          {meta ? (
-            <ListIcon name={meta.icon} iconLib={meta.iconLib} color={accentColor} size={compact ? 12 : 14} />
-          ) : (
-            <Ionicons name="grid" size={compact ? 12 : 14} color={accentColor} />
-          )}
-        </View>
-        <Text
-          allowFontScaling={false}
-          numberOfLines={2}
-          style={[
-            styles.sharedListName,
-            compact && styles.sharedListNameCompact,
-            { color: theme.text?.primary ?? "#fff" },
-          ]}
-        >
-          {meta?.label ?? listName}
-        </Text>
-      </View>
-
-      <Text
-        allowFontScaling={false}
-        numberOfLines={1}
-        style={[styles.sharedListCount, { color: theme.text?.muted ?? "#666" }]}
-      >
-        {i18nText("autoI18n.item_count", "{{count}} içerik", { count: items?.length ?? 0 })}
-      </Text>
     </Container>
   );
 });
 
-const SharedListMediaCard = memo(function SharedListMediaCard({ item, theme, getTmdbUrl, onPress }) {
-  const isMovie = item?.type === "movie";
-  const title = item?.name || item?.title || item?.originalName || item?.original_title || item?.id || "";
-
+const SharedListMediaCard = memo(function SharedListMediaCard({
+  item,
+  theme,
+  getTmdbUrl,
+  onPress,
+  activity,
+  showRating,
+  showComment,
+}) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.86}
-      onPress={onPress}
-      style={[
-        styles.sharedMediaPoster,
-        {
-          backgroundColor: theme.secondary ?? "#111",
-          borderColor: theme.border ?? "rgba(255,255,255,0.08)",
-          borderWidth: 1,
-        },
-      ]}
-    >
-      {item?.imagePath ? (
-        <Image
-          source={{ uri: getTmdbUrl(item.imagePath, "poster", 200) }}
-          style={styles.sharedMediaPosterImg}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          recyclingKey={`shared-media-${item.type}-${item.id}`}
-        />
-      ) : (
-        <Ionicons name="image-outline" size={32} color={theme.text?.muted ?? "#555"} />
-      )}
-      
-      <LinearGradient
-        colors={["transparent", "rgba(0,0,0,0.7)", "rgba(0,0,0,0.95)"]}
-        locations={[0, 0.6, 1]}
-        style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 60, paddingHorizontal: 6, paddingBottom: 8, justifyContent: "flex-end", alignItems: "center" }}
+    <View>
+      <TouchableOpacity
+        activeOpacity={0.86}
+        onPress={onPress}
+        style={[
+          styles.sharedMediaPoster,
+          {
+            backgroundColor: theme.secondary ?? "#111",
+            borderColor: theme.border ?? "rgba(255,255,255,0.08)",
+            borderWidth: 1,
+          },
+        ]}
       >
-        <Text
-          allowFontScaling={false}
-          numberOfLines={2}
-          style={{ fontSize: 11, lineHeight: 14, fontWeight: "800", color: "#fff", textAlign: "center" }}
-        >
-          {title}
-        </Text>
-      </LinearGradient>
-    </TouchableOpacity>
+        {item?.imagePath ? (
+          <Image
+            source={{ uri: getTmdbUrl(item.imagePath, "poster", 200) }}
+            style={styles.sharedMediaPosterImg}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={`shared-media-${item.type}-${item.id}`}
+          />
+        ) : (
+          <Ionicons name="image-outline" size={32} color={theme.text?.muted ?? "#555"} />
+        )}
+        {/* Arkadaşın bu içeriğe verdiği puan (yıldız) + yorum ikonu —
+            posterin ÜZERİNDE, alt kısmına yaslı */}
+        <PosterActivityBadge
+          hasRating={activity?.hasRating}
+          rating={activity?.rating}
+          hasComment={activity?.hasComment}
+          showRating={showRating}
+          showComment={showComment}
+          layout="overlay"
+          corner="bottomLeft"
+        />
+      </TouchableOpacity>
+    </View>
   );
 });
 
@@ -328,9 +327,10 @@ export default function FriendProfileScreen({ route, navigation }) {
   const { theme } = useTheme();
   const { user: currentUser } = useAuth();
   const { language } = useLanguage();
-  const { avatars } = useProfileUi();
+  const { avatars, gridStyle, allCornersRounded } = useProfileUi();
   const { getTmdbUrl } = useImageQualitySettings();
-  const { width: windowWidth } = useWindowDimensions();
+  const { posterBadges } = useListLayoutSettings();
+  const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const {
     isFriend,
@@ -352,12 +352,16 @@ export default function FriendProfileScreen({ route, navigation }) {
   // Yeni format alt koleksiyonlar — null: henüz çekilmedi
   const [subMovies, setSubMovies] = useState(null);
   const [subShows, setSubShows] = useState(null);
+  const [subFavorites, setSubFavorites] = useState(null);
+  const [subWatchList, setSubWatchList] = useState(null);
+  const [subCustomItems, setSubCustomItems] = useState(null);
   const [selectedSharedList, setSelectedSharedList] = useState(null);
   const [sharedListColumns, setSharedListColumns] = useState(3);
   const [pendingSaveListPost, setPendingSaveListPost] = useState(null);
   const [saveListPost, setSaveListPost] = useState(null);
   const [unfriendModalVisible, setUnfriendModalVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
+  const [showAvatarPreview, setShowAvatarPreview] = useState(false);
 
   const friend = isFriend(friendUid);
   const blocked = isBlocked(friendUid);
@@ -409,26 +413,48 @@ export default function FriendProfileScreen({ route, navigation }) {
     return () => unsub();
   }, [friendUid, canViewLists]);
 
+  // Arkadaşın kendi puanladığı/yorum yaptığı içerikler — aynı `Lists/{uid}`
+  // dokümanının `activityIndex`'i, kendi MediaActivityContext'imiz değil
+  // (o yalnız OTURUM SAHİBİNİ bilir). Ek okuma yok: zaten dinlenen `allLists`'ten türer.
+  const friendActivityIndex = useMemo(
+    () => buildActivityFromRoot(allLists?.activityIndex),
+    [allLists?.activityIndex],
+  );
+  const getFriendActivity = useCallback(
+    (type, id) => friendActivityIndex?.[type]?.[id] ?? null,
+    [friendActivityIndex],
+  );
+
   // ── Yeni format alt koleksiyonlar — tek seferlik okuma (listener pahalı) ─
+  // Öntanımlı dört liste + özel listeler artık kök dokümanda değil, kendi alt
+  // koleksiyonlarında yaşıyor (bkz. listItemsService.js). Hepsi çekilmezse
+  // arkadaş profilinde "boş" görünürler.
   useEffect(() => {
     if (!friendUid || !canViewLists) {
       setSubMovies(null);
       setSubShows(null);
+      setSubFavorites(null);
+      setSubWatchList(null);
+      setSubCustomItems(null);
       return;
     }
     let cancelled = false;
     const fetchSubs = async () => {
-      const [movSnap, tvSnap] = await Promise.all([
+      const [movSnap, tvSnap, favSnap, wlSnap, customSnap] = await Promise.all([
         getDocs(collection(db, "Lists", friendUid, "watchedMovies")).catch(() => null),
         getDocs(collection(db, "Lists", friendUid, "watchedTv")).catch(() => null),
+        getDocs(collection(db, "Lists", friendUid, "favorites")).catch(() => null),
+        getDocs(collection(db, "Lists", friendUid, "watchList")).catch(() => null),
+        getDocs(collection(db, "Lists", friendUid, "customItems")).catch(() => null),
       ]);
       if (cancelled) return;
-      setSubMovies(
-        movSnap ? movSnap.docs.map((d) => ({ ...d.data(), id: d.data().id ?? d.id })) : [],
-      );
-      setSubShows(
-        tvSnap ? tvSnap.docs.map((d) => ({ ...d.data(), id: d.data().id ?? d.id })) : [],
-      );
+      const mapSnap = (snap) =>
+        snap ? snap.docs.map((d) => ({ ...d.data(), id: d.data().id ?? d.id })) : [];
+      setSubMovies(mapSnap(movSnap));
+      setSubShows(mapSnap(tvSnap));
+      setSubFavorites(mapSnap(favSnap));
+      setSubWatchList(mapSnap(wlSnap));
+      setSubCustomItems(mapSnap(customSnap));
     };
     fetchSubs();
     return () => {
@@ -442,11 +468,6 @@ export default function FriendProfileScreen({ route, navigation }) {
   const stats = useMemo(() => {
     if (!canViewLists || allLists === null || subMovies === null || subShows === null)
       return null;
-
-    const mergeById = (subItems, legacyItems) => {
-      const subIds = new Set(subItems.map((i) => i.id));
-      return [...subItems, ...legacyItems.filter((i) => !subIds.has(i.id))];
-    };
 
     // Filmler
     const movies = mergeById(
@@ -514,6 +535,9 @@ export default function FriendProfileScreen({ route, navigation }) {
   }, [canViewLists, allLists, subMovies, subShows]);
 
   // ── Görünür listeler: listVisible haritası + sabit liste sıralaması ──────
+  // Dört öntanımlı liste VE özel listeler artık kendi alt koleksiyonlarında
+  // yaşıyor; kök dokümandaki eski array'lerle birleştirip TÜM listeleri
+  // (boş olmayan + görünür işaretlenmiş) burada topluyoruz.
   const visibleLists = useMemo(() => {
     if (!allLists || !profile) return [];
     const rawVisible = profile.listVisible;
@@ -522,7 +546,39 @@ export default function FriendProfileScreen({ route, navigation }) {
       ? rawVisible.filter((m) => Object.values(m)[0] === true).map((m) => Object.keys(m)[0])
       : Object.entries(rawVisible || {}).filter(([, v]) => v === true).map(([k]) => k);
 
-    const entries = Object.entries(allLists).filter(
+    const predefinedEntries = [
+      ["favorites", mergeById(subFavorites, allLists.favorites || [])],
+      ["watchList", mergeById(subWatchList, allLists.watchList || [])],
+      [
+        "watchedMovies",
+        mergeById(subMovies, (allLists.watchedMovies || []).filter((m) => m.type === "movie")),
+      ],
+      ["watchedTv", mergeById(subShows, allLists.watchedTv || [])],
+    ];
+
+    // Özel listeler — kayıt defteri (customLists) + customItems alt koleksiyonu
+    // (içeri aktarma akışının yazdığı yeni format).
+    const registry = Array.isArray(allLists.customLists) ? allLists.customLists : [];
+    const itemsByListId = new Map();
+    (subCustomItems || []).forEach((item) => {
+      if (!item.listId) return;
+      if (!itemsByListId.has(item.listId)) itemsByListId.set(item.listId, []);
+      itemsByListId.get(item.listId).push(item);
+    });
+    const registeredNames = new Set(registry.map((r) => r.name));
+    const customEntries = registry.map((r) => [r.name, itemsByListId.get(r.listId) || []]);
+
+    // Eski format özel listeler — kök dokümanda doğrudan array olarak duran,
+    // henüz customItems'a taşınmamış listeler (bkz. listItemsService.js).
+    const legacyCustomEntries = Object.entries(allLists).filter(
+      ([name, items]) =>
+        !PROTECTED_LISTS.includes(name) &&
+        name !== "customLists" &&
+        !registeredNames.has(name) &&
+        Array.isArray(items),
+    );
+
+    const entries = [...predefinedEntries, ...customEntries, ...legacyCustomEntries].filter(
       ([name, items]) =>
         visibleNames.includes(name) && Array.isArray(items) && items.length > 0,
     );
@@ -532,17 +588,12 @@ export default function FriendProfileScreen({ route, navigation }) {
         .filter(([ln]) => !PROTECTED_LISTS.includes(ln))
         .sort((a, b) => a[0].localeCompare(b[0], language === "tr" ? "tr" : "en")),
     ];
-  }, [allLists, profile, language]);
+  }, [allLists, profile, language, subMovies, subShows, subFavorites, subWatchList, subCustomItems]);
 
   const totalItems = useMemo(
     () => visibleLists.reduce((acc, [, items]) => acc + items.length, 0),
     [visibleLists],
   );
-  const sharedListCardWidth = useMemo(
-    () => Math.max(96, Math.floor((windowWidth - 32 - 28 - 18) / 3)),
-    [windowWidth],
-  );
-
   // ── Moderasyon: şikâyet + engelle ─────────────────────────────────────────
   const isSelf = !!currentUser?.uid && currentUser.uid === friendUid;
 
@@ -648,6 +699,7 @@ export default function FriendProfileScreen({ route, navigation }) {
   const selectedListItems = selectedSharedList?.[1] ?? [];
   const selectedListMeta = LIST_META[selectedListName];
   const selectedListTitle = selectedListMeta?.label ?? selectedListName;
+  const isFullScreenList = selectedListItems.length >= FULLSCREEN_LIST_THRESHOLD;
 
   // Aynı anda iki native Modal sunmak iOS'ta arada boş kare/presentation
   // yarışına yol açıyor. Liste sayfasının 260 ms çıkışını tamamlatıp ortak
@@ -671,13 +723,24 @@ export default function FriendProfileScreen({ route, navigation }) {
       )
       .filter(Boolean);
     if (mediaList.length === 0) return;
+    // Kimden alındığı isimde kalsın — aynı liste adını birden çok arkadaştan
+    // kaydedince hangisinin hangisi olduğu karışmasın.
+    const sourceName = displayName || profile?.username || friendName || "";
     setPendingSaveListPost({
       id: `friend-list-${friendUid}-${selectedListName}`,
-      title: selectedListTitle,
+      title: sourceName ? `${selectedListTitle} (${sourceName})` : selectedListTitle,
       mediaList,
     });
     setSelectedSharedList(null);
-  }, [friendUid, selectedListItems, selectedListName, selectedListTitle]);
+  }, [
+    friendUid,
+    selectedListItems,
+    selectedListName,
+    selectedListTitle,
+    displayName,
+    profile?.username,
+    friendName,
+  ]);
 
   // ── Yükleniyor / bulunamadı ───────────────────────────────────────────────
   if (profileLoading) {
@@ -725,16 +788,23 @@ export default function FriendProfileScreen({ route, navigation }) {
 
           <View style={styles.profileTopRow}>
             <View style={styles.avatarBlock}>
-              <View style={[styles.avatarWrapper, { borderColor: theme.accent + "66" }]}>
-                {avatars?.[profile.avatarIndex] ? (
-                  <RNImage source={avatars[profile.avatarIndex]} style={styles.avatar} />
-                ) : (
-                  <View style={[styles.avatarPlaceholder, { backgroundColor: theme.primary }]}>
-                    <Ionicons name="person" size={34} color={theme.text?.muted ?? "#555"} />
-                  </View>
-                )}
-              </View>
-              {online && <View style={[styles.onlineDot, { borderColor: theme.secondary }]} />}
+              <UserAvatar
+                avatarIndex={profile.avatarIndex}
+                photoURL={profile.photoURL}
+                size={68}
+                shape="squircle"
+                iconRatio={0.794}
+                borderWidth={2}
+                borderColor={theme.accent + "66"}
+                online={online}
+                onlineBorderColor={theme.secondary}
+                onPress={() => setShowAvatarPreview(true)}
+                onLongPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  setShowAvatarPreview(true);
+                }}
+                delayLongPress={220}
+              />
             </View>
 
             <View style={styles.profileIdentity}>
@@ -1057,7 +1127,7 @@ export default function FriendProfileScreen({ route, navigation }) {
                       <View style={[styles.sectionAccent, { backgroundColor: theme.accent }]} />
                       <View style={styles.sharedListsTitleText}>
                         <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.text?.primary ?? "#fff" }]}>
-                          {i18nText("autoI18n.paylasilan_listeler", "Paylaşılan Listeler")}
+                          {i18nText("autoI18n.listeler", "Listeler")}
                         </Text>
                       </View>
                     </View>
@@ -1081,8 +1151,9 @@ export default function FriendProfileScreen({ route, navigation }) {
                         items={items}
                         theme={theme}
                         getTmdbUrl={getTmdbUrl}
+                        gridStyle={gridStyle}
+                        allCornersRounded={allCornersRounded}
                         onPress={() => setSelectedSharedList([listName, items])}
-                        style={{ width: sharedListCardWidth, flex: 0 }}
                       />
                     )}
                   />
@@ -1101,6 +1172,10 @@ export default function FriendProfileScreen({ route, navigation }) {
         dimColor="rgba(0,0,0,0.4)"
         sheetStyle={[
           styles.listModalSheet,
+          isFullScreenList && {
+            height: Math.round(windowHeight - insets.top - 12),
+            maxHeight: Math.round(windowHeight - insets.top - 12),
+          },
           {
             backgroundColor: theme.secondary,
             borderColor: theme.border ?? "rgba(255,255,255,0.08)",
@@ -1137,7 +1212,7 @@ export default function FriendProfileScreen({ route, navigation }) {
                   accessibilityLabel={i18nText("autoI18n.listeyi_kaydet", "Listeyi kaydet")}
                   style={[styles.modalActionButton, { backgroundColor: theme.accent }]}
                 >
-                  <Ionicons name="download-outline" size={18} color="#fff" />
+                  <Ionicons name="file-tray-full-outline" size={18} color="#fff" />
                 </Pressable>
 
                 <View
@@ -1208,6 +1283,7 @@ export default function FriendProfileScreen({ route, navigation }) {
             ) : (
               <FlatList
                 key={`shared-list-${sharedListColumns}`}
+                style={isFullScreenList ? styles.sharedListsModalListGrow : undefined}
                 data={selectedListItems}
                 keyExtractor={(item, index) => `${item?.type ?? "item"}-${item?.id ?? index}`}
                 numColumns={sharedListColumns}
@@ -1228,6 +1304,9 @@ export default function FriendProfileScreen({ route, navigation }) {
                       item={item}
                       theme={theme}
                       getTmdbUrl={getTmdbUrl}
+                      activity={getFriendActivity(item?.type, item?.id)}
+                      showRating={posterBadges?.rated !== false}
+                      showComment={posterBadges?.commented !== false}
                       onPress={() => {
                         if (!item?.id) return;
                         setSelectedSharedList(null);
@@ -1315,6 +1394,15 @@ export default function FriendProfileScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
+
+      <AvatarPreviewModal
+        visible={showAvatarPreview}
+        onClose={() => setShowAvatarPreview(false)}
+        source={getAvatarSource(profile.avatarIndex, profile.photoURL)}
+        isCustomPhoto={profile.avatarIndex === -1}
+        displayName={displayName || profile.username || friendName}
+        username={profile.username}
+      />
     </SafeAreaView>
   );
 }
@@ -1371,8 +1459,11 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     borderWidth: 2,
     overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
   },
   avatar: { width: "100%", height: "100%", borderRadius: 21 },
+  avatarIcon: { width: 54, height: 54 },
   avatarPlaceholder: {
     width: "100%",
     height: "100%",
@@ -1644,73 +1735,62 @@ const styles = StyleSheet.create({
     gap: 9,
     paddingRight: 2,
   },
-  sharedListGridCard: {
-    flex: 1,
-    minWidth: 0,
-    borderRadius: 15,
+  // ── Liste kartı — ProfileLists (profil rayı) ile BİREBİR aynı çerçeve ────
+  railCardBg: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    height: RAIL_CARD_H,
+    borderRadius: 20,
+  },
+  railCardGlow: {
+    position: "absolute",
+    top: 4,
+    left: 4,
+    right: 4,
+    bottom: 0,
+    borderRadius: 20,
     borderWidth: 1,
-    padding: 8,
   },
-  sharedListGridCardCompact: {
-    borderRadius: 13,
-    padding: 6,
-  },
-  sharedPosterStrip: {
-    height: 86,
-    flexDirection: "row",
-    gap: 3,
-    marginBottom: 8,
-  },
-  sharedPosterStripCompact: {
-    height: 64,
-    marginBottom: 6,
-  },
-  sharedPosterSlot: {
-    flex: 1,
-    borderRadius: 8,
+  railCard: {
+    height: RAIL_CARD_H,
+    borderRadius: 20,
     overflow: "hidden",
+    padding: RAIL_CARD_PADDING,
     alignItems: "center",
-    justifyContent: "center",
+    gap: 2,
   },
-  sharedPosterMainSlot: {
-    flex: 1.35,
+  railDivider: {
+    height: 1,
+    alignSelf: "stretch",
+    marginHorizontal: 4,
+    marginTop: 7,
+    marginBottom: 5,
   },
-  sharedPosterSideColumn: {
-    flex: 0.72,
-    gap: 3,
-  },
-  sharedPosterSlotCompact: {
-    borderRadius: 7,
-  },
-  sharedPosterImage: { width: "100%", height: "100%" },
-  sharedListInfoRow: {
+  railCardFooter: {
     flexDirection: "row",
     alignItems: "center",
+    alignSelf: "stretch",
     gap: 6,
-    minWidth: 0,
   },
-  sharedListIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    alignItems: "center",
+  railIconDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     justifyContent: "center",
+    alignItems: "center",
   },
-  sharedListName: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: 11.5,
-    lineHeight: 15,
-    fontWeight: "800",
-  },
-  sharedListNameCompact: {
-    fontSize: 10,
-    lineHeight: 13,
-  },
-  sharedListCount: {
-    fontSize: 10,
+  railCardName: {
+    fontSize: 13,
     fontWeight: "700",
-    marginTop: 5,
+    letterSpacing: -0.2,
+    flexShrink: 1,
+    maxWidth: 120,
+  },
+  railCountBadge: {
+    fontSize: 12,
+    fontWeight: "800",
+    marginLeft: "auto",
   },
   sharedListsHintRow: {
     flexDirection: "row",
@@ -1799,6 +1879,9 @@ const styles = StyleSheet.create({
   columnSelectorText: { fontSize: 13, fontWeight: "900" },
   sharedListsModalContent: {
     gap: 10,
+  },
+  sharedListsModalListGrow: {
+    flex: 1,
   },
   sharedListsModalRow: {
     justifyContent: "flex-start",

@@ -29,6 +29,7 @@ import ScreenDecor from "../../../components/ScreenDecor";
 import BackButton from "../../../components/BackButton";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { i18nText } from "../../../utils/i18nText";
+import UserAvatar from "../../../components/common/UserAvatar";
 
 export default function FriendsListScreen({ navigation }) {
   const [friends, setFriends] = useState([]);
@@ -66,6 +67,7 @@ export default function FriendsListScreen({ navigation }) {
                 displayName: data.friendName || "",
                 username: data.friendUsername || "",
                 avatarIndex: data.friendAvatarIndex ?? 0,
+                photoURL: data.friendPhotoURL || data.photoURL || null,
               };
             }),
           );
@@ -155,15 +157,14 @@ export default function FriendsListScreen({ navigation }) {
         }
         style={[styles.friendCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}
       >
-        <View style={[styles.avatarWrapper, { borderColor: theme.accent + "66" }]}>
-          {avatars?.[item.avatarIndex] ? (
-            <Image source={avatars[item.avatarIndex]} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatarPlaceholder, { backgroundColor: theme.primary }]}>
-              <Ionicons name="person" size={22} color={theme.text?.muted ?? "#555"} />
-            </View>
-          )}
-        </View>
+        <UserAvatar
+          avatarIndex={item.avatarIndex}
+          photoURL={item.photoURL}
+          isCustomPhoto
+          size={52}
+          borderWidth={2}
+          borderColor={theme.accent + "66"}
+        />
         <View style={styles.friendInfo}>
           <Text style={[styles.friendName, { color: theme.text?.primary ?? "#fff" }]} numberOfLines={1}>
             {item.displayName}

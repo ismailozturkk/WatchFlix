@@ -1,4 +1,3 @@
-import { Image } from "expo-image";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -9,7 +8,7 @@ import { useFriends } from "@context/FriendsContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import { fetchLeaderboard } from "@services/sceneGameService";
-import { getAvatarSource } from "@utils/avatars";
+import UserAvatar from "@components/common/UserAvatar";
 import { GameScreenShell, gameSharedStyles } from "./GameScreenShell";
 
 const PODIUM_COLORS = ["#E8B931", "#C7CDD6", "#CD7F32"];
@@ -75,7 +74,7 @@ export default function GameLeaderboardScreen({ navigation }) {
     return (
       <View style={[styles.row, { backgroundColor: isSelf ? `${theme.accent}1A` : theme.secondary, borderColor: isSelf ? theme.accent : theme.border }]}>
         <Text style={[styles.rank, { color: theme.text.muted }]}>#{rank}</Text>
-        <Image source={getAvatarSource(item.avatarIndex)} style={styles.avatar} />
+        <UserAvatar avatarIndex={item.avatarIndex} photoURL={item.photoURL} isCustomPhoto size={36} />
         <View style={styles.player}>
           <Text style={[styles.name, { color: theme.text.primary }]} numberOfLines={1}>{isSelf ? (tr ? "Sen" : "You") : item.displayName || (tr ? "Anonim" : "Anonymous")}</Text>
           <Text style={[styles.meta, { color: theme.text.muted }]}>{accuracyOf(item)}% {tr ? "doğruluk" : "accuracy"} · 🔥 {Number(item.bestStreak) || 0}</Text>
@@ -175,7 +174,12 @@ function Podium({ entries, currentUid, theme, tr }) {
         return (
           <View key={entry.uid} style={[styles.podiumCol, isWinner && styles.podiumColWinner]}>
             <View style={[styles.podiumAvatarWrap, { borderColor: PODIUM_COLORS[realRank] }, isWinner && styles.podiumAvatarWrapWinner]}>
-              <Image source={getAvatarSource(entry.avatarIndex)} style={styles.podiumAvatar} />
+              <UserAvatar
+                avatarIndex={entry.avatarIndex}
+                photoURL={entry.photoURL}
+                isCustomPhoto
+                size={isWinner ? 59 : 49}
+              />
               <View style={[styles.podiumRank, { backgroundColor: PODIUM_COLORS[realRank] }]}><Text style={styles.podiumRankText}>{realRank + 1}</Text></View>
             </View>
             <Text style={[styles.podiumName, { color: theme.text.primary }]} numberOfLines={1}>{isSelf ? (tr ? "Sen" : "You") : entry.displayName || (tr ? "Anonim" : "Anonymous")}</Text>

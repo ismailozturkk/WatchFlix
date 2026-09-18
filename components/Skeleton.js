@@ -258,6 +258,35 @@ export const MovieOscarSkeleton = () => {
     </View>
   );
 };
+export const TvShowsEmmySkeleton = () => {
+  const rp = useRailPosterStyle();
+  return (
+    <View
+      style={{
+        width: rp.posterWidth + width * 0.04,
+        height: rp.posterHeight,
+        marginRight: 15,
+        flexDirection: "row",
+      }}
+    >
+      <View style={{ width: width * 0.04, alignItems: "center", justifyContent: "space-around" }}>
+        <Skeleton width={10} height={40} style={{ borderRadius: 5 }} />
+        <Skeleton width={10} height={Math.min(120, rp.posterHeight * 0.5)} style={{ borderRadius: 5 }} />
+      </View>
+      <View style={{ width: rp.posterWidth, height: rp.posterHeight }}>
+        <Skeleton
+          width={rp.posterWidth}
+          height={rp.posterHeight}
+          style={{ borderRadius: rp.radius }}
+        />
+        <PosterBadgeSkeleton
+          variant="rating"
+          style={POSTER_BADGE_POS.bottomRight}
+        />
+      </View>
+    </View>
+  );
+};
 // Yatay poster section'ları (Genres, NowPlaying, Provders, TvGenres, TvProvders…)
 // Gerçek kart 0.4×0.6 r15 → skeleton de aynı ölçüde.
 export const MovieSkeleton = () => {
@@ -273,7 +302,9 @@ export const MovieUpComingSkeleton = () => {
   );
 };
 export const AvatarSkeleton = () => {
-  return <Skeleton width={140} height={140} style={{ borderRadius: 70 }} />;
+  // ProfileScreen'deki avatarProgressWrapper/profilImageTouch (156x156,
+  // borderRadius 78) ile eşleşir — yükleme sırasında boyut sıçraması olmasın.
+  return <Skeleton width={156} height={156} style={{ borderRadius: 78 }} />;
 };
 export const WatchedInfoSkeleton = () => {
   return (

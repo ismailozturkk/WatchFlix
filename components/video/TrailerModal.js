@@ -11,7 +11,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import TrailerSection from "./TrailerSection";
 
-export default function TrailerModal({ visible, mediaType, id, apiKey, onClose }) {
+export default function TrailerModal({ visible, mediaType, id, apiKey, originalLanguage, onClose }) {
   const { theme } = useTheme();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -36,7 +36,12 @@ export default function TrailerModal({ visible, mediaType, id, apiKey, onClose }
         </View>
 
         {visible && id ? (
-          <TrailerSection mediaType={mediaType} id={id} apiKey={apiKey} />
+          <TrailerSection
+            mediaType={mediaType}
+            id={id}
+            apiKey={apiKey}
+            originalLanguage={originalLanguage}
+          />
         ) : null}
       </View>
     </Modal>

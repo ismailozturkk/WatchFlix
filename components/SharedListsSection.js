@@ -17,7 +17,7 @@ import {
 } from "../services/sharedListsService";
 import { i18nText } from "../utils/i18nText";
 
-const ACCENT = "#38bdf8";
+import { getSharedListAccent } from "../utils/listAppearance";
 
 /**
  * Detay ekranı "Diğer Listeler" modalındaki ORTAK LİSTELER bölümü.
@@ -34,6 +34,7 @@ const ACCENT = "#38bdf8";
  */
 export default function SharedListsSection({ sharedItem, visible }) {
   const { theme } = useTheme();
+  const ACCENT = getSharedListAccent(theme.primary);
   const { user } = useAuth();
   const { displayName, username, avatarIndex } = useUserProfile();
   const { sharedLists, sharedItemsByList } = useSharedLists();

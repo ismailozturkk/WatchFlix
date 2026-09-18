@@ -1,3 +1,4 @@
+import { isLightSurface } from "@utils/colorUtils";
 import React, { memo, useEffect, useMemo, useRef } from "react";
 import {
   StyleSheet,
@@ -308,7 +309,7 @@ export default function TvShowsTrends({ navigation }) {
   if (loadingTrend) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
         {trendHeader}
         <TrendRailSkeleton metrics={TREND_SKELETON_METRICS} />
       </View>
@@ -317,7 +318,7 @@ export default function TvShowsTrends({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
 
       {trendHeader}
       <Animated.FlatList

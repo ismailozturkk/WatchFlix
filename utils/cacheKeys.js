@@ -9,6 +9,7 @@
 export const cacheKeys = {
   profile: (uid) => ["profile", uid],                  // obje: { uid, ...userDoc }
   notes: (uid) => ["notes", uid],                      // dizi: [{ ...note, id }] (createdAt desc)
+  mediaNotes: (uid) => ["mediaNotes", uid],             // dizi: [{ ...mediaNote, id }] (updatedAt desc)
   reminders: (uid, kind) => ["reminders", `${uid}:${kind}`], // kind: 'movies'|'episodes' → dizi
   lists: (uid, name) => ["lists", `${uid}:${name}`],   // name: root|favorites|watchList|watchedMovies|watchedTv
   activity: (uid) => ["activity", uid],                // obje: { ratings, comments, likes, bookmarks, posts }

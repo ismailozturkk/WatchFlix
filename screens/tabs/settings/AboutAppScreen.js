@@ -39,7 +39,7 @@ if (
 // Sürüm TEK KAYNAKTAN: app.json → expo.version. Buraya elle yazılan dize
 // ("v1.21.1") gerçek sürümden kopmuştu ve destek e-postasının konusuna da
 // yanlış sürüm giriyordu — kullanıcı hangi build'i kullandığını söyleyemiyordu.
-const APP_VERSION = `v${Constants.expoConfig?.version ?? "?"}`;
+const APP_VERSION = `v${Constants.expoConfig?.version ?? "1.4.5"}`;
 
 export default function AboutAppScreen() {
   const navigation = useNavigation();

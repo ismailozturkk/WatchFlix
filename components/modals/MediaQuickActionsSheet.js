@@ -86,8 +86,8 @@ import {
 } from "../../utils/watchState";
 
 const { width, height } = Dimensions.get("window");
-const BACKDROP_H = Math.round(width * (9 / 16) * 0.78);
-const POSTER_W = Math.round(width * 0.26);
+const BACKDROP_H = Math.round(width * (9 / 16) * 0.72);
+const POSTER_W = Math.round(width * 0.25);
 // Kapanış animasyonu ile bir sonraki sayfanın açılışı arasındaki nefes payı.
 // WatchHistorySheet'in "tekrar ekle" akışında kullanılan değerle aynı.
 const HANDOFF_MS = 220;
@@ -114,7 +114,7 @@ const ActionRow = ({ icon, tint, title, subtitle, onPress, theme }) => (
     ]}
   >
     <View style={[styles.actionIcon, { backgroundColor: alpha(tint, 0.18) }]}>
-      <Ionicons name={icon} size={19} color={tint} />
+      <Ionicons name={icon} size={18} color={tint} />
     </View>
     <View style={styles.actionCopy}>
       <Text
@@ -132,7 +132,7 @@ const ActionRow = ({ icon, tint, title, subtitle, onPress, theme }) => (
         {subtitle}
       </Text>
     </View>
-    <Ionicons name="chevron-forward" size={17} color={theme.text.muted} />
+    <Ionicons name="chevron-forward" size={16} color={theme.text.muted} />
   </TouchableOpacity>
 );
 
@@ -156,8 +156,13 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
   // hemen ardından güncelleniyordu. `target` varken doğrudan onu çiziyoruz.
   const [shown, setShown] = useState(null);
   const current = target || shown;
+  const [overviewExpanded, setOverviewExpanded] = useState(false);
+
   useEffect(() => {
-    if (target && target !== shown) setShown(target);
+    if (target && target !== shown) {
+      setShown(target);
+      setOverviewExpanded(false);
+    }
   }, [target, shown]);
 
   const media = current?.media || null;
@@ -416,6 +421,7 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
     media?.releaseDate ??
     null;
   const genres = details?.genres || [];
+  const overviewText = details?.overview || media?.overview || "";
 
   const releaseState = getReleaseState(releaseDate, details?.status);
   // Film göz butonu: tarih ileride → hatırlatmaya döner, tarih bilinmiyor →
@@ -695,6 +701,7 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
               episodeName: episode.name || "Unknown",
               episodeRatings: parseFloat(episode.vote_average?.toFixed(1)) || 0,
               episodeMinutes: episode.runtime || 0,
+              releaseDate: episode.air_date || null,
             })),
           });
         }
@@ -905,96 +912,100 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
               contentContainerStyle={styles.scrollBody}
               bounces={false}
             >
-              {/* ── HERO / BACKDROP ── */}
-              <View style={styles.hero}>
-                {backdropPath ? (
-                  <Image
-                    source={{ uri: getTmdbUrl(backdropPath, "backdrop", 1000) }}
-                    style={styles.backdrop}
-                    contentFit="cover"
-                    cachePolicy="memory-disk"
-                    transition={140}
+              {/* ── ÜST ALAN (HERO + POSTER + BİLGİ) — DOKUNUNCA DETAYA GİDER ── */}
+              <TouchableOpacity
+                activeOpacity={0.88}
+                onPress={openDetailScreen}
+                style={styles.topTouchArea}
+              >
+                {/* ── HERO / BACKDROP ── */}
+                <View style={styles.hero}>
+                  {backdropPath ? (
+                    <Image
+                      source={{ uri: getTmdbUrl(backdropPath, "backdrop", 1000) }}
+                      style={styles.backdrop}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                      transition={140}
+                      blurRadius={3}
+                    />
+                  ) : (
+                    <View
+                      style={[styles.backdrop, { backgroundColor: theme.between }]}
+                    />
+                  )}
+                  <LinearGradient
+                    colors={["transparent", "rgba(0,0,0,0.18)", theme.primary]}
+                    locations={[0.25, 0.6, 1]}
+                    style={StyleSheet.absoluteFill}
+                    pointerEvents="none"
                   />
-                ) : (
-                  <View
-                    style={[styles.backdrop, { backgroundColor: theme.between }]}
-                  />
-                )}
-                <LinearGradient
-                  colors={["transparent", "rgba(0,0,0,0.18)", theme.primary]}
-                  locations={[0.25, 0.6, 1]}
-                  style={StyleSheet.absoluteFill}
-                  pointerEvents="none"
-                />
-              </View>
+                </View>
 
-              {/* ── POSTER + BİLGİ BAŞLIĞI ── */}
-              <View style={styles.infoHeader}>
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  onPress={openDetailScreen}
-                  style={styles.posterShadow}
-                >
-                  <PosterImage
-                    path={posterPath}
-                    type={mediaType}
-                    size={200}
-                    style={[styles.poster, { borderColor: theme.border + "80" }]}
-                    cachePolicy="memory-disk"
-                    transition={140}
-                  />
-                </TouchableOpacity>
+                {/* ── POSTER + BİLGİ BAŞLIĞI ── */}
+                <View style={styles.infoHeader}>
+                  <View style={styles.posterShadow}>
+                    <PosterImage
+                      path={posterPath}
+                      type={mediaType}
+                      size={200}
+                      style={[styles.poster, { borderColor: alpha(theme.border, 0.5019607843137255) }]}
+                      cachePolicy="memory-disk"
+                      transition={140}
+                    />
+                  </View>
 
-                <View style={styles.titleBlock}>
-                  <Text
-                    allowFontScaling={false}
-                    numberOfLines={2}
-                    style={[styles.title, { color: theme.text.primary }]}
-                  >
-                    {title}
-                  </Text>
-                  {metaLine ? (
-                    <Text
-                      allowFontScaling={false}
-                      numberOfLines={1}
-                      style={[styles.meta, { color: theme.text.muted }]}
-                    >
-                      {metaLine}
-                    </Text>
-                  ) : null}
-                  {details?.tagline ? (
+                  <View style={styles.titleBlock}>
                     <Text
                       allowFontScaling={false}
                       numberOfLines={2}
-                      style={[styles.tagline, { color: theme.accent }]}
+                      style={[styles.title, { color: theme.text.primary }]}
                     >
-                      "{details.tagline}"
+                      {title}
                     </Text>
-                  ) : null}
-
-                  <View style={styles.genreRow}>
-                    {genres.slice(0, 3).map((genre) => (
-                      <View
-                        key={genre.id}
-                        style={[
-                          styles.genreChip,
-                          {
-                            backgroundColor: theme.accent + "22",
-                            borderColor: theme.accent + "44",
-                          },
-                        ]}
+                    {metaLine ? (
+                      <Text
+                        allowFontScaling={false}
+                        numberOfLines={1}
+                        style={[styles.meta, { color: theme.text.muted }]}
                       >
-                        <Text
-                          allowFontScaling={false}
-                          style={[styles.genreChipText, { color: theme.accent }]}
+                        {metaLine}
+                      </Text>
+                    ) : null}
+                    {details?.tagline ? (
+                      <Text
+                        allowFontScaling={false}
+                        numberOfLines={2}
+                        style={[styles.tagline, { color: theme.accent }]}
+                      >
+                        "{details.tagline}"
+                      </Text>
+                    ) : null}
+
+                    <View style={styles.genreRow}>
+                      {genres.slice(0, 3).map((genre) => (
+                        <View
+                          key={genre.id}
+                          style={[
+                            styles.genreChip,
+                            {
+                              backgroundColor: theme.accent + "22",
+                              borderColor: theme.accent + "44",
+                            },
+                          ]}
                         >
-                          {genre.name}
-                        </Text>
-                      </View>
-                    ))}
+                          <Text
+                            allowFontScaling={false}
+                            style={[styles.genreChipText, { color: theme.accent }]}
+                          >
+                            {genre.name}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
                   </View>
                 </View>
-              </View>
+              </TouchableOpacity>
 
               {/* Puan özeti — detay ekranındaki bileşenin aynısı */}
               <View style={styles.ratingRow}>
@@ -1008,26 +1019,12 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
                 />
               </View>
 
-              {/* ── LİSTELER ── */}
-              <View style={styles.sectionHead}>
-                <View
-                  style={[styles.sectionBar, { backgroundColor: theme.accent }]}
-                />
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.sectionTitle, { color: theme.text.primary }]}
-                >
-                  {i18nText("autoI18n.listelerim", "Listelerim")}
-                </Text>
-              </View>
-
-              {/* ListView/ListViewTv kartı kendi kenar boşluğunu taşımıyor
-                  (detay ekranında gövde `body` içinde duruyor); yatay boşluğu
-                  burada veriyoruz. */}
+              {/* ── LİSTELER (KOMPAKT) ── */}
               <View style={styles.listWrap}>
               {isTv ? (
                 <ListViewTv
                   type="tv"
+                  compact={true}
                   navigation={listNavigation}
                   updateList={updateList}
                   openModal={requestWatchDate}
@@ -1058,6 +1055,7 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
               ) : (
                 <ListView
                   type="movie"
+                  compact={true}
                   navigation={listNavigation}
                   updateList={updateList}
                   updateWatchedList={requestWatchDate}
@@ -1073,22 +1071,7 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
               )}
               </View>
 
-              {/* ── YÖNLENDİRMELER ── */}
-              <View style={[styles.sectionHead, styles.sectionHeadTight]}>
-                <View
-                  style={[
-                    styles.sectionBar,
-                    { backgroundColor: theme.colors.blue },
-                  ]}
-                />
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.sectionTitle, { color: theme.text.primary }]}
-                >
-                  {i18nText("autoI18n.kesfet_ve_incele", "Keşfet ve incele")}
-                </Text>
-              </View>
-
+              {/* ── BÖLÜM GRAFİĞİ & ÖZET (SİNOPSİS) ── */}
               <View style={styles.actionList}>
                 {hasGraph ? (
                   <ActionRow
@@ -1106,21 +1089,52 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
                     onPress={openGraphScreen}
                   />
                 ) : null}
-                <ActionRow
-                  theme={theme}
-                  icon={isTv ? "tv" : "film"}
-                  tint={theme.accent}
-                  title={
-                    isTv
-                      ? i18nText("autoI18n.dizi_detayi", "Dizi detayı")
-                      : i18nText("autoI18n.film_detayi", "Film detayı")
-                  }
-                  subtitle={i18nText(
-                    "autoI18n.oyuncular_fragman_benzerler",
-                    "Oyuncular, fragman, benzerler",
-                  )}
-                  onPress={openDetailScreen}
-                />
+
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => setOverviewExpanded((prev) => !prev)}
+                  style={[
+                    styles.overviewBox,
+                    {
+                      backgroundColor: theme.secondary,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <View style={styles.overviewHeader}>
+                    <View style={styles.overviewTitleRow}>
+                      <Ionicons
+                        name="document-text-outline"
+                        size={14}
+                        color={theme.accent}
+                      />
+                      <Text
+                        allowFontScaling={false}
+                        style={[styles.overviewTitle, { color: theme.text.primary }]}
+                      >
+                        {t.overview || i18nText("autoI18n.ozet", "Özet")}
+                      </Text>
+                    </View>
+                    {overviewText ? (
+                      <Ionicons
+                        name={overviewExpanded ? "chevron-up" : "chevron-down"}
+                        size={14}
+                        color={theme.text.muted}
+                      />
+                    ) : null}
+                  </View>
+                  <Text
+                    allowFontScaling={false}
+                    numberOfLines={overviewExpanded ? undefined : 3}
+                    style={[styles.overviewText, { color: theme.text.secondary }]}
+                  >
+                    {overviewText ||
+                      i18nText(
+                        "autoI18n.ozet_bulunmuyor",
+                        "Özet bulunmuyor.",
+                      )}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </ScrollView>
 
@@ -1169,6 +1183,10 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
         releaseDate={releaseDate}
         minDate={releaseDate}
         mediaType={mediaType}
+        scope={isTv ? "show" : "movie"}
+        mediaId={id}
+        mediaTitle={title}
+        posterPath={posterPath}
         busy={busy}
         onConfirm={isTv ? confirmShowWatch : confirmMovieWatch}
       />
@@ -1181,7 +1199,7 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
         busy={busy}
         onAddAgain={() => {
           setHistoryVisible(false);
-          setTimeout(() => setDateSheetVisible(true), 180);
+          setTimeout(() => setDateSheetVisible(true), 300);
         }}
         onDeleteEvent={deleteWatchEvent}
       />
@@ -1217,9 +1235,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     overflow: "hidden",
   },
-  scrollBody: { paddingBottom: 30 },
+  scrollBody: { paddingBottom: 24 },
 
-  /* Hero */
+  /* Hero & Üst Tıklanabilir Alan */
+  topTouchArea: {
+    width: "100%",
+  },
   hero: { height: BACKDROP_H, position: "relative" },
   backdrop: { width: "100%", height: "100%" },
   handleWrap: {
@@ -1245,78 +1266,93 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(0,0,0,0.45)",
+    zIndex: 10,
   },
 
   /* Poster + başlık */
   infoHeader: {
     flexDirection: "row",
     paddingHorizontal: 16,
-    marginTop: -BACKDROP_H * 0.34,
-    gap: 13,
+    marginTop: -BACKDROP_H * 0.36,
+    gap: 12,
     alignItems: "flex-end",
   },
   posterShadow: {
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   poster: {
     width: POSTER_W,
     height: POSTER_W * 1.5,
-    borderRadius: 13,
+    borderRadius: 12,
     borderWidth: 1.5,
   },
   titleBlock: { flex: 1, paddingBottom: 2, gap: 3 },
-  title: { fontSize: 19, fontWeight: "800", letterSpacing: -0.4, lineHeight: 23 },
-  meta: { fontSize: 11.5, fontWeight: "600" },
-  tagline: { fontSize: 11.5, fontStyle: "italic", lineHeight: 16 },
-  genreRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 3 },
+  title: { fontSize: 18, fontWeight: "800", letterSpacing: -0.4, lineHeight: 22 },
+  meta: { fontSize: 11, fontWeight: "600" },
+  tagline: { fontSize: 11, fontStyle: "italic", lineHeight: 15 },
+  genreRow: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 2 },
   genreChip: {
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  genreChipText: { fontSize: 10.5, fontWeight: "600" },
-  ratingRow: { paddingHorizontal: 16, marginTop: 12 },
-
-  /* Bölüm başlıkları */
-  sectionHead: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    paddingHorizontal: 16,
-    marginTop: 18,
-    marginBottom: 10,
-  },
-  // ListView kartının kendi `marginBottom: 20`u var; sonraki başlık iki kat
-  // boşluk almasın.
-  sectionHeadTight: { marginTop: 0 },
-  sectionBar: { width: 3, height: 16, borderRadius: 2 },
-  sectionTitle: { fontSize: 15, fontWeight: "700", letterSpacing: -0.2 },
-  listWrap: { paddingHorizontal: 16 },
-
-  /* Yönlendirme satırları */
-  actionList: { paddingHorizontal: 16, gap: 10 },
-  actionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-    paddingHorizontal: 13,
-    paddingVertical: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
     borderRadius: 16,
     borderWidth: 1,
   },
+  genreChipText: { fontSize: 10, fontWeight: "600" },
+  ratingRow: { paddingHorizontal: 16, marginTop: 10, marginBottom: 8 },
+
+  listWrap: { paddingHorizontal: 16, marginBottom: 10 },
+
+  /* Yönlendirme ve Özet */
+  actionList: { paddingHorizontal: 16, gap: 8 },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
   actionIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
   actionCopy: { flex: 1, minWidth: 0 },
-  actionTitle: { fontSize: 13.5, fontWeight: "700" },
-  actionSub: { fontSize: 11, fontWeight: "600", marginTop: 2 },
+  actionTitle: { fontSize: 13, fontWeight: "700" },
+  actionSub: { fontSize: 10.5, fontWeight: "600", marginTop: 1 },
+
+  /* Özet Kutusu */
+  overviewBox: {
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 6,
+  },
+  overviewHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  overviewTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  overviewTitle: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+  },
+  overviewText: {
+    fontSize: 12,
+    lineHeight: 17,
+    letterSpacing: 0.1,
+  },
 });

@@ -38,12 +38,13 @@ const WIDGETS = [
 
 const BUILTIN_THEMES = [
   { id: "gray", labelKey: "grayTheme", fallback: "Gri" },
-  { id: "blue", labelKey: "blueTheme", fallback: "Lacivert" },
-  { id: "green", labelKey: "greenTheme", fallback: "Yeşil" },
   { id: "dark", labelKey: "darkTheme", fallback: "AMOLED" },
   { id: "light", labelKey: "lightTheme", fallback: "Açık" },
+  { id: "sky", labelKey: "skyTheme", fallback: "Açık Mavi" },
+  { id: "blue", labelKey: "blueTheme", fallback: "Lacivert" },
+  { id: "green", labelKey: "greenTheme", fallback: "Yeşil" },
   { id: "purple", labelKey: "purpleTheme", fallback: "Gece Moru" },
-  { id: "amber", labelKey: "amberTheme", fallback: "Sinema" },
+  { id: "amber", labelKey: "amberTheme", fallback: "Kızıl Sinema" },
 ];
 
 const POSTERS = [
@@ -174,7 +175,7 @@ function OptionRow({ icon, title, subtitle, value, onChange, colors, last }) {
 //   • .../widget/ListsWidgetProvider.kt        (çalışma anı renkleri/görünürlük)
 // Renkler tema paletinden ÇALIŞMA ANINDA basılır (WidgetThemeViews.tintBackground):
 // kök = background, öne çıkan satır = surface, diğer satır = surfaceAlt.
-const LOGO_KAYNAK = require("../../../assets/android-icon-monochrome.png");
+const LOGO_KAYNAK = require("../../../assets/icon.png");
 
 function Poster({ uri, style, contain }) {
   return (
@@ -188,27 +189,32 @@ function Poster({ uri, style, contain }) {
   );
 }
 
-// Uygulama logosu rozeti. Gradyan SABİTTİR (reminder_widget_logo_badge.xml):
-// tema değişince bile mor kalır — widget'ın kimliği bu rozet.
+// Uygulama logosu. Ana uygulamayla AYNI launcher ikonu (reminder_widget.xml
+// → @mipmap/ic_launcher): kendi gradyan rozetini kurup üstüne beyaza boyanmış
+// bir "S" siluet basmak yerine, gerçek Seelogd ikonu (gradyanı dahil) olduğu
+// gibi gösterilir.
 function WidgetBrand({ size = 28, radius = 9 }) {
   return (
-    <LinearGradient
-      colors={["#8E7CFF", "#574BDB"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[
-        styles.brand,
-        { width: size, height: size, borderRadius: radius },
-      ]}
-    >
-      <Image
-        source={LOGO_KAYNAK}
-        resizeMode="contain"
-        style={{ width: size - 8, height: size - 8, tintColor: "#FFFFFF" }}
-      />
-    </LinearGradient>
+    <Image
+      source={LOGO_KAYNAK}
+      resizeMode="cover"
+      style={[styles.brand, { width: size, height: size, borderRadius: radius }]}
+    />
   );
 }
+
+// Kalan süreye göre renk. ReminderWidgetRemoteViewsService.kt'teki
+// countdownColor() ile BİREBİR aynı kurallar: yalnız gerçekten yaklaşan
+// (bugün/yarın) satırlar sabit alarm renginde parlar, sonrası widget'ın
+// KENDİ temasına söner — böylece widget teması ne olursa olsun her satır
+// gökkuşağı gibi görünmez, yalnız gerçek aciliyet öne çıkar.
+const countdownColor = (days, p) => {
+  if (days <= 0) return "#FF6B6B";
+  if (days === 1) return "#FFB547";
+  if (days <= 3) return p.accent;
+  if (days <= 7) return p.secondaryText;
+  return p.muted;
+};
 
 // Örnek satırlar. Meta biçimi servisteki ile aynı: "Tip  •  alt bilgi"
 // (ReminderWidgetRemoteViewsService.kt, joinToString("  •  ")).
@@ -220,14 +226,16 @@ const REMINDER_SAMPLES = [
     when: "Bugün",
     date: "30 Tem",
     today: true,
+    daysLeft: 0,
   },
   {
     title: "Silo",
     type: "tv",
     sub: "S3 · 5. Bölüm",
-    when: "Bugün",
-    date: "30 Tem",
-    today: true,
+    when: "Yarın",
+    date: "31 Tem",
+    today: false,
+    daysLeft: 1,
   },
   {
     title: "House of the Dragon",
@@ -235,6 +243,7 @@ const REMINDER_SAMPLES = [
     sub: "S3 · 7. Bölüm",
     when: "3 gün",
     date: "2 Ağu",
+    daysLeft: 3,
   },
   {
     title: "Dune: Part Three",
@@ -242,6 +251,7 @@ const REMINDER_SAMPLES = [
     sub: "",
     when: "6 gün",
     date: "5 Ağu",
+    daysLeft: 6,
   },
   {
     title: "Silo",
@@ -249,6 +259,7 @@ const REMINDER_SAMPLES = [
     sub: "S3 · 6. Bölüm",
     when: "7 gün",
     date: "6 Ağu",
+    daysLeft: 7,
   },
   {
     title: "The Batman: Part II",
@@ -256,6 +267,7 @@ const REMINDER_SAMPLES = [
     sub: "",
     when: "12 gün",
     date: "11 Ağu",
+    daysLeft: 12,
   },
   {
     title: "Severance",
@@ -263,6 +275,7 @@ const REMINDER_SAMPLES = [
     sub: "S3 · 1. Bölüm",
     when: "18 gün",
     date: "17 Ağu",
+    daysLeft: 18,
   },
   {
     title: "Avatar: Fire and Ash",
@@ -270,6 +283,7 @@ const REMINDER_SAMPLES = [
     sub: "",
     when: "24 gün",
     date: "23 Ağu",
+    daysLeft: 24,
   },
 ];
 
@@ -284,8 +298,9 @@ function ReminderPreview({ settings }) {
       ? REMINDER_SAMPLES
       : REMINDER_SAMPLES.filter((item) => item.type === settings.content);
   // Servis `take(maxItems)` yapar — eksikse eksik gösterilir, tekrar edilmez.
-  // Ayar 100'e çıkabilir; canlı önizleme gerçek widget gibi kaydırılabilir ama
-  // aynı örnekleri onlarca kez render etmek Ayarlar ekranını gereksiz yorar.
+  // Ayar 100'e çıkabilir; önizleme kaydırılamaz olduğundan (bkz. aşağıdaki not)
+  // yalnız çerçeveye sığan kadarı gösterilir — aynı örnekleri onlarca kez
+  // render etmek de Ayarlar ekranını gereksiz yorardı.
   const display = filtered.slice(0, Math.min(settings.maxItems, 8));
   const typeLabel = (type) =>
     type === "movie" ? (isTr ? "Film" : "Movie") : isTr ? "Dizi" : "TV";
@@ -328,9 +343,13 @@ function ReminderPreview({ settings }) {
         </View>
       </View>
 
-      {/* Gerçeğinde bu bir ListView'dur: çerçeveye sığmayan satırlar kırpılır ve
-          kaydırılarak görülür. Önizleme de öyle — böylece "5 öğe" ile "8 öğe"
-          farkı hem sayaçta hem kaydırılabilir içerikte gerçekten görünür. */}
+      {/* Gerçeğinde bu bir ListView'dur: çerçeveye sığmayan satırlar kırpılır.
+          Önizleme kaydırılabilir YAPILMAZ: bu panel Ayarlar'ın kendi dikey
+          ScrollView'ı içinde yaşıyor, aynı yöndeki iç içe ScrollView jest
+          çakışmasına (özellikle iOS'ta parmağın önizleme üstünde kilitlenip
+          sayfanın kaydırılamaması) yol açardı. "5 öğe" ile "8 öğe" farkı
+          sayaçta ve alttaki özellik etiketlerinde zaten görünür; taşan
+          satırlar burada gerçek widget'ın ilk açılışındaki gibi kırpılır. */}
       {display.length === 0 ? (
         <View style={styles.remEmpty}>
           {/* İkon sabit gri (reminder_widget_ic_empty), yalnız metin temaya uyar. */}
@@ -342,11 +361,7 @@ function ReminderPreview({ settings }) {
           </Text>
         </View>
       ) : (
-        <ScrollView
-          style={styles.widgetScroll}
-          showsVerticalScrollIndicator={false}
-          nestedScrollEnabled
-        >
+        <View style={styles.widgetScroll}>
           {display.map((item, index) => (
           <View
             key={`${item.title}-${index}`}
@@ -355,14 +370,16 @@ function ReminderPreview({ settings }) {
               {
                 // Satır zemini DÜZ RENK DEĞİL. Provider drawable'ı SRC_IN ile
                 // boyar; kaynak alfa korunduğu için sonuç, temanın renginin
-                // saydam bir yıkaması olur: bugünküler surface @%16
-                // (row_bg_today #2A…), diğerleri surfaceAlt @%8 (row_bg #14…).
+                // saydam bir yıkaması olur: bugünküler surface @%35
+                // (row_bg_today #59…), diğerleri surfaceAlt @%24 (row_bg #3D…).
+                // Önceki %16/%8 değerleri koyu zeminlerde kartı neredeyse
+                // görünmez kılıyordu; satırlar artık zeminden net ayrışır.
                 backgroundColor: item.today
-                  ? alpha(p.surface, 0.165)
-                  : alpha(p.surfaceAlt, 0.078),
+                  ? alpha(p.surface, 0.349)
+                  : alpha(p.surfaceAlt, 0.239),
                 borderColor: item.today
-                  ? alpha(p.surface, 0.3)
-                  : alpha(p.surfaceAlt, 0.063),
+                  ? alpha(p.surface, 0.388)
+                  : alpha(p.surfaceAlt, 0.259),
                 // Dolgu 1'er azaltıldı: RN kenarlığı kutuya EKLER, native ise
                 // 1dp çizgiyi içeri çizer — satır yüksekliği 64/58 kalsın.
                 paddingHorizontal: compact ? 5 : 7,
@@ -400,7 +417,7 @@ function ReminderPreview({ settings }) {
                 allowFontScaling={false}
                 style={[
                   styles.remWhen,
-                  { color: item.today ? p.accent : p.text },
+                  { color: countdownColor(item.daysLeft, p) },
                 ]}
               >
                 {item.when}
@@ -416,7 +433,7 @@ function ReminderPreview({ settings }) {
             </View>
           </View>
           ))}
-        </ScrollView>
+        </View>
       )}
     </View>
   );
@@ -427,10 +444,12 @@ function ListsPreview({ settings }) {
   const { language } = useLanguage();
   const isTr = language !== "en";
   const compact = settings.density === "compact";
-  // Gerçek widget hücreleri 3 sütunda 6dp aralıkla dizilir; hücre yüksekliği
-  // SABİT 112dp (lists_widget_item.xml) ve poster fitCenter olduğu için 2:3
-  // afişin solunda/sağında hücre zemini şerit olarak görünür — ızgaranın en
-  // tanınır özelliği bu.
+  // Gerçek widget hücreleri 3 sütunda 6dp aralıkla dizilir. Eskiden hücre
+  // yüksekliği SABİT 112dp'ydi ve poster "fitCenter" ile sığdırılıyordu; 2:3
+  // afiş her sütun genişliğine tam oturmadığından yanlarda temanın rengiyle
+  // boyanmış boşluk şeritleri kalıyordu. Artık hücre 2:3 oranında (poster
+  // boyutuyla aynı) ve poster "cover" ile hücreyi TAMAMEN doldurur: arka
+  // plan görünmez, poster sade ve yuvarlak köşeli kalır.
   const cells = Array.from(
     { length: Math.min(settings.maxPosters, 12) },
     (_, index) => POSTERS[index % POSTERS.length],
@@ -496,30 +515,20 @@ function ListsPreview({ settings }) {
         )}
       </View>
 
-      {/* Gerçeğinde kaydırılabilir bir GridView: 12 ile 18 poster farkı
-          kaydırınca görünür, tıpkı ana ekrandaki gibi. */}
-      <ScrollView
-        style={[styles.widgetScroll, styles.posterGrid]}
-        showsVerticalScrollIndicator={false}
-        nestedScrollEnabled
-      >
+      {/* Gerçeğinde kaydırılabilir bir GridView. Burada kaydırılamaz bırakılır:
+          Ayarlar'ın kendi dikey ScrollView'ı içinde aynı yönde ikinci bir
+          ScrollView, parmağın önizleme üstünde kilitlenip sayfa kaydırmasını
+          engellemesine yol açardı (özellikle iOS'ta). Poster sayısı farkı
+          zaten alt etiketten okunur; taşan satırlar burada da kırpılır. */}
+      <View style={[styles.widgetScroll, styles.posterGrid]}>
         {chunk(cells, 3).map((row, rowIndex) => (
           <View key={`row-${rowIndex}`} style={styles.gridRow}>
             {row.map((uri, index) => (
               <View
                 key={`${uri}-${index}`}
-                style={[
-                  styles.gridCell,
-                  { backgroundColor: p.surfaceAlt, padding: compact ? 2 : 5 },
-                ]}
+                style={[styles.gridCell, { padding: compact ? 2 : 5 }]}
               >
-                {/* Yan şeritler hücre zeminiyle AYNI renk olmalı: gerçekte
-                    poster_bg da temanın surfaceAlt'ıyla boyanır. */}
-                <Poster
-                  uri={uri}
-                  style={[styles.gridPoster, { backgroundColor: p.surfaceAlt }]}
-                  contain
-                />
+                <Poster uri={uri} style={styles.gridPoster} />
               </View>
             ))}
             {/* Son satır eksikse boş hücreler koy: yoksa kalan afişler
@@ -529,7 +538,7 @@ function ListsPreview({ settings }) {
             ))}
           </View>
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -684,19 +693,17 @@ function StatsPreview({ settings }) {
 
       {settings.showTv && (
         <StatsCard palette={p} style={styles.statsCardFollow}>
+          {/* Gerçek widget'ta (stats_widget.xml) dizi kartında YALNIZCA bölüm
+              sayısı vardır — dizi sayısı hiç gösterilmez. Önizleme burada
+              iki sayı gösteriyordu; film kartıyla birebir aynı tek-sayı
+              düzenine (statsCountPanel) çekildi. */}
           <View
             style={[
               styles.statsPanel,
               styles.statsCountPanel,
-              styles.statsTvCountPanel,
               { backgroundColor: alpha(p.surfaceAlt, 0.85) },
             ]}
           >
-            <CountBlock
-              value="37"
-              label={etiket(ps.tvShowCount, isTr ? "Dizi Sayısı" : "Series Count")}
-              palette={p}
-            />
             <CountBlock
               value="912"
               label={etiket(
@@ -1038,7 +1045,9 @@ export default function WidgetSettingsScreen() {
       </View>
 
       <View style={styles.previewStage}>
-        <WidgetPreview active={activeWidget} settings={settings} />
+        <View style={styles.previewShadow}>
+          <WidgetPreview active={activeWidget} settings={settings} />
+        </View>
       </View>
       <SelectedFeatureChips active={activeWidget} settings={settings} />
 
@@ -1353,6 +1362,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  // Widget kartına gerçek bir "ana ekrana yerleştirilmiş widget" hissi veren
+  // yumuşak gölge. widgetFrame'in kendisi overflow:hidden olduğu için gölge
+  // burada, onu saran (kırpmayan) bir kapta tanımlanır.
+  previewShadow: {
+    width: "100%",
+    borderRadius: 24,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.24,
+    shadowRadius: 20,
+    elevation: 7,
+  },
   // ── Widget önizlemeleri ────────────────────────────────────────────────
   // Sayılar native kaynaklardaki dp/sp değerleridir; ölçek 1:1 korunur.
   // Kök çerçevenin görünür kenarlığı YOK: gerçekte drawable'ın çizgisi de
@@ -1366,7 +1387,7 @@ const styles = StyleSheet.create({
   /* Yaklaşanlar */
   reminderRoot: { paddingHorizontal: 13, paddingTop: 12, paddingBottom: 11 },
   remHeader: { height: 32, flexDirection: "row", alignItems: "center" },
-  brand: { alignItems: "center", justifyContent: "center" },
+  brand: { alignItems: "center", justifyContent: "center", overflow: "hidden" },
   remTitle: { flex: 1, marginStart: 9, fontSize: 15, fontWeight: "700" },
   remCountBadge: {
     // reminder_widget_count_badge.xml — sabit indigo, temayla değişmez.
@@ -1442,9 +1463,11 @@ const styles = StyleSheet.create({
   widgetScroll: { flex: 1 },
   posterGrid: { marginTop: 8 },
   gridRow: { flexDirection: "row", gap: GRID_GAP, marginBottom: GRID_GAP },
-  gridCell: { flex: 1, height: 112, borderRadius: 9, overflow: "hidden" },
+  // Sabit 112dp yükseklik yerine gerçek poster oranı (2:3): hücre her sütun
+  // genişliğinde otomatik doğru yükseklikte olur, poster'ı asla letterbox'lamaz.
+  gridCell: { flex: 1, aspectRatio: 2 / 3, borderRadius: 10, overflow: "hidden" },
   gridCellEmpty: { flex: 1 },
-  gridPoster: { flex: 1, borderRadius: 7 },
+  gridPoster: { flex: 1, borderRadius: 10 },
 
   /* İstatistikler */
   statsHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -1452,20 +1475,25 @@ const styles = StyleSheet.create({
   statsCard: {
     flex: 1,
     flexDirection: "row",
-    borderRadius: 18,
+    // Eskiden 18dp'ydi (profildeki watchStats'tan kopyalanmıştı); iç panelle
+    // (12dp) daha iyi "iç içe" dursun diye 16dp'ye indirildi.
+    borderRadius: 16,
     borderWidth: 1,
     padding: 2,
     marginTop: 3,
   },
   statsCardFollow: { marginTop: 3 },
   statsPanel: {
-    borderRadius: 10,
+    // Eskiden 10dp'ydi (profildeki watchStatsView'dan — 7dp dolgulu bir
+    // bağlamdan — olduğu gibi kopyalanmıştı); widget'ın 2dp dolgusuyla
+    // eşleşmediği için dış karta göre köşeler orantısız/sivri duruyordu.
+    // 12dp hem dış kartla (statsCard, 16) hem şeritle (statsStrip) uyumlu.
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 1,
   },
   statsCountPanel: { flex: 43, paddingHorizontal: 4 },
-  statsTvCountPanel: { flexDirection: "row", paddingHorizontal: 3 },
   statsTimePanel: {
     flex: 55,
     marginStart: 5,
@@ -1481,6 +1509,7 @@ const styles = StyleSheet.create({
   statsStrip: {
     flexDirection: "row",
     alignItems: "center",
+    // Kart panelleriyle (statsPanel, 12) aynı köşe dili.
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 8,

@@ -1,3 +1,4 @@
+import { isLightSurface } from "../../utils/colorUtils";
 // Giriş ekranı — IslamicGuide auth tasarım diline göre sadeleştirildi:
 // dikeyde ortalanmış düzen, rozetli marka bloğu, solid yüzeyli tek kart,
 // dolgulu input kabukları ve solid accent ana buton. Blur/gradyan yok.
@@ -99,12 +100,12 @@ const deleteSavedPassword = async (email) => {
 // görmeyen kullanıcılarda sızıntı yerinde kalıyordu.
 
 export default function LoginScreen({ navigation }) {
-  const { theme, selectedTheme } = useTheme();
+  const { theme } = useTheme();
   const { t, language, toggleLanguage } = useLanguage();
   const insets = useSafeAreaInsets();
   const accent = theme.accent;
   const hairline = theme.border;
-  const isLightTheme = selectedTheme === "light" || selectedTheme === "green";
+  const isLightTheme = isLightSurface(theme.primary);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isloading, setIsloading] = useState(false);

@@ -37,7 +37,10 @@ import {
   FlatList,
   ActivityIndicator,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
+import ComposerBlur, { ComposerBlurTarget, useComposerBlurTarget } from "../chat/ComposerBlur";
+import useAdaptiveSheetHeight from "@hooks/useAdaptiveSheetHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   Ionicons,
@@ -49,7 +52,7 @@ import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import { useUserProfile } from "@context/UserProfileContext";
-import { getAvatarSource } from "@utils/avatars";
+import UserAvatar from "../common/UserAvatar";
 import { i18nText } from "@utils/i18nText";
 import appAlert from "@components/AppAlert";
 import { alpha } from "../../theme/colors";
@@ -63,11 +66,11 @@ import {
 
 const { height: SCREEN_H } = Dimensions.get("window");
 
-// Sheet içeriğe göre boyutlanır; bu iki sınır dengeyi kurar. Alt sınır boş ya
-// da tek yorumluk listede sheet'in ince bir şeride dönmesini, üst sınır dolu
-// listede ekranı tamamen kaplamasını engeller. (Aynı oranlar dizi/film yorum
-// sayfasında da kullanılıyor — bkz. CommentSheetModal.js)
-const SHEET_MAX_H = SCREEN_H * 0.82;
+// Sheet artık İÇERİĞE göre canlı büyüyüp küçülüyor (bkz. useAdaptiveSheetHeight):
+// hiç yorum yoksa SHEET_MIN_H, yorum sayısı arttıkça SHEET_MAX_H'a doğru büyür.
+// Üst sınır neredeyse tam ekran. (Aynı oranlar dizi/film yorum sayfasında da
+// kullanılıyor — bkz. CommentSheetModal.js)
+const SHEET_MAX_H = SCREEN_H * 0.94;
 const SHEET_MIN_H = SCREEN_H * 0.5;
 
 const EMPTY_INPUT = {
@@ -109,16 +112,12 @@ const CommentItem = memo(function CommentItem({
   onDelete,
   theme,
   styles,
+  currentUserAvatar,
 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const isLiked = !!item.likedBy?.[currentUid];
   const likeCount = item.likesCount || 0;
   const isOwner = item.authorId === currentUid;
-
-  const avatarSrc =
-    typeof item.authorAvatarIndex === "number"
-      ? getAvatarSource(item.authorAvatarIndex)
-      : getAvatarSource(0);
 
   const timeText = shortTimeAgo(item.createdAt);
 
@@ -169,10 +168,16 @@ const CommentItem = memo(function CommentItem({
 
       <View style={styles.threadAvatarColumn}>
         <View style={[styles.avatarFrame, isReply && styles.replyAvatarFrame]}>
-          <Image
-            source={avatarSrc}
-            style={[styles.avatar, isReply && styles.replyAvatar]}
-          />
+          {isOwner && currentUserAvatar ? (
+            <UserAvatar source={currentUserAvatar} size={isReply ? 26 : 34} />
+          ) : (
+            <UserAvatar
+              avatarIndex={item.authorAvatarIndex}
+              photoURL={item.authorPhotoURL || item.authorAvatar || item.photoURL}
+              isCustomPhoto
+              size={isReply ? 26 : 34}
+            />
+          )}
         </View>
         {!isReply && replyCount > 0 && isRepliesVisible && (
           <View style={styles.threadLine} />
@@ -263,40 +268,58 @@ const CommentItem = memo(function CommentItem({
 export default function PostCommentSheetModal({ visible, post, onClose }) {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { selectAvatarIndex } = useProfileUi();
+  const { avatar, selectAvatarIndex } = useProfileUi();
   const {
     displayName: profileDisplayName,
     username: profileUsername,
     avatarIndex: profileAvatarIndex,
+    photoURL: profilePhotoURL,
   } = useUserProfile();
   const styles = getStyles(theme);
+  const insets = useSafeAreaInsets();
 
   const postId = post?.id;
   const postPoster = post?.mediaList?.find((item) => item?.poster)?.poster || null;
-  const postAuthorAvatar =
-    typeof post?.authorAvatarIndex === "number"
-      ? getAvatarSource(post.authorAvatarIndex)
-      : typeof post?.authorAvatar === "string"
-        ? { uri: post.authorAvatar }
-        : post?.authorAvatar || getAvatarSource(0);
+  const isPostAuthorMe = post?.authorId === user?.uid;
 
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [replyVisibility, setReplyVisibility] = useState({});
   const [input, setInput] = useState(EMPTY_INPUT);
+  const composerBlur = useComposerBlurTarget();
+
+  // Sheet yüksekliği İÇERİĞE göre canlı hesaplanır: yorum (+ yanıt) sayısı
+  // arttıkça SHEET_MIN_H'tan SHEET_MAX_H'a doğru büyür, klavye açıkken
+  // ekrana sığacak şekilde küçülür.
+  const { heightAnim } = useAdaptiveSheetHeight({
+    visible,
+    count: comments.length,
+    minHeight: SHEET_MIN_H,
+    maxHeight: SHEET_MAX_H,
+    topInset: insets.top + 12,
+  });
 
   // Sheet animasyonu.
-  // Yükseklik sabit değil, içerikten geliyor (bkz. styles.sheet:
-  // minHeight/maxHeight); kapanışta kaydırılacak mesafe ölçümden okunuyor.
-  // İlk açılışta ölçüm yokken üst sınır kullanılıyor — sheet yine ekranın
+  // Yükseklik sabit değil, içerikten geliyor (bkz. useAdaptiveSheetHeight +
+  // styles.sheet); kapanışta kaydırılacak mesafe ölçümden okunuyor. İlk
+  // açılışta ölçüm yokken üst sınır kullanılıyor — sheet yine ekranın
   // altında başlar, tek etkisi yolun biraz uzun olması.
   const slideAnim = useRef(new Animated.Value(SHEET_MAX_H)).current;
   const sheetHRef = useRef(SHEET_MAX_H);
   const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const commentInputRef = useRef(null);
+
+  // Gerçek blur hedefi sheet açılış kayması + yükseklik animasyonu OTURANA
+  // kadar devreye girmiyor (AIChatScreen'deki blurReady ile aynı önlem):
+  // Android'de RenderNode yakalaması hâlâ boyut değiştiren bir görünüme
+  // bağlanırsa kalıcı olarak düz katmana düşebiliyor. Sabit bir süre yerine
+  // animasyonun gerçek bitişini beklemek gerekir; yavaş cihazda 500ms yetmez.
+  const [blurReady, setBlurReady] = useState(false);
 
   useEffect(() => {
     if (visible) {
+      setBlurReady(false);
       Animated.parallel([
         Animated.spring(slideAnim, {
           toValue: 0,
@@ -310,8 +333,11 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
           duration: 280,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]).start(({ finished }) => {
+        if (finished) setBlurReady(true);
+      });
     } else {
+      setBlurReady(false);
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: sheetHRef.current,
@@ -343,10 +369,14 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
     if (!visible) {
       setInput(EMPTY_INPUT);
       setReplyVisibility({});
+      // `value` sıfırlansa da bazı Android çok satırlı alanları native
+      // tamponunu koruyabiliyor; modal yeniden açıldığında eski metin görünmesin.
+      requestAnimationFrame(() => commentInputRef.current?.clear());
     }
   }, [visible]);
 
   const handleClose = useCallback(() => {
+    setBlurReady(false);
     Animated.parallel([
       Animated.timing(slideAnim, {
         toValue: sheetHRef.current,
@@ -404,6 +434,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
               : typeof selectAvatarIndex === "number"
                 ? selectAvatarIndex
                 : 0,
+          authorPhotoURL: profilePhotoURL || user?.photoURL || null,
           postTitle: post?.title || "",
           postPoster: post?.mediaList?.[0]?.poster || null,
           },
@@ -414,6 +445,11 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
         }
       }
       setInput(EMPTY_INPUT);
+      // Kontrollü `value` bazı Android sürümlerinde çok satırlı TextInput'ta
+      // aynı karede tazelenmiyor. React'in yeni value değerini uygulamasından
+      // sonra native tamponu da temizle; böylece Hub'da gönderilen yorum inputta
+      // kalmaz.
+      requestAnimationFrame(() => commentInputRef.current?.clear());
     } catch (e) {
       if (__DEV__) console.warn("post comment submit failed:", e.message);
     } finally {
@@ -479,6 +515,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
           <CommentItem
             item={item}
             currentUid={user?.uid}
+            currentUserAvatar={avatar}
             isReply={false}
             replyCount={replies.length}
             isRepliesVisible={visible}
@@ -496,6 +533,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
                 key={rep.id}
                 item={rep}
                 currentUid={user?.uid}
+                currentUserAvatar={avatar}
                 isReply
                 isLastReply={index === replies.length - 1}
                 onLike={handleLike}
@@ -509,7 +547,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
       );
     },
     // repliesByParent/replyVisibility her render'da yeniden hesaplanıyor; kasıtlı
-    [repliesByParent, replyVisibility, user?.uid, theme, styles],
+    [repliesByParent, replyVisibility, user?.uid, avatar, theme, styles],
   );
 
   return (
@@ -535,7 +573,12 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
         onPress={handleClose}
       />
 
-      {/* Sheet */}
+      {/* Sheet ── İKİ AYRI Animated.View ŞART: transform (native driver) ve
+          height (native driver DESTEKLEMİYOR — JS driver) aynı düğümde
+          birleşirse RN "Style property 'height' is not supported by native
+          animated module" hatası atıyor. Dış katman yalnız kaymayı (native)
+          taşır, iç katman yalnız yüksekliği (JS) — bağımsız düğümler. */}
+      <Animated.View style={{ transform: [{ translateY: slideAnim }] }}>
       <Animated.View
         onLayout={(e) => {
           sheetHRef.current = e.nativeEvent.layout.height;
@@ -543,7 +586,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
         style={[
           styles.sheet,
           {
-            transform: [{ translateY: slideAnim }],
+            height: heightAnim,
             backgroundColor: theme.secondary,
           },
         ]}
@@ -577,7 +620,26 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
           </View>
 
           <View style={styles.miniPost}>
-            <Image source={postAuthorAvatar} style={styles.miniPostAvatar} />
+            {isPostAuthorMe && avatar ? (
+              <UserAvatar
+                source={avatar}
+                isCustomPhoto
+                size={34}
+                borderWidth={1}
+                borderColor={alpha(theme.text.primary, 0.16)}
+                style={{ alignSelf: "flex-start", marginTop: 1 }}
+              />
+            ) : (
+              <UserAvatar
+                avatarIndex={post?.authorAvatarIndex}
+                photoURL={post?.authorPhotoURL || (typeof post?.authorAvatar === "string" ? post.authorAvatar : null)}
+                isCustomPhoto
+                size={34}
+                borderWidth={1}
+                borderColor={alpha(theme.text.primary, 0.16)}
+                style={{ alignSelf: "flex-start", marginTop: 1 }}
+              />
+            )}
 
             <View style={styles.miniPostCopy}>
               <View style={styles.miniPostAuthorRow}>
@@ -633,6 +695,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
 
         {/* Liste */}
         <View style={styles.commentArea}>
+          <ComposerBlurTarget attach={composerBlur.attach} backgroundColor={theme.primary} style={{ flex: 1 }}>
           {loading ? (
             <View style={styles.center}>
               <ActivityIndicator color={theme.text.muted} />
@@ -660,6 +723,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
               showsVerticalScrollIndicator={false}
             />
           )}
+          </ComposerBlurTarget>
 
           {/* Giriş */}
           <View style={styles.inputWrapper}>
@@ -682,9 +746,12 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
 
             {/* Girdi hapı — AI sohbetindeki (screens/chat/AIChatScreen.js)
                 composer ile aynı yapı: [input][gönder] tek parça, ikisi de 42px.
-                Sarmalayıcı saydam ve ayırıcı çizgisiz; yalnız hap görünür. */}
+                Sarmalayıcı saydam ve ayırıcı çizgisiz; yalnız hap görünür.
+                Hap arka planı da o composer gibi camsı blur. */}
             <View style={styles.composerPill}>
+              <ComposerBlur target={blurReady ? composerBlur.target : null} theme={theme} />
               <TextInput
+                ref={commentInputRef}
                 style={styles.input}
                 placeholder={i18nText("autoI18n.yorum_yap", "Yorum yap...")}
                 placeholderTextColor={theme.text.muted}
@@ -708,6 +775,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
           </View>
         </View>
       </Animated.View>
+      </Animated.View>
     </KeyboardAvoidingView>
   );
 }
@@ -724,9 +792,10 @@ const getStyles = (theme) =>
       ...StyleSheet.absoluteFillObject,
     },
 
+    // height artık sabit değil: useAdaptiveSheetHeight'ın Animated değeri
+    // (bkz. JSX'teki inline `height: heightAnim`) SHEET_MIN_H/MAX_H arasında
+    // canlı olarak veriliyor.
     sheet: {
-      maxHeight: SHEET_MAX_H,
-      minHeight: SHEET_MIN_H,
       borderTopLeftRadius: 30,
       borderTopRightRadius: 30,
       overflow: "hidden",
@@ -1040,7 +1109,7 @@ const getStyles = (theme) =>
       right: 0,
       paddingHorizontal: 12,
       paddingTop: 10,
-      paddingBottom: Platform.OS === "ios" ? 28 : 12,
+      paddingBottom: Platform.OS === "ios" ? 28 : 20,
     },
     composerPill: {
       flexDirection: "row",
@@ -1048,7 +1117,7 @@ const getStyles = (theme) =>
       borderWidth: 1.5,
       borderRadius: 28,
       borderColor: theme.border,
-      backgroundColor: theme.secondary,
+      backgroundColor: "transparent",
       padding: 5,
       shadowColor: "#000",
       shadowOpacity: 0.35,

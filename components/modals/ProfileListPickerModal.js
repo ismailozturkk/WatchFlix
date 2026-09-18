@@ -61,10 +61,10 @@ export default function ProfileListPickerModal({ visible, onClose, onSelect }) {
         label: nameFor(key),
         // Kullanıcının profilde gördüğü sıra neyse paylaşıma da o gitsin.
         items: sortItemsByListOrder(items),
-        accent: getListAccent(key),
+        accent: getListAccent(key, theme.secondary),
         icon: getListIcon(key),
       }));
-  }, [profileLists, t]);
+  }, [profileLists, t, theme.secondary]);
 
   const hasAnyItem = useMemo(() => lists.some((list) => list.items.length > 0), [lists]);
 

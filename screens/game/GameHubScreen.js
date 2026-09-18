@@ -1,4 +1,4 @@
-import { Image } from "expo-image";
+import UserAvatar from "@components/common/UserAvatar";
 import React, { useCallback, useMemo, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
@@ -10,7 +10,6 @@ import { useFriends } from "@context/FriendsContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import { fetchLeaderboard, loadGameData } from "@services/sceneGameService";
-import { getAvatarSource } from "@utils/avatars";
 import { i18nText } from "@utils/i18nText";
 import { GameScreenShell } from "./GameScreenShell";
 import {
@@ -167,12 +166,18 @@ function PlayerProfileBanner({ user, progress, theme }) {
   return (
     <View style={[styles.profileBanner, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
       <View style={styles.bannerTopRow}>
-        <View style={styles.avatarWrap}>
-          <Image source={getAvatarSource(user?.avatarIndex)} style={styles.bannerAvatar} />
-          <View style={[styles.avatarBadge, { backgroundColor: theme.accent }]}>
-            <AppIcon family="Ionicons" name="sparkles" size={10} color="#fff" />
-          </View>
-        </View>
+        <UserAvatar
+          avatarIndex={user?.avatarIndex}
+          photoURL={user?.photoURL}
+          isCustomPhoto
+          size={48}
+          shape="squircle"
+          badge={
+            <View style={[styles.avatarBadgeInner, { backgroundColor: theme.accent }]}>
+              <AppIcon family="Ionicons" name="sparkles" size={10} color="#fff" />
+            </View>
+          }
+        />
 
         <View style={styles.bannerInfo}>
           <View style={styles.nameRow}>
@@ -493,7 +498,13 @@ function FriendsRankingCard({ loading, error, rows, currentUid, theme, onOpen })
             </Text>
           </View>
           <View style={[styles.avatarContainer, { borderColor: getRankColor(index) }]}>
-            <Image source={getAvatarSource(entry.avatarIndex)} style={styles.rankAvatar} />
+            <UserAvatar
+              avatarIndex={entry.avatarIndex}
+              photoURL={entry.photoURL}
+              isCustomPhoto
+              size={34}
+              style={{ borderRadius: 12 }}
+            />
           </View>
           <View style={styles.rankCopy}>
             <Text style={[styles.rankName, { color: theme.text.primary }]} numberOfLines={1} allowFontScaling={false}>
@@ -659,9 +670,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   bannerTopRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  avatarWrap: { position: "relative" },
-  bannerAvatar: { width: 48, height: 48, borderRadius: 16 },
-  avatarBadge: { position: "absolute", bottom: -2, right: -2, width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  avatarBadgeInner: { width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   bannerInfo: { flex: 1 },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   bannerName: { fontSize: 16, fontWeight: "900", maxWidth: 140 },

@@ -25,11 +25,11 @@ import { useFocusEffect } from "@react-navigation/native";
 import ListBadges from "../../components/ListBadges";
 import { SafeAreaView } from "react-native-safe-area-context";
 import IconBacground from "../../components/IconBacground";
-import { LinearGradient } from "expo-linear-gradient";
 import { i18nText } from "../../utils/i18nText";
 import { searchMediaWithFuzzyFallback } from "../../services/fuzzyMediaSearch";
 import ScreenSnow from "../../components/ScreenSnow";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
+import QuickListButtons from "../../components/search/QuickListButtons";
 
 
 const { width } = Dimensions.get("window");
@@ -40,11 +40,19 @@ const GRID_GAP = 8;
 const GRID_HPAD = 16;
 const GRID_ITEM_W =
   (width - GRID_HPAD * 2 - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
-const GRID_ITEM_H = GRID_ITEM_W * 1.52;
+const GRID_ITEM_H = GRID_ITEM_W * 1.52; // poster boyu — oran sabit kalır
+// Hızlı ekleme butonları posterin ALTINDA, kartın kendi (dar) alanında —
+// kompakt olsun diye yalnızca buton boyu kadar pay ayrılır.
+const GRID_FOOTER_H = 25;
+const GRID_CARD_H = GRID_ITEM_H + GRID_FOOTER_H;
 
 // Row kart poster boyutu
 const ROW_POSTER_W = 100;
 const ROW_POSTER_H = 152;
+
+// Bu dört rozet QuickListButtons'ın dolu/boş ikonlarıyla zaten gösteriliyor —
+// ListBadges'te tekrar etmesin (bkz. components/ListBadges.js `hide` prop'u).
+const QUICK_BUTTON_BADGE_KEYS = ["watchlist", "watched", "favorite", "other"];
 
 // ─── Yardımcı: puan rengi ─────────────────────────────────────────────────────
 const getRatingColor = (r) => {
@@ -144,20 +152,14 @@ const MovieRowItem = memo(
           >
             {/* Backdrop */}
             {item.backdrop_path && (
-              <>
-                <Image
-                  source={{
-                    uri: getTmdbUrl(item.backdrop_path, 'poster', 200),
-                  }}
-                  style={styles.rowBackdrop}
-                />
-                <LinearGradient
-                  colors={["rgba(0,0,0,0)", theme.secondary]}
-                  start={{ x: 0.25, y: 0.5 }}
-                  end={{ x: 1, y: 0.5 }}
-                  style={[StyleSheet.absoluteFill, { borderRadius: 16 }]}
-                />
-              </>
+              <Image
+                source={{
+                  uri: getTmdbUrl(item.backdrop_path, 'backdrop', 200),
+                }}
+                style={styles.rowBackdrop}
+                contentFit="cover"
+                blurRadius={2}
+              />
             )}
             {/* Poster */}
             {item.poster_path ? (
@@ -235,15 +237,25 @@ const MovieRowItem = memo(
                 </View>
               )}
             </View>
-            {/* Rozetler */}
+            {/* Hızlı listelere ekleme */}
+            <QuickListButtons
+              item={item}
+              mediaType="movie"
+              navigation={navigation}
+              orientation="vertical"
+              style={styles.rowQuickAdd}
+            />
+            {/* Rozetler — hızlı butonlarla çakışan dördü gizli */}
             <ListBadges
               mediaId={item.id}
               mediaType="movie"
               theme={theme}
               variant="chip"
               vertical
+              side="left"
               iconSize={8}
               chipSize={15}
+              hide={QUICK_BUTTON_BADGE_KEYS}
             />
           </View>
         </TouchableOpacity>
@@ -280,52 +292,69 @@ const MovieGridItem = memo(
         }
         delayLongPress={350}
         >
-          <View style={styles.gridCard}>
-            {/* Poster */}
-            {item.poster_path ? (
-              <Image
-                source={{
-                  uri: getTmdbUrl(item.poster_path, 'poster', 200),
-                }}
-                style={styles.gridPoster}
-              />
-            ) : (
-              <View
-                style={[
-                  styles.gridNoPoster,
-                  { backgroundColor: theme.secondary },
-                ]}
-              >
-                <Ionicons
-                  name="film-outline"
-                  size={24}
-                  color={theme.text?.muted ?? "#555"}
+          <View style={[styles.gridCard, { backgroundColor: theme.between }]}>
+            {/* Poster — sabit yükseklik, ALTINDA ayrı bir alan var (bindirme yok) */}
+            <View style={styles.gridPosterWrap}>
+              {item.poster_path ? (
+                <Image
+                  source={{
+                    uri: getTmdbUrl(item.poster_path, 'poster', 200),
+                  }}
+                  style={styles.gridPoster}
                 />
-              </View>
-            )}
-            {/* Puan rozeti – sağ üst */}
-            {posterBadges?.tmdbRating !== false && rating > 0 && (
-              <View
-                style={[
-                  styles.gridRatingBadge,
-                  { backgroundColor: ratingColor + "ee" },
-                ]}
-              >
-                <Text style={styles.gridRatingText}>★ {rating.toFixed(1)}</Text>
-              </View>
-            )}
-            <ListBadges
-              mediaId={item.id}
-              mediaType="movie"
-              theme={theme}
-              variant="chip"
-              vertical
-              side="left"
-              verticalAlign="bottom"
-              iconSize={8}
-              chipSize={15}
-              style={styles.gridBadgeColumn}
-            />
+              ) : (
+                <View
+                  style={[
+                    styles.gridNoPoster,
+                    { backgroundColor: theme.secondary },
+                  ]}
+                >
+                  <Ionicons
+                    name="film-outline"
+                    size={24}
+                    color={theme.text?.muted ?? "#555"}
+                  />
+                </View>
+              )}
+              {/* Puan rozeti – sağ üst */}
+              {posterBadges?.tmdbRating !== false && rating > 0 && (
+                <View
+                  style={[
+                    styles.gridRatingBadge,
+                    { backgroundColor: ratingColor + "ee" },
+                  ]}
+                >
+                  <Text style={styles.gridRatingText}>★ {rating.toFixed(1)}</Text>
+                </View>
+              )}
+              {/* Rozetler — posterin üzerinde, sola yapışık (hızlı butonlarla
+                  çakışan dördü hâlâ gizli) */}
+              <ListBadges
+                mediaId={item.id}
+                mediaType="movie"
+                theme={theme}
+                variant="chip"
+                vertical
+                side="left"
+                verticalAlign="bottom"
+                iconSize={8}
+                chipSize={15}
+                hide={QUICK_BUTTON_BADGE_KEYS}
+                style={styles.gridBadgeColumn}
+              />
+            </View>
+
+            {/* Posterin ALTI: hızlı ekleme, kompakt ve posterin hemen altında */}
+            <View style={styles.gridFooter}>
+              <QuickListButtons
+                item={item}
+                mediaType="movie"
+                navigation={navigation}
+                orientation="horizontal"
+                size={18}
+                iconSize={9}
+              />
+            </View>
           </View>
         </TouchableOpacity>
       </Animated.View>
@@ -483,6 +512,7 @@ const DiscoverSection = memo(
             columnWrapperStyle={styles.gridRow}
             contentContainerStyle={styles.gridList}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           />
         ) : (
           /*  */
@@ -491,6 +521,7 @@ const DiscoverSection = memo(
             data={activeData}
             keyExtractor={(item) => item.id.toString()}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.discoverRowList}
             renderItem={({ item, index }) => (
               <View style={styles.discoverRowItem}>
@@ -998,6 +1029,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     overflow: "visible",
+    marginLeft: 28, // sol taraftaki liste rozetlerine yer açar
+  },
+  rowQuickAdd: {
+    paddingVertical: 6,
+    paddingRight: 10,
+    paddingLeft: 4,
   },
   rowPoster: {
     width: ROW_POSTER_W,
@@ -1045,29 +1082,27 @@ const styles = StyleSheet.create({
   gridRow: { gap: GRID_GAP, marginBottom: GRID_GAP },
   gridCard: {
     width: GRID_ITEM_W,
-    height: GRID_ITEM_H,
+    height: GRID_CARD_H,
     borderRadius: 14,
     overflow: "hidden",
     position: "relative",
-    justifyContent: "flex-end",
     backgroundColor: "#111",
   },
+  // Poster kendi sabit yüksekliğinde — hızlı ekleme/rozet alanı ONUN ALTINDA,
+  // üstüne bindirilmiyor.
+  gridPosterWrap: {
+    width: "100%",
+    height: GRID_ITEM_H,
+    position: "relative",
+  },
   gridPoster: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     width: "100%",
     height: "100%",
     contentFit: "cover",
   },
   gridNoPoster: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    width: "100%",
+    height: "100%",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -1080,7 +1115,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   gridRatingText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-  gridBadgeColumn: { left: 3, bottom: 4 },
+  // Rozetler yine posterin ÜZERİNDE, sol-alta yapışık (eski konum).
+  gridBadgeColumn: {
+    position: "absolute",
+    left: 3,
+    bottom: 4,
+  },
+  // Posterin hemen ALTINDAKİ dar şerit: yalnız hızlı ekleme butonları,
+  // kompakt ve posterin alt kenarına yakın.
+  gridFooter: {
+    width: "100%",
+    height: GRID_FOOTER_H,
+    justifyContent: "flex-start",
+    alignItems: "center",
+    paddingTop: 3,
+  },
 
   // ── Paylaşılan ────────────────────────────────────────────────────────────
   ratingPill: {

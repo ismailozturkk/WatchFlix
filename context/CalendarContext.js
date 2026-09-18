@@ -13,6 +13,7 @@ import { useAuth } from "./AuthContext";
 import { db } from "../firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import { snapshotErrorHandler } from "../utils/firestoreError";
+import { trackFirestoreRead } from "../services/usageTrackerService";
 
 const CalendarContext = createContext();
 
@@ -78,6 +79,7 @@ export const CalendarProvider = ({ children }) => {
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(collection(db, "Notes", user.uid, "items"), (snap) => {
+      trackFirestoreRead("Notes", snap.docs.length);
       const nMap = {};
       snap.docs.forEach((d) => {
         const n = d.data();
@@ -100,6 +102,7 @@ export const CalendarProvider = ({ children }) => {
     const movieUnsub = onSnapshot(
       collection(db, "Reminders", uid, "movies"),
       (snap) => {
+        trackFirestoreRead("Reminders/movies", snap.docs.length);
         const mMap = {};
         snap.docs.forEach((d) => {
           const m = d.data();
@@ -131,6 +134,7 @@ export const CalendarProvider = ({ children }) => {
     const showsUnsub = onSnapshot(
       collection(db, "Reminders", uid, "tvShows"),
       (showsSnap) => {
+        trackFirestoreRead("Reminders/tvShows", showsSnap.docs.length);
         const activeShowIds = new Set(showsSnap.docs.map((d) => d.id));
 
         // Remove stale episode listeners
@@ -150,6 +154,7 @@ export const CalendarProvider = ({ children }) => {
           epUnsubs[sid] = onSnapshot(
             collection(db, "Reminders", uid, "tvShows", sid, "episodes"),
             (epSnap) => {
+              trackFirestoreRead("Reminders/episodes", epSnap.docs.length);
               epDataMap[sid] = epSnap.docs.map((d) => d.data());
               setTvReminderEpisodes(Object.values(epDataMap).flat());
             },

@@ -1,3 +1,4 @@
+import { nestedSummaryFields } from "../utils/firestoreNestedFields";
 // services/listItemsService.js
 //
 // İzlenen DİZİLER dışındaki TÜM listeler için TEK yazma kaynağı. Kanonik model:
@@ -34,8 +35,11 @@ import {
   deleteField,
   arrayUnion,
   runTransaction,
+  increment,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { trackFirestoreWrite, trackFirestoreDelete, trackFirestoreRead } from "./usageTrackerService";
 import {
   createWatchEventId,
   materializeMovieWatchEvents,
@@ -45,6 +49,7 @@ import { resolveListName, RESERVED_LIST_NAMES } from "../utils/listShare";
 import { assertWatchable } from "../utils/watchState";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 import { trackFirstContentActivation } from "./activationAnalytics";
+import { updateLocalItem, deleteLocalItem } from "./listSyncService";
 
 export const PREDEFINED_MOVIE_LISTS = ["favorites", "watchList", "watchedMovies"];
 const CUSTOM_ITEMS = "customItems";
@@ -57,15 +62,12 @@ const customDocId = (listId, type, id) => `${listId}__${type}_${id}`;
 function normalizeItem(item) {
   const out = {
     id: item.id,
-    type: item.type,
-    name: item.name ?? "",
-    imagePath: item.imagePath ?? null,
-    dateAdded: item.dateAdded ?? null,
-    genres: Array.isArray(item.genres) ? item.genres : [],
+    type: item.type || "movie",
   };
-  // DİKKAT: bu bir BEYAZ LİSTE. Buraya eklenmeyen alan sessizce düşer, hiçbir
-  // hata log'lanmaz. Süre/bölüm olguları (utils/mediaFacts) buradan geçmezse
-  // paylaşımdan kaydedilen liste yine bilgisiz kalır.
+  if (item.name != null) out.name = item.name;
+  if (item.imagePath != null) out.imagePath = item.imagePath;
+  if (item.dateAdded != null) out.dateAdded = item.dateAdded;
+  if (Array.isArray(item.genres)) out.genres = item.genres;
   if (item.minutes != null) out.minutes = item.minutes;              // yalnız film
   if (item.episodeMinutes != null) out.episodeMinutes = item.episodeMinutes;
   if (item.episodeCount != null) out.episodeCount = item.episodeCount;
@@ -81,32 +83,77 @@ function normalizeItem(item) {
 /** Öğeyi bir öntanımlı listeye ekler (idempotent — docId `${type}_${id}`). */
 export async function addToList(uid, listKey, item) {
   if (!uid || !listKey || item?.id == null || !item?.type) return;
-  const ref = doc(db, "Lists", uid, listKey, itemKey(item.type, item.id));
-  await setDoc(ref, normalizeItem(item), { merge: true });
+  const docKey = itemKey(item.type, item.id);
+  const ref = doc(db, "Lists", uid, listKey, docKey);
+  const rootRef = doc(db, "Lists", uid);
+  const normalized = { ...normalizeItem(item), updatedAt: serverTimestamp() };
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    tx.set(ref, normalized, { merge: true });
+
+    const statusField = listKey === "favorites" ? "inFavorites" : "inWatchList";
+    const rootUpdates = {
+      [`statusIndex.${item.type}.${item.id}.${statusField}`]: true,
+      updatedAt: serverTimestamp(),
+      _schemaVersion: 3,
+    };
+    // Belge-id tabanlı yeni model idempotenttir. Aynı öğeye tekrar basılması
+    // belgeyi güncelleyebilir ama liste sayacını ikinci kez artırmamalıdır.
+    if (!snap.exists()) rootUpdates[`counts.${listKey}`] = increment(1);
+    tx.set(rootRef, nestedSummaryFields(rootUpdates), { merge: true });
+  });
+  trackFirestoreWrite(`Lists/${listKey}`, 1);
+  updateLocalItem(uid, listKey, docKey, {
+    ...normalizeItem(item),
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 /** Öğeyi bir öntanımlı listeden çıkarır. */
 export async function removeFromList(uid, listKey, type, id) {
   if (!uid || !listKey || id == null || !type) return;
-  await deleteDoc(doc(db, "Lists", uid, listKey, itemKey(type, id)));
+  const docKey = itemKey(type, id);
+  const ref = doc(db, "Lists", uid, listKey, docKey);
+  const rootRef = doc(db, "Lists", uid);
+
+  let removed = false;
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) return;
+    removed = true;
+    tx.delete(ref);
+
+    const statusField = listKey === "favorites" ? "inFavorites" : "inWatchList";
+    tx.set(
+      rootRef,
+      nestedSummaryFields({
+        [`statusIndex.${type}.${id}.${statusField}`]: false,
+        [`counts.${listKey}`]: increment(-1),
+        updatedAt: serverTimestamp(),
+        _schemaVersion: 3,
+      }),
+      { merge: true },
+    );
+  });
+  if (!removed) return;
+  trackFirestoreDelete(`Lists/${listKey}`, 1);
+  deleteLocalItem(uid, listKey, docKey);
 }
 
 /**
  * Filmin her izlenmesini aynı kanonik belge içinde ayrı olay olarak saklar.
  * İlk yazmada eski liste alanları korunur; sonraki yazmalar üyeliği silmeden
  * geçmişe yeni bir occurrence ekler.
- *
- * `item.releaseDate` / `item.status` YAZILMAZ (normalizeItem beyaz listesinde
- * yok) — yalnız yayın kapısını beslerler. Ekranlar zaten butonu kilitliyor;
- * buradaki kontrol son savunma hattı: yeni bir çağrı yeri eklendiğinde sessizce
- * bozuk istatistik yazmak yerine görünür biçimde hata verir.
  */
 export async function markMovieWatch(uid, item, watchDate) {
   if (!uid || item?.id == null) return null;
   const watchedAt = normalizeWatchDate(watchDate);
   if (!watchedAt) return null;
   assertWatchable(item?.releaseDate, item?.status);
-  const ref = doc(db, "Lists", uid, "watchedMovies", itemKey("movie", item.id));
+  const docKey = itemKey("movie", item.id);
+  const ref = doc(db, "Lists", uid, "watchedMovies", docKey);
+  const rootRef = doc(db, "Lists", uid);
   const event = {
     id: createWatchEventId(`movie_${item.id}`),
     watchedAt,
@@ -115,24 +162,63 @@ export async function markMovieWatch(uid, item, watchDate) {
   };
 
   let watchNumber = 1;
+  let isFirstWatch = false;
+  let localDocument = null;
+  const minutes = Number(item.minutes) || 0;
+
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     const existing = snap.exists() ? snap.data() : {};
     const watchEvents = [...materializeMovieWatchEvents(existing), event];
     watchNumber = watchEvents.length;
-    tx.set(
-      ref,
-      {
-        ...normalizeItem({ ...existing, ...item, type: "movie", dateAdded: watchedAt }),
-        watchEvents,
-        watchCount: watchEvents.length,
-      },
-      { merge: true },
-    );
+    isFirstWatch = !snap.exists() || !existing.watchEvents || existing.watchEvents.length === 0;
+
+    const normalized = {
+      ...normalizeItem({ ...existing, ...item, type: "movie", dateAdded: watchedAt }),
+      watchEvents,
+      watchCount: watchEvents.length,
+      updatedAt: serverTimestamp(),
+    };
+    localDocument = {
+      ...normalized,
+      // Firestore sentinel'i yerel cache'e taşımak yerine sıralanabilir bir
+      // istemci zamanı kullanılır; sunucudaki alan transaction ile yazılır.
+      updatedAt: new Date().toISOString(),
+    };
+
+    tx.set(ref, normalized, { merge: true });
+
+    // Kök özet ve istatistik dokümanı güncellemesi
+    const rootUpdates = {
+      "stats.movies.totalRewatchCount": increment(1),
+      "stats.movies.totalMinutes": increment(minutes),
+      "stats.totalMinutes": increment(minutes),
+      updatedAt: serverTimestamp(),
+      _schemaVersion: 3,
+    };
+
+    if (isFirstWatch) {
+      rootUpdates[`statusIndex.movie.${item.id}.isWatched`] = true;
+      rootUpdates["counts.watchedMovies"] = increment(1);
+      rootUpdates["stats.movies.uniqueCount"] = increment(1);
+
+      if (Array.isArray(item.genres)) {
+        item.genres.forEach((genreId) => {
+          if (genreId != null) {
+            rootUpdates[`stats.genreCounts.${genreId}`] = increment(1);
+          }
+        });
+      }
+    }
+
+    tx.set(rootRef, nestedSummaryFields(rootUpdates), { merge: true });
   });
 
-  // Ürünün çekirdek eylemi: "içerik takip edildi". Retention ve aktivasyon
-  // (D1/D7) bu olayın üzerine kurulacak.
+  trackFirestoreWrite("Lists/watchedMovies", 1);
+  if (localDocument) {
+    updateLocalItem(uid, "watchedMovies", docKey, localDocument);
+  }
+
   trackEvent(ANALYTICS_EVENTS.CONTENT_TRACKED, {
     content_type: "movie",
     content_id: String(item.id),
@@ -151,7 +237,12 @@ export async function markMovieWatch(uid, item, watchDate) {
 /** Seçilen film izleme olayını siler; son olay silinirse liste belgesi de silinir. */
 export async function removeMovieWatchEvent(uid, movieId, eventId) {
   if (!uid || movieId == null || !eventId) return;
-  const ref = doc(db, "Lists", uid, "watchedMovies", itemKey("movie", movieId));
+  const docKey = itemKey("movie", movieId);
+  const ref = doc(db, "Lists", uid, "watchedMovies", docKey);
+  const rootRef = doc(db, "Lists", uid);
+
+  let nextLocalDocument = null;
+  let shouldDeleteLocal = false;
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists()) return;
@@ -159,10 +250,36 @@ export async function removeMovieWatchEvent(uid, movieId, eventId) {
     const remaining = materializeMovieWatchEvents(current).filter(
       (event) => event.id !== eventId,
     );
+    const minutes = Number(current.minutes) || 0;
+    const removedEvent = materializeMovieWatchEvents(current).find(
+      (event) => event.id === eventId,
+    );
+    if (!removedEvent) return;
+
     if (!remaining.length) {
       tx.delete(ref);
+      const rootUpdates = {
+        [`statusIndex.movie.${movieId}.isWatched`]: false,
+        "counts.watchedMovies": increment(-1),
+        "stats.movies.uniqueCount": increment(-1),
+        "stats.movies.totalRewatchCount": increment(-1),
+        "stats.movies.totalMinutes": increment(-minutes),
+        "stats.totalMinutes": increment(-minutes),
+        updatedAt: serverTimestamp(),
+        _schemaVersion: 3,
+      };
+      if (Array.isArray(current.genres)) {
+        current.genres.forEach((genreId) => {
+          if (genreId != null) {
+            rootUpdates[`stats.genreCounts.${genreId}`] = increment(-1);
+          }
+        });
+      }
+      tx.set(rootRef, nestedSummaryFields(rootUpdates), { merge: true });
+      shouldDeleteLocal = true;
       return;
     }
+
     const latest = remaining
       .slice()
       .sort((a, b) => String(b.watchedAt).localeCompare(String(a.watchedAt)))[0];
@@ -170,8 +287,31 @@ export async function removeMovieWatchEvent(uid, movieId, eventId) {
       watchEvents: remaining,
       watchCount: remaining.length,
       dateAdded: latest.watchedAt,
+      updatedAt: serverTimestamp(),
     });
+    tx.set(
+      rootRef,
+      nestedSummaryFields({
+        "stats.movies.totalRewatchCount": increment(-1),
+        "stats.movies.totalMinutes": increment(-minutes),
+        "stats.totalMinutes": increment(-minutes),
+        updatedAt: serverTimestamp(),
+        _schemaVersion: 3,
+      }),
+      { merge: true },
+    );
+    nextLocalDocument = {
+      ...current,
+      watchEvents: remaining,
+      watchCount: remaining.length,
+      dateAdded: latest.watchedAt,
+      updatedAt: new Date().toISOString(),
+    };
   });
+  if (shouldDeleteLocal) deleteLocalItem(uid, "watchedMovies", docKey);
+  else if (nextLocalDocument) {
+    updateLocalItem(uid, "watchedMovies", docKey, nextLocalDocument);
+  }
 }
 
 /**
@@ -211,7 +351,7 @@ export async function createCustomList(uid, name, currentLists = []) {
   );
   batch.set(
     doc(db, "Users", uid),
-    { listVisible: { [entry.name]: false } },
+    { listVisible: { [entry.name]: true } },
     { merge: true },
   );
   await batch.commit();
@@ -255,14 +395,33 @@ export async function deleteCustomList(uid, listId, currentLists) {
 /** Öğeyi özel listeye ekler. */
 export async function addToCustomList(uid, listId, item) {
   if (!uid || !listId || item?.id == null || !item?.type) return;
-  const ref = doc(db, "Lists", uid, CUSTOM_ITEMS, customDocId(listId, item.type, item.id));
-  await setDoc(ref, { ...normalizeItem(item), listId }, { merge: true });
+  const docKey = customDocId(listId, item.type, item.id);
+  const ref = doc(db, "Lists", uid, CUSTOM_ITEMS, docKey);
+  const rootRef = doc(db, "Lists", uid);
+
+  const batch = writeBatch(db);
+  batch.set(ref, { ...normalizeItem(item), listId, updatedAt: serverTimestamp() }, { merge: true });
+  batch.set(
+    rootRef,
+    nestedSummaryFields({
+      [`statusIndex.${item.type}.${item.id}.isInOtherLists`]: true,
+      updatedAt: serverTimestamp(),
+      _schemaVersion: 3,
+    }),
+    { merge: true },
+  );
+
+  await batch.commit();
+  updateLocalItem(uid, CUSTOM_ITEMS, docKey, { ...normalizeItem(item), listId });
 }
 
 /** Öğeyi özel listeden çıkarır. */
 export async function removeFromCustomList(uid, listId, type, id) {
   if (!uid || !listId || id == null || !type) return;
-  await deleteDoc(doc(db, "Lists", uid, CUSTOM_ITEMS, customDocId(listId, type, id)));
+  const docKey = customDocId(listId, type, id);
+  const ref = doc(db, "Lists", uid, CUSTOM_ITEMS, docKey);
+  await deleteDoc(ref);
+  deleteLocalItem(uid, CUSTOM_ITEMS, docKey);
 }
 
 /** Özel listede manuel sırayı `listOrder` ile saklar. */
@@ -278,20 +437,6 @@ export async function reorderCustomList(uid, listId, orderedItems, fromIndex, to
 
 /**
  * Öğeyi ESKİ MODELDEKİ özel listeye (kök doküman alanındaki dizi) ekler.
- *
- * Part B'ye kadar özel listeler hâlâ `Lists/{uid}.<listeAdı>[]` dizisinde
- * duruyor (ListStatusContext.combinedLists oradan okuyor); `addToCustomList`
- * ise yeni `customItems` koleksiyonuna yazar ve ekranda GÖRÜNMEZ. Liste
- * ekranından yapılan hızlı ekleme bu yüzden buradan geçer.
- *
- * İki incelik:
- *  • Transaction: kök doküman TÜM özel listeleri taşıyor. Oku-değiştir-yaz'ı
- *    istemcide yapmak, başka bir cihazdaki eşzamanlı eklemeyi sessizce siler.
- *  • `tx.set(..., { merge: true })` — `updateDoc` DEĞİL: updateDoc string
- *    anahtardaki noktaları alan yolu ayracı sayar ve "S.W.A.T. Favorilerim"
- *    gibi bir liste adı iç içe map'e dönüşüp liste tamamen kaybolur.
- *
- * @returns {Promise<boolean>} eklendiyse true, öğe zaten listedeyse false
  */
 export async function addToCustomRootList(uid, listName, item) {
   if (!uid || !listName || item?.id == null || !item?.type) return false;
@@ -309,7 +454,16 @@ export async function addToCustomRootList(uid, listName, item) {
         (it.type || "movie") === item.type,
     );
     if (exists) return;
-    tx.set(ref, { [listName]: [...current, normalizeItem(item)] }, { merge: true });
+    tx.set(
+      ref,
+      nestedSummaryFields({
+        [listName]: [...current, normalizeItem(item)],
+        [`statusIndex.${item.type}.${item.id}.isInOtherLists`]: true,
+        updatedAt: serverTimestamp(),
+        _schemaVersion: 3,
+      }),
+      { merge: true },
+    );
     added = true;
   });
 
@@ -317,16 +471,7 @@ export async function addToCustomRootList(uid, listName, item) {
 }
 
 /**
- * Öğeyi ESKİ MODELDEKİ özel listeden (kök doküman alanındaki dizi) çıkarır —
- * `addToCustomRootList`in tersi ve onunla aynı iki inceliğe tabi:
- *
- *  • Transaction: kök doküman TÜM özel listeleri taşıyor; oku-değiştir-yaz'ı
- *    istemcide yapmak başka bir cihazdaki eşzamanlı eklemeyi sessizce siler.
- *  • `tx.set(..., { merge: true })` — `updateDoc` DEĞİL: updateDoc string
- *    anahtardaki noktaları alan yolu ayracı sayar ve "S.W.A.T. Favorilerim"
- *    gibi bir liste adı iç içe map'e dönüşüp liste tamamen kaybolur.
- *
- * @returns {Promise<boolean>} çıkarıldıysa true, öğe listede değilse false
+ * Öğeyi ESKİ MODELDEKİ özel listeden (kök doküman alanındaki dizi) çıkarır.
  */
 export async function removeFromCustomRootList(uid, listName, type, id) {
   if (!uid || !listName || id == null || !type) return false;
@@ -346,7 +491,15 @@ export async function removeFromCustomRootList(uid, listName, type, id) {
         ),
     );
     if (next.length === current.length) return;
-    tx.set(ref, { [listName]: next }, { merge: true });
+    tx.set(
+      ref,
+      {
+        [listName]: next,
+        updatedAt: serverTimestamp(),
+        _schemaVersion: 3,
+      },
+      { merge: true },
+    );
     removed = true;
   });
 

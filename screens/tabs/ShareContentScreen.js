@@ -43,7 +43,7 @@ import BackButton from "@components/BackButton";
 import RatingStars from "../../components/RatingStars";
 import PollMessage from "@components/chat/PollMessage";
 import { FeedSkeleton } from "@components/Skeleton";
-import { getAvatarSource } from "../../utils/avatars";
+import UserAvatar from "../../components/common/UserAvatar";
 import { i18nText } from "../../utils/i18nText";
 import { appAlert } from "@components/AppAlert";
 import { toast } from "@components/AppToast";
@@ -299,6 +299,7 @@ const PostCard = memo(function PostCard({
   theme,
   t,
   currentUid,
+  currentUserAvatar,
   onLike,
   onBookmark,
   onComment,
@@ -315,7 +316,7 @@ const PostCard = memo(function PostCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const showSpoiler = post.hasSpoiler && !spoilerRevealed;
-  const isOwner = currentUid && post.authorId === currentUid;
+  const isOwner = currentUid && (post.authorId === currentUid || post.userId === currentUid);
 
   const accentColor =
     post.type === "list"
@@ -334,16 +335,6 @@ const PostCard = memo(function PostCard({
 
   const timeText = formatTimeAgo(post._createdAtMs || 0, t.timeAgo);
 
-  // Avatar çözümleme önceliği:
-  //   1) authorAvatarIndex (Firestore'da tutulan sayı) → local require()
-  //   2) Legacy authorAvatar (URL string veya require sonucu) → fallback
-  //   3) Hiçbiri yoksa default
-  const avatarSrc =
-    typeof post.authorAvatarIndex === "number"
-      ? getAvatarSource(post.authorAvatarIndex)
-      : typeof post.authorAvatar === "string"
-        ? { uri: post.authorAvatar }
-        : post.authorAvatar || getAvatarSource(0);
   const joinedListPosters =
     post.type === "list" && postListPosterLayout === "joined";
 
@@ -420,25 +411,17 @@ const PostCard = memo(function PostCard({
           activeOpacity={0.7}
           onPress={() => onPressAuthor?.(post)}
         >
-          {avatarSrc ? (
-            <Image
-              source={avatarSrc}
-              style={[postStyles.avatar, { borderColor: accentColor + "66" }]}
-            />
+          {isOwner && currentUserAvatar ? (
+            <UserAvatar source={currentUserAvatar} size={42} borderWidth={1.5} borderColor={accentColor + "66"} />
           ) : (
-            <View
-              style={[
-                postStyles.avatar,
-                {
-                  backgroundColor: theme.border,
-                  borderColor: accentColor + "66",
-                  justifyContent: "center",
-                  alignItems: "center",
-                },
-              ]}
-            >
-              <AppIcon family="Ionicons" name="person" size={17} color={theme.text.muted} />
-            </View>
+            <UserAvatar
+              avatarIndex={post.authorAvatarIndex}
+              photoURL={post.authorPhotoURL || (typeof post.authorAvatar === "string" ? post.authorAvatar : null)}
+              isCustomPhoto
+              size={42}
+              borderWidth={1.5}
+              borderColor={accentColor + "66"}
+            />
           )}
         </TouchableOpacity>
 
@@ -1399,6 +1382,7 @@ export default function ShareContentScreen({ route }) {
           theme={theme}
           t={ts}
           currentUid={user?.uid}
+          currentUserAvatar={avatar}
           onLike={toggleLike}
           onBookmark={toggleBookmark}
           onComment={handleOpenComments}
@@ -1413,7 +1397,7 @@ export default function ShareContentScreen({ route }) {
         />
       </StaggerItem>
     ),
-    [theme, ts, user?.uid, toggleLike, toggleBookmark, handleOpenComments, handleOpenProfile, handleEditRequest, deletePost, handleReportPost, votePoll, getTmdbUrl, postListPosterLayout],
+    [theme, ts, user?.uid, avatar, toggleLike, toggleBookmark, handleOpenComments, handleOpenProfile, handleEditRequest, deletePost, handleReportPost, votePoll, getTmdbUrl, postListPosterLayout],
   );
 
   const listFooter = useMemo(() => {

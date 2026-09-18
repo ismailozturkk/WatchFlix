@@ -22,6 +22,13 @@ export const RESERVED_LIST_NAMES = [
   "watchedMovies",
   "customLists",
   "listOrder",
+  "stats",
+  "statusIndex",
+  "activityIndex",
+  "counts",
+  "updatedAt",
+  "_schemaVersion",
+  "createdAt",
 ];
 
 export const MAX_LIST_NAME_LENGTH = 60;

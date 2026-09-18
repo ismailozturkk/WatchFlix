@@ -176,143 +176,250 @@ export function alpha(hex, a = 1) {
 
 // ─── Not renk paleti (tüm temalar paylaşır) ───────────────────────────────────
 
-const SHARED_NOTES_COLORS = {
-  green: PALETTE.noteGreen,
+// ─── Semantic & Not Renk Setleri (Tema Bazlı) ─────────────────────────────────
 
-  greenBackground: alpha(PALETTE.noteGreen, 0.25),
+// Koyu Temalar (Gray, Dark, Purple, Amber)
+export const DARK_THEME_COLORS = Object.freeze({
+  green: "#22C55E",
+  red: "#EF4444",
+  blue: "#3B82F6",
+  orange: "#F97316",
+  purple: "#A855F7",
+  yellow: "#FACC15",
+});
 
-  red: PALETTE.noteRed,
+export const DARK_THEME_NOTES_COLORS = Object.freeze({
+  green: "#22C55E",
+  greenBackground: alpha("#22C55E", 0.2),
+  red: "#EF4444",
+  redBackground: alpha("#EF4444", 0.2),
+  blue: "#3B82F6",
+  blueBackground: alpha("#3B82F6", 0.2),
+  orange: "#F97316",
+  orangeBackground: alpha("#F97316", 0.2),
+  yellow: "#FACC15",
+  yellowBackground: alpha("#FACC15", 0.2),
+  purple: "#A855F7",
+  purpleBackground: alpha("#A855F7", 0.2),
+  pink: "#F472B6",
+  pinkBackground: alpha("#F472B6", 0.2),
+  aqua: "#22D3EE",
+  aquaBackground: alpha("#22D3EE", 0.2),
+  teal: "#14B8A6",
+  tealBackground: alpha("#14B8A6", 0.2),
+});
 
-  redBackground: alpha(PALETTE.noteRed, 0.25),
+// Açık Tema (Light) — Beyaz/Açık Gri zeminlerde yüksek kontrast ve temiz okunurluk
+export const LIGHT_THEME_COLORS = Object.freeze({
+  green: "#15803D", // Canlı derin zümrüt yeşili (kontrast > 5:1)
+  red: "#DC2626",   // Net crimson kırmızısı (kontrast > 4.8:1)
+  blue: "#2563EB",  // Modern mavi (kontrast > 5.2:1)
+  orange: "#C2410C",// Yanık kehribar turuncusu (kontrast > 4.9:1)
+  purple: "#7E22CE",// Kraliyet moru (kontrast > 5.6:1)
+  yellow: "#A16207",// Zengin altın sarısı / amber (kontrast > 4.8:1)
+});
 
-  blue: PALETTE.noteBlue,
+export const LIGHT_THEME_NOTES_COLORS = Object.freeze({
+  green: "#15803D",
+  greenBackground: alpha("#15803D", 0.14),
+  red: "#DC2626",
+  redBackground: alpha("#DC2626", 0.14),
+  blue: "#2563EB",
+  blueBackground: alpha("#2563EB", 0.14),
+  orange: "#C2410C",
+  orangeBackground: alpha("#C2410C", 0.14),
+  yellow: "#A16207",
+  yellowBackground: alpha("#A16207", 0.16),
+  purple: "#7E22CE",
+  purpleBackground: alpha("#7E22CE", 0.14),
+  pink: "#BE185D",
+  pinkBackground: alpha("#BE185D", 0.14),
+  aqua: "#0E7490",
+  aquaBackground: alpha("#0E7490", 0.14),
+  teal: "#0F766E",
+  tealBackground: alpha("#0F766E", 0.14),
+});
 
-  blueBackground: alpha(PALETTE.noteBlue, 0.25),
+// Yeşil Tema (Green) — Adaçayı/Nane zeminlerde net ayrışan tonlar
+export const GREEN_THEME_COLORS = Object.freeze({
+  green: "#0D6E5B", // Koyu çam yeşili (adaçayı zeminde net ayrışır, kontrast > 4.8:1)
+  red: "#B91C1C",   // Derin yakut kırmızısı (kontrast > 5.3:1)
+  blue: "#0369A1",  // Derin safir mavi (kontrast > 4.7:1)
+  orange: "#C2410C",// Zengin sıcak turuncu (kontrast > 4.9:1)
+  purple: "#6B21A8",// Derin mürdüm moru (kontrast > 5.7:1)
+  yellow: "#92400E",// Sıcak altın sarısı / kehribar (kontrast > 5.1:1)
+});
 
-  orange: PALETTE.noteOrange,
+export const GREEN_THEME_NOTES_COLORS = Object.freeze({
+  green: "#0D6E5B",
+  greenBackground: alpha("#0D6E5B", 0.15),
+  red: "#B91C1C",
+  redBackground: alpha("#B91C1C", 0.15),
+  blue: "#0369A1",
+  blueBackground: alpha("#0369A1", 0.15),
+  orange: "#C2410C",
+  orangeBackground: alpha("#C2410C", 0.15),
+  yellow: "#92400E",
+  yellowBackground: alpha("#92400E", 0.16),
+  purple: "#6B21A8",
+  purpleBackground: alpha("#6B21A8", 0.15),
+  pink: "#9D174D",
+  pinkBackground: alpha("#9D174D", 0.15),
+  aqua: "#155E75",
+  aquaBackground: alpha("#155E75", 0.15),
+  teal: "#115E59",
+  tealBackground: alpha("#115E59", 0.15),
+});
 
-  orangeBackground: alpha(PALETTE.noteOrange, 0.25),
+// Açık Mavi Tema (Sky) — Ferah gökyüzü / buz mavisi zeminler (#81D4FA / #4FC3F7 tabanlı)
+export const SKY_THEME_COLORS = Object.freeze({
+  green: "#0D6E5B",
+  red: "#B91C1C",
+  blue: "#026AA7",
+  orange: "#C2410C",
+  purple: "#6B21A8",
+  yellow: "#92400E",
+});
 
-  yellow: PALETTE.noteYellow,
+export const SKY_THEME_NOTES_COLORS = Object.freeze({
+  green: "#0D6E5B",
+  greenBackground: alpha("#0D6E5B", 0.14),
+  red: "#B91C1C",
+  redBackground: alpha("#B91C1C", 0.14),
+  blue: "#026AA7",
+  blueBackground: alpha("#026AA7", 0.14),
+  orange: "#C2410C",
+  orangeBackground: alpha("#C2410C", 0.14),
+  yellow: "#92400E",
+  yellowBackground: alpha("#92400E", 0.15),
+  purple: "#6B21A8",
+  purpleBackground: alpha("#6B21A8", 0.14),
+  pink: "#9D174D",
+  pinkBackground: alpha("#9D174D", 0.14),
+  aqua: "#0E7490",
+  aquaBackground: alpha("#0E7490", 0.14),
+  teal: "#0F766E",
+  tealBackground: alpha("#0F766E", 0.14),
+});
 
-  yellowBackground: alpha(PALETTE.noteYellow, 0.2),
+// Lacivert Tema (Blue) — Gece laciverti zeminler
+export const BLUE_THEME_COLORS = Object.freeze({
+  green: "#34D399",
+  red: "#F87171",
+  blue: "#60A5FA",
+  orange: "#FB923C",
+  purple: "#C084FC",
+  yellow: "#FDE047",
+});
 
-  purple: PALETTE.notePurple,
+export const BLUE_THEME_NOTES_COLORS = Object.freeze({
+  green: "#34D399",
+  greenBackground: alpha("#34D399", 0.2),
+  red: "#F87171",
+  redBackground: alpha("#F87171", 0.2),
+  blue: "#60A5FA",
+  blueBackground: alpha("#60A5FA", 0.2),
+  orange: "#FB923C",
+  orangeBackground: alpha("#FB923C", 0.2),
+  yellow: "#FDE047",
+  yellowBackground: alpha("#FDE047", 0.2),
+  purple: "#C084FC",
+  purpleBackground: alpha("#C084FC", 0.2),
+  pink: "#F472B6",
+  pinkBackground: alpha("#F472B6", 0.2),
+  aqua: "#38BDF8",
+  aquaBackground: alpha("#38BDF8", 0.2),
+  teal: "#2DD4BF",
+  tealBackground: alpha("#2DD4BF", 0.2),
+});
 
-  purpleBackground: alpha(PALETTE.notePurple, 0.25),
+export const SHARED_COLORS = DARK_THEME_COLORS;
+export const SHARED_NOTES_COLORS = DARK_THEME_NOTES_COLORS;
 
-  pink: PALETTE.notePink,
-
-  pinkBackground: alpha(PALETTE.notePink, 0.25),
-
-  aqua: PALETTE.noteAqua,
-
-  aquaBackground: alpha(PALETTE.noteAqua, 0.2),
-
-  teal: PALETTE.noteTeal,
-
-  tealBackground: alpha(PALETTE.noteTeal, 0.25),
-};
-
-// ─── Semantic renk seti (tüm temalar paylaşır) ────────────────────────────────
-
-const SHARED_COLORS = {
-  green: PALETTE.green,
-
-  red: PALETTE.red,
-
-  blue: PALETTE.blue,
-
-  orange: PALETTE.orange,
-
-  purple: PALETTE.purple,
-
-  yellow: PALETTE.yellow,
-};
+export function getSemanticColorsForTheme(themeKey, surfaceHex) {
+  if (themeKey === "light") {
+    return { colors: LIGHT_THEME_COLORS, notesColor: LIGHT_THEME_NOTES_COLORS };
+  }
+  if (themeKey === "green") {
+    return { colors: GREEN_THEME_COLORS, notesColor: GREEN_THEME_NOTES_COLORS };
+  }
+  if (themeKey === "sky") {
+    return { colors: SKY_THEME_COLORS, notesColor: SKY_THEME_NOTES_COLORS };
+  }
+  if (themeKey === "blue") {
+    return { colors: BLUE_THEME_COLORS, notesColor: BLUE_THEME_NOTES_COLORS };
+  }
+  if (themeKey === "gray" || themeKey === "dark" || themeKey === "purple" || themeKey === "amber") {
+    return { colors: DARK_THEME_COLORS, notesColor: DARK_THEME_NOTES_COLORS };
+  }
+  if (surfaceHex) {
+    const hsl = hexToHsl(toHex(surfaceHex));
+    if (hsl.h >= 80 && hsl.h <= 180 && hsl.l >= 35) {
+      return { colors: GREEN_THEME_COLORS, notesColor: GREEN_THEME_NOTES_COLORS };
+    }
+    if (hsl.h >= 181 && hsl.h <= 220 && hsl.l >= 50) {
+      return { colors: SKY_THEME_COLORS, notesColor: SKY_THEME_NOTES_COLORS };
+    }
+    if (hsl.l >= 50) {
+      return { colors: LIGHT_THEME_COLORS, notesColor: LIGHT_THEME_NOTES_COLORS };
+    }
+  }
+  return { colors: DARK_THEME_COLORS, notesColor: DARK_THEME_NOTES_COLORS };
+}
 
 // ─── Theme factory ────────────────────────────────────────────────────────────
 
 /**
-
  * Tema token'larını üreten factory fonksiyonu.
-
  * Her tema yalnızca kendi değerlerini geçirir, shared değerler otomatik eklenir.
-
  */
-
 function makeTheme({
   primary,
-
   secondary,
-
   between,
-
   border,
-
   tab,
-
   text,
-
   accent,
-
   bold,
-
   shadow,
+  themeKey,
 }) {
+  const semantic = getSemanticColorsForTheme(themeKey, primary);
   return {
     // ── Yüzey renkleri ─────────────────────────────────────────────────────
-
     primary,
-
     secondary,
-
     secondaryt: alpha(
       secondary
-
         .replace("rgb(", "rgba(")
-
         .replace(")", ", 0.5)")
-
         .startsWith("rgba")
         ? secondary
         : secondary,
-
       0,
-    ), // aşağıda override
-
+    ),
     between,
-
     border,
-
     tab,
-
     ai: alpha(tab, 0.4),
 
     // ── Metin ──────────────────────────────────────────────────────────────
-
     text: {
       primary: text.primary,
-
       secondary: text.secondary,
-
       between: text.between,
-
       muted: text.muted,
     },
 
     // ── Vurgu ──────────────────────────────────────────────────────────────
-
     accent,
-
     bold,
-
     shadow,
 
-    // ── Paylaşılan renk setleri ─────────────────────────────────────────────
-
-    colors: SHARED_COLORS,
-
-    notesColor: SHARED_NOTES_COLORS,
+    // ── Tema Bazlı Renk Setleri ─────────────────────────────────────────────
+    colors: semantic.colors,
+    notesColor: semantic.notesColor,
   };
 }
 
@@ -320,303 +427,181 @@ function makeTheme({
 
 export const themes = {
   /* ── Koyu Gri ─────────────────────────────────────────────────── */
-
-  // Varsayılan tema — kimliği (nötr koyu gri + mavi accent) korunarak inceltildi:
-  // yüzeylere çok hafif soğuk alt ton, soluk metne daha okunur kademe
-  // (#666 ≈ 4.0:1 → #7C838F ≈ 4.9:1), accent dark temayla aynı modern maviye.
   gray: {
     primary: "#1D1F23",
-
     secondary: "#2A2D33",
-
     secondaryt: alpha("#2A2D33", 0.5),
-
     between: "#24262B",
-
     border: alpha("#4A4F58", 0.8),
-
     tab: alpha("#2A2D33", 0.95),
-
     ai: alpha("#2A2D33", 0.4),
-
     text: {
       primary: "#F6F7F9",
-
       secondary: "#D6D9DE",
-
       between: "#B4B9C1",
-
       muted: "#7C838F",
     },
-
     accent: "#3B82F6",
-
     bold: "#2563EB",
-
     shadow: alpha(PALETTE.black, 0.6),
-
-    colors: SHARED_COLORS,
-
-    notesColor: SHARED_NOTES_COLORS,
+    colors: DARK_THEME_COLORS,
+    notesColor: DARK_THEME_NOTES_COLORS,
   },
 
-  /* ── Siyah (AMOLED) ──────────────────────────────────────────────
-     Zemin saf siyah (OLED kimliği); yüzeyler hafif mavi alt tonlu koyu
-     griler (Material dark rehberi: saf siyah kart yerine yükseltilmiş
-     yüzey). Eski accent (#0551A3) siyah üstünde ~2.4:1 ile ölüydü —
-     yeni accent #3B82F6 siyahta ~6.2:1 kontrast verir. */
-
+  /* ── Siyah (AMOLED) ────────────────────────────────────────────── */
   dark: {
     primary: PALETTE.black,
-
     secondary: "#15171C",
-
     secondaryt: alpha("#15171C", 0.5),
-
     between: "#1D2026",
-
     border: "#262A31",
-
     tab: "#121418",
-
     ai: alpha("#121418", 0.4),
-
     text: {
       primary: "#F5F6F8",
-
       secondary: "#C9CDD4",
-
       between: "#9AA1AB",
-
       muted: "#757C87",
     },
-
     accent: "#3B82F6",
-
     bold: "#2563EB",
-
     shadow: alpha(PALETTE.black, 0.55),
-
-    colors: SHARED_COLORS,
-
-    notesColor: SHARED_NOTES_COLORS,
+    colors: DARK_THEME_COLORS,
+    notesColor: DARK_THEME_NOTES_COLORS,
   },
 
-  /* ── Açık (Light) ────────────────────────────────────────────────
-     Eski palet baştan sona orta-gri (zemin #E8E8E8, kart #D6D6D6) olduğu
-     için yıkanmış görünüyordu. Modern açık tema deseni: hafif soğuk kırık
-     beyaz zemin + BEYAZ kartlar + ince ayrım çizgileri. Metin koyu lacivert-
-     grafit ölçeği; accent beyaz üstünde ~5.2:1 kontrastlı (#2563EB) —
-     eski #38A6F0 (~2.5:1) buton üzerindeki beyaz yazıyı okunmaz kılıyordu.
-     Gölge %70 siyah yerine yumuşak, mavi alt tonlu %16. */
-
+  /* ── Açık (Light) ──────────────────────────────────────────────── */
   light: {
-    // Saf beyaz kart + çok açık zemin fazla parlak geldi — tüm yüzeyler bir
-    // kademe koyulaştırıldı (slate alt tonlu): kart kırık beyaz, zemin gri.
-    primary: "#EDF0F5",
-
-    secondary: "#F7F9FC",
-
-    secondaryt: alpha("#F7F9FC", 0.5),
-
-    between: "#E2E7EE",
-
-    border: "#D3DAE3",
-
-    tab: "#F7F9FC",
-
-    ai: alpha("#F7F9FC", 0.4),
-
+    primary: "#F1F5F9",
+    secondary: "#FFFFFF",
+    secondaryt: alpha("#FFFFFF", 0.5),
+    between: "#EEF2F6",
+    border: "#E2E8F0",
+    tab: "#FFFFFF",
+    ai: alpha("#FFFFFF", 0.4),
     text: {
-      primary: "#1A202C",
-
-      secondary: "#3E4756",
-
-      between: "#667081",
-
-      muted: "#7C8594",
+      primary: "#0F172A",
+      secondary: "#334155",
+      between: "#64748B",
+      muted: "#94A3B8",
     },
-
     accent: "#2563EB",
-
     bold: "#1D4ED8",
-
-    shadow: alpha("#0F172A", 0.16),
-
-    colors: SHARED_COLORS,
-
-    notesColor: SHARED_NOTES_COLORS,
+    shadow: alpha("#0F172A", 0.08),
+    colors: LIGHT_THEME_COLORS,
+    notesColor: LIGHT_THEME_NOTES_COLORS,
   },
 
-  /* ── Lacivert ─────────────────────────────────────────────────────
-     Eski accent (#2B4C84) lacivert zeminde ~1.8:1 ile görünmezdi ve bold
-     zeminle AYNI renkti (fiilen bozuk). Yeni accent parlak azur (~6:1);
-     between artık zemin-kart arasında (eskiden karttan açık bir orta mavi
-     olduğu için chip'ler metin gibi parlıyordu); muted, secondary metinden
-     ayrıştırıldı. */
+  /* ── Açık Mavi (Sky / Ice Blue) ───────────────────────────────────
+     #81D4FA / #4FC3F7 tabanlı ferah pastel mavi zemin + berrak buz mavisi
+     kartlar + derin okyanus safir accent. */
+  sky: {
+    primary: "#B6DCF0",
+    secondary: "#DDF2FC",
+    secondaryt: alpha("#DDF2FC", 0.5),
+    between: "#A5D4EC",
+    border: "#8EC4E0",
+    tab: "#DDF2FC",
+    ai: alpha("#DDF2FC", 0.4),
+    text: {
+      primary: "#0A2540",
+      secondary: "#183B5E",
+      between: "#2D557B",
+      muted: "#486E94",
+    },
+    accent: "#026AA7",
+    bold: "#024C7B",
+    shadow: alpha("#032B44", 0.18),
+    colors: SKY_THEME_COLORS,
+    notesColor: SKY_THEME_NOTES_COLORS,
+  },
 
+  /* ── Lacivert ───────────────────────────────────────────────────── */
   blue: {
     primary: PALETTE.navy500,
-
     secondary: PALETTE.navy400,
-
     secondaryt: alpha(PALETTE.navy400, 0.5),
-
     between: "#1B2440",
-
     border: "#2A3E63",
-
     tab: "#20304F",
-
     ai: alpha("#20304F", 0.4),
-
     text: {
       primary: PALETTE.navy050,
-
       secondary: PALETTE.navy100,
-
       between: "#6E87A8",
-
       muted: "#5F7694",
     },
-
     accent: "#4C8DFF",
-
     bold: "#2D6BDF",
-
     shadow: alpha(PALETTE.black, 0.6),
-
-    colors: SHARED_COLORS,
-
-    notesColor: SHARED_NOTES_COLORS,
+    colors: BLUE_THEME_COLORS,
+    notesColor: BLUE_THEME_NOTES_COLORS,
   },
 
-  /* ── Açık Yeşil (Teal) ────────────────────────────────────────────
-     Eski palette kartlar zeminden KOYUYDU (ters hiyerarşi → çamurlu his)
-     ve accent (#62BEB4) açık zeminde ~2:1 ile kayboluyordu. Yeni düzen:
-     ferah adaçayı zemin + açık nane kartlar + koyu teal accent (Tailwind
-     teal-700, açık yüzeylerde ~4.8:1). Kimlik (yeşil/teal) korunur. */
-
+  /* ── Açık Yeşil (Teal / Sage) ──────────────────────────────────── */
   green: {
-    // İlk düzenleme fazla açık kaçıp beyaz temaya benzedi — yeşil kimliği
-    // hissedilir kılmak için tüm yüzeyler bir kademe koyulaştırıldı: doygun
-    // adaçayı zemin + nane kartlar. Kart > zemin hiyerarşisi korunur; accent
-    // koyu teal, orta tonlu zeminde de ~4.6:1 kontrast verir.
     primary: "#B9CEC7",
-
     secondary: "#D8E7E1",
-
     secondaryt: alpha("#D8E7E1", 0.5),
-
     between: "#A9C0B8",
-
     border: "#93AFA6",
-
     tab: "#D8E7E1",
-
     ai: alpha("#D8E7E1", 0.4),
-
     text: {
       primary: "#122E2B",
-
       secondary: "#24504B",
-
       between: "#3E6862",
-
       muted: "#527570",
     },
-
     accent: "#0B5F57",
-
     bold: "#0A4A44",
-
     shadow: alpha("#0B221F", 0.22),
-
-    colors: SHARED_COLORS,
-
-    notesColor: SHARED_NOTES_COLORS,
+    colors: GREEN_THEME_COLORS,
+    notesColor: GREEN_THEME_NOTES_COLORS,
   },
 
-  /* ── Gece Moru ────────────────────────────────────────────────────
-     Medya uygulamalarının klasiği: mor alt tonlu koyu yüzeyler + canlı
-     violet accent. Uygulamanın mevcut mor kimliğiyle (sohbet accent'i
-     #6C63FF, Wrapped gradyanı) akraba. Accent koyu zeminde ~5.3:1. */
-
+  /* ── Gece Moru ──────────────────────────────────────────────────── */
   purple: {
     primary: "#16131E",
-
     secondary: "#211C2E",
-
     secondaryt: alpha("#211C2E", 0.5),
-
     between: "#1B1726",
-
     border: "#332C46",
-
     tab: "#1D1929",
-
     ai: alpha("#1D1929", 0.4),
-
     text: {
       primary: "#F4F2F9",
-
       secondary: "#CFC9DE",
-
       between: "#A79FBE",
-
       muted: "#7E7694",
     },
-
     accent: "#8B5CF6",
-
     bold: "#7C3AED",
-
     shadow: alpha(PALETTE.black, 0.6),
-
-    colors: SHARED_COLORS,
-
-    notesColor: SHARED_NOTES_COLORS,
+    colors: DARK_THEME_COLORS,
+    notesColor: DARK_THEME_NOTES_COLORS,
   },
 
-  /* ── Kehribar (Sinema) ────────────────────────────────────────────
-     Sıcak projektör ışığı hissi: kahve alt tonlu koyu yüzeyler + altın
-     accent — film uygulaması kimliğine birebir. Amber accent koyu
-     zeminde ~9:1 kontrast verir; metin ölçeği sıcak kırık beyazlar. */
-
+  /* ── Kızıl Sinema (Crimson / Velvet Red) ────────────────────────── */
   amber: {
-    primary: "#1A1512",
-
-    secondary: "#282017",
-
-    secondaryt: alpha("#282017", 0.5),
-
-    between: "#211A14",
-
-    border: "#3E3226",
-
-    tab: "#241D15",
-
-    ai: alpha("#241D15", 0.4),
-
+    primary: "#170D12",
+    secondary: "#24141D",
+    secondaryt: alpha("#24141D", 0.5),
+    between: "#1C0F17",
+    border: "#3D202F",
+    tab: "#20121A",
+    ai: alpha("#20121A", 0.4),
     text: {
-      primary: "#F8F4EE",
-
-      secondary: "#DCD2C4",
-
-      between: "#B3A794",
-
-      muted: "#847A69",
+      primary: "#FDF2F4",
+      secondary: "#E2CBD2",
+      between: "#B89CA5",
+      muted: "#886E77",
     },
-
-    accent: "#F59E0B",
-
-    bold: "#D97706",
-
+    accent: "#F43F5E",
+    bold: "#E11D48",
     shadow: alpha(PALETTE.black, 0.6),
-
-    colors: SHARED_COLORS,
-
-    notesColor: SHARED_NOTES_COLORS,
+    colors: DARK_THEME_COLORS,
+    notesColor: DARK_THEME_NOTES_COLORS,
   },
 };
 
@@ -761,6 +746,7 @@ export function resolveThemeTokens(tokens) {
  */
 export function buildCustomTheme(tokens) {
   const t = resolveThemeTokens(tokens);
+  const semantic = getSemanticColorsForTheme("custom", t.primary);
   return {
     primary: t.primary,
     secondary: t.secondary,
@@ -778,8 +764,8 @@ export function buildCustomTheme(tokens) {
     accent: t.accent,
     bold: t.bold,
     shadow: alpha(PALETTE.black, 0.7),
-    colors: SHARED_COLORS,
-    notesColor: SHARED_NOTES_COLORS,
+    colors: semantic.colors,
+    notesColor: semantic.notesColor,
   };
 }
 

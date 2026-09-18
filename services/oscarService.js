@@ -678,12 +678,26 @@ export const FALLBACK_OSCAR_CONFIG = {
   ]
 };
 
-const OSCAR_CONFIG_CACHE_KEY = "app_config_oscar_awards_v5";
+export const isValidOscarConfig = (config) => {
+  return (
+    Array.isArray(config?.items) &&
+    config.items.length >= FALLBACK_OSCAR_CONFIG.items.length &&
+    config.items.some(
+      (it) =>
+        it &&
+        it.categories &&
+        typeof it.categories === "object" &&
+        Object.keys(it.categories).length > 0,
+    )
+  );
+};
+
+const OSCAR_CONFIG_CACHE_KEY = "app_config_oscar_awards_v6";
 
 export async function getOscarConfig({ forceRefresh = false } = {}) {
   if (!forceRefresh) {
     const cached = await getCachedValue(OSCAR_CONFIG_CACHE_KEY, TTL.OSCAR);
-    if (cached?.items?.length && cached.items.length >= FALLBACK_OSCAR_CONFIG.items.length) {
+    if (isValidOscarConfig(cached)) {
       return cached;
     }
   }
@@ -693,7 +707,7 @@ export async function getOscarConfig({ forceRefresh = false } = {}) {
     const snap = await getDoc(ref);
     if (snap.exists()) {
       const data = snap.data();
-      if (Array.isArray(data?.items) && data.items.length >= FALLBACK_OSCAR_CONFIG.items.length) {
+      if (isValidOscarConfig(data)) {
         const sorted = {
           updatedAt: data.updatedAt || Date.now(),
           totalYears: data.items.length,
@@ -735,7 +749,7 @@ export async function fetchOscarByCategory({
 
   const resolved = await Promise.all(
     targetSlice.map(async (entry) => {
-      const tmdbId = entry.categories?.[categoryKey];
+      const tmdbId = entry.categories?.[categoryKey] || (categoryKey === "best_picture" ? entry.tmdbId : null);
       if (!entry.isConfirmed || !tmdbId) {
         return {
           id: `oscar-pending-${entry.year}-${categoryKey}`,
@@ -821,7 +835,7 @@ export async function fetchOscarByYear({
 
   const results = await Promise.all(
     OSCAR_CATEGORIES.map(async (cat) => {
-      const tmdbId = yearEntry.categories?.[cat.key];
+      const tmdbId = yearEntry.categories?.[cat.key] || (cat.key === "best_picture" ? yearEntry.tmdbId : null);
       if (!yearEntry.isConfirmed || !tmdbId) {
         return {
           id: `oscar-pending-${yearEntry.year}-${cat.key}`,

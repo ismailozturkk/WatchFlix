@@ -127,8 +127,8 @@ const TvStatisticsScreen = ({ navigation }) => {
           imageUri: item.seasonPosterPath
             ? getTmdbUrl(item.seasonPosterPath, "poster", 200)
             : null,
-          title: item.episodeName,
-          subtitle: item.showName,
+          mediaId: item.showId,
+          mediaType: "tv",
           minutes: item.episodeMinutes,
           onPress: () => navigation.navigate("TvShowsDetails", { id: item.showId }),
         })),
@@ -144,11 +144,12 @@ const TvStatisticsScreen = ({ navigation }) => {
         genres={section.genres}
         totalMinutes={section.totalMinutes}
         minutesLabel={t.minutes}
+        posterMinutesLabel={t.profileScreen?.minutesShort}
         formatDate={formatDate}
         rankColor={borderColorTv}
       />
     ),
-    [theme, t.minutes, formatDate, borderColorTv],
+    [theme, t.minutes, t.profileScreen?.minutesShort, formatDate, borderColorTv],
   );
 
   const onToggleSearch = useCallback(() => setSearchVisible((v) => !v), []);

@@ -46,9 +46,14 @@ const ALLOWED = new Set([
   "(MIT OR GPL-2.0)",
   "(BSD-3-Clause OR GPL-2.0)",
   "(BSD-2-Clause OR MIT OR Apache-2.0)",
+  // JSZip — MIT veya GPL-3.0 secenekli (dual-license); MIT secilerek dagitilir.
+  "(MIT OR GPL-3.0-or-later)",
+  // pako — MIT ve Zlib icerir; Zlib serbest dagitima izin veren permissive lisanstir.
+  "(MIT AND Zlib)",
 ]);
 
 // Kapali kaynak bir mobil uygulamada dagitilmasi sorunlu olan lisanslar.
+// Eger paket MIT veya BSD gibi izinli bir lisansla dual-licensed ise risk teskil etmez.
 const FORBIDDEN_RE = /\b(AGPL|GPL-3\.0|LGPL-3\.0|SSPL|CC-BY-NC|Commons-Clause)\b/i;
 
 describe("acik kaynak lisans verisi", () => {
@@ -95,7 +100,9 @@ describe("acik kaynak lisans verisi", () => {
   });
 
   it("dagitimi engelleyecek bir lisans icermiyor", () => {
-    const riskli = db.packages.filter((p) => FORBIDDEN_RE.test(p.license));
+    const riskli = db.packages.filter(
+      (p) => !ALLOWED.has(p.license) && FORBIDDEN_RE.test(p.license),
+    );
     expect(riskli.map((p) => `${p.name}: ${p.license}`)).toEqual([]);
   });
 

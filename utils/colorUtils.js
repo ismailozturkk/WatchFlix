@@ -96,6 +96,11 @@ export function luminance(hex) {
   return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
 }
 
+// Siyah metnin beyazdan daha yüksek kontrast verdiği gerçek yüzey eşiği.
+export function isLightSurface(color) {
+  return luminance(toHex(color)) > 0.179;
+}
+
 /** Verilen arka plan uzerinde okunur metin rengi (siyah/beyaz). */
 export function readableTextOn(hex) {
   return luminance(hex) > 0.5 ? "#000000" : "#FFFFFF";
@@ -154,7 +159,7 @@ function computeReadableOn(color, surface, target) {
   const { h, s, l } = hexToHsl(base);
   // Cok soluk renkler koyulasinca griye dusuyor; doygunlugu tabanla.
   const sat = Math.max(s, 45);
-  const darken = luminance(bg) > 0.5;
+  const darken = isLightSurface(bg);
   let best = base;
   let bestRatio = contrastRatio(base, bg);
 

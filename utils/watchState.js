@@ -87,6 +87,25 @@ export function canMarkWatched(date, status) {
   return getReleaseState(date, status) === RELEASE_STATE.RELEASED;
 }
 
+/**
+ * Toplu sezon/dizi işaretlemesinde yayınlanmış bölümleri seçer. Tarih alanı
+ * taşımayan eski kayıtlar geriye uyumluluk için korunur; TMDB air_date bilgisi
+ * olan gelecek bölümler ise izleme olayına alınmaz.
+ */
+export function filterWatchableEpisodes(episodes = []) {
+  return (Array.isArray(episodes) ? episodes : []).filter((episode) => {
+    const hasReleaseField =
+      episode != null &&
+      (Object.prototype.hasOwnProperty.call(episode, "releaseDate") ||
+        Object.prototype.hasOwnProperty.call(episode, "airDate"));
+    // Alan hiç yoksa çağıran eski sürümdür. Alan bilinçli biçimde null geldiyse
+    // TMDB tarihi henüz bilmiyor demektir ve yeni kayıt kapısı kapalı kalır.
+    if (!hasReleaseField) return true;
+    const releaseDate = episode?.releaseDate ?? episode?.airDate ?? null;
+    return canMarkWatched(releaseDate, episode?.status);
+  });
+}
+
 /** Engel gerekçesi — çağıran taraf metni kendi diliyle seçebilsin diye. */
 export const WATCH_BLOCKED = {
   UNRELEASED: "unreleased",       // yayın tarihi ileride

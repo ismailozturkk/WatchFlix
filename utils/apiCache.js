@@ -4,16 +4,19 @@ import {
 } from "./dataCacheSettings";
 import { getIsOnline } from "../context/ConnectivityContext";
 import { Namespaces, createNamespace } from "../services/storage";
+import { trackTmdbRequest } from "../services/usageTrackerService";
 
 /** TTL constants (milliseconds) */
 export const TTL = {
-  TREND:      1  * 60 * 60 * 1000,       // 1 hour
-  NOW_PLAYING: 6 * 60 * 60 * 1000,       // 6 hours
-  PROVIDERS:  24 * 60 * 60 * 1000,       // 24 hours
-  GENRES:      7 * 24 * 60 * 60 * 1000,  // 7 days
-  OSCAR:       7 * 24 * 60 * 60 * 1000,  // 7 days
-  COLLECTION:  7 * 24 * 60 * 60 * 1000,  // 7 days
-  CALENDAR:    1 * 60 * 60 * 1000,       // 1 hour
+  DAILY:       24 * 60 * 60 * 1000,       // 24 hours — referans sabiti
+  TREND:       24 * 60 * 60 * 1000,       // 24 hours (eskiden 1 saat)
+  NOW_PLAYING: 24 * 60 * 60 * 1000,       // 24 hours (eskiden 6 saat)
+  PROVIDERS:   24 * 60 * 60 * 1000,       // 24 hours
+  GENRES:       7 * 24 * 60 * 60 * 1000,  // 7 days
+  OSCAR:        7 * 24 * 60 * 60 * 1000,  // 7 days
+  EMMY:         7 * 24 * 60 * 60 * 1000,  // 7 days
+  COLLECTION:   7 * 24 * 60 * 60 * 1000,  // 7 days
+  CALENDAR:    24 * 60 * 60 * 1000,       // 24 hours (eskiden 1 saat)
 };
 
 // Fiziksel anahtar öneki ("apicache_") artık burada DEĞİL, registry'de tanımlı.
@@ -43,7 +46,10 @@ export const getCachedValue = (key, ttlMs) => {
 
   const hit = mem.get(key);
   if (hit) {
-    if (offline || now - hit.ts < ttlMs) return hit.data;
+    if (offline || now - hit.ts < ttlMs) {
+      trackTmdbRequest(key, true);
+      return hit.data;
+    }
     mem.delete(key);
   }
 
@@ -51,6 +57,7 @@ export const getCachedValue = (key, ttlMs) => {
   if (!entry || entry.ts === undefined) return null;
   if (offline || now - entry.ts < ttlMs) {
     mem.set(key, entry);
+    trackTmdbRequest(key, true);
     return entry.data;
   }
   store.remove(key);
@@ -85,9 +92,10 @@ export const getSwr = (key, { maxAge = 0 } = {}) => {
 
   mem.set(key, entry);
   const age = Date.now() - entry.ts;
-  // Çevrimdışıyken tazeleme zaten başarısız olur; bayat kaydı taze sayıp
-  // gereksiz istek denemesini ve "yükleniyor" durumunu engelliyoruz.
   const fresh = !getIsOnline() || age < maxAge;
+  if (entry.data) {
+    trackTmdbRequest(key, true);
+  }
   return { data: entry.data, fresh, ts: entry.ts, age };
 };
 
@@ -125,11 +133,7 @@ export const setCachedValue = (
   data,
   { force = false, startupSnapshot = false } = {},
 ) => {
-  // Oturum içi bellek katmanı HER ZAMAN dolar: `mem` bir Map, diske hiçbir şey
-  // yazmıyor ve uygulama kapanınca gidiyor. "Verileri indir" ayarı yalnız KALICI
-  // yazmayı kapatıyor (bkz. utils/dataCacheSettings.js). Eskiden kapı bunun
-  // üstündeydi: getCachedValue mem'i koşulsuz okuduğu hâlde mem hiç dolmuyordu,
-  // ayar kapalı olan her kullanıcıda her ekran TMDB'yi baştan çekiyordu.
+  trackTmdbRequest(key, false);
   const entry = { data, ts: Date.now() };
   mem.set(key, entry);
 

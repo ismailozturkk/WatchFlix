@@ -63,16 +63,15 @@ describe("katalog bütünlüğü", () => {
 
   it("kullanıcının ortak ve role özel marjinal font sözleşmesini korur", () => {
     const ortak = [
-      "matemasie", "novaFlat", "newRocker", "blaka", "novaSquare",
-      "bitcountSingle", "kablammo", "denkOne", "rubikGemstones", "smokum",
-      "tourney", "butcherman", "chakraPetch",
+      "matemasie", "novaFlat", "newRocker", "denkOne", "rubikGemstones",
+      "tourney", "chakraPetch",
     ];
     for (const id of ortak) {
       expect(TEXT_ROLES.every((rol) => isPresetRecommendedFor(id, rol))).toBe(true);
     }
 
     const baslik = [
-      "pressStart2P", "fascinateInline", "rubikDoodleShadow", "brunoAceSC",
+      "fascinateInline", "rubikDoodleShadow", "brunoAceSC",
       "climateCrisis", "ribeyeMarrow", "rubikWetPaint", "sancreek", "bungeeShade",
     ];
     const yazi = [
@@ -80,7 +79,7 @@ describe("katalog bütünlüğü", () => {
       "sairaStencilOne", "courgette", "julee",
     ];
     const rakam = [
-      "bitcountSingle", "monoton", "brunoAceSC", "carattere",
+      "monoton", "brunoAceSC", "carattere",
       "sairaStencilOne", "rubikWetPaint", "sancreek", "bungeeShade",
     ];
     expect(baslik.every((id) => isPresetRecommendedFor(id, "heading"))).toBe(true);
@@ -241,15 +240,15 @@ describe("aile çözümü", () => {
   });
 
   it("ağırlığa göre doğru dosya adını verir", () => {
-    expect(resolveFontFamily({ presetId: "inter", fontWeight: "700" })).toBe("Inter_700Bold");
-    expect(resolveFontFamily({ presetId: "inter", fontWeight: undefined })).toBe("Inter_400Regular");
+    expect(resolveFontFamily({ presetId: "spaceMono", fontWeight: "700" })).toBe("SpaceMono_700Bold");
+    expect(resolveFontFamily({ presetId: "spaceMono", fontWeight: undefined })).toBe("SpaceMono_400Regular");
     expect(resolveFontFamily({ presetId: "oswald", fontWeight: "900" })).toBe("Oswald_700Bold");
   });
 
   it("italik varyantı olmayan ailede normal varyanta düşer", () => {
-    expect(hasItalicVariant("inter")).toBe(true);
+    expect(hasItalicVariant("spaceMono")).toBe(true);
     expect(hasItalicVariant("oswald")).toBe(false);
-    expect(resolveFontFamily({ presetId: "inter", fontWeight: "400", italic: true })).toBe("Inter_400Regular_Italic");
+    expect(resolveFontFamily({ presetId: "spaceMono", fontWeight: "400", italic: true })).toBe("SpaceMono_400Regular_Italic");
     expect(resolveFontFamily({ presetId: "oswald", fontWeight: "400", italic: true })).toBe("Oswald_400Regular");
   });
 
@@ -260,7 +259,7 @@ describe("aile çözümü", () => {
   });
 
   it("üç rol birbirinden bağımsız üç farklı aile üretebilir", () => {
-    const roller = { heading: "bebasNeue", body: "inter", numeric: "spaceMono" };
+    const roller = { heading: "bebasNeue", body: "barlow", numeric: "spaceMono" };
     const aileler = TEXT_ROLES.map((rol) =>
       resolveFontFamily({ presetId: roller[rol], fontWeight: "700" }),
     );
@@ -282,8 +281,8 @@ describe("iç içe metinde sistem fontuna dönüş", () => {
   });
 
   it("iç metnin kendi ailesi varsa sıfırlama yapılmaz", () => {
-    expect(needsSystemFamilyReset("Inter_400Regular", "Monoton_400Regular")).toBe(false);
-    expect(needsSystemFamilyReset("Inter_400Regular", null)).toBe(false);
+    expect(needsSystemFamilyReset("Barlow_400Regular", "Monoton_400Regular")).toBe(false);
+    expect(needsSystemFamilyReset("Barlow_400Regular", null)).toBe(false);
   });
 
   it("gerçek senaryo: başlık Monoton, rakam Sistem -> sayaç sıfırlanır", () => {
@@ -313,7 +312,7 @@ describe("rol haritası normalleştirme", () => {
   });
 
   it("geçerli üçlüyü aynen korur", () => {
-    const roller = { heading: "oswald", body: "inter", numeric: "audiowide" };
+    const roller = { heading: "oswald", body: "barlow", numeric: "audiowide" };
     expect(normalizeFontRoles(roller)).toEqual(roller);
   });
 
@@ -324,13 +323,13 @@ describe("rol haritası normalleştirme", () => {
   });
 
   it("fazladan alanları taşımaz", () => {
-    const sonuc = normalizeFontRoles({ heading: "inter", fontsLoaded: true, x: 1 });
+    const sonuc = normalizeFontRoles({ heading: "oswald", fontsLoaded: true, x: 1 });
     expect(Object.keys(sonuc).sort()).toEqual([...TEXT_ROLES].sort());
   });
 
   it("isValidPresetId prototip anahtarlarına kanmaz", () => {
     expect(isValidPresetId("toString")).toBe(false);
     expect(isValidPresetId("constructor")).toBe(false);
-    expect(isValidPresetId("inter")).toBe(true);
+    expect(isValidPresetId("oswald")).toBe(true);
   });
 });

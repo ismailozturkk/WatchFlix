@@ -241,7 +241,7 @@ const ActorGridItem = memo(
             navigation.navigate("ActorViewScreen", { personId: item.id });
           }}
         >
-          <View style={styles.gridCard}>
+          <View style={[styles.gridCard, { backgroundColor: theme.between }]}>
             {item.profile_path ? (
               <Image
                 source={{ uri: getTmdbUrl(item.profile_path, 'profile', 200) }}
@@ -418,6 +418,7 @@ const DiscoverSection = memo(
             columnWrapperStyle={styles.gridRow}
             contentContainerStyle={styles.gridList}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           />
         ) : (
           <FlatList
@@ -425,6 +426,7 @@ const DiscoverSection = memo(
             data={activeData}
             keyExtractor={(item) => item.id.toString()}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.discoverRowList}
             renderItem={({ item, index }) => (
               <View style={styles.discoverRowItem}>

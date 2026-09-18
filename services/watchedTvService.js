@@ -1,3 +1,4 @@
+import { nestedSummaryFields } from "../utils/firestoreNestedFields";
 // services/watchedTvService.js
 //
 // İzlenen DİZİLER için TEK yazma kaynağı. Kanonik model: HER DİZİ İÇİN TEK DOKÜMAN
@@ -27,9 +28,10 @@ import {
   collection,
   runTransaction,
   setDoc,
-  deleteDoc,
   getDocs,
   writeBatch,
+  increment,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import {
@@ -38,8 +40,13 @@ import {
   normalizeWatchDate,
 } from "../utils/watchHistory";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
+import { trackFirestoreWrite, trackFirestoreDelete } from "./usageTrackerService";
 import { trackFirstContentActivation } from "./activationAnalytics";
-import { assertWatchable } from "../utils/watchState";
+import {
+  assertWatchable,
+  filterWatchableEpisodes,
+} from "../utils/watchState";
+import { updateLocalItem, deleteLocalItem } from "./listSyncService";
 
 // Doküman id şeması: `tv_${showId}` — TÜM liste öğesi koleksiyonlarıyla aynı
 // (`${type}_${id}`). favorites/watchList film+dizi karışık tuttuğu için type
@@ -313,8 +320,17 @@ export async function markEpisodes(
 ) {
   if (!uid || showMeta?.id == null || seasonMeta?.seasonNumber == null) return;
   if (!Array.isArray(episodes) || episodes.length === 0) return;
+  const releasedEpisodes = filterWatchableEpisodes(episodes);
+  if (releasedEpisodes.length === 0) {
+    const first = episodes[0] || {};
+    assertWatchable(first.releaseDate ?? first.airDate, first.status);
+    return null;
+  }
   const ref = showRef(uid, showMeta.id);
+  const rootRef = doc(db, "Lists", uid);
+  const docKey = `tv_${showMeta.id}`;
   let createdEvent = null;
+  let localDocument = null;
 
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
@@ -322,36 +338,80 @@ export async function markEpisodes(
     const result = appendWatchEvent(
       data,
       showMeta,
-      [{ seasonMeta, episodes }],
+      [{ seasonMeta, episodes: releasedEpisodes }],
       watchDate,
       options.scope || "episode",
     );
     if (!result) return;
     createdEvent = result.event;
 
-    tx.set(
-      ref,
-      {
-        ...(snap.exists() ? {} : buildShowMeta(showMeta, watchDate)),
-        ...(snap.exists() && !data.name ? { name: showMeta.name || "" } : {}),
-        seasons: result.seasons,
-        watchEvents: result.watchEvents,
-        watchCount: result.watchEvents.length,
-        addedShowDate: data?.addedShowDate || normalizeWatchDate(watchDate),
-        ...recomputeAggregates(result.seasons),
-      },
-      { merge: true },
-    );
+    const isFirstShowWatch = !snap.exists();
+    const showData = {
+      ...(snap.exists() ? {} : buildShowMeta(showMeta, watchDate)),
+      ...(snap.exists() && !data?.name ? { name: showMeta.name || "" } : {}),
+      // showEpisodeCount/showSeasonCount: yeni sezon çıktığında eski donmuş
+      // değerin güncellenmesi için mevcut dokümanda da yazılır (Math.max →
+      // dil farkından kaynaklanan düşük TMDB tutarsızlıkları eski değeri ezemez).
+      ...(snap.exists() && showMeta.showEpisodeCount > 0
+        ? {
+            showEpisodeCount: Math.max(
+              data?.showEpisodeCount || 0,
+              showMeta.showEpisodeCount,
+            ),
+            showSeasonCount: Math.max(
+              data?.showSeasonCount || 0,
+              showMeta.showSeasonCount || 0,
+            ),
+          }
+        : {}),
+      seasons: result.seasons,
+      watchEvents: result.watchEvents,
+      watchCount: result.watchEvents.length,
+      addedShowDate: data?.addedShowDate || normalizeWatchDate(watchDate),
+      ...recomputeAggregates(result.seasons),
+      updatedAt: serverTimestamp(),
+    };
+    localDocument = {
+      ...data,
+      ...showData,
+      updatedAt: new Date().toISOString(),
+    };
+
+    tx.set(ref, showData, { merge: true });
+
+    const rootUpdates = {
+      [`statusIndex.tv.${showMeta.id}.isWatched`]: true,
+      "stats.tv.episodes.total": increment(result.event.episodeCount),
+      "stats.tv.totalMinutes": increment(result.event.minutes),
+      "stats.totalMinutes": increment(result.event.minutes),
+      updatedAt: serverTimestamp(),
+      _schemaVersion: 3,
+    };
+
+    if (isFirstShowWatch) {
+      rootUpdates["counts.watchedTv"] = increment(1);
+      rootUpdates["stats.tv.shows.unique"] = increment(1);
+      if (Array.isArray(showMeta.genres)) {
+        showMeta.genres.forEach((genreId) => {
+          if (genreId != null) {
+            rootUpdates[`stats.genreCounts.${genreId}`] = increment(1);
+          }
+        });
+      }
+    }
+
+    tx.set(rootRef, nestedSummaryFields(rootUpdates), { merge: true });
   });
 
+  if (localDocument) updateLocalItem(uid, "watchedTv", docKey, localDocument);
+
   // markSeason da buraya delege ediyor; `scope` hangisi olduğunu ayırır.
-  // (markShow ayrı bir transaction kuruyor, kendi olayını kendisi gönderir.)
   if (createdEvent) {
     trackEvent(ANALYTICS_EVENTS.CONTENT_TRACKED, {
       content_type: "tv",
       content_id: String(showMeta.id),
       scope: options.scope || "episode",
-      episode_count: episodes.length,
+      episode_count: releasedEpisodes.length,
       season_number: seasonMeta.seasonNumber,
     });
     trackFirstContentActivation(uid, {
@@ -368,6 +428,7 @@ export async function markEpisodes(
 export async function unmarkEpisode(uid, showId, seasonNumber, episodeNumber) {
   if (!uid || showId == null || seasonNumber == null) return;
   const ref = showRef(uid, showId);
+  const docKey = `tv_${showId}`;
 
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
@@ -392,10 +453,23 @@ export async function unmarkEpisode(uid, showId, seasonNumber, episodeNumber) {
 
     if (newSeasons.length === 0) {
       tx.delete(ref);
+      tx.set(
+        doc(db, "Lists", uid),
+        nestedSummaryFields({
+          [`statusIndex.tv.${showId}.isWatched`]: false,
+          "counts.watchedTv": increment(-1),
+          "stats.tv.shows.unique": increment(-1),
+          updatedAt: serverTimestamp(),
+          _schemaVersion: 3,
+        }),
+        { merge: true },
+      );
+      deleteLocalItem(uid, "watchedTv", docKey);
       return;
     }
     tx.update(ref, {
       seasons: newSeasons,
+      updatedAt: serverTimestamp(),
       ...recomputeAggregates(newSeasons),
     });
   });
@@ -412,6 +486,7 @@ export async function markSeason(uid, showMeta, seasonMeta, episodes, watchDate)
 export async function unmarkSeason(uid, showId, seasonNumber) {
   if (!uid || showId == null || seasonNumber == null) return;
   const ref = showRef(uid, showId);
+  const docKey = `tv_${showId}`;
 
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
@@ -422,10 +497,23 @@ export async function unmarkSeason(uid, showId, seasonNumber) {
 
     if (newSeasons.length === 0) {
       tx.delete(ref);
+      tx.set(
+        doc(db, "Lists", uid),
+        nestedSummaryFields({
+          [`statusIndex.tv.${showId}.isWatched`]: false,
+          "counts.watchedTv": increment(-1),
+          "stats.tv.shows.unique": increment(-1),
+          updatedAt: serverTimestamp(),
+          _schemaVersion: 3,
+        }),
+        { merge: true },
+      );
+      deleteLocalItem(uid, "watchedTv", docKey);
       return;
     }
     tx.update(ref, {
       seasons: newSeasons,
+      updatedAt: serverTimestamp(),
       ...recomputeAggregates(newSeasons),
     });
   });
@@ -433,37 +521,88 @@ export async function unmarkSeason(uid, showId, seasonNumber) {
 
 /**
  * Diziyi komple işaretler (tüm sezonların bölümleriyle — üzerine yazar).
- * seasonsWithEpisodes: [{ seasonNumber, seasonPosterPath, seasonEpisodes, episodes:[...] }]
- *
- * `showMeta.firstAirDate` / `showMeta.status` yalnız yayın kapısını besler,
- * belgeye yazılmaz. Ekranlar zaten yayınlanmamış diziyi "Hatırlat"a çeviriyor;
- * bu kontrol son savunma hattı (bkz. utils/watchState.js).
  */
 export async function markShow(uid, showMeta, seasonsWithEpisodes, watchDate) {
   if (!uid || showMeta?.id == null || !Array.isArray(seasonsWithEpisodes)) return;
   assertWatchable(showMeta?.firstAirDate, showMeta?.status);
   const targets = seasonsWithEpisodes
-    .filter((season) => season?.seasonNumber != null && (season.episodes || []).length)
-    .map((season) => ({ seasonMeta: season, episodes: season.episodes }));
+    .filter((season) => season?.seasonNumber != null)
+    .map((season) => ({
+      seasonMeta: season,
+      episodes: filterWatchableEpisodes(season.episodes),
+    }))
+    .filter((target) => target.episodes.length > 0);
   if (!targets.length) return null;
   const ref = showRef(uid, showMeta.id);
+  const rootRef = doc(db, "Lists", uid);
+  const docKey = `tv_${showMeta.id}`;
   let createdEvent = null;
+  let localDocument = null;
+
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     const data = snap.exists() ? snap.data() : null;
     const result = appendWatchEvent(data, showMeta, targets, watchDate, "show");
     if (!result) return;
     createdEvent = result.event;
-    tx.set(ref, {
-      ...(snap.exists() ? {} : buildShowMeta(showMeta, watchDate)),
-      ...(snap.exists() && !data.name ? { name: showMeta.name || "" } : {}),
-      seasons: result.seasons,
-      watchEvents: result.watchEvents,
-      watchCount: result.watchEvents.length,
-      addedShowDate: data?.addedShowDate || normalizeWatchDate(watchDate),
-      ...recomputeAggregates(result.seasons),
-    }, { merge: true });
+
+    const isFirstShowWatch = !snap.exists();
+    const showData = {
+        ...(snap.exists() ? {} : buildShowMeta(showMeta, watchDate)),
+        ...(snap.exists() && !data?.name ? { name: showMeta.name || "" } : {}),
+        // showEpisodeCount/showSeasonCount: yeni sezon çıktığında eski donmuş
+        // değerin güncellenmesi için mevcut dokümanda da yazılır.
+        ...(snap.exists() && showMeta.showEpisodeCount > 0
+          ? {
+              showEpisodeCount: Math.max(
+                data?.showEpisodeCount || 0,
+                showMeta.showEpisodeCount,
+              ),
+              showSeasonCount: Math.max(
+                data?.showSeasonCount || 0,
+                showMeta.showSeasonCount || 0,
+              ),
+            }
+          : {}),
+        seasons: result.seasons,
+        watchEvents: result.watchEvents,
+        watchCount: result.watchEvents.length,
+        addedShowDate: data?.addedShowDate || normalizeWatchDate(watchDate),
+        updatedAt: serverTimestamp(),
+        ...recomputeAggregates(result.seasons),
+    };
+    tx.set(ref, showData, { merge: true });
+    localDocument = {
+      ...data,
+      ...showData,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const rootUpdates = {
+      [`statusIndex.tv.${showMeta.id}.isWatched`]: true,
+      "stats.tv.episodes.total": increment(result.event.episodeCount),
+      "stats.tv.totalMinutes": increment(result.event.minutes),
+      "stats.totalMinutes": increment(result.event.minutes),
+      updatedAt: serverTimestamp(),
+      _schemaVersion: 3,
+    };
+
+    if (isFirstShowWatch) {
+      rootUpdates["counts.watchedTv"] = increment(1);
+      rootUpdates["stats.tv.shows.unique"] = increment(1);
+      if (Array.isArray(showMeta.genres)) {
+        showMeta.genres.forEach((genreId) => {
+          if (genreId != null) {
+            rootUpdates[`stats.genreCounts.${genreId}`] = increment(1);
+          }
+        });
+      }
+    }
+
+    tx.set(rootRef, nestedSummaryFields(rootUpdates), { merge: true });
   });
+
+  if (localDocument) updateLocalItem(uid, "watchedTv", docKey, localDocument);
 
   if (createdEvent) {
     trackEvent(ANALYTICS_EVENTS.CONTENT_TRACKED, {
@@ -485,17 +624,25 @@ export async function markShow(uid, showMeta, seasonsWithEpisodes, watchDate) {
 
 /**
  * Tek bir izleme olayını dizi, sezon ve bölüm geçmişinden birlikte kaldırır.
- * Tam dizi olayı bölüm ekranından silinse dahi aynı occurrence'ın bütün
- * bölümleri birlikte kaldırılır; böylece istatistiklerde yarım olay kalmaz.
+ * Başka bir olayın da kapsadığı bölümler belgede kalır; yalnız bu olaya ait
+ * bölümler son geçmiş kaydıyla birlikte temizlenir.
  */
 export async function removeTvWatchEvent(uid, showId, eventId) {
   if (!uid || showId == null || !eventId) return;
   const ref = showRef(uid, showId);
+  const rootRef = doc(db, "Lists", uid);
+  const docKey = `tv_${showId}`;
+  let nextLocalDocument = null;
+  let shouldDeleteLocal = false;
+
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists()) return;
     const data = snap.data() || {};
     const current = materializeTvWatchState({ ...data, id: data.id ?? showId });
+    const removedEvent = current.watchEvents.find((event) => event.id === eventId);
+    if (!removedEvent) return;
+
     const seasons = current.seasons
       .map((season) => ({
         ...season,
@@ -507,7 +654,9 @@ export async function removeTvWatchEvent(uid, showId, eventId) {
             if (!watchEvents.length) return null;
             const latest = watchEvents
               .slice()
-              .sort((a, b) => String(b.watchedAt).localeCompare(String(a.watchedAt)))[0];
+              .sort((a, b) =>
+                String(b.watchedAt).localeCompare(String(a.watchedAt)),
+              )[0];
             const { watchEvents: _storedEvents, ...compactEpisode } = episode;
             return { ...compactEpisode, episodeWatchTime: latest.watchedAt };
           })
@@ -515,23 +664,102 @@ export async function removeTvWatchEvent(uid, showId, eventId) {
       }))
       .filter((season) => season.episodes.length);
     const watchEvents = current.watchEvents.filter((event) => event.id !== eventId);
+    const removedMinutes = Number(removedEvent.minutes) || 0;
+    const removedEpisodes = Number(removedEvent.episodeCount) || 0;
+
+    const rootUpdates = {
+      "stats.tv.episodes.total": increment(-removedEpisodes),
+      "stats.tv.totalMinutes": increment(-removedMinutes),
+      "stats.totalMinutes": increment(-removedMinutes),
+      updatedAt: serverTimestamp(),
+      _schemaVersion: 3,
+    };
+
     if (!seasons.length || !watchEvents.length) {
       tx.delete(ref);
+      rootUpdates[`statusIndex.tv.${showId}.isWatched`] = false;
+      rootUpdates["counts.watchedTv"] = increment(-1);
+      rootUpdates["stats.tv.shows.unique"] = increment(-1);
+      if (Array.isArray(data.genres)) {
+        data.genres.forEach((genreId) => {
+          if (genreId != null) {
+            rootUpdates[`stats.genreCounts.${genreId}`] = increment(-1);
+          }
+        });
+      }
+      tx.set(rootRef, nestedSummaryFields(rootUpdates), { merge: true });
+      shouldDeleteLocal = true;
       return;
     }
-    tx.update(ref, {
-      seasons,
+
+    const next = {
+      ...data,
+      seasons: seasons.map((season) => {
+        const { episodes, ...seasonMeta } = season;
+        return {
+          ...seasonMeta,
+          episodes: episodes.map(({ watchEvents: _events, ...episode }) => episode),
+        };
+      }),
       watchEvents,
       watchCount: watchEvents.length,
       ...recomputeAggregates(seasons),
-    });
+    };
+    tx.update(ref, { ...next, updatedAt: serverTimestamp() });
+    tx.set(rootRef, nestedSummaryFields(rootUpdates), { merge: true });
+    nextLocalDocument = { ...next, updatedAt: new Date().toISOString() };
   });
+
+  if (shouldDeleteLocal) deleteLocalItem(uid, "watchedTv", docKey);
+  else if (nextLocalDocument) {
+    updateLocalItem(uid, "watchedTv", docKey, nextLocalDocument);
+  }
 }
 
 /** Dizinin tüm izlenme kaydını siler. */
 export async function unmarkShow(uid, showId) {
   if (!uid || showId == null) return;
-  await deleteDoc(showRef(uid, showId));
+  const docKey = `tv_${showId}`;
+  const ref = showRef(uid, showId);
+  const rootRef = doc(db, "Lists", uid);
+  let removed = false;
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) return;
+    removed = true;
+    const data = snap.data() || {};
+    const current = materializeTvWatchState({ ...data, id: data.id ?? showId });
+    const removedEpisodes = current.watchEvents.reduce(
+      (sum, event) => sum + (Number(event.episodeCount) || 0),
+      0,
+    );
+    const removedMinutes = current.watchEvents.reduce(
+      (sum, event) => sum + (Number(event.minutes) || 0),
+      0,
+    );
+    const rootUpdates = {
+      [`statusIndex.tv.${showId}.isWatched`]: false,
+      "counts.watchedTv": increment(-1),
+      "stats.tv.shows.unique": increment(-1),
+      "stats.tv.episodes.total": increment(-removedEpisodes),
+      "stats.tv.totalMinutes": increment(-removedMinutes),
+      "stats.totalMinutes": increment(-removedMinutes),
+      updatedAt: serverTimestamp(),
+      _schemaVersion: 3,
+    };
+    if (Array.isArray(data.genres)) {
+      data.genres.forEach((genreId) => {
+        if (genreId != null) {
+          rootUpdates[`stats.genreCounts.${genreId}`] = increment(-1);
+        }
+      });
+    }
+    tx.delete(ref);
+    tx.set(rootRef, nestedSummaryFields(rootUpdates), { merge: true });
+  });
+  if (!removed) return;
+  trackFirestoreDelete("watchedTv", 1);
+  deleteLocalItem(uid, "watchedTv", docKey);
 }
 
 /**

@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import { isLightSurface } from "./utils/colorUtils";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 // Production'da gereksiz console çıktılarını kapat
@@ -25,6 +26,8 @@ import {
 
 import {
   NavigationContainer,
+  DefaultTheme,
+  DarkTheme,
   createNavigationContainerRef,
 } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -62,6 +65,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ProfileStatsProvider }     from "./context/ProfileStatsContext";
 import { WatchProgressProvider }    from "./context/WatchProgressContext";
 import { ProfileNotesProvider }     from "./context/ProfileNotesContext";
+import { MediaNotesProvider }       from "./context/MediaNotesContext";
 import { ProfileRemindersProvider } from "./context/ProfileRemindersContext";
 import { ProfileUiProvider }        from "./context/ProfileUiContext";
 import { UserProfileProvider }      from "./context/UserProfileContext";
@@ -191,23 +195,7 @@ setTimeout(() => {
 // Splash arka planı (theme.primary) koyuysa status bar ikonları açık renk
 // basılmalı. expo-status-bar "barStyle" değil "style" prop'u tanır; cihaz
 // temasına düşen "auto" yerine gerçek arka plan parlaklığından türetiyoruz.
-const isDarkHexColor = (hex) => {
-  if (typeof hex !== "string") return true;
-  const raw = hex.replace("#", "");
-  const full =
-    raw.length === 3
-      ? raw
-          .split("")
-          .map((c) => c + c)
-          .join("")
-      : raw;
-  const n = parseInt(full.slice(0, 6), 16);
-  if (Number.isNaN(n)) return true;
-  const r = (n >> 16) & 255;
-  const g = (n >> 8) & 255;
-  const b = n & 255;
-  return 0.299 * r + 0.587 * g + 0.114 * b < 140;
-};
+
 
 const SplashScreen = () => {
   const { theme } = useTheme();
@@ -225,7 +213,7 @@ const SplashScreen = () => {
           loop
         />
       )}
-      <StatusBar style={isDarkHexColor(theme.primary) ? "light" : "dark"} />
+      <StatusBar style={isLightSurface(theme.primary) ? "dark" : "light"} />
     </View>
   );
 };
@@ -239,6 +227,22 @@ const SwipeViewHost = () => {
 };
 
 function AppContent() {
+  const { theme } = useTheme();
+  const navigationTheme = useMemo(() => {
+    const base = isLightSurface(theme.primary) ? DefaultTheme : DarkTheme;
+    return {
+      ...base,
+      colors: {
+        ...base.colors,
+        primary: theme.accent,
+        background: theme.primary,
+        card: theme.secondary,
+        text: theme.text.primary,
+        border: theme.border,
+        notification: theme.colors.red,
+      },
+    };
+  }, [theme]);
   const [showChatModal, setShowChatModal] = useState(false); // State for modal visibility
   const [swipeViewReady, setSwipeViewReady] = useState(false);
   const { user, initialRoute, loading, needsProfileCompletion } = useAuth();
@@ -310,6 +314,7 @@ function AppContent() {
 
   return (
     <NavigationContainer
+      theme={navigationTheme}
       ref={navigationRef}
       linking={linking}
       // Sentry ekran geçiş/TTID izlemesi container kaydıyla başlar (no-op
@@ -343,7 +348,7 @@ function AppContent() {
       <Stack.Navigator
         initialRouteName={initialRoute}
         screenOptions={({ navigation }) => ({
-          contentStyle: { backgroundColor: "#1a1a1a" },
+          contentStyle: { backgroundColor: theme.primary },
           //animation: "fade", // iOS benzeri geçiş
           animation: "slide_from_right", // iOS benzeri geçiş
           gestureEnabled: true, // swipe-back gibi hareketleri açar
@@ -687,6 +692,11 @@ function AppContent() {
           options={{ headerShown: false, animation: "slide_from_bottom" }}
         />
         <Stack.Screen
+          name="CineSwipeScreen"
+          getComponent={() => require("./screens/cineswipe/CineSwipeScreen").default}
+          options={{ headerShown: false, animation: "slide_from_bottom" }}
+        />
+        <Stack.Screen
           name="Comment"
           getComponent={() => require("./components/Comment").default}
           options={{
@@ -781,6 +791,11 @@ function AppContent() {
           getComponent={() => require("./screens/tabs/setting/CustomThemeScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
+        <Stack.Screen
+          name="UsageDebugScreen"
+          getComponent={() => require("./screens/tabs/UsageDebugScreen").default}
+          options={{ headerShown: true, title: "Debug", animation: "slide_from_right" }}
+        />
       </Stack.Navigator>
 
       {showChatModal && swipeViewReady && <SwipeViewHost />}
@@ -791,7 +806,7 @@ function AppContent() {
         visibilityTime={3000}
       />
       <AppAlertHost />
-      <StatusBar style="dark" />
+      <StatusBar style={isLightSurface(theme.primary) ? "dark" : "light"} />
     </NavigationContainer>
   );
 }
@@ -947,6 +962,7 @@ export default wrapRoot(function App() {
                           mutabakatını ikiye katlamasını engelliyor. */}
                       <WatchProgressProvider>
                       <ProfileNotesProvider>
+                      <MediaNotesProvider>
                         <ProfileRemindersProvider>
                           <ProfileUiProvider>
                             <PostsProvider>
@@ -977,6 +993,7 @@ export default wrapRoot(function App() {
                             </PostsProvider>
                           </ProfileUiProvider>
                         </ProfileRemindersProvider>
+                      </MediaNotesProvider>
                       </ProfileNotesProvider>
                       </WatchProgressProvider>
                     </ProfileStatsProvider>

@@ -46,24 +46,86 @@ export const AVATARS = [
 
 export const AVATAR_COUNT = AVATARS.length;
 export const DEFAULT_AVATAR_INDEX = 0;
+export const CUSTOM_AVATAR_INDEX = -1;
+export const SOCIAL_AVATAR_INDEX = -1;
 
 /**
  * Geçersiz/eksik index'i güvenli sınıra çek.
- * Firestore'dan -1, null, NaN, undefined veya 9999 gibi bir değer gelirse
- * crash yerine varsayılan avatar döner.
+ * allowCustom=true ise -1 (Google/Apple sosyal profil fotoğrafı) geçerli kabul edilir.
  */
-export function clampAvatarIndex(index) {
+export function clampAvatarIndex(index, allowCustom = true) {
+  if (index === null || index === undefined) return DEFAULT_AVATAR_INDEX;
   const n = Number(index);
+  if (allowCustom && n === CUSTOM_AVATAR_INDEX) {
+    return CUSTOM_AVATAR_INDEX;
+  }
   if (!Number.isFinite(n)) return DEFAULT_AVATAR_INDEX;
   if (n < 0 || n >= AVATAR_COUNT) return DEFAULT_AVATAR_INDEX;
   return Math.floor(n);
 }
 
 /**
- * Index'ten `<Image source={...} />`'e geçirilebilir asset resource döner.
+ * Profil fotoğrafı URL'sini yüksek çözünürlüğe optimize eder (Google `=s96-c` → `=s500-c`).
  */
-export function getAvatarSource(index) {
-  return AVATARS[clampAvatarIndex(index)];
+export function optimizeAvatarUrl(url, size = 500) {
+  if (!url || typeof url !== "string") return url;
+  const trimmed = url.trim();
+  if (trimmed.includes("googleusercontent.com") || trimmed.includes("ggpht.com")) {
+    if (/=s\d+(-c)?$/i.test(trimmed)) {
+      return trimmed.replace(/=s\d+(-c)?$/i, `=s${size}-c`);
+    }
+  }
+  return trimmed;
+}
+
+/**
+ * Index veya URL'den `<Image source={...} />`'e geçirilebilir asset resource veya URI döner.
+ *
+ * @param {number|string|object} index - Avatar indexi (0-55), -1 (özel/sosyal), URL string'i veya { uri }
+ * @param {string|object|null} photoURL - İsteğe bağlı Google/Apple profil fotoğrafı URL'si
+ */
+export function getAvatarSource(index, photoURL = null) {
+  // 1) Doğrudan URI nesnesi geçilmişse
+  if (index && typeof index === "object" && index.uri) {
+    const optUri = optimizeAvatarUrl(index.uri);
+    return optUri === index.uri ? index : { ...index, uri: optUri };
+  }
+
+  // 2) Doğrudan URL string'i geçilmişse
+  if (
+    typeof index === "string" &&
+    (index.startsWith("http://") ||
+      index.startsWith("https://") ||
+      index.startsWith("file://") ||
+      index.startsWith("data:"))
+  ) {
+    return { uri: optimizeAvatarUrl(index) };
+  }
+
+  // 3) Özel / Sosyal Avatar (-1)
+  const numericIndex = Number(index);
+  if (numericIndex === CUSTOM_AVATAR_INDEX) {
+    if (photoURL && typeof photoURL === "string" && photoURL.trim()) {
+      return { uri: optimizeAvatarUrl(photoURL.trim()) };
+    }
+    if (photoURL && typeof photoURL === "object" && photoURL.uri) {
+      const optUri = optimizeAvatarUrl(photoURL.uri);
+      return optUri === photoURL.uri ? photoURL : { ...photoURL, uri: optUri };
+    }
+    return AVATARS[DEFAULT_AVATAR_INDEX];
+  }
+
+  // 4) Eğer index geçersiz ama photoURL dolu gelmişse
+  if (
+    (!Number.isFinite(numericIndex) || numericIndex < 0) &&
+    typeof photoURL === "string" &&
+    (photoURL.startsWith("http://") || photoURL.startsWith("https://"))
+  ) {
+    return { uri: optimizeAvatarUrl(photoURL.trim()) };
+  }
+
+  // 5) Hazır yerel avatarlar (0-55)
+  return AVATARS[clampAvatarIndex(index, false)];
 }
 
 /**

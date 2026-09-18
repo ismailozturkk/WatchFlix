@@ -149,9 +149,8 @@ export const ProfileRemindersProvider = ({ children }) => {
   // İlk kare + ana ekran widget'ı tohumdan besleniyor (aşağıdaki widget
   // effect'i kapıya TABİ DEĞİL, seed'i hemen aynalar). Buradaki 2+N listener
   // kümesi (dizi başına episodes aboneliği) açılışın en pahalı ikinci Firestore
-  // yükü — DeviceNotifications'ın zamanlayıcısı (4200+800 ms) koşmadan önce
-  // taze veri gelecek şekilde ertelendi. Kademeler: hooks/useStartupGate.js.
-  const startupReady = useStartupGate(2400);
+  // yükü. Kademeler: hooks/useStartupGate.js.
+  const startupReady = useStartupGate(2200);
 
   useEffect(() => {
     if (!startupReady) return;

@@ -1,3 +1,4 @@
+import { isLightSurface } from "@utils/colorUtils";
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
@@ -992,7 +993,7 @@ export default function StoryShareScreen({ route, navigation }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
       <StoryHeader
         busy={busy}
         onBack={() => navigation.goBack()}

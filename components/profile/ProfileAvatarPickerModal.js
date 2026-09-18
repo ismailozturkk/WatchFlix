@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from "react";
+import React, { memo, useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -13,17 +13,25 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import { useTheme } from "@context/ThemeContext";
-import { AVATARS } from "@utils/avatars";
+import { useAuth } from "@context/AuthContext";
+import { useUserProfile } from "@context/UserProfileContext";
+import { AVATARS, CUSTOM_AVATAR_INDEX, getAvatarSource } from "@utils/avatars";
 import { i18nText } from "@utils/i18nText";
 
-const AVATAR_INDEXES = AVATARS.map((_, index) => index);
+const RAW_AVATAR_INDEXES = AVATARS.map((_, index) => index);
 
 const AvatarCell = memo(function AvatarCell({
   index,
   selected,
   accent,
+  photoURL,
   onSelect,
 }) {
+  const isSocial = index === CUSTOM_AVATAR_INDEX;
+  const avatarSource = isSocial
+    ? getAvatarSource(CUSTOM_AVATAR_INDEX, photoURL)
+    : getAvatarSource(index);
+
   return (
     <TouchableOpacity
       activeOpacity={0.78}
@@ -34,17 +42,26 @@ const AvatarCell = memo(function AvatarCell({
       ]}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      accessibilityLabel={i18nText("autoI18n.avatar_n", "Avatar {{n}}", {
-        n: index + 1,
-      })}
+      accessibilityLabel={
+        isSocial
+          ? "Sosyal Profil Fotoğrafı"
+          : i18nText("autoI18n.avatar_n", "Avatar {{n}}", { n: index + 1 })
+      }
     >
       <Image
-        source={AVATARS[index]}
+        source={avatarSource}
         style={styles.avatar}
         contentFit="cover"
         cachePolicy="memory-disk"
         recyclingKey={String(index)}
       />
+
+      {isSocial && (
+        <View style={[styles.socialBadge, { backgroundColor: accent }]}>
+          <Ionicons name="sparkles" size={8} color="#fff" />
+        </View>
+      )}
+
       {selected && (
         <View style={[styles.check, { backgroundColor: accent }]}>
           <Ionicons name="checkmark" size={11} color="#fff" />
@@ -62,7 +79,19 @@ export default function ProfileAvatarPickerModal({
   onClose,
 }) {
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const { profile } = useUserProfile();
   const insets = useSafeAreaInsets();
+
+  const socialPhotoURL = profile?.photoURL || user?.photoURL || null;
+
+  const avatarIndexes = useMemo(() => {
+    if (socialPhotoURL) {
+      return [CUSTOM_AVATAR_INDEX, ...RAW_AVATAR_INDEXES];
+    }
+    return RAW_AVATAR_INDEXES;
+  }, [socialPhotoURL]);
+
   const chooseAvatar = useCallback(
     (index) => {
       Promise.resolve(onSelect(index)).catch(() => {});
@@ -76,10 +105,11 @@ export default function ProfileAvatarPickerModal({
         index={item}
         selected={item === selectedIndex}
         accent={theme.accent}
+        photoURL={socialPhotoURL}
         onSelect={chooseAvatar}
       />
     ),
-    [selectedIndex, theme.accent, chooseAvatar]
+    [selectedIndex, theme.accent, socialPhotoURL, chooseAvatar]
   );
 
   return (
@@ -99,63 +129,64 @@ export default function ProfileAvatarPickerModal({
         },
       ]}
     >
-          <View style={[styles.handle, { backgroundColor: theme.border }]} />
-          <View style={styles.header}>
-            <View
-              style={[
-                styles.headerIcon,
-                { backgroundColor: theme.accent + "1F" },
-              ]}
-            >
-              <Ionicons
-                name="person-circle-outline"
-                size={20}
-                color={theme.accent}
-              />
-            </View>
-            <View style={styles.headerCopy}>
-              <Text style={[styles.title, { color: theme.text.primary }]}>
-                {i18nText("autoI18n.avatar_sec", "Avatar seç")}
-              </Text>
-              <Text style={[styles.subtitle, { color: theme.text.muted }]}>
-                {i18nText("autoI18n.n_avatar", "{{n}} avatar", {
-                  n: AVATAR_INDEXES.length,
-                })}
-              </Text>
-            </View>
-            <TouchableOpacity
-              disabled={saving}
-              onPress={onClose}
-              style={[styles.close, { backgroundColor: theme.primary }]}
-            >
-              <Ionicons name="close" size={20} color={theme.text.primary} />
-            </TouchableOpacity>
-          </View>
-
-          <FlatList
-            data={AVATAR_INDEXES}
-            extraData={selectedIndex}
-            keyExtractor={(item) => String(item)}
-            renderItem={renderItem}
-            numColumns={5}
-            columnWrapperStyle={styles.row}
-            contentContainerStyle={styles.grid}
-            showsVerticalScrollIndicator={false}
-            initialNumToRender={20}
-            maxToRenderPerBatch={15}
-            updateCellsBatchingPeriod={40}
-            windowSize={4}
-            removeClippedSubviews={Platform.OS === "android"}
+      <View style={[styles.handle, { backgroundColor: theme.border }]} />
+      <View style={styles.header}>
+        <View
+          style={[
+            styles.headerIcon,
+            { backgroundColor: theme.accent + "1F" },
+          ]}
+        >
+          <Ionicons
+            name="person-circle-outline"
+            size={20}
+            color={theme.accent}
           />
+        </View>
+        <View style={styles.headerCopy}>
+          <Text style={[styles.title, { color: theme.text.primary }]}>
+            {i18nText("autoI18n.avatar_sec", "Avatar seç")}
+          </Text>
+          <Text style={[styles.subtitle, { color: theme.text.muted }]}>
+            {socialPhotoURL ? "Profil fotoğrafın ve " : ""}
+            {i18nText("autoI18n.n_avatar", "{{n}} avatar", {
+              n: RAW_AVATAR_INDEXES.length,
+            })}
+          </Text>
+        </View>
+        <TouchableOpacity
+          disabled={saving}
+          onPress={onClose}
+          style={[styles.close, { backgroundColor: theme.primary }]}
+        >
+          <Ionicons name="close" size={20} color={theme.text.primary} />
+        </TouchableOpacity>
+      </View>
 
-          {saving && (
-            <View style={styles.savingOverlay}>
-              <ActivityIndicator color={theme.accent} />
-              <Text style={[styles.savingText, { color: theme.text.primary }]}>
-                {i18nText("autoI18n.kaydediliyor", "Kaydediliyor...")}
-              </Text>
-            </View>
-          )}
+      <FlatList
+        data={avatarIndexes}
+        extraData={selectedIndex}
+        keyExtractor={(item) => String(item)}
+        renderItem={renderItem}
+        numColumns={5}
+        columnWrapperStyle={styles.row}
+        contentContainerStyle={styles.grid}
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={20}
+        maxToRenderPerBatch={15}
+        updateCellsBatchingPeriod={40}
+        windowSize={4}
+        removeClippedSubviews={Platform.OS === "android"}
+      />
+
+      {saving && (
+        <View style={styles.savingOverlay}>
+          <ActivityIndicator color={theme.accent} />
+          <Text style={[styles.savingText, { color: theme.text.primary }]}>
+            {i18nText("autoI18n.kaydediliyor", "Kaydediliyor...")}
+          </Text>
+        </View>
+      )}
     </BottomSheetModal>
   );
 }
@@ -209,19 +240,36 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 2,
     borderColor: "transparent",
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
   },
   avatar: { width: "100%", height: "100%", borderRadius: 12 },
-  check: {
+  socialBadge: {
     position: "absolute",
-    right: 1,
-    bottom: 1,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    top: 2,
+    left: 2,
+    width: 15,
+    height: 15,
+    borderRadius: 7.5,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1.5,
     borderColor: "#fff",
+    zIndex: 2,
+  },
+  check: {
+    position: "absolute",
+    right: 2,
+    bottom: 2,
+    width: 17,
+    height: 17,
+    borderRadius: 8.5,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#fff",
+    zIndex: 2,
   },
   savingOverlay: {
     ...StyleSheet.absoluteFill,

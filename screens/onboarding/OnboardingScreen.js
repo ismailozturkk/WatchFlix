@@ -1,3 +1,4 @@
+import { isLightSurface } from "../../utils/colorUtils";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -168,7 +169,7 @@ const COPY = {
 // index 0 (discover) kayan poster arka planı kullanır; diğerleri mock gösterir.
 const DISCOVER_LOTTIE = require("@lottie/dizi_film_animation.json");
 export default function OnboardingScreen({ navigation }) {
-  const { theme, selectedTheme } = useTheme();
+  const { theme } = useTheme();
   const { language, toggleLanguage, t } = useLanguage();
   const { API_KEY } = useApiSettings();
   const { getTmdbUrl } = useImageQualitySettings();
@@ -179,7 +180,7 @@ export default function OnboardingScreen({ navigation }) {
   const insets = useSafeAreaInsets();
 
   const accent = theme.accent;
-  const isLightTheme = selectedTheme === "light" || selectedTheme === "green";
+  const isLightTheme = isLightSurface(theme.primary);
   const copy = COPY[language === "en" ? "en" : "tr"];
 
   const [phase, setPhase] = useState("intro"); // "intro" | "main"

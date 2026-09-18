@@ -13,11 +13,34 @@
 // KALICI veriler (mesajlar, lastMessage) Firestore'da KALIR — burada yalnızca
 // uçucu sinyaller var.
 
+import { AppState } from "react-native";
 import { rtdb } from "../firebase";
 import { ref, onValue, onDisconnect, set } from "firebase/database";
 
 const typingRef = (chatId, uid) => ref(rtdb, `chatMeta/${chatId}/typing/${uid}`);
 const inChatRef = (chatId, uid) => ref(rtdb, `chatMeta/${chatId}/inChat/${uid}`);
+
+// Ekran mount'tayken uygulama arka plana alınırsa React Navigation ekranı
+// UNMOUNT ETMEZ (leaveChat tetiklenmez) ve socket de hemen kopmayabilir (RTDB
+// onDisconnect gecikmeli). Bu yüzden presenceService ile aynı desen: AppState'i
+// dinleyip arka plana geçişte inChat/typing'i elle false yaz, öne dönünce
+// (ekran hâlâ açıksa) inChat'i geri true yap.
+let _activeChatId = null;
+let _activeUid = null;
+let _appStateSub = null;
+
+function _ensureAppStateSub() {
+  if (_appStateSub) return;
+  _appStateSub = AppState.addEventListener("change", (next) => {
+    if (!_activeChatId || !_activeUid) return;
+    if (next === "active") {
+      set(inChatRef(_activeChatId, _activeUid), true).catch(() => {});
+    } else {
+      set(inChatRef(_activeChatId, _activeUid), false).catch(() => {});
+      set(typingRef(_activeChatId, _activeUid), false).catch(() => {});
+    }
+  });
+}
 
 /**
  * Sohbete girince inChat=true yaz ve socket koparsa otomatik temizlenecek
@@ -30,6 +53,9 @@ export function enterChat(chatId, uid) {
   onDisconnect(ic).set(false).catch(() => {});
   onDisconnect(tp).set(false).catch(() => {});
   set(ic, true).catch(() => {});
+  _activeChatId = chatId;
+  _activeUid = uid;
+  _ensureAppStateSub();
 }
 
 /**
@@ -43,6 +69,10 @@ export function leaveChat(chatId, uid) {
   onDisconnect(tp).cancel().catch(() => {});
   set(ic, false).catch(() => {});
   set(tp, false).catch(() => {});
+  if (_activeChatId === chatId && _activeUid === uid) {
+    _activeChatId = null;
+    _activeUid = null;
+  }
 }
 
 /**

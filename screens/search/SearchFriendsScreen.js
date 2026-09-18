@@ -22,8 +22,7 @@ import { useProfileUi } from "../../context/ProfileUiContext";
 import { useFriends } from "../../context/FriendsContext";
 import { searchUsersByUsername } from "../../services/userService";
 import { i18nText } from "../../utils/i18nText";
-
-;
+import UserAvatar from "../../components/common/UserAvatar";
 
 export default function SearchFriendsScreen({ navigation }) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -151,15 +150,13 @@ export default function SearchFriendsScreen({ navigation }) {
           ]}
         >
           {/* Avatar */}
-          <View style={[styles.avatarWrapper, { borderColor: statusColor ?? theme.border }]}>
-            {avatars?.[item.avatarIndex] ? (
-              <Image source={avatars[item.avatarIndex]} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatarPlaceholder, { backgroundColor: theme.primary }]}>
-                <Ionicons name="person" size={22} color={theme.text?.muted ?? "#555"} />
-              </View>
-            )}
-          </View>
+          <UserAvatar
+            avatarIndex={item.avatarIndex}
+            photoURL={item.photoURL}
+            size={52}
+            borderWidth={2}
+            borderColor={statusColor ?? theme.border}
+          />
 
           {/* Bilgiler */}
           <View style={styles.userInfo}>

@@ -17,10 +17,11 @@ const {
 const YUZEYLER = {
   gray: "#2A2D33",
   dark: "#15171C",
-  light: "#F7F9FC",
+  light: "#FFFFFF",
+  sky: "#DDF2FC",
   green: "#D8E7E1",
   purple: "#211C2E",
-  amber: "#282017",
+  amber: "#24141D",
 };
 
 // GlobalSearchResults'un kullandigi anlam renkleri

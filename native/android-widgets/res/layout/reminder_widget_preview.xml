@@ -18,12 +18,9 @@
         <ImageView
             android:layout_width="28dp"
             android:layout_height="28dp"
-            android:background="@drawable/reminder_widget_logo_badge"
             android:importantForAccessibility="no"
-            android:padding="4dp"
             android:scaleType="fitCenter"
-            android:src="@mipmap/ic_launcher_monochrome"
-            android:tint="#FFFFFF" />
+            android:src="@mipmap/ic_launcher" />
 
         <TextView
             android:layout_width="0dp"
@@ -69,7 +66,7 @@
 
             <ImageView
                 android:layout_width="34dp"
-                android:layout_height="48dp"
+                android:layout_height="50dp"
                 android:background="@drawable/reminder_widget_movie_badge"
                 android:importantForAccessibility="no"
                 android:padding="8dp"
@@ -94,13 +91,17 @@
                     android:textSize="12sp"
                     android:textStyle="bold" />
 
+                <!-- Gerçekte meta yalnız "Tip  •  alt bilgi"dir, geri sayımı
+                     içermez (bkz. ReminderWidgetRemoteViewsService.kt meta) —
+                     eskiden "Film  •  Yarın" gibi geri sayımı da buraya
+                     tekrarlıyordu, alakasız/yanlış bir örnekti. -->
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:text="Film  •  Yarın"
+                    android:text="Film"
                     android:textColor="#9AA3B8"
                     android:textSize="9sp" />
             </LinearLayout>
@@ -111,11 +112,12 @@
                 android:gravity="end"
                 android:orientation="vertical">
 
+                <!-- countdownColor(1, ...) = "#FFB547" (yarın → amber) -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Yarın"
-                    android:textColor="#C9C7FF"
+                    android:textColor="#FFB547"
                     android:textSize="10sp"
                     android:textStyle="bold" />
 
@@ -142,7 +144,7 @@
 
             <ImageView
                 android:layout_width="34dp"
-                android:layout_height="48dp"
+                android:layout_height="50dp"
                 android:background="@drawable/reminder_widget_tv_badge"
                 android:importantForAccessibility="no"
                 android:padding="8dp"
@@ -167,13 +169,14 @@
                     android:textSize="12sp"
                     android:textStyle="bold" />
 
+                <!-- "S{sezon} · {bölüm}. Bölüm" gerçek alt bilgi biçimi -->
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:text="Dizi  •  S2 • E1  •  3 gün"
+                    android:text="Dizi  •  S2 · 1. Bölüm"
                     android:textColor="#9AA3B8"
                     android:textSize="9sp" />
             </LinearLayout>
@@ -184,11 +187,12 @@
                 android:gravity="end"
                 android:orientation="vertical">
 
+                <!-- countdownColor(3, ...) = appearance.accent (varsayılan mor #8B5CF6) -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="3 gün"
-                    android:textColor="#C9C7FF"
+                    android:textColor="#8B5CF6"
                     android:textSize="10sp"
                     android:textStyle="bold" />
 

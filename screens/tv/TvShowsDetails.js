@@ -1,3 +1,4 @@
+import { alpha } from "@theme/colors";
 import React, {
   useState,
   useEffect,
@@ -43,6 +44,8 @@ import {
 } from "../../context/AppSettingsContext";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
 import WatchHistorySheet from "@components/modals/WatchHistorySheet";
+import MediaNoteSheet from "@components/detail/MediaNoteSheet";
+import { useMediaNotes, mediaNoteItemKey } from "../../context/MediaNotesContext";
 import ListViewTv from "../../components/ListViewTv";
 import PosterImage from "../../components/PosterImage";
 import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
@@ -63,6 +66,7 @@ import RatingSummary from "@components/RatingSummary";
 import { i18nText } from "../../utils/i18nText";
 import { useWatchedShow } from "../../hooks/useWatchedShow";
 import { markShow, removeTvWatchEvent } from "../../services/watchedTvService";
+import { refreshShowMeta } from "../../services/refreshShowMeta";
 import AIChatScreen from "@screens/chat/AIChatScreen";
 import NewConversationSheet from "@components/chat/NewConversationSheet";
 import {
@@ -140,7 +144,7 @@ const RecommendedTvShow = memo(function RecommendedTvShow({
           type="tv"
           size={200}
           iconSize={46}
-          style={[styles.railPoster, { borderColor: theme.border + "55" }]}
+          style={[styles.railPoster, { borderColor: alpha(theme.border, 0.3333333333333333) }]}
         />
         {posterBadges?.tmdbRating !== false && (
           <View
@@ -184,6 +188,9 @@ export default function TvShowsDetails({ route, navigation }) {
     !!openComments || !!commentScope,
   );
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [noteSheetVisible, setNoteSheetVisible] = useState(false);
+  const { mediaNotes } = useMediaNotes();
+  const myMediaNote = mediaNotes.find((n) => n.id === mediaNoteItemKey("tv", id)) || null;
   // Sezon carousel'i: 5+ sezonda tek tek sayfalı görünüm; "Tümünü Gör" düz listeye açar.
   const [showAllSeasons, setShowAllSeasons] = useState(false);
   // Ana kadro (credits.cast) — MovieDetail ile aynı bölüm/kart yapısı.
@@ -327,6 +334,13 @@ export default function TvShowsDetails({ route, navigation }) {
       loading: false,
     });
   }, [details]);
+
+  // Dizi TMDB'den çekildiğinde ve kullanıcı bu diziyi izlemişse (Firestore'da kaydı varsa),
+  // yeni sezon/bölümler eklenmişse showEpisodeCount ve showSeasonCount'u sessizce güncelle.
+  useEffect(() => {
+    if (!user?.uid || !id || !details || !watched?.showDoc) return;
+    refreshShowMeta(user.uid, id, details, watched.showDoc);
+  }, [user?.uid, id, details, watched?.showDoc]);
 
   const loadMoreRail = useCallback(async () => {
     if (railBusyRef.current || railState.page >= railState.totalPages) return;
@@ -507,6 +521,7 @@ export default function TvShowsDetails({ route, navigation }) {
             episodeName: ep.name || "Unknown",
             episodeRatings: parseFloat(ep.vote_average?.toFixed(1)) || 0,
             episodeMinutes: ep.runtime || 0,
+            releaseDate: ep.air_date || null,
           })),
         });
       }
@@ -824,7 +839,7 @@ export default function TvShowsDetails({ route, navigation }) {
                 source={{
                   uri: getTmdbUrl(details.poster_path, "poster", 200),
                 }}
-                style={[styles.poster, { borderColor: theme.border + "80" }]}
+                style={[styles.poster, { borderColor: alpha(theme.border, 0.5019607843137255) }]}
               />
             ) : (
               <View
@@ -1196,6 +1211,50 @@ export default function TvShowsDetails({ route, navigation }) {
             >
               {t.comments || i18nText("autoI18n.yorumlar", "Yorumlar")}
             </Text>
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={theme.text.muted}
+            />
+          </TouchableOpacity>
+
+          {/* ── NOTUM KARTI ── */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => setNoteSheetVisible(true)}
+            style={[
+              styles.commentsBtn,
+              { backgroundColor: theme.secondary, borderColor: theme.border },
+            ]}
+          >
+            <View
+              style={[
+                styles.commentsIconWrap,
+                { backgroundColor: theme.accent + "20" },
+              ]}
+            >
+              <Ionicons
+                name={myMediaNote ? "document-text" : "document-text-outline"}
+                size={18}
+                color={theme.accent}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                allowFontScaling={false}
+                style={{ fontSize: 15, fontWeight: "700", color: theme.text.primary }}
+              >
+                {i18nText("autoI18n.notum", "Notum")}
+              </Text>
+              <Text
+                allowFontScaling={false}
+                numberOfLines={1}
+                style={{ fontSize: 12, marginTop: 2, color: theme.text.muted }}
+              >
+                {myMediaNote?.text ||
+                  i18nText("autoI18n.bu_dizi_hakkinda_bir_not_ekle", "Bu dizi hakkında bir not ekle")}
+              </Text>
+            </View>
             <Ionicons
               name="chevron-forward"
               size={16}
@@ -1698,6 +1757,16 @@ export default function TvShowsDetails({ route, navigation }) {
 
       {/* ═══ MODALS ═══ */}
 
+      {/* Notum */}
+      <MediaNoteSheet
+        visible={noteSheetVisible}
+        onClose={() => setNoteSheetVisible(false)}
+        type="tv"
+        mediaId={id}
+        title={details?.name}
+        posterPath={details?.poster_path}
+      />
+
       {/* İzleme tarihi */}
       <WatchHistorySheet
         visible={watchHistoryVisible}
@@ -1707,7 +1776,7 @@ export default function TvShowsDetails({ route, navigation }) {
         busy={isLoading}
         onAddAgain={() => {
           setWatchHistoryVisible(false);
-          setTimeout(openModal, 180);
+          setTimeout(openModal, 300);
         }}
         onDeleteEvent={removeShowWatchEvent}
       />
@@ -1726,6 +1795,10 @@ export default function TvShowsDetails({ route, navigation }) {
         releaseDate={details?.first_air_date}
         minDate={details?.first_air_date}
         mediaType="tv"
+        scope="show"
+        mediaId={id}
+        mediaTitle={details?.name}
+        posterPath={details?.poster_path}
         busy={isLoading}
         onConfirm={handleConfirm}
       />

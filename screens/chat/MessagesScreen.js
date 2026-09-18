@@ -9,11 +9,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
-  Image,
   FlatList,
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
+import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getAuth } from "firebase/auth";
 import { collection, onSnapshot } from "firebase/firestore";
@@ -28,7 +28,9 @@ import GroupAvatar from "@components/chat/GroupAvatar";
 import ChatCreateFab from "@components/chat/ChatCreateFab";
 import NewConversationSheet from "@components/chat/NewConversationSheet";
 import { i18nText } from "@utils/i18nText";
+import UserAvatar from "@components/common/UserAvatar";
 import { subscribeUserGroups } from "@services/groupsService";
+import { trackFirestoreRead } from "@services/usageTrackerService";
 
 const toMs = (ts) => ts?.toMillis?.() || 0;
 const formatTime = (ts) => {
@@ -62,6 +64,7 @@ export default function MessagesScreen({ navigation }) {
     const unsub = onSnapshot(
       collection(db, "Users", user.uid, "conversations"),
       (snap) => {
+        trackFirestoreRead("Users/conversations", snap.docs.length);
         const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         list.sort((a, b) => toMs(b.lastTime) - toMs(a.lastTime));
         setConvs(list);
@@ -98,17 +101,13 @@ export default function MessagesScreen({ navigation }) {
         },
       ]}
     >
-      <View style={[styles.avatarWrap, { borderColor: theme.accent + "55" }]}>
-        {avatars?.[item.withAvatarIndex] ? (
-          <Image source={avatars[item.withAvatarIndex]} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarPh, { backgroundColor: theme.primary }]}>
-            <Text style={styles.avatarInitial}>
-              {(item.withName || "?").charAt(0).toUpperCase()}
-            </Text>
-          </View>
-        )}
-      </View>
+      <UserAvatar
+        avatarIndex={item.withAvatarIndex}
+        photoURL={item.withPhotoURL}
+        size={50}
+        borderWidth={2}
+        borderColor={theme.accent + "55"}
+      />
       <View style={{ flex: 1 }}>
         <View style={styles.rowTop}>
           <Text style={[styles.name, { color: theme.text?.primary ?? "#fff" }]} numberOfLines={1}>

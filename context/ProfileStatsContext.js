@@ -94,26 +94,63 @@ const groupByDateFlatTv = (items) => {
     .map(([date, data]) => ({ title: date, data }));
 };
 
-// Avatar halkalarını, hero gradyanını ve istatistik ekranlarının accent'ini
+// Avatar halkasını, hero gradyanını ve istatistik ekranlarının accent'ini
 // besleyen türetilmiş renk. `step` = 10.080 dakikalık (1 hafta) izleme adımı.
 //
-// ETİKET DEĞİŞTİ, RENK ÜRETİMİ AYNI: eskiden "Rank 7" yazıyordu ve bu, profildeki
-// asıl ilerleme göstergesi olan **Perde** ile (components/profile/WatchLevelCard.js)
-// aynı anlama gelen ikinci bir "seviye" gibi okunuyordu — uygulamada üç ayrı
+// ETİKET DEĞİŞTİ: eskiden "Rank 7" yazıyordu ve bu, profildeki asıl ilerleme
+// göstergesi olan **Perde** ile (components/profile/WatchLevelCard.js) aynı
+// anlama gelen ikinci bir "seviye" gibi okunuyordu — uygulamada üç ayrı
 // ilerleme sayısı görünüyordu (Rank, Perde, oyun Seviyesi). Artık ölçtüğü şeyi
-// söylüyor: "7 hafta". Renk mantığına ve 6 görsel yüzeye DOKUNULMADI; tam
-// emeklilik gereksiz bir regresyon yüzeyi olurdu (docs §10.3).
-const getDynamicRankColor = (totalMinutes, type) => {
+// söylüyor: "7 hafta" (docs §10.3).
+//
+// RENK ÜRETİMİ: eskiden `hue = step*35` ile sabit %80/%90 doygunlukta 360°'yi
+// dönen ham bir HSL rotasyonuydu — bazı adımlarda neon/göz yoran tonlar
+// çıkıyordu ve "seviyeye göre değer artıyor" hissi vermiyordu (her adım aynı
+// doygunluk/parlaklıkta, sadece rastgele farklı bir renkti). Yerine elle
+// seçilmiş, birbiriyle çakışmayan RANK_COLOR_PALETTE (aşağıda) geldi: ilk tur
+// bu paleti sırayla kullanır, palet bitince bir SONRAKİ tur aynı tonları hafif
+// kaydırıp koyulaştırıp/doygunlaştırarak tekrar kullanır — böylece üst
+// seviyeler tükenmeden yeni, "değerli" hissettiren tonlar almaya devam eder.
+const RANK_COLOR_PALETTE = [
+  { hue: 210, sat: 68, light: 56 }, // Gök mavisi
+  { hue: 152, sat: 55, light: 45 }, // Zümrüt
+  { hue: 265, sat: 60, light: 60 }, // Ametist
+  { hue: 188, sat: 62, light: 45 }, // Turkuaz
+  { hue: 340, sat: 65, light: 58 }, // Yakut
+  { hue: 32, sat: 82, light: 55 }, // Amber
+  { hue: 48, sat: 86, light: 52 }, // Altın
+  { hue: 285, sat: 52, light: 55 }, // Orkide
+  { hue: 168, sat: 58, light: 40 }, // Yeşim
+  { hue: 8, sat: 68, light: 55 }, // Mercan
+  { hue: 225, sat: 58, light: 52 }, // Safir
+  { hue: 130, sat: 42, light: 42 }, // Koyu yeşil
+];
+
+const getRankTierForMinutes = (totalMinutes) => {
   const step = Math.floor(totalMinutes / 10080);
-  const hue  = (step * 35) % 360;
-  const c1 = `hsl(${hue}, 80%, 50%)`;
-  const c2 = `hsl(${(hue + 20) % 360}, 90%, 60%)`;
-  const c3 = `hsla(${(hue + 40) % 360}, 70%, 40%, 0.9)`;
-  const label = i18nText("autoI18n.hafta_sayisi", `${step} hafta`, { count: step });
-  return type === "movie"
-    ? { borderColorMovie: c1, borderColor2Movie: c2, shadowColorMovie: c3, rankLevelMovie: step, rankNameMovie: label }
-    : { borderColorTv: c1, borderColor2Tv: c2, shadowColorTv: c3, rankLevelTv: step, rankNameTv: label };
+  const paletteLength = RANK_COLOR_PALETTE.length;
+  const cycle = Math.floor(step / paletteLength);
+  const base = RANK_COLOR_PALETTE[((step % paletteLength) + paletteLength) % paletteLength];
+  const hue = (base.hue + cycle * 11 + 360) % 360;
+  const sat = Math.min(92, base.sat + cycle * 3);
+  const light = Math.max(30, base.light - cycle * 4);
+  const borderColor = `hsl(${hue}, ${sat}%, ${light}%)`;
+  const borderColor2 = `hsl(${hue}, ${Math.min(96, sat + 14)}%, ${Math.min(72, light + 16)}%)`;
+  const shadowColor = `hsla(${hue}, ${Math.max(35, sat - 10)}%, ${Math.max(22, light - 18)}%, 0.9)`;
+  const rankName = i18nText("autoI18n.hafta_sayisi", `${step} hafta`, { count: step });
+  return { borderColor, borderColor2, shadowColor, rankLevel: step, rankName };
 };
+
+// Film/dizi ayrımına göre `Movie`/`Tv` son ekli alan adları üretir — mevcut
+// istatistik ekranları (Movie/TvStatisticsScreen, StatisticsSection, widget
+// senkronu) hâlâ kategori bazlı rengi/seviyeyi ayrı ayrı okuyor.
+const suffixRankTier = (tier, suffix) => ({
+  [`borderColor${suffix}`]: tier.borderColor,
+  [`borderColor2${suffix}`]: tier.borderColor2,
+  [`shadowColor${suffix}`]: tier.shadowColor,
+  [`rankLevel${suffix}`]: tier.rankLevel,
+  [`rankName${suffix}`]: tier.rankName,
+});
 
 const getTopGenreNames = (items, limit = 3) => {
   const counts = {};
@@ -151,37 +188,20 @@ export const ProfileStatsProvider = ({ children }) => {
   // Bu context'in tüketicileri (Profil sekmesi, istatistik ekranları, AI sohbet)
   // açılışta mount değil; listener'lar + flatEpisodesTv/groupBy türetmeleri ilk
   // saniyelerde JS thread'i kilitliyordu. Splash sonrası pencerenin dışına ertele.
-  const startupReady = useStartupGate(3200);
+  const startupReady = useStartupGate(1600);
   const { t, language } = useLanguage();
   // Öntanımlı listeler (favorites/watchList/watchedMovies) artık subcollection'da;
   // kök doc'tan kalkacakları için profil liste kartları combinedLists'ten beslenir.
-  const { combinedLists } = useListStatusContext();
+  const { combinedLists, stats: precomputedStats, loading: listsLoading } = useListStatusContext();
 
   const [lists,              setLists]             = useState([]);
-  // Liste silme/yeniden adlandırma buradan çıktı: iki ekran da ortak
-  // components/lists/ListManageSheet'i kullanıyor (yazma yolu tek yerde).
 
   // ── AÇILIŞ TOHUMU ────────────────────────────────────────────────────────
-  //
-  // Sayaçlar üç Firestore listener'ından TÜRETİLİYOR; hepsi ağdan gelene kadar
-  // profil sıfırlarla çiziliyordu. Son oturumda hesaplanan sayaçlar diske
-  // yazılıyor ve burada SENKRON okunuyor — kullanıcı kendisi bir şey izlemediği
-  // sürece bu değerler zaten değişmiyor.
-  //
-  // DİKKAT — `loadingTv`/`loadingMovies` bilerek TOHUMLANMIYOR. O bayraklar
-  // rozet defterinin "veri hazır" kapısı (bkz. aşağıdaki watchedMovies
-  // listener'ının başındaki not); tohumla açıp defteri bayat veriyle
-  // çalıştırmak yanlış rozet kutlamasına yol açardı. Tohum yalnız GÖSTERİLEN
-  // sayaçlar için.
   const statsSeed = useMemo(
     () => {
-      // Firebase oturumu ASENKRON çözülüyor; ilk render'da `uid` genelde henüz
-      // null olur ve tohum hiç okunmazdı. Son aktif kullanıcı depodan senkron
-      // okunabiliyor (aynı desen: ListStatusContext).
       const tohumUid = uid ?? getActiveUser();
       return tohumUid ? seed(cacheKeys.stats(tohumUid)).data || {} : {};
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
@@ -194,19 +214,14 @@ export const ProfileStatsProvider = ({ children }) => {
   const [totalWatchedTimeTv,  setTotalWatchedTimeTv]   = useState(statsSeed.totalWatchedTimeTv ?? {});
   const [totalMinutesTimeTv,  setTotalMinutesTimeTv]   = useState(statsSeed.totalMinutesTimeTv ?? 0);
 
-  // ── Tekrarsız (öz) sayaçlar ─────────────────────────────────────────────
-  // Yukarıdaki sayaçlar her izleme OLAYINI sayar: 100 filmi 5'er kez izleyen
-  // kullanıcı 500 görür. Bunlar ise kaç FARKLI eser izlendiğini söyler. İkisi
-  // de doğru; hangisinin gösterileceğini `statsCountMode` seçer. Süre her iki
-  // modda da tekrarları içerir — o dakikalar gerçekten harcandı.
   const [uniqueMovieCount,    setUniqueMovieCount]    = useState(statsSeed.uniqueMovieCount ?? 0);
   const [uniqueTvCount,       setUniqueTvCount]       = useState(statsSeed.uniqueTvCount ?? 0);
   const [uniqueSeasonsCount,  setUniqueSeasonsCount]  = useState(statsSeed.uniqueSeasonsCount ?? 0);
   const [uniqueEpisodesCount, setUniqueEpisodesCount] = useState(statsSeed.uniqueEpisodesCount ?? 0);
 
   const [isLoading,          setIsLoading]          = useState(false);
-  const [loadingTv,          setLoadingTv]          = useState(true);
-  const [loadingMovies,      setLoadingMovies]      = useState(true);
+  const [loadingTv,          setLoadingTv]          = useState(false);
+  const [loadingMovies,      setLoadingMovies]      = useState(false);
   const [isloadingShowInfo,  setIsLoadingShowInfo]  = useState(false);
   const [isloadingMovieInfo, setIsLoadingMovieInfo] = useState(false);
 
@@ -216,120 +231,44 @@ export const ProfileStatsProvider = ({ children }) => {
   const [selectedDateTv, setSelectedDateTv] = useState(null);
   const [timeDisplayMode, setTimeDisplayMode] = useState("minutes");
   const [scaleValues,     setScaleValues]     = useState({});
-  // "total" = tekrarlı · "unique" = tekrarsız. Profil kartlarındaki anahtarla
-  // seçilir ve cihazda kalıcıdır: her açılışta yeniden seçtirmek gerekmez.
-  // Senkron okuma: kip ilk render'da doğru, sayaçlar bir kare "total" gösterip
-  // sonra "unique"e atlamıyor.
   const [statsCountMode,  setStatsCountMode]  = useState(() => get(Keys.statsCountMode));
 
-  // ── Logout/hesap değişimi: önceki hesabın verisi yeni hesaba sızmasın ───
-  // Listener effect'leri `!uid` iken sadece return ediyor; state'i burada
-  // sıfırlamazsak A çıkış yapıp B girince B'nin snapshot'ları gelene dek
-  // (legacy kayıtlar içinse kalıcı olarak) A'nın izleme verisi görünür.
+  // ── Sync listItems and precomputed stats from ListStatusContext ────────────
   useEffect(() => {
-    if (uid) return;
-    setListItems([]);
-    setListItemsTv([]);
-    setLists([]);
-  }, [uid]);
+    if (!uid) {
+      setListItems([]);
+      setListItemsTv([]);
+      setLists([]);
+      return;
+    }
 
-  // ── Root doc listener — özel listeler + eski format veri ────────────────
-  useEffect(() => {
-    if (!uid || !startupReady) return;
-    setIsLoadingMovieInfo(true);
-    setIsLoadingShowInfo(true);
-    setIsLoading(true);
-    setLoadingTv(true);
+    if (combinedLists) {
+      setListItems(combinedLists.watchedMovies || []);
+      setListItemsTv(combinedLists.watchedTv || []);
+      setLists(Object.entries(combinedLists));
+    }
 
-    const unsub = onSnapshot(doc(db, "Lists", uid), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        // Özel listeler (custom list yönetimi için)
-        setLists(Object.entries(data));
-
-        // Film verisi artık YALNIZ subcollection'dan gelir (watchedMovies
-        // listener'ı). Eski kök-array merge'i kaldırıldı — migration array'i
-        // taşıyıp kök'ten siler (hibrit yok).
-
-        // Eski format dizi verisi — subcollection listener tarafından override edilir
-        const oldShows = data?.watchedTv || [];
-        setListItemsTv((prev) => {
-          const subItems = prev.filter((s) => s._src === "sub");
-          // String()'e normalize ZORUNLU: subcollection kayıtlarının id'si her
-          // zaman string (Firestore d.id), eski format kök dizide ise sayı
-          // olabiliyor. Normalize edilmezse Set eşleşmesi kaçıyor ve aynı dizi
-          // hem legacy hem sub olarak iki kez sayılıyor (izlenen dizi/bölüm
-          // sayıları ve toplam süre şişiyor). Kardeş listener zaten böyle yapıyor.
-          const subIds = new Set(subItems.map((s) => String(s.id)));
-          const legacy = oldShows.filter((s) => !subIds.has(String(s.id)));
-          return [...subItems, ...legacy];
-        });
-      } else {
-        setLists([]);
+    if (precomputedStats) {
+      if (precomputedStats.movies) {
+        setWatchedMovieCount(precomputedStats.movies.totalRewatchCount || 0);
+        setUniqueMovieCount(precomputedStats.movies.uniqueCount || 0);
+        setTotalMinutesTime(precomputedStats.movies.totalMinutes || 0);
+        setTotalWatchedTime(formatTime(precomputedStats.movies.totalMinutes || 0));
       }
-      setIsLoadingMovieInfo(false);
-      setIsLoadingShowInfo(false);
-      setIsLoading(false);
-    }, snapshotErrorHandler("Stats/Lists"));
-    return () => unsub();
-  }, [uid, startupReady]);
-
-  // ── Subcollection listener: watchedMovies ────────────────────────────────
-  // `loadingMovies` NEDEN VAR: `isloadingMovieInfo` KÖK dokümanın bayrağıdır,
-  // filmlerin geldiği bu subcollection'ın değil. Bayrak olmadan, watchedTv
-  // snapshot'ı watchedMovies'ten önce gelirse tüketiciler "veri hazır" sanıp
-  // SIFIR filmle hesap yapar. İzleme puanı için bu sessiz bir hata değil:
-  // rozet defteri o anki (eksik) durumu "zaten senindi" diye tohumlar, filmler
-  // gelince de kullanıcının yıllardır sahip olduğu rozetler YENİ kazanılmış
-  // gibi kutlanır (hooks/useWatchProgress.js, docs §6.1).
-  useEffect(() => {
-    if (!uid || !startupReady) return;
-    setLoadingMovies(true);
-    const unsub = onSnapshot(collection(db, "Lists", uid, "watchedMovies"), (snap) => {
-      // Firestore doc data'sında id alanı OLMAYABILIR — doc.id'yi explicit ekliyoruz.
-      // Aksi halde item.id undefined olur, keyExtractor `item.id.toString()` crash eder.
-      const subMovies = snap.docs.map((d) => {
-        const data = d.data() || {};
-        return { ...data, id: data.id ?? d.id, _src: "sub" };
-      });
-      setListItems((prev) => {
-        const subIds = new Set(subMovies.map((m) => m.id));
-        const legacy = prev.filter((m) => m._src !== "sub" && !subIds.has(m.id));
-        return [...subMovies, ...legacy];
-      });
+      if (precomputedStats.tv) {
+        setWatchedTvCount(precomputedStats.tv.shows?.total || 0);
+        setUniqueTvCount(precomputedStats.tv.shows?.unique || 0);
+        setTotalSeasonsCount(precomputedStats.tv.seasons?.total || 0);
+        setUniqueSeasonsCount(precomputedStats.tv.seasons?.unique || 0);
+        setTotalEpisodesCount(precomputedStats.tv.episodes?.total || 0);
+        setUniqueEpisodesCount(precomputedStats.tv.episodes?.unique || 0);
+        setTotalMinutesTimeTv(precomputedStats.tv.totalMinutes || 0);
+        setTotalWatchedTimeTv(formatTime(precomputedStats.tv.totalMinutes || 0));
+      }
       setLoadingMovies(false);
-    }, snapshotErrorHandler("Stats/watchedMovies"));
-    return () => unsub();
-  }, [uid, startupReady]);
-
-  // ── Subcollection listener: watchedTv ────────────────────────────────────
-  useEffect(() => {
-    if (!uid || !startupReady) return;
-    const unsub = onSnapshot(collection(db, "Lists", uid, "watchedTv"), (snap) => {
-      // bare+tv_ ikileme giderme: aynı dizi hem 1399 hem tv_1399 olarak
-      // durabilir → dedupeWatchedTvEntries ile tekilleştir.
-      //
-      // HAM data GEÇİLİR, `id` ÖNCEDEN DOLDURULMAZ. Eskiden burada
-      // `id: data.id ?? d.id` yazıyordu ve bu tekilleştirmeyi SESSİZCE
-      // BOZUYORDU: dedupe `data.id ?? bareId` diyor, yani id zaten doluysa
-      // `tv_` öneki hiç soyulmuyor ve "1399" ile "tv_1399" iki AYRI kayıt
-      // oluyordu. Ölçüldü: 73 bölümlük bir dizi 2 kayıt / 83 bölüm görünüyor —
-      // profildeki bölüm sayısı, izleme süresi ve izleme puanı birden şişiyor.
-      // `id` alanı olmayan kayıt riski yok: dedupe her çıktıya `id` yazıyor.
-      const entries = snap.docs.map((d) => [d.id, d.data() || {}]);
-      const subShows = dedupeWatchedTvEntries(entries).map((s) => ({ ...s, _src: "sub" }));
-      setListItemsTv((prev) => {
-        // String()'e normalize ZORUNLU: dedupe artık bare id döndürüyor ve
-        // eski format kayıtlarda id sayı olabiliyor. Tip kayması Set eşleşmesini
-        // kaçırıp aynı diziyi hem alt koleksiyondan hem kök diziden sayardı.
-        const subIds = new Set(subShows.map((s) => String(s.id)));
-        const legacy = prev.filter((s) => s._src !== "sub" && !subIds.has(String(s.id)));
-        return [...subShows, ...legacy];
-      });
       setLoadingTv(false);
-    }, snapshotErrorHandler("Stats/watchedTv"));
-    return () => unsub();
-  }, [uid, startupReady]);
+    }
+  }, [uid, combinedLists, precomputedStats]);
 
   // Talebe bağlı türetme cache'i: { key: { deps, value } }
   const lazyCacheRef = useRef({});
@@ -367,18 +306,30 @@ export const ProfileStatsProvider = ({ children }) => {
 
   // ── Film istatistikleri ─────────────────────────────────────────────────
   useEffect(() => {
+    if (
+      movieHistoryItems.length === 0 &&
+      (precomputedStats?.movies?.uniqueCount || statsSeed.uniqueMovieCount)
+    ) {
+      return;
+    }
     const totalMin = movieHistoryItems.reduce((acc, movie) => acc + (movie.minutes || 0), 0);
     const counts = countMovieWatchStats(movieHistoryItems);
     setWatchedMovieCount(counts.total);
     setUniqueMovieCount(counts.unique);
     setTotalMinutesTime(totalMin);
     setTotalWatchedTime(formatTime(totalMin));
-  }, [movieHistoryItems]);
+  }, [movieHistoryItems, precomputedStats, statsSeed]);
 
   // ── Dizi istatistikleri ─────────────────────────────────────────────────
   // Süre `flatEpisodesTv`ten, sayaçlar aynı kaynaktan türeyen izleme
   // durumlarından gelir; ikisi de tekrarları içerir, `unique` alanları içermez.
   useEffect(() => {
+    if (
+      flatEpisodesTv.length === 0 &&
+      (precomputedStats?.tv?.shows?.unique || statsSeed.uniqueTvCount)
+    ) {
+      return;
+    }
     const totalMinTv = flatEpisodesTv.reduce(
       (sum, episode) => sum + (Number(episode.episodeMinutes) || 0),
       0,
@@ -392,7 +343,7 @@ export const ProfileStatsProvider = ({ children }) => {
     setUniqueEpisodesCount(counts.episodes.unique);
     setTotalMinutesTimeTv(totalMinTv);
     setTotalWatchedTimeTv(formatTime(totalMinTv));
-  }, [flatEpisodesTv, tvHistoryStates]);
+  }, [flatEpisodesTv, tvHistoryStates, precomputedStats, statsSeed]);
 
   // ── Sayaçları sonraki açılış için sakla ─────────────────────────────────
   //
@@ -565,9 +516,14 @@ export const ProfileStatsProvider = ({ children }) => {
     );
 
   // ── Rank colors ──────────────────────────────────────────────────────────
+  // Kategori bazlı (`Movie`/`Tv` son ekli) alanlar istatistik ekranları için
+  // korunuyor; son eksiz `borderColor`/`rankLevel`/`rankName` ise film+dizi
+  // dakikalarının TOPLAMINDAN türeyen tek, birleşik seviye — avatardaki tek
+  // halkayı besler (bkz. screens/tabs/ProfileScreen.js).
   const rankInfo = useMemo(() => ({
-    ...getDynamicRankColor(totalMinutesTime, "movie"),
-    ...getDynamicRankColor(totalMinutesTimeTv, "tv"),
+    ...suffixRankTier(getRankTierForMinutes(totalMinutesTime), "Movie"),
+    ...suffixRankTier(getRankTierForMinutes(totalMinutesTimeTv), "Tv"),
+    ...getRankTierForMinutes((totalMinutesTime || 0) + (totalMinutesTimeTv || 0)),
   }), [totalMinutesTime, totalMinutesTimeTv]);
 
   // İzlenen diziler artık subcollection'da (Lists/{uid}/watchedTv/{showId}); kök

@@ -23,7 +23,9 @@ import SwitchToggle from "../../components/SwitchToggle";
 import appAlert from "../../components/AppAlert";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
+import { useProfileUi } from "@context/ProfileUiContext";
 import { getAvatarSource } from "@utils/avatars";
+import UserAvatar from "@components/common/UserAvatar";
 import { i18nText } from "@utils/i18nText";
 import CreateSharedListModal from "../../components/modals/CreateSharedListModal";
 import ScreenDecor from "@components/ScreenDecor";
@@ -31,6 +33,7 @@ import ListItemActionsSheet from "@components/lists/ListItemActionsSheet";
 import ListSearchBar from "@components/lists/ListSearchBar";
 import GlobalSearchResults from "@components/lists/GlobalSearchResults";
 import ListPosterInfoControls from "@components/lists/ListPosterInfoControls";
+import { MyPosterActivityBadge } from "@components/PosterActivityBadge";
 import {
   useApiSettings,
   useContentSettings,
@@ -104,6 +107,7 @@ export default function SharedListScreen({ route, navigation }) {
   const { listId } = route.params || {};
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { avatar } = useProfileUi();
   const uid = user?.uid;
   const { language, t } = useLanguage();
   const { API_KEY } = useApiSettings();
@@ -163,13 +167,20 @@ export default function SharedListScreen({ route, navigation }) {
   const memberRows = useMemo(() => {
     if (!list?.members) return [];
     return Object.entries(list.members)
-      .map(([mUid, m]) => ({ uid: mUid, ...m }))
+      .map(([mUid, m]) => ({
+        uid: mUid,
+        ...m,
+        avatarSource:
+          mUid === uid && avatar
+            ? avatar
+            : getAvatarSource(m.avatarIndex, m.photoURL),
+      }))
       .sort((a, b) => {
         if (a.uid === list.ownerId) return -1;
         if (b.uid === list.ownerId) return 1;
         return (a.addedAt || 0) - (b.addedAt || 0);
       });
-  }, [list]);
+  }, [list, uid, avatar]);
 
   const availableGenres = useMemo(() => {
     const genres = new Set();
@@ -593,18 +604,37 @@ export default function SharedListScreen({ route, navigation }) {
         ) : null}
         {listPosterInfo.addedBy ? (
           <View style={styles.addedByChip}>
-            <Image
-              source={getAvatarSource(item.addedByAvatarIndex)}
-              style={styles.addedByAvatar}
-            />
+            {item.addedBy === uid && avatar ? (
+              <UserAvatar source={avatar} isCustomPhoto size={16} />
+            ) : (
+              <UserAvatar
+                avatarIndex={list?.members?.[item.addedBy]?.avatarIndex ?? item.addedByAvatarIndex}
+                photoURL={list?.members?.[item.addedBy]?.photoURL ?? item.addedByPhotoURL}
+                isCustomPhoto
+                size={16}
+              />
+            )}
             <Text numberOfLines={1} style={styles.addedByName}>
               {item.addedBy === uid
                 ? i18nText("autoI18n.sen", "Sen")
-                : item.addedByName ||
+                : list?.members?.[item.addedBy]?.name ||
+                  item.addedByName ||
                   i18nText("autoI18n.uye", "Üye")}
             </Text>
           </View>
         ) : null}
+        {/* Kişisel puan (yıldız) + yorum ikonu — posterin ÜZERİNDE, alt
+            kısmına yaslı. "Ekleyen" çipi de açıksa onun üstüne biner. */}
+        <MyPosterActivityBadge
+          mediaId={item.id}
+          mediaType={item.type}
+          posterWidth={posterW}
+          showRating={listPosterInfo.rating}
+          showComment={listPosterInfo.comment}
+          layout="overlay"
+          corner="bottomLeft"
+          style={listPosterInfo.addedBy ? { bottom: 32 } : null}
+        />
       </View>
       {listPosterInfo.title ? (
         <Text
@@ -650,13 +680,14 @@ export default function SharedListScreen({ route, navigation }) {
         >
           <View style={styles.avatarStack}>
             {memberRows.slice(0, 3).map((m, i) => (
-              <Image
+              <UserAvatar
                 key={m.uid}
-                source={getAvatarSource(m.avatarIndex)}
-                style={[
-                  styles.stackAvatar,
-                  { marginLeft: i === 0 ? 0 : -10, zIndex: 3 - i },
-                ]}
+                source={m.avatarSource}
+                isCustomPhoto
+                size={22}
+                borderWidth={1.5}
+                borderColor="rgba(0,0,0,0.4)"
+                style={{ marginLeft: i === 0 ? 0 : -10, zIndex: 3 - i }}
               />
             ))}
           </View>
@@ -985,10 +1016,7 @@ export default function SharedListScreen({ route, navigation }) {
                     },
                   ]}
                 >
-                  <Image
-                    source={getAvatarSource(member.avatarIndex)}
-                    style={styles.memberFilterCardAvatar}
-                  />
+                  <UserAvatar source={member.avatarSource} isCustomPhoto size={30} style={{ marginBottom: 4 }} />
                   <Text
                     numberOfLines={1}
                     style={[styles.memberFilterCardName, { color: theme.text.primary }]}
@@ -1127,10 +1155,7 @@ export default function SharedListScreen({ route, navigation }) {
                       { backgroundColor: theme.primary, borderColor: theme.border },
                     ]}
                   >
-                    <Image
-                      source={getAvatarSource(m.avatarIndex)}
-                      style={styles.memberAvatar}
-                    />
+                    <UserAvatar source={m.avatarSource} isCustomPhoto size={38} />
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                         <Text

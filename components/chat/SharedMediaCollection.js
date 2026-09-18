@@ -21,7 +21,9 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
+import { alpha } from "../../theme/colors";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const GAP = 8;
@@ -44,9 +46,10 @@ const typeMeta = (mt) =>
       : { label: i18nText("autoI18n.kisi_upper", "KİŞİ"), color: "#CE93D8" };
 
 // ─── Tek mini poster kartı ───────────────────────────────────────────────────
-function MiniCard({ item, getTmdbUrl, accent, highlighted, picked, onPress, cardW }) {
+function MiniCard({ item, getTmdbUrl, accent, highlighted, picked, onPress, cardW, isOutgoing, theme }) {
   const poster = item.poster_path || item.profile_path;
   const meta = typeMeta(item.media_type);
+  const primaryTextColor = isOutgoing ? "#fff" : theme.text.primary;
   return (
     <TouchableOpacity
       activeOpacity={0.8}
@@ -56,10 +59,13 @@ function MiniCard({ item, getTmdbUrl, accent, highlighted, picked, onPress, card
       <View
         style={[
           styles.posterBox,
-          { width: cardW, height: Math.round(cardW * 1.5) },
-          // Border genişliği SABİT (2) — yalnızca renk değişir; spin sırasında
-          // layout kayması/titreme olmaz.
-          (highlighted || picked) && { borderColor: accent },
+          {
+            width: cardW,
+            height: Math.round(cardW * 1.5),
+            backgroundColor: isOutgoing ? "rgba(255,255,255,0.1)" : theme.between,
+            borderColor: isOutgoing ? "rgba(255,255,255,0.2)" : theme.border,
+          },
+          (highlighted || picked) && { borderColor: isOutgoing ? "#fff" : accent },
         ]}
       >
         {poster ? (
@@ -70,11 +76,11 @@ function MiniCard({ item, getTmdbUrl, accent, highlighted, picked, onPress, card
             transition={120}
           />
         ) : (
-          <View style={[styles.poster, styles.posterPlaceholder]}>
+          <View style={[styles.poster, styles.posterPlaceholder, { backgroundColor: isOutgoing ? "rgba(255,255,255,0.1)" : theme.between }]}>
             <Ionicons
               name={item.media_type === "person" ? "person" : "film-outline"}
               size={20}
-              color="rgba(255,255,255,0.35)"
+              color={isOutgoing ? "rgba(255,255,255,0.6)" : theme.text.muted}
             />
           </View>
         )}
@@ -98,7 +104,7 @@ function MiniCard({ item, getTmdbUrl, accent, highlighted, picked, onPress, card
           </View>
         )}
       </View>
-      <Text style={styles.cardTitle} numberOfLines={2}>
+      <Text style={[styles.cardTitle, { color: primaryTextColor }]} numberOfLines={2}>
         {item.title}
       </Text>
     </TouchableOpacity>
@@ -108,11 +114,13 @@ function MiniCard({ item, getTmdbUrl, accent, highlighted, picked, onPress, card
 export default function SharedMediaCollection({
   items = [],
   listTitle,
-  accent = "#6C63FF",
+  accent: propAccent,
   getTmdbUrl,
   isOutgoing = false,
   onOpenItem,
 }) {
+  const { theme } = useTheme();
+  const accent = propAccent || theme.accent || "#6C63FF";
   // Liste tek tip (homojen): ya dizi/film ya oyuncu. Oyuncu listesinde
   // "rastgele seç" anlamsız — yalnızca dizi/film listelerinde göster.
   const isPersonList = items[0]?.media_type === "person";
@@ -136,7 +144,6 @@ export default function SharedMediaCollection({
     setPicked(-1);
     bannerAnim.setValue(0);
     setSpinning(true);
-
     const target = Math.floor(Math.random() * items.length);
     const totalSteps = 16 + Math.floor(Math.random() * items.length);
     let step = 0;
@@ -155,7 +162,6 @@ export default function SharedMediaCollection({
         return;
       }
       setHighlight((prev) => (prev + 1) % items.length);
-      // Yavaşlayan "çark" hissi: adım ilerledikçe gecikme artar.
       const delay = 55 + Math.floor((step / totalSteps) * 190);
       timerRef.current = setTimeout(tick, delay);
     };
@@ -163,6 +169,7 @@ export default function SharedMediaCollection({
   }, [spinning, canRandom, items.length, bannerAnim]);
 
   const pickedItem = picked >= 0 ? items[picked] : null;
+  const primaryTextColor = isOutgoing ? "#fff" : theme.text.primary;
 
   return (
     <View style={styles.wrap}>
@@ -171,9 +178,9 @@ export default function SharedMediaCollection({
         <Ionicons
           name={isPersonList ? "people-outline" : listTitle ? "list" : "albums-outline"}
           size={14}
-          color={accent}
+          color={isOutgoing ? "#fff" : accent}
         />
-        <Text style={styles.headerText} numberOfLines={2}>
+        <Text style={[styles.headerText, { color: primaryTextColor }]} numberOfLines={2}>
           {listTitle ||
             (isPersonList
               ? i18nText("autoI18n.n_oyuncu", "{{n}} oyuncu", { n: items.length })
@@ -192,6 +199,8 @@ export default function SharedMediaCollection({
             getTmdbUrl={getTmdbUrl}
             accent={accent}
             cardW={cardW}
+            isOutgoing={isOutgoing}
+            theme={theme}
             highlighted={spinning && highlight === idx}
             picked={picked === idx}
             onPress={onOpenItem}
@@ -206,7 +215,13 @@ export default function SharedMediaCollection({
             onPress={spin}
             disabled={spinning}
             activeOpacity={0.85}
-            style={[styles.randomBtn, { backgroundColor: accent, opacity: spinning ? 0.7 : 1 }]}
+            style={[
+              styles.randomBtn,
+              {
+                backgroundColor: isOutgoing ? "rgba(255,255,255,0.25)" : accent,
+                opacity: spinning ? 0.7 : 1,
+              },
+            ]}
           >
             <Ionicons name="dice-outline" size={15} color="#fff" />
             <Text style={styles.randomBtnText}>
@@ -224,7 +239,12 @@ export default function SharedMediaCollection({
           style={[
             styles.pickedBanner,
             {
-              borderColor: accent + "66",
+              backgroundColor: isOutgoing
+                ? "rgba(255,255,255,0.12)"
+                : theme.between,
+              borderColor: isOutgoing
+                ? "rgba(255,255,255,0.3)"
+                : alpha(accent, 0.45),
               opacity: bannerAnim,
               transform: [
                 {
@@ -237,9 +257,19 @@ export default function SharedMediaCollection({
             },
           ]}
         >
-          <Ionicons name="sparkles" size={14} color={accent} />
-          <Text style={styles.pickedBannerText} numberOfLines={2}>
-            {i18nText("autoI18n.secilen", "Seçilen")}: <Text style={{ fontWeight: "900", color: "#fff" }}>{pickedItem.title}</Text>
+          <Ionicons
+            name="sparkles"
+            size={14}
+            color={isOutgoing ? "#fff" : accent}
+          />
+          <Text
+            style={[styles.pickedBannerText, { color: primaryTextColor }]}
+            numberOfLines={2}
+          >
+            {i18nText("autoI18n.secilen", "Seçilen")}:{" "}
+            <Text style={{ fontWeight: "900", color: primaryTextColor }}>
+              {pickedItem.title}
+            </Text>
           </Text>
         </Animated.View>
       )}

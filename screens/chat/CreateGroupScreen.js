@@ -12,9 +12,9 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  Image,
   ActivityIndicator,
 } from "react-native";
+import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getAuth } from "firebase/auth";
 import { collection, onSnapshot } from "firebase/firestore";
@@ -28,6 +28,7 @@ import ScreenDecor from "@components/ScreenDecor";
 import GroupAvatar from "@components/chat/GroupAvatar";
 import GroupAvatarPickerModal from "@components/chat/GroupAvatarPickerModal";
 import { i18nText } from "@utils/i18nText";
+import UserAvatar from "@components/common/UserAvatar";
 import { toast } from "@components/AppToast";
 import { createGroup } from "@services/groupsService";
 import { ICON_BACKGROUND_COUNT } from "@components/IconBacground";
@@ -43,7 +44,7 @@ export default function CreateGroupScreen({ navigation }) {
   const user = auth.currentUser;
   const { theme } = useTheme();
   const { avatars, selectAvatarIndex } = useProfileUi();
-  const { displayName, username, avatarIndex: profileAvatarIndex } = useUserProfile();
+  const { displayName, username, avatarIndex: profileAvatarIndex, photoURL: profilePhotoURL } = useUserProfile();
 
   const [friends, setFriends] = useState([]);
   const [selected, setSelected] = useState({}); // uid -> friend
@@ -71,6 +72,7 @@ export default function CreateGroupScreen({ navigation }) {
               displayName: data.friendName || "",
               username: data.friendUsername || "",
               avatarIndex: data.friendAvatarIndex ?? 0,
+              photoURL: data.friendPhotoURL || null,
             };
           }),
         );
@@ -106,6 +108,7 @@ export default function CreateGroupScreen({ navigation }) {
               : typeof selectAvatarIndex === "number"
                 ? selectAvatarIndex
                 : 0,
+          photoURL: profilePhotoURL || user?.photoURL || null,
         },
       };
       selectedList.forEach((f) => {
@@ -113,6 +116,7 @@ export default function CreateGroupScreen({ navigation }) {
           name: f.displayName,
           username: f.username || "",
           avatarIndex: f.avatarIndex ?? 0,
+          photoURL: f.photoURL || null,
         };
       });
 
@@ -138,7 +142,7 @@ export default function CreateGroupScreen({ navigation }) {
       );
       setCreating(false);
     }
-  }, [canCreate, creating, user, selectedList, name, color, avatarIndex, selectAvatarIndex, profileAvatarIndex, displayName, username, navigation]);
+  }, [canCreate, creating, user, selectedList, name, color, avatarIndex, selectAvatarIndex, profileAvatarIndex, profilePhotoURL, displayName, username, navigation]);
 
   const renderFriend = ({ item }) => {
     const isSel = !!selected[item.uid];
@@ -151,15 +155,13 @@ export default function CreateGroupScreen({ navigation }) {
           { backgroundColor: theme.secondary, borderColor: isSel ? color : theme.border },
         ]}
       >
-        <View style={[styles.avatarWrap, { borderColor: theme.accent + "66" }]}>
-          {avatars?.[item.avatarIndex] ? (
-            <Image source={avatars[item.avatarIndex]} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, styles.avatarPh, { backgroundColor: theme.primary }]}>
-              <Ionicons name="person" size={20} color={theme.text?.muted ?? "#555"} />
-            </View>
-          )}
-        </View>
+        <UserAvatar
+          avatarIndex={item.avatarIndex}
+          photoURL={item.photoURL}
+          size={46}
+          borderWidth={2}
+          borderColor={theme.accent + "66"}
+        />
         <View style={{ flex: 1 }}>
           <Text style={[styles.friendName, { color: theme.text?.primary ?? "#fff" }]} numberOfLines={1}>
             {item.displayName}
@@ -168,7 +170,13 @@ export default function CreateGroupScreen({ navigation }) {
             @{item.username}
           </Text>
         </View>
-        <View style={[styles.checkDot, isSel && { backgroundColor: color, borderColor: color }]}>
+        <View
+          style={[
+            styles.checkDot,
+            { borderColor: isSel ? color : theme.border },
+            isSel && { backgroundColor: color },
+          ]}
+        >
           {isSel && <Ionicons name="checkmark" size={15} color="#fff" />}
         </View>
       </TouchableOpacity>
@@ -203,7 +211,12 @@ export default function CreateGroupScreen({ navigation }) {
           accessibilityLabel={i18nText("autoI18n.grup_avatari_sec", "Grup avatarı seç")}
         >
           <GroupAvatar avatarIndex={avatarIndex} color={color} size={56} iconSize={37} />
-          <View style={[styles.editAvatarBadge, { backgroundColor: theme.accent }]}>
+          <View
+            style={[
+              styles.editAvatarBadge,
+              { backgroundColor: theme.accent, borderColor: theme.primary },
+            ]}
+          >
             <Ionicons name="pencil" size={10} color="#fff" />
           </View>
         </TouchableOpacity>
@@ -213,7 +226,14 @@ export default function CreateGroupScreen({ navigation }) {
           placeholder={i18nText("autoI18n.grup_adi", "Grup adı")}
           placeholderTextColor={theme.text?.muted ?? "#777"}
           maxLength={40}
-          style={[styles.nameInput, { color: theme.text?.primary ?? "#fff", borderColor: theme.border }]}
+          style={[
+            styles.nameInput,
+            {
+              backgroundColor: theme.secondary,
+              color: theme.text?.primary ?? "#fff",
+              borderColor: theme.border,
+            },
+          ]}
         />
       </View>
 
@@ -225,7 +245,10 @@ export default function CreateGroupScreen({ navigation }) {
             onPress={() => setColor(c)}
             style={[
               styles.colorDot,
-              { backgroundColor: c, borderColor: color === c ? "#fff" : "transparent" },
+              {
+                backgroundColor: c,
+                borderColor: color === c ? (theme.text?.primary ?? "#fff") : "transparent",
+              },
             ]}
           />
         ))}

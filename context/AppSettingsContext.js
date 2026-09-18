@@ -108,6 +108,8 @@ const DEFAULT_LIST_POSTER_INFO = Object.freeze({
   duration: true,
   title: false,
   addedBy: true,
+  rating: true,
+  comment: true,
 });
 const LIST_POSTER_INFO_KEYS = Object.keys(DEFAULT_LIST_POSTER_INFO);
 

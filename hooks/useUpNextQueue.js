@@ -342,6 +342,7 @@ export default function useUpNextQueue({
               episodeName: item.episodeName,
               episodeRatings: item.episodeRatings,
               episodeMinutes: item.episodeMinutes,
+              releaseDate: item.airDate || null,
             },
           ],
           watchDate,

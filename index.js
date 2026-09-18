@@ -2,7 +2,6 @@ import "react-native-gesture-handler";
 import { StyleSheet } from "react-native";
 import { registerRootComponent } from "expo";
 import { applyStyleSheetCompat } from "./utils/styleSheetCompat";
-import App from "./App";
 
 // RN 0.85'te kaldırılan StyleSheet.absoluteFillObject'i geri koyar. Güncellenmeyen
 // üçüncü parti paketler (circular-progress-indicator, calendars/Timeline) bu alanı
@@ -12,4 +11,9 @@ import App from "./App";
 applyStyleSheetCompat(StyleSheet);
 
 // Sadece registerRootComponent kullanın
-registerRootComponent(App);
+// Native tab-bar QA uses an isolated fixture and never authenticates or writes
+// backend data. Release builds always register the real application.
+const RootComponent = __DEV__ && process.env.EXPO_PUBLIC_TAB_BAR_QA === "1"
+  ? require("./screens/development/TabBarQaScreen").default
+  : require("./App").default;
+registerRootComponent(RootComponent);

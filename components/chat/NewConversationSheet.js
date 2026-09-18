@@ -17,12 +17,14 @@ import { useProfileUi } from "@context/ProfileUiContext";
 import { useTheme } from "@context/ThemeContext";
 import { subscribeUserGroups } from "@services/groupsService";
 import { i18nText } from "@utils/i18nText";
+import UserAvatar from "../common/UserAvatar";
 
 const normalizeFriend = (friend) => ({
   uid: friend?.friendUid || friend?.uid || friend?.id,
   name: friend?.friendName || friend?.displayName || friend?.username || "",
   username: friend?.friendUsername || friend?.username || "",
   avatarIndex: friend?.friendAvatarIndex ?? friend?.avatarIndex ?? 0,
+  photoURL: friend?.friendPhotoURL || friend?.photoURL || null,
 });
 
 export default function NewConversationSheet({
@@ -204,17 +206,14 @@ export default function NewConversationSheet({
                 iconSize={29}
               />
             ) : (
-              <View style={[styles.avatarWrap, { borderColor: theme.accent + "55" }]}>
-              {avatars?.[item.avatarIndex] ? (
-                <Image source={avatars[item.avatarIndex]} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: theme.primary }]}>
-                  <Text style={styles.avatarInitial}>
-                    {(item.name || "?").charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-              )}
-              </View>
+              <UserAvatar
+                avatarIndex={item.avatarIndex}
+                photoURL={item.photoURL}
+                isCustomPhoto
+                size={44}
+                borderWidth={2}
+                borderColor={theme.accent + "55"}
+              />
             )}
             <View style={styles.friendCopy}>
               <Text numberOfLines={1} style={[styles.friendName, { color: theme.text.primary }]}>

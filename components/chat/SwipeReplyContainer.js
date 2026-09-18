@@ -8,12 +8,14 @@ import Reanimated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
+import { useTheme } from "@context/ThemeContext";
 
 const REPLY_THRESHOLD = 62;
 const MAX_DRAG = 82;
 const SPRING = { damping: 18, stiffness: 220, mass: 0.7 };
 
 export default function SwipeReplyContainer({ children, onReply, disabled = false }) {
+  const { theme } = useTheme();
   const translateX = useSharedValue(0);
 
   const gesture = Gesture.Pan()
@@ -42,7 +44,10 @@ export default function SwipeReplyContainer({ children, onReply, disabled = fals
   return (
     <GestureDetector gesture={gesture}>
       <View style={styles.container}>
-        <Reanimated.View pointerEvents="none" style={[styles.icon, iconStyle]}>
+        <Reanimated.View
+          pointerEvents="none"
+          style={[styles.icon, { backgroundColor: theme.accent }, iconStyle]}
+        >
           <Ionicons name="arrow-undo" size={18} color="#fff" />
         </Reanimated.View>
         <Reanimated.View style={contentStyle}>{children}</Reanimated.View>
@@ -63,6 +68,5 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(108,99,255,0.92)",
   },
 });

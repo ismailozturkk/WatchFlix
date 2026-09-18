@@ -120,11 +120,12 @@ private class ReminderRemoteViewsFactory(
     rv.setTextViewText(R.id.reminder_widget_item_meta, meta)
     rv.setTextColor(R.id.reminder_widget_item_meta, appearance.secondaryText)
 
-    val isToday = startOfDay(item.dateEpoch) == startOfToday()
+    val daysUntil = daysUntil(item.dateEpoch)
+    val isToday = daysUntil == 0L
     rv.setTextViewText(R.id.reminder_widget_item_when, countdown(item.dateEpoch))
     rv.setTextColor(
       R.id.reminder_widget_item_when,
-      if (isToday) appearance.accent else appearance.text,
+      countdownColor(daysUntil, appearance),
     )
     rv.setTextViewText(R.id.reminder_widget_item_date, shortDate(item.dateEpoch))
     rv.setViewVisibility(
@@ -210,7 +211,7 @@ private class ReminderRemoteViewsFactory(
   }
 
   private fun countdown(epoch: Long): String {
-    val diff = TimeUnit.MILLISECONDS.toDays(startOfDay(epoch) - startOfToday())
+    val diff = daysUntil(epoch)
     return when (diff) {
       0L -> if (isTurkish) "Bugün" else "Today"
       1L -> if (isTurkish) "Yarın" else "Tomorrow"
@@ -224,6 +225,19 @@ private class ReminderRemoteViewsFactory(
   }
 
   private fun startOfToday(): Long = startOfDay(System.currentTimeMillis())
+
+  private fun daysUntil(epoch: Long): Long =
+    TimeUnit.MILLISECONDS.toDays(startOfDay(epoch) - startOfToday())
+
+  // Aciliyet arttıkça süre etiketi ısınır: bugün kırmızı, yarın amber,
+  // ilk birkaç gün aksan; uzak tarihler nötr kalır.
+  private fun countdownColor(days: Long, appearance: WidgetAppearance): Int = when {
+    days <= 0L -> Color.parseColor("#FF6B6B")
+    days == 1L -> Color.parseColor("#FFB547")
+    days <= 3L -> appearance.accent
+    days <= 7L -> appearance.secondaryText
+    else -> appearance.muted
+  }
 
   private fun startOfDay(epoch: Long): Long = Calendar.getInstance().run {
     timeInMillis = epoch
@@ -258,8 +272,6 @@ private class ReminderRemoteViewsFactory(
   }
 
   companion object {
-    private val COUNTDOWN_TODAY = Color.parseColor("#DDD9FF")
-    private val COUNTDOWN_DEFAULT = Color.parseColor("#C9C7FF")
     // 34x50dp @ ~3x → poster hedef pikselleri (net görünüm için sabit).
     private const val POSTER_W_PX = 108
     private const val POSTER_H_PX = 156

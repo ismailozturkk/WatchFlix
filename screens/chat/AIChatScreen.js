@@ -1,3 +1,4 @@
+import ComposerBlur, { ComposerBlurTarget, useComposerBlurTarget } from "../../components/chat/ComposerBlur";
 // screens/chat/AIChatScreen.js
 //
 // CineMatch Pro — yapılandırılmış (JSON) AI cevap + zengin kart sohbeti.
@@ -224,23 +225,29 @@ export default function AIChatScreen({
   // ── Aç/kapa animasyonu (FAB'dan büyür / FAB'a küçülür) ──────────────────────
   const anim = useRef(new Animated.Value(0)).current;
   const [rendered, setRendered] = useState(false);
+  const [blurReady, setBlurReady] = useState(false);
 
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (visible) {
       setRendered(true);
+      setBlurReady(false);
       anim.setValue(0);
       Animated.timing(anim, {
         toValue: 1,
         duration: 460,
         easing: Easing.bezier(0.22, 1, 0.36, 1), // easeOutQuint — yumuşak yavaşlama
         useNativeDriver: true,
-      }).start();
+      }).start(({ finished }) => {
+        if (finished) setBlurReady(true);
+      });
     }
+    return () => anim.stopAnimation();
   }, [visible, anim]);
 
   const handleClose = useCallback(() => {
+    setBlurReady(false);
     Keyboard.dismiss();
     Animated.timing(anim, {
       toValue: 0,
@@ -259,6 +266,8 @@ export default function AIChatScreen({
   }, [anim, onClose]);
 
   const scrollRef = useRef(null);
+  const [composerHeight, setComposerHeight] = useState(76);
+  const composerBlur = useComposerBlurTarget();
   const scrollToEndSoon = useCallback(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 60);
   }, []);
@@ -892,7 +901,7 @@ export default function AIChatScreen({
             </View>
           ) : (
             // ── Sohbet ──
-            <Reanimated.View style={styles.chatBody}>
+            <Reanimated.View style={[styles.chatBody, composerKeyboardStyle]}>
               {settingsVisible && (
                 <View style={[styles.settings, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
                   <ScrollView
@@ -1088,10 +1097,11 @@ export default function AIChatScreen({
                 </View>
               )}
 
+              <ComposerBlurTarget attach={composerBlur.attach} backgroundColor={theme.primary} style={{ flex: 1 }}>
               <ScrollView
                 ref={scrollRef}
                 style={{ flex: 1 }}
-                contentContainerStyle={{ padding: 12, paddingBottom: 16 }}
+                contentContainerStyle={{ padding: 12, paddingBottom: composerHeight + 16 }}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
@@ -1195,18 +1205,23 @@ export default function AIChatScreen({
                 {loading && <TypingBubble theme={theme} label={t?.AICineChat?.typing || i18nText("autoI18n.dusunuyor", "Düşünüyor…")} />}
               </ScrollView>
 
+              </ComposerBlurTarget>
+
               {/* Giriş çubuğu — arkadaş sohbetindeki hap ile aynı yapı:
                   [rozet][input][gönder] tek parça, odakta kenarlık vurguya döner.
-                  Sarmalayıcı saydam ve ayırıcı çizgisiz: ekranda yalnız hap görünür. */}
+                  Liste kutunun arkasına kadar uzanır; dış şerit saydamdır. */}
               <Reanimated.View
-                style={[styles.inputWrap, composerKeyboardStyle]}
+                style={styles.inputWrap}
+                pointerEvents="box-none"
+                onLayout={(event) => setComposerHeight(event.nativeEvent.layout.height)}
               >
                 <Animated.View
                   style={[
                     styles.composerPill,
-                    { backgroundColor: theme.secondary, borderColor: inputBorderColor },
+                    { backgroundColor: "transparent", borderColor: inputBorderColor },
                   ]}
                 >
+                  <ComposerBlur target={blurReady ? composerBlur.target : null} theme={theme} />
                   <View style={[styles.composerBadge, { backgroundColor: alpha(theme.accent, 0.16) }]}>
                     <Ionicons name="sparkles" size={19} color={theme.bold} />
                   </View>
@@ -1308,11 +1323,14 @@ const styles = StyleSheet.create({
   convRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: 14, borderWidth: 1 },
   convIcon: { width: 36, height: 36, borderRadius: 18, justifyContent: "center", alignItems: "center" },
 
-  // Composer ölçüleri arkadaş sohbetindekiyle (screens/chat/ChatScreen.js)
-  // birebir aynı; oradaki hap sabit koyu renkler, buradaki tema renkleri
-  // kullanıyor. Sarmalayıcı yalnız boşluk veriyor — arka plan ve üst ayırıcı
-  // çizgi yok, gölge de yalnız hapta.
+  // Mesaj kutusu listenin üzerinde; dış şerit saydam ve dokunmaları geçirir.
   inputWrap: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+    backgroundColor: "transparent",
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: Platform.OS === "ios" ? 8 : 12,
@@ -1323,11 +1341,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderRadius: 28,
     padding: 5,
-    shadowColor: "#000",
-    shadowOpacity: 0.35,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 14,
-    elevation: 10,
+
+    backgroundColor: "transparent",
   },
   composerBadge: {
     width: 42,
@@ -1348,6 +1363,7 @@ const styles = StyleSheet.create({
   // Android'de çok satırlı input metni tepeye yapışır, ortalamayı açıkça
   // istiyoruz; iOS textAlignVertical desteklemiyor, simetrik padding yetiyor.
   input: {
+    backgroundColor: "transparent",
     flex: 1,
     minHeight: 42,
     paddingHorizontal: 12,

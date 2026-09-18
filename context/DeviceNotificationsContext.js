@@ -57,6 +57,7 @@ import {
   shouldPrimeNotifications,
 } from "../utils/notificationPriming";
 import { Keys, get, set } from "../services/storage";
+import { getActiveChatId } from "../services/activeChatTracker";
 
 // iOS'ta bekleyen local bildirim üst sınırı 64; fazlası sessizce düşer. En
 // yakın tarihli 60'ını zamanlıyoruz (kalan pay foreground sosyal bildirimlere).
@@ -165,7 +166,7 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
   // Ayar aynalama (Firestore yazması) + reminder senkronu açılışta acil değil;
   // splash sonrası donma penceresinin dışına ertele. Kapı açıldıktan sonra
   // davranış birebir aynı (debounce'lar korunur).
-  const startupReady = useStartupGate(4200);
+  const startupReady = useStartupGate(3600);
 
   // ── 1. Bir kerelik kurulum: handler + mevcut izin durumu ──────────────────
   useEffect(() => {
@@ -517,6 +518,19 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
 
       const settingKey = SOCIAL_SETTING_KEY[item.type];
       if (settingKey && settings[settingKey] === false) return;
+
+      // Bu mesaj, kullanıcının o an ekranda açık tuttuğu sohbetten geldiyse
+      // foreground banner gereksiz — mesajı zaten sohbette canlı görüyor.
+      if (item.type === "message") {
+        const notifChatId = item.groupId
+          ? item.groupId
+          : item.fromUid && uid
+            ? item.fromUid > uid
+              ? item.fromUid + "_" + uid
+              : uid + "_" + item.fromUid
+            : null;
+        if (notifChatId && notifChatId === getActiveChatId()) return;
+      }
 
       const { title, body } = buildSocialContent(item, t);
       presentNow({
