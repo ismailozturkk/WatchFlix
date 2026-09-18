@@ -1,11 +1,30 @@
 export const PREMIUM_ENTITLEMENT_ID = "com.smlztrk.seelogd Pro";
 
+// Mağaza ürün kimlikleri — Play ve App Store'da AYNI. Kimlik bir kez
+// oluşturulunca değişmez, silinse de yeniden kullanılamaz; plan (Premium /
+// Max) kimlikten okunduğu için adı planı söylemeli.
 export const REVENUECAT_PRODUCT_IDS = Object.freeze({
-  PREMIUM_MONTHLY: "monthly_2",
-  PREMIUM_YEARLY: "yearly",
-  UNLIMITED_MONTHLY: "monthly",
-  UNLIMITED_YEARLY: "unlimited_yearly",
+  PREMIUM_MONTHLY: "premium_monthly",
+  PREMIUM_YEARLY: "premium_yearly",
+  UNLIMITED_MONTHLY: "max_monthly",
+  UNLIMITED_YEARLY: "max_yearly",
 });
+
+// Eylül 2026 öncesi yalnız RevenueCat Test Store'da duran kimlikler (gerçek
+// satış olmadı; `monthly` Max aylıktı). Test abonelikleri bitince silinecek.
+const LEGACY_PREMIUM_PRODUCT_IDS = Object.freeze(["monthly_2", "yearly"]);
+const LEGACY_UNLIMITED_PRODUCT_IDS = Object.freeze(["monthly", "unlimited_yearly"]);
+
+const PREMIUM_PRODUCT_IDS = new Set([
+  REVENUECAT_PRODUCT_IDS.PREMIUM_MONTHLY,
+  REVENUECAT_PRODUCT_IDS.PREMIUM_YEARLY,
+  ...LEGACY_PREMIUM_PRODUCT_IDS,
+]);
+const UNLIMITED_PRODUCT_IDS = new Set([
+  REVENUECAT_PRODUCT_IDS.UNLIMITED_MONTHLY,
+  REVENUECAT_PRODUCT_IDS.UNLIMITED_YEARLY,
+  ...LEGACY_UNLIMITED_PRODUCT_IDS,
+]);
 
 export const PREMIUM_PLAN = Object.freeze({
   FREE: "free",
@@ -29,22 +48,24 @@ export function getPremiumPlanDisplayName(plan) {
   return PREMIUM_PLAN_DISPLAY_NAME[plan] || PREMIUM_PLAN_DISPLAY_NAME.free;
 }
 
+// 19 Eylül 2026 kararı. Max 2,5 kat: TR'de ₺119,99'da kotasını dolduran Max
+// kullanıcısının AI maliyeti (~₺88) net geliri (~₺85) aşıyordu.
 export const RECOMMENDED_LAUNCH_PRICES = Object.freeze({
   [REVENUECAT_PRODUCT_IDS.PREMIUM_MONTHLY]: Object.freeze({
-    tr: Object.freeze({ price: 79.99, currencyCode: "TRY" }),
-    global: Object.freeze({ price: 3.99, currencyCode: "USD" }),
+    tr: Object.freeze({ price: 59.99, currencyCode: "TRY" }),
+    global: Object.freeze({ price: 1.99, currencyCode: "USD" }),
   }),
   [REVENUECAT_PRODUCT_IDS.PREMIUM_YEARLY]: Object.freeze({
-    tr: Object.freeze({ price: 599.99, currencyCode: "TRY" }),
-    global: Object.freeze({ price: 29.99, currencyCode: "USD" }),
+    tr: Object.freeze({ price: 449.99, currencyCode: "TRY" }),
+    global: Object.freeze({ price: 14.99, currencyCode: "USD" }),
   }),
   [REVENUECAT_PRODUCT_IDS.UNLIMITED_MONTHLY]: Object.freeze({
-    tr: Object.freeze({ price: 159.99, currencyCode: "TRY" }),
-    global: Object.freeze({ price: 7.99, currencyCode: "USD" }),
+    tr: Object.freeze({ price: 149.99, currencyCode: "TRY" }),
+    global: Object.freeze({ price: 4.99, currencyCode: "USD" }),
   }),
   [REVENUECAT_PRODUCT_IDS.UNLIMITED_YEARLY]: Object.freeze({
-    tr: Object.freeze({ price: 1199.99, currencyCode: "TRY" }),
-    global: Object.freeze({ price: 59.99, currencyCode: "USD" }),
+    tr: Object.freeze({ price: 1099.99, currencyCode: "TRY" }),
+    global: Object.freeze({ price: 34.99, currencyCode: "USD" }),
   }),
 });
 
@@ -78,11 +99,7 @@ export function baseProductIdentifier(identifier) {
 }
 
 export function isUnlimitedProductIdentifier(identifier) {
-  const base = baseProductIdentifier(identifier);
-  return (
-    base === REVENUECAT_PRODUCT_IDS.UNLIMITED_MONTHLY ||
-    base === REVENUECAT_PRODUCT_IDS.UNLIMITED_YEARLY
-  );
+  return UNLIMITED_PRODUCT_IDS.has(baseProductIdentifier(identifier));
 }
 
 /**
@@ -151,10 +168,7 @@ export function getPackageTierKey(aPackage) {
   if (isUnlimitedProductIdentifier(productIdentifier)) {
     return PREMIUM_PLAN.UNLIMITED;
   }
-  if (
-    productIdentifier === REVENUECAT_PRODUCT_IDS.PREMIUM_MONTHLY ||
-    productIdentifier === REVENUECAT_PRODUCT_IDS.PREMIUM_YEARLY
-  ) {
+  if (PREMIUM_PRODUCT_IDS.has(productIdentifier)) {
     return PREMIUM_PLAN.PREMIUM;
   }
   const searchable = [
@@ -164,7 +178,7 @@ export function getPackageTierKey(aPackage) {
   ]
     .filter(Boolean)
     .join(" ");
-  return /unlimited|sinirsiz|sınırsız/i.test(searchable)
+  return /unlimited|\bmax\b|sinirsiz|sınırsız/i.test(searchable)
     ? PREMIUM_PLAN.UNLIMITED
     : PREMIUM_PLAN.PREMIUM;
 }

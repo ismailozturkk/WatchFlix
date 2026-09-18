@@ -445,6 +445,7 @@
 
 - **[ ] C1 — Marka kararı:** "Seelogd" için TÜRKPATENT + EUIPO + USPTO + iki mağazada ad taraması → AD KARARI. Mağaza metinleri (`store/play/`) bu karara kilitli. *(AI: tarama sonuç özetini derleyebilir, alternatif ad listesi çıkarabilir.)*
 - **[ ] C2 — Play ürünleri + RevenueCat panel:** Play Console'da abonelik IAP'leri (Premium/Premium Max, TR+global fiyat) → RevenueCat panelinde Play service credentials → Integrations→Webhooks'a fonksiyon URL'si + `Authorization` değeri → paneldeki hazır paywall'un footer'ında Koşullar/Gizlilik linklerinin açık olduğunun teyidi (B5'in panel ayağı).
+  > **2026-09-18:** Webhook bağlı, test olayı 200 döndü (`revenuecatwebhook-nvr53u7q5q-uc.a.run.app`). Panel paywall'u kaldırıldı — tek ödeme ekranı `PremiumScreen` (bkz. `docs/kurulum/REVENUECAT_KURULUM.md` §2); footer linki maddesi bu yüzden düştü.
 - **[ ] C3 — Kapalı test kullanıcıları:** 12+ kişi kesinleşsin; 14 gün sayacı 24 Ağustos'ta başlamalı.
 - **[ ] C4 — Mağaza görselleri:** feature graphic 1024×500, telefon ekran görüntüleri (TR ve EN ayrı setler, ilk 3 kritik), 512×512 ikon. *(AI: ekran görüntüsü çerçeve/başlık metinlerini `store/play/` altına taslaklayabilir; ham görüntüler `store/raw-screenshots/`'ta.)*
 - **[ ] C5 — Data Safety + IARC formları:** **asgari yaş 13** (B7 kararı, kodda uygulandı), beyanlar — Firebase (Auth/Firestore/Analytics), Sentry (crash), RevenueCat (satın alma), Advertising ID, **uzak push CANLI**, UGC (sohbet/yorum/gönderi) VAR + şikâyet/engelleme mekanizmaları (B4 tamamlanmış olmalı). *(AI: soru-cevap taslağı çıkarabilir.)*

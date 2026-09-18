@@ -17,7 +17,6 @@ import {
   loadRevenueCatState,
   openRevenueCatSubscriptionManagement,
   presentRevenueCatCustomerCenter,
-  presentRevenueCatPaywall,
   purchaseRevenueCatPackage,
   restoreRevenueCatPurchases,
   syncPremiumStatusOnServer,
@@ -226,27 +225,6 @@ export function PremiumProvider({ children }) {
     }
   }, [customerInfo]);
 
-  const showPaywall = useCallback(
-    // `source` = paywall'ı açan kapı ("ai_quota", "themes", "lists_limit"...).
-    // Analytics'te hangi kapının dönüştüğünü ölçmek için çağıranlar geçirmeli.
-    async ({ onlyIfNeeded = false, source = "unknown" } = {}) => {
-      setBusyAction("paywall");
-      try {
-        const result = await presentRevenueCatPaywall({
-          offering: offerings?.current,
-          entitlementId: config.entitlementId,
-          onlyIfNeeded,
-          source,
-        });
-        if (result.customerInfo) setCustomerInfo(result.customerInfo);
-        return result;
-      } finally {
-        setBusyAction(null);
-      }
-    },
-    [config.entitlementId, offerings?.current]
-  );
-
   const openCustomerCenter = useCallback(async () => {
     setBusyAction("customer-center");
     try {
@@ -309,7 +287,6 @@ export function PremiumProvider({ children }) {
       purchasePackage,
       restorePurchases,
       manageSubscription,
-      showPaywall,
       openCustomerCenter,
       refresh,
     };
@@ -329,7 +306,6 @@ export function PremiumProvider({ children }) {
     purchasePackage,
     refresh,
     restorePurchases,
-    showPaywall,
     standaloneProducts,
     storePlan,
   ]);

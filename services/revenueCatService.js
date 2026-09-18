@@ -1,6 +1,6 @@
 import { Linking, Platform } from "react-native";
 import Purchases, { LOG_LEVEL } from "react-native-purchases";
-import RevenueCatUI, { PAYWALL_RESULT } from "react-native-purchases-ui";
+import RevenueCatUI from "react-native-purchases-ui";
 import { httpsCallable } from "firebase/functions";
 import { fns } from "../firebase";
 import {
@@ -152,38 +152,6 @@ export async function syncPremiumStatusOnServer() {
   const call = httpsCallable(fns, "syncPremiumStatus");
   const { data } = await call({});
   return data;
-}
-
-export async function presentRevenueCatPaywall({
-  offering,
-  entitlementId = PREMIUM_ENTITLEMENT_ID,
-  onlyIfNeeded = false,
-  source = "unknown",
-} = {}) {
-  // `source`: paywall'ı hangi kapı açtı (ai_quota, themes, lists_limit...).
-  // Hangi kapının para kazandırdığını bilmeden fiyat/paket kararı verilemez.
-  trackEvent(ANALYTICS_EVENTS.PAYWALL_VIEW, {
-    source,
-    offering: offering?.identifier || null,
-    only_if_needed: onlyIfNeeded,
-  });
-
-  const result = onlyIfNeeded
-    ? await RevenueCatUI.presentPaywallIfNeeded({
-        requiredEntitlementIdentifier: entitlementId,
-        offering,
-        displayCloseButton: true,
-      })
-    : await RevenueCatUI.presentPaywall({
-        offering,
-        displayCloseButton: true,
-      });
-
-  const customerInfo =
-    result === PAYWALL_RESULT.PURCHASED || result === PAYWALL_RESULT.RESTORED
-      ? await Purchases.getCustomerInfo()
-      : null;
-  return { result, customerInfo };
 }
 
 export const presentRevenueCatCustomerCenter = (callbacks) =>

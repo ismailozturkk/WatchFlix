@@ -152,7 +152,6 @@ export default function PremiumScreen() {
     usingTestStore,
     purchasePackage,
     restorePurchases,
-    showPaywall,
     openCustomerCenter,
   } = usePremium();
 
@@ -341,27 +340,6 @@ export default function PremiumScreen() {
       Toast.show({
         type: "error",
         text1: tr ? "Abonelik ayarları açılamadı" : "Subscription settings could not be opened",
-        text2: error?.message,
-      });
-    }
-  };
-
-  const openPaywall = async () => {
-    if (busy) return;
-    try {
-      const { result } = await showPaywall({ source: "premium_screen" });
-      if (result === "PURCHASED" || result === "RESTORED") {
-        Toast.show({
-          type: "success",
-          text1: tr ? "Premium erişimin güncellendi" : "Premium access updated",
-        });
-      } else if (result === "ERROR") {
-        throw new Error("Paywall error");
-      }
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: tr ? "Ödeme ekranı açılamadı" : "Paywall could not be opened",
         text2: error?.message,
       });
     }
@@ -1245,33 +1223,8 @@ export default function PremiumScreen() {
         )}
       </View>
 
-      {/* SECONDARY ACTIONS & STORE PAYWALL FALLBACK */}
+      {/* SECONDARY ACTIONS */}
       <View style={styles.secondaryActions}>
-        <Pressable
-          disabled={busy || loading || !packages.length}
-          onPress={openPaywall}
-          style={({ pressed }) => [
-            styles.secondaryButton,
-            {
-              backgroundColor: C.card,
-              borderColor: C.border,
-              opacity: busy || loading || !packages.length ? 0.45 : pressed ? 0.78 : 1,
-            },
-          ]}
-        >
-          {busyAction === "paywall" ? (
-            <ActivityIndicator color={C.accent} size="small" />
-          ) : (
-            <>
-              <AppIcon name="shield-checkmark-outline" size={15} color={C.accent} />
-              <Text style={[styles.secondaryButtonText, { color: C.text }]}>
-                {tr ? "Alternatif Güvenli Ödeme Ekranı" : "Alternative Secure Checkout"}
-              </Text>
-              <AppIcon name="open-outline" size={14} color={C.muted} />
-            </>
-          )}
-        </Pressable>
-
         <Pressable disabled={busy} onPress={restore} style={styles.restoreBtn}>
           {busyAction === "restore" ? (
             <ActivityIndicator size="small" color={C.accent} />
@@ -2064,20 +2017,6 @@ const styles = StyleSheet.create({
   secondaryActions: {
     gap: 8,
     marginBottom: 20,
-  },
-  secondaryButton: {
-    borderRadius: 14,
-    borderWidth: 1,
-    minHeight: 46,
-    paddingHorizontal: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  secondaryButtonText: {
-    flex: 1,
-    fontSize: 11,
-    fontWeight: "700",
   },
   restoreBtn: {
     minHeight: 42,

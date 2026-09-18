@@ -74,7 +74,29 @@ describe("premium helpers", () => {
     ).toBe(PREMIUM_PLAN.UNLIMITED);
   });
 
-  test("configured product identifiers map to the correct tier", () => {
+  test("store product identifiers map to the correct tier", () => {
+    const tierOf = (identifier) => getPackageTierKey({ product: { identifier } });
+    expect(tierOf("premium_monthly")).toBe(PREMIUM_PLAN.PREMIUM);
+    expect(tierOf("premium_yearly:p1y")).toBe(PREMIUM_PLAN.PREMIUM);
+    expect(tierOf("max_monthly:p1m")).toBe(PREMIUM_PLAN.UNLIMITED);
+    expect(tierOf("max_yearly")).toBe(PREMIUM_PLAN.UNLIMITED);
+    expect(
+      getPremiumPlan({
+        entitlements: {
+          active: { "com.smlztrk.seelogd Pro": { productIdentifier: "max_monthly:p1m" } },
+        },
+      })
+    ).toBe(PREMIUM_PLAN.UNLIMITED);
+    expect(
+      getPremiumPlan({
+        entitlements: {
+          active: { "com.smlztrk.seelogd Pro": { productIdentifier: "premium_yearly" } },
+        },
+      })
+    ).toBe(PREMIUM_PLAN.PREMIUM);
+  });
+
+  test("legacy Test Store identifiers still map to the correct tier", () => {
     const premium = {
       identifier: "premium_monthly",
       product: { identifier: "monthly_2" },
@@ -143,7 +165,7 @@ describe("premium helpers", () => {
   test("test store uses launch prices while production keeps store prices", () => {
     const aPackage = {
       product: {
-        identifier: "monthly_2",
+        identifier: "premium_monthly",
         price: 1,
         priceString: "$1.00",
         currencyCode: "USD",
@@ -154,9 +176,15 @@ describe("premium helpers", () => {
       usingTestStore: true,
       language: "tr",
     });
-    expect(testProduct.price).toBe(79.99);
+    expect(testProduct.price).toBe(59.99);
     expect(testProduct.currencyCode).toBe("TRY");
-    expect(testProduct.priceString).toContain("79,99");
+    expect(testProduct.priceString).toContain("59,99");
+    expect(
+      getPackageDisplayProduct(
+        { product: { identifier: "max_monthly", price: 1, currencyCode: "USD" } },
+        { usingTestStore: true, language: "en" }
+      ).price
+    ).toBe(4.99);
     expect(
       getPackageDisplayProduct(aPackage, {
         usingTestStore: false,
@@ -234,6 +262,17 @@ describe("Play ürün kimlikleri ve ürün değişimi", () => {
         platform: "android",
       }),
     ).toEqual({ oldProductIdentifier: "monthly_2", replacementMode: "WITH_TIME_PRORATION" });
+  });
+
+  test("yeni kimliklerle Premium → Max anında, Max → Premium dönem sonunda", () => {
+    const change = (from, target) =>
+      getStoreProductChange({ customerInfo: activeOn(from), entitlementId, aPackage: target, platform: "android" });
+    expect(change("premium_monthly:p1m", pkg("max_monthly:p1m", "MONTHLY"))).toEqual({
+      oldProductIdentifier: "premium_monthly",
+      replacementMode: "WITH_TIME_PRORATION",
+    });
+    expect(change("max_yearly:p1y", pkg("premium_yearly:p1y", "ANNUAL")).replacementMode).toBe("DEFERRED");
+    expect(change("premium_monthly", pkg("premium_yearly:p1y", "ANNUAL")).replacementMode).toBe("WITH_TIME_PRORATION");
   });
 
   test("aylıktan yıllığa anında; yıllıktan aylığa ve Max'ten Premium'a dönem sonunda", () => {

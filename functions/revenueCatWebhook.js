@@ -1,5 +1,13 @@
 const PREMIUM_ENTITLEMENT_ID = "com.smlztrk.seelogd Pro";
-const UNLIMITED_PRODUCT_IDS = new Set(["monthly", "unlimited_yearly"]);
+// İstemci aynası: utils/premium.js. `monthly` ve `unlimited_yearly` Eylül 2026
+// öncesi Test Store kimlikleri (gerçek satış olmadı); test abonelikleri bitince
+// silinecek.
+const UNLIMITED_PRODUCT_IDS = new Set([
+  "max_monthly",
+  "max_yearly",
+  "monthly",
+  "unlimited_yearly",
+]);
 
 const ACTIVE_EVENT_TYPES = new Set([
   "INITIAL_PURCHASE",

@@ -228,12 +228,18 @@ satmaz; küresel pazarda TR fiyatı para bırakır).
 
 | Plan                  |              Türkiye | Global (ABD baz) | Not                                     |
 | --------------------- | -------------------: | ---------------: | --------------------------------------- |
-| Premium aylık         |               ₺79,99 |            $3.99 | 20/gün ve 300/ay CineMatch AI mesajı    |
-| Premium yıllık ⭐     |    ₺599,99 (≈₺50/ay) |           $29.99 | Aylık ödemeye göre yaklaşık %37 avantaj |
-| Premium Max aylık     |              ₺159,99 |            $7.99 | 50/gün ve 900/ay CineMatch AI mesajı    |
-| Premium Max yıllık ⭐ | ₺1.199,99 (≈₺100/ay) |           $59.99 | Aylık ödemeye göre yaklaşık %37 avantaj |
+| Premium aylık         |               ₺59,99 |            $1.99 | 20/gün ve 300/ay CineMatch AI mesajı    |
+| Premium yıllık ⭐     |    ₺449,99 (≈₺37/ay) |           $14.99 | Aylık ödemeye göre yaklaşık %37 avantaj |
+| Premium Max aylık     |              ₺149,99 |            $4.99 | 50/gün ve 900/ay CineMatch AI mesajı    |
+| Premium Max yıllık ⭐ |  ₺1.099,99 (≈₺92/ay) |           $34.99 | Aylık ödemeye göre yaklaşık %39–42 avantaj |
 
-- Mağaza komisyonu: iki mağazada da küçük işletme programıyla **%15** → net ~%85.
+_19 Eylül 2026'da ₺79,99/$3.99 tabanından indirildi. Max 2,5 kat: 2 katta
+(₺119,99) kotasını dolduran Max kullanıcısının AI maliyeti TR net gelirini
+aşıyordu. Hesap: `docs/kurulum/REVENUECAT_KURULUM.md` §3._
+
+- Mağaza komisyonu: Play abonelikte %10 hizmet + ödeme işlem ücreti (ABD/İngiltere/AB'de
+  %5, TR henüz açıklanmadı); Apple Small Business Program ile %15 (başvurulmazsa
+  ilk yıl %30) → net ~%85. TR fiyatlarında ayrıca %20 KDV içeride.
 - İlk fiyat testi bu dört mağaza fiyatıyla başlatılır; kampanya/deneme uygulanacaksa
   mağaza promosyonu olarak ayrıca tanımlanır ve arayüz yalnız gerçek oranı gösterir.
 - Fiyatları Faz 1'de RevenueCat üzerinden kur ki sonradan A/B test edebilesin.

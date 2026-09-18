@@ -14,7 +14,7 @@ const currentLanguage = () =>
 
 /**
  * PremiumScreen'i açar. `source` hangi kapının ödeme ekranına getirdiğini
- * analytics'e taşır (bkz. revenueCatService.presentRevenueCatPaywall).
+ * analytics'e taşır (PremiumScreen PAYWALL_VIEW olayına yazar).
  */
 export function openPremiumScreen(source = "unknown") {
   return navigateRoot("PremiumScreen", { source });

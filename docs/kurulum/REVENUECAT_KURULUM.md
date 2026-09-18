@@ -32,14 +32,21 @@ yazılmaz.
 
 ## 2. RevenueCat ürün kataloğu
 
-RevenueCat > Product catalog altında Test Store için bu dört ürünü oluştur:
+Ürün kimlikleri 19 Eylül 2026'da yeniden kuruldu; Play, App Store ve Test
+Store'da AYNI kimlikler kullanılır. Mağaza kimliği bir kez oluşturulunca
+değişmez ve silinse de yeniden kullanılamaz; plan kimlikten okunduğu için adı
+planı söyler:
 
-| Gösterim           | Product ID         | Süre  | Uygulama seviyesi |
-| ------------------ | ------------------ | ----- | ----------------- |
-| Premium            | `monthly_2`        | 1 ay  | Premium           |
-| Premium Yıllık     | `yearly`           | 1 yıl | Premium           |
-| Premium Max        | `monthly`          | 1 ay  | Premium Max       |
-| Premium Max Yıllık | `unlimited_yearly` | 1 yıl | Premium Max       |
+| Gösterim           | Product ID        | Play base plan | Süre  | Uygulama seviyesi |
+| ------------------ | ----------------- | -------------- | ----- | ----------------- |
+| Premium            | `premium_monthly` | `p1m`          | 1 ay  | Premium           |
+| Premium Yıllık     | `premium_yearly`  | `p1y`          | 1 yıl | Premium           |
+| Premium Max        | `max_monthly`     | `p1m`          | 1 ay  | Premium Max       |
+| Premium Max Yıllık | `max_yearly`      | `p1y`          | 1 yıl | Premium Max       |
+
+Play'de her ürün ayrı bir abonelik, içinde tek base plan; RevenueCat Play
+kimliğini `premium_monthly:p1m` olarak verir, kod `:` sonrasını atar
+(`baseProductIdentifier`).
 
 Tek entitlement oluştur:
 
@@ -48,23 +55,36 @@ com.smlztrk.seelogd Pro
 ```
 
 Dört ürünün tamamını bu entitlement'a bağla. Uygulama aktif entitlement'ın
-`productIdentifier` alanını okuyarak `monthly` ve `unlimited_yearly` ürünlerini
-kullanıcıya Premium Max olarak gösterir; teknik planda bunlar geriye dönük
-uyumluluk için `unlimited` anahtarına eşlenir. `monthly_2` ve `yearly` ürünleri
-Premium olarak sınıflandırılır.
+`productIdentifier` alanını okuyarak `max_*` ürünlerini Premium Max
+(teknik planda `unlimited`), `premium_*` ürünlerini Premium sayar
+(`utils/premium.js`, sunucu aynası `functions/revenueCatWebhook.js`).
+
+**Eski kimlikler:** `monthly_2`, `yearly` (Premium), `monthly`,
+`unlimited_yearly` (Max) Eylül 2026'ya kadar yalnız Test Store'da vardı, gerçek
+satış olmadı. Kod test abonelikleri bitene kadar bunları da tanır; sonra iki
+yerdeki `LEGACY`/eski kimlik listeleri silinir.
 
 `default` adında bir Offering oluştur, Current olarak işaretle ve dört custom
-package ekle:
+package ekle (paket kimliği = ürün kimliği):
 
-- `premium_monthly` -> `monthly_2`
-- `premium_yearly` -> `yearly`
-- `unlimited_monthly` -> `monthly`
-- `unlimited_yearly` -> `unlimited_yearly`
+- `premium_monthly` -> `premium_monthly`
+- `premium_yearly` -> `premium_yearly`
+- `max_monthly` -> `max_monthly`
+- `max_yearly` -> `max_yearly`
 
-RevenueCat Paywalls editöründe `default` offering için dört paketi içeren bir
-paywall oluşturup Publish et. Uygulamadaki “RevenueCat ödeme ekranını aç”
-butonu bu uzaktan yönetilen paywall'ı gösterir; tasarım ve metin güncellemeleri
-uygulama sürümü çıkarmadan yapılabilir.
+Offering'i yeni ürünlere ancak yeni kimlikleri tanıyan uygulama sürümü ve
+webhook yayındayken çevir: eski sürüm `max_monthly`'yi tanımaz ve Max alana
+Premium verir.
+
+RevenueCat Paywalls editöründe paywall KURULMAZ: tek ödeme ekranı uygulamanın
+kendi `PremiumScreen`'idir ve metnini `utils/premiumFeatures.js`'ten üretir.
+Eskiden PremiumScreen'deki “Alternatif Güvenli Ödeme Ekranı” butonu
+RevenueCatUI paywall'ını açıyordu; 18 Eylül 2026'da kaldırıldı. Panelde paywall
+yayında değildi (RevenueCat'in özelliksiz varsayılan ekranı görünüyordu), buton
+paketler yüklenemeyince zaten devre dışıydı ve panelde ikinci bir vaat metni
+tutmak P0.2'deki ayrışmayı geri getirirdi. RevenueCat Paywalls/A-B testi
+ileride istenirse metin registry'den elle aktarılır ve Android'de ürün
+değişiminin tek abonelikle kaldığı ayrıca test edilir.
 
 ## 3. Gerçek mağazalar
 
@@ -74,17 +94,22 @@ uygulama sürümü çıkarmadan yapılabilir.
 - Ürünleri RevenueCat'e import edip Test Store ürünleriyle aynı offering/package
   düzenine bağla.
 
-Önerilen lansman fiyatları (22 Temmuz 2026 araştırması):
+Lansman fiyatları (19 Eylül 2026 kararı; önceki 22 Temmuz tablosu ₺79,99 /
+$3.99 tabanlıydı):
 
-| Ürün                                  |   Türkiye | Global (ABD taban) |
-| ------------------------------------- | --------: | -----------------: |
-| Premium aylık (`monthly_2`)           |    ₺79,99 |              $3.99 |
-| Premium yıllık (`yearly`)             |   ₺599,99 |             $29.99 |
-| Premium Max aylık (`monthly`)           |   ₺159,99 |              $7.99 |
-| Premium Max yıllık (`unlimited_yearly`) | ₺1.199,99 |             $59.99 |
+| Ürün                                |    Türkiye | Global (ABD taban) |
+| ----------------------------------- | ---------: | -----------------: |
+| Premium aylık (`premium_monthly`)   |     ₺59,99 |              $1.99 |
+| Premium yıllık (`premium_yearly`)   |    ₺449,99 |             $14.99 |
+| Premium Max aylık (`max_monthly`)   |    ₺149,99 |              $4.99 |
+| Premium Max yıllık (`max_yearly`)   |  ₺1.099,99 |             $34.99 |
 
-Bu yapı her iki yıllık planda da 12 aylık ödemeye göre yaklaşık `%37` gerçek
-avantaj sağlar. Fiyatları Google Play Console ve App Store Connect'te bu şekilde
+Max, Premium'un 2,5 katı: TR'de ₺119,99'da (2 kat) net gelir ~₺85 kalırken
+aylık 900 mesaj kotasını uzun sohbetlerle dolduran Max kullanıcısının Gemini
+maliyeti ~₺88'e çıkıyordu (mesaj başı ölçülen ~$0,0007, yoğun ~$0,002; kur
+48,8). Mağazaya fiyatı USD taban + Türkiye elle girilerek tanımla.
+
+Yıllık planlar 12 aylık ödemeye göre yaklaşık `%37–42` avantaj sağlar. Fiyatları Google Play Console ve App Store Connect'te bu şekilde
 tanımla; sonra ürünleri RevenueCat'e yeniden içe aktar/senkronize et. Uygulama
 fiyatı sabitlemez, mağazadan gelen yerelleştirilmiş `priceString` değerini
 gösterir. İndirim oranı ve üzeri çizili referans fiyat da aynı plandaki gerçek
@@ -147,7 +172,8 @@ Premium Max'te 50/gün ve 900/aydır.
 - `getCustomerInfo()` ve `getOfferings()` birlikte yüklenir.
 - CustomerInfo listener satın alma/restore/yenileme değişikliklerini anında
   context'e taşır.
-- Manuel package satın alma ve RevenueCat Paywall birlikte desteklenir.
+- Satın alma yalnız `PremiumScreen` üzerinden, manuel package satın alma ile
+  yapılır (RevenueCatUI yalnız Customer Center için kullanılır).
 - **Android plan değişimi:** aktif bir Play aboneliği varken başka ürün
   alınırsa satın alma `productChangeInfo` ile ÜRÜN DEĞİŞİMİ olarak gönderilir
   (`utils/premium.js` → `getStoreProductChange`). Aksi halde Google Play
@@ -202,8 +228,8 @@ Kurallar:
 - Limitler değişecekse: `utils/premiumFeatures.js` + sunucu aynası
   (`functions/aiQuota.js`, `functions/planCapabilities.js`) birlikte;
   `__tests__/premiumFeatures.test.js` ayrışmayı yakalar. Ardından
-  `store/play/*/full-description.txt`, `website/terms.html` ve RevenueCat
-  panelindeki paywall metnini güncelle.
+  `store/play/*/full-description.txt` ve `website/terms.html`'i güncelle
+  (RevenueCat panelinde paywall yok, bkz. §2).
 - Analytics: kapıya takılma `premium_gate_hit` (`feature`, `plan`), ödeme
   ekranı görüntüleme `paywall_view` (`source` = kapının özellik kimliği).
 
@@ -211,7 +237,7 @@ Kurallar:
 
 - Expo Go yerine yeni bir development build/APK kullan.
 - Test Store'da başarı, kullanıcı iptali ve hata sonuçlarını ayrı dene.
-- `monthly_2`, `yearly`, `monthly` ve `unlimited_yearly` ürünlerinin doğru planı
+- `premium_monthly`, `premium_yearly`, `max_monthly` ve `max_yearly` ürünlerinin doğru planı
   açtığını doğrula.
 - Purchase, restore, Premium -> Premium Max geçişi, expiration ve hesap değiştirme
   akışlarını test et.

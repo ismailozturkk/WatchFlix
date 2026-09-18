@@ -140,6 +140,27 @@ describe("RevenueCat webhook helpers", () => {
     });
   });
 
+  test("store product identifiers are classified by plan", () => {
+    const planOf = (productId) =>
+      parseRevenueCatPremiumState(
+        {
+          subscriber: {
+            entitlements: {
+              "com.smlztrk.seelogd Pro": {
+                product_identifier: productId,
+                expires_date: "2030-01-01T00:00:00Z",
+              },
+            },
+          },
+        },
+        Date.parse("2029-01-01T00:00:00Z")
+      ).premiumPlan;
+    expect(planOf("max_monthly")).toBe("unlimited");
+    expect(planOf("max_yearly:p1y")).toBe("unlimited");
+    expect(planOf("premium_monthly")).toBe("premium");
+    expect(planOf("premium_yearly:p1y")).toBe("premium");
+  });
+
   test("Unlimited yearly customer info is classified as Unlimited", () => {
     expect(
       parseRevenueCatPremiumState(
