@@ -27,8 +27,10 @@ import { alpha } from "../../theme/colors";
 import {
   getPackagesForTier,
   getPackageDisplayProduct,
+  getPackageIntroOffer,
   getPackageMonthlyEquivalent,
   getPackagePeriodKey,
+  getPackageRegularPrice,
   getPackageSavings,
   getPackageTierKey,
   getPremiumPlanDisplayName,
@@ -116,6 +118,9 @@ function buildHighlights(tier, tr) {
   ];
 }
 
+// Mağazada tanımlı giriş teklifinin (lansman indirimi) vurgusu.
+const OFFER_COLOR = "#EC4899";
+
 function packageTitle(aPackage, tr) {
   const key = getPackagePeriodKey(aPackage);
   if (key === "annual") return tr ? "Yıllık Plan" : "Annual Plan";
@@ -133,6 +138,52 @@ function packagePeriodLabel(aPackage, tr) {
   return "";
 }
 
+function packageRenewalNote(aPackage, tr) {
+  const key = getPackagePeriodKey(aPackage);
+  if (key === "annual") return tr ? "Yıllık tek faturalandırma" : "Billed annually";
+  if (key === "monthly") {
+    return tr ? "Aylık yenilenir, dilediğinde iptal" : "Renews monthly, cancel anytime";
+  }
+  return tr ? "Dilediğinde iptal" : "Cancel anytime";
+}
+
+// Giriş teklifinin süresi: "İlk 3 ay", "İlk yıl" (faz birimi × tekrar sayısı).
+function offerDurationLabel(offer, tr) {
+  const count = (offer.cycles || 1) * (offer.unitCount || 1);
+  const one = count === 1;
+  const units = {
+    day: tr ? "gün" : one ? "day" : "days",
+    week: tr ? "hafta" : one ? "week" : "weeks",
+    month: tr ? "ay" : one ? "month" : "months",
+    year: tr ? "yıl" : one ? "year" : "years",
+  };
+  const unit = units[offer.unit];
+  if (!unit) return tr ? "İlk dönem" : "Intro period";
+  if (one) return tr ? `İlk ${unit}` : `First ${unit}`;
+  return tr ? `İlk ${count} ${unit}` : `First ${count} ${unit}`;
+}
+
+// Teklif fazının fatura aralığı ("/ ay"); faz birden uzun birimse boş.
+function offerPeriodLabel(offer, tr) {
+  if ((offer.unitCount || 1) !== 1) return "";
+  if (offer.unit === "year") return tr ? "/ yıl" : "/ year";
+  if (offer.unit === "month") return tr ? "/ ay" : "/ month";
+  if (offer.unit === "week") return tr ? "/ hafta" : "/ week";
+  return "";
+}
+
+// Mağaza kuralı: teklif fiyatının yanında sonrasında ödenecek tutar açıkça
+// yazmalı. "İlk 3 ay ₺29,99/ay, sonra ₺59,99/ay".
+function offerDisclosure(offer, aPackage, tr) {
+  const duration = offerDurationLabel(offer, tr);
+  const after = `${offer.regularPriceString}${packagePeriodLabel(aPackage, tr).replace(" ", "")}`;
+  if (offer.free) {
+    return tr ? `${duration} ücretsiz, sonra ${after}` : `${duration} free, then ${after}`;
+  }
+  const intro = `${offer.priceString}${offerPeriodLabel(offer, tr).replace(" ", "")}`;
+  return tr ? `${duration} ${intro}, sonra ${after}` : `${duration} ${intro}, then ${after}`;
+}
+
 export default function PremiumScreen() {
   const { language } = useLanguage();
   const { theme } = useTheme();
@@ -145,6 +196,7 @@ export default function PremiumScreen() {
     isUnlimited,
     plan,
     packages,
+    introEligibleIds,
     loading,
     busyAction,
     configurationError,
@@ -263,6 +315,11 @@ export default function PremiumScreen() {
   const selectedDisplayPackage =
     pricedPackages.find((item) => item.identifier === selectedId) || null;
   const selectedTierPackages = getPackagesForTier(pricedPackages, selectedTier);
+  const introOfferFor = (aPackage) =>
+    getPackageIntroOffer(aPackage, {
+      iosIntroEligible: (introEligibleIds || []).includes(aPackage?.product?.identifier),
+    });
+  const selectedOffer = selectedDisplayPackage ? introOfferFor(selectedDisplayPackage) : null;
   const busy = Boolean(busyAction);
   const selectedPlanName = getPremiumPlanDisplayName(selectedTier);
   const selectedIdentityBadge =
@@ -661,6 +718,8 @@ export default function PremiumScreen() {
               const isAnnual = getPackagePeriodKey(aPackage) === "annual";
               const savings = getPackageSavings(aPackage, pricedPackages, language);
               const monthlyEquivalent = getPackageMonthlyEquivalent(aPackage, language);
+              const regular = getPackageRegularPrice(aPackage);
+              const offer = introOfferFor(aPackage);
               const cardBorderColor = isSelected
                 ? isAnnual
                   ? "#F59E0B"
@@ -747,30 +806,75 @@ export default function PremiumScreen() {
                         {packageTitle(aPackage, tr)}
                       </Text>
                       <Text style={[styles.pricingPeriodSub, { color: C.muted }]}>
-                        {isAnnual
-                          ? tr ? "Yıllık tek faturalandırma" : "Billed annually"
-                          : tr ? "Aylık yenilenir, dilediğinde iptal" : "Renews monthly, cancel anytime"}
+                        {packageRenewalNote(aPackage, tr)}
                       </Text>
                     </View>
 
                     <View style={styles.pricingNumbersWrap}>
-                      {savings && (
-                        <View style={[styles.savingsPill, { backgroundColor: C.iconGreen }]}>
-                          <Text style={[styles.savingsText, { color: C.green }]}>
-                            {tr ? `%${savings.percent} TASARRUF` : `SAVE ${savings.percent}%`}
+                      <View style={styles.pillRow}>
+                        {offer && (
+                          <View style={[styles.savingsPill, { backgroundColor: alpha(OFFER_COLOR, 0.16) }]}>
+                            <Text style={[styles.savingsText, { color: OFFER_COLOR }]}>
+                              {offer.free
+                                ? tr ? "ÜCRETSİZ DENEME" : "FREE TRIAL"
+                                : tr ? `%${offer.percent} İNDİRİM` : `${offer.percent}% OFF`}
+                            </Text>
+                          </View>
+                        )}
+                        {savings && (
+                          <View style={[styles.savingsPill, { backgroundColor: C.iconGreen }]}>
+                            <Text style={[styles.savingsText, { color: C.green }]}>
+                              {tr ? `%${savings.percent} TASARRUF` : `SAVE ${savings.percent}%`}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      {offer ? (
+                        <>
+                          <Text
+                            fontRole="numeric"
+                            style={[styles.strikePrice, { color: C.muted }]}
+                          >
+                            {regular.priceString}
+                          </Text>
+                          <View style={styles.priceRow}>
+                            <Text fontRole="numeric" style={[styles.priceString, { color: C.text }]}>
+                              {offer.free ? (tr ? "Ücretsiz" : "Free") : offer.priceString}
+                            </Text>
+                            <Text style={[styles.pricePeriod, { color: C.muted }]}>
+                              {offer.free ? "" : offerPeriodLabel(offer, tr)}
+                            </Text>
+                          </View>
+                        </>
+                      ) : (
+                        <View style={styles.priceRow}>
+                          <Text fontRole="numeric" style={[styles.priceString, { color: C.text }]}>
+                            {regular.priceString}
+                          </Text>
+                          <Text style={[styles.pricePeriod, { color: C.muted }]}>
+                            {packagePeriodLabel(aPackage, tr)}
                           </Text>
                         </View>
                       )}
-                      <View style={styles.priceRow}>
-                        <Text fontRole="numeric" style={[styles.priceString, { color: C.text }]}>
-                          {aPackage.product?.priceString}
-                        </Text>
-                        <Text style={[styles.pricePeriod, { color: C.muted }]}>
-                          {packagePeriodLabel(aPackage, tr)}
-                        </Text>
-                      </View>
                     </View>
                   </View>
+
+                  {offer && (
+                    <View
+                      style={[
+                        styles.offerCallout,
+                        {
+                          backgroundColor: alpha(OFFER_COLOR, 0.08),
+                          borderColor: alpha(OFFER_COLOR, 0.22),
+                        },
+                      ]}
+                    >
+                      <AppIcon name="pricetag-outline" size={13} color={OFFER_COLOR} />
+                      <Text style={[styles.monthlyEquivalentText, { color: C.text, flex: 1 }]}>
+                        {offerDisclosure(offer, aPackage, tr)}
+                      </Text>
+                    </View>
+                  )}
 
                   {isAnnual && monthlyEquivalent && (
                     <View style={[styles.monthlyEquivalentCallout, { backgroundColor: alpha(C.accent, 0.08), borderColor: alpha(C.accent, 0.16) }]}>
@@ -872,8 +976,9 @@ export default function PremiumScreen() {
                   </Text>
                   {selectedTier !== plan && selectedDisplayPackage && (
                     <Text style={styles.ctaSubText}>
-                      {selectedDisplayPackage.product?.priceString}{" "}
-                      {packagePeriodLabel(selectedDisplayPackage, tr)}
+                      {selectedOffer
+                        ? offerDisclosure(selectedOffer, selectedDisplayPackage, tr)
+                        : `${getPackageRegularPrice(selectedDisplayPackage).priceString} ${packagePeriodLabel(selectedDisplayPackage, tr)}`}
                       {tr ? " · İstediğin an iptal et" : " · Cancel anytime"}
                     </Text>
                   )}
@@ -1582,6 +1687,25 @@ const styles = StyleSheet.create({
   pricingNumbersWrap: {
     alignItems: "flex-end",
     gap: 3,
+  },
+  pillRow: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  strikePrice: {
+    fontSize: 11,
+    fontWeight: "700",
+    textDecorationLine: "line-through",
+  },
+  offerCallout: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    marginTop: 10,
   },
   savingsPill: {
     borderRadius: 6,

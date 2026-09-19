@@ -40,12 +40,19 @@ planı söyler:
 | Gösterim           | Product ID        | Play base plan | Süre  | Uygulama seviyesi |
 | ------------------ | ----------------- | -------------- | ----- | ----------------- |
 | Premium            | `premium_monthly` | `p1m`          | 1 ay  | Premium           |
-| Premium Yıllık     | `premium_yearly`  | `p1y`          | 1 yıl | Premium           |
+| Premium Yıllık     | `premium_yearly`  | `p1y-v2`       | 1 yıl | Premium           |
 | Premium Max        | `max_monthly`     | `p1m`          | 1 ay  | Premium Max       |
-| Premium Max Yıllık | `max_yearly`      | `p1y`          | 1 yıl | Premium Max       |
+| Premium Max Yıllık | `max_yearly`      | `p1y-v2`       | 1 yıl | Premium Max       |
+
+**`p1y-v2` neden:** 19 Eylül 2026'da iki yıllık ürünün ilk base plan'ı (`p1y`)
+Play'de yanlışlıkla **aylık** kurulmuştu (yıllık fiyat her ay kesilecekti).
+Aktif base plan'ın süresi değişmiyor ve kimlik yeniden kullanılamıyor; `p1y`
+deaktif edildi, yerine 1 yıllık `p1y-v2` açıldı. Kod base plan kimliğine
+bakmaz (`baseProductIdentifier`); süreyi mağazadan okur (`getPackagePeriodKey`,
+RevenueCat paket türünden ÖNCE) — yanlış süre artık ekranda görünür.
 
 Play'de her ürün ayrı bir abonelik, içinde tek base plan; RevenueCat Play
-kimliğini `premium_monthly:p1m` olarak verir, kod `:` sonrasını atar
+kimliğini `premium_monthly:p1m` / `max_yearly:p1y-v2` olarak verir, kod `:` sonrasını atar
 (`baseProductIdentifier`).
 
 Tek entitlement oluştur:
@@ -64,13 +71,16 @@ Dört ürünün tamamını bu entitlement'a bağla. Uygulama aktif entitlement'�
 satış olmadı. Kod test abonelikleri bitene kadar bunları da tanır; sonra iki
 yerdeki `LEGACY`/eski kimlik listeleri silinir.
 
-`default` adında bir Offering oluştur, Current olarak işaretle ve dört custom
-package ekle (paket kimliği = ürün kimliği):
+`default` offering (Current) paketleri — paket kimlikleri eski düzenden
+kaldı; kod paket kimliğine ve RevenueCat'in `offering.monthly/annual`
+kısayollarına BAKMAZ, planı ürün kimliğinden, süreyi mağazadan okur:
 
-- `premium_monthly` -> `premium_monthly`
-- `premium_yearly` -> `premium_yearly`
-- `max_monthly` -> `max_monthly`
-- `max_yearly` -> `max_yearly`
+| Paket (panel adı)                   | Play ürünü              |
+| ----------------------------------- | ----------------------- |
+| Premium Monthly (`custom_monthly_2`) | `premium_monthly:p1m`  |
+| Premium Yearly (`$rc_annual`)       | `premium_yearly:p1y-v2` |
+| Unlimited Monthly (`$rc_monthly`)   | `max_monthly:p1m`       |
+| Unlimited Yearly (`unlimited_yearly`) | `max_yearly:p1y-v2`   |
 
 Offering'i yeni ürünlere ancak yeni kimlikleri tanıyan uygulama sürümü ve
 webhook yayındayken çevir: eski sürüm `max_monthly`'yi tanımaz ve Max alana
@@ -183,6 +193,16 @@ Premium Max'te 50/gün ve 900/aydır.
   olmalı; o zaman değişimi App Store kendisi yönetir.
 - Kullanıcının iptali hemen erişimi kapatmaz; entitlement aktif olduğu sürece
   erişim devam eder.
+- **Aynı mağaza hesabı, birden çok Seelogd hesabı:** Project settings →
+  "Transferring purchases seen on multiple App User IDs" = **Transfer to new
+  App User ID** (19 Eylül 2026 kararı). Abonelik o cihazda en son giriş yapan
+  hesaba geçer; önceki hesap Free'ye düşer (webhook TRANSFER olayında iki
+  `Users` belgesini de yazar). Neden: hesabını silip yeniden açan ya da
+  Google/e-posta girişini karıştırıp ikinci hesap açan kullanıcı ödediği
+  aboneliği kaybetmesin; "Keep with original" seçilirse ikinci hesap ne
+  alabilir ne geri yükleyebilir (Play "zaten sahipsiniz" der). Suistimal sınırlı:
+  aynı anda tek hesap aktif, aynı mağaza hesabı gerekir. Cihaz testinde A
+  hesabıyla alıp B'ye geçince A'nın Free görünmesi bu yüzden BEKLENEN davranış.
 - **Etkin plan** RevenueCat planı ile sunucu planının yükseğidir. RevenueCat
   cevabı beklenirken son bilinen plan (`services/premiumState.js`, diskte)
   kullanılır; premium kullanıcı açılışta bir anlığına kilit ya da varsayılan

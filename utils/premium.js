@@ -192,26 +192,35 @@ export function selectPreferredPackage(packages = []) {
   if (!Array.isArray(packages) || packages.length === 0) return null;
 
   return (
-    packages.find((item) => item?.packageType === "ANNUAL") ||
+    packages.find((item) => getPackagePeriodKey(item) === "annual") ||
     packages.find((item) =>
       /annual|year|yillik|yıllık/i.test(item?.identifier || "")
     ) ||
-    packages.find((item) => item?.packageType === "MONTHLY") ||
+    packages.find((item) => getPackagePeriodKey(item) === "monthly") ||
     packages[0]
   );
 }
 
+/**
+ * Paketin fatura dönemi. Mağazanın bildirdiği süre (subscriptionPeriod) ESAS:
+ * RevenueCat paket türü panelde elle seçilir ve ürünle çelişebilir, fatura ise
+ * mağazadaki base plan süresine göre kesilir. (19 Eylül 2026: Play'de
+ * `max_yearly` base plan'ı yanlışlıkla aylık kurulmuştu; `$rc_annual` gibi bir
+ * paket türü bunu "Yıllık" diye gösterip gizleyebilirdi.) Paket türü yalnız
+ * mağaza süre vermezse (ör. Test Store) kullanılır.
+ */
 export function getPackagePeriodKey(aPackage) {
+  const period = aPackage?.product?.subscriptionPeriod || "";
+  if (/^P(1Y|12M)$/i.test(period)) return "annual";
+  if (/^P1M$/i.test(period)) return "monthly";
+  if (/^P(1W|7D)$/i.test(period)) return "weekly";
+  if (period) return "other";
+
   const type = aPackage?.packageType;
   if (type === "ANNUAL") return "annual";
   if (type === "MONTHLY") return "monthly";
   if (type === "WEEKLY") return "weekly";
   if (type === "LIFETIME") return "lifetime";
-
-  const period = aPackage?.product?.subscriptionPeriod || "";
-  if (/P1Y/i.test(period)) return "annual";
-  if (/P1M/i.test(period)) return "monthly";
-  if (/P1W/i.test(period)) return "weekly";
   return "other";
 }
 
@@ -229,10 +238,109 @@ export function formatStorePrice(price, currency, language) {
   }
 }
 
+const MICROS_PER_UNIT = 1000000;
+
+const PERIOD_UNIT_KEYS = Object.freeze({
+  DAY: "day",
+  WEEK: "week",
+  MONTH: "month",
+  YEAR: "year",
+});
+
+function pricingPhasePrice(phase) {
+  const micros = Number(phase?.price?.amountMicros);
+  if (!Number.isFinite(micros) || micros < 0) return null;
+  return {
+    price: micros / MICROS_PER_UNIT,
+    priceString: phase.price.formatted,
+    currencyCode: phase.price.currencyCode,
+  };
+}
+
+/**
+ * Paketin teklifsiz (normal) fiyatı. Play'de `product.price` varsayılan
+ * seçeneğin — teklif varsa teklifin — fiyatı olabilir; normal fiyat o
+ * seçeneğin son (tam fiyat) fazındadır. Tasarruf ve "aya denk gelir"
+ * hesapları teklife değil normal fiyata dayanmalı.
+ */
+export function getPackageRegularPrice(aPackage) {
+  const product = aPackage?.product || {};
+  const full = pricingPhasePrice(product.defaultOption?.fullPricePhase);
+  if (full) return full;
+  return {
+    price: Number(product.price),
+    priceString: product.priceString,
+    currencyCode: product.currencyCode,
+  };
+}
+
+/**
+ * Kullanıcının yararlanabileceği giriş teklifi (lansman indirimi / deneme).
+ *
+ * Play: `defaultOption` base plan değil bir teklifse onun ücretsiz ya da
+ * indirimli ilk fazı. Play yalnız kullanıcının uygun olduğu teklifleri
+ * döndürür ve RevenueCat satın almada `defaultOption`'ı kullanır; yani burada
+ * görünen teklif, tahsil edilecek olanın ta kendisi.
+ * App Store: `introPrice`; uygunluğu mağaza söylemez, ayrıca sorulur
+ * (`iosIntroEligible`). Uygun olmayana teklif göstermek yanıltıcıdır.
+ *
+ * Sahte indirim üretmez: teklif fiyatı normal fiyattan düşük değilse null.
+ */
+export function getPackageIntroOffer(aPackage, { iosIntroEligible = false } = {}) {
+  const product = aPackage?.product;
+  if (!product) return null;
+
+  let offer = null;
+  const option = product.defaultOption;
+  if (option && !option.isBasePlan) {
+    const phase = option.freePhase || option.introPhase;
+    const phasePrice = pricingPhasePrice(phase);
+    if (phasePrice) {
+      offer = {
+        ...phasePrice,
+        cycles: phase.billingCycleCount || 1,
+        unit: PERIOD_UNIT_KEYS[phase.billingPeriod?.unit] || null,
+        unitCount: phase.billingPeriod?.value || 1,
+      };
+    }
+  } else if (!option && product.introPrice && iosIntroEligible) {
+    const intro = product.introPrice;
+    offer = {
+      price: Number(intro.price),
+      priceString: intro.priceString,
+      currencyCode: product.currencyCode,
+      cycles: intro.cycles || 1,
+      unit: PERIOD_UNIT_KEYS[intro.periodUnit] || null,
+      unitCount: intro.periodNumberOfUnits || 1,
+    };
+  }
+  if (!offer) return null;
+
+  const regular = getPackageRegularPrice(aPackage);
+  if (
+    !Number.isFinite(offer.price) ||
+    !Number.isFinite(regular.price) ||
+    regular.price <= 0 ||
+    offer.price >= regular.price ||
+    (offer.currencyCode && regular.currencyCode && offer.currencyCode !== regular.currencyCode)
+  ) {
+    return null;
+  }
+
+  return {
+    ...offer,
+    free: offer.price === 0,
+    percent: Math.round((1 - offer.price / regular.price) * 100),
+    regularPrice: regular.price,
+    regularPriceString: regular.priceString,
+  };
+}
+
 export function getPackageMonthlyEquivalent(aPackage, language = "en") {
   if (getPackagePeriodKey(aPackage) !== "annual") return null;
-  const annualPrice = Number(aPackage?.product?.price);
-  const currency = aPackage?.product?.currencyCode;
+  const regular = getPackageRegularPrice(aPackage);
+  const annualPrice = regular.price;
+  const currency = regular.currencyCode;
   if (!Number.isFinite(annualPrice) || annualPrice <= 0 || !currency) return null;
   const monthly = annualPrice / 12;
   return formatStorePrice(monthly, currency, language);
@@ -279,10 +387,12 @@ export function getPackageSavings(aPackage, allPackages = [], language = "en") {
       getPackageTierKey(item) === tier &&
       getPackagePeriodKey(item) === "monthly"
   );
-  const annualPrice = Number(aPackage?.product?.price);
-  const monthlyPrice = Number(monthlyPackage?.product?.price);
-  const currency = aPackage?.product?.currencyCode;
-  const sameCurrency = currency === monthlyPackage?.product?.currencyCode;
+  const annual = getPackageRegularPrice(aPackage);
+  const monthly = getPackageRegularPrice(monthlyPackage);
+  const annualPrice = annual.price;
+  const monthlyPrice = monthly.price;
+  const currency = annual.currencyCode;
+  const sameCurrency = Boolean(monthlyPackage) && currency === monthly.currencyCode;
   const monthlyTotal = monthlyPrice * 12;
 
   if (

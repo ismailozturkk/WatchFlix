@@ -2,7 +2,9 @@ import {
   AI_PLAN_LIMITS,
   getPackagesForTier,
   getPackageDisplayProduct,
+  getPackageIntroOffer,
   getPackageMonthlyEquivalent,
+  getPackageRegularPrice,
   getPackagePeriodKey,
   getPackageSavings,
   getPackageTierKey,
@@ -123,6 +125,23 @@ describe("premium helpers", () => {
     expect(selectPreferredPackage([monthly, annual])).toBe(annual);
   });
 
+  test("store period wins over a contradicting RevenueCat package type", () => {
+    // Panelde "annual" paket, mağazada aylık base plan: fatura aylık kesilir.
+    const mislabeled = {
+      identifier: "$rc_annual",
+      packageType: "ANNUAL",
+      product: { identifier: "max_yearly:p1y", subscriptionPeriod: "P1M" },
+    };
+    expect(getPackagePeriodKey(mislabeled)).toBe("monthly");
+    const realAnnual = {
+      identifier: "unlimited_yearly",
+      packageType: "CUSTOM",
+      product: { identifier: "max_yearly:yearly", subscriptionPeriod: "P1Y" },
+    };
+    expect(getPackagePeriodKey(realAnnual)).toBe("annual");
+    expect(selectPreferredPackage([mislabeled, realAnnual])).toBe(realAnnual);
+  });
+
   test("subscription period is used as a package fallback", () => {
     expect(
       getPackagePeriodKey({ product: { subscriptionPeriod: "P1Y" } })
@@ -205,6 +224,93 @@ describe("premium helpers", () => {
     const monthlyEquivalent = getPackageMonthlyEquivalent(annual, "tr");
     expect(monthlyEquivalent).toContain("50");
     expect(getPackageMonthlyEquivalent(monthly, "tr")).toBeNull();
+  });
+});
+
+// Lansman teklifi: Play'de defaultOption bir teklifse (base plan değilse) ilk
+// fazı; App Store'da introPrice yalnız uygunluk doğrulanınca. Sahte indirim yok.
+describe("giriş teklifi (lansman indirimi)", () => {
+  const phase = (amount, unit, cycles, value = 1) => ({
+    billingPeriod: { unit, value, iso8601: `P${value}${unit[0]}` },
+    billingCycleCount: cycles,
+    price: {
+      amountMicros: Math.round(amount * 1000000),
+      formatted: `₺${amount.toFixed(2).replace(".", ",")}`,
+      currencyCode: "TRY",
+    },
+  });
+  const playPackage = ({ offer = true, full = 59.99, intro = 29.99, unit = "MONTH", cycles = 3 } = {}) => {
+    const fullPricePhase = phase(full, unit, null);
+    const introPhase = phase(intro, unit, cycles);
+    return {
+      packageType: unit === "YEAR" ? "ANNUAL" : "MONTHLY",
+      product: {
+        identifier: "premium_monthly:p1m",
+        // Play'de product.price varsayılan seçeneğin (teklifin) fiyatı olabilir.
+        price: offer ? intro : full,
+        priceString: offer ? introPhase.price.formatted : fullPricePhase.price.formatted,
+        currencyCode: "TRY",
+        defaultOption: offer
+          ? { isBasePlan: false, introPhase, freePhase: null, fullPricePhase }
+          : { isBasePlan: true, introPhase: fullPricePhase, freePhase: null, fullPricePhase },
+      },
+    };
+  };
+
+  test("Play teklifi: ilk 3 ay %50, normal fiyat tam fiyat fazından", () => {
+    const offer = getPackageIntroOffer(playPackage());
+    expect(offer).toMatchObject({ price: 29.99, cycles: 3, unit: "month", percent: 50, free: false });
+    expect(offer.regularPriceString).toBe("₺59,99");
+    expect(getPackageRegularPrice(playPackage()).price).toBe(59.99);
+  });
+
+  test("Play yıllık teklif: ilk yıl %20", () => {
+    const offer = getPackageIntroOffer(
+      playPackage({ full: 449.99, intro: 359.99, unit: "YEAR", cycles: 1 })
+    );
+    expect(offer).toMatchObject({ cycles: 1, unit: "year", percent: 20 });
+  });
+
+  test("uygun teklif yoksa (base plan) teklif gösterilmez", () => {
+    expect(getPackageIntroOffer(playPackage({ offer: false }))).toBeNull();
+  });
+
+  test("teklif normal fiyattan ucuz değilse sahte indirim üretilmez", () => {
+    expect(getPackageIntroOffer(playPackage({ intro: 59.99 }))).toBeNull();
+  });
+
+  test("App Store introPrice yalnız uygunluk doğrulanınca gösterilir", () => {
+    const iosPackage = {
+      packageType: "MONTHLY",
+      product: {
+        identifier: "premium_monthly",
+        price: 59.99,
+        priceString: "₺59,99",
+        currencyCode: "TRY",
+        defaultOption: null,
+        introPrice: {
+          price: 29.99,
+          priceString: "₺29,99",
+          cycles: 3,
+          period: "P1M",
+          periodUnit: "MONTH",
+          periodNumberOfUnits: 1,
+        },
+      },
+    };
+    expect(getPackageIntroOffer(iosPackage)).toBeNull();
+    expect(getPackageIntroOffer(iosPackage, { iosIntroEligible: true })).toMatchObject({
+      percent: 50,
+      cycles: 3,
+      unit: "month",
+    });
+  });
+
+  test("yıllık tasarruf teklif fiyatına değil normal fiyatlara göre hesaplanır", () => {
+    const monthly = playPackage();
+    const annual = playPackage({ full: 449.99, intro: 359.99, unit: "YEAR", cycles: 1 });
+    annual.product.identifier = "premium_yearly:p1y";
+    expect(getPackageSavings(annual, [monthly, annual], "tr").percent).toBe(37);
   });
 });
 

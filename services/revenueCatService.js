@@ -89,6 +89,27 @@ export async function loadRevenueCatState() {
   return { customerInfo, offerings, standaloneProducts };
 }
 
+/**
+ * iOS'ta giriş teklifine (introPrice) UYGUN ürün kimlikleri. Play uygunluğu
+ * teklif listesine zaten yansıtır (uygun olmayana teklif dönmez); App Store
+ * yansıtmaz. Hata ya da "bilinmiyor" durumunda kimse uygun sayılmaz:
+ * uygun olmayana indirim göstermektense teklifsiz fiyat göstermek doğru olan.
+ */
+export async function loadIntroEligibleProductIds(productIdentifiers = []) {
+  if (Platform.OS !== "ios" || productIdentifiers.length === 0) return [];
+  const eligible =
+    Purchases.INTRO_ELIGIBILITY_STATUS?.INTRO_ELIGIBILITY_STATUS_ELIGIBLE ?? 2;
+  try {
+    const result =
+      await Purchases.checkTrialOrIntroductoryPriceEligibility(productIdentifiers);
+    return Object.entries(result || {})
+      .filter(([, value]) => value?.status === eligible)
+      .map(([identifier]) => identifier);
+  } catch {
+    return [];
+  }
+}
+
 // Satın alma olayı GA4'ün önerilen `purchase` şemasıyla gönderilir (currency +
 // value + item_id) — konsoldaki hazır gelir raporları bu alanları bekler.
 // Deneme (trial) başlangıcı AYRI olay: dönüşüm hunisinde "deneme başlattı" ile

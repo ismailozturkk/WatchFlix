@@ -14,6 +14,7 @@ import {
   configureRevenueCat,
   disconnectRevenueCatUser,
   getRevenueCatConfiguration,
+  loadIntroEligibleProductIds,
   loadRevenueCatState,
   openRevenueCatSubscriptionManagement,
   presentRevenueCatCustomerCenter,
@@ -61,6 +62,9 @@ export function PremiumProvider({ children }) {
   const [resolvedUid, setResolvedUid] = useState(null);
   const [busyAction, setBusyAction] = useState(null);
   const [configurationError, setConfigurationError] = useState(null);
+  // iOS'ta giriş teklifine uygun ürünler (Android'de hep boş; Play uygunluğu
+  // teklif listesine kendisi yansıtır). Bkz. utils/premium getPackageIntroOffer.
+  const [introEligibleIds, setIntroEligibleIds] = useState([]);
   const config = getRevenueCatConfiguration();
 
   const refresh = useCallback(async () => {
@@ -141,6 +145,21 @@ export function PremiumProvider({ children }) {
       removeListener?.();
     };
   }, [config.apiKey, config.supported, needsProfileCompletion, user]);
+
+  // Uygunluk kullanıcıya özgü (daha önce abone olan teklif alamaz): paketler
+  // ya da müşteri değişince yeniden sorulur.
+  useEffect(() => {
+    let active = true;
+    const productIds = (offerings?.current?.availablePackages || [])
+      .map((item) => item?.product?.identifier)
+      .filter(Boolean);
+    loadIntroEligibleProductIds(productIds).then((ids) => {
+      if (active) setIntroEligibleIds(ids);
+    });
+    return () => {
+      active = false;
+    };
+  }, [offerings, customerInfo?.originalAppUserId]);
 
   const signedIn = Boolean(user?.uid && !needsProfileCompletion);
   // RevenueCat bu kullanıcı için henüz cevap vermedi mi?
@@ -278,6 +297,7 @@ export function PremiumProvider({ children }) {
       customerInfo,
       offerings,
       packages,
+      introEligibleIds,
       loading,
       busyAction,
       configurationError,
@@ -298,6 +318,7 @@ export function PremiumProvider({ children }) {
     config.usingTestStore,
     configurationError,
     customerInfo,
+    introEligibleIds,
     loading,
     manageSubscription,
     openCustomerCenter,
