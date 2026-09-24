@@ -22,6 +22,19 @@ MEVCUT DURUM (19.07.2026): Yerel debug SHA-1 Firebase'e eklendi ve hem
          client_type:1 Android istemcisi mevcut. Yerel development build yolu
          hazir. EAS/Play imzalari kullanilacaksa onlar ayrica eklenmelidir.
 
+GUNCEL (19.09.2026): Firebase Android uygulamasinda (…eaf678e1…) kayitli:
+         5E:8F:16…F6:25  yerel debug keystore
+         8A:76:F7…58:2E  EAS keystore = Play UPLOAD key (preview APK'lar)
+         45:EF:BF:04:75:3A:9B:0F:46:F7:AB:30:E7:FE:B0:7E:39:5E:45:A9
+                         Play APP SIGNING key (klasik) — Play'den kurulan
+                         surum bununla imzali. Eksikken internal testing
+                         surumunde Google girisi "bu surumde kullanilamiyor"
+                         verdi; SHA-256'siyla birlikte eklendi.
+         Play Console'da yeri degisti: Protected with Play > Play Store
+         protection > Play app signing (ya da .../app/<id>/keymanagement).
+         Play imzalama anahtarini degistirirse ("Change key") YENI anahtarin
+         parmak izleri de eklenmeli.
+
 COZUM:
   a) Gereken SHA-1'leri topla. Uygulamayi imzalayan HER keystore icin ayri:
 
