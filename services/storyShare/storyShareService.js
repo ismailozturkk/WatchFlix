@@ -48,7 +48,10 @@ export async function shareStoryImage(fileUri) {
  * @param {string} fileUri
  */
 export async function saveStoryToGallery(fileUri) {
-  const { status } = await MediaLibrary.requestPermissionsAsync();
+  // writeOnly=true: uygulama galeriyi hic OKUMUYOR, yalnizca kart gorselini
+  // kaydediyor. Tam izin istenirse Android READ_MEDIA_IMAGES gerektirir ve Play
+  // "Photo & Video Permissions" beyani acilir (bkz. docs/kurulum/PLAY_DATA_SAFETY.md).
+  const { status } = await MediaLibrary.requestPermissionsAsync(true);
   if (status !== "granted") {
     throw new Error("Galeriye kaydetmek için medya izni gereklidir.");
   }

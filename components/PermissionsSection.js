@@ -2,8 +2,8 @@
 //
 // Ayarlar > "İzinlerim" bölümü. Cihaz (OS) izinlerini tek yerde gösterir:
 //   - Bildirimler   (expo-notifications)
-//   - Galeri/Medya  (expo-media-library — story görselini kaydetme)
-//   - Fotoğraflar    (expo-image-picker — avatar seçme)
+//   - Galeri/Medya  (expo-media-library — story/Wrapped görselini kaydetme;
+//                    YALNIZCA yazma izni, galeri hiç okunmuyor)
 //
 // Her satır: durum rozeti (Verildi / Reddedildi / Belirsiz) + aksiyon.
 //   • İzin verilmemişse  → "İzin ver" (tekrar sorulabiliyorsa sistem sorar,
@@ -27,7 +27,6 @@ import {
 } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as MediaLibrary from "expo-media-library";
-import * as ImagePicker from "expo-image-picker";
 import AppIcon from "@components/AppIcon";
 import { appAlert } from "@components/AppAlert";
 import { ensureAndroidChannels } from "@services/pushNotificationsService";
@@ -57,18 +56,8 @@ const PERMISSIONS = [
     bgKey: "iconGreen",
     titleKey: "permGallery",
     descKey: "permGalleryDesc",
-    get: () => MediaLibrary.getPermissionsAsync(),
-    request: () => MediaLibrary.requestPermissionsAsync(),
-  },
-  {
-    key: "photos",
-    icon: "image-outline",
-    colorKey: "purple",
-    bgKey: "iconPurple",
-    titleKey: "permPhotos",
-    descKey: "permPhotosDesc",
-    get: () => ImagePicker.getMediaLibraryPermissionsAsync(),
-    request: () => ImagePicker.requestMediaLibraryPermissionsAsync(),
+    get: () => MediaLibrary.getPermissionsAsync(true),
+    request: () => MediaLibrary.requestPermissionsAsync(true),
   },
 ];
 

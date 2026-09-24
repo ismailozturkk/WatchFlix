@@ -414,7 +414,7 @@ const ImageGalleryModal = ({
     try {
       setDownloadingPath(filePath);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      const { status } = await MediaLibrary.requestPermissionsAsync();
+      const { status } = await MediaLibrary.requestPermissionsAsync(true);
       if (status !== "granted") {
         // Izin reddi bir hata degil, yapilacak is var: mesaji toast tasisin.
         Toast.show({

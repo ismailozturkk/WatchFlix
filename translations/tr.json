@@ -164,8 +164,6 @@
   "permNotificationsDesc": "Hatırlatıcı ve sosyal bildirimleri göstermek için",
   "permGallery": "Galeri / Medya",
   "permGalleryDesc": "Oluşturduğun story görselini galerine kaydetmek için",
-  "permPhotos": "Fotoğraflar",
-  "permPhotosDesc": "Profil fotoğrafı için galeriden görsel seçmek için",
   "permRevokeTitle": "İzni geri çek",
   "permRevokeMessage": "İzni geri çekmek için sistem ayarlarını açmanız gerekir. Oradan bu uygulamanın iznini kapatabilirsiniz.",
   "permOpenSettingsTitle": "Sistem ayarları",

@@ -56,12 +56,16 @@ COZUM:
   b) Firebase Console > Project settings > Your apps > Android
      (com.smlztrk.seelogd) > "Add fingerprint" ile her SHA-1'i ekle.
 
-  c) Guncellenmis google-services.json'u indir ve IKI yere birden koy:
+  c) Guncellenmis google-services.json'u repo KOKUNE koy:
          ./google-services.json
-         ./android/app/google-services.json
-     (android/ dizini bu repoda commit'li oldugu icin build android/app
-      altindakini kullanir; app.json'daki googleServicesFile yalnizca
-      `expo prebuild` calistiginda koktekini oraya kopyalar.)
+     DUZELTME (24.09.2026): `android/` dizini .gitignore'da (satir 18) ve
+     git'te TAKIPLI TEK BIR DOSYASI YOK. Yani EAS build bu dizini hic
+     almaz, `expo prebuild` ile bastan uretir ve app.json'daki
+     `googleServicesFile` alanindaki koktenki dosyayi kullanir. Yerel
+     ./android/app/google-services.json yalnizca yerel `expo run:android`
+     icin anlamli ve prebuild'de zaten uzerine yazilir.
+     (Bu maddenin eski hali "android/ commit'li, build oradakini kullanir"
+      diyordu — YANLISTI.)
 
   d) Dogrula — yeni dosyada su blok GORUNMELI:
          { "client_type": 1,

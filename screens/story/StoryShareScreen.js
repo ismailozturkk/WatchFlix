@@ -868,7 +868,7 @@ export default function StoryShareScreen({ route, navigation }) {
   const handleSave = async () => {
     try {
       setBusy(true);
-      const { status } = await MediaLibrary.requestPermissionsAsync();
+      const { status } = await MediaLibrary.requestPermissionsAsync(true);
       if (status !== "granted") {
         Toast.show({ type: "error", text1: i18nText("autoI18n.galeri_izni_gerekli", "Galeri izni gerekli") });
         return;

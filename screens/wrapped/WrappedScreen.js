@@ -366,7 +366,7 @@ export default function WrappedScreen({ route, navigation }) {
     if (busy) return;
     try {
       setBusyAction("save");
-      const { status } = await MediaLibrary.requestPermissionsAsync();
+      const { status } = await MediaLibrary.requestPermissionsAsync(true);
       if (status !== "granted") {
         Toast.show({ type: "error", text1: str.galleryPermission });
         return;

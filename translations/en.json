@@ -164,8 +164,6 @@
   "permNotificationsDesc": "Required to show reminder and social notifications",
   "permGallery": "Gallery / Media",
   "permGalleryDesc": "To save your created story image to your gallery",
-  "permPhotos": "Photos",
-  "permPhotosDesc": "To pick an image from your gallery for your profile photo",
   "permRevokeTitle": "Revoke permission",
   "permRevokeMessage": "To revoke this permission you need to open system settings. You can turn off this app's permission there.",
   "permOpenSettingsTitle": "System settings",
