@@ -13,6 +13,9 @@ yazma, galeriye kaydetme) burada beyan EDİLMEZ.
 Firebase Analytics Android'de reklam kimliğini **varsayılan olarak** toplar ve kodda bunu kapatan
 bir ayar yok. İki seçenek:
 
+> **24 Eyl doğrulandı:** 1.4.6 AAB manifestinde `com.google.android.gms.permission.AD_ID`
+> ve `android.permission.ACCESS_ADSERVICES_AD_ID` mevcut — reklam kimliği gerçekten toplanıyor.
+
 - **A) Olduğu gibi bırak** → Data safety'de "Device or other IDs" işaretlenir, ayrıca Play'in
   **Advertising ID** beyanı doldurulur. İleride reklam/atıf yapacaksan bu yol.
 - **B) Kapat** → `app.json` Android manifest'ine `google_analytics_adid_collection_enabled=false`
@@ -38,9 +41,9 @@ Yapılan:
 - Native değişiklik → `app.json` version **1.4.5 → 1.4.6** (runtimeVersion politikası appVersion).
 
 **Sonuç: Photo & Video Permissions beyanı artık hiç açılmıyor.**
-Bu değişiklik **yeni AAB ile** yayına girer; cihazda hikâye/Wrapped kaydetmenin hâlâ çalıştığı
-doğrulanmalı (Android 13+ write-only ile sorunsuz; Android ≤12'de `WRITE_EXTERNAL_STORAGE`
-zaten `blockedPermissions`'ta olduğu için kaydetme eskiden beri kısıtlı olabilir — test et).
+**24 Eyl doğrulandı:** 1.4.6 AAB manifestinde iki izin de yok; cihazda hikâye kartı ve Wrapped
+görseli galeriye sorunsuz kaydediliyor. (Android ≤12'de `WRITE_EXTERNAL_STORAGE` zaten
+`blockedPermissions`'ta — eski sürümlerde kaydetme kısıtlı olabilir, bugünkü değişiklikten bağımsız.)
 
 ---
 
