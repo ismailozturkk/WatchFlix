@@ -13,11 +13,10 @@ import useTabBarScrollSync from "../../hooks/useTabBarScrollSync";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLanguage } from "../../context/LanguageContext";
 import AppIcon from "../../components/AppIcon";
-import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "../../firebase";
 import ProfileLists from "./profile/ProfileLists";
 import { useAuth } from "../../context/AuthContext";
 import { useFriends } from "../../context/FriendsContext";
+import { useUnreadMessages } from "../../context/UnreadMessagesContext";
 import { AvatarSkeleton } from "../../components/Skeleton";
 import UserAvatar from "../../components/common/UserAvatar";
 import { useProfileStats } from "../../context/ProfileStatsContext";
@@ -25,6 +24,7 @@ import { useProfileUi } from "../../context/ProfileUiContext";
 import NotesCard from "./profile/NotesCard";
 import RemindersPreviewButton from "./profile/RemindersPreviewButton";
 import MyActivityButton from "./profile/MyActivityButton";
+import FriendsActionBar from "../../components/profile/FriendsActionBar";
 import {
   CircularProgressBase,
 } from "react-native-circular-progress-indicator";
@@ -207,23 +207,28 @@ const ProfileScreen = ({ navigation }) => {
     0;
 
   // Mesajlar butonundaki okunmamış rozeti — gelen kutusu index'indeki
-  // unreadCount alanlarının toplamı (ChatScreen sohbet açılınca sıfırlar).
-  const [unreadMessages, setUnreadMessages] = useState(0);
-  useEffect(() => {
-    if (!user?.uid) return undefined;
-    const unsub = onSnapshot(
-      collection(db, "Users", user.uid, "conversations"),
-      (snap) => {
-        let total = 0;
-        snap.forEach((d) => {
-          total += d.data()?.unreadCount || 0;
-        });
-        setUnreadMessages(total);
-      },
-      () => setUnreadMessages(0)
-    );
-    return () => unsub();
-  }, [user?.uid]);
+  // unreadCount toplamı (ChatScreen sohbet açılınca sıfırlar). Tek listener
+  // context/UnreadMessagesContext'te; uygulama simgesi rozeti de oradan besleniyor.
+  const { unreadMessages } = useUnreadMessages();
+
+  // Şerit kartları memo'lu; yönlendirme referanslarını sabit tutarak ilgisiz
+  // profil render'larında dört kartı yeniden çizdirmiyoruz.
+  const goSearch = useCallback(
+    () => navigation.navigate("SearchFriendsScreen"),
+    [navigation]
+  );
+  const goFriends = useCallback(
+    () => navigation.navigate("FriendsListScreen"),
+    [navigation]
+  );
+  const goMessages = useCallback(
+    () => navigation.navigate("MessagesScreen"),
+    [navigation]
+  );
+  const goRequests = useCallback(
+    () => navigation.navigate("FriendRequestsScreen"),
+    [navigation]
+  );
 
   const handleAvatarSelect = useCallback(
     async (index) => {
@@ -434,214 +439,17 @@ const ProfileScreen = ({ navigation }) => {
             />
           </View>
           {/* ── Arkadaş aksiyonları ── */}
-          {/* ── Arkadaş aksiyonları ── */}
-          <View
-            style={[styles.friendBar, { backgroundColor: theme.secondary }]}
-          >
-            {/* Arkadaş Ara */}
-            <TouchableOpacity
-              style={styles.friendBarBtnCompact}
-              onPress={() => navigation.navigate("SearchFriendsScreen")}
-              activeOpacity={0.6}
-            >
-              <View
-                style={[
-                  styles.friendBarIconWrap,
-                  { backgroundColor: theme.accent + "15" },
-                ]}
-              >
-                <AppIcon
-                  family="Ionicons"
-                  name="search-outline"
-                  size={18}
-                  color={theme.accent}
-                />
-              </View>
-              <Text
-                allowFontScaling={false}
-                numberOfLines={1}
-                style={[styles.friendBarLabel, { color: theme.text.secondary }]}
-              >
-                {i18nText("autoI18n.ara_2", "Ara")}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Dikey ayraç */}
-            <View
-              style={[
-                styles.friendBarDivider,
-                { backgroundColor: theme.text.secondary + "20" },
-              ]}
-            />
-
-            {/* Arkadaşlar — yatay */}
-            <TouchableOpacity
-              style={styles.friendBarBtnWide}
-              onPress={() => navigation.navigate("FriendsListScreen")}
-              activeOpacity={0.6}
-            >
-              <View
-                style={[
-                  styles.friendBarIconWrap,
-                  { backgroundColor: "#64b4ff15" },
-                ]}
-              >
-                <AppIcon
-                  family="Ionicons"
-                  name="people-outline"
-                  size={18}
-                  color="#64b4ff"
-                />
-              </View>
-              <Text
-                allowFontScaling={false}
-                numberOfLines={1}
-                style={[styles.friendBarLabel, { color: theme.text.secondary }]}
-              >
-                {i18nText("autoI18n.arkadaslar", "Arkadaşlar")}
-              </Text>
-              {friendCount > 0 && (
-                <View style={styles.friendBarPillRow}>
-                  <View
-                    style={[
-                      styles.friendBarPill,
-                      { backgroundColor: "#64b4ff" },
-                    ]}
-                  >
-                    <Text
-                      allowFontScaling={false}
-                      style={styles.friendBarPillText}
-                    >
-                      {friendCount}
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            {/* Dikey ayraç */}
-            <View
-              style={[
-                styles.friendBarDivider,
-                { backgroundColor: theme.text.secondary + "20" },
-              ]}
-            />
-
-            {/* Mesajlar — yatay (arkadaşlardan ayrı sohbet/grup alanı) */}
-            <TouchableOpacity
-              style={styles.friendBarBtnWide}
-              onPress={() => navigation.navigate("MessagesScreen")}
-              activeOpacity={0.6}
-            >
-              <View
-                style={[
-                  styles.friendBarIconWrap,
-                  { backgroundColor: "#6C63FF15" },
-                ]}
-              >
-                <AppIcon
-                  family="Ionicons"
-                  name="chatbubble-ellipses-outline"
-                  size={18}
-                  color="#6C63FF"
-                />
-              </View>
-              <Text
-                allowFontScaling={false}
-                numberOfLines={1}
-                style={[styles.friendBarLabel, { color: theme.text.secondary }]}
-              >
-                {i18nText("autoI18n.mesajlar", "Mesajlar")}
-              </Text>
-              {unreadMessages > 0 && (
-                <View style={styles.friendBarPillRow}>
-                  <View
-                    style={[
-                      styles.friendBarPill,
-                      { backgroundColor: "#6C63FF" },
-                    ]}
-                  >
-                    <Text
-                      allowFontScaling={false}
-                      style={styles.friendBarPillText}
-                    >
-                      {unreadMessages > 99 ? "99+" : unreadMessages}
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            {/* Dikey ayraç */}
-            <View
-              style={[
-                styles.friendBarDivider,
-                { backgroundColor: theme.text.secondary + "20" },
-              ]}
-            />
-
-            {/* İstekler — yatay */}
-            <TouchableOpacity
-              style={styles.friendBarBtnWide}
-              onPress={() => navigation.navigate("FriendRequestsScreen")}
-              activeOpacity={0.6}
-            >
-              <View
-                style={[
-                  styles.friendBarIconWrap,
-                  { backgroundColor: "#29b86415" },
-                ]}
-              >
-                <AppIcon
-                  family="Ionicons"
-                  name="mail-outline"
-                  size={18}
-                  color="#29b864"
-                />
-              </View>
-              <Text
-                allowFontScaling={false}
-                numberOfLines={1}
-                style={[styles.friendBarLabel, { color: theme.text.secondary }]}
-              >
-                {i18nText("autoI18n.istekler", "İstekler")}
-              </Text>
-              {(receivedCount > 0 || sendCount > 0) && (
-                <View style={styles.friendBarPillRow}>
-                  {receivedCount > 0 && (
-                    <View
-                      style={[
-                        styles.friendBarPill,
-                        { backgroundColor: "#29b864" },
-                      ]}
-                    >
-                      <Text
-                        allowFontScaling={false}
-                        style={styles.friendBarPillText}
-                      >
-                        {receivedCount}
-                      </Text>
-                    </View>
-                  )}
-                  {sendCount > 0 && (
-                    <View
-                      style={[
-                        styles.friendBarPill,
-                        { backgroundColor: "#ff9650" },
-                      ]}
-                    >
-                      <Text
-                        allowFontScaling={false}
-                        style={styles.friendBarPillText}
-                      >
-                        {sendCount}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
+          <FriendsActionBar
+            theme={theme}
+            friendCount={friendCount}
+            unreadMessages={unreadMessages}
+            incomingRequests={receivedCount}
+            outgoingRequests={sendCount}
+            onSearch={goSearch}
+            onFriends={goFriends}
+            onMessages={goMessages}
+            onRequests={goRequests}
+          />
 
           <StatisticsSection
             theme={theme}
@@ -705,82 +513,6 @@ const ProfileScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  // ── Arkadaş bar ───────────────────────────────────────────────────────────
-  friendBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 20,
-    paddingVertical: 4,
-  },
-
-  // Tüm bar butonları — DİKEY kolon (icon üst, label alt). 4 buton sığsın diye
-  // yatay düzenden kolona geçildi (yatayda label'lar sarıp kayıyordu).
-  friendBarBtnCompact: {
-    flex: 1,
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 2,
-    gap: 5,
-    position: "relative",
-  },
-  friendBarBtnWide: {
-    flex: 1,
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 2,
-    gap: 5,
-    position: "relative",
-  },
-
-  friendBarDivider: {
-    width: 1,
-    height: 36,
-    borderRadius: 1,
-  },
-  friendBarIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-  },
-  friendBarLabel: {
-    fontSize: 10.5,
-    fontWeight: "600",
-    letterSpacing: 0.1,
-  },
-  // Rozet(ler) — butonun sağ-üst köşesinde (icon üstünde)
-  friendBarPillRow: {
-    position: "absolute",
-    top: 2,
-    right: 8,
-    flexDirection: "row",
-    gap: 3,
-    alignItems: "center",
-  },
-  friendBarPill: {
-    minWidth: 18,
-    height: 16,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 5,
-  },
-  friendBarPillText: {
-    color: "#fff",
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 0.3,
-  },
-  // ───────────────────────────────────────────────────────────────────────────
-
   container: {
     flex: 1,
     //paddingTop: 0,
