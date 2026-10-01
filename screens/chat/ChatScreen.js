@@ -84,7 +84,9 @@ import {
   setTyping,
   subscribeChatMeta,
 } from "@services/chatRtdb";
-import { setActiveChatId } from "@services/activeChatTracker";
+import { enterActiveChat } from "@services/activeChatTracker";
+import { dismissChatNotifications } from "@services/pushNotificationsService";
+import { useIsFocused } from "@react-navigation/native";
 import {
   subscribeGroup,
   memberColor,
@@ -939,27 +941,43 @@ export default function ChatScreen({ route, navigation }) {
   const currentUserIsCreator = isGroupCreator(groupData, currentUser.uid);
   const currentUserCanManageGroup = canManageGroup(groupData, currentUser.uid);
 
+  // "Sohbet ekranda" durumu EKRANIN ODAĞINA bağlı, yalnız mount'a değil.
+  // ChatScreen yığında kalıp üstüne başka ekran (arkadaş profili, başka bir
+  // sohbet) açıldığında kullanıcı artık bu sohbeti görmüyor: o sırada gelen
+  // mesaj için bildirim çıkmalı, okunmamış sayacı da sıfırlanmamalı. Eskiden
+  // her şey mount'a bağlıydı; üstteki ekran kapanınca alttaki sohbet "açık
+  // değil" sayılıyor ya da bakılmayan sohbetin bildirimi bastırılıyordu.
+  const isFocused = useIsFocused();
+
   // Çevrimiçi/typing/inChat (RTDB) yalnızca 1-1 modunda. Grupta per-üye presence
   // gösterilmez (üye sayısı header'da). enterChat/leaveChat sadece 1-1.
+  // Sunucu push'u bu bayrağa bakıp mesajı atlıyor (functions/index.js).
   useEffect(() => {
-    if (isGroup) return;
+    if (isGroup || !isFocused) return undefined;
     enterChat(chatId, currentUser.uid);
     return () => leaveChat(chatId, currentUser.uid);
-  }, [isGroup, chatId, currentUser.uid]);
+  }, [isGroup, isFocused, chatId, currentUser.uid]);
 
-  // Bu sohbet ekranda açıkken chatId'yi bellekte işaretle (grup + 1-1 ikisinde
-  // de) — foreground bildirim gösterimi zaten açık olan sohbet için gereksiz
-  // banner basmasın diye (bkz. DeviceNotificationsContext).
+  // Bu sohbet GÖRÜNÜRKEN chatId'yi bellekte işaretle (grup + 1-1 ikisinde de) —
+  // ön plandaki bildirim handler'ı o sohbetin mesajı için banner/ses çıkarmasın
+  // (bkz. utils/notificationPresentation.js). Sayaçlı: üst üste açılan
+  // sohbetler birbirinin durumunu bozmaz (services/activeChatTracker.js).
+  // Görününce, bildirim çekmecesinde bekleyen bu sohbet bildirimleri de
+  // temizlenir — okunmuş mesajın bildirimi çekmecede (ve rozette) kalmasın.
   useEffect(() => {
-    setActiveChatId(chatId);
-    return () => setActiveChatId(null);
-  }, [chatId]);
+    if (!isFocused) return undefined;
+    const release = enterActiveChat(chatId);
+    dismissChatNotifications(chatId, currentUser.uid);
+    return release;
+  }, [isFocused, chatId, currentUser.uid]);
 
   // Sohbet açıkken gelen kutusu index'imdeki okunmamış sayacını sıfır tut:
   // girişte birikmiş sayacı, sohbet açıkken de yeni gelen artışları temizler
-  // (profildeki rozet ve Mesajlar ekranındaki renkli border bu alana bakar).
+  // (profildeki rozet, Mesajlar ekranındaki renkli border ve uygulama simgesi
+  // rozeti bu alana bakar). Yalnız ekran odaktayken: arkada kalmış bir sohbet
+  // gelen mesajı "okundu" yapmamalı.
   useEffect(() => {
-    if (isGroup) return undefined;
+    if (isGroup || !isFocused) return undefined;
     const myConvRef = doc(db, "Users", currentUser.uid, "conversations", friendUid);
     const unsub = onSnapshot(
       myConvRef,
@@ -971,7 +989,7 @@ export default function ChatScreen({ route, navigation }) {
       () => {},
     );
     return () => unsub();
-  }, [isGroup, currentUser.uid, friendUid]);
+  }, [isGroup, isFocused, currentUser.uid, friendUid]);
 
   // Clear processed-message guard when switching chats
   useEffect(() => { processedMsgIds.current.clear(); }, [chatId]);
@@ -1342,14 +1360,6 @@ export default function ChatScreen({ route, navigation }) {
           }).catch(() => {}),
         );
       } else {
-        createSocialNotification({
-          toUid: friendUid,
-          fromUid: currentUser.uid,
-          fromName: profileDisplayName || currentUser.displayName || "",
-          fromAvatarIndex,
-          type: "message",
-          text: previewText,
-        }).catch(() => {});
         await setDoc(
           chatRef,
           {
@@ -1400,6 +1410,19 @@ export default function ChatScreen({ route, navigation }) {
           },
           { merge: true },
         ).catch(() => {});
+        // SIRA ÖNEMLİ: bildirim dokümanı sayaç artışından SONRA yazılmalı.
+        // Sunucu push'u bu doküman oluşunca tetiklenir ve rozete yazacağı
+        // okunmamış toplamını o an Firestore'dan okur (functions/appBadge.js);
+        // bildirim önce gitseydi toplam yeni mesajı saymadan hesaplanırdı.
+        // Firestore istemcisi yazıları verildiği sırayla gönderir.
+        createSocialNotification({
+          toUid: friendUid,
+          fromUid: currentUser.uid,
+          fromName: profileDisplayName || currentUser.displayName || "",
+          fromAvatarIndex,
+          type: "message",
+          text: previewText,
+        }).catch(() => {});
       }
     },
     [

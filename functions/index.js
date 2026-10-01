@@ -62,6 +62,11 @@ const {
   revokeAppleAuthorizationCode,
   verifyAppleIdentityToken,
 } = require("./appleAuth");
+const {
+  badgeForPush,
+  chatIdForMessage,
+  sumUnreadMessages,
+} = require("./appBadge");
 
 initializeApp();
 const db = getFirestore();
@@ -947,6 +952,36 @@ exports.onSocialNotificationCreated = onDocumentCreated(
     // Dil: istemci Users/{uid}.notificationLanguage'a yansıtır (tr varsayılan).
     const lang = userData.notificationLanguage === "en" ? "en" : "tr";
     const { title, body } = buildContent(n, lang);
+
+    // Uygulama simgesi rozeti (iOS): MUTLAK sayı, artış değil. Eskiden push
+    // `badge` taşımıyordu; uygulama kapalıyken sayı hiç düzeltilemiyor, istemci
+    // ise okunmamış bildirim DOKÜMANLARINI sayıp yalnız büyütüyordu. Tanım:
+    // okunmamış 1-1 mesajlar + bekleyen gelen istekler (bkz. appBadge.js).
+    // Sorgu başarısız olursa `badge` hiç yazılmaz — OS mevcut sayıyı korur,
+    // yanlış bir sayı yazmaktan iyidir.
+    let badge = null;
+    try {
+      const [convSnap, requestsAgg] = await Promise.all([
+        db
+          .collection(`Users/${recipientUid}/conversations`)
+          .where("unreadCount", ">", 0)
+          .select("unreadCount")
+          .get(),
+        db
+          .collection(`Users/${recipientUid}/friendRequests`)
+          .where("status", "==", "pending")
+          .count()
+          .get(),
+      ]);
+      badge = badgeForPush(n, {
+        unreadMessages: sumUnreadMessages(convSnap.docs),
+        pendingRequests: requestsAgg.data().count,
+      });
+    } catch (e) {
+      console.warn("Rozet sayısı hesaplanamadı (badge atlanıyor):", e.message);
+    }
+
+    const chatId = chatIdForMessage(n, recipientUid);
     const messages = tokens.map((to) => ({
       to,
       sound: "default",
@@ -954,6 +989,7 @@ exports.onSocialNotificationCreated = onDocumentCreated(
       body,
       channelId: "social", // istemcideki Android kanalıyla aynı
       priority: "high",
+      ...(badge !== null ? { badge } : {}),
       data: {
         kind: "social",
         type: n.type || "",
@@ -963,6 +999,9 @@ exports.onSocialNotificationCreated = onDocumentCreated(
         fromName: n.fromName || null,
         groupId: n.groupId || null,
         groupName: n.groupName || null,
+        // İstemci bununla "kullanıcı bu sohbeti izliyor mu" kararını verir ve
+        // sohbet açılınca çekmecedeki bildirimleri temizler.
+        chatId,
       },
     }));
 
@@ -989,7 +1028,7 @@ exports.onSocialNotificationCreated = onDocumentCreated(
     await clearDeadPushTokens(recipientUid, userData, priv, deadTokens);
 
     console.log(
-      `Push gönderildi → ${recipientUid} | tür: ${n.type} | cihaz: ${tokens.length} | ölü: ${deadTokens.length}`,
+      `Push gönderildi → ${recipientUid} | tür: ${n.type} | cihaz: ${tokens.length} | ölü: ${deadTokens.length} | rozet: ${badge ?? "-"}`,
     );
   },
 );

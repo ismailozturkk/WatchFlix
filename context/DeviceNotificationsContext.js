@@ -29,6 +29,8 @@ import {
   useStreamingProviderSettings,
 } from "./AppSettingsContext";
 import { useNotifications } from "./NotificationsContext";
+import { useFriends } from "./FriendsContext";
+import { useUnreadMessages } from "./UnreadMessagesContext";
 import { useProfileReminders } from "./ProfileRemindersContext";
 import { useProfileNotes } from "./ProfileNotesContext";
 import {
@@ -57,7 +59,11 @@ import {
   shouldPrimeNotifications,
 } from "../utils/notificationPriming";
 import { Keys, get, set } from "../services/storage";
-import { getActiveChatId } from "../services/activeChatTracker";
+import {
+  chatIdForNotification,
+  isChatActive,
+} from "../services/activeChatTracker";
+import { computeAppBadgeCount } from "../utils/appBadge";
 
 // iOS'ta bekleyen local bildirim üst sınırı 64; fazlası sessizce düşer. En
 // yakın tarihli 60'ını zamanlıyoruz (kalan pay foreground sosyal bildirimlere).
@@ -151,6 +157,8 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
   const { notificationSettings: settings } = useNotificationSettings();
   const { streamingProviderIds } = useStreamingProviderSettings();
   const { items, loading: notifLoading } = useNotifications();
+  const friendsState = useFriends();
+  const { unreadMessages, ready: unreadReady } = useUnreadMessages();
   const { reminders } = useProfileReminders();
   const { notes } = useProfileNotes();
 
@@ -497,7 +505,6 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
     if (!seededRef.current) {
       knownIdsRef.current = new Set(items.map((i) => i.id));
       seededRef.current = true;
-      setBadgeCount(items.filter((i) => !i.read).length);
       return;
     }
 
@@ -512,6 +519,12 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
       if (!showAllowed) return;
       if (item.read) return;
 
+      // Yerel kopya YALNIZ uygulama ön plandayken üretilir. Arka planda (özellikle
+      // Android'de JS birkaç dakika canlı kalır) Firestore listener yine tetiklenir;
+      // orada yerel kopya basılırsa backend push'uyla ÇİFT bildirim olurdu —
+      // arka planın tek kaynağı backend push'u.
+      if (AppState.currentState !== "active") return;
+
       // Çok eski (listener gecikmesi / yeniden bağlanma) bildirimleri atla.
       const createdMs = item.createdAt?.toMillis?.() ?? null;
       if (createdMs !== null && now - createdMs > 5 * 60 * 1000) return;
@@ -519,18 +532,14 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
       const settingKey = SOCIAL_SETTING_KEY[item.type];
       if (settingKey && settings[settingKey] === false) return;
 
-      // Bu mesaj, kullanıcının o an ekranda açık tuttuğu sohbetten geldiyse
-      // foreground banner gereksiz — mesajı zaten sohbette canlı görüyor.
-      if (item.type === "message") {
-        const notifChatId = item.groupId
-          ? item.groupId
-          : item.fromUid && uid
-            ? item.fromUid > uid
-              ? item.fromUid + "_" + uid
-              : uid + "_" + item.fromUid
-            : null;
-        if (notifChatId && notifChatId === getActiveChatId()) return;
-      }
+      // Mesaj bildirimlerinde sohbet kimliği taşınır: hem aşağıdaki erken kontrol
+      // hem de OS handler'ı (utils/notificationPresentation.js) onunla karar verir.
+      const chatId =
+        item.type === "message" ? chatIdForNotification(item, uid) : null;
+
+      // Bu mesaj, kullanıcının o an ekranda tuttuğu sohbetten geldiyse banner
+      // gereksiz — mesajı zaten sohbette canlı görüyor.
+      if (chatId && isChatActive(chatId)) return;
 
       const { title, body } = buildSocialContent(item, t);
       presentNow({
@@ -546,12 +555,74 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
           fromName: item.fromName || null,
           groupId: item.groupId || null,
           groupName: item.groupName || null,
+          chatId,
         },
       });
     });
+  }, [items, notifLoading, settings, permissionStatus, t, uid]);
 
-    setBadgeCount(items.filter((i) => !i.read).length);
-  }, [items, notifLoading, settings, permissionStatus, t]);
+  // ── 5b. Uygulama simgesi rozeti ──────────────────────────────────────────
+  //
+  // Rozet = okunmamış 1-1 mesajlar + bekleyen gelen arkadaşlık istekleri
+  // (tanım ve gerekçe: utils/appBadge.js). Sayı HER değiştiğinde mutlak değer
+  // olarak yazılır; kullanıcı sohbeti okuyup isteği yanıtlayınca kendiliğinden
+  // düşer. Uygulama kapalıyken aynı sayıyı sunucu push'unun `badge` alanı
+  // taşır (functions/appBadge.js).
+  //
+  // Her iki kaynak da ilk snapshot'ını almadan yazılmaz: hazır olmayan "0",
+  // sunucunun bıraktığı doğru rozeti açılışta bir an silip geri getirirdi.
+  const friendsReady = friendsState ? friendsState.loading === false : false;
+  const incomingRequestCount = friendsState?.incomingRequests?.length ?? 0;
+  const appBadgeCount = computeAppBadgeCount({
+    unreadMessages,
+    incomingRequests: incomingRequestCount,
+  });
+  const badgeAllowed =
+    !!uid && settings.enabled !== false && permissionStatus === "granted";
+
+  // Çıkışı "açılışta oturum henüz yok" durumundan ayırmak için: yalnız bir uid
+  // GERÇEKTEN düşerse temizlenir; soğuk açılışta oturum geri yüklenirken uid
+  // kısa süre null olur ve o an rozeti silmek sunucunun doğru sayısını yakardı.
+  const hadUidRef = useRef(false);
+
+  useEffect(() => {
+    if (!uid) {
+      if (hadUidRef.current) {
+        hadUidRef.current = false;
+        // Çıkış: önceki hesabın sayısı simgede kalmasın.
+        setBadgeCount(0);
+      }
+      return;
+    }
+    hadUidRef.current = true;
+    // İzin yok ya da henüz çözülmedi ("undetermined" ilk karedir): dokunma —
+    // izin yokken rozet zaten gösterilemez, çözülmemişken yazmak yanlış olur.
+    if (permissionStatus !== "granted") return;
+    if (settings.enabled === false) {
+      // Kullanıcı bildirimleri kapattıysa rozet de kalmasın.
+      setBadgeCount(0);
+      return;
+    }
+    if (!unreadReady || !friendsReady) return;
+    setBadgeCount(appBadgeCount);
+  }, [
+    uid,
+    permissionStatus,
+    settings.enabled,
+    unreadReady,
+    friendsReady,
+    appBadgeCount,
+  ]);
+
+  // Uygulama öne gelince sayıyı yeniden yaz: arka plandayken gelen push'lar
+  // sunucu sayısını bıraktı; gerçek değer artık istemcide.
+  useEffect(() => {
+    if (!badgeAllowed || !unreadReady || !friendsReady) return undefined;
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") setBadgeCount(appBadgeCount);
+    });
+    return () => sub.remove();
+  }, [badgeAllowed, unreadReady, friendsReady, appBadgeCount]);
 
   // ── 6. Bildirime dokunma → yönlendirme ───────────────────────────────────
   useEffect(() => {

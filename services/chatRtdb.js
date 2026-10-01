@@ -25,20 +25,26 @@ const inChatRef = (chatId, uid) => ref(rtdb, `chatMeta/${chatId}/inChat/${uid}`)
 // onDisconnect gecikmeli). Bu yüzden presenceService ile aynı desen: AppState'i
 // dinleyip arka plana geçişte inChat/typing'i elle false yaz, öne dönünce
 // (ekran hâlâ açıksa) inChat'i geri true yap.
-let _activeChatId = null;
-let _activeUid = null;
+//
+// Tek değişken (_activeChatId) yerine SAYAÇLI harita: yığında iki sohbet
+// ekranı bulunabilir ve yeni ekranın enter'ı eskisinin leave'inden ÖNCE
+// gelebilir (aynı sohbet için bile). Tek yuvada ikinci leave, hâlâ görünen
+// sohbeti "değil" yazıp sunucu push'unun gereksiz yere gitmesine yol açıyordu.
+//   chatId -> { uid, count }
+const _active = new Map();
 let _appStateSub = null;
 
 function _ensureAppStateSub() {
   if (_appStateSub) return;
   _appStateSub = AppState.addEventListener("change", (next) => {
-    if (!_activeChatId || !_activeUid) return;
-    if (next === "active") {
-      set(inChatRef(_activeChatId, _activeUid), true).catch(() => {});
-    } else {
-      set(inChatRef(_activeChatId, _activeUid), false).catch(() => {});
-      set(typingRef(_activeChatId, _activeUid), false).catch(() => {});
-    }
+    _active.forEach(({ uid }, chatId) => {
+      if (next === "active") {
+        set(inChatRef(chatId, uid), true).catch(() => {});
+      } else {
+        set(inChatRef(chatId, uid), false).catch(() => {});
+        set(typingRef(chatId, uid), false).catch(() => {});
+      }
+    });
   });
 }
 
@@ -53,26 +59,29 @@ export function enterChat(chatId, uid) {
   onDisconnect(ic).set(false).catch(() => {});
   onDisconnect(tp).set(false).catch(() => {});
   set(ic, true).catch(() => {});
-  _activeChatId = chatId;
-  _activeUid = uid;
+  const entry = _active.get(chatId);
+  _active.set(chatId, { uid, count: (entry?.count || 0) + 1 });
   _ensureAppStateSub();
 }
 
 /**
- * Ekrandan ayrılınca (unmount) inChat + typing'i kapat ve onDisconnect'leri iptal et.
+ * Ekrandan ayrılınca (blur/unmount) inChat + typing'i kapat ve onDisconnect'leri
+ * iptal et. Aynı sohbeti hâlâ gösteren başka bir ekran varsa bayraklara dokunmaz.
  */
 export function leaveChat(chatId, uid) {
   if (!chatId || !uid || !rtdb) return;
+  const entry = _active.get(chatId);
+  if (entry && entry.count > 1) {
+    _active.set(chatId, { uid: entry.uid, count: entry.count - 1 });
+    return;
+  }
+  _active.delete(chatId);
   const ic = inChatRef(chatId, uid);
   const tp = typingRef(chatId, uid);
   onDisconnect(ic).cancel().catch(() => {});
   onDisconnect(tp).cancel().catch(() => {});
   set(ic, false).catch(() => {});
   set(tp, false).catch(() => {});
-  if (_activeChatId === chatId && _activeUid === uid) {
-    _activeChatId = null;
-    _activeUid = null;
-  }
 }
 
 /**

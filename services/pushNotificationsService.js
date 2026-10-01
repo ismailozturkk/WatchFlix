@@ -26,6 +26,8 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { isChatActive, notificationBelongsToChat } from "./activeChatTracker";
+import { decideForegroundPresentation } from "../utils/notificationPresentation";
 
 // Token'ların YERİ: Users/{uid} kök dokümanı tüm oturumlulara okunur olduğu
 // için token'lar orada duramaz — herhangi bir kullanıcı hepsini döküp Expo
@@ -70,30 +72,17 @@ export function configureNotificationHandler() {
   if (handlerConfigured) return;
   handlerConfigured = true;
   Notifications.setNotificationHandler({
-    handleNotification: async (notification) => {
-      const data = notification?.request?.content?.data || {};
-      // Uygulama önplandayken backend'den gelen sosyal push'u GÖSTERME:
-      // aynı bildirimi yerel presentNow (data.local === true) zaten gösteriyor
-      // (üstelik tür ayarlarına saygı duyarak). Böylece çift bildirim olmaz.
-      // Arka planda handler çağrılmaz → backend push'u OS normal gösterir.
-      const isForeground = AppState.currentState === "active";
-      const isRemoteSocial = data?.kind === "social" && data?.local !== true;
-      if (isForeground && isRemoteSocial) {
-        return {
-          shouldShowBanner: false,
-          shouldShowList: false,
-          shouldPlaySound: false,
-          shouldSetBadge: false,
-        };
-      }
-      // Yeni API (banner/list) — shouldShowAlert kaldırıldı (deprecated uyarısı).
-      return {
-        shouldShowBanner: true,
-        shouldShowList: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-      };
-    },
+    // Karar mantığı utils/notificationPresentation.js'te (saf + testli):
+    //   - ön planda uzak sosyal push gizlenir (yerel kopya zaten gösteriyor),
+    //   - kullanıcının o an izlediği sohbetin mesajı hiç gösterilmez,
+    //   - rozeti handler YAZMAZ (sayıyı uygulama kendisi hesaplıyor).
+    // Arka planda handler çağrılmaz → backend push'unu OS normal gösterir.
+    handleNotification: async (notification) =>
+      decideForegroundPresentation({
+        data: notification?.request?.content?.data,
+        appActive: AppState.currentState === "active",
+        chatIsActive: isChatActive,
+      }),
   });
 }
 
@@ -368,10 +357,42 @@ export async function getLastNotificationResponse() {
   }
 }
 
+/**
+ * Uygulama simgesi rozetini MUTLAK bir değere ayarla (0 = temizle). Sayının
+ * tanımı utils/appBadge.js'te. İzin yoksa/platform desteklemiyorsa sessizce
+ * no-op (iOS'ta rozet izni bildirim izniyle birlikte gelir).
+ */
 export async function setBadgeCount(count) {
   try {
-    await Notifications.setBadgeCountAsync(Math.max(0, count || 0));
+    const n = Math.floor(Number(count));
+    await Notifications.setBadgeCountAsync(Number.isFinite(n) && n > 0 ? n : 0);
   } catch {
     /* no-op */
   }
+}
+
+/**
+ * Bildirim çekmecesindeki (teslim edilmiş) bildirimlerden koşulu sağlayanları
+ * kaldırır. Çekmecedeki kalıntı iOS'ta rozet sayısını, Android'de başlatıcı
+ * noktasını canlı tutar; kullanıcı ilgili yere girdiğinde temizlenmeli.
+ */
+export async function dismissPresentedWhere(predicate) {
+  try {
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    await Promise.all(
+      presented
+        .filter((n) => predicate(n?.request?.content?.data || {}))
+        .map((n) => Notifications.dismissNotificationAsync(n.request.identifier)),
+    );
+  } catch {
+    /* no-op — temizlik best-effort */
+  }
+}
+
+/** Bu sohbete ait çekmece bildirimlerini temizle (sohbet açılınca). */
+export function dismissChatNotifications(chatId, myUid) {
+  if (!chatId) return Promise.resolve();
+  return dismissPresentedWhere((data) =>
+    notificationBelongsToChat(data, chatId, myUid),
+  );
 }

@@ -71,6 +71,7 @@ import { ProfileUiProvider }        from "./context/ProfileUiContext";
 import { UserProfileProvider }      from "./context/UserProfileContext";
 import { FriendsProvider }          from "./context/FriendsContext";
 import { NotificationsProvider }    from "./context/NotificationsContext";
+import { UnreadMessagesProvider }   from "./context/UnreadMessagesContext";
 import { DeviceNotificationsProvider } from "./context/DeviceNotificationsContext";
 import { PostsProvider }            from "./context/PostsContext";
 import { TvShowProvider } from "./context/TvShowContex";
@@ -955,6 +956,7 @@ export default wrapRoot(function App() {
                   <PremiumProvider>
                   <FriendsProvider>
                   <NotificationsProvider>
+                  <UnreadMessagesProvider>
                   <ListStatusProvider>
                   <MediaActivityProvider>
                   <SharedListsProvider>
@@ -1003,6 +1005,7 @@ export default wrapRoot(function App() {
                   </SharedListsProvider>
                   </MediaActivityProvider>
                   </ListStatusProvider>
+                  </UnreadMessagesProvider>
                   </NotificationsProvider>
                   </FriendsProvider>
                   </PremiumProvider>
