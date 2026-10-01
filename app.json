@@ -2,9 +2,9 @@
   "expo": {
     "name": "Seelogd",
     "slug": "seelogd",
-    "version": "1.4.6",
+    "version": "1.4.7",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/icon_default/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "seelogd",
     "ios": {
@@ -25,9 +25,9 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#00000000",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/icon_default/android-icon-foreground.png",
+        "backgroundImage": "./assets/icon_default/android-icon-background.png",
+        "monochromeImage": "./assets/icon_default/android-icon-monochrome.png"
       },
       "package": "com.smlztrk.seelogd",
       "googleServicesFile": "./google-services.json",
@@ -43,14 +43,14 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/icon_default/favicon.png"
     },
     "plugins": [
       "expo-image",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/android-icon-foreground.png",
+          "image": "./assets/icon_default/android-icon-foreground.png",
           "resizeMode": "contain",
           "backgroundColor": "#1E1E1E"
         }
@@ -68,7 +68,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
+          "icon": "./assets/icon_default/notification-icon.png",
           "color": "#1E1E1E",
           "defaultChannel": "default"
         }
@@ -97,6 +97,22 @@
         }
       ],
       "./plugins/withAndroidWidgets.js",
+      [
+        "./plugins/withAlternateAppIcons.js",
+        {
+          "icons": [
+            {
+              "name": "Glass",
+              "ios": "./assets/icon_glass/icon.png",
+              "android": {
+                "foregroundImage": "./assets/icon_glass/android-icon-foreground.png",
+                "backgroundImage": "./assets/icon_glass/android-icon-background.png",
+                "monochromeImage": "./assets/icon_glass/android-icon-monochrome.png"
+              }
+            }
+          ]
+        }
+      ],
       "expo-secure-store",
       "expo-localization",
       "expo-sharing"

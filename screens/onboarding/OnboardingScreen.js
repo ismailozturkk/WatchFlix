@@ -566,7 +566,7 @@ export default function OnboardingScreen({ navigation }) {
         <>
           <View style={[styles.mainHeader, { top: insets.top + 8 }]}>
             <View style={styles.headerBrand}>
-              <Image source={require("../../assets/android-icon-foreground.png")} style={styles.headerLogo} />
+              <Image source={require("../../assets/icon_default/android-icon-foreground.png")} style={styles.headerLogo} />
               <Text style={[styles.headerBrandText, { color: theme.text.primary }]}>
                 See<Text style={{ color: accent }}>logd</Text>
               </Text>
@@ -1225,7 +1225,7 @@ function IntroOverlay({ theme, accent, isLightTheme, tagline, eyebrow, tapHint, 
             style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }}
           >
             <Image
-              source={require("../../assets/android-icon-foreground.png")}
+              source={require("../../assets/icon_default/android-icon-foreground.png")}
               style={styles.logoImage}
               resizeMode="contain"
             />
@@ -1618,7 +1618,7 @@ function PosterFan({ posters, theme, accent }) {
   if (!cards.length) {
     return (
       <View style={[styles.ctaLogoFallback, { backgroundColor: alpha(accent, 0.12), borderColor: alpha(accent, 0.24) }]}>
-        <Image source={require("../../assets/android-icon-foreground.png")} style={styles.ctaLogoImage} />
+        <Image source={require("../../assets/icon_default/android-icon-foreground.png")} style={styles.ctaLogoImage} />
       </View>
     );
   }

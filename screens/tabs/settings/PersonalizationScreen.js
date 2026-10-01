@@ -20,6 +20,7 @@ import {
 } from "@components/settings/SettingPreviews";
 import PetSettingsSection from "@components/pet/PetSettingsSection";
 import FontSettingsSection from "@components/typography/FontSettingsSection";
+import AppIconSection from "@components/settings/AppIconSection";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import {
@@ -388,6 +389,10 @@ export default function PersonalizationScreen() {
       </View>
 
       <View style={ps.personalizationGap} />
+
+      {/* Uygulama simgesi: destek yoksa (modül yok / cihaz desteklemiyor) hiçbir
+          şey çizmez ve boşluk da bırakmaz. */}
+      <AppIconSection colors={C} />
 
       <View
         style={[

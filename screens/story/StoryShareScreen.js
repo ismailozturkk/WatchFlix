@@ -67,7 +67,7 @@ const CANVAS_TOP = HEADER_H + 10; // header + canvasArea paddingTop
 const SHEET_TOP = CANVAS_TOP + Math.round(CANVAS_H * SHRINK) + 16;
 const SHEET_H = SCREEN_H - SHEET_TOP;
 
-const APP_LOGO = require("@assets/android-icon-foreground.png");
+const APP_LOGO = require("@assets/icon_default/android-icon-foreground.png");
 
 const TEXT_COLORS = [
   "#FFFFFF",

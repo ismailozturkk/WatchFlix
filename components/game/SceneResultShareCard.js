@@ -11,7 +11,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 
-const APP_LOGO = require("../../assets/android-icon-foreground.png");
+const APP_LOGO = require("../../assets/icon_default/android-icon-foreground.png");
 const REF_H = 640; // referans tuval yuksekligi (9:16 -> genislik 360)
 
 const withAlpha = (color, alpha = 1) => {

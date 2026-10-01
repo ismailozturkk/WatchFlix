@@ -18,7 +18,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { formatNumber, minutesBreakdown } from "../../utils/wrapped";
 
-const APP_LOGO = require("../../assets/android-icon-foreground.png");
+const APP_LOGO = require("../../assets/icon_default/android-icon-foreground.png");
 const REF_H = 640; // referans tuval yüksekliği (9:16 → genişlik 360)
 
 export const WRAPPED_CARD_THEMES = [

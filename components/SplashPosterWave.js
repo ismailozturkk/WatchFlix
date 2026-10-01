@@ -230,7 +230,7 @@ const SplashPosterWave = () => {
           boş olduğundan arkasına ayrıca zemin konmaz. Halkalarla AYNI merkezden
           absolute konumlanır (flex-center değil). */}
       <Image
-        source={require("../assets/android-icon-foreground.png")}
+        source={require("../assets/icon_default/android-icon-foreground.png")}
         style={[
           styles.icon,
           {

@@ -175,7 +175,7 @@ function OptionRow({ icon, title, subtitle, value, onChange, colors, last }) {
 //   • .../widget/ListsWidgetProvider.kt        (çalışma anı renkleri/görünürlük)
 // Renkler tema paletinden ÇALIŞMA ANINDA basılır (WidgetThemeViews.tintBackground):
 // kök = background, öne çıkan satır = surface, diğer satır = surfaceAlt.
-const LOGO_KAYNAK = require("../../../assets/icon.png");
+const LOGO_KAYNAK = require("../../../assets/icon_default/icon.png");
 
 function Poster({ uri, style, contain }) {
   return (

@@ -269,7 +269,7 @@ export default function AboutAppScreen() {
         >
           <View style={[styles.appIconWrap, { borderColor: C.border }]}>
             <Image
-              source={require("../../../assets/android-icon-foreground.png")}
+              source={require("../../../assets/icon_default/android-icon-foreground.png")}
               style={{ width: 54, height: 54 }}
               contentFit="contain"
             />

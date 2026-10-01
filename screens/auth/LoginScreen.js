@@ -332,7 +332,7 @@ export default function LoginScreen({ navigation }) {
               ]}
             >
               <Image
-                source={require("../../assets/android-icon-foreground.png")}
+                source={require("../../assets/icon_default/android-icon-foreground.png")}
                 style={styles.heroIconImage}
                 resizeMode="contain"
               />
