@@ -18,8 +18,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../components/BackButton";
 import PosterImage from "@components/PosterImage";
 import { useTheme } from "@context/ThemeContext";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db } from "../../firebase";
 import { useListStatusContext } from "@context/ListStatusContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useAuth } from "@context/AuthContext";
@@ -47,7 +45,6 @@ import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "@services/hapticsService";
 import { i18nText } from "@utils/i18nText";
-import { captureError } from "@services/crashReporting";
 import { buildGenreMap } from "@utils/genreLabels";
 import { todayListDate, formatMinutes } from "@utils/mediaFacts";
 import {
@@ -63,14 +60,14 @@ import {
   fetchSuggestionsForList,
   searchForList,
 } from "@services/listQuickAdd";
-import { reorderWatchedShows, unmarkShow } from "../../services/watchedTvService";
+import { reorderWatchedShows } from "../../services/watchedTvService";
+import { removeFromListAny, reorderCustomList } from "../../services/libraryActions";
+import { showLibraryError } from "../../utils/libraryErrorText";
 import { refreshShowMeta } from "../../services/refreshShowMeta";
 import { cachedTmdb } from "../../utils/cachedRead";
 import ScreenDecor from "@components/ScreenDecor";
 import {
   reorderList,
-  removeFromList,
-  removeFromCustomRootList,
   PREDEFINED_MOVIE_LISTS,
 } from "../../services/listItemsService";
 
@@ -184,18 +181,15 @@ export default function ListsScreen({ route, navigation }) {
     if (!reorderItems || !user?.uid || isReordering) return;
     setIsReordering(true);
     try {
-      if (listName === "watchedTv") {
-        await unmarkShow(user.uid, reorderItems.id);
-      } else if (PREDEFINED_MOVIE_LISTS.includes(listName)) {
-        await removeFromList(user.uid, listName, reorderItems.type, reorderItems.id);
-      } else {
-        await removeFromCustomRootList(
-          user.uid,
-          listName,
-          reorderItems.type,
-          reorderItems.id,
-        );
-      }
+      // Hangi liste olduğuna göre DOĞRU geri alma yolunu libraryActions seçer:
+      // izlenen film/dizide tüm izleme kaydı + istatistik + izlendi bayrağı,
+      // favori/izlenecekte üyelik, özel listede dizi girdisi.
+      await removeFromListAny({
+        uid: user.uid,
+        listName,
+        type: reorderItems.type,
+        id: reorderItems.id,
+      });
       setListItems((current) =>
         current.filter(
           (item) =>
@@ -212,11 +206,7 @@ export default function ListsScreen({ route, navigation }) {
         text1: i18nText("autoI18n.listeden_kaldirildi", "Listeden kaldırıldı"),
       });
     } catch (error) {
-      captureError(error, { tags: { source: "lists_remove_item" } });
-      Toast.show({
-        type: "error",
-        text1: i18nText("autoI18n.islem_tamamlanamadi", "İşlem tamamlanamadı"),
-      });
+      showLibraryError(error, { source: "lists_remove_item" });
     } finally {
       setIsReordering(false);
     }
@@ -462,35 +452,11 @@ export default function ListsScreen({ route, navigation }) {
         setListItems(currentItems);
         await reorderList(user.uid, listName, currentItems, fromIndex, targetIndex);
       } else {
-        // Özel liste — eski kök-array (Part B'de reorderCustomList).
-        const docRef = doc(db, "Lists", user.uid);
-        const docSnap = await getDoc(docRef);
-
-        if (!docSnap.exists()) {
-          console.warn(
-            i18nText("autoI18n.belge_bulunamadi", "Belge bulunamadı."),
-          );
-          return;
-        }
-
-        // currentItems görüntüdeki İSTENEN nihai sıradır. Ham diziye görüntü
-        // indeksleriyle splice uygulamak (eski kod) sıralar farklıyken yanlış
-        // öğeyi taşıyordu — ham öğeleri id eşleyerek görüntü sırasına diz.
-        const data = docSnap.data();
-        const rawById = new Map(
-          (data[listName] || []).map((it) => [String(it?.id), it]),
-        );
-        const ordered = [];
-        for (const it of currentItems) {
-          const raw = rawById.get(String(it?.id));
-          if (raw) {
-            ordered.push(raw);
-            rawById.delete(String(it?.id));
-          }
-        }
-        rawById.forEach((leftover) => ordered.push(leftover));
+        // Özel liste (kök dokümandaki dizi): ekrandaki nihai sırayı libraryActions
+        // transaction içinde uygular; ekranın görmediği (başka cihazda eklenen)
+        // öğeler silinmez, noktalı liste adları bozulmaz.
         setListItems(currentItems);
-        await updateDoc(docRef, { [listName]: ordered });
+        await reorderCustomList({ uid: user.uid, listName, orderedItems: currentItems });
       }
 
       setIndex(targetIndex);
@@ -508,18 +474,13 @@ export default function ListsScreen({ route, navigation }) {
         }),
       });
     } catch (error) {
-      // Optimistik güncellemeyi geri al (watchedTv + öntanımlı film listeleri).
-      if (listName === "watchedTv" || PREDEFINED_MOVIE_LISTS.includes(listName))
-        setListItems(listItems);
+      // Optimistik güncellemeyi geri al (her kolda sıra yazımdan ÖNCE ekrana uygulanır).
+      setListItems(listItems);
       Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Error,
       ).catch(() => {});
-      // Ham hata metni kullanıcıya değil Sentry'ye (bkz. captureError).
-      captureError(error, { tags: { source: "lists_reorder" } });
-      Toast.show({
-        type: "error",
-        text1: i18nText("autoI18n.islem_tamamlanamadi", "İşlem tamamlanamadı"),
-      });
+      // Beklenmeyen hata Sentry'ye, kullanıcıya sınıflanmış (yerelleştirilmiş) neden.
+      showLibraryError(error, { source: "lists_reorder" });
     } finally {
       setIsReordering(false);
     }
@@ -855,10 +816,10 @@ export default function ListsScreen({ route, navigation }) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(
           () => {},
         );
-        Toast.show({
-          type: "error",
-          text1: i18nText("autoI18n.eklenemedi", "Eklenemedi"),
-          text2: error?.message,
+        // Başlık "Eklenemedi", neden yerelleştirilmiş: çevrimdışı / yayınlanmamış / …
+        showLibraryError(error, {
+          source: "lists_add_media",
+          title: i18nText("autoI18n.eklenemedi", "Eklenemedi"),
         });
       } finally {
         setAddingKey(null);

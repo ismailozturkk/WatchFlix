@@ -47,9 +47,17 @@ import {
 } from "../utils/watchHistory";
 import { resolveListName, RESERVED_LIST_NAMES } from "../utils/listShare";
 import { assertWatchable } from "../utils/watchState";
+import {
+  LIBRARY_ERROR,
+  LibraryError,
+  isCustomListName,
+  isMembershipList,
+  mediaKey,
+  MEMBERSHIP_FLAG,
+} from "../utils/libraryCore";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 import { trackFirstContentActivation } from "./activationAnalytics";
-import { updateLocalItem, deleteLocalItem } from "./listSyncService";
+import { updateLocalItem, updateLocalItems, deleteLocalItem } from "./listSyncService";
 
 export const PREDEFINED_MOVIE_LISTS = ["favorites", "watchList", "watchedMovies"];
 const CUSTOM_ITEMS = "customItems";
@@ -59,7 +67,7 @@ const itemKey = (type, id) => `${type}_${id}`;
 const customDocId = (listId, type, id) => `${listId}__${type}_${id}`;
 
 // undefined alanları ele (Firestore undefined kabul etmez); öğeyi normalize et.
-function normalizeItem(item) {
+export function normalizeItem(item) {
   const out = {
     id: item.id,
     type: item.type || "movie",
@@ -78,11 +86,49 @@ function normalizeItem(item) {
   return out;
 }
 
+/**
+ * Kök dokümanın ilk kez oluşturulması (yoksa). Transaction: eski "getDoc → yoksa
+ * setDoc" kalıbı arada başka bir yazım (ilk ekleme, başka cihaz) kök dokümanı
+ * yarattıysa onu SIFIRLARDI — setDoc merge'siz yazıyordu.
+ *
+ * @returns {Promise<boolean>} bu çağrı oluşturduysa true
+ */
+export async function ensureListsRoot(uid) {
+  if (!uid) return false;
+  const ref = doc(db, "Lists", uid);
+  let created = false;
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (snap.exists()) return;
+    tx.set(ref, { watchedTv: [], favorites: [], watchList: [], watchedMovies: [] });
+    created = true;
+  });
+  return created;
+}
+
 // ── Öntanımlı film/dizi listeleri ────────────────────────────────────────────
 
-/** Öğeyi bir öntanımlı listeye ekler (idempotent — docId `${type}_${id}`). */
+/**
+ * Üyelik listesi dışındaki bir anahtar bu iki fonksiyondan geçerse YANLIŞ bayrak
+ * ve sayaç yazılırdı (izlenen film için `inWatchList` gibi). Sessizce yanlış
+ * yere yazmak yerine yüksek sesle reddedilir.
+ */
+function assertMembershipList(listKey, fn) {
+  if (isMembershipList(listKey)) return;
+  throw new LibraryError(
+    LIBRARY_ERROR.INVALID,
+    `${fn}: "${listKey}" bir üyelik listesi değil (yalnız favorites/watchList)`,
+  );
+}
+
+/**
+ * Öğeyi favorilere / izlenecekler listesine ekler (idempotent — docId `${type}_${id}`).
+ * İzlenen film/dizi BURADAN geçmez: onlar üyelik değil izleme olayı yazar
+ * (`markMovieWatch` / watchedTvService).
+ */
 export async function addToList(uid, listKey, item) {
   if (!uid || !listKey || item?.id == null || !item?.type) return;
+  assertMembershipList(listKey, "addToList");
   const docKey = itemKey(item.type, item.id);
   const ref = doc(db, "Lists", uid, listKey, docKey);
   const rootRef = doc(db, "Lists", uid);
@@ -92,9 +138,8 @@ export async function addToList(uid, listKey, item) {
     const snap = await tx.get(ref);
     tx.set(ref, normalized, { merge: true });
 
-    const statusField = listKey === "favorites" ? "inFavorites" : "inWatchList";
     const rootUpdates = {
-      [`statusIndex.${item.type}.${item.id}.${statusField}`]: true,
+      [`statusIndex.${item.type}.${item.id}.${MEMBERSHIP_FLAG[listKey]}`]: true,
       updatedAt: serverTimestamp(),
       _schemaVersion: 3,
     };
@@ -110,9 +155,81 @@ export async function addToList(uid, listKey, item) {
   });
 }
 
-/** Öğeyi bir öntanımlı listeden çıkarır. */
+// Tek transaction'da okunan/yazılan öğe sayısı. Firestore transaction'ı 500
+// yazmayla sınırlı; kök doküman yazımına ve güvenlik payına yer bırakır.
+const BULK_CHUNK = 100;
+
+/**
+ * Birden çok öğeyi favorilere / izlenecekler listesine ekler (CineSwipe sepeti).
+ * `addToList` ile AYNI muhasebe (idempotent belge, yalnız YENİ öğeler sayacı
+ * artırır, statusIndex bayrağı), ama 100'lük parçalar hâlinde TEK transaction:
+ * N öğe için N transaction + N kök yazımı yerine ⌈N/100⌉.
+ *
+ * @returns {Promise<{ added: number, existing: number }>}
+ */
+export async function addItemsToList(uid, listKey, items) {
+  const seen = new Set();
+  const incoming = (Array.isArray(items) ? items : []).filter((item) => {
+    if (item?.id == null || !item?.type) return false;
+    const key = itemKey(item.type, item.id);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (!uid || !listKey || incoming.length === 0) return { added: 0, existing: 0 };
+  assertMembershipList(listKey, "addItemsToList");
+
+  const rootRef = doc(db, "Lists", uid);
+  let added = 0;
+
+  for (let offset = 0; offset < incoming.length; offset += BULK_CHUNK) {
+    const chunk = incoming.slice(offset, offset + BULK_CHUNK);
+    const refs = chunk.map((item) => doc(db, "Lists", uid, listKey, itemKey(item.type, item.id)));
+    let chunkAdded = 0;
+
+    await runTransaction(db, async (tx) => {
+      const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
+      const rootUpdates = { updatedAt: serverTimestamp(), _schemaVersion: 3 };
+      chunkAdded = 0;
+      chunk.forEach((item, index) => {
+        tx.set(refs[index], { ...normalizeItem(item), updatedAt: serverTimestamp() }, { merge: true });
+        rootUpdates[`statusIndex.${item.type}.${item.id}.${MEMBERSHIP_FLAG[listKey]}`] = true;
+        if (!snaps[index].exists()) chunkAdded += 1;
+      });
+      if (chunkAdded > 0) rootUpdates[`counts.${listKey}`] = increment(chunkAdded);
+      tx.set(rootRef, nestedSummaryFields(rootUpdates), { merge: true });
+    });
+
+    added += chunkAdded;
+    trackFirestoreWrite(`Lists/${listKey}`, chunk.length);
+    const now = new Date().toISOString();
+    updateLocalItems(
+      uid,
+      listKey,
+      Object.fromEntries(
+        chunk.map((item) => [itemKey(item.type, item.id), { ...normalizeItem(item), updatedAt: now }]),
+      ),
+    );
+  }
+  return { added, existing: incoming.length - added };
+}
+
+/**
+ * Öğeyi favorilerden / izlenecekler listesinden çıkarır.
+ *
+ * `watchedMovies` geriye uyumluluk için KABUL edilir ve `removeWatchedMovie`ye
+ * yönlendirilir: bu fonksiyon eskiden her listeye aynı kalıbı uyguluyor, izlenen
+ * film için yanlış bayrağı (`inWatchList`) kapatıp `isWatched`'ı ve tüm
+ * istatistiği olduğu gibi bırakıyordu (bkz. libraryServices.test.js "denetim").
+ */
 export async function removeFromList(uid, listKey, type, id) {
   if (!uid || !listKey || id == null || !type) return;
+  if (listKey === "watchedMovies") {
+    if (type !== "movie") return;
+    await removeWatchedMovie(uid, id);
+    return;
+  }
+  assertMembershipList(listKey, "removeFromList");
   const docKey = itemKey(type, id);
   const ref = doc(db, "Lists", uid, listKey, docKey);
   const rootRef = doc(db, "Lists", uid);
@@ -124,11 +241,10 @@ export async function removeFromList(uid, listKey, type, id) {
     removed = true;
     tx.delete(ref);
 
-    const statusField = listKey === "favorites" ? "inFavorites" : "inWatchList";
     tx.set(
       rootRef,
       nestedSummaryFields({
-        [`statusIndex.${type}.${id}.${statusField}`]: false,
+        [`statusIndex.${type}.${id}.${MEMBERSHIP_FLAG[listKey]}`]: false,
         [`counts.${listKey}`]: increment(-1),
         updatedAt: serverTimestamp(),
         _schemaVersion: 3,
@@ -149,7 +265,8 @@ export async function removeFromList(uid, listKey, type, id) {
 export async function markMovieWatch(uid, item, watchDate) {
   if (!uid || item?.id == null) return null;
   const watchedAt = normalizeWatchDate(watchDate);
-  if (!watchedAt) return null;
+  // Geçersiz tarihle sessizce null dönmek arayüze "başarılı" gibi görünürdü.
+  if (!watchedAt) throw new LibraryError(LIBRARY_ERROR.INVALID, "Geçersiz izleme tarihi");
   assertWatchable(item?.releaseDate, item?.status);
   const docKey = itemKey("movie", item.id);
   const ref = doc(db, "Lists", uid, "watchedMovies", docKey);
@@ -315,6 +432,56 @@ export async function removeMovieWatchEvent(uid, movieId, eventId) {
 }
 
 /**
+ * Filmin TÜM izleme kaydını (her tekrar izleme dahil) tek seferde siler ve
+ * kök özetteki etkisini geri alır: üyelik sayacı, benzersiz/tekrar sayaçları,
+ * süre ve tür sayaçları, `isWatched` bayrağı. "Listeden kaldır" davranışı.
+ *
+ * Tek tek olay silmek (`removeMovieWatchEvent`) ile aynı muhasebe, olay sayısı
+ * kadar çarpılmış: her olay `totalRewatchCount`a 1, `totalMinutes`a film süresi
+ * eklemişti.
+ */
+export async function removeWatchedMovie(uid, movieId) {
+  if (!uid || movieId == null) return false;
+  const docKey = itemKey("movie", movieId);
+  const ref = doc(db, "Lists", uid, "watchedMovies", docKey);
+  const rootRef = doc(db, "Lists", uid);
+
+  let removed = false;
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) return;
+    removed = true;
+    const current = snap.data() || {};
+    const eventCount = Math.max(1, materializeMovieWatchEvents(current).length);
+    const minutes = Number(current.minutes) || 0;
+
+    tx.delete(ref);
+    const rootUpdates = {
+      [`statusIndex.movie.${movieId}.isWatched`]: false,
+      "counts.watchedMovies": increment(-1),
+      "stats.movies.uniqueCount": increment(-1),
+      "stats.movies.totalRewatchCount": increment(-eventCount),
+      "stats.movies.totalMinutes": increment(-eventCount * minutes),
+      "stats.totalMinutes": increment(-eventCount * minutes),
+      updatedAt: serverTimestamp(),
+      _schemaVersion: 3,
+    };
+    if (Array.isArray(current.genres)) {
+      current.genres.forEach((genreId) => {
+        if (genreId != null) {
+          rootUpdates[`stats.genreCounts.${genreId}`] = increment(-1);
+        }
+      });
+    }
+    tx.set(rootRef, nestedSummaryFields(rootUpdates), { merge: true });
+  });
+  if (!removed) return false;
+  trackFirestoreDelete("Lists/watchedMovies", 1);
+  deleteLocalItem(uid, "watchedMovies", docKey);
+  return true;
+}
+
+/**
  * Bir öntanımlı listede manuel sırayı `listOrder` ile saklar (watchedTv
  * `reorderWatchedShows` deseni: yalnız taşınan aralığı yaz, ilk seferde normalize).
  */
@@ -329,6 +496,20 @@ export async function reorderList(uid, listKey, orderedItems, fromIndex, toIndex
 }
 
 // ── Özel listeler ────────────────────────────────────────────────────────────
+
+/**
+ * Kök doküman ayrılmış adlı alanları (counts/stats/statusIndex…) HARİTA olarak
+ * kullanır. Aynı adla dizi yazmak, doküman o alanı henüz içermiyorsa çakışma
+ * kontrolünden geçip alanı diziye çeviriyordu ve sonraki her sayaç yazımını
+ * bozuyordu. Arayüz bu adları zaten süzer; bu, servis katmanının kendi savunması.
+ */
+function assertCustomListName(listName) {
+  if (!RESERVED_LIST_NAMES.includes(listName)) return;
+  throw new LibraryError(
+    LIBRARY_ERROR.LIST_RESERVED,
+    `"${listName}" liste adı olarak kullanılamaz`,
+  );
+}
 
 const newListId = () =>
   `cl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -440,6 +621,7 @@ export async function reorderCustomList(uid, listId, orderedItems, fromIndex, to
  */
 export async function addToCustomRootList(uid, listName, item) {
   if (!uid || !listName || item?.id == null || !item?.type) return false;
+  assertCustomListName(listName);
   const ref = doc(db, "Lists", uid);
   let added = false;
 
@@ -475,6 +657,9 @@ export async function addToCustomRootList(uid, listName, item) {
  */
 export async function removeFromCustomRootList(uid, listName, type, id) {
   if (!uid || !listName || id == null || !type) return false;
+  // Ayrılmış adlar özel liste değildir: kök dokümandaki eski dizi kalıntısına
+  // (ör. App.js'in açılışta yazdığı boş `favorites: []`) dokunma.
+  if (RESERVED_LIST_NAMES.includes(listName)) return false;
   const ref = doc(db, "Lists", uid);
   let removed = false;
 
@@ -504,6 +689,55 @@ export async function removeFromCustomRootList(uid, listName, type, id) {
   });
 
   return removed;
+}
+
+/**
+ * ESKİ MODELDEKİ özel listede manuel sırayı yazar.
+ *
+ * `orderedItems` ekrandaki NİHAİ sıradır ({ id, type } yeter). Ham dizi işlem
+ * İÇİNDE okunur ve ekran sırasına göre dizilir; ekranın görmediği öğeler
+ * (başka cihazda o sırada eklenenler) sona eklenir, SİLİNMEZ. Eski ekran kodu
+ * `updateDoc(ref, { [listName]: ordered })` yapıyordu: oku-değiştir-yaz kilitsizdi
+ * ve `updateDoc` string anahtardaki noktaları alan yolu ayracı sayıyordu
+ * ("S.W.A.T. Listem" iç içe haritaya dönüşürdü). Eşleştirme id'nin yanı sıra
+ * TİPE bakar: aynı TMDB id'li film ve dizi ayrı eserdir.
+ *
+ * @returns {Promise<boolean>} liste varsa ve yazıldıysa true
+ */
+export async function reorderCustomRootList(uid, listName, orderedItems) {
+  if (!uid || !isCustomListName(listName) || !Array.isArray(orderedItems)) return false;
+  const ref = doc(db, "Lists", uid);
+  let written = false;
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.exists() ? snap.data() : {};
+    const raw = data[listName];
+    if (!Array.isArray(raw)) return;
+
+    const rawByKey = new Map(
+      raw.filter((entry) => entry?.id != null).map((entry) => [mediaKey(entry.type, entry.id), entry]),
+    );
+    const ordered = [];
+    for (const entry of orderedItems) {
+      if (entry?.id == null) continue;
+      const key = mediaKey(entry.type, entry.id);
+      const match = rawByKey.get(key);
+      if (match) {
+        ordered.push(match);
+        rawByKey.delete(key);
+      }
+    }
+    rawByKey.forEach((leftover) => ordered.push(leftover));
+
+    tx.set(
+      ref,
+      { [listName]: ordered, updatedAt: serverTimestamp(), _schemaVersion: 3 },
+      { merge: true },
+    );
+    written = true;
+  });
+  return written;
 }
 
 /**

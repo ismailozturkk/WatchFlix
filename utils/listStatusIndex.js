@@ -41,6 +41,93 @@ export function resolveStatusIndex(root, fallback, cached) {
   return index;
 }
 
+const hasEntries = (value) => isMap(value) && Object.keys(value).length > 0;
+
+/**
+ * Bekleyen (henüz sunucuya yazılmamış) işlemlerin bayraklarını indeksin üstüne
+ * bindirir. `overlay` biçimi indeksle aynı: { movie: { [id]: { inFavorites: true } }, tv: {...} }.
+ * Bindirme boşsa AYNI referans döner (context gereksiz yeniden hesaplamasın).
+ *
+ * NEDEN BİNDİRME: kök dokümandaki `statusIndex` sunucudan gelir ve transaction
+ * commit olana kadar değişmez; resolveStatusIndex'te kök, yerel tahminden önceliklidir.
+ * Düğmeye basıldığı an ekranın tepki vermesi için işlemin NİYETİ kısa süre
+ * indeksin üstüne konur, işlem bitince/başarısız olunca kalkar.
+ */
+export function applyStatusOverlay(index, overlay) {
+  if (!hasEntries(overlay?.movie) && !hasEntries(overlay?.tv)) return index;
+  const next = { movie: { ...(index?.movie || {}) }, tv: { ...(index?.tv || {}) } };
+  for (const type of ["movie", "tv"]) {
+    if (!hasEntries(overlay[type])) continue;
+    for (const [id, flags] of Object.entries(overlay[type])) {
+      next[type][id] = { ...(next[type][id] || EMPTY_LIST_STATUS), ...flags };
+    }
+  }
+  return next;
+}
+
+// Sunucudaki durum bayrağı ↔ yerel liste haritası eşlemesi. `type` verilmişse
+// o liste yalnız o tipi taşır (izlenen filmler film, izlenen diziler dizi).
+const DRIFT_LISTS = [
+  { listKey: "favorites", flag: "inFavorites" },
+  { listKey: "watchList", flag: "inWatchList" },
+  { listKey: "watchedMovies", flag: "isWatched", type: "movie" },
+  { listKey: "watchedTv", flag: "isWatched", type: "tv" },
+];
+
+/**
+ * Sunucudaki `statusIndex` ile yerel liste haritaları ARASINDA üyelik sapması
+ * olan listeleri döndürür.
+ *
+ * Yerel haritalar yalnızca bu cihazın kendi yazımlarıyla ve açılıştaki tek
+ * seferlik indirmeyle güncellenir; kök dokümandaki `statusIndex` ise canlı
+ * dinlenir. Başka bir cihazda yapılan ekleme/silme, ya da yazım commit olduktan
+ * sonra yerel güncellemeden önce uygulamanın kapanması, ikisini ayırır: detay
+ * ekranı "listede" der, liste ekranı öğeyi göstermez. Bu fonksiyon o ayrışmayı
+ * SIFIR okumayla tespit eder; yalnız sapan listeler yeniden çekilir.
+ *
+ * Yalnız AÇIK bayraklar karşılaştırılır:
+ *   • bayrak true  ama yerelde yok → sunucuda var, bizde eksik
+ *   • bayrak false ama yerelde var → sunucuda silinmiş, bizde kalmış
+ * Bayrağı hiç olmayan öğe (eski kayıt) sapma SAYILMAZ.
+ *
+ * @param {{movie?:object, tv?:object}} statusIndex   sunucudan gelen kök statusIndex
+ * @param {{favorites?:object, watchList?:object, watchedMovies?:object, watchedTv?:object}} maps
+ *        listKey → { [docId]: öğe }; `undefined` olan liste (henüz yüklenmemiş) atlanır
+ * @returns {string[]} sapan liste anahtarları
+ */
+export function findDriftedLists(statusIndex, maps) {
+  if (!isMap(statusIndex)) return [];
+  const drifted = [];
+  for (const { listKey, flag, type: onlyType } of DRIFT_LISTS) {
+    const map = maps?.[listKey];
+    if (!isMap(map)) continue;
+
+    const local = new Set();
+    Object.values(map).forEach((item) => {
+      if (!item || item.id == null) return;
+      const type = onlyType || (item.type === "tv" ? "tv" : "movie");
+      local.add(`${type}:${item.id}`);
+    });
+
+    let drift = false;
+    for (const type of ["movie", "tv"]) {
+      if (onlyType && onlyType !== type) continue;
+      const bucket = statusIndex[type];
+      if (!isMap(bucket)) continue;
+      for (const [id, status] of Object.entries(bucket)) {
+        const present = local.has(`${type}:${id}`);
+        if ((status?.[flag] === true && !present) || (status?.[flag] === false && present)) {
+          drift = true;
+          break;
+        }
+      }
+      if (drift) break;
+    }
+    if (drift) drifted.push(listKey);
+  }
+  return drifted;
+}
+
 export function buildStatusIndex({ allLists, favoritesMap = {}, watchListMap = {}, watchedMoviesMap = {}, watchedTvMap = {}, customItemsMap = {} } = {}) {
   const index = { movie: {}, tv: {} };
   const mark = (item, flag, fallback = "movie") => {

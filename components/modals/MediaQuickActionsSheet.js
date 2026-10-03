@@ -63,16 +63,20 @@ import {
 } from "../../context/AppSettingsContext";
 import { useListStatusContext } from "../../context/ListStatusContext";
 import { useWatchedShow } from "../../hooks/useWatchedShow";
+import { PREDEFINED_MOVIE_LISTS } from "../../services/listItemsService";
 import {
-  PREDEFINED_MOVIE_LISTS,
-  addToCustomRootList,
-  addToList,
-  markMovieWatch,
-  removeFromCustomRootList,
-  removeFromList,
-  removeMovieWatchEvent,
-} from "../../services/listItemsService";
-import { markShow, removeTvWatchEvent } from "../../services/watchedTvService";
+  markMovieWatched,
+  markShowWatched,
+  removeMovieWatch,
+  removeTvWatch,
+  setListMembership,
+} from "../../services/libraryActions";
+import {
+  customListHas,
+  listItemFromDetails,
+  movieWatchItemFromDetails,
+} from "../../utils/libraryCore";
+import { showLibraryError } from "../../utils/libraryErrorText";
 import { movieWatchEvents } from "../../utils/watchHistory";
 import { getCachedValue, setCachedValue, TTL } from "../../utils/apiCache";
 import { i18nText } from "../../utils/i18nText";
@@ -402,11 +406,7 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
           return;
         }
         if (Array.isArray(value)) {
-          state[key] = value.some(
-            (item) =>
-              String(item?.id) === String(id) &&
-              (item?.type || "movie") === mediaType,
-          );
+          state[key] = customListHas(allLists, key, id, mediaType);
         }
       });
     }
@@ -542,71 +542,45 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
       }
 
       const kind = type || mediaType;
-      const isIn = !!listStates[listType];
-      const toastRemove = () =>
-        Toast.show({
-          type: "warning",
-          text1: i18nText(
-            "autoI18n.media_removed_from_list",
-            "{{media}} {{list}} listesinden kaldırıldı!",
-            { media: kindLabel, list: listLabel(listType) },
-          ),
-        });
-      const toastAdd = () =>
-        Toast.show({
-          type: "success",
-          text1: i18nText(
-            "autoI18n.media_added_to_list",
-            "{{media}} {{list}} listesine eklendi!",
-            { media: kindLabel, list: listLabel(listType) },
-          ),
-        });
+      // "İzledim" hiçbir zaman buradan geçmez (göz butonu tarih sayfasını
+      // açar); yine de yeni bir çağrı yeri eklenirse tarihsiz yazmak yerine
+      // doğru akışa yönlendirsin.
+      if (listType === "watchedMovies") {
+        requestWatchDate();
+        return;
+      }
 
-      const payload = {
-        id: details.id,
-        type: kind,
-        name: title,
-        imagePath: details.poster_path ?? posterPath,
-        dateAdded: date || formatDateSave(new Date()),
-        minutes: kind === "movie" ? details.runtime : undefined,
-        genres: details.genres?.map((genre) => genre.name) || [],
-      };
-
+      // Hedef durum GÖRÜNEN (bindirmeli) durumdan türer: art arda iki dokunuş
+      // ekle→çıkar olur, ekle→ekle olmaz. Yazma (sıra, iyimser durum, hatada
+      // geri alma, noktalı liste adları) services/libraryActions'ta.
+      const desired = !listStates[listType];
       try {
-        if (PREDEFINED_MOVIE_LISTS.includes(listType)) {
-          // "İzledim" hiçbir zaman buradan geçmez (göz butonu tarih sayfasını
-          // açar); yine de yeni bir çağrı yeri eklenirse tarihsiz yazmak yerine
-          // doğru akışa yönlendirsin.
-          if (listType === "watchedMovies") {
-            requestWatchDate();
-            return;
-          }
-          if (isIn) {
-            await removeFromList(user.uid, listType, kind, details.id);
-            toastRemove();
-          } else {
-            await addToList(user.uid, listType, payload);
-            toastAdd();
-          }
-          return;
-        }
-
-        // Özel listeler — Part B'ye kadar kök doküman dizisinde. Yazma
-        // listItemsService'in transaction'lı yolundan geçer: başka cihazdaki
-        // eşzamanlı ekleme silinmez, noktalı liste adları bozulmaz.
-        if (isIn) {
-          if (await removeFromCustomRootList(user.uid, listType, kind, details.id)) {
-            toastRemove();
-          }
-        } else if (await addToCustomRootList(user.uid, listType, payload)) {
-          toastAdd();
-        }
-      } catch (error) {
-        Toast.show({
-          type: "error",
-          text1:
-            i18nText("autoI18n.hata_2", "Hata: ") + (error?.message || ""),
+        await setListMembership({
+          uid: user.uid,
+          listKey: listType,
+          item: listItemFromDetails(
+            {
+              ...details,
+              name: details.name || title,
+              poster_path: details.poster_path ?? posterPath,
+            },
+            kind,
+            { dateAdded: date || formatDateSave(new Date()) },
+          ),
+          desired,
         });
+        Toast.show({
+          type: desired ? "success" : "warning",
+          text1: i18nText(
+            desired ? "autoI18n.media_added_to_list" : "autoI18n.media_removed_from_list",
+            desired
+              ? "{{media}} {{list}} listesine eklendi!"
+              : "{{media}} {{list}} listesinden kaldırıldı!",
+            { media: kindLabel, list: listLabel(listType) },
+          ),
+        });
+      } catch (error) {
+        showLibraryError(error, { source: "quick_actions_list" });
       }
     },
     [
@@ -628,22 +602,11 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
       const isRewatch = !!listStates.watchedMovies;
       setBusy(true);
       try {
-        await markMovieWatch(
-          user.uid,
-          {
-            id: details.id,
-            type: "movie",
-            name: details.title,
-            imagePath: details.poster_path,
-            dateAdded: date,
-            minutes: details.runtime,
-            genres: details.genres?.map((genre) => genre.name) || [],
-            // Yayın kapısı için — Firestore'a yazılmaz (normalizeItem beyaz liste).
-            releaseDate: details.release_date,
-            status: details.status,
-          },
-          date,
-        );
+        await markMovieWatched({
+          uid: user.uid,
+          movie: movieWatchItemFromDetails(details, { dateAdded: date }),
+          watchDate: date,
+        });
         setDateSheetVisible(false);
         Toast.show({
           type: "success",
@@ -658,11 +621,7 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
               ),
         });
       } catch (error) {
-        Toast.show({
-          type: "error",
-          text1:
-            i18nText("autoI18n.hata_2", "Hata: ") + (error?.message || ""),
-        });
+        showLibraryError(error, { source: "quick_actions_movie_watch" });
       } finally {
         setBusy(false);
       }
@@ -670,57 +629,31 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
     [user?.uid, details, listStates.watchedMovies],
   );
 
-  /* Diziyi komple işaretle — detay ekranındaki `addShowToFirestore` ile aynı
-     sıra: her sezonun bölümleri çekilir, sonra TEK `markShow` yazımı yapılır.
-     Tek bir sezon isteği patlarsa hiçbir bölüm yazılmaz; sessiz kalmayıp hata
-     gösteriyoruz. */
+  /* Diziyi komple işaretle: sezonların çekilmesi, "biri düşerse hiçbiri
+     yazılmaz" kuralı ve tek olay yazımı services/libraryActions.markShowWatched'ta
+     (detay ekranı ve listeye hızlı ekleme ile AYNI yol). */
   const confirmShowWatch = useCallback(
     async (date) => {
       if (!user?.uid || !Array.isArray(details?.seasons)) return;
       setBusy(true);
       try {
-        const watchDate = formatDateSave(date);
-        const locale = language === "tr" ? "tr-TR" : "en-US";
-        const seasonsWithEpisodes = [];
-        for (const season of details.seasons) {
-          if (!season.season_number || season.episode_count === 0) continue;
-          const response = await axios.get(
-            `https://api.themoviedb.org/3/tv/${details.id}/season/${season.season_number}`,
-            {
-              params: { language: locale },
-              headers: { accept: "application/json", Authorization: API_KEY },
-            },
-          );
-          seasonsWithEpisodes.push({
-            seasonNumber: season.season_number,
-            seasonPosterPath: season.poster_path || null,
-            seasonEpisodes: season.episode_count,
-            episodes: (response.data?.episodes || []).map((episode) => ({
-              episodeNumber: episode.episode_number,
-              episodePosterPath: episode.still_path || null,
-              episodeName: episode.name || "Unknown",
-              episodeRatings: parseFloat(episode.vote_average?.toFixed(1)) || 0,
-              episodeMinutes: episode.runtime || 0,
-              releaseDate: episode.air_date || null,
-            })),
+        const { status } = await markShowWatched({
+          uid: user.uid,
+          details,
+          watchDate: formatDateSave(date),
+          apiKey: API_KEY,
+          language,
+        });
+        if (status === "empty-show") {
+          Toast.show({
+            type: "warning",
+            text1: i18nText(
+              "autoI18n.bolum_bilgisi_bulunamadi",
+              "Bu dizinin bölüm bilgisi bulunamadı.",
+            ),
           });
+          return;
         }
-        await markShow(
-          user.uid,
-          {
-            id: details.id,
-            name: details.name,
-            showEpisodeCount: details.number_of_episodes,
-            showSeasonCount: details.number_of_seasons,
-            imagePath: details.poster_path,
-            genres: details.genres?.map((genre) => genre.name) || [],
-            // Yayın kapısı için — belgeye yazılmaz (buildShowMeta beyaz liste).
-            firstAirDate: details.first_air_date,
-            status: details.status,
-          },
-          seasonsWithEpisodes,
-          watchDate,
-        );
         setDateSheetVisible(false);
         Toast.show({
           type: "success",
@@ -730,11 +663,7 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
           ),
         });
       } catch (error) {
-        Toast.show({
-          type: "error",
-          text1:
-            i18nText("autoI18n.hata_2", "Hata: ") + (error?.message || ""),
-        });
+        showLibraryError(error, { source: "quick_actions_show_watch" });
       } finally {
         setBusy(false);
       }
@@ -748,8 +677,8 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
       const remaining = isTv ? watchEvents : movieEvents;
       setBusy(true);
       try {
-        if (isTv) await removeTvWatchEvent(user.uid, id, event.id);
-        else await removeMovieWatchEvent(user.uid, id, event.id);
+        if (isTv) await removeTvWatch({ uid: user.uid, showId: id, eventId: event.id });
+        else await removeMovieWatch({ uid: user.uid, movieId: id, eventId: event.id });
         Toast.show({
           type: "success",
           text1: i18nText(
@@ -759,11 +688,7 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
         });
         if (remaining.length <= 1) setHistoryVisible(false);
       } catch (error) {
-        Toast.show({
-          type: "error",
-          text1:
-            i18nText("autoI18n.hata_2", "Hata: ") + (error?.message || ""),
-        });
+        showLibraryError(error, { source: "quick_actions_remove_watch" });
       } finally {
         setBusy(false);
       }

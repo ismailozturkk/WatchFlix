@@ -10,8 +10,8 @@
 // parçası. Onu buradan tetiklemek için ListView'i BÜTÜN OLARAK açmak (uzun
 // basma davranışı) gerekirdi — oysa bu buton yalnız Diğer Listeler'e gitmeli.
 // Bu yüzden aynı veriyi (ListStatusContext.otherListKeys/allLists) ve aynı
-// yazma yollarını (addToCustomRootList/removeFromCustomRootList) kullanan,
-// tek işi bu olan küçük bir sayfa.
+// yazma yolunu (services/libraryActions.setListMembership → özel liste dalı)
+// kullanan, tek işi bu olan küçük bir sayfa.
 
 import React, { useEffect, useRef, useState, memo } from "react";
 import {
@@ -31,12 +31,10 @@ import { useAuth } from "@context/AuthContext";
 import { useListStatusContext } from "@context/ListStatusContext";
 import { useHapticsSettings } from "@context/AppSettingsContext";
 import * as Haptics from "@services/hapticsService";
-import {
-  addToCustomRootList,
-  removeFromCustomRootList,
-} from "@services/listItemsService";
+import { setListMembership } from "@services/libraryActions";
 import { todayListDate } from "@utils/mediaFacts";
 import { i18nText } from "@utils/i18nText";
+import { showLibraryError } from "@utils/libraryErrorText";
 
 const GridCard = memo(function GridCard({ label, active, onPress, theme }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -154,14 +152,21 @@ export default function OtherListsPickerModal({
       );
     }
     try {
-      if (next) {
-        await addToCustomRootList(user.uid, key, {
+      // Özel listeler kök dokümanda: libraryActions bunları tek sırada, noktalı
+      // adlara ve eşzamanlı yazımlara karşı güvenli (transaction) yazar.
+      await setListMembership({
+        uid: user.uid,
+        listKey: key,
+        item: {
           id: mediaId,
           type: mediaType,
           name: title,
           imagePath: posterPath,
           dateAdded: todayListDate(),
-        });
+        },
+        desired: next,
+      });
+      if (next) {
         Toast.show({
           type: "success",
           text1: i18nText(
@@ -171,7 +176,6 @@ export default function OtherListsPickerModal({
           ),
         });
       } else {
-        await removeFromCustomRootList(user.uid, key, mediaType, mediaId);
         Toast.show({
           type: "warning",
           text1: i18nText(
@@ -183,10 +187,7 @@ export default function OtherListsPickerModal({
       }
     } catch (error) {
       setOptimistic((prev) => ({ ...prev, [key]: current }));
-      Toast.show({
-        type: "error",
-        text1: i18nText("autoI18n.hata_2", "Hata: ") + (error?.message || ""),
-      });
+      showLibraryError(error, { source: "other_lists_toggle" });
     }
   };
 

@@ -1,4 +1,9 @@
-import { buildStatusIndex, resolveStatusIndex } from "../utils/listStatusIndex";
+import {
+  applyStatusOverlay,
+  buildStatusIndex,
+  findDriftedLists,
+  resolveStatusIndex,
+} from "../utils/listStatusIndex";
 import React, {
   createContext,
   useContext,
@@ -7,6 +12,7 @@ import React, {
   useMemo,
   useRef,
   useCallback,
+  useSyncExternalStore,
 } from "react";
 import {
   doc,
@@ -15,9 +21,16 @@ import {
 import { Keys, get, set, getActiveUser } from "../services/storage";
 import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
+import { useConnectivity } from "./ConnectivityContext";
 import {
+  EMPTY_OVERLAY,
+  clearOverlayFor,
+  getOverlay,
+  subscribeOverlay,
+} from "../services/libraryOverlay";
+import {
+  clearLegacyWatchedTv,
   dedupeWatchedTvEntries,
-  migrateWatchedTvDocIds,
   migrateLegacyShow,
 } from "../services/watchedTvService";
 import {
@@ -39,10 +52,10 @@ import {
 } from "../services/usageTrackerService";
 import {
   getLocalList,
+  hasLocalList,
   setLocalList,
   subscribeLocalList,
   fetchFullListOnce,
-  syncListDelta,
 } from "../services/listSyncService";
 import {
   materializeTvWatchState,
@@ -52,6 +65,21 @@ import {
 const RESERVED_SET = new Set(RESERVED_LIST_NAMES);
 
 const EMPTY_INDEX = Object.freeze({ movie: {}, tv: {} });
+
+// Bu cihazda ilk açılışta indirilen dört alt koleksiyon.
+const LIST_KEYS = ["favorites", "watchList", "watchedMovies", "watchedTv"];
+
+// Kök snapshot geldikten sonra sapma denetimini bu kadar bekletiriz: kendi
+// yazımızın yankısı (sunucu commit'i yerel haritayı güncellemeden önce gelebilir)
+// sapma gibi görünmesin.
+const DRIFT_CHECK_DELAY_MS = 2500;
+
+// Kök dokümanın son değişiklik zamanı (ms) — "bu sürümü zaten denedik" damgası.
+const rootStamp = (root) => {
+  const value = root?.updatedAt;
+  if (typeof value?.toMillis === "function") return value.toMillis();
+  return Number.isFinite(value?.seconds) ? value.seconds * 1000 : 0;
+};
 
 const ListStatusContext = createContext();
 
@@ -102,6 +130,7 @@ const tohumOku = (uid) => {
 
 export const ListStatusProvider = ({ children }) => {
   const { user } = useAuth();
+  const { isOnline } = useConnectivity();
   const ilkTohum = useMemo(
     () => tohumOku(user?.uid ?? getActiveUser()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,6 +147,13 @@ export const ListStatusProvider = ({ children }) => {
   const cacheHydratedForUid = useRef(null);
   const hasHydratedStatusCache = useRef(Boolean(ilkTohum));
   const missingSyncInitiatedForUidRef = useRef(null);
+  // Son kök snapshot SUNUCUDAN mı geldi (yerel yazım yankısı / önbellek değil)?
+  const rootFromServerRef = useRef(false);
+  // listKey → o listeyi yeniden çektiğimiz kök sürümü (updatedAt ms). Sapma
+  // yeniden çekmeyle de kapanmıyorsa (ör. eski bir hatadan kalma hayalet bayrak)
+  // aynı sürümde tekrar tekrar sorgulamayalım.
+  const driftResyncRef = useRef({});
+  const allListsRef = useRef(null);
 
   const [favoritesMap, setFavoritesMap] = useState(
     ilkTohum?.favoritesMap ?? {},
@@ -138,7 +174,13 @@ export const ListStatusProvider = ({ children }) => {
   // ── 1. Kullanıcı Değişimi & Açılış: Senkron Yerel Yükleme ve Temizlik ────────
   useEffect(() => {
     const uid = user?.uid;
+    // Önceki kullanıcının bekleyen iyimser bayrakları yenisine sızmasın.
+    if (currentUidRef.current && currentUidRef.current !== uid) {
+      clearOverlayFor(currentUidRef.current);
+    }
     currentUidRef.current = uid;
+    rootFromServerRef.current = false;
+    driftResyncRef.current = {};
 
     if (!uid) {
       // Çıkış yapıldı veya henüz oturum açılmadı
@@ -201,12 +243,24 @@ export const ListStatusProvider = ({ children }) => {
     return unsubscribe;
   }, [user?.uid]);
 
-  // ── 3. Yerelde Olmayan Listeleri TEK SEFERLİK Çek ve Kaydet (Lazy Hydration) ──
+  // ── 3. Bu Cihaza Hiç İndirilmemiş Listeleri TEK SEFERLİK Çek (Lazy Hydration) ──
+  //
+  // KAPI: "bu liste bu cihaza hiç indirildi mi?" (hasLocalList). Eskiden kapı kök
+  // dokümandaki `counts.X > 0` sayacıydı; sayaçlar artış/azalışla tutulduğundan
+  // sapabiliyor ve sıfıra inmiş bir sayaç yeni cihazda dolu listeyi BOŞ
+  // gösteriyordu. İndirilmiş-ama-boş liste hasLocalList'te true kalır, yani boş
+  // listeler her açılışta yeniden sorgulanmaz.
+  //
+  // @returns {Promise<boolean>} dört liste de bu cihazda mevcutsa true
   const checkAndFetchMissingLists = useCallback(async (uid, rootData) => {
-    if (!uid || currentUidRef.current !== uid) return;
+    if (!uid || currentUidRef.current !== uid) return true;
+    const setters = {
+      favorites: setFavoritesMap,
+      watchList: setWatchListMap,
+      watchedMovies: setWatchedMoviesMap,
+      watchedTv: setWatchedTvMap,
+    };
     try {
-      const counts = rootData?.counts || {};
-
       // Legacy migration: eski kök-array formatı varsa
       const hasLegacyMovies = PREDEFINED_MOVIE_LISTS.some(
         (k) => Array.isArray(rootData?.[k]) && rootData[k].length > 0,
@@ -214,39 +268,21 @@ export const ListStatusProvider = ({ children }) => {
       if (hasLegacyMovies && currentUidRef.current === uid) {
         await migrateLegacyMovieLists(uid, rootData);
       }
-      if (Array.isArray(rootData?.watchedTv) && rootData.watchedTv.length > 0 && currentUidRef.current === uid) {
+      if (Array.isArray(rootData?.watchedTv) && currentUidRef.current === uid) {
         for (const show of rootData.watchedTv) {
           if (show && show.id != null && currentUidRef.current === uid) {
             await migrateLegacyShow(uid, show);
           }
         }
+        // Hepsi hatasız taşındıysa eski dizi silinir; yoksa her açılışta yeniden denenirdi.
+        if (currentUidRef.current === uid) await clearLegacyWatchedTv(uid);
       }
 
-      // YALNIZCA yerel depoda hiç veri yoksa ve Firestore'da kayıt varsa TEK SEFERLİK çek
-      const favLocal = getLocalList(uid, "favorites");
-      if ((counts.favorites > 0 || hasLegacyMovies) && Object.keys(favLocal).length === 0) {
-        const favs = await fetchFullListOnce(uid, "favorites");
-        if (currentUidRef.current === uid) setFavoritesMap(favs);
-      }
-
-      const watchLocal = getLocalList(uid, "watchList");
-      if ((counts.watchList > 0 || hasLegacyMovies) && Object.keys(watchLocal).length === 0) {
-        const wls = await fetchFullListOnce(uid, "watchList");
-        if (currentUidRef.current === uid) setWatchListMap(wls);
-      }
-
-      const movLocal = getLocalList(uid, "watchedMovies");
-      if ((counts.watchedMovies > 0 || hasLegacyMovies) && Object.keys(movLocal).length === 0) {
-        const movs = await fetchFullListOnce(uid, "watchedMovies");
-        if (currentUidRef.current === uid) setWatchedMoviesMap(movs);
-      }
-
-      const tvLocal = getLocalList(uid, "watchedTv");
-      if ((counts.watchedTv > 0 || Array.isArray(rootData?.watchedTv)) && Object.keys(tvLocal).length === 0) {
-        const tvs = await fetchFullListOnce(uid, "watchedTv");
-        if (currentUidRef.current === uid) {
-          setWatchedTvMap(tvs);
-        }
+      for (const listKey of LIST_KEYS) {
+        if (currentUidRef.current !== uid) break;
+        if (hasLocalList(uid, listKey)) continue;
+        const map = await fetchFullListOnce(uid, listKey);
+        if (currentUidRef.current === uid) setters[listKey](map);
       }
     } catch (err) {
       if (__DEV__) console.warn("[ListStatusContext] checkAndFetchMissingLists error:", err);
@@ -256,6 +292,8 @@ export const ListStatusProvider = ({ children }) => {
         setLoading(false);
       }
     }
+    // fetchFullListOnce hatada yerel işaretçiyi YAZMAZ: eksik kalan varsa tekrar denenecek.
+    return LIST_KEYS.every((listKey) => hasLocalList(uid, listKey));
   }, []);
 
   // ── 4. KÖK DOKÜMAN DİNLEYİCİSİ: Lists/{uid} (Açılışta YALNIZCA 1 READ) ───
@@ -268,6 +306,11 @@ export const ListStatusProvider = ({ children }) => {
         trackFirestoreRead("Lists/root", 1);
         const next = docSnap.exists() ? docSnap.data() : null;
         if (currentUidRef.current === user.uid) {
+          // Yerel yazım yankısı / önbellek değil, sunucu onaylı sürüm: sapma
+          // denetimi yalnız buna güvenir (aşağıdaki "sapma onarımı" effect'i).
+          rootFromServerRef.current =
+            !docSnap.metadata?.fromCache && !docSnap.metadata?.hasPendingWrites;
+          allListsRef.current = next;
           setAllLists((current) => (sameJson(current, next) ? current : next));
           publishSnapshot(cacheKeys.lists(user.uid, "root"), next);
           setRootLoaded(true);
@@ -275,7 +318,13 @@ export const ListStatusProvider = ({ children }) => {
 
           if (missingSyncInitiatedForUidRef.current !== user.uid) {
             missingSyncInitiatedForUidRef.current = user.uid;
-            checkAndFetchMissingLists(user.uid, next);
+            checkAndFetchMissingLists(user.uid, next).then((complete) => {
+              // Çevrimdışı açılış gibi durumlarda eksik kalan liste olursa bir
+              // sonraki fırsatta (kök değişimi / bağlantı dönüşü) yeniden denensin.
+              if (!complete && currentUidRef.current === user.uid) {
+                missingSyncInitiatedForUidRef.current = null;
+              }
+            });
           }
         }
       },
@@ -358,25 +407,94 @@ export const ListStatusProvider = ({ children }) => {
     ],
   );
 
-  const statusIndex = useMemo(() => resolveStatusIndex(
+  const baseStatusIndex = useMemo(() => resolveStatusIndex(
     allLists,
     fallbackStatusIndex,
     rootLoaded ? null : cachedStatusIndex,
   ), [rootLoaded, cachedStatusIndex, fallbackStatusIndex, allLists]);
 
-  // Debounce'lu cache yazımı
+  // Bekleyen (henüz sunucuya yazılmamış) işlemlerin niyeti: düğmeye basıldığı
+  // an o eseri gösteren HER ekran güncellensin (bkz. services/libraryOverlay).
+  const overlayUid = user?.uid;
+  const overlay = useSyncExternalStore(
+    subscribeOverlay,
+    useCallback(() => getOverlay(overlayUid), [overlayUid]),
+  );
+  const statusIndex = useMemo(
+    () => applyStatusOverlay(baseStatusIndex, overlay),
+    [baseStatusIndex, overlay],
+  );
+
+  // Debounce'lu cache yazımı — bindirmesiz TABAN indeks yazılır: başarısız olacak
+  // bir iyimser bayrak diske kalıcı olmasın.
   useEffect(() => {
-    if (!user?.uid || !statusIndex) return undefined;
+    if (!user?.uid || !baseStatusIndex) return undefined;
     const uid = user.uid;
     const timer = setTimeout(() => {
       set(
         Keys.listStatus,
-        { allLists, statusIndex, ts: Date.now() },
+        { allLists, statusIndex: baseStatusIndex, ts: Date.now() },
         { uid },
       );
     }, 2500);
     return () => clearTimeout(timer);
-  }, [allLists, statusIndex, user?.uid]);
+  }, [allLists, baseStatusIndex, user?.uid]);
+
+  // ── Sapma onarımı ─────────────────────────────────────────────────────────
+  // Kök dokümandaki statusIndex canlı dinlenir; yerel liste haritaları ise
+  // yalnız bu cihazın yazımlarıyla ve ilk indirmeyle güncellenir. Başka cihazda
+  // yapılan ekleme/silme (ya da commit sonrası yerel güncellemeden önce kapanan
+  // uygulama) ikisini ayırır. Sapma SIFIR okumayla tespit edilir; yalnız sapan
+  // liste yeniden çekilir. Aynı kök sürümünde bir liste bir kez denenir:
+  // yeniden çekmeyle de kapanmayan sapma (ör. eski bir hatadan kalma hayalet
+  // bayrak) sonsuz sorgu döngüsüne dönmez.
+  const overlayIdle = overlay === EMPTY_OVERLAY;
+  useEffect(() => {
+    const uid = user?.uid;
+    const index = allLists?.statusIndex;
+    if (!uid || !rootLoaded || !overlayIdle || !index || !rootFromServerRef.current) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      if (currentUidRef.current !== uid) return;
+      const stamp = rootStamp(allListsRef.current);
+      findDriftedLists(index, {
+        favorites: favoritesMap,
+        watchList: watchListMap,
+        watchedMovies: watchedMoviesMap,
+        watchedTv: watchedTvMap,
+      }).forEach((listKey) => {
+        if (driftResyncRef.current[listKey] === stamp) return;
+        driftResyncRef.current[listKey] = stamp;
+        refreshList(listKey).catch(() => {});
+      });
+    }, DRIFT_CHECK_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [
+    user?.uid,
+    rootLoaded,
+    overlayIdle,
+    allLists,
+    favoritesMap,
+    watchListMap,
+    watchedMoviesMap,
+    watchedTvMap,
+    refreshList,
+  ]);
+
+  // Bağlantı geri geldiğinde, çevrimdışı açılışta indirilemeyen listeler varsa
+  // ilk indirmeyi yeniden dene (kök snapshot'ın değişmesini beklemeden).
+  useEffect(() => {
+    const uid = user?.uid;
+    if (!isOnline || !uid || !rootLoaded) return;
+    if (missingSyncInitiatedForUidRef.current !== null) return;
+    missingSyncInitiatedForUidRef.current = uid;
+    checkAndFetchMissingLists(uid, allListsRef.current).then((complete) => {
+      if (!complete && currentUidRef.current === uid) {
+        missingSyncInitiatedForUidRef.current = null;
+      }
+    });
+  }, [isOnline, user?.uid, rootLoaded, checkAndFetchMissingLists]);
 
   const otherListKeys = useMemo(() => {
     if (!allLists) return [];

@@ -23,7 +23,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
-import { getDoc, doc, updateDoc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
 import WatchHistorySheet from "@components/modals/WatchHistorySheet";
@@ -38,13 +38,19 @@ import SwipeCard from "@components/SwipeCard";
 import ListBadges from "../../components/ListBadges";
 import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
 import { useListStatusContext } from "../../context/ListStatusContext";
+import { PREDEFINED_MOVIE_LISTS } from "../../services/listItemsService";
 import {
-  addToList,
-  markMovieWatch,
-  removeMovieWatchEvent,
-  removeFromList,
-  PREDEFINED_MOVIE_LISTS,
-} from "../../services/listItemsService";
+  markMovieWatched,
+  removeMovieWatch,
+  setListMembership,
+} from "../../services/libraryActions";
+import {
+  customListHas,
+  listItemFromDetails,
+  movieWatchItemFromDetails,
+} from "../../utils/libraryCore";
+import { showLibraryError } from "../../utils/libraryErrorText";
+import { todayListDate } from "../../utils/mediaFacts";
 import { movieWatchEvents } from "../../utils/watchHistory";
 import ScreenDecor from "../../components/ScreenDecor";
 import { useAuth } from "../../context/AuthContext";
@@ -618,7 +624,6 @@ export default function MovieDetails({ navigation, route }) {
   const updateMovieList = async (listType, type, date = null) => {
     if (!user?.uid || !details) return;
     closeModal();
-    const isPredefined = PREDEFINED_MOVIE_LISTS.includes(listType);
     const toastRemove = () =>
       Toast.show({
         type: "warning",
@@ -634,89 +639,52 @@ export default function MovieDetails({ navigation, route }) {
       });
 
     try {
-      if (isPredefined) {
-        // Yeni model: her öğe ayrı doküman (listItemsService).
-        const isIn = !!listStates[listType];
-        setIsLoading(listType === "watchedMovies");
-        if (listType === "watchedMovies") {
-          if (!date) {
-            Toast.show({ type: "warning", text1: i18nText("autoI18n.lutfen_bir_tarih_secin", "Lütfen bir tarih seçin.") });
-            setIsLoading(false);
-            return;
-          }
-          await markMovieWatch(user.uid, {
-            id: details.id,
-            type: "movie",
-            name: details.title,
-            imagePath: details.poster_path,
-            dateAdded: date,
-            minutes: details.runtime,
-            genres: details.genres?.map((g) => g.name) || [],
-            // Yayın kapısı için — Firestore'a yazılmaz (normalizeItem beyaz liste).
-            releaseDate: details.release_date,
-            status: details.status,
-          }, date);
-          Toast.show({
-            type: "success",
-            text1: isIn
-              ? i18nText("autoI18n.tekrar_izleme_eklendi", "Tekrar izleme geçmişe eklendi.")
-              : i18nText("autoI18n.film_izlendi_eklendi", "Film izlendi olarak eklendi."),
-          });
-        } else if (isIn) {
-          await removeFromList(user.uid, listType, type, details.id);
-          toastRemove();
-        } else {
-          if (!date) {
-            Toast.show({ type: "warning", text1: i18nText("autoI18n.lutfen_bir_tarih_secin", "Lütfen bir tarih seçin.") });
-            setIsLoading(false);
-            return;
-          }
-          await addToList(user.uid, listType, {
-            id: details.id,
-            type,
-            name: type === "movie" ? details.title : details.name,
-            imagePath: details.poster_path,
-            dateAdded: date,
-            minutes: type === "movie" ? details.runtime : undefined,
-            genres: details.genres?.map((g) => g.name) || [],
-          });
-          toastAdd();
+      // İzlendi: liste üyeliği değil izleme OLAYI (tekrar izleme desteklenir).
+      if (listType === "watchedMovies") {
+        if (!date) {
+          Toast.show({ type: "warning", text1: i18nText("autoI18n.lutfen_bir_tarih_secin", "Lütfen bir tarih seçin.") });
+          return;
         }
-        setIsLoading(false);
+        const isRewatch = !!listStates.watchedMovies;
+        setIsLoading(true);
+        try {
+          await markMovieWatched({
+            uid: user.uid,
+            movie: movieWatchItemFromDetails(details, { dateAdded: date }),
+            watchDate: date,
+          });
+        } finally {
+          setIsLoading(false);
+        }
+        Toast.show({
+          type: "success",
+          text1: isRewatch
+            ? i18nText("autoI18n.tekrar_izleme_eklendi", "Tekrar izleme geçmişe eklendi.")
+            : i18nText("autoI18n.film_izlendi_eklendi", "Film izlendi olarak eklendi."),
+        });
         return;
       }
 
-      // Özel listeler — eski kök-array yolu (Part B'de listItemsService'e taşınacak).
-      const ref = doc(db, "Lists", user.uid);
-      const snap = await getDoc(ref);
-      let data = snap.exists() ? snap.data() : {};
-      if (!snap.exists()) await setDoc(ref, data);
-      let list = data[listType] || [];
-      const idx = list.findIndex((i) => i.id === details.id && i.type === type);
-      if (idx !== -1) {
-        list.splice(idx, 1);
-        toastRemove();
-      } else {
-        list.push({
-          id: details.id,
-          imagePath: details.poster_path,
-          dateAdded: date,
-          name: type === "movie" ? details.title : details.name,
-          minutes: type === "movie" ? details.runtime : undefined,
-          type,
-          genres: details.genres?.map((g) => g.name) || [],
-        });
-        toastAdd();
-      }
-      await updateDoc(ref, { [listType]: list });
+      // Favoriler / izlenecekler / özel listeler: tek kapı (sıralı, iyimser,
+      // hatada geri alınır). Hedef durum GÖRÜNEN durumdan türer — art arda iki
+      // dokunuş ekle→çıkar olur, ekle→ekle olmaz.
+      const desired = !listStates[listType];
+      await setListMembership({
+        uid: user.uid,
+        listKey: listType,
+        item: listItemFromDetails(details, type, { dateAdded: date || todayListDate() }),
+        desired,
+      });
+      if (desired) toastAdd();
+      else toastRemove();
     } catch (error) {
-      setIsLoading(false);
-      Toast.show({ type: "error", text1: i18nText("autoI18n.hata_2", "Hata: ") + error.message });
+      showLibraryError(error, { source: "movie_detail_list" });
     }
   };
 
-  // listStates: öntanımlı (favorites/watchList/watchedMovies) artık subcollection
-  // tabanlı statusIndex'ten; özel listeler Part B'ye kadar kök-array'den.
+  // listStates: öntanımlı (favorites/watchList/watchedMovies) subcollection
+  // tabanlı statusIndex'ten (bekleyen işlemlerin bindirmesi dahil); özel listeler
+  // kök dokümandaki dizilerden.
   const listStates = useMemo(() => {
     const s = {};
     const m = statusIndex?.movie?.[id] || {};
@@ -731,8 +699,7 @@ export default function MovieDetails({ navigation, route }) {
           k === "customLists"
         )
           return;
-        if (Array.isArray(v))
-          s[k] = v.some((i) => i.id === id && i.type === "movie");
+        if (Array.isArray(v)) s[k] = customListHas(allLists, k, id, "movie");
       });
     }
     return s;
@@ -1762,14 +1729,14 @@ export default function MovieDetails({ navigation, route }) {
           if (!user?.uid || !details?.id) return;
           try {
             setIsLoading(true);
-            await removeMovieWatchEvent(user.uid, details.id, event.id);
+            await removeMovieWatch({ uid: user.uid, movieId: details.id, eventId: event.id });
             Toast.show({
               type: "success",
               text1: i18nText("autoI18n.izleme_kaydi_silindi", "Seçilen izleme kaydı silindi."),
             });
             if (watchEvents.length <= 1) setWatchHistoryVisible(false);
           } catch (error) {
-            Toast.show({ type: "error", text1: i18nText("autoI18n.hata_2", "Hata: ") + error.message });
+            showLibraryError(error, { source: "movie_detail_remove_watch" });
           } finally {
             setIsLoading(false);
           }

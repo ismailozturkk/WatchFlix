@@ -27,9 +27,9 @@ import {
   doc,
   collection,
   runTransaction,
-  setDoc,
   getDocs,
   writeBatch,
+  deleteField,
   increment,
   serverTimestamp,
 } from "firebase/firestore";
@@ -46,6 +46,7 @@ import {
   assertWatchable,
   filterWatchableEpisodes,
 } from "../utils/watchState";
+import { LIBRARY_ERROR, LibraryError } from "../utils/libraryCore";
 import { updateLocalItem, deleteLocalItem } from "./listSyncService";
 
 // Doküman id şeması: `tv_${showId}` — TÜM liste öğesi koleksiyonlarıyla aynı
@@ -306,26 +307,16 @@ function buildShowMeta(showMeta, watchDate) {
 }
 
 /**
- * Bir sezona bir veya daha çok bölüm ekler (transaction; dedupe episodeNumber).
- * showMeta: { id, name, showEpisodeCount, showSeasonCount, imagePath, genres }
- * seasonMeta: { seasonNumber, seasonPosterPath, seasonEpisodes }
+ * Ortak yazma çekirdeği: bir dizi için verilen sezon/bölüm hedeflerini TEK
+ * olay olarak ekler (transaction; bölümler episodeNumber'a göre tekilleşir).
+ *
+ * `markEpisodes` (tek bölüm / sezon) ile `markShow` (tüm dizi) eskiden bu
+ * gövdeyi birebir kopyalıyordu; ikisinin sapması (ör. biri kök özeti, diğeri
+ * yerel önbelleği unutursa) izleme sayaçlarını sessizce bozardı. Şimdi tek yer.
+ *
+ * @returns {Promise<object|null>} oluşturulan izleme olayı
  */
-export async function markEpisodes(
-  uid,
-  showMeta,
-  seasonMeta,
-  episodes,
-  watchDate,
-  options = {},
-) {
-  if (!uid || showMeta?.id == null || seasonMeta?.seasonNumber == null) return;
-  if (!Array.isArray(episodes) || episodes.length === 0) return;
-  const releasedEpisodes = filterWatchableEpisodes(episodes);
-  if (releasedEpisodes.length === 0) {
-    const first = episodes[0] || {};
-    assertWatchable(first.releaseDate ?? first.airDate, first.status);
-    return null;
-  }
+async function commitWatch(uid, showMeta, targets, watchDate, scope) {
   const ref = showRef(uid, showMeta.id);
   const rootRef = doc(db, "Lists", uid);
   const docKey = `tv_${showMeta.id}`;
@@ -335,13 +326,7 @@ export async function markEpisodes(
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     const data = snap.exists() ? snap.data() : null;
-    const result = appendWatchEvent(
-      data,
-      showMeta,
-      [{ seasonMeta, episodes: releasedEpisodes }],
-      watchDate,
-      options.scope || "episode",
-    );
+    const result = appendWatchEvent(data, showMeta, targets, watchDate, scope);
     if (!result) return;
     createdEvent = result.event;
 
@@ -404,118 +389,70 @@ export async function markEpisodes(
   });
 
   if (localDocument) updateLocalItem(uid, "watchedTv", docKey, localDocument);
+  return createdEvent;
+}
+
+/** Geçersiz tarihle yazmak sessizce hiçbir şey yapmazdı; arayüz yine "başarılı" derdi. */
+function assertWatchDate(watchDate) {
+  if (normalizeWatchDate(watchDate)) return;
+  throw new LibraryError(LIBRARY_ERROR.INVALID, "Geçersiz izleme tarihi");
+}
+
+/**
+ * Bir sezona bir veya daha çok bölüm ekler (transaction; dedupe episodeNumber).
+ * showMeta: { id, name, showEpisodeCount, showSeasonCount, imagePath, genres }
+ * seasonMeta: { seasonNumber, seasonPosterPath, seasonEpisodes }
+ */
+export async function markEpisodes(
+  uid,
+  showMeta,
+  seasonMeta,
+  episodes,
+  watchDate,
+  options = {},
+) {
+  if (!uid || showMeta?.id == null || seasonMeta?.seasonNumber == null) return;
+  if (!Array.isArray(episodes) || episodes.length === 0) return;
+  const releasedEpisodes = filterWatchableEpisodes(episodes);
+  if (releasedEpisodes.length === 0) {
+    const first = episodes[0] || {};
+    assertWatchable(first.releaseDate ?? first.airDate, first.status);
+    return null;
+  }
+  assertWatchDate(watchDate);
+
+  const scope = options.scope || "episode";
+  const createdEvent = await commitWatch(
+    uid,
+    showMeta,
+    [{ seasonMeta, episodes: releasedEpisodes }],
+    watchDate,
+    scope,
+  );
 
   // markSeason da buraya delege ediyor; `scope` hangisi olduğunu ayırır.
   if (createdEvent) {
     trackEvent(ANALYTICS_EVENTS.CONTENT_TRACKED, {
       content_type: "tv",
       content_id: String(showMeta.id),
-      scope: options.scope || "episode",
+      scope,
       episode_count: releasedEpisodes.length,
       season_number: seasonMeta.seasonNumber,
     });
     trackFirstContentActivation(uid, {
       content_type: "tv",
       content_id: String(showMeta.id),
-      source: options.source || options.scope || "episode",
+      source: options.source || scope,
     });
   }
 
   return createdEvent;
 }
 
-/** Tek bir bölümün işaretini kaldırır (boş sezon→çıkar, son bölüm→show'u sil). */
-export async function unmarkEpisode(uid, showId, seasonNumber, episodeNumber) {
-  if (!uid || showId == null || seasonNumber == null) return;
-  const ref = showRef(uid, showId);
-  const docKey = `tv_${showId}`;
-
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists()) return;
-    const seasons = snap.data().seasons || [];
-    const idx = seasons.findIndex((s) => s.seasonNumber === seasonNumber);
-    if (idx === -1) return;
-
-    const remainingEps = (seasons[idx].episodes || []).filter(
-      (e) => e.episodeNumber !== episodeNumber,
-    );
-    if (remainingEps.length === (seasons[idx].episodes || []).length) return; // yok
-
-    let newSeasons;
-    if (remainingEps.length === 0) {
-      newSeasons = seasons.filter((s) => s.seasonNumber !== seasonNumber);
-    } else {
-      newSeasons = seasons.map((s, i) =>
-        i === idx ? { ...s, episodes: remainingEps } : s,
-      );
-    }
-
-    if (newSeasons.length === 0) {
-      tx.delete(ref);
-      tx.set(
-        doc(db, "Lists", uid),
-        nestedSummaryFields({
-          [`statusIndex.tv.${showId}.isWatched`]: false,
-          "counts.watchedTv": increment(-1),
-          "stats.tv.shows.unique": increment(-1),
-          updatedAt: serverTimestamp(),
-          _schemaVersion: 3,
-        }),
-        { merge: true },
-      );
-      deleteLocalItem(uid, "watchedTv", docKey);
-      return;
-    }
-    tx.update(ref, {
-      seasons: newSeasons,
-      updatedAt: serverTimestamp(),
-      ...recomputeAggregates(newSeasons),
-    });
-  });
-}
-
 /** Bir sezonun tüm bölümlerini işaretler (markEpisodes wrapper'ı). */
 export async function markSeason(uid, showMeta, seasonMeta, episodes, watchDate) {
   return markEpisodes(uid, showMeta, seasonMeta, episodes, watchDate, {
     scope: "season",
-  });
-}
-
-/** Bir sezonun işaretini komple kaldırır. */
-export async function unmarkSeason(uid, showId, seasonNumber) {
-  if (!uid || showId == null || seasonNumber == null) return;
-  const ref = showRef(uid, showId);
-  const docKey = `tv_${showId}`;
-
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists()) return;
-    const seasons = snap.data().seasons || [];
-    const newSeasons = seasons.filter((s) => s.seasonNumber !== seasonNumber);
-    if (newSeasons.length === seasons.length) return; // yok
-
-    if (newSeasons.length === 0) {
-      tx.delete(ref);
-      tx.set(
-        doc(db, "Lists", uid),
-        nestedSummaryFields({
-          [`statusIndex.tv.${showId}.isWatched`]: false,
-          "counts.watchedTv": increment(-1),
-          "stats.tv.shows.unique": increment(-1),
-          updatedAt: serverTimestamp(),
-          _schemaVersion: 3,
-        }),
-        { merge: true },
-      );
-      deleteLocalItem(uid, "watchedTv", docKey);
-      return;
-    }
-    tx.update(ref, {
-      seasons: newSeasons,
-      updatedAt: serverTimestamp(),
-      ...recomputeAggregates(newSeasons),
-    });
   });
 }
 
@@ -533,76 +470,9 @@ export async function markShow(uid, showMeta, seasonsWithEpisodes, watchDate) {
     }))
     .filter((target) => target.episodes.length > 0);
   if (!targets.length) return null;
-  const ref = showRef(uid, showMeta.id);
-  const rootRef = doc(db, "Lists", uid);
-  const docKey = `tv_${showMeta.id}`;
-  let createdEvent = null;
-  let localDocument = null;
+  assertWatchDate(watchDate);
 
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    const data = snap.exists() ? snap.data() : null;
-    const result = appendWatchEvent(data, showMeta, targets, watchDate, "show");
-    if (!result) return;
-    createdEvent = result.event;
-
-    const isFirstShowWatch = !snap.exists();
-    const showData = {
-        ...(snap.exists() ? {} : buildShowMeta(showMeta, watchDate)),
-        ...(snap.exists() && !data?.name ? { name: showMeta.name || "" } : {}),
-        // showEpisodeCount/showSeasonCount: yeni sezon çıktığında eski donmuş
-        // değerin güncellenmesi için mevcut dokümanda da yazılır.
-        ...(snap.exists() && showMeta.showEpisodeCount > 0
-          ? {
-              showEpisodeCount: Math.max(
-                data?.showEpisodeCount || 0,
-                showMeta.showEpisodeCount,
-              ),
-              showSeasonCount: Math.max(
-                data?.showSeasonCount || 0,
-                showMeta.showSeasonCount || 0,
-              ),
-            }
-          : {}),
-        seasons: result.seasons,
-        watchEvents: result.watchEvents,
-        watchCount: result.watchEvents.length,
-        addedShowDate: data?.addedShowDate || normalizeWatchDate(watchDate),
-        updatedAt: serverTimestamp(),
-        ...recomputeAggregates(result.seasons),
-    };
-    tx.set(ref, showData, { merge: true });
-    localDocument = {
-      ...data,
-      ...showData,
-      updatedAt: new Date().toISOString(),
-    };
-
-    const rootUpdates = {
-      [`statusIndex.tv.${showMeta.id}.isWatched`]: true,
-      "stats.tv.episodes.total": increment(result.event.episodeCount),
-      "stats.tv.totalMinutes": increment(result.event.minutes),
-      "stats.totalMinutes": increment(result.event.minutes),
-      updatedAt: serverTimestamp(),
-      _schemaVersion: 3,
-    };
-
-    if (isFirstShowWatch) {
-      rootUpdates["counts.watchedTv"] = increment(1);
-      rootUpdates["stats.tv.shows.unique"] = increment(1);
-      if (Array.isArray(showMeta.genres)) {
-        showMeta.genres.forEach((genreId) => {
-          if (genreId != null) {
-            rootUpdates[`stats.genreCounts.${genreId}`] = increment(1);
-          }
-        });
-      }
-    }
-
-    tx.set(rootRef, nestedSummaryFields(rootUpdates), { merge: true });
-  });
-
-  if (localDocument) updateLocalItem(uid, "watchedTv", docKey, localDocument);
+  const createdEvent = await commitWatch(uid, showMeta, targets, watchDate, "show");
 
   if (createdEvent) {
     trackEvent(ANALYTICS_EVENTS.CONTENT_TRACKED, {
@@ -845,10 +715,18 @@ export async function migrateWatchedTvDocIds(uid, pendingRekey) {
 
 /**
  * Eski kök-dizi modelindeki ({ ..., seasons:[{ seasonNumber, episodes:[...] }] })
- * tek bir diziyi tek-doküman modeline taşır (yalnız subcollection'da olmayanlar için).
+ * tek bir diziyi tek-doküman modeline taşır — YALNIZ yeni modelde belgesi
+ * olmayanlar için.
+ *
+ * Eskiden merge'siz `setDoc` yapıyordu ve göç sonrası kök dizi silinmediği için
+ * ListStatusContext her açılışta aynı diziyi eski verisiyle yeniden yazıyordu:
+ * eski kökten gelen hesaplarda sonradan işaretlenen bölümler ve izleme olayları
+ * her oturumda sıfırlanıyordu. Artık belge varsa dokunulmaz (transaction).
+ *
+ * @returns {Promise<boolean>} bu çağrı yazdıysa true
  */
 export async function migrateLegacyShow(uid, legacyShow) {
-  if (!uid || legacyShow?.id == null || !Array.isArray(legacyShow.seasons)) return;
+  if (!uid || legacyShow?.id == null || !Array.isArray(legacyShow.seasons)) return false;
   const seasons = [];
   for (const sea of legacyShow.seasons) {
     if (sea?.seasonNumber == null) continue;
@@ -870,24 +748,53 @@ export async function migrateLegacyShow(uid, legacyShow) {
       episodes: eps.sort((a, b) => a.episodeNumber - b.episodeNumber),
     });
   }
-  if (seasons.length === 0) return; // taşınacak gerçek veri yok
+  if (seasons.length === 0) return false; // taşınacak gerçek veri yok
   seasons.sort((a, b) => a.seasonNumber - b.seasonNumber);
 
-  await setDoc(showRef(uid, legacyShow.id), {
-    ...buildShowMeta(
-      {
-        id: legacyShow.id,
-        name: legacyShow.name,
-        showEpisodeCount: legacyShow.showEpisodeCount,
-        showSeasonCount: legacyShow.showSeasonCount,
-        imagePath: legacyShow.imagePath,
-        genres: legacyShow.genres,
-      },
-      legacyShow.addedShowDate || null,
-    ),
-    seasons,
-    ...recomputeAggregates(seasons),
+  const ref = showRef(uid, legacyShow.id);
+  let migrated = false;
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (snap.exists()) return; // yeni modelde zaten var: eski veriyle EZME
+    tx.set(ref, {
+      ...buildShowMeta(
+        {
+          id: legacyShow.id,
+          name: legacyShow.name,
+          showEpisodeCount: legacyShow.showEpisodeCount,
+          showSeasonCount: legacyShow.showSeasonCount,
+          imagePath: legacyShow.imagePath,
+          genres: legacyShow.genres,
+        },
+        legacyShow.addedShowDate || null,
+      ),
+      seasons,
+      ...recomputeAggregates(seasons),
+    });
+    migrated = true;
   });
+  return migrated;
+}
+
+/**
+ * Göç tamamlandıktan sonra kök dokümandaki eski `watchedTv[]` dizisini siler
+ * (`migrateLegacyMovieLists` öntanımlı film listeleri için aynısını yapıyor).
+ * Silinmezse her açılışta yeniden göç denenir. Yalnız alan GERÇEKTEN dizi ise
+ * dokunur; alan yoksa/başka tipteyse hiçbir şey yazmaz.
+ *
+ * @returns {Promise<boolean>} alan silindiyse true
+ */
+export async function clearLegacyWatchedTv(uid) {
+  if (!uid) return false;
+  const rootRef = doc(db, "Lists", uid);
+  let cleared = false;
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(rootRef);
+    if (!snap.exists() || !Array.isArray(snap.data()?.watchedTv)) return;
+    tx.update(rootRef, { watchedTv: deleteField() });
+    cleared = true;
+  });
+  return cleared;
 }
 
 /**

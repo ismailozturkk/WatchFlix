@@ -11,10 +11,10 @@ import {
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
-import axios from "axios";
 import Toast from "react-native-toast-message";
 import Reminder from "../../components/Reminder";
-import { markSeason, removeTvWatchEvent } from "../../services/watchedTvService";
+import { markSeasonWatched, removeTvWatch } from "../../services/libraryActions";
+import { showLibraryError } from "../../utils/libraryErrorText";
 import WatchHistorySheet from "@components/modals/WatchHistorySheet";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
 import {
@@ -116,46 +116,32 @@ const SeasonItem = ({
     [language]
   );
 
-  // ── Firestore: sezon ekle / sil — kanonik servis (race-free) ─────────────
+  // ── Sezonu izlendi işaretle — tek kapı: services/libraryActions ───────────
+  // Sezonun bölümlerini TMDB'den çekme, yayınlanmamış bölümleri eleme, sıralı
+  // yazma ve hata sınıflaması orada; burada yalnız arayüz durumu var.
   const addSeasonToFirestore = useCallback(
     async (_isDelete = false, date = null) => {
-      if (!user?.uid) return;
+      if (!user?.uid || !date) return;
       try {
         setIsLoading(true);
-        if (!date) return;
-        const response = await axios.get(
-          `https://api.themoviedb.org/3/tv/${details.id}/season/${season.season_number}`,
-          {
-            params: { language: language === "tr" ? "tr-TR" : "en-US" },
-            headers: { accept: "application/json", Authorization: API_KEY },
-          }
-        );
-        const episodesData = response.data.episodes.map((ep) => ({
-          episodeNumber: ep.episode_number,
-          episodePosterPath: ep.still_path,
-          episodeName: ep.name,
-          episodeRatings: parseFloat(ep.vote_average?.toFixed(1)) || 0,
-          episodeMinutes: ep.runtime,
-          releaseDate: ep.air_date || null,
-        }));
-        await markSeason(
-          user.uid,
-          {
-            id: details.id,
-            name: details.name,
-            showEpisodeCount: details.number_of_episodes,
-            showSeasonCount: details.number_of_seasons,
-            imagePath: details.poster_path,
-            genres: details.genres ? details.genres.map((g) => g.name) : [],
-          },
-          {
-            seasonNumber: season.season_number,
-            seasonPosterPath: season.poster_path,
-            seasonEpisodes: season.episode_count,
-          },
-          episodesData,
-          date
-        );
+        const { status } = await markSeasonWatched({
+          uid: user.uid,
+          details,
+          season,
+          watchDate: date,
+          apiKey: API_KEY,
+          language,
+        });
+        if (status === "empty-season") {
+          Toast.show({
+            type: "warning",
+            text1: i18nText(
+              "autoI18n.bolum_bilgisi_bulunamadi",
+              "Bu dizinin bölüm bilgisi bulunamadı.",
+            ),
+          });
+          return;
+        }
         setModalVisible(false);
         Toast.show({
           type: "success",
@@ -165,20 +151,9 @@ const SeasonItem = ({
           ),
         });
       } catch (e) {
-        if (__DEV__)
-          console.error(
-            i18nText(
-              "autoI18n.sezon_eklenirken_hata",
-              "Sezon eklenirken hata:"
-            ),
-            e
-          );
         // Sessiz kalınırsa kullanıcı sezonu işaretlediğini sanıp ekrandan
         // çıkıyor; aynı dosyadaki onDeleteEvent ile aynı geri bildirim.
-        Toast.show({
-          type: "error",
-          text1: i18nText("autoI18n.hata_2", "Hata: ") + (e?.message || ""),
-        });
+        showLibraryError(e, { source: "season_item_mark" });
       } finally {
         setIsLoading(false);
       }
@@ -471,14 +446,14 @@ const SeasonItem = ({
           if (!user?.uid || !event?.id) return;
           try {
             setIsLoading(true);
-            await removeTvWatchEvent(user.uid, details.id, event.id);
+            await removeTvWatch({ uid: user.uid, showId: details.id, eventId: event.id });
             Toast.show({
               type: "success",
               text1: i18nText("autoI18n.izleme_kaydi_silindi", "Seçilen izleme kaydı silindi."),
             });
             if (watchEvents.length <= 1) setWatchHistoryVisible(false);
           } catch (error) {
-            Toast.show({ type: "error", text1: i18nText("autoI18n.hata_2", "Hata: ") + error.message });
+            showLibraryError(error, { source: "season_item_remove_watch" });
           } finally {
             setIsLoading(false);
           }

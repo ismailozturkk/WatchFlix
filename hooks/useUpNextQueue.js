@@ -26,7 +26,8 @@ import {
   loadUpNextPreferences,
   saveUpNextPreferences,
 } from "../services/upNextPreferences";
-import { markEpisodes } from "../services/watchedTvService";
+import { markEpisodeWatched } from "../services/libraryActions";
+import { libraryErrorMessage } from "../utils/libraryErrorText";
 import { advanceUpNextItem } from "../utils/upNext";
 import {
   getWatchedShowActivityTime,
@@ -320,9 +321,11 @@ export default function useUpNextQueue({
       pendingMarks.current.set(item.id, String(item.showId));
       const revertAdvance = advanceEntry(item);
       try {
-        await markEpisodes(
-          user.uid,
-          {
+        // Aynı dizinin bölümleri libraryActions'ta tek sırada yazılır: kart
+        // hemen ilerlediği için art arda işaretleme olağan, yarışmamalı.
+        await markEpisodeWatched({
+          uid: user.uid,
+          showMeta: {
             id: item.showId,
             name: item.showName,
             showEpisodeCount: item.showEpisodeCount,
@@ -330,24 +333,22 @@ export default function useUpNextQueue({
             imagePath: item.showPosterPath,
             genres: item.genres,
           },
-          {
+          seasonMeta: {
             seasonNumber: item.seasonNumber,
             seasonPosterPath: item.seasonPosterPath,
             seasonEpisodes: item.seasonEpisodes,
           },
-          [
-            {
-              episodeNumber: item.episodeNumber,
-              episodePosterPath: item.episodePosterPath,
-              episodeName: item.episodeName,
-              episodeRatings: item.episodeRatings,
-              episodeMinutes: item.episodeMinutes,
-              releaseDate: item.airDate || null,
-            },
-          ],
+          episode: {
+            episodeNumber: item.episodeNumber,
+            episodePosterPath: item.episodePosterPath,
+            episodeName: item.episodeName,
+            episodeRatings: item.episodeRatings,
+            episodeMinutes: item.episodeMinutes,
+            releaseDate: item.airDate || null,
+          },
           watchDate,
-          { scope: "episode", source: "up_next" }
-        );
+          source: "up_next",
+        });
         trackEvent(ANALYTICS_EVENTS.UP_NEXT_COMPLETED, {
           surface,
           content_id: String(item.showId),
@@ -373,6 +374,8 @@ export default function useUpNextQueue({
             "autoI18n.up_next_kayit_hatasi",
             "Bölüm kaydedilemedi."
           ),
+          // Neden: çevrimdışı / yetki / yayınlanmamış — ham SDK metni değil.
+          text2: libraryErrorMessage(error),
         });
       } finally {
         pendingMarks.current.delete(item.id);

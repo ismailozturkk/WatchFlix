@@ -2,7 +2,8 @@ import { TouchableOpacity, View } from "react-native";
 import React, { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAuth } from "../../context/AuthContext";
-import { markEpisodes, removeTvWatchEvent } from "../../services/watchedTvService";
+import { markEpisodeWatched, removeTvWatch } from "../../services/libraryActions";
+import { showLibraryError } from "../../utils/libraryErrorText";
 import WatchHistorySheet from "@components/modals/WatchHistorySheet";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
 import Toast from "react-native-toast-message";
@@ -46,15 +47,15 @@ export default function WatchedAdd({
   const openModal = () => setModalVisible(true);
   const closeModal = () => setModalVisible(false);
 
-  // İşaretle / kaldır — kanonik subcollection servisine yönlendirir (race-free).
+  // Bölümü izlendi işaretle — tek kapı: services/libraryActions (sıralı yazma:
+  // art arda bölüm işaretleme aynı belgede yarışmaz).
   const markEpisodeAsWatched = async (date = null) => {
-    if (!user?.uid) return;
+    if (!user?.uid || !date) return;
     try {
       setIsLoading(true);
-      if (!date) return;
-      await markEpisodes(
-        user.uid,
-        {
+      await markEpisodeWatched({
+        uid: user.uid,
+        showMeta: {
           id: showId,
           name: showName,
           showEpisodeCount,
@@ -62,23 +63,21 @@ export default function WatchedAdd({
           imagePath: showPosterPath,
           genres: genres || [],
         },
-        {
+        seasonMeta: {
           seasonNumber,
           seasonPosterPath: seasonPosterPath || null,
           seasonEpisodes,
         },
-        [
-          {
-            episodeNumber,
-            episodePosterPath: episodePosterPath || null,
-            episodeName: episodeName || "Unknown",
-            episodeRatings: episodeRatings || 0,
-            episodeMinutes: episodeMinutes || 0,
-            releaseDate: showReleaseDate || null,
-          },
-        ],
-        date,
-      );
+        episode: {
+          episodeNumber,
+          episodePosterPath: episodePosterPath || null,
+          episodeName: episodeName || "Unknown",
+          episodeRatings: episodeRatings || 0,
+          episodeMinutes: episodeMinutes || 0,
+          releaseDate: showReleaseDate || null,
+        },
+        watchDate: date,
+      });
       closeModal();
       Toast.show({
         type: "success",
@@ -88,11 +87,7 @@ export default function WatchedAdd({
         ),
       });
     } catch (error) {
-      console.error(i18nText("autoI18n.hata_3", "Hata:"), error);
-      Toast.show({
-        type: "error",
-        text1: i18nText("autoI18n.hata_2", "Hata: ") + (error?.message || ""),
-      });
+      showLibraryError(error, { source: "watched_add_episode" });
     } finally {
       setIsLoading(false);
     }
@@ -163,14 +158,14 @@ export default function WatchedAdd({
           if (!user?.uid || !event?.id) return;
           try {
             setIsLoading(true);
-            await removeTvWatchEvent(user.uid, showId, event.id);
+            await removeTvWatch({ uid: user.uid, showId, eventId: event.id });
             Toast.show({
               type: "success",
               text1: i18nText("autoI18n.izleme_kaydi_silindi", "Seçilen izleme kaydı silindi."),
             });
             if (watchEvents.length <= 1) setWatchHistoryVisible(false);
           } catch (error) {
-            Toast.show({ type: "error", text1: i18nText("autoI18n.hata_2", "Hata: ") + error.message });
+            showLibraryError(error, { source: "watched_add_remove_watch" });
           } finally {
             setIsLoading(false);
           }

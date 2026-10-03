@@ -7,14 +7,14 @@
 // NEDEN AYRI DOSYA: "listeye ekle" tek bir işlem değil, listenin modeline göre
 // DÖRT ayrı yazma yolu:
 //
-//   favorites / watchList   → Lists/{uid}/{liste}/{type_id}        (addToList)
-//   watchedMovies           → izleme OLAYI ekler                   (markMovieWatch)
-//   watchedTv               → tüm sezon/bölümleri işaretler        (markShow)
-//   özel (kullanıcı listesi) → kök dokümandaki dizi                (addToCustomRootList)
+//   favorites / watchList   → Lists/{uid}/{liste}/{type_id}        (setListMembership)
+//   watchedMovies           → izleme OLAYI ekler                   (markMovieWatched)
+//   watchedTv               → tüm sezon/bölümleri işaretler        (markShowWatched)
+//   özel (kullanıcı listesi) → kök dokümandaki dizi                (setListMembership)
 //
-// Bu dallanma ekranda dursaydı ListsScreen'in içinde dördüncü bir Firestore
-// yazma bloğu daha olurdu; ekran yalnız "ekle" diyor, hangi yolun doğru olduğu
-// burada biliniyor.
+// Yazmanın kendisi services/libraryActions'ta (sıra, iyimser durum, hata
+// sınıflaması); bu dosya yalnız "arama sonucu → doğru listeye doğru çağrı"yı
+// bilir. Ekran yalnız "ekle" diyor.
 //
 // SÜRE/BÖLÜM OLGULARI: TMDB arama sonucu hafiftir (süre YOK). Liste öğesi ise
 // `minutes` / `totalMinutes` okuyor (ListsScreen süre rozeti + süreye göre
@@ -26,14 +26,12 @@ import axios from "axios";
 
 import { searchMediaWithFuzzyFallback } from "./fuzzyMediaSearch";
 import { fetchMediaFacts } from "./tmdbFacts";
-import { mapWithConcurrency } from "./upNextService";
 import {
-  addToCustomRootList,
-  addToList,
-  markMovieWatch,
-  PREDEFINED_MOVIE_LISTS,
-} from "./listItemsService";
-import { markShow } from "./watchedTvService";
+  markMovieWatched,
+  markShowWatched,
+  setListMembership,
+} from "./libraryActions";
+import { LIBRARY_ERROR, LibraryError, isMembershipList, toLibraryError } from "../utils/libraryCore";
 import { cachedTmdb } from "../utils/cachedRead";
 import { resolveGenreIds } from "../utils/discoveryPersonalization";
 import { applyFacts, langOf, todayListDate } from "../utils/mediaFacts";
@@ -254,45 +252,6 @@ async function buildListItem({ media, apiKey, language, genreMap, dateAdded }) {
 }
 
 /**
- * Diziyi komple izlendi işaretlemek için tüm sezonların bölümlerini çeker.
- * TvShowsDetails.addShowToFirestore ile AYNI kurallar: 0. sezon (özel bölümler)
- * ve boş sezonlar atlanır.
- */
-async function fetchSeasonsForShow({ showId, details, apiKey, language }) {
-  const seasons = (details?.seasons || []).filter(
-    (season) => season?.season_number && season?.episode_count > 0,
-  );
-  if (seasons.length === 0) return [];
-
-  const fetched = await mapWithConcurrency(seasons, 4, async (season) => {
-    const { data } = await axios.get(
-      `${TMDB}/tv/${showId}/season/${season.season_number}`,
-      {
-        params: { language: langOf(language) },
-        headers: { accept: "application/json", Authorization: apiKey },
-      },
-    );
-    return {
-      seasonNumber: season.season_number,
-      seasonPosterPath: season.poster_path || null,
-      seasonEpisodes: season.episode_count,
-      episodes: (data?.episodes || []).map((episode) => ({
-        episodeNumber: episode.episode_number,
-        episodePosterPath: episode.still_path || null,
-        episodeName: episode.name || "Unknown",
-        episodeRatings: parseFloat(episode.vote_average?.toFixed(1)) || 0,
-        episodeMinutes: episode.runtime || 0,
-        releaseDate: episode.air_date || null,
-      })),
-    };
-  });
-
-  // mapWithConcurrency hatalı isteği null'a çevirir; yarım kalan sezon listesi
-  // yine yazılır — kullanıcı eksik sezonu bölüm ekranından tamamlayabilir.
-  return fetched.filter((season) => season && season.episodes.length > 0);
-}
-
-/**
  * Seçilen eseri açık olan listeye ekler.
  *
  * @param {object}   p
@@ -324,38 +283,29 @@ export async function addMediaToList({
 
   // ── İzlenen diziler: liste üyeliği değil, tüm bölümlerin izleme kaydı ──────
   if (listName === "watchedTv") {
-    const { data: details } = await axios.get(`${TMDB}/tv/${media.id}`, {
-      params: { language: langOf(language) },
-      headers: { accept: "application/json", Authorization: apiKey },
-    });
+    let details;
+    try {
+      ({ data: details } = await axios.get(`${TMDB}/tv/${media.id}`, {
+        params: { language: langOf(language) },
+        headers: { accept: "application/json", Authorization: apiKey },
+      }));
+    } catch (error) {
+      throw toLibraryError(error);
+    }
     // Yayın kapısı: arama sonucundan değil TMDB detayından karar verilir.
     const blocked = blockedStatus(details?.first_air_date, details?.status);
     if (blocked) return { status: blocked, item: null };
 
-    const seasons = await fetchSeasonsForShow({
-      showId: media.id,
-      details,
+    // Sezonları çekme, "biri düşerse hiçbiri yazılmaz" kuralı ve yazma sırası
+    // libraryActions/showSeasons'ta.
+    const { status } = await markShowWatched({
+      uid,
+      details: { ...details, name: details.name || media.title },
+      watchDate: dateAdded,
       apiKey,
       language,
     });
-    if (seasons.length === 0) return { status: "empty-show", item: null };
-
-    await markShow(
-      uid,
-      {
-        id: details.id,
-        name: details.name || media.title,
-        showEpisodeCount: details.number_of_episodes || 0,
-        showSeasonCount: details.number_of_seasons || 0,
-        imagePath: details.poster_path || media.poster_path || null,
-        genres: (details.genres || []).map((genre) => genre?.name).filter(Boolean),
-        firstAirDate: details.first_air_date,
-        status: details.status,
-      },
-      seasons,
-      dateAdded,
-    );
-    return { status: "added", item: null };
+    return { status: status === "added" ? "added" : "empty-show", item: null };
   }
 
   // ── İzlenen filmler: yayın kapısı, öğe kurulmadan ÖNCE ────────────────────
@@ -371,7 +321,9 @@ export async function addMediaToList({
     });
     // Olgu çözülemedi: "tarihi yok" demek DEĞİL. Sessizce engellemek yerine
     // hata verilir, çağıran ekran "Eklenemedi" gösterir.
-    if (!facts) throw new Error("addMediaToList: yayın bilgisi alınamadı");
+    if (!facts) {
+      throw new LibraryError(LIBRARY_ERROR.UNKNOWN, "addMediaToList: yayın bilgisi alınamadı");
+    }
     const blocked = blockedStatus(facts.releaseDate, facts.status);
     if (blocked) return { status: blocked, item: null };
     movieRelease = { releaseDate: facts.releaseDate, status: facts.status };
@@ -384,23 +336,25 @@ export async function addMediaToList({
     genreMap,
     dateAdded,
   });
-  if (!item) throw new Error("addMediaToList: öğe oluşturulamadı");
+  if (!item) throw new LibraryError(LIBRARY_ERROR.INVALID, "addMediaToList: öğe oluşturulamadı");
 
   // ── İzlenen filmler: her ekleme bir izleme olayı (tekrar izleme desteklenir) ─
   if (listName === "watchedMovies") {
-    await markMovieWatch(uid, { ...item, type: "movie", ...movieRelease }, dateAdded);
+    await markMovieWatched({
+      uid,
+      movie: { ...item, type: "movie", ...movieRelease },
+      watchDate: dateAdded,
+    });
     return { status: "added", item };
   }
 
-  // ── Favoriler / İzlenecekler: öğe başına doküman (idempotent) ──────────────
-  if (PREDEFINED_MOVIE_LISTS.includes(listName)) {
-    await addToList(uid, listName, item);
-    return { status: "added", item };
+  // ── Favoriler / İzlenecekler / özel liste ──────────────────────────────────
+  // Özel listede aynı öğe zaten varsa "unchanged" döner → "duplicate".
+  const { status } = await setListMembership({ uid, listKey: listName, item, desired: true });
+  if (!isMembershipList(listName) && status === "unchanged") {
+    return { status: "duplicate", item };
   }
-
-  // ── Özel liste: kök dokümandaki dizi ───────────────────────────────────────
-  const added = await addToCustomRootList(uid, listName, item);
-  return { status: added ? "added" : "duplicate", item };
+  return { status: "added", item };
 }
 
 /** Global arama adayını ortak liste öğesine dönüştürüp kaydeder. */

@@ -54,12 +54,13 @@ import { ListStatusProvider } from "./context/ListStatusContext";
 import { MediaActivityProvider } from "./context/MediaActivityContext";
 import { SharedListsProvider } from "./context/SharedListsContext";
 import { MediaQuickActionsProvider } from "./context/MediaQuickActionsContext";
-import { auth, db } from "./firebase";
+import { auth } from "./firebase";
 import Toast from "react-native-toast-message";
 import { i18nText } from "./utils/i18nText";
 import { toastConfig } from "@components/AppToast";
 import { AppAlertHost } from "@components/AppAlert";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { ensureListsRoot } from "./services/listItemsService";
+import { LIBRARY_ERROR, classifyLibraryError } from "./utils/libraryCore";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ProfileStatsProvider }     from "./context/ProfileStatsContext";
@@ -256,18 +257,15 @@ function AppContent() {
     // bir daha doğru olamayacağı için kalıcı olarak erişilemez çöp olur.
     if (user && !needsProfileCompletion) {
       const createList = async () => {
-        const docRef = doc(db, "Lists", user.uid);
         try {
-          const docSnap = await getDoc(docRef);
-          if (!docSnap.exists()) {
-            await setDoc(docRef, {
-              watchedTv: [],
-              favorites: [],
-              watchList: [],
-              watchedMovies: [],
-            });
-          }
+          // Transaction: eski "getDoc → yoksa merge'siz setDoc" kalıbı, arada başka
+          // bir yazım (ilk ekleme, başka cihaz) kök dokümanı yarattıysa onu SIFIRLARDI.
+          await ensureListsRoot(user.uid);
         } catch (e) {
+          // Çevrimdışı açılış olağan: kök doküman bir sonraki yazımda zaten
+          // oluşturuluyor (tüm servisler merge ile yazar). Her çevrimdışı açılışta
+          // hata toast'ı + rapor basmak gürültüydü.
+          if (classifyLibraryError(e).code === LIBRARY_ERROR.OFFLINE) return;
           // Ham hata metni kullanıcıya değil Sentry'ye: ekranda yerelleştirilmiş
           // genel mesaj kalır, teşhis için gereken ayrıntı raporlamaya gider.
           captureError(e, { tags: { source: "app_create_user_lists" } });

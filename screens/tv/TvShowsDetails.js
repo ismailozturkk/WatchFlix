@@ -30,8 +30,6 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import TVShowItem from "../../components/TVShowItem";
 import { LinearGradient } from "expo-linear-gradient";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { getDoc, doc, updateDoc, setDoc } from "firebase/firestore";
-import { db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
 import Toast from "react-native-toast-message";
 import SeasonItem from "./SeasonItem";
@@ -51,11 +49,15 @@ import PosterImage from "../../components/PosterImage";
 import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
 import ListBadges from "../../components/ListBadges";
 import { useListStatusContext } from "../../context/ListStatusContext";
+import { PREDEFINED_MOVIE_LISTS } from "../../services/listItemsService";
 import {
-  addToList,
-  removeFromList,
-  PREDEFINED_MOVIE_LISTS,
-} from "../../services/listItemsService";
+  markShowWatched,
+  removeTvWatch,
+  setListMembership,
+} from "../../services/libraryActions";
+import { customListHas, listItemFromDetails } from "../../utils/libraryCore";
+import { showLibraryError } from "../../utils/libraryErrorText";
+import { todayListDate } from "../../utils/mediaFacts";
 import ScreenDecor from "../../components/ScreenDecor";
 import ImageGalleryModal from "@components/modals/ImageGalleryModal";
 import TrailerSection from "@components/video/TrailerSection";
@@ -65,7 +67,6 @@ import RatingSheetModal from "@components/modals/RatingSheetModal";
 import RatingSummary from "@components/RatingSummary";
 import { i18nText } from "../../utils/i18nText";
 import { useWatchedShow } from "../../hooks/useWatchedShow";
-import { markShow, removeTvWatchEvent } from "../../services/watchedTvService";
 import { refreshShowMeta } from "../../services/refreshShowMeta";
 import AIChatScreen from "@screens/chat/AIChatScreen";
 import NewConversationSheet from "@components/chat/NewConversationSheet";
@@ -275,8 +276,7 @@ export default function TvShowsDetails({ route, navigation }) {
           k === "customLists"
         )
           return;
-        if (Array.isArray(v))
-          s[k] = v.some((i) => i.id === id && i.type === "tv");
+        if (Array.isArray(v)) s[k] = customListHas(allLists, k, id, "tv");
       });
     }
     return s;
@@ -390,7 +390,6 @@ export default function TvShowsDetails({ route, navigation }) {
   /* ── updateTvSeriesList ── */
   const updateTvSeriesList = async (listType, type) => {
     if (!user?.uid || !details) return;
-    const isPredefined = PREDEFINED_MOVIE_LISTS.includes(listType);
     const getName = (l) =>
       ({
         favorites: t.tvShowsDetails?.favorites,
@@ -418,53 +417,19 @@ export default function TvShowsDetails({ route, navigation }) {
       });
 
     try {
-      if (isPredefined) {
-        // Yeni model: her öğe ayrı doküman (listItemsService).
-        const isIn = !!listStates[listType];
-        if (isIn) {
-          await removeFromList(user.uid, listType, type, details.id);
-          toastRemove();
-        } else {
-          await addToList(user.uid, listType, {
-            id: details.id,
-            type,
-            name: details.name,
-            imagePath: details.poster_path,
-            dateAdded: formatDateSave(new Date()),
-            genres: details.genres?.map((g) => g.name) || [],
-          });
-          toastAdd();
-        }
-        return;
-      }
-
-      // Özel listeler — eski kök-array yolu (Part B'de listItemsService'e taşınacak).
-      const ref = doc(db, "Lists", user.uid);
-      const snap = await getDoc(ref);
-      let data = snap.exists() ? snap.data() : {};
-      if (!snap.exists()) await setDoc(ref, data);
-      let list = data[listType] || [];
-      const idx = list.findIndex((i) => i.id === details.id && i.type === type);
-      if (idx !== -1) {
-        list.splice(idx, 1);
-        toastRemove();
-      } else {
-        list.push({
-          id: details.id,
-          dateAdded: formatDateSave(new Date()),
-          imagePath: details.poster_path,
-          name: details.name,
-          type,
-          genres: details.genres?.map((g) => g.name) || [],
-        });
-        toastAdd();
-      }
-      await updateDoc(ref, { [listType]: list });
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: i18nText("autoI18n.hata_2", "Hata: ") + e.message,
+      // Favoriler / izlenecekler / özel listeler: tek kapı (sıralı, iyimser,
+      // hatada geri alınır). Hedef durum GÖRÜNEN durumdan türer.
+      const desired = !listStates[listType];
+      await setListMembership({
+        uid: user.uid,
+        listKey: listType,
+        item: listItemFromDetails(details, type, { dateAdded: todayListDate() }),
+        desired,
       });
+      if (desired) toastAdd();
+      else toastRemove();
+    } catch (e) {
+      showLibraryError(e, { source: "tv_detail_list" });
     }
   };
 
@@ -494,53 +459,31 @@ export default function TvShowsDetails({ route, navigation }) {
       setExpandedCard(null);
     }
   };
-  /* ── Diziyi komple işaretle (tüm sezonların bölümlerini çek → markShow) ── */
+  /* ── Diziyi komple işaretle (sezonları çek → tek olay olarak yaz) ── */
   const addShowToFirestore = async (selDate = null) => {
     if (!user?.uid || !details?.seasons || !selDate) return;
     try {
       setIsLoading(true);
       closeModal();
-      const eDate = formatDateSave(selDate);
-      const seasonsWithEpisodes = [];
-      for (const seasonObj of details.seasons) {
-        if (!seasonObj.season_number || seasonObj.episode_count === 0) continue;
-        const res = await axios.get(
-          `https://api.themoviedb.org/3/tv/${details.id}/season/${seasonObj.season_number}`,
-          {
-            params: { language: language === "tr" ? "tr-TR" : "en-US" },
-            headers: { accept: "application/json", Authorization: API_KEY },
-          }
-        );
-        seasonsWithEpisodes.push({
-          seasonNumber: seasonObj.season_number,
-          seasonPosterPath: seasonObj.poster_path || null,
-          seasonEpisodes: seasonObj.episode_count,
-          episodes: (res.data?.episodes || []).map((ep) => ({
-            episodeNumber: ep.episode_number,
-            episodePosterPath: ep.still_path || null,
-            episodeName: ep.name || "Unknown",
-            episodeRatings: parseFloat(ep.vote_average?.toFixed(1)) || 0,
-            episodeMinutes: ep.runtime || 0,
-            releaseDate: ep.air_date || null,
-          })),
+      // Sezonların çekilmesi, "biri düşerse hiçbiri yazılmaz" kuralı ve yazma
+      // services/libraryActions.markShowWatched'ta — hata kodu yerelleştirilir.
+      const { status } = await markShowWatched({
+        uid: user.uid,
+        details,
+        watchDate: formatDateSave(selDate),
+        apiKey: API_KEY,
+        language,
+      });
+      if (status === "empty-show") {
+        Toast.show({
+          type: "warning",
+          text1: i18nText(
+            "autoI18n.bolum_bilgisi_bulunamadi",
+            "Bu dizinin bölüm bilgisi bulunamadı."
+          ),
         });
+        return;
       }
-      await markShow(
-        user.uid,
-        {
-          id: details.id,
-          name: details.name,
-          showEpisodeCount: details.number_of_episodes,
-          showSeasonCount: details.number_of_seasons,
-          imagePath: details.poster_path,
-          genres: details.genres?.map((g) => g.name) || [],
-          // Yayın kapısı için — belgeye yazılmaz (buildShowMeta beyaz liste).
-          firstAirDate: details.first_air_date,
-          status: details.status,
-        },
-        seasonsWithEpisodes,
-        eDate
-      );
       Toast.show({
         type: "success",
         text1: i18nText(
@@ -549,13 +492,7 @@ export default function TvShowsDetails({ route, navigation }) {
         ),
       });
     } catch (e) {
-      console.error(e);
-      // Tek bir sezon isteği patlarsa markShow hiç çalışmaz — hiçbir bölüm
-      // yazılmaz. Sessiz kalınırsa kullanıcı işlemi başarılı sanıyor.
-      Toast.show({
-        type: "error",
-        text1: i18nText("autoI18n.hata_2", "Hata: ") + (e?.message || ""),
-      });
+      showLibraryError(e, { source: "tv_detail_mark_show" });
     } finally {
       setIsLoading(false);
     }
@@ -565,7 +502,7 @@ export default function TvShowsDetails({ route, navigation }) {
     if (!user?.uid || !details || !event?.id) return;
     try {
       setIsLoading(true);
-      await removeTvWatchEvent(user.uid, details.id, event.id);
+      await removeTvWatch({ uid: user.uid, showId: details.id, eventId: event.id });
       Toast.show({
         type: "success",
         text1: i18nText(
@@ -575,7 +512,8 @@ export default function TvShowsDetails({ route, navigation }) {
       });
       if (watched.watchEvents.length <= 1) setWatchHistoryVisible(false);
     } catch (e) {
-      console.error(e);
+      // Eskiden yalnız console.error: kullanıcı silmenin başarısız olduğunu görmüyordu.
+      showLibraryError(e, { source: "tv_detail_remove_watch" });
     } finally {
       setIsLoading(false);
     }

@@ -9,26 +9,25 @@
 // farkı yönetiyor.
 //
 // DÖRT BUTON, DÖRT AYRI HEDEF:
-//   • İzlenecekler / Favoriler → anında, tek dokunuşlu Firestore ekle/çıkar
-//     (idempotent, geri alınabilir — bkz. services/listItemsService).
+//   • İzlenecekler / Favoriler → anında, tek dokunuşlu ekle/çıkar
+//     (services/libraryActions.setListMembership: sıralı, iyimser, hatada geri alır).
 //   • İzledim → components/detail/WatchedDateSheet'i DOĞRUDAN açar (detay
 //     ekranı ve MediaQuickActionsSheet'in kullandığı AYNI, standalone sayfa).
 //     Onay anında services/listQuickAdd.addMediaToList çağrılır — bu
 //     fonksiyon filmde yayın-tarihi kapısını, DİZİDE TÜM SEZON/BÖLÜM
-//     verisinin TMDB'den çekilip TEK seferde markShow'a yazılmasını zaten
+//     verisinin TMDB'den çekilip TEK seferde yazılmasını zaten
 //     doğru yapıyor (ListsScreen'in global arama "hızlı ekle" akışıyla
 //     birebir aynı yol). Bu mantığı burada YENİDEN YAZMAK — özellikle dizi
 //     sezon/bölüm çekimi — ikinci, sapabilecek bir kopya doğururdu.
 //   • Diğer Listeler → components/lists/OtherListsPickerModal'ı açar (aynı
-//     ListStatusContext.otherListKeys verisi + addToCustomRootList/
-//     removeFromCustomRootList yazma yolu, ListView.js'in "Diğer Listeler"
-//     ızgarasıyla aynı davranış).
+//     ListStatusContext.otherListKeys verisi + setListMembership özel liste
+//     yolu, ListView.js'in "Diğer Listeler" ızgarasıyla aynı davranış).
 //
 // Önceki sürümde bu iki buton `useMediaQuickActions().openQuickActions()`
 // çağırıp UZUN BASMAYLA açılan genel sayfayı açıyordu — ikisi de aynı yere
 // gidiyordu. Bu, doğru hedefe gitmiyor.
 
-import React, { useEffect, useRef, useState, memo } from "react";
+import React, { useRef, useState, memo } from "react";
 import { StyleSheet, View, TouchableOpacity, Animated } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
@@ -38,8 +37,9 @@ import { useAuth } from "../../context/AuthContext";
 import { useHapticsSettings, useApiSettings } from "../../context/AppSettingsContext";
 import { useListStatus } from "@hooks/useListStatus";
 import * as Haptics from "@services/hapticsService";
-import { addToList, removeFromList } from "../../services/listItemsService";
+import { setListMembership } from "../../services/libraryActions";
 import { addMediaToList } from "../../services/listQuickAdd";
+import { showLibraryError } from "../../utils/libraryErrorText";
 import { toCandidate } from "../../utils/listSearch";
 import { todayListDate } from "../../utils/mediaFacts";
 import { i18nText } from "../../utils/i18nText";
@@ -138,17 +138,10 @@ function QuickListButtons({
     mediaType,
   );
 
-  // İyimser durum: yazım Firestore'a gidip statusIndex güncellenene kadar
-  // (birkaç yüz ms) butonun anında tepki vermesi için. Yalnız anında yazılan
-  // iki liste (izlenecekler/favoriler) bu duruma giriyor — izledim/diğer
-  // listeler kendi sayfalarının durumunu kendi yönetiyor.
-  const [optimistic, setOptimistic] = useState({});
-  useEffect(() => {
-    setOptimistic({});
-  }, [inWatchList, inFavorites]);
-
-  const isActive = (key, real) =>
-    optimistic[key] !== undefined ? optimistic[key] : real;
+  // NOT: iyimser durum burada TUTULMUYOR. useListStatus'un döndürdüğü bayraklar
+  // services/libraryOverlay bindirmesini zaten içerir: işlem başlar başlamaz
+  // düğme döner, hata olursa kendiliğinden geri döner — üstelik aynı eseri
+  // gösteren başka ekranlar da aynı anda güncellenir.
 
   const c = theme?.colors ?? {};
   const btnSize = size ?? (orientation === "vertical" ? 24 : 20);
@@ -172,10 +165,9 @@ function QuickListButtons({
 
   const toggle = async (listKey) => {
     if (mediaId == null || !requireAuth()) return;
-    const real = listKey === "favorites" ? inFavorites : inWatchList;
-    const currentlyActive = isActive(listKey, real);
-    const nextActive = !currentlyActive;
-    setOptimistic((prev) => ({ ...prev, [listKey]: nextActive }));
+    // Hedef durum GÖRÜNEN (bindirmeli) durumdan türer: art arda iki dokunuş
+    // ekle→çıkar olur, ekle→ekle değil; sıralamayı libraryActions korur.
+    const nextActive = !(listKey === "favorites" ? inFavorites : inWatchList);
     if (hapticsEnabled) {
       Haptics.impactAsync(
         nextActive
@@ -185,14 +177,19 @@ function QuickListButtons({
     }
     const listLabel = listKey === "favorites" ? t.favorites : t.watchList;
     try {
-      if (nextActive) {
-        await addToList(user.uid, listKey, {
+      await setListMembership({
+        uid: user.uid,
+        listKey,
+        item: {
           id: mediaId,
           type: mediaType,
           name: title,
           imagePath: posterPath,
           dateAdded: todayListDate(),
-        });
+        },
+        desired: nextActive,
+      });
+      if (nextActive) {
         Toast.show({
           type: "success",
           text1: i18nText(
@@ -202,7 +199,6 @@ function QuickListButtons({
           ),
         });
       } else {
-        await removeFromList(user.uid, listKey, mediaType, mediaId);
         Toast.show({
           type: "warning",
           text1: i18nText(
@@ -213,13 +209,8 @@ function QuickListButtons({
         });
       }
     } catch (error) {
-      // Yazım başarısızsa iyimser durumu geri al — buton gerçek durumdan
-      // sapık kalmasın.
-      setOptimistic((prev) => ({ ...prev, [listKey]: currentlyActive }));
-      Toast.show({
-        type: "error",
-        text1: i18nText("autoI18n.hata_2", "Hata: ") + (error?.message || ""),
-      });
+      // Bindirme ve yerel liste kendiliğinden geri döndü; yalnız bildir.
+      showLibraryError(error, { source: "quick_list_toggle" });
     }
   };
 
@@ -285,10 +276,7 @@ function QuickListButtons({
       }
       setWatchedSheetVisible(false);
     } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: i18nText("autoI18n.hata_2", "Hata: ") + (error?.message || ""),
-      });
+      showLibraryError(error, { source: "quick_list_watched" });
     }
   };
 
@@ -303,7 +291,7 @@ function QuickListButtons({
         ]}
       >
         <QuickButton
-          active={isActive("watchList", inWatchList)}
+          active={inWatchList}
           iconOn="bookmark"
           iconOff="bookmark-outline"
           tint={c.blue ?? FALLBACK.blue}
@@ -325,7 +313,7 @@ function QuickListButtons({
           accessibilityLabel={t.watchedMovies}
         />
         <QuickButton
-          active={isActive("favorites", inFavorites)}
+          active={inFavorites}
           iconOn="heart"
           iconOff="heart-outline"
           tint={c.red ?? FALLBACK.red}

@@ -73,6 +73,27 @@ export function getLocalList(uid, listKey) {
 }
 
 /**
+ * Bu liste bu cihaza HİÇ indirildi mi? `getLocalList` "hiç indirilmedi" ile "indirildi
+ * ama boş" durumlarını ikisi de {} döndürerek ayırt edemez; ilk indirme kararı
+ * (ListStatusContext) bunu bilmek zorunda: boş liste her açılışta yeniden
+ * sorgulanmasın, ama hiç çekilmemiş liste de boş sanılıp atlanmasın.
+ *
+ * Eski kapı kök dokümandaki sayaçlara (`counts.X > 0`) bakıyordu; sayaçlar
+ * artış/azalış ile tutulduğundan sapabiliyor ve sıfıra düşmüş bir sayaç, yeni
+ * cihazda dolu listeyi BOŞ gösteriyordu.
+ *
+ * @returns {boolean}
+ */
+export function hasLocalList(uid, listKey) {
+  if (!uid || !listKey) return false;
+  try {
+    return Boolean(seedSnapshot(cacheKeys.lists(uid, listKey)).hasCache);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Yerel depoya listenin son halini kaydeder ve aboneleri bilgilendirir.
  * @param {string} uid
  * @param {string} listKey
@@ -101,6 +122,17 @@ export function updateLocalItem(uid, listKey, itemKey, itemData) {
   const current = { ...getLocalList(uid, listKey) };
   current[itemKey] = itemData;
   setLocalList(uid, listKey, current);
+}
+
+/**
+ * Birden çok öğeyi yerel depoda TEK yazımda günceller. `setLocalList` her
+ * çağrıda haritanın tamamını diske yazar; N öğe için N kez çağırmak büyük
+ * listelerde N tam yazım demekti.
+ * @param {Record<string, any>} patch { [itemKey]: itemData }
+ */
+export function updateLocalItems(uid, listKey, patch) {
+  if (!uid || !listKey || !patch || Object.keys(patch).length === 0) return;
+  setLocalList(uid, listKey, { ...getLocalList(uid, listKey), ...patch });
 }
 
 /**
