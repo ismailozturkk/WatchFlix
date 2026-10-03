@@ -43,7 +43,6 @@ import { getAuth } from "firebase/auth";
 import {
   collection,
   doc,
-  addDoc,
   onSnapshot,
   orderBy,
   query,
@@ -74,11 +73,9 @@ import { useLanguage } from "@context/LanguageContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import { useUserProfile } from "@context/UserProfileContext";
 import { createSocialNotification } from "@services/socialNotificationsService";
+import { isOnlineVisible } from "@services/presenceService";
 import {
-  subscribeToUserPresence,
-  isOnlineVisible,
-} from "@services/presenceService";
-import {
+  createTypingController,
   enterChat,
   leaveChat,
   setTyping,
@@ -107,6 +104,7 @@ import { toast } from "@components/AppToast";
 import SharedMediaMessage from "@components/chat/SharedMediaMessage";
 import SharedMediaCollection from "@components/chat/SharedMediaCollection";
 import PollMessage from "@components/chat/PollMessage";
+import useAppActive from "../../hooks/useAppActive";
 import TextPollComposer from "@components/chat/TextPollComposer";
 import GroupInfoModal from "@components/chat/GroupInfoModal";
 import GroupAvatar from "@components/chat/GroupAvatar";
@@ -125,6 +123,11 @@ import {
   mergeServerMessages,
   removeOptimisticMessage,
 } from "@utils/chatOptimistic";
+import {
+  isLatestMessage,
+  latestAfterDelete,
+  previewOf,
+} from "@utils/threadPreview";
 import Reanimated, {
   runOnJS,
   useAnimatedReaction,
@@ -688,7 +691,7 @@ export default function ChatScreen({ route, navigation }) {
   }, [keyboard, kbGate]);
 
   const flatListRef = useRef();
-  const typingTimerRef   = useRef(null);   // debounce typing writes
+  const typingCtrlRef    = useRef(null);   // "yazıyor" bayrağı (ilk tuşta yaz, boşta kapat)
   const processedMsgIds  = useRef(new Set()); // guard against redundant seen/delivered writes
   const messageInputRef  = useRef(null);
   const searchInputRef   = useRef(null);   // arama input — modal açıldıktan SONRA odakla
@@ -881,10 +884,6 @@ export default function ChatScreen({ route, navigation }) {
       pendingComposerRef.current = null;
       if (composerTimerRef.current) clearTimeout(composerTimerRef.current);
       if (searchFocusTimerRef.current) clearTimeout(searchFocusTimerRef.current);
-      // Typing debounce'u da temizle: leaveChat typing=false yazıp onDisconnect
-      // guard'larını iptal ettikten SONRA bu timer ateşlenirse karşı tarafta
-      // kalıcı hayalet "yazıyor…" göstergesi kalıyordu.
-      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     };
   }, [commitPendingComposer, kbGate]);
 
@@ -949,35 +948,65 @@ export default function ChatScreen({ route, navigation }) {
   // değil" sayılıyor ya da bakılmayan sohbetin bildirimi bastırılıyordu.
   const isFocused = useIsFocused();
 
+  // Kullanıcı bu sohbeti GERÇEKTEN görüyor mu: ekran odakta VE uygulama ön
+  // planda. Odak tek başına yetmez — uygulama arka plana atılınca React
+  // Navigation ekranı odakta tutar; o sırada gelen mesaj "okundu" işaretleniyor,
+  // okunmamış sayacı (rozet) sıfırlanıyor ve karşı taraf "Sohbette" görüyordu.
+  const appActive = useAppActive();
+  const isViewing = isFocused && appActive;
+
+  // "Yazıyor" bayrağı: ilk tuşta hemen yazılır, 4 sn hareketsizlikte / gönderince /
+  // odak kaybında kapanır (services/chatSignals.js). Grupta typing yok.
+  useEffect(() => {
+    if (isGroup) return undefined;
+    const ctrl = createTypingController({
+      send: (value) => setTyping(chatId, currentUser.uid, value),
+    });
+    typingCtrlRef.current = ctrl;
+    return () => {
+      ctrl.stop();
+      if (typingCtrlRef.current === ctrl) typingCtrlRef.current = null;
+    };
+  }, [isGroup, chatId, currentUser.uid]);
+
   // Çevrimiçi/typing/inChat (RTDB) yalnızca 1-1 modunda. Grupta per-üye presence
   // gösterilmez (üye sayısı header'da). enterChat/leaveChat sadece 1-1.
   // Sunucu push'u bu bayrağa bakıp mesajı atlıyor (functions/index.js).
   useEffect(() => {
-    if (isGroup || !isFocused) return undefined;
+    if (isGroup || !isViewing) return undefined;
     enterChat(chatId, currentUser.uid);
-    return () => leaveChat(chatId, currentUser.uid);
-  }, [isGroup, isFocused, chatId, currentUser.uid]);
+    return () => {
+      // Görünmez olunca "yazıyor" da kapanmalı: denetleyici bayrağı hâlâ açık
+      // sanırsa dönüşteki ilk tuş hiç yazılmazdı.
+      typingCtrlRef.current?.stop();
+      leaveChat(chatId, currentUser.uid);
+    };
+  }, [isGroup, isViewing, chatId, currentUser.uid]);
 
   // Bu sohbet GÖRÜNÜRKEN chatId'yi bellekte işaretle (grup + 1-1 ikisinde de) —
   // ön plandaki bildirim handler'ı o sohbetin mesajı için banner/ses çıkarmasın
   // (bkz. utils/notificationPresentation.js). Sayaçlı: üst üste açılan
   // sohbetler birbirinin durumunu bozmaz (services/activeChatTracker.js).
-  // Görününce, bildirim çekmecesinde bekleyen bu sohbet bildirimleri de
-  // temizlenir — okunmuş mesajın bildirimi çekmecede (ve rozette) kalmasın.
   useEffect(() => {
     if (!isFocused) return undefined;
-    const release = enterActiveChat(chatId);
+    return enterActiveChat(chatId);
+  }, [isFocused, chatId]);
+
+  // Sohbet görünürken bildirim çekmecesinde bekleyen bu sohbet bildirimleri de
+  // temizlenir — okunmuş mesajın bildirimi çekmecede (ve rozette) kalmasın.
+  // Uygulama arka plandan dönünce de çalışır (arada gelenler için).
+  useEffect(() => {
+    if (!isViewing) return;
     dismissChatNotifications(chatId, currentUser.uid);
-    return release;
-  }, [isFocused, chatId, currentUser.uid]);
+  }, [isViewing, chatId, currentUser.uid]);
 
   // Sohbet açıkken gelen kutusu index'imdeki okunmamış sayacını sıfır tut:
   // girişte birikmiş sayacı, sohbet açıkken de yeni gelen artışları temizler
   // (profildeki rozet, Mesajlar ekranındaki renkli border ve uygulama simgesi
-  // rozeti bu alana bakar). Yalnız ekran odaktayken: arkada kalmış bir sohbet
-  // gelen mesajı "okundu" yapmamalı.
+  // rozeti bu alana bakar). Yalnız sohbet görünürken: arkada kalmış ya da
+  // arka plandaki bir sohbet gelen mesajı "okundu" yapmamalı.
   useEffect(() => {
-    if (isGroup || !isFocused) return undefined;
+    if (isGroup || !isViewing) return undefined;
     const myConvRef = doc(db, "Users", currentUser.uid, "conversations", friendUid);
     const unsub = onSnapshot(
       myConvRef,
@@ -989,7 +1018,7 @@ export default function ChatScreen({ route, navigation }) {
       () => {},
     );
     return () => unsub();
-  }, [isGroup, isFocused, currentUser.uid, friendUid]);
+  }, [isGroup, isViewing, currentUser.uid, friendUid]);
 
   // Clear processed-message guard when switching chats
   useEffect(() => { processedMsgIds.current.clear(); }, [chatId]);
@@ -1021,8 +1050,9 @@ export default function ChatScreen({ route, navigation }) {
         messages: mergeServerMessages(msgs, prev.messages, chatId),
       }));
 
-      // seen/delivered yalnızca 1-1'de anlamlı (grupta çok alıcı → tek durum
-      // paylaşılamaz; gereksiz yazma). Grupta atla.
+      // delivered yalnızca 1-1'de anlamlı (grupta çok alıcı → tek durum
+      // paylaşılamaz; gereksiz yazma). Grupta atla. "seen" burada DEĞİL: görüldü
+      // işareti yalnız sohbet görünürken yazılır (aşağıdaki isViewing efekti).
       if (isGroup) return;
       const batch = writeBatch(db);
       let hasBatch = false;
@@ -1042,12 +1072,6 @@ export default function ChatScreen({ route, navigation }) {
           });
           hasBatch = true;
           processedMsgIds.current.add(docSnap.id);
-        } else if (msg.senderId !== currentUser.uid && msg.status !== "seen") {
-          // Alıcı tarafı one-shot DEĞİL: gönderenin gecikmiş "delivered"
-          // yazımı bizim "seen"i ezebilir; snapshot'ta seen değilse yeniden
-          // yaz (idempotent) ki durum "seen"de sabitlensin.
-          batch.update(doc(messagesRef, docSnap.id), { status: "seen" });
-          hasBatch = true;
         }
       });
       if (hasBatch) batch.commit().catch(console.error);
@@ -1061,27 +1085,21 @@ export default function ChatScreen({ route, navigation }) {
 
     // Grup: doc'u dinle (header + memberInfo). 1-1: typing + presence.
     let unsubMeta = () => {};
-    let unsubPresence = () => {};
     let unsubFriendProfile = () => {};
     let unsubGroup = () => {};
     if (isGroup) {
       unsubGroup = subscribeGroup(groupId, (g) => setGroupData(g));
     } else {
-      unsubMeta = subscribeChatMeta(chatId, friendUid, (meta) => {
-        setChatData((prev) => ({
-          ...prev,
-          friendTyping: meta.typing,
-          friendInChat: meta.inChat,
-        }));
-      });
       // Arkadaşın privacy.onlineStatus tercihi sohbette de geçerli: "none"
-      // seçtiyse yeşil nokta VE son görülme gizlenir. 1-1 sohbet arkadaşlar
+      // seçtiyse yeşil nokta, "Sohbette" VE son görülme gizlenir ("yazıyor"
+      // sohbet içi etkileşim olduğundan gizlenmez). 1-1 sohbet arkadaşlar
       // arası olduğundan viewerIsFriend=true. Privacy yüklenene dek çevrimdışı
       // varsayılır (anlık "çevrimiçi" sızıntısı olmasın); okuma başarısızsa
       // varsayılan (görünür) davranışa düşülür.
       let friendPrivacy = null;
       let privacyReady = false;
       let lastPresence = null;
+      let lastInChat = false;
       const applyPresence = () => {
         if (!privacyReady) return;
         const hidden = friendPrivacy?.onlineStatus === "none";
@@ -1090,9 +1108,22 @@ export default function ChatScreen({ route, navigation }) {
           friendIsOnline: isOnlineVisible(lastPresence, friendPrivacy, {
             viewerIsFriend: true,
           }),
+          friendInChat: !hidden && lastInChat,
           friendPresence: hidden ? null : lastPresence,
         }));
       };
+      // typing/inChat yalnız arkadaşın bağlantısı CANLIYSA true gelir (bkz.
+      // services/chatRtdb.js): uygulamayı kapatan kullanıcı takılı kalmaz.
+      unsubMeta = subscribeChatMeta(chatId, friendUid, (meta) => {
+        lastPresence = meta.presence;
+        lastInChat = meta.inChat;
+        setChatData((prev) =>
+          prev.friendTyping === meta.typing
+            ? prev
+            : { ...prev, friendTyping: meta.typing },
+        );
+        applyPresence();
+      });
       unsubFriendProfile = onSnapshot(
         doc(db, "Users", friendUid),
         (snap) => {
@@ -1116,20 +1147,40 @@ export default function ChatScreen({ route, navigation }) {
           applyPresence();
         },
       );
-      unsubPresence = subscribeToUserPresence(friendUid, (presence) => {
-        lastPresence = presence;
-        applyPresence();
-      });
     }
 
     return () => {
       unsubscribeMessages();
       unsubMeta();
-      unsubPresence();
       unsubFriendProfile();
       unsubGroup();
     };
   }, [isGroup, groupId, chatId, friendUid, messageLimit]);
+
+  // Gelen mesajları "görüldü" yap — YALNIZ sohbet gerçekten görünürken (odakta
+  // + uygulama ön planda). Eskiden snapshot dinleyicisi, ekran arka planda ya da
+  // üstte başka ekran varken de yazıyordu: kullanıcı görmeden "görüldü" çıkıyordu.
+  // Sohbete dönüldüğünde birikenler de burada işaretlenir. Alıcı tarafı one-shot
+  // DEĞİL: gönderenin gecikmiş "delivered" yazımı "seen"i ezebilir; durum seen
+  // değilse yeniden yazılır (idempotent) ki "seen"de sabitlensin.
+  useEffect(() => {
+    if (isGroup || !isViewing) return;
+    const unseen = chatData.messages.filter(
+      (m) =>
+        m.id &&
+        !m._optimistic &&
+        !m._pendingWrite &&
+        m.senderId &&
+        m.senderId !== currentUser.uid &&
+        m.status !== "seen",
+    );
+    if (unseen.length === 0) return;
+    const batch = writeBatch(db);
+    unseen.forEach((m) => batch.update(doc(messagesRef, m.id), { status: "seen" }));
+    batch.commit().catch((err) => {
+      if (__DEV__) console.warn("seen:", err?.message);
+    });
+  }, [isGroup, isViewing, chatData.messages, currentUser.uid, messagesRef]);
 
   useEffect(() => {
     const unsubscribePins = onSnapshot(
@@ -1174,6 +1225,8 @@ export default function ChatScreen({ route, navigation }) {
     }).start();
   };
   const handleInputBlur = () => {
+    // Odak gidince "yazıyor" kapanır (metin kutuda kalsa bile).
+    typingCtrlRef.current?.stop();
     Animated.timing(inputBorderAnim, {
       toValue: 0,
       duration: 200,
@@ -1320,17 +1373,23 @@ export default function ChatScreen({ route, navigation }) {
     [busyPinId, canRemovePin, pinsRef],
   );
 
-  // lastMessage yaz + bildirim gönder (moda göre). Grup ve 1-1 şemaları farklı.
-  const finalizeThread = useCallback(
-    async (previewText) => {
-      const fromAvatarIndex =
-        typeof profileAvatarIndex === "number"
-          ? profileAvatarIndex
-          : typeof selectAvatarIndex === "number"
-            ? selectAvatarIndex
-            : 0;
+  const fromAvatarIndex =
+    typeof profileAvatarIndex === "number"
+      ? profileAvatarIndex
+      : typeof selectAvatarIndex === "number"
+        ? selectAvatarIndex
+        : 0;
+
+  // Mesajın kalıcı YAN ETKİLERİ — sohbet özeti, gelen kutusu index'i (iki taraf)
+  // ve alıcının okunmamış sayacı — mesajın KENDİSİYLE aynı batch'e eklenir.
+  // Eskiden mesaj yazılıp ardından üç ayrı yazım denenirdi; araya giren bir
+  // kopma ya da süreç ölümü mesajı bırakıp alıcının gelen kutusunu, sayacını ve
+  // rozetini güncellenmemiş bırakıyordu. Batch atomiktir: ya hepsi ya hiçbiri.
+  // Grup ve 1-1 şemaları farklı.
+  const queueThreadWrites = useCallback(
+    (batch, previewText) => {
       if (isGroup) {
-        await setDoc(
+        batch.set(
           chatRef,
           {
             lastMessage: {
@@ -1344,6 +1403,81 @@ export default function ChatScreen({ route, navigation }) {
           },
           { merge: true },
         );
+        return;
+      }
+      batch.set(
+        chatRef,
+        {
+          information: {
+            lastMessage: {
+              [currentUser.uid]: {
+                lastMessageText: previewText,
+                lastMessageTime: serverTimestamp(),
+              },
+            },
+            updatedAt: serverTimestamp(),
+            participants: [currentUser.uid, friendUid],
+          },
+        },
+        { merge: true },
+      );
+      // Gelen kutusu index'i (iki taraf) — Mesajlar ekranı bunu listeler.
+      const convEntry = (withUid, withName, withUsername, withAvatarIndex) => ({
+        withUid,
+        withName: withName || "",
+        withUsername: withUsername || "",
+        ...(typeof withAvatarIndex === "number" ? { withAvatarIndex } : {}),
+        lastText: previewText,
+        lastTime: serverTimestamp(),
+      });
+      batch.set(
+        doc(db, "Users", currentUser.uid, "conversations", friendUid),
+        convEntry(
+          friendUid,
+          friendIdentity.displayName || friendName,
+          friendIdentity.username,
+          friendIdentity.avatarIndex,
+        ),
+        { merge: true },
+      );
+      batch.set(
+        doc(db, "Users", friendUid, "conversations", currentUser.uid),
+        {
+          ...convEntry(
+            currentUser.uid,
+            profileDisplayName || currentUser.displayName,
+            profileUsername,
+            fromAvatarIndex,
+          ),
+          // Alıcı sohbeti açana dek biriken okunmamış sayacı; alıcının
+          // ChatScreen'i sohbet görünürken sıfırlar.
+          unreadCount: increment(1),
+        },
+        { merge: true },
+      );
+    },
+    [
+      isGroup,
+      chatRef,
+      currentUser.uid,
+      currentUser.displayName,
+      profileDisplayName,
+      profileUsername,
+      fromAvatarIndex,
+      friendUid,
+      friendName,
+      friendIdentity,
+    ],
+  );
+
+  // Bildirim dokümanları mesaj batch'i işlendikten SONRA yazılır (push'u
+  // tetikler). SIRA ÖNEMLİ: sunucu push'u bildirim oluşunca rozete yazacağı
+  // okunmamış toplamını o an Firestore'dan okur (functions/appBadge.js); sayaç
+  // artışı batch ile zaten işlenmiş olduğundan toplam yeni mesajı sayar.
+  // Bildirim hatası gönderimi geri almaz: mesaj zaten kalıcı.
+  const notifyThread = useCallback(
+    (previewText) => {
+      if (isGroup) {
         const others = (groupData?.members || []).filter(
           (u) => u !== currentUser.uid,
         );
@@ -1359,87 +1493,75 @@ export default function ChatScreen({ route, navigation }) {
             groupName: groupData?.name || groupName || "",
           }).catch(() => {}),
         );
-      } else {
-        await setDoc(
-          chatRef,
-          {
-            information: {
-              lastMessage: {
-                [currentUser.uid]: {
-                  lastMessageText: previewText,
-                  lastMessageTime: serverTimestamp(),
-                },
-              },
-              updatedAt: serverTimestamp(),
-              participants: [currentUser.uid, friendUid],
-            },
-          },
-          { merge: true },
-        );
-        // Gelen kutusu index'i (iki taraf) — Mesajlar ekranı bunu listeler.
-        const convEntry = (withUid, withName, withUsername, withAvatarIndex) => ({
-          withUid,
-          withName: withName || "",
-          withUsername: withUsername || "",
-          ...(typeof withAvatarIndex === "number" ? { withAvatarIndex } : {}),
-          lastText: previewText,
-          lastTime: serverTimestamp(),
-        });
-        setDoc(
-          doc(db, "Users", currentUser.uid, "conversations", friendUid),
-          convEntry(
-            friendUid,
-            friendIdentity.displayName || friendName,
-            friendIdentity.username,
-            friendIdentity.avatarIndex,
-          ),
-          { merge: true },
-        ).catch(() => {});
-        setDoc(
-          doc(db, "Users", friendUid, "conversations", currentUser.uid),
-          {
-            ...convEntry(
-              currentUser.uid,
-              profileDisplayName || currentUser.displayName,
-              profileUsername,
-              fromAvatarIndex,
-            ),
-            // Alıcı sohbeti açana dek biriken okunmamış sayacı; alıcının
-            // ChatScreen'i sohbet açıkken sıfırlar.
-            unreadCount: increment(1),
-          },
-          { merge: true },
-        ).catch(() => {});
-        // SIRA ÖNEMLİ: bildirim dokümanı sayaç artışından SONRA yazılmalı.
-        // Sunucu push'u bu doküman oluşunca tetiklenir ve rozete yazacağı
-        // okunmamış toplamını o an Firestore'dan okur (functions/appBadge.js);
-        // bildirim önce gitseydi toplam yeni mesajı saymadan hesaplanırdı.
-        // Firestore istemcisi yazıları verildiği sırayla gönderir.
-        createSocialNotification({
-          toUid: friendUid,
-          fromUid: currentUser.uid,
-          fromName: profileDisplayName || currentUser.displayName || "",
-          fromAvatarIndex,
-          type: "message",
-          text: previewText,
-        }).catch(() => {});
+        return;
       }
+      createSocialNotification({
+        toUid: friendUid,
+        fromUid: currentUser.uid,
+        fromName: profileDisplayName || currentUser.displayName || "",
+        fromAvatarIndex,
+        type: "message",
+        text: previewText,
+      }).catch(() => {});
     },
     [
       isGroup,
-      chatRef,
+      chatId,
       currentUser.uid,
       currentUser.displayName,
       profileDisplayName,
-      profileUsername,
-      profileAvatarIndex,
-      selectAvatarIndex,
+      fromAvatarIndex,
       groupData,
+      groupName,
       friendUid,
-      friendName,
-      friendAvatarIndex,
-      friendIdentity,
     ],
+  );
+
+  // TÜM gönderim yolları (metin, anket, medya, koleksiyon, detaydan paylaşım)
+  // buradan geçer: mesaj + yan etkiler tek atomik batch, ardından bildirim.
+  const postMessage = useCallback(
+    async (messageData, previewText) => {
+      const batch = writeBatch(db);
+      batch.set(doc(messagesRef), messageData);
+      queueThreadWrites(batch, previewText);
+      await batch.commit();
+      notifyThread(previewText);
+    },
+    [messagesRef, queueThreadWrites, notifyThread],
+  );
+
+  // Mesajlar listesindeki önizlemeyi sohbetin GÜNCEL son mesajına eşitler (bkz.
+  // utils/threadPreview.js): son mesaj silinince ya da düzenlenince eski metin
+  // karşı tarafın listesinde kalmasın. Hata önizlemeyi bayat bırakır, işlemi bozmaz.
+  const syncThreadPreview = useCallback(
+    async (latest) => {
+      try {
+        const text = previewOf(latest);
+        const stamped = latest?.timestamp?.toMillis ? latest.timestamp : null;
+        if (isGroup) {
+          await updateDoc(chatRef, {
+            lastMessage: latest
+              ? {
+                  text,
+                  senderId: latest.senderId || "",
+                  senderName: latest.senderName || "",
+                  senderUsername: latest.senderUsername || "",
+                  time: stamped || serverTimestamp(),
+                }
+              : deleteField(),
+          });
+          return;
+        }
+        const patch = { lastText: text, ...(stamped ? { lastTime: stamped } : {}) };
+        await Promise.all([
+          updateDoc(doc(db, "Users", currentUser.uid, "conversations", friendUid), patch),
+          updateDoc(doc(db, "Users", friendUid, "conversations", currentUser.uid), patch),
+        ]);
+      } catch (error) {
+        if (__DEV__) console.warn("syncThreadPreview:", error?.message);
+      }
+    },
+    [isGroup, chatRef, currentUser.uid, friendUid],
   );
 
   // Anket oyu (toggle). poll.votes.{uid} alanını günceller.
@@ -1478,36 +1600,31 @@ export default function ChatScreen({ route, navigation }) {
         },
       };
       try {
-        await addDoc(messagesRef, messageData);
-        await finalizeThread(previewText);
+        await postMessage(messageData, previewText);
         setReplyingTo(null);
       } catch (err) {
         console.error("textPoll:", err);
         appAlert(i18nText("autoI18n.hata", "Hata"), i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
       }
     },
-    [messagesRef, currentUser.uid, replyFields, senderFields, finalizeThread, closeTextPollModal],
+    [currentUser.uid, replyFields, senderFields, postMessage, closeTextPollModal],
   );
 
   const handleTyping = useCallback(
     (value) => {
       setText(value);
       setTextLink(isLink(value));
-      if (isGroup) return; // grupta typing göstergesi yok
-      // Debounce: write typing status at most once per 600 ms (RTDB).
-      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-      typingTimerRef.current = setTimeout(() => {
-        setTyping(chatId, currentUser.uid, value.length > 0);
-      }, 600);
+      // Grupta typing göstergesi yok (denetleyici oluşturulmaz). İlk tuşta hemen
+      // yazılır, hareketsizlikte kapanır (services/chatSignals.js).
+      typingCtrlRef.current?.input(value.length > 0);
     },
-    [isLink, isGroup, chatId, currentUser.uid],
+    [isLink],
   );
 
   const sendMessage = useCallback(async () => {
     if (text.trim() === "") return;
-    // Pending debounced typing write'ı iptal et ve typing'i hemen kapat (RTDB).
-    if (typingTimerRef.current) { clearTimeout(typingTimerRef.current); typingTimerRef.current = null; }
-    if (!isGroup) setTyping(chatId, currentUser.uid, false);
+    // Gönderince "yazıyor" hemen kapanır.
+    typingCtrlRef.current?.stop();
     const outgoing = text;
     const replySnapshot = replyingTo;
 
@@ -1531,6 +1648,10 @@ export default function ChatScreen({ route, navigation }) {
           text: outgoing,
           edited: true,
         });
+        // Son mesaj düzenlendiyse liste önizlemesi de yeni metni göstersin.
+        if (isLatestMessage(chatData.messages, targetMessage.id)) {
+          syncThreadPreview({ ...targetMessage, text: outgoing });
+        }
       } catch (error) {
         setChatData((prev) => ({
           ...prev,
@@ -1580,17 +1701,17 @@ export default function ChatScreen({ route, navigation }) {
     setSearchModalVisible(false);
 
     try {
-      await addDoc(messagesRef, {
-        ...messageData,
-        text: outgoing,
-        timestamp: serverTimestamp(),
-        status: "sent",
-      });
-      // Mesaj zaten görünür ve kalıcı yazılmıştır; özet/bildirim hatası gönderim
-      // deneyimini geri almamalı.
-      finalizeThread(outgoing).catch((error) => {
-        if (__DEV__) console.warn("finalizeThread:", error?.message);
-      });
+      // Mesaj + sohbet özeti + gelen kutusu + okunmamış sayacı TEK atomik batch;
+      // bildirim bunun ardından (bkz. postMessage).
+      await postMessage(
+        {
+          ...messageData,
+          text: outgoing,
+          timestamp: serverTimestamp(),
+          status: "sent",
+        },
+        outgoing,
+      );
     } catch (error) {
       setChatData((prev) => ({
         ...prev,
@@ -1606,13 +1727,14 @@ export default function ChatScreen({ route, navigation }) {
     text,
     editingMessage,
     replyingTo,
-    isGroup,
     chatId,
     messagesRef,
     currentUser.uid,
     isLink,
     senderFields,
-    finalizeThread,
+    postMessage,
+    chatData.messages,
+    syncThreadPreview,
   ]);
 
   const handleLongPress = useCallback(
@@ -1782,12 +1904,23 @@ export default function ChatScreen({ route, navigation }) {
         await deleteDoc(doc(messagesRef, message.id));
         if (replyingTo?.messageId === message.id) setReplyingTo(null);
         setOptionsVisible(false);
+        // Silinen son mesajsa liste önizlemesi bir öncekine dönsün (silinen
+        // metin karşı tarafın listesinde kalmasın).
+        const next = latestAfterDelete(chatData.messages, message.id);
+        if (next !== undefined) syncThreadPreview(next);
       } catch (error) {
         console.error("deleteMessage:", error);
         toast.error(i18nText("autoI18n.mesaj_silinemedi", "Mesaj silinemedi"));
       }
     },
-    [pinnedMessages, pinsRef, messagesRef, replyingTo?.messageId],
+    [
+      pinnedMessages,
+      pinsRef,
+      messagesRef,
+      replyingTo?.messageId,
+      chatData.messages,
+      syncThreadPreview,
+    ],
   );
 
   const selectedPin = selectedMessage
@@ -2088,8 +2221,7 @@ export default function ChatScreen({ route, navigation }) {
     setSearchChoise(null);
 
     try {
-      await addDoc(messagesRef, messageData);
-      await finalizeThread(previewText);
+      await postMessage(messageData, previewText);
       setReplyingTo(null);
     } catch (err) {
       console.error(i18nText("autoI18n.arama_sonucu_gonderme_hatasi", "Arama sonucu gönderme hatası:"), err);
@@ -2099,11 +2231,10 @@ export default function ChatScreen({ route, navigation }) {
     selectedItems,
     composeTitle,
     pollMode,
-    messagesRef,
     currentUser.uid,
     replyFields,
     senderFields,
-    finalizeThread,
+    postMessage,
     resetCompose,
   ]);
 
@@ -2121,15 +2252,17 @@ export default function ChatScreen({ route, navigation }) {
     const sendInitialMedia = async () => {
       const previewText = initialMedia.title || i18nText("autoI18n.icerik", "İçerik");
       try {
-        await addDoc(messagesRef, {
-          text: previewText,
-          senderId: currentUser.uid,
-          timestamp: serverTimestamp(),
-          status: "sent",
-          ...senderFields(),
-          media: initialMedia,
-        });
-        await finalizeThread(previewText);
+        await postMessage(
+          {
+            text: previewText,
+            senderId: currentUser.uid,
+            timestamp: serverTimestamp(),
+            status: "sent",
+            ...senderFields(),
+            media: initialMedia,
+          },
+          previewText,
+        );
       } catch (error) {
         console.error("detailMediaSend:", error);
         appAlert(
@@ -2142,12 +2275,11 @@ export default function ChatScreen({ route, navigation }) {
     sendInitialMedia();
   }, [
     currentUser.uid,
-    finalizeThread,
+    postMessage,
     groupData,
     initialMedia,
     initialMediaKey,
     isGroup,
-    messagesRef,
     navigation,
     senderFields,
   ]);

@@ -3,13 +3,37 @@
     "presence": {
       "$uid": {
         ".read": "auth != null",
-        ".write": "auth != null && auth.uid === $uid"
+        ".write": "auth != null && auth.uid === $uid",
+        "conns": {
+          "$connId": {
+            ".validate": "newData.isNumber() && $connId.length <= 64"
+          }
+        },
+        "lastSeen": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
       }
     },
     "chatMeta": {
       "$chatId": {
         ".read": "auth != null && ($chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid))",
-        ".write": "auth != null && ($chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid))"
+        ".write": "auth != null && ($chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid))",
+        "typing": {
+          "$uid": {
+            ".validate": "$uid === auth.uid && newData.isString() && newData.val().length <= 64"
+          }
+        },
+        "inChat": {
+          "$uid": {
+            ".validate": "$uid === auth.uid && newData.isString() && newData.val().length <= 64"
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
       }
     }
   }

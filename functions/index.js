@@ -67,6 +67,7 @@ const {
   chatIdForMessage,
   sumUnreadMessages,
 } = require("./appBadge");
+const { isRecipientViewingChat } = require("./chatPresence");
 
 initializeApp();
 const db = getFirestore();
@@ -924,16 +925,15 @@ exports.onSocialNotificationCreated = onDocumentCreated(
     // (chatRtdb.js'nin inChat bayrağı) push gereksiz — mesajı zaten sohbette
     // canlı görüyor. Yalnızca 1-1 mesajlar için: gruplarda inChat izlenmiyor
     // (bkz. chatRtdb.js — enterChat/leaveChat yalnızca 1-1 modunda çağrılır).
+    // Bayrak yalnız alıcının bağlantısı hâlâ canlıysa geçerli sayılır (bkz.
+    // chatPresence.js): ani kapanışta takılı kalan bayrak push'u susturamaz.
     if (rtdb && n.type === "message" && !n.groupId && n.fromUid) {
       const chatId =
         n.fromUid > recipientUid
           ? `${n.fromUid}_${recipientUid}`
           : `${recipientUid}_${n.fromUid}`;
       try {
-        const inChatSnap = await rtdb
-          .ref(`chatMeta/${chatId}/inChat/${recipientUid}`)
-          .get();
-        if (inChatSnap.val() === true) {
+        if (await isRecipientViewingChat(rtdb, chatId, recipientUid)) {
           console.log(`Alıcı sohbette, push atlandı: ${recipientUid}`);
           return;
         }

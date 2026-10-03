@@ -1,148 +1,147 @@
 // services/presenceService.js
 //
-// Presence (online/offline) artık Realtime Database üzerinde: /presence/{uid}.
+// Presence (çevrimiçi / son görülme) — Realtime Database üzerinde /presence/{uid}.
 //
-// NEDEN RTDB (Firestore yerine):
-//   Firestore'da bağlantı kopunca otomatik temizlik PRIMITIFI YOKTUR; bu yüzden
-//   eskiden 60 sn'de bir heartbeat yazıp "stale window" ile online tahmini
-//   yapıyorduk (100 kullanıcı x 8 saat ≈ 48.000 yazma/gün). RTDB'nin
-//   `onDisconnect()` primitifi, socket koptuğu an sunucu tarafında isOnline:false
-//   + lastSeen yazar. Böylece:
-//     - Heartbeat write fırtınası TAMAMEN kalkar (yazma maliyeti ~0).
-//     - Crash/ağ kopması/uygulama öldürülmesi anında güvenilir offline.
-//     - isOnline boolean'ı artık GÜVENİLİR (tahmin/stale-window gerekmez).
+// MİMARİ:
+//   • Karar mantığı services/presenceSession.js'de (saf durum makinesi, testli).
+//     Burası yalnızca onu gerçek RTDB + AppState'e bağlayan ince katman.
+//   • Veri modeli ve okuyucu yardımcıları services/presenceModel.js'de.
 //
-// PUBLIC API değişmedi — tüketiciler (App.js, ChatScreen, FriendProfileScreen)
-// aynen çalışır. Sadece backend Firestore→RTDB değişti ve zaman damgaları artık
-// number (ms) olarak gelir (helper'lar her iki tipi de tolere eder).
+// Çevrimiçi kaydı soket başına /presence/{uid}/conns/{connId}. Kullanıcı en az
+// bir canlı kaydı varken çevrimiçidir; her kayıt yalnız kendi soketinin ölümüyle
+// (onDisconnect) ya da uygulama arka plana atılınca silinir. Firestore'daki
+// heartbeat (60 sn'de bir yazma) modeli yok; RTDB'nin onDisconnect'i soket
+// koptuğu an sunucu tarafında temizler.
 //
-// ŞEMA:
 //   /presence/{uid}
-//     isOnline      : boolean
-//     lastActiveAt  : number (serverTimestamp)  ← son foreground/connect
-//     lastSeen      : number (serverTimestamp)  ← onDisconnect / background
+//     conns/{connId} : number (serverTimestamp)  ← açık soket + ön plan
+//     lastSeen       : number (serverTimestamp)  ← en son çevrimdışına düşüş
+//
+// ÇIKIŞ: auth düştükten sonra offline yazımı reddedilirdi (kullanıcı çıkış
+// yapınca "çevrimiçi" takılı kalırdı). `beforeAuthStateChanged` kancası oturum
+// DEĞİŞMEDEN önce kaydı siler; Ayarlar'daki çıkış, hesap silme ve kayıt sonrası
+// çıkış gibi her yolu tek noktadan kapsar.
 
 import { AppState } from "react-native";
-import { rtdb } from "../firebase";
+import { auth, rtdb } from "../firebase";
 import { i18nText } from "../utils/i18nText";
 import {
   ref,
   onValue,
   onDisconnect,
-  set,
+  update,
+  push,
   get,
   serverTimestamp as rtdbServerTimestamp,
 } from "firebase/database";
+import { createPresenceSession } from "./presenceSession";
+import {
+  isOnlineEffective,
+  isOnlineVisible,
+  lastSeenMs,
+} from "./presenceModel";
 
-let _connectedUnsub = null;
-let _appStateSub = null;
-let _currentUid = null;
+export { isOnlineEffective, isOnlineVisible };
+
+// Çıkış yolunu bekletmemek için kaydı silmeye ayrılan azami süre.
+const SIGN_OUT_BUDGET_MS = 1500;
 
 const presenceRef = (uid) => ref(rtdb, `presence/${uid}`);
+const connRef = (uid, connId) => ref(rtdb, `presence/${uid}/conns/${connId}`);
+const lastSeenRef = (uid) => ref(rtdb, `presence/${uid}/lastSeen`);
 
-const OFFLINE = () => ({ isOnline: false, lastSeen: rtdbServerTimestamp() });
-const ONLINE = () => ({ isOnline: true, lastActiveAt: rtdbServerTimestamp() });
+// RTDB + AppState'i durum makinesinin beklediği arayüze çevirir.
+const adapter = {
+  getAppState: () => AppState.currentState,
+  subscribeConnected: (cb) =>
+    onValue(ref(rtdb, ".info/connected"), (snap) => cb(snap.val() === true)),
+  subscribeAppState: (cb) => {
+    const sub = AppState.addEventListener("change", cb);
+    return () => sub.remove?.();
+  },
+  // push() yalnızca anahtar üretir; ağ çağrısı yapmaz.
+  newConnId: (uid) => push(ref(rtdb, `presence/${uid}/conns`)).key,
+  arm: (uid, connId) =>
+    Promise.all([
+      onDisconnect(connRef(uid, connId)).remove(),
+      onDisconnect(lastSeenRef(uid)).set(rtdbServerTimestamp()),
+    ]),
+  disarm: (uid, connId) =>
+    Promise.all([
+      onDisconnect(connRef(uid, connId)).cancel(),
+      onDisconnect(lastSeenRef(uid)).cancel(),
+    ]),
+  // isOnline/lastActiveAt: eski şemanın (takılı kalabilen) alanları — temizlenir.
+  markOnline: (uid, connId, staleConnId) =>
+    update(presenceRef(uid), {
+      [`conns/${connId}`]: rtdbServerTimestamp(),
+      ...(staleConnId ? { [`conns/${staleConnId}`]: null } : {}),
+      isOnline: null,
+      lastActiveAt: null,
+    }),
+  markOffline: (uid, connId) =>
+    update(presenceRef(uid), {
+      [`conns/${connId}`]: null,
+      lastSeen: rtdbServerTimestamp(),
+    }),
+  onError: (err) => {
+    if (__DEV__) console.warn("presence:", err?.message);
+  },
+};
 
-const writeOnline = (uid) =>
-  set(presenceRef(uid), ONLINE()).catch(() => {});
-const writeOffline = (uid) =>
-  set(presenceRef(uid), OFFLINE()).catch(() => {});
+let session = null;
+let authGuardOff = null;
+
+/** Paylaşılan oturum (sohbet sinyalleri aynı bağlantı kimliğini kullanır). */
+export function getPresenceSession() {
+  if (!session && rtdb) session = createPresenceSession(adapter);
+  return session;
+}
+
+function ensureAuthGuard() {
+  if (authGuardOff || typeof auth?.beforeAuthStateChanged !== "function") return;
+  authGuardOff = auth.beforeAuthStateChanged(async (nextUser) => {
+    // Bu kanca çıkışı/hesap geçişini ASLA engellememeli: hata yutulur, süre kısıtlıdır.
+    let budgetTimer;
+    try {
+      const current = session?.getState().uid;
+      if (!current || nextUser?.uid === current) return;
+      await Promise.race([
+        stopPresence(),
+        new Promise((resolve) => {
+          budgetTimer = setTimeout(resolve, SIGN_OUT_BUDGET_MS);
+        }),
+      ]);
+    } catch {
+      /* yut */
+    } finally {
+      clearTimeout(budgetTimer);
+    }
+  });
+}
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export function startPresence(uid) {
-  if (!uid || !rtdb) return () => {};
-  if (_currentUid === uid && _connectedUnsub) return stopPresence;
-
-  // Hesap değişimi: önceki kullanıcıyı offline yap ve dinleyicileri temizle.
-  if (_currentUid && _currentUid !== uid) {
-    writeOffline(_currentUid);
-    _cleanup();
-  }
-
-  _currentUid = uid;
-
-  // Kanonik Firebase presence deseni: `.info/connected` dinle; bağlantı kurulunca
-  // ÖNCE onDisconnect'i kur (socket koparsa sunucu offline yazsın), SONRA online yaz.
-  const connectedRef = ref(rtdb, ".info/connected");
-  _connectedUnsub = onValue(connectedRef, (snap) => {
-    if (snap.val() !== true) return;
-    const myRef = presenceRef(uid);
-    onDisconnect(myRef)
-      .set(OFFLINE())
-      .then(() => set(myRef, ONLINE()))
-      .catch(() => {});
-  });
-
-  // Uygulama arka plana alınınca (socket hemen kopmayabilir) elle offline yaz;
-  // öne gelince tekrar online. onDisconnect armed kalır (zarar vermez).
-  _appStateSub = AppState.addEventListener("change", (next) => {
-    if (!_currentUid) return;
-    if (next === "active") writeOnline(_currentUid);
-    else writeOffline(_currentUid);
-  });
-
+  const s = getPresenceSession();
+  if (!uid || !s) return () => {};
+  ensureAuthGuard();
+  s.start(uid);
   return stopPresence;
 }
 
+/** Kaydı siler (mümkünse) ve dinleyicileri bırakır. Çıkışta beklenebilir. */
 export function stopPresence() {
-  if (_currentUid) {
-    const myRef = presenceRef(_currentUid);
-    onDisconnect(myRef).cancel().catch(() => {});
-    writeOffline(_currentUid);
-  }
-  _cleanup();
-  _currentUid = null;
+  return session ? session.stop() : Promise.resolve();
 }
 
-function _cleanup() {
-  if (_connectedUnsub) {
-    _connectedUnsub();
-    _connectedUnsub = null;
-  }
-  if (_appStateSub) {
-    _appStateSub.remove?.();
-    _appStateSub = null;
-  }
-}
-
-// ─── Zaman damgası yardımcısı (Firestore Timestamp | number ms) ───────────────
-const toMillis = (v) => {
-  if (v == null) return null;
-  if (typeof v === "number") return v;
-  if (typeof v.toMillis === "function") return v.toMillis();
-  return null;
-};
-
-// ─── Stale check helpers ─────────────────────────────────────────────────────
-
-/**
- * "Gerçekten online mi?" — onDisconnect sayesinde isOnline boolean'ı artık
- * güvenilir; tahmin/stale-window gerekmez.
- */
-export function isOnlineEffective(presence) {
-  return !!presence && presence.isOnline === true;
-}
-
-/**
- * Privacy filtreli versiyon (Users.privacy.onlineStatus alanına bakar).
- */
-export function isOnlineVisible(
-  presence,
-  userPrivacy,
-  { viewerIsFriend = false } = {},
-) {
-  const mode = userPrivacy?.onlineStatus || "everyone";
-  if (mode === "none") return false;
-  if (mode === "friends" && !viewerIsFriend) return false;
-  return isOnlineEffective(presence);
-}
+// ─── Son görülme biçimlendirme ───────────────────────────────────────────────
 
 /**
  * "5 dakika önce" gibi relative string.
  */
 export function formatLastSeen(presence, t = {}) {
-  const ms = toMillis(presence?.lastSeen);
+  const ms = lastSeenMs(presence);
   if (!ms) return t.unknown || "";
   const diff = Date.now() - ms;
   const sec = Math.floor(diff / 1000);

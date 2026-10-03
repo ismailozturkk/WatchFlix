@@ -181,11 +181,12 @@ ErrorBoundary
 - Snapshot pattern — eski postlarda eski avatar görünmeye devam eder
 - Universal `getAvatarSource(idx)` + `clampAvatarIndex(idx)` (NaN/eski veri için güvenlik ağı)
 
-### 2. Presence ayrı koleksiyonda
+### 2. Presence ayrı bir veri deposunda (Realtime Database)
+> **Güncel mimari: [`docs/mimari/PRESENCE.md`](./docs/mimari/PRESENCE.md).** Eski heartbeat (60 sn) +
+> stale-window modeli kaldırıldı; soket başına `conns` kaydı + onDisconnect modeline geçildi.
+
 [`services/presenceService.js`](./services/presenceService.js):
-- Heartbeat (60 sn) `Presence/{uid}`'e yazar — `Users/{uid}` stabil kalır
-- Aksi halde Users üzerinde her 60 sn listener fan-out olurdu (UserProfile + Friends + tüm tüketiciler re-render)
-- `isOnlineEffective(presence)` 2 dakika stale window — crash sonrası "sonsuz online" engellenir
+- Presence `Users/{uid}`'den ayrı — aksi halde Users üzerinde listener fan-out olurdu (UserProfile + Friends + tüm tüketiciler re-render)
 - Privacy katmanı: `isOnlineVisible(presence, privacy)` UI tarafında
 
 ### 3. Username uniqueness — runTransaction
