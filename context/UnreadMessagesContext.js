@@ -11,7 +11,9 @@
 //
 // Kaynak: Users/{uid}/conversations/{otherUid}.unreadCount. Karşı taraf mesaj
 // yazarken artırır, alıcının ChatScreen'i sohbet açılınca sıfırlar. Grup
-// sohbetlerinde sayaç tutulmuyor (bkz. utils/appBadge.js).
+// sohbetlerinin sayacı (groups/{id}.unread.{uid}) yalnız Mesajlar ekranındaki
+// "Gruplar" sekmesinde gösterilir; buradaki toplama ve rozete GİRMEZ
+// (bkz. utils/appBadge.js).
 
 import React, {
   createContext,

@@ -383,8 +383,8 @@ describe("Free planı kararları", () => {
     expect(canUseFeature("tournament_vote", PREMIUM)).toBe(true);
   });
 
-  test("kişiselleştirme: simge, kar, ikon arka planı, pet Free'de YOK", () => {
-    for (const id of ["app_icon", "snow_effect", "icon_background", "pet_companion"]) {
+  test("kişiselleştirme: simge, kar, ambiyans, ikon arka planı, pet Free'de YOK", () => {
+    for (const id of ["app_icon", "snow_effect", "ambient_background", "icon_background", "pet_companion"]) {
       expect(freeLimit(id)).toBe(false);
       expect(isLockedFor(id, FREE)).toBe(true);
       expect(canUseFeature(id, PREMIUM)).toBe(true);
@@ -464,7 +464,7 @@ describe("yeni özelliklerin kayıt bütünlüğü", () => {
   });
 
   test("erişim özelliklerinin ücretsiz ve ücretli değeri tanımlı (karşılaştırma tablosu '—' basmasın)", () => {
-    for (const id of ["tournament_vote", "app_icon", "snow_effect", "icon_background", "pet_companion"]) {
+    for (const id of ["tournament_vote", "app_icon", "snow_effect", "ambient_background", "icon_background", "pet_companion"]) {
       const feature = PREMIUM_FEATURES[id];
       expect(feature.freeValue.tr && feature.freeValue.en).toBeTruthy();
       expect(feature.paidValue.tr && feature.paidValue.en).toBeTruthy();

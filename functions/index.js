@@ -686,7 +686,10 @@ exports.callGemini = onCall(
         topP: 0.95,
         topK: 40,
         // CineMatch yalnız kompakt JSON döndürür; düz sohbet biraz daha geniş kalır.
-        maxOutputTokens: mode === "cine" ? 1200 : 2048,
+        // Cine tavanı: ayrıntılı üslup + 10 öğe (8 ayarı + filtre payı) 1200'de
+        // kesiliyordu; istemci kesik JSON'u onarır (repairTruncatedJSON) ama
+        // tavan sonuca yetmeli. Ücret yalnız üretilen token kadar artar.
+        maxOutputTokens: mode === "cine" ? 1800 : 2048,
         responseMimeType: mode === "cine" ? "application/json" : "text/plain",
         thinkingConfig: { thinkingBudget: 0 },
       },

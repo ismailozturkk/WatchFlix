@@ -236,8 +236,9 @@ Ayarlar kartı ve limit uyarıları bu kayıttan üretilir — kaydı olmayan bi
 | Özel tema oluşturma | 8 hazır tema | ✓ | ✓ | `SettingsTheme`, `ThemeContext` |
 | Yazı tipi kataloğu | 7 font | 56 font | 56 font | `FontSettingsSection`, `typographySettings` |
 | Uygulama simgesi | Varsayılan | ✓ | ✓ | `AppIconSection` |
-| Kar animasyonu | — | ✓ | ✓ | `AppSettingsContext`, `PersonalizationScreen` |
-| İkon arka planı | — | ✓ | ✓ | `AppSettingsContext`, `PersonalizationScreen` |
+| Kar animasyonu | — | ✓ | ✓ | `AppSettingsContext`, `PersonalizationScreen`, `DecorScopesScreen` |
+| Ambiyans arka planı | — | ✓ | ✓ | `AppSettingsContext`, `PersonalizationScreen`, `DecorScopesScreen` |
+| İkon arka planı | — | ✓ | ✓ | `AppSettingsContext`, `PersonalizationScreen`, `DecorScopesScreen` |
 | Pet / Dost | — | ✓ | ✓ | `PetContext`, `PetSettingsSection` |
 | Platform bildirimi | 10 başlık | 100 | 100 | Sunucu (`dailyStreamingAvailability`) |
 | Wrapped arşivi | Yalnız bu yıl | Son 5 yıl | Tüm yıllar | `WrappedScreen`, `HubWrappedModule` (`canViewWrappedYear`) |
@@ -245,7 +246,12 @@ Ayarlar kartı ve limit uyarıları bu kayıttan üretilir — kaydı olmayan bi
 Free planı 10 Ekim 2026 kararıdır (arkadaş 2, grup 1, AI 3/gün · 30/ay, bir
 özel liste, Hub'da oyun ve CineSwipe yok, turnuvada yalnız izleyici, kozmetik
 dört özellik kapalı, 10 film + 20 dizi hatırlatması, 5 not + 5 yapılacak,
-20 film + 20 dizi notu). Premium ve Max değerleri bu kararın PARÇASI DEĞİL,
+20 film + 20 dizi notu). Ambiyans arka planı 15 Ekim'de beşinci kapalı kozmetik
+olarak eklendi (kar ve ikon arka planıyla aynı kural). Üç dekor efektinin
+(kar / ambiyans / ikon arka planı) her birinin kayıtta bir erişim girdisi olmak
+zorundadır; `__tests__/decorScopes.test.js` "Premium kapısı bekçisi" bunu ve
+ham tercih bayrağının kapıyı atlayarak okunmadığını doğrular.
+Premium ve Max değerleri bu kararın PARÇASI DEĞİL,
 önerilen varsayılandır (özellikle not, hatırlatma ve film/dizi notu): satış
 verisi geldikçe `utils/premiumFeatures.js`'ten değişir.
 
@@ -284,7 +290,7 @@ Kurallar:
 - **Abonelik bitince veri silinmez:** fazla listeler ve arkadaşlar kalır,
   yalnız yenisi engellenir. Özel tema ve premium font seçimi saklanır ama
   varsayılan tema / sistem fontu çizilir; abonelik yenilenince kendiliğinden
-  geri gelir. Aynısı kar animasyonu, ikon arka planı ve pet için de geçerli:
+  geri gelir. Aynısı kar animasyonu, ambiyans, ikon arka planı ve pet için de geçerli:
   tercih saklanır, Free'de kapalı çizilir. Uygulama simgesinde varsayılana
   dönmek her zaman serbesttir.
 - **Maliyetli ve başkalarına görünen özellikler sunucuda** (AI, platform

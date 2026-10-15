@@ -84,7 +84,8 @@ export async function reconcileLedger(uid, {
   const seriler = serileriHesapla(a.ledger.aktiflik.gunler, a.ledger.aktiflik);
   const r = rekorYukselt(a.ledger, seriler);
 
-  const sonuc = birlestir(r.ledger, { badgeIds, tumIds, perde, makara });
+  // `bugun` yeni kazanılan rozetlere KAZANMA GÜNÜ olarak yazılır (defter v3).
+  const sonuc = birlestir(r.ledger, { badgeIds, tumIds, perde, makara, bugun });
   if (sonuc.degisti || a.degisti || r.degisti) await saveLedger(uid, sonuc.ledger);
   return {
     ledger: sonuc.ledger,

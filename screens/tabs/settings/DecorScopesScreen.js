@@ -180,11 +180,12 @@ export default function DecorScopesScreen() {
 
   const { showSnow, snowAllowed } = useSnowSettings();
   const { showIconBackground, iconBackgroundAllowed } = useIconBackgroundSettings();
-  const { showAmbientBackground } = useAmbientBackgroundSettings();
+  const { showAmbientBackground, ambientAllowed } = useAmbientBackgroundSettings();
   const { decorHidden, changeDecorVisible, changeDecorEffectVisible, resetDecorScopes } =
     useDecorScopeSettings();
   const snowGate = usePremiumGate("snow_effect");
   const iconGate = usePremiumGate("icon_background");
+  const ambientGate = usePremiumGate("ambient_background");
 
   // `enabled`: genel anahtar etkin değer (Free'de kilitliyse zaten false).
   // `locked`: Premium gerektiriyor ve plan yetmiyor → kutu yükseltmeye gider.
@@ -196,7 +197,12 @@ export default function DecorScopesScreen() {
       gate: iconGate,
       color: C.blue,
     },
-    ambient: { enabled: showAmbientBackground, locked: false, gate: null, color: C.purple },
+    ambient: {
+      enabled: showAmbientBackground,
+      locked: !ambientAllowed,
+      gate: ambientGate,
+      color: C.purple,
+    },
   };
 
   const guard = (effect) => {

@@ -1,13 +1,55 @@
 const {
   advanceTabBarCollapse,
+  shouldForwardCollapse,
   TAB_BAR_COLLAPSE_DISTANCE,
   TAB_BAR_COLLAPSE_FLOOR,
+  TAB_BAR_COLLAPSE_SCALE_DELTA,
+  TAB_BAR_MIN_SCALE,
+  TAB_BAR_NATIVE_SCALE_ENABLED,
+  TAB_BAR_NATIVE_STEP,
   TAB_BAR_SCROLL_UNSET,
 } = require("../utils/tabBarCollapse");
 
 function shared(value) {
   return { value };
 }
+
+describe("shared shrink amount", () => {
+  it("is exactly 20%, and the minimum scale is its complement", () => {
+    expect(TAB_BAR_COLLAPSE_SCALE_DELTA).toBe(0.2);
+    expect(TAB_BAR_MIN_SCALE).toBeCloseTo(0.8, 10);
+    expect(TAB_BAR_MIN_SCALE + TAB_BAR_COLLAPSE_SCALE_DELTA).toBeCloseTo(1, 10);
+  });
+
+  it("keeps the native iOS 26 scaling switched on (flip to false to roll back to the system minimize)", () => {
+    expect(TAB_BAR_NATIVE_SCALE_ENABLED).toBe(true);
+  });
+});
+
+describe("shouldForwardCollapse (what the native bridge hears)", () => {
+  it("always forwards the first value, whatever it is", () => {
+    expect(shouldForwardCollapse(-1, 0)).toBe(true);
+    expect(shouldForwardCollapse(-1, 0.4)).toBe(true);
+  });
+
+  it("ignores a repeat of the same value", () => {
+    expect(shouldForwardCollapse(0.5, 0.5)).toBe(false);
+    expect(shouldForwardCollapse(0, 0)).toBe(false);
+    expect(shouldForwardCollapse(1, 1)).toBe(false);
+  });
+
+  it("skips changes finer than one step but forwards a full step in either direction", () => {
+    expect(shouldForwardCollapse(0.5, 0.5 + TAB_BAR_NATIVE_STEP / 2)).toBe(false);
+    expect(shouldForwardCollapse(0.5, 0.5 + TAB_BAR_NATIVE_STEP)).toBe(true);
+    expect(shouldForwardCollapse(0.5, 0.5 - TAB_BAR_NATIVE_STEP)).toBe(true);
+  });
+
+  it("always forwards the two rest positions, so the bar is never left a hair short", () => {
+    // 0.004 -> 0 is a sub-step change, but full size must be reached exactly.
+    expect(shouldForwardCollapse(0.004, 0)).toBe(true);
+    expect(shouldForwardCollapse(0.996, 1)).toBe(true);
+  });
+});
 
 describe("advanceTabBarCollapse", () => {
   it("increases progress proportionally to downward scroll distance", () => {

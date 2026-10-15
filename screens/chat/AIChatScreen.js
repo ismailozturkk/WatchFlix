@@ -11,6 +11,11 @@ import { useLiquidGlass } from "../../services/liquidGlass";
 // İkisi ayrışmıştı — kota göstergesi ve i18n yalnız burada, initialPrompt
 // akışı yalnız orada. Kopya silindi, akış buraya taşındı; giriş noktaları
 // için bileşenin başındaki nota bak.
+//
+// ARAYÜZ PARÇALARI components/ai/* içindedir (karşılama + ruh hali seçici,
+// geçmiş, hızlı ayar paneli, kota ölçer, düşünüyor iskeleti); "akıllı" mantık
+// (filtre doğrulama, tekrar engeli, devam çipleri…) services/aiCineInsights.js'te,
+// tercih şeması utils/aiPrefs.js'te. Bu dosya yalnız bunları birbirine bağlar.
 
 import React, {
   useCallback,
@@ -25,27 +30,26 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  FlatList,
   StyleSheet,
   Platform,
   Keyboard,
   ActivityIndicator,
-  Switch,
   Modal,
   Animated,
   Easing,
   Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Keys, get, set } from "../../services/storage";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import LottieView from "lottie-react-native";
-import Reanimated, { FadeInUp } from "react-native-reanimated";
+import Reanimated from "react-native-reanimated";
 import { useNavigation } from "@react-navigation/native";
 
 import useModalKeyboardLift from "@hooks/useModalKeyboardLift";
+import useAiPrefs from "@hooks/useAiPrefs";
+import useAiQuota from "@hooks/useAiQuota";
 
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
@@ -53,10 +57,11 @@ import {
   STREAMING_PROVIDERS,
   useAppSettings,
   useImageQualitySettings,
-  useStreamingProviderSettings,
 } from "@context/AppSettingsContext";
 import { useProfileStats } from "@context/ProfileStatsContext";
 import { useListStatusContext } from "@context/ListStatusContext";
+import { useUserProfile } from "@context/UserProfileContext";
+import { buildFavoritesPrompt, readProfileFavorites } from "@utils/fourFavorites";
 import { usePremium } from "@context/PremiumContext";
 import { alpha } from "@theme/colors";
 import { buildLimitCopy } from "@utils/premiumFeatures";
@@ -72,6 +77,17 @@ import {
   friendlyError,
 } from "@services/aiCineService";
 import { buildLibraryContext, applyWatchedFilter } from "@services/aiUserContext";
+import {
+  applyDiscoveryFilters,
+  buildAvoidBlock,
+  buildContextBlock,
+  buildTargetCard,
+  buildVibePrompt,
+  collectSuggestedTitles,
+  countResponseItems,
+  maxRuntimeForVibe,
+  quotaMeter,
+} from "@services/aiCineInsights";
 import { resolveCards } from "@services/tmdbLookup";
 import {
   loadCineConversations,
@@ -79,10 +95,18 @@ import {
   saveCineConversation,
   upsertCineConversation,
   removeCineConversation,
+  clearCineConversations,
   makeId,
   summarizeTitle,
 } from "@services/aiCineStore";
 import ChatBubble from "@components/AICineCards";
+import AIThinking from "@components/ai/AIThinking";
+import AIWelcome from "@components/ai/AIWelcome";
+import AIHistory from "@components/ai/AIHistory";
+import AIQuotaMeter from "@components/ai/AIQuotaMeter";
+import AIPrefsPanel, { genreLabel } from "@components/ai/AIPrefsPanel";
+import { getAiCopy } from "@utils/aiCopy";
+import { countDiscoveryFilters } from "@utils/aiPrefs";
 import { i18nText } from "@utils/i18nText";
 import GlassIconButton from "@components/common/GlassIconButton";
 import { appAlert } from "@components/AppAlert";
@@ -100,59 +124,19 @@ const TAB_ICONS = {
   plan: "git-compare-outline",
   lists: "albums-outline",
 };
-const DEFAULT_PREFS = {
-  enabled: false,
-  watchList: true,
-  favorites: true,
-  custom: true,
-  watched: true,
-  mediaType: "all",
-  providerIds: [],
-  genreKeys: [],
+
+// Filtre açıkken model, yerelde elenecekler için biraz fazla öğe üretsin.
+const FILTER_HEADROOM = 2;
+// Yeni cevabın başına kaydırma penceresi: içerik (posterler, kartlar) boyut
+// değiştirdikçe konum korunur, sonra kullanıcıya bırakılır.
+const ANSWER_SCROLL_WINDOW_MS = 900;
+
+const lastIndexWhere = (list, predicate) => {
+  for (let i = list.length - 1; i >= 0; i -= 1) {
+    if (predicate(list[i])) return i;
+  }
+  return -1;
 };
-const LIST_TOGGLES = [
-  ["watchList", "listWatchList"],
-  ["favorites", "listFavorites"],
-  ["custom", "listCustom"],
-  ["watched", "listWatched"],
-];
-
-// ── "Yazıyor" baloncuğu ───────────────────────────────────────────────────────
-const TypingBubble = ({ theme, label }) => (
-  <Reanimated.View entering={FadeInUp.duration(200)} style={[styles.row, { justifyContent: "flex-start" }]}>
-    <View style={[styles.typing, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      <ActivityIndicator size="small" color={theme.bold} />
-      <Text style={{ color: theme.text.muted, fontSize: 12 }}>{label}</Text>
-    </View>
-  </Reanimated.View>
-);
-
-// ── Geçmiş satırı ─────────────────────────────────────────────────────────────
-const ConversationRow = ({ conv, theme, t, isActive, onOpen, onDelete }) => (
-  <TouchableOpacity
-    activeOpacity={0.8}
-    onPress={() => onOpen(conv)}
-    style={[
-      styles.convRow,
-      { backgroundColor: isActive ? theme.between : theme.secondary, borderColor: isActive ? theme.bold : theme.border },
-    ]}
-  >
-    <View style={[styles.convIcon, { backgroundColor: theme.primary }]}>
-      <MaterialCommunityIcons name="movie-open-outline" size={18} color={theme.bold} />
-    </View>
-    <View style={{ flex: 1 }}>
-      <Text numberOfLines={1} style={{ color: theme.text.primary, fontSize: 14, fontWeight: "600" }}>
-        {conv.title}
-      </Text>
-      <Text style={{ color: theme.text.muted, fontSize: 11, marginTop: 2 }}>
-        {(conv.messages?.length || 0)} {t?.AICineChat?.messagesCount || i18nText("autoI18n.mesaj", "mesaj")}
-      </Text>
-    </View>
-    <TouchableOpacity hitSlop={10} onPress={() => onDelete(conv.id)} style={{ padding: 4 }}>
-      <MaterialIcons name="delete-outline" size={20} color={theme.text.muted} />
-    </TouchableOpacity>
-  </TouchableOpacity>
-);
 
 /**
  * İKİ GİRİŞ NOKTASI, TEK BİLEŞEN:
@@ -177,7 +161,6 @@ export default function AIChatScreen({
   const { theme } = useTheme();
   const { API_KEY, adultContent } = useAppSettings();
   const { getTmdbUrl } = useImageQualitySettings();
-  const { streamingProviderIds } = useStreamingProviderSettings();
   const {
     mostWatchedGenre,
     secondWatchedGenre,
@@ -189,18 +172,20 @@ export default function AIChatScreen({
   const { combinedLists: allLists } = useListStatusContext();
   const { plan: premiumPlan } = usePremium();
 
+  // Tercihler Ayarlar > Yapay zeka ile AYNI kayıttır (Keys.aiCinePrefs).
+  const { prefs, updatePrefs } = useAiPrefs();
+
   const [view, setView] = useState("chat"); // "chat" | "history"
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("explore");
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const [prefs, setPrefs] = useState(DEFAULT_PREFS);
+  // Son cevapla gelen sunucu kotası (canlı kullanım okunana kadar ölçerin kaynağı)
   const [quota, setQuota] = useState(null);
 
   const [messages, setMessages] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [conversations, setConversations] = useState([]);
-  const prefsLoadedRef = useRef(false);
   // Aynı initialPrompt ile ikinci kez sohbet açılmasın (panel yeniden render
   // olduğunda efekt tekrar çalışır); panel kapanınca sıfırlanır.
   const initialPromptRef = useRef(null);
@@ -209,22 +194,6 @@ export default function AIChatScreen({
   const initialMetaRef = useRef({ display: "", attachment: null });
 
   const quotaPlan = AI_PLAN_LIMITS[premiumPlan] ? premiumPlan : "free";
-  const quotaText = useMemo(() => {
-    const serverPlan = AI_PLAN_LIMITS[quota?.plan] ? quota.plan : quotaPlan;
-    const planLabel = t?.AICineChat?.plans?.[serverPlan] || serverPlan;
-    const daily = quota?.daily;
-    const monthly = quota?.monthly;
-    const template = daily && monthly
-      ? t?.AICineChat?.quotaUsage || "{plan} · Bugün {dailyUsed}/{dailyLimit} · Bu ay {monthlyUsed}/{monthlyLimit}"
-      : t?.AICineChat?.quotaLimits || "{plan} · Günlük {dailyLimit} · Aylık {monthlyLimit}";
-    const limits = AI_PLAN_LIMITS[serverPlan];
-    return template
-      .replace("{plan}", planLabel)
-      .replace("{dailyUsed}", String(daily?.used ?? 0))
-      .replace("{dailyLimit}", String(daily?.limit ?? limits.daily))
-      .replace("{monthlyUsed}", String(monthly?.used ?? 0))
-      .replace("{monthlyLimit}", String(monthly?.limit ?? limits.monthly));
-  }, [premiumPlan, quota, quotaPlan, t]);
 
   // ── Aç/kapa animasyonu (FAB'dan büyür / FAB'a küçülür) ──────────────────────
   const anim = useRef(new Animated.Value(0)).current;
@@ -232,6 +201,24 @@ export default function AIChatScreen({
   const [blurReady, setBlurReady] = useState(false);
 
   const insets = useSafeAreaInsets();
+
+  // Panel kapalıyken Firestore dinleyicisi açılmaz.
+  const liveUsage = useAiQuota({ active: rendered });
+
+  const quotaState = useMemo(() => {
+    const serverPlan = AI_PLAN_LIMITS[quota?.plan] ? quota.plan : quotaPlan;
+    const input = liveUsage
+      ? {
+          daily: { used: liveUsage.dailyUsed, limit: quota?.daily?.limit },
+          monthly: { used: liveUsage.monthlyUsed, limit: quota?.monthly?.limit },
+        }
+      : quota;
+    return {
+      meter: quotaMeter(input, AI_PLAN_LIMITS[serverPlan]),
+      known: Boolean(liveUsage || quota),
+      planLabel: t?.AICineChat?.plans?.[serverPlan] || serverPlan,
+    };
+  }, [liveUsage, quota, quotaPlan, t]);
 
   useEffect(() => {
     if (visible) {
@@ -270,11 +257,32 @@ export default function AIChatScreen({
   }, [anim, onClose]);
 
   const scrollRef = useRef(null);
+  // Kaydırma niyeti: "end" = en alta yapış (kullanıcı mesajı / düşünüyor),
+  // "message" = yeni cevabın BAŞINA (uzun cevap ortadan başlamasın), null = bırak.
+  const scrollTargetRef = useRef({ mode: "end", id: null });
+  const messageYRef = useRef({});
   const [composerHeight, setComposerHeight] = useState(76);
   const composerBlur = useComposerBlurTarget();
   const glass = useLiquidGlass();
   const scrollToEndSoon = useCallback(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 60);
+  }, []);
+
+  const applyScrollTarget = useCallback(() => {
+    const target = scrollTargetRef.current;
+    if (target.mode === "end") {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    } else if (target.mode === "message") {
+      const y = messageYRef.current[target.id];
+      if (y != null) scrollRef.current?.scrollTo({ y: Math.max(0, y - 6), animated: true });
+    }
+  }, []);
+
+  const focusAnswer = useCallback((id) => {
+    scrollTargetRef.current = { mode: "message", id };
+    setTimeout(() => {
+      if (scrollTargetRef.current.id === id) scrollTargetRef.current = { mode: null, id: null };
+    }, ANSWER_SCROLL_WINDOW_MS);
   }, []);
 
   // ── Klavye kaldırma ─────────────────────────────────────────────────────────
@@ -316,40 +324,21 @@ export default function AIChatScreen({
     loadCineConversations().then(setConversations).catch(() => {});
   }, []);
 
-  // Kişiselleştirme tercihlerini yükle. AI'ya özel platform seçimi daha önce
-  // yapılmadıysa uygulamadaki "Platform üyeliklerim" seçimi başlangıç olur.
-  useEffect(() => {
-    if (prefsLoadedRef.current) return;
-    prefsLoadedRef.current = true;
-    const saved = get(Keys.aiCinePrefs);
-    const validGenreKeys = new Set(ONBOARDING_GENRES.map((genre) => genre.key));
-    const providerIds = Array.isArray(saved?.providerIds)
-      ? saved.providerIds.map(Number).filter((id) => STREAMING_PROVIDERS.some((provider) => provider.id === id))
-      : streamingProviderIds;
-    const genreKeys = Array.isArray(saved?.genreKeys)
-      ? [...new Set(saved.genreKeys)].filter((key) => validGenreKeys.has(key))
-      : [];
-    setPrefs((current) => ({
-      ...current,
-      ...(saved || {}),
-      mediaType: ["all", "movie", "tv"].includes(saved?.mediaType) ? saved.mediaType : "all",
-      providerIds,
-      genreKeys,
-    }));
-  }, [streamingProviderIds]);
-
-  const updatePrefs = useCallback((patch) => {
-    setPrefs((prev) => {
-      const next = { ...prev, ...patch };
-      set(Keys.aiCinePrefs, next);
-      return next;
-    });
-  }, []);
-
   // Kullanıcı kütüphanesi bağlamı — yalnızca ayar açıkken kurulur (kapalıyken 0 token)
+  // Dört favori ("profilimin vitrini") AI'a da gider: kullanıcının açıkça seçtiği
+  // en güçlü zevk işareti. Aynı ana anahtara (prefs.enabled) bağlı — kütüphane
+  // bağlamı kapalıyken hiçbir kişisel veri modele gitmez.
+  const { profile: userProfile } = useUserProfile();
+  const favoritesBlock = useMemo(
+    () => buildFavoritesPrompt(readProfileFavorites(userProfile)),
+    [userProfile],
+  );
   const library = useMemo(
-    () => (prefs.enabled ? buildLibraryContext(allLists, prefs, { capPerList: 100 }) : null),
-    [prefs, allLists],
+    () =>
+      prefs.enabled
+        ? buildLibraryContext(allLists, prefs, { capPerList: 100, favoritesBlock })
+        : null,
+    [prefs, allLists, favoritesBlock],
   );
 
   const movieGenres = useMemo(
@@ -365,24 +354,11 @@ export default function AIChatScreen({
     () => STREAMING_PROVIDERS.filter((provider) => prefs.providerIds.includes(provider.id)),
     [prefs.providerIds],
   );
-  const availableGenres = useMemo(
-    () => ONBOARDING_GENRES.filter((genre) => (
-      prefs.mediaType === "movie"
-        ? genre.movieId
-        : prefs.mediaType === "tv"
-          ? genre.tvId
-          : genre.movieId || genre.tvId
-    )),
-    [prefs.mediaType],
-  );
   const selectedGenreLabels = useMemo(
     () => prefs.genreKeys
       .map((key) => ONBOARDING_GENRES.find((genre) => genre.key === key))
       .filter(Boolean)
-      .map((genre) => {
-        if (prefs.mediaType === "tv") return genre[language === "tr" ? "tvTr" : "tvEn"] || genre[language === "tr" ? "tr" : "en"];
-        return genre[language === "tr" ? "tr" : "en"];
-      }),
+      .map((genre) => genreLabel(genre, prefs.mediaType, language)),
     [language, prefs.genreKeys, prefs.mediaType],
   );
   const discoveryPreferences = useMemo(() => {
@@ -398,37 +374,8 @@ export default function AIChatScreen({
       : "";
   }, [prefs.mediaType, selectedGenreLabels, selectedProviders]);
 
-  const toggleProvider = useCallback((providerId) => {
-    const next = prefs.providerIds.includes(providerId)
-      ? prefs.providerIds.filter((id) => id !== providerId)
-      : [...prefs.providerIds, providerId];
-    updatePrefs({ providerIds: next });
-  }, [prefs.providerIds, updatePrefs]);
+  const copy = useMemo(() => getAiCopy(language), [language]);
 
-  const changeMediaType = useCallback((mediaType) => {
-    const supports = (genre) => (
-      mediaType === "movie" ? genre.movieId : mediaType === "tv" ? genre.tvId : genre.movieId || genre.tvId
-    );
-    const validGenres = prefs.genreKeys.filter((key) => {
-      const genre = ONBOARDING_GENRES.find((item) => item.key === key);
-      return genre && supports(genre);
-    });
-    updatePrefs({ mediaType, genreKeys: validGenres });
-  }, [prefs.genreKeys, updatePrefs]);
-
-  const toggleGenre = useCallback((genreKey) => {
-    const next = prefs.genreKeys.includes(genreKey)
-      ? prefs.genreKeys.filter((key) => key !== genreKey)
-      : [...prefs.genreKeys, genreKey];
-    updatePrefs({ genreKeys: next });
-  }, [prefs.genreKeys, updatePrefs]);
-
-  const clearDiscoveryFilters = useCallback(() => {
-    updatePrefs({ mediaType: "all", providerIds: [], genreKeys: [] });
-  }, [updatePrefs]);
-
-  const discoveryFilterCount =
-    (prefs.mediaType === "all" ? 0 : 1) + prefs.providerIds.length + prefs.genreKeys.length;
   const filterSummary = useMemo(() => {
     const parts = [];
     if (prefs.mediaType === "movie") parts.push(language === "tr" ? "Film" : "Movies");
@@ -473,8 +420,11 @@ export default function AIChatScreen({
           i18nText("autoI18n.from_watchlist_prompt", "İzleme listemden bana ne izleyeyim diye birkaç seçim yap"),
       });
     }
+    if (activeTab === "explore") {
+      list.push({ label: copy.vibe.surprise, prompt: copy.vibe.surprisePrompt });
+    }
     return list;
-  }, [t, activeTab, mostWatchedGenre, prefs.enabled, prefs.watchList, allLists, discoveryPreferences, language]);
+  }, [t, activeTab, mostWatchedGenre, prefs.enabled, prefs.watchList, allLists, discoveryPreferences, language, copy]);
 
   // ── Aktif sohbeti diske kaydet ──
   const saveActive = useCallback((msgs, id) => {
@@ -494,16 +444,21 @@ export default function AIChatScreen({
     };
 
     setConversations((prev) => upsertCineConversation(prev, conv));
-    saveCineConversation(conv).then(setConversations).catch(() => {});
-  }, []);
+    saveCineConversation(conv, { limit: prefs.historyLimit }).then(setConversations).catch(() => {});
+  }, [prefs.historyLimit]);
 
   // ── Asistanı çalıştır ──
+  // options.avoidSource: "tekrar öneri engeli" için taranacak mesajlar. "Yeniden
+  // öner"de atılan cevap msgsIncludingUser'da YOKTUR ama yine de tekrarlanmamalı.
+  // options.regenerate: aynı soru, farklı seçimler.
   const runAssistant = useCallback(
-    async (msgsIncludingUser, convId, userText) => {
+    async (msgsIncludingUser, convId, userText, options = {}) => {
       setLoading(true);
+      scrollTargetRef.current = { mode: "end", id: null };
       scrollToEndSoon();
       try {
-        const requestedProviders = selectedProviders.map((provider) => provider.name);
+        const lastUserIndex = lastIndexWhere(msgsIncludingUser, (m) => m.role === "user");
+        const lastUserMsg = lastUserIndex >= 0 ? msgsIncludingUser[lastUserIndex] : null;
         const priorHistory = msgsIncludingUser
           .filter((m) => m.status !== "error")
           .slice(0, -1)
@@ -517,13 +472,29 @@ export default function AIChatScreen({
             return { role: m.role, text: m.text || m.display || "" };
           });
 
+        // Yalnız SON mesajın ataçı cevabı kilitler (title_spotlight). Önceki
+        // mesajlardaki ataç yalnız "bu / onu" zamirlerini çözer; aksi hâlde
+        // takip soruları hep aynı yapımın tanıtımını döndürürdü.
+        const targetMedia = lastUserMsg?.attachment?.title ? lastUserMsg.attachment : null;
+        const focusMedia = targetMedia
+          ? null
+          : [...msgsIncludingUser].reverse().find((item) => item.role === "user" && item.attachment?.title)?.attachment || null;
+
+        const filterActive = countDiscoveryFilters(prefs) > 0;
+        const requestedProviders = selectedProviders.map((provider) => provider.name);
+        const avoidSource = options.avoidSource || msgsIncludingUser;
+        const avoidBlock = prefs.avoidRepeats
+          ? buildAvoidBlock(collectSuggestedTitles(avoidSource))
+          : "";
+        const contextBlock = prefs.timeContext ? buildContextBlock(new Date()) : "";
+        const maxRuntime = lastUserMsg?.maxRuntime || null;
+
         // API anahtarı istemcide değil — istek callGemini proxy'sinden geçer.
-        const targetMedia = msgsIncludingUser.find(
-          (item) => item.role === "user" && item.attachment?.title,
-        )?.attachment;
         const response = await askCineStructured({
           history: priorHistory,
-          userMessage: userText,
+          userMessage: options.regenerate
+            ? `${userText}\n\n(Give me a clearly different set of picks than before.)`
+            : userText,
           language,
           movieGenres,
           tvGenres,
@@ -531,10 +502,18 @@ export default function AIChatScreen({
           userLibrary: library?.librarySummary || "",
           discoveryPreferences,
           targetMedia,
+          focusMedia,
+          responseStyle: prefs.responseStyle,
+          spoilerLevel: prefs.spoilerLevel,
+          maxItems: filterActive ? prefs.maxItems + FILTER_HEADROOM : prefs.maxItems,
+          contextBlock,
+          avoidBlock,
           onQuota: setQuota,
         });
 
-        // Başlıkları TMDB poster kartlarına çöz
+        // Başlıkları TMDB poster kartlarına çöz. Spotlight'ta tam detay (oyuncu,
+        // benzer yapım); diğerlerinde "lite" (süre + tür + platform): zevk uyumu,
+        // süre rozeti, platform/tür doğrulaması bunlara bağlı.
         const pairs = collectTitles(response);
         let posterMap = {};
         if (pairs.length) {
@@ -545,87 +524,53 @@ export default function AIChatScreen({
             series,
             language,
             includeAdult: adultContent,
-            includeDetails:
-              response.type === "title_spotlight" ||
-              requestedProviders.length > 0 ||
-              selectedGenreLabels.length > 0,
+            includeDetails: response.type === "title_spotlight" ? true : "lite",
           });
           posterMap = buildPosterMap(cards);
           if (targetMedia?.title) {
-            const targetCard = {
-              key: `${targetMedia.mediaType}-${targetMedia.id}`,
-              mediaType: targetMedia.mediaType,
-              query: targetMedia.title,
-              found: true,
-              id: targetMedia.id,
-              title: targetMedia.title,
-              posterPath: targetMedia.posterPath,
-              year: targetMedia.year,
-              rating: targetMedia.rating,
-              overview: targetMedia.overview,
-              genres: targetMedia.genres,
-              cast: targetMedia.cast,
-              director: targetMedia.director,
-              providers: targetMedia.providers,
-              similar: [],
-            };
+            const key = posterKey(targetMedia.mediaType, targetMedia.title);
+            const targetCard = buildTargetCard(targetMedia, posterMap[key]);
             posterMap[posterKey(targetCard.mediaType, targetCard.title)] = targetCard;
           }
         }
 
         // Model filtreleri sistem yönergesinden alır; sonuç kartları TMDB'den
-        // çözüldükten sonra platform/tür/içerik tipi yerelde de doğrulanır.
-        let preferenceCheckedResponse = response;
-        const hasDiscoveryFilter =
-          requestedProviders.length > 0 || selectedGenreLabels.length > 0 || prefs.mediaType !== "all";
-        if (hasDiscoveryFilter && ["recommendations", "watchlist"].includes(response.type)) {
-          const normalizedRequested = requestedProviders.map((name) => name.toLowerCase());
-          const normalizedGenres = selectedGenreLabels.map((name) => name.toLowerCase());
-          const matchesFilters = (item) => {
-            if (prefs.mediaType !== "all" && item.mediaType !== prefs.mediaType) return false;
-            const card = posterMap[posterKey(item.mediaType, item.title)];
-            const providerMatch = normalizedRequested.length === 0 || (card?.providers || []).some((provider) => {
-              const value = String(provider).toLowerCase();
-              return normalizedRequested.some((wanted) => value.includes(wanted) || wanted.includes(value));
-            });
-            const genreMatch = normalizedGenres.length === 0 || (card?.genres || []).some((genre) => {
-              const value = String(genre).toLowerCase();
-              return normalizedGenres.some((wanted) => value.includes(wanted) || wanted.includes(value));
-            });
-            return providerMatch && genreMatch;
-          };
+        // çözüldükten sonra platform/tür/içerik tipi/süre yerelde de doğrulanır
+        // ve öneri sayısı ayardaki sınıra çekilir.
+        const filtered = applyDiscoveryFilters(response, posterMap, {
+          mediaType: prefs.mediaType,
+          providers: requestedProviders,
+          genres: selectedGenreLabels,
+          maxRuntime,
+          maxItems: prefs.maxItems,
+        });
 
-          if (response.type === "recommendations") {
-            const verifiedItems = (response.items || []).filter(matchesFilters);
-            if (verifiedItems.length > 0) {
-              preferenceCheckedResponse = { ...response, items: verifiedItems };
-            }
-          } else {
-            const sections = (response.sections || [])
-              .map((section) => ({ ...section, items: (section.items || []).filter(matchesFilters) }))
-              .filter((section) => section.items.length > 0);
-            if (sections.length > 0) {
-              preferenceCheckedResponse = { ...response, sections };
-            }
-          }
-        }
-
-        const finalResponse =
+        const watchedChecked =
           library && prefs.watched
-            ? applyWatchedFilter(preferenceCheckedResponse, posterMap, library.watchedIndex)
-            : preferenceCheckedResponse;
+            ? applyWatchedFilter(filtered.response, posterMap, library.watchedIndex)
+            : filtered.response;
+        const seen = Math.max(0, countResponseItems(filtered.response) - countResponseItems(watchedChecked));
+
+        const notes = {
+          removed: filtered.report.removed,
+          relaxed: filtered.report.relaxed,
+          seen,
+          truncated: Boolean(response.truncated),
+        };
+        const hasNotes = notes.removed > 0 || notes.relaxed || notes.seen > 0 || notes.truncated;
 
         const aiMsg = {
           id: makeId(),
           role: "assistant",
-          aiResponse: finalResponse,
+          aiResponse: watchedChecked,
           posterMap,
-          text: responseToHistoryText(finalResponse),
+          text: responseToHistoryText(watchedChecked),
+          ...(hasNotes ? { notes } : null),
         };
         const finalMessages = [...msgsIncludingUser, aiMsg];
+        focusAnswer(aiMsg.id);
         setMessages(finalMessages);
         saveActive(finalMessages, convId);
-        scrollToEndSoon();
       } catch (err) {
         const code = err?.code || "GENERIC";
         if (err?.quota) setQuota(err.quota);
@@ -661,6 +606,7 @@ export default function AIChatScreen({
             : null,
         };
         const finalMessages = [...msgsIncludingUser, errMsg];
+        scrollTargetRef.current = { mode: "end", id: null };
         setMessages(finalMessages);
         saveActive(finalMessages, convId);
         scrollToEndSoon();
@@ -668,12 +614,18 @@ export default function AIChatScreen({
         setLoading(false);
       }
     },
-    [language, movieGenres, tvGenres, t, API_KEY, adultContent, saveActive, scrollToEndSoon, library, prefs.mediaType, prefs.watched, selectedProviders, selectedGenreLabels, discoveryPreferences, premiumPlan],
+    [
+      language, movieGenres, tvGenres, t, API_KEY, adultContent, saveActive, scrollToEndSoon,
+      focusAnswer, library, prefs, selectedProviders, selectedGenreLabels, discoveryPreferences, premiumPlan,
+    ],
   );
 
   // ── Gönder ──
+  // options.display: baloncukta görünecek metin (model yine `text`'i alır; devam
+  // çipleri ve ruh hali seçicisi İngilizce yönerge gönderir, kullanıcı kendi dilini görür).
+  // options.maxRuntime: "kısa" süre seçimi için yerel doğrulama üst sınırı (dk).
   const handleSend = useCallback(
-    (explicit) => {
+    (explicit, options) => {
       if (loading) return;
       const text = (typeof explicit === "string" ? explicit : message).trim();
       if (!text) return;
@@ -681,7 +633,9 @@ export default function AIChatScreen({
       const convId = activeId || makeId();
       if (!activeId) setActiveId(convId);
 
-      const userMsg = { id: makeId(), role: "user", text, display: text };
+      const display = String(options?.display || "").trim() || text;
+      const userMsg = { id: makeId(), role: "user", text, display };
+      if (options?.maxRuntime) userMsg.maxRuntime = options.maxRuntime;
       const msgs = [...messages, userMsg];
       setMessages(msgs);
       setMessage("");
@@ -719,16 +673,25 @@ export default function AIChatScreen({
     initialMetaRef.current = { display: initialDisplay, attachment: initialAttachment };
   }, [initialDisplay, initialAttachment]);
 
+  // startPromptChat kimliği tercihler/listeler değiştikçe değişir; efektin
+  // bağımlılığı yapılırsa 120 ms'lik zamanlayıcı iptal olur ve ilk mesaj hiç
+  // gönderilmezdi. Bu yüzden en güncel işlev ref üzerinden çağrılır, "gönderildi"
+  // kilidi de zamanlayıcı ATEŞLENİRKEN konur (iptal olan zamanlayıcı kilit bırakmaz).
+  const startPromptChatRef = useRef(startPromptChat);
+  startPromptChatRef.current = startPromptChat;
+
   useEffect(() => {
-    if (!visible || !initialPrompt) return;
+    if (!visible || !initialPrompt) return undefined;
     const key = String(initialPrompt);
-    if (initialPromptRef.current === key) return;
-    initialPromptRef.current = key;
+    if (initialPromptRef.current === key) return undefined;
     // Kısa gecikme: açılış animasyonu başlasın, ilk balon boş panele değil
     // görünen panele düşsün.
-    const timer = setTimeout(() => startPromptChat(key, initialMetaRef.current), 120);
+    const timer = setTimeout(() => {
+      initialPromptRef.current = key;
+      startPromptChatRef.current(key, initialMetaRef.current);
+    }, 120);
     return () => clearTimeout(timer);
-  }, [visible, initialPrompt, startPromptChat]);
+  }, [visible, initialPrompt]);
 
   const handleRetry = useCallback(
     (userText) => {
@@ -742,6 +705,22 @@ export default function AIChatScreen({
     [loading, messages, activeId, runAssistant],
   );
 
+  // "Yeniden öner": son soru aynı kalır, son cevap atılır; atılan cevaptaki
+  // başlıklar tekrar-engeline girer ki gerçekten farklı seçimler gelsin.
+  const handleRegenerate = useCallback(() => {
+    if (loading) return;
+    const lastUserIndex = lastIndexWhere(messages, (m) => m.role === "user");
+    if (lastUserIndex < 0) return;
+    const kept = messages.slice(0, lastUserIndex + 1);
+    const convId = activeId || makeId();
+    if (!activeId) setActiveId(convId);
+    setMessages(kept);
+    runAssistant(kept, convId, messages[lastUserIndex].text, {
+      regenerate: true,
+      avoidSource: messages,
+    });
+  }, [loading, messages, activeId, runAssistant]);
+
   // ── Sohbet yönetimi ──
   const newChat = useCallback(() => {
     setMessages([]);
@@ -752,6 +731,7 @@ export default function AIChatScreen({
 
   const openConversation = useCallback(
     (conv) => {
+      scrollTargetRef.current = { mode: "end", id: null };
       setMessages(conv.messages || []);
       setActiveId(conv.id);
       setView("chat");
@@ -764,17 +744,20 @@ export default function AIChatScreen({
     (id) => {
       setConversations((prev) => {
         const next = removeCineConversation(prev, id);
-        persistCineConversations(next);
+        persistCineConversations(next, prefs.historyLimit);
         return next;
       });
       if (id === activeId) newChat();
     },
-    [activeId, newChat],
+    [activeId, newChat, prefs.historyLimit],
   );
 
   const clearAll = useCallback(() => {
     setConversations([]);
-    persistCineConversations([]);
+    clearCineConversations();
+    // Açık sohbet de silinmiş sayılır; sonraki mesaj eski bir kayda yazmasın.
+    setMessages([]);
+    setActiveId(null);
   }, []);
 
   // ── Poster / başlık tıklama → detay veya arama (modal kapanır) ──
@@ -800,6 +783,61 @@ export default function AIChatScreen({
     handleClose();
   }, [navigation, handleClose]);
 
+  // Üst çubuktaki kota ölçerine dokunuş: ayrıntılı kullanım ekranı.
+  const handleOpenUsage = useCallback(() => {
+    navigation.navigate("PremiumUsageScreen");
+    handleClose();
+  }, [navigation, handleClose]);
+
+  // Hızlı paneldeki "Tüm yapay zeka ayarları".
+  const handleOpenAllSettings = useCallback(() => {
+    navigation.navigate("AISettingsScreen");
+    handleClose();
+  }, [navigation, handleClose]);
+
+  // Kartların ortak bağlamı (components/AICineCards → ChatBubble `baseCtx`).
+  const tasteGenres = useMemo(() => {
+    const out = [];
+    const size = Math.max(movieGenres.length, tvGenres.length);
+    for (let i = 0; i < size; i += 1) {
+      [movieGenres[i], tvGenres[i]].forEach((genre) => {
+        if (genre && !out.includes(genre)) out.push(genre);
+      });
+    }
+    return out;
+  }, [movieGenres, tvGenres]);
+  const baseCtx = useMemo(
+    () => ({
+      theme, t, copy, language, getTmdbUrl,
+      onTitlePress: handleTitlePress,
+      tasteGenres,
+      showMatchScore: prefs.showMatchScore,
+    }),
+    [theme, t, copy, language, getTmdbUrl, handleTitlePress, tasteGenres, prefs.showMatchScore],
+  );
+
+  const handleFollowUp = useCallback((prompt, label) => handleSend(prompt, { display: label }), [handleSend]);
+
+  // Ruh hali seçicisi: seçimler istek metnine girer; "kısa" süre ayrıca yerelde doğrulanır.
+  const handleVibe = useCallback(
+    (vibe) => {
+      const labels = [
+        vibe.mood && copy.vibe.mood[vibe.mood],
+        vibe.length && copy.vibe.length[vibe.length],
+        vibe.company && copy.vibe.company[vibe.company],
+      ].filter(Boolean);
+      handleSend(buildVibePrompt(vibe), {
+        display: labels.join(" · "),
+        maxRuntime: maxRuntimeForVibe(vibe),
+      });
+    },
+    [copy, handleSend],
+  );
+
+  const handleSendChip = useCallback((prompt) => handleSend(prompt), [handleSend]);
+  const handleOpenFilters = useCallback(() => setSettingsVisible(true), []);
+
+  const filterCount = countDiscoveryFilters(prefs);
   const origin = fabOrigin || FAB_ORIGIN;
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -850,31 +888,54 @@ export default function AIChatScreen({
         >
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: theme.border }]}>
-            <GlassIconButton
-              variant="plain"
-              icon="chevron-down"
-              iconSize={26}
-              size={36}
-              color={theme.text.primary}
-              accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
-              onPress={handleClose}
-            />
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
-              <LottieView
-                style={{ width: 28, height: 28 }}
-                source={require("@lottie/gemini.json")}
-                autoPlay
-                loop
+            {view === "chat" ? (
+              <GlassIconButton
+                variant="plain"
+                icon="chevron-down"
+                iconSize={26}
+                size={36}
+                color={theme.text.primary}
+                accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
+                onPress={handleClose}
               />
-              <View style={styles.headerCopy}>
-                <Text style={[styles.headerTitle, { color: theme.text.primary }]}>
-                  {t?.AICineChat?.title || "CineMatch"}
-                </Text>
-                <Text numberOfLines={1} style={[styles.headerSub, { color: theme.text.muted }]}>
-                  {quotaText}
-                </Text>
+            ) : (
+              <GlassIconButton
+                variant="plain"
+                icon="chevron-back"
+                iconSize={24}
+                size={36}
+                color={theme.text.primary}
+                accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
+                onPress={() => setView("chat")}
+              />
+            )}
+            {view === "chat" ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                <LottieView
+                  style={{ width: 28, height: 28 }}
+                  source={require("@lottie/gemini.json")}
+                  autoPlay
+                  loop
+                />
+                <View style={styles.headerCopy}>
+                  <Text style={[styles.headerTitle, { color: theme.text.primary }]}>
+                    {t?.AICineChat?.title || "CineMatch"}
+                  </Text>
+                  <AIQuotaMeter
+                    meter={quotaState.meter}
+                    known={quotaState.known}
+                    planLabel={quotaState.planLabel}
+                    theme={theme}
+                    copy={copy}
+                    onPress={handleOpenUsage}
+                  />
+                </View>
               </View>
-            </View>
+            ) : (
+              <Text style={[styles.headerTitle, { color: theme.text.primary, flex: 1, marginLeft: 4 }]}>
+                {t?.AICineChat?.history || copy.history.title}
+              </Text>
+            )}
             {view === "chat" ? (
               <>
                 <GlassIconButton
@@ -882,7 +943,7 @@ export default function AIChatScreen({
                   icon="options-outline"
                   iconSize={22}
                   size={36}
-                  color={settingsVisible ? theme.bold : theme.text.between}
+                  color={settingsVisible || filterCount > 0 ? theme.bold : theme.text.between}
                   accessibilityLabel={i18nText("autoI18n.filtrele", "Filtrele")}
                   onPress={() => setSettingsVisible((v) => !v)}
                 />
@@ -903,258 +964,36 @@ export default function AIChatScreen({
                   <MaterialIcons name="history" size={24} color={theme.text.between} />
                 </GlassIconButton>
               </>
-            ) : (
-              conversations.length > 0 && (
-                <GlassIconButton
-                  variant="plain"
-                  size={36}
-                  accessibilityLabel={i18nText("autoI18n.temizle", "Temizle")}
-                  onPress={clearAll}
-                >
-                  <MaterialCommunityIcons name="delete-sweep-outline" size={22} color={theme.text.between} />
-                </GlassIconButton>
-              )
-            )}
+            ) : null}
           </View>
 
           {view === "history" ? (
             // ── Geçmiş ──
-            <View style={{ flex: 1 }}>
-              <View style={[styles.header, { borderBottomColor: theme.border }]}>
-                <GlassIconButton
-                  variant="plain"
-                  icon="chevron-back"
-                  iconSize={24}
-                  size={36}
-                  color={theme.text.primary}
-                  accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
-                  onPress={() => setView("chat")}
-                />
-                <Text style={[styles.headerTitle, { color: theme.text.primary, flex: 1, marginLeft: 4 }]}>
-                  {t?.AICineChat?.history || "Sohbetler"}
-                </Text>
-              </View>
-              {conversations.length === 0 ? (
-                <View style={styles.empty}>
-                  <MaterialCommunityIcons name="message-off-outline" size={46} color={theme.text.muted} />
-                  <Text style={[styles.emptyText, { color: theme.text.muted }]}>
-                    {t?.AICineChat?.noConversations || i18nText("autoI18n.henuz_kayitli_sohbet_yok", "Henüz kayıtlı sohbet yok")}
-                  </Text>
-                </View>
-              ) : (
-                <FlatList
-                  data={conversations}
-                  keyExtractor={(c) => c.id}
-                  contentContainerStyle={{ padding: 12, gap: 8 }}
-                  renderItem={({ item }) => (
-                    <ConversationRow
-                      conv={item}
-                      theme={theme}
-                      t={t}
-                      isActive={item.id === activeId}
-                      onOpen={openConversation}
-                      onDelete={deleteConversation}
-                    />
-                  )}
-                />
-              )}
-            </View>
+            <AIHistory
+              theme={theme}
+              t={t}
+              copy={copy}
+              language={language}
+              conversations={conversations}
+              activeId={activeId}
+              getTmdbUrl={getTmdbUrl}
+              onOpen={openConversation}
+              onDelete={deleteConversation}
+              onClearAll={clearAll}
+            />
           ) : (
             // ── Sohbet ──
             <Reanimated.View style={[styles.chatBody, composerKeyboardStyle]}>
               {settingsVisible && (
-                <View style={[styles.settings, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-                  <ScrollView
-                    nestedScrollEnabled
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.settingsContent}
-                  >
-                    <View style={styles.settingsHeading}>
-                      <View style={[styles.settingsHeadingIcon, { backgroundColor: alpha(theme.accent, 0.16) }]}>
-                        <Ionicons name="options-outline" size={18} color={theme.bold} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.settingsTitle, { color: theme.text.primary }]}>
-                          {t?.AICineChat?.personalizeTitle || "CineMatch'i özelleştir"}
-                        </Text>
-                        <Text style={[styles.settingHint, { color: theme.text.muted }]}>
-                          {t?.AICineChat?.personalizeHint || "Öneriler seçtiğin liste, platform ve türlere göre hazırlanır."}
-                        </Text>
-                      </View>
-                      {discoveryFilterCount > 0 ? (
-                        <View style={[styles.filterCount, { backgroundColor: theme.accent }]}>
-                          <Text style={styles.filterCountText}>{discoveryFilterCount}</Text>
-                        </View>
-                      ) : null}
-                    </View>
-
-                    <View style={[styles.settingsDivider, { backgroundColor: theme.border }]} />
-
-                    <View style={styles.settingRow}>
-                      <View style={{ flex: 1, paddingRight: 10 }}>
-                        <Text style={[styles.settingTitle, { color: theme.text.primary }]}>
-                          {t?.AICineChat?.useMyLists || "Listelerimi kullan"}
-                        </Text>
-                        <Text style={[styles.settingHint, { color: theme.text.muted }]}>
-                          {t?.AICineChat?.listsHint ||
-                            i18nText("autoI18n.onerileri_listelerine_gore_kisisellestirir", "Önerileri listelerine göre kişiselleştirir (daha fazla token kullanır)")}
-                        </Text>
-                      </View>
-                      <Switch
-                        value={prefs.enabled}
-                        onValueChange={(v) => updatePrefs({ enabled: v })}
-                        trackColor={{ true: theme.bold, false: theme.border }}
-                        thumbColor="#fff"
-                      />
-                    </View>
-                    {prefs.enabled ? (
-                      <View style={styles.settingChips}>
-                        {LIST_TOGGLES.map(([key, lbl]) => {
-                          const on = prefs[key];
-                          return (
-                            <TouchableOpacity
-                              key={key}
-                              onPress={() => updatePrefs({ [key]: !on })}
-                              style={[
-                                styles.setChip,
-                                { borderColor: on ? theme.bold : theme.border, backgroundColor: on ? alpha(theme.bold, 0.14) : "transparent" },
-                              ]}
-                            >
-                              <Ionicons
-                                name={on ? "checkmark-circle" : "ellipse-outline"}
-                                size={14}
-                                color={on ? theme.bold : theme.text.muted}
-                              />
-                              <Text style={[styles.setChipText, { color: on ? theme.bold : theme.text.secondary }]}>
-                                {t?.AICineChat?.[lbl] || key}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    ) : null}
-
-                    <View style={[styles.settingsDivider, { backgroundColor: theme.border }]} />
-
-                    <View style={styles.settingSectionTitleRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.settingTitle, { color: theme.text.primary }]}>
-                          {t?.AICineChat?.platformsTitle || "Platformlar"}
-                        </Text>
-                        <Text style={[styles.settingHint, { color: theme.text.muted }]}>
-                          {t?.AICineChat?.platformsHint || "Boş bırakırsan tüm platformlarda arar."}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.settingChips}>
-                      <TouchableOpacity
-                        onPress={() => updatePrefs({ providerIds: [] })}
-                        style={[
-                          styles.setChip,
-                          {
-                            borderColor: prefs.providerIds.length === 0 ? theme.bold : theme.border,
-                            backgroundColor: prefs.providerIds.length === 0 ? alpha(theme.bold, 0.14) : "transparent",
-                          },
-                        ]}
-                      >
-                        <Ionicons name="globe-outline" size={14} color={prefs.providerIds.length === 0 ? theme.bold : theme.text.muted} />
-                        <Text style={[styles.setChipText, { color: prefs.providerIds.length === 0 ? theme.bold : theme.text.secondary }]}>
-                          {t?.AICineChat?.allPlatforms || "Tümü"}
-                        </Text>
-                      </TouchableOpacity>
-                      {STREAMING_PROVIDERS.map((provider) => {
-                        const on = prefs.providerIds.includes(provider.id);
-                        return (
-                          <TouchableOpacity
-                            key={provider.id}
-                            onPress={() => toggleProvider(provider.id)}
-                            style={[
-                              styles.setChip,
-                              { borderColor: on ? theme.bold : theme.border, backgroundColor: on ? alpha(theme.bold, 0.14) : "transparent" },
-                            ]}
-                          >
-                            <View style={[styles.providerDot, { backgroundColor: provider.color }]} />
-                            <Text style={[styles.setChipText, { color: on ? theme.bold : theme.text.secondary }]}>
-                              {provider.name}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-
-                    <View style={[styles.settingsDivider, { backgroundColor: theme.border }]} />
-
-                    <Text style={[styles.settingTitle, { color: theme.text.primary }]}>
-                      {t?.AICineChat?.contentTypeTitle || "İçerik türü"}
-                    </Text>
-                    <View style={styles.settingChips}>
-                      {[
-                        ["all", t?.AICineChat?.contentAll || "Film + Dizi", "apps-outline"],
-                        ["movie", t?.AICineChat?.contentMovies || "Yalnız film", "film-outline"],
-                        ["tv", t?.AICineChat?.contentSeries || "Yalnız dizi", "tv-outline"],
-                      ].map(([key, label, icon]) => {
-                        const on = prefs.mediaType === key;
-                        return (
-                          <TouchableOpacity
-                            key={key}
-                            onPress={() => changeMediaType(key)}
-                            style={[
-                              styles.setChip,
-                              { borderColor: on ? theme.bold : theme.border, backgroundColor: on ? alpha(theme.bold, 0.14) : "transparent" },
-                            ]}
-                          >
-                            <Ionicons name={icon} size={14} color={on ? theme.bold : theme.text.muted} />
-                            <Text style={[styles.setChipText, { color: on ? theme.bold : theme.text.secondary }]}>{label}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-
-                    <View style={styles.genreHeading}>
-                      <Text style={[styles.settingTitle, { color: theme.text.primary }]}>
-                        {t?.AICineChat?.genresTitle || "Türler"}
-                      </Text>
-                      {prefs.genreKeys.length ? (
-                        <TouchableOpacity onPress={() => updatePrefs({ genreKeys: [] })}>
-                          <Text style={[styles.clearInline, { color: theme.bold }]}>{t?.AICineChat?.clear || "Temizle"}</Text>
-                        </TouchableOpacity>
-                      ) : null}
-                    </View>
-                    <Text style={[styles.settingHint, { color: theme.text.muted }]}>
-                      {t?.AICineChat?.genresHint || "Birden fazla tür seçebilirsin."}
-                    </Text>
-                    <View style={styles.settingChips}>
-                      {availableGenres.map((genre) => {
-                        const on = prefs.genreKeys.includes(genre.key);
-                        const label = prefs.mediaType === "tv"
-                          ? genre[language === "tr" ? "tvTr" : "tvEn"] || genre[language === "tr" ? "tr" : "en"]
-                          : genre[language === "tr" ? "tr" : "en"];
-                        return (
-                          <TouchableOpacity
-                            key={genre.key}
-                            onPress={() => toggleGenre(genre.key)}
-                            style={[
-                              styles.setChip,
-                              { borderColor: on ? theme.bold : theme.border, backgroundColor: on ? alpha(theme.bold, 0.14) : "transparent" },
-                            ]}
-                          >
-                            <Ionicons name={genre.icon} size={14} color={on ? theme.bold : theme.text.muted} />
-                            <Text style={[styles.setChipText, { color: on ? theme.bold : theme.text.secondary }]}>{label}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-
-                    {discoveryFilterCount > 0 ? (
-                      <TouchableOpacity onPress={clearDiscoveryFilters} style={styles.clearFiltersBtn}>
-                        <Ionicons name="refresh-outline" size={15} color={theme.bold} />
-                        <Text style={[styles.clearFiltersText, { color: theme.bold }]}>
-                          {t?.AICineChat?.clearDiscoveryFilters || "Platform ve tür filtrelerini temizle"}
-                        </Text>
-                      </TouchableOpacity>
-                    ) : null}
-                  </ScrollView>
-                </View>
+                <AIPrefsPanel
+                  theme={theme}
+                  t={t}
+                  copy={copy}
+                  language={language}
+                  prefs={prefs}
+                  updatePrefs={updatePrefs}
+                  onOpenAllSettings={handleOpenAllSettings}
+                />
               )}
 
               <ComposerBlurTarget attach={composerBlur.attach} backgroundColor={theme.primary} style={{ flex: 1 }}>
@@ -1164,106 +1003,52 @@ export default function AIChatScreen({
                 contentContainerStyle={{ padding: 12, paddingBottom: composerHeight + 16 }}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
-                onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+                onContentSizeChange={applyScrollTarget}
               >
                 {messages.length === 0 && !loading ? (
-                  <View style={styles.welcome}>
-                    <LottieView
-                      style={{ width: 96, height: 96, opacity: 0.95 }}
-                      source={require("@lottie/gemini.json")}
-                      autoPlay
-                      loop
-                    />
-                    <Text style={[styles.welcomeTitle, { color: theme.text.primary }]}>
-                      {t?.AICineChat?.emptyTitle || i18nText("autoI18n.ne_izleyecegine_birlikte_karar_verelim", "Ne izleyeceğine birlikte karar verelim")}
-                    </Text>
-                    <Text style={[styles.welcomeText, { color: theme.text.muted }]}>
-                      {t?.AICineChat?.emptyText ||
-                        i18nText("autoI18n.oner_iste_karsilastir_planla_liste_olustur", "Bir öneri iste, iki yapımı karşılaştır, izleme planı yap ya da temalı liste oluştur.")}
-                    </Text>
-
-                    {filterSummary ? (
-                      <TouchableOpacity
-                        activeOpacity={0.82}
-                        onPress={() => setSettingsVisible(true)}
-                        style={[
-                          styles.activeFilters,
-                          { backgroundColor: alpha(theme.accent, 0.12), borderColor: alpha(theme.accent, 0.35) },
-                        ]}
-                      >
-                        <Ionicons name="options-outline" size={15} color={theme.bold} />
-                        <Text numberOfLines={2} style={[styles.activeFiltersText, { color: theme.bold }]}>
-                          {filterSummary}
-                        </Text>
-                        <Ionicons name="chevron-forward" size={15} color={theme.bold} />
-                      </TouchableOpacity>
-                    ) : null}
-
-                    <View style={styles.tabRow}>
-                      {TABS.map((tab) => {
-                        const active = activeTab === tab;
-                        return (
-                          <TouchableOpacity
-                            key={tab}
-                            onPress={() => setActiveTab(tab)}
-                            style={[
-                              styles.tab,
-                              { borderColor: active ? theme.bold : theme.border, backgroundColor: active ? alpha(theme.bold, 0.14) : "transparent" },
-                            ]}
-                          >
-                            <View style={[
-                              styles.tabIcon,
-                              { backgroundColor: active ? alpha(theme.bold, 0.18) : theme.secondary },
-                            ]}>
-                              <Ionicons
-                                name={TAB_ICONS[tab]}
-                                size={18}
-                                color={active ? theme.bold : theme.text.muted}
-                              />
-                            </View>
-                            <Text style={[styles.tabText, { color: active ? theme.bold : theme.text.primary }]}>
-                              {t?.AICineChat?.tabs?.[tab] || tab}
-                            </Text>
-                            <Text numberOfLines={2} style={[styles.tabHint, { color: theme.text.muted }]}>
-                              {t?.AICineChat?.tabHints?.[tab] || ""}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-
-                    <View style={styles.chipWrap}>
-                      {chips.map((c, i) => (
-                        <TouchableOpacity
-                          key={i}
-                          activeOpacity={0.8}
-                          onPress={() => handleSend(c.prompt)}
-                          style={[styles.promptChip, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-                        >
-                          <View style={[styles.promptIcon, { backgroundColor: alpha(theme.accent, 0.14) }]}>
-                            <Ionicons name={TAB_ICONS[activeTab]} size={17} color={theme.bold} />
-                          </View>
-                          <Text style={[styles.promptChipText, { color: theme.text.primary }]}>{c.label}</Text>
-                          <Ionicons name="arrow-forward" size={16} color={theme.text.muted} />
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
+                  <AIWelcome
+                    theme={theme}
+                    t={t}
+                    copy={copy}
+                    tabs={TABS}
+                    tabIcons={TAB_ICONS}
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
+                    chips={chips}
+                    chipIcon={TAB_ICONS[activeTab]}
+                    filterSummary={filterSummary}
+                    onOpenFilters={handleOpenFilters}
+                    onSendChip={handleSendChip}
+                    onVibe={handleVibe}
+                  />
                 ) : (
-                  messages.map((msg) => (
-                    <ChatBubble
+                  messages.map((msg, index) => (
+                    <View
                       key={msg.id}
-                      msg={msg}
-                      theme={theme}
-                      t={t}
-                      getTmdbUrl={getTmdbUrl}
-                      onTitlePress={handleTitlePress}
-                      onRetry={handleRetry}
-                      onUpgrade={handleUpgrade}
-                    />
+                      onLayout={(event) => {
+                        messageYRef.current[msg.id] = event.nativeEvent.layout.y;
+                        // İçerik boyutu olayı konumdan ÖNCE gelirse yeni cevabın
+                        // başına kaydırma atlanırdı; ölçüm bitince de dene.
+                        if (scrollTargetRef.current.mode === "message" && scrollTargetRef.current.id === msg.id) {
+                          applyScrollTarget();
+                        }
+                      }}
+                    >
+                      <ChatBubble
+                        msg={msg}
+                        baseCtx={baseCtx}
+                        isLast={index === messages.length - 1}
+                        loading={loading}
+                        showFollowUps={prefs.showFollowUps}
+                        onRetry={handleRetry}
+                        onUpgrade={handleUpgrade}
+                        onFollowUp={handleFollowUp}
+                        onRegenerate={handleRegenerate}
+                      />
+                    </View>
                   ))
                 )}
-                {loading && <TypingBubble theme={theme} label={t?.AICineChat?.typing || i18nText("autoI18n.dusunuyor", "Düşünüyor…")} />}
+                {loading && <AIThinking theme={theme} copy={copy} />}
               </ScrollView>
 
               </ComposerBlurTarget>
@@ -1351,39 +1136,6 @@ const styles = StyleSheet.create({
   },
   headerCopy: { flex: 1, minWidth: 0 },
   headerTitle: { fontSize: 16, fontWeight: "800", letterSpacing: -0.3 },
-  headerSub: { fontSize: 11, marginTop: -1 },
-
-  row: { width: "100%", marginBottom: 12, flexDirection: "row" },
-  typing: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 18,
-    borderBottomLeftRadius: 5,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-
-  welcome: { alignItems: "center", paddingTop: 18, paddingHorizontal: 6 },
-  welcomeTitle: { fontSize: 18, fontWeight: "800", textAlign: "center", marginTop: 8 },
-  welcomeText: { fontSize: 13, lineHeight: 19, textAlign: "center", marginTop: 6, maxWidth: "90%" },
-  activeFilters: { width: "100%", marginTop: 14, minHeight: 42, borderRadius: 14, borderWidth: 1, paddingHorizontal: 11, flexDirection: "row", alignItems: "center", gap: 7 },
-  activeFiltersText: { flex: 1, fontSize: 11, lineHeight: 15, fontWeight: "600" },
-  tabRow: { width: "100%", flexDirection: "row", gap: 8, marginTop: 18 },
-  tab: { flex: 1, minHeight: 92, paddingHorizontal: 7, paddingVertical: 9, borderRadius: 17, borderWidth: 1, alignItems: "center" },
-  tabIcon: { width: 32, height: 32, borderRadius: 11, alignItems: "center", justifyContent: "center", marginBottom: 6 },
-  tabText: { fontSize: 11, lineHeight: 14, fontWeight: "800", textAlign: "center" },
-  tabHint: { fontSize: 9, lineHeight: 12, textAlign: "center", marginTop: 3 },
-  chipWrap: { width: "100%", gap: 8, marginTop: 14 },
-  promptChip: { width: "100%", minHeight: 52, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 15, borderWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 9 },
-  promptIcon: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center" },
-  promptChipText: { flex: 1, fontSize: 13, fontWeight: "600" },
-
-  empty: { flex: 1, justifyContent: "center", alignItems: "center", gap: 10, padding: 30 },
-  emptyText: { fontSize: 13, textAlign: "center" },
-  convRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: 14, borderWidth: 1 },
-  convIcon: { width: 36, height: 36, borderRadius: 18, justifyContent: "center", alignItems: "center" },
 
   // Mesaj kutusu listenin üzerinde; dış şerit saydam ve dokunmaları geçirir.
   inputWrap: {
@@ -1436,41 +1188,4 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "android" ? { textAlignVertical: "center" } : null),
   },
   clearBtn: { height: 42, justifyContent: "center", paddingHorizontal: 4 },
-
-  // Liste + keşif filtreleri paneli
-  settings: {
-    margin: 10,
-    marginBottom: 0,
-    maxHeight: "58%",
-    borderRadius: 18,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: "hidden",
-  },
-  settingsContent: { padding: 13, paddingBottom: 18 },
-  settingsHeading: { flexDirection: "row", alignItems: "center", gap: 10 },
-  settingsHeadingIcon: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  settingsTitle: { fontSize: 15, fontWeight: "800" },
-  filterCount: { minWidth: 25, height: 25, borderRadius: 13, paddingHorizontal: 7, alignItems: "center", justifyContent: "center" },
-  filterCountText: { color: "#fff", fontSize: 11, fontWeight: "900" },
-  settingsDivider: { height: StyleSheet.hairlineWidth, marginVertical: 13 },
-  settingRow: { flexDirection: "row", alignItems: "center" },
-  settingSectionTitleRow: { flexDirection: "row", alignItems: "center" },
-  settingTitle: { fontSize: 14, fontWeight: "700" },
-  settingHint: { fontSize: 11, lineHeight: 15, marginTop: 2 },
-  settingChips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
-  setChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  setChipText: { fontSize: 12, fontWeight: "600" },
-  providerDot: { width: 9, height: 9, borderRadius: 5 },
-  genreHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 15 },
-  clearInline: { fontSize: 11, fontWeight: "700" },
-  clearFiltersBtn: { minHeight: 40, marginTop: 15, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
-  clearFiltersText: { fontSize: 12, fontWeight: "700" },
 });

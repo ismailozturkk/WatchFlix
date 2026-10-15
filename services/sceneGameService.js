@@ -27,10 +27,26 @@ import {
   dayKeyOf,
   nextStreak,
 } from "../utils/dailyChallenge";
+import {
+  distillImages,
+  maxPageForSource,
+  pickSceneImage,
+  pickTextlessPoster,
+  pickWeightedPages,
+  weightedOrder,
+} from "../utils/gameSelection";
 
 // ── Cache ────────────────────────────────────────────────────────────────────
 // Bellek ici cache: ayni oturumda tekrar tekrar API istegi yapmayi onler.
-const titleCache = new Map(); // sourceKey -> items[]
+// Havuz, kaynak+dil basina BUYUR: her oyunda yeni sayfalar eklenir, cekilmis
+// sayfalar (`pages`) tekrar istenmez.
+const poolState = new Map(); // `${source}_${language}` -> { items: [], pages: Set<number> }
+
+// Yapim basina gorsel listesi (sahne + afis ayni istekten). Promise saklanir:
+// ayni yapim icin es zamanli iki istek tek aga duser. LRU, en cok IMAGES_CACHE_MAX.
+const imagesCache = new Map(); // mediaKey -> Promise<{backdrops, posters}|null>
+const IMAGES_CACHE_MAX = 400;
+const TMDB_TIMEOUT_MS = 10000;
 
 // Diske kalici cache (Part 18.3): uygulamanin mevcut cachedRead/cacheStore
 // altyapisi ile ayri bir "game" namespace'i kullanilir. Anahtar semasi:
@@ -47,19 +63,6 @@ const HEADERS = (apiKey) => ({
 });
 
 // ── Yardımcı Fonksiyonlar ───────────────────────────────────────────────────
-
-// Rastgele sayı üretici (min ve max dahil)
-const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-
-// TMDB'den dizi/film çekerken rastgele sayfaları hedefleriz (1 ile 50 arası)
-// API limitleri veya "popular" olmayan listeler için sayfa sayısı daha düşük tutulabilir.
-const getRandomPages = (count, maxPage) => {
-  const pages = new Set();
-  while (pages.size < count) {
-    pages.add(randomInt(1, maxPage));
-  }
-  return Array.from(pages);
-};
 
 // ── Normalize Medya Modeli (Part 10.2) ───────────────────────────────────────
 // Popülerliği bantlara ayırır; "benzer popülerlik" karşılaştırması için kullanılır.
@@ -113,6 +116,9 @@ function normalizeMediaItem(raw, sourceId) {
     genreIds,
     popularity,
     popularityBand: popularityBandOf(popularity),
+    // Oy sayisi "herkes izlemis mi"nin kalici gostergesi (popularity gunluk
+    // dalgalanir); bilindik yapimlari one cikarmak icin (utils/gameSelection).
+    voteCount: Number(raw.vote_count ?? raw.voteCount) || 0,
     posterPath: raw.posterPath || raw.poster_path || raw.imagePath || null,
     backdropPath: raw.backdropPath || raw.backdrop_path || null,
     sourceIds: sourceId ? [sourceId] : [],
@@ -121,91 +127,109 @@ function normalizeMediaItem(raw, sourceId) {
 
 // ── TMDB API Helpers ─────────────────────────────────────────────────────────
 
+const POOL_ENDPOINTS = {
+  trending: "https://api.themoviedb.org/3/trending/all/week",
+  top_rated_movie: "https://api.themoviedb.org/3/movie/top_rated",
+  top_rated_tv: "https://api.themoviedb.org/3/tv/top_rated",
+  popular_movie: "https://api.themoviedb.org/3/movie/popular",
+  popular_tv: "https://api.themoviedb.org/3/tv/popular",
+};
+// "popular" — karisik trending (varsayilan)
+const poolEndpointOf = (source) => POOL_ENDPOINTS[source] || POOL_ENDPOINTS.trending;
+
+const POOL_PAGES_PER_FETCH = 3;
+// Havuzda oyuncunun HENUZ gormedigi en az bu kadar yapim olmali; azsa yeni
+// sayfalar cekilir (eskiden gecmis havuzu kapladiginda gecmis tamamen siliniyor,
+// ayni 60 yapim yeniden donuyordu).
+const POOL_MIN_FRESH = 30;
+const POOL_MAX_TOPUP_ROUNDS = 2;
+const POOL_MAX_ITEMS = 400;
+
+const mergePoolItems = (existing, incoming) => {
+  const byKey = new Map();
+  existing.forEach((item) => byKey.set(item.mediaKey || mediaKeyOf(item.type, item.id), item));
+  incoming.forEach((item) => {
+    if (!byKey.has(item.mediaKey)) byKey.set(item.mediaKey, item);
+  });
+  const merged = Array.from(byKey.values());
+  return merged.length > POOL_MAX_ITEMS ? merged.slice(merged.length - POOL_MAX_ITEMS) : merged;
+};
+
+const countFresh = (items, seen) => {
+  if (!seen || seen.size === 0) return items.length;
+  let fresh = 0;
+  for (const item of items) {
+    if (!seen.has(`${item.type}_${item.id}`)) fresh += 1;
+  }
+  return fresh;
+};
+
 /**
- * Belirtilen kaynaktan rastgele 3 sayfa çekerek geniş bir havuz oluşturur.
+ * Belirtilen kaynaktan baslik havuzu. Sayfalar ilk sayfalara dogru AGIRLIKLI
+ * secilir (utils/gameSelection#pickWeightedPages): sondaki sayfalar cok az
+ * kisinin taniyacagi yapimlar getiriyordu.
+ *
+ * Havuz oturum boyunca BUYUR. Yeterince taze (oyuncunun gormedigi) yapim varsa
+ * hic ag istegi yapmadan bellekten doner; azsa yalnizca daha once cekilmemis
+ * yeni sayfalar eklenir.
+ *
+ * @param {object} [opts]
+ * @param {Set<string>} [opts.seen] Oyuncunun gecmisteki `${type}_${id}` anahtarlari.
  */
-export async function fetchTitlePool(apiKey, language = "tr", source = "popular") {
+export async function fetchTitlePool(apiKey, language = "tr", source = "popular", { seen } = {}) {
   const cacheKey = `${source}_${language}`;
-  
-  // Cache'de yeterince eleman varsa doğrudan onu kullan (oyun süresince cache şişerse temizlenebilir)
-  if (titleCache.has(cacheKey) && titleCache.get(cacheKey).length > 20) {
-    return titleCache.get(cacheKey);
+  const state = poolState.get(cacheKey) || { items: [], pages: new Set() };
+  poolState.set(cacheKey, state);
+
+  if (state.items.length > 20 && countFresh(state.items, seen) >= POOL_MIN_FRESH) {
+    return state.items;
   }
 
   const lang = language === "tr" ? "tr-TR" : "en-US";
-  
-  // Çoğu TMDB endpoint'inde ilk 500 sayfa kullanılabilir.
-  // "trending" veya popüler listelerde 1 ile 50 arası sayfalar güvenlidir.
-  const pagesToFetch = getRandomPages(3, 50);
+  const url = poolEndpointOf(source);
+  const maxPage = maxPageForSource(source);
 
-  let url;
-  switch (source) {
-    case "trending":
-      url = "https://api.themoviedb.org/3/trending/all/week";
-      break;
-    case "top_rated_movie":
-      url = "https://api.themoviedb.org/3/movie/top_rated";
-      break;
-    case "top_rated_tv":
-      url = "https://api.themoviedb.org/3/tv/top_rated";
-      break;
-    case "popular_movie":
-      url = "https://api.themoviedb.org/3/movie/popular";
-      break;
-    case "popular_tv":
-      url = "https://api.themoviedb.org/3/tv/popular";
-      break;
-    default: // "popular" — karışık trending
-      url = "https://api.themoviedb.org/3/trending/all/week";
-      break;
-  }
-
-  // Part 18.3: TMDB istegi cachedRead uzerinden yapilir. Online iken her
-  // zaman taze sayfalar cekilir (cesitlilik tasarimin parcasi oldugu icin
-  // TTL ile dondurulmez); cachedRead burada sadece "cevrimdisi/hata aninda
-  // son bilinen havuza dus" rolunu ustlenir (Part 18.4). Basarili sonuc
-  // ayrica diske yazilir ki internet kesilince antrenman modu mumkun olsun.
+  // Part 18.3: TMDB istegi cachedRead uzerinden yapilir. Online iken her zaman
+  // taze sayfalar cekilir (cesitlilik tasarimin parcasi oldugu icin TTL ile
+  // dondurulmez); cachedRead burada sadece "cevrimdisi/hata aninda son bilinen
+  // havuza dus" rolunu ustlenir (Part 18.4). Basarili sonuc diske yazilir ki
+  // internet kesilince antrenman modu mumkun olsun.
   const fetchFresh = async () => {
-    const all = [];
-    const requests = pagesToFetch.map((page) =>
-      axios.get(url, { params: { language: lang, page }, headers: HEADERS(apiKey) })
-    );
-    const responses = await Promise.allSettled(requests);
-    responses.forEach((res) => {
-      if (res.status === "fulfilled" && res.value.data?.results) {
-        res.value.data.results.forEach((r) => {
+    for (let round = 0; round < POOL_MAX_TOPUP_ROUNDS; round += 1) {
+      const pages = pickWeightedPages(POOL_PAGES_PER_FETCH, maxPage, { exclude: state.pages });
+      if (pages.length === 0) break;
+
+      const responses = await Promise.allSettled(
+        pages.map((page) =>
+          axios.get(url, {
+            params: { language: lang, page },
+            headers: HEADERS(apiKey),
+            timeout: TMDB_TIMEOUT_MS,
+          }),
+        ),
+      );
+      const incoming = [];
+      responses.forEach((res, index) => {
+        if (res.status !== "fulfilled" || !Array.isArray(res.value.data?.results)) return;
+        state.pages.add(pages[index]);
+        res.value.data.results.forEach((raw) => {
           // 10.1 adim 3: gorseli (backdrop) olmayan kayitlar elenir.
-          if (!r.backdrop_path) return;
-          all.push(normalizeMediaItem(r, source));
+          if (!raw.backdrop_path) return;
+          incoming.push(normalizeMediaItem(raw, source));
         });
-      }
-    });
-    if (all.length === 0) {
+      });
+      state.items = mergePoolItems(state.items, incoming);
+      if (countFresh(state.items, seen) >= POOL_MIN_FRESH) break;
+    }
+    if (state.items.length === 0) {
       throw Object.assign(new Error("TMDB title pool fetch returned no items"), {
         code: "empty_pool_fetch",
       });
     }
-
-    // Benzersiz olanları filtrele ve eskilerle birleştir (bellek ici cache).
-    const existing = titleCache.get(cacheKey) || [];
-    const merged = [...existing, ...all];
-    const seen = new Set();
-    const unique = merged.filter((item) => {
-      const key = `${item.type}_${item.id}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    titleCache.set(cacheKey, unique);
-    return unique;
+    return state.items;
   };
 
   try {
-    // forceRefresh: true -> online iken her zaman taze sayfalar cekilir
-    // (havuz cesitliligi tasarimin parcasidir, TTL ile dondurulmaz). maxAge
-    // burada sadece poolMaxAge(...) ile uyumlu kalsin diye tutulur; gercek
-    // davranis cevrimdisi/hata durumunda son basarili sonuca dusmektir
-    // (Part 18.4 cevrimdisi davranis).
     const { data } = await cachedRead(
       GAME_CACHE_NS,
       poolCacheKey(source, language),
@@ -213,16 +237,17 @@ export async function fetchTitlePool(apiKey, language = "tr", source = "popular"
       { forceRefresh: true, fallbackToCache: true },
     );
     if (Array.isArray(data) && data.length > 0) {
-      titleCache.set(cacheKey, data);
-      return data;
+      // Cevrimdisi/hata aninda diskten gelen havuz bellege de alinir.
+      if (data !== state.items) state.items = mergePoolItems(state.items, data);
+      return state.items;
     }
   } catch (error) {
     if (__DEV__) console.warn("fetchTitlePool error", error);
   }
 
   // cachedRead disk cache'inde de veri yoksa (ilk kez cevrimdisi acilis vb.)
-  // bellek ici cache varsa onu kullan, yoksa bos dondur.
-  return titleCache.get(cacheKey) || [];
+  // bellek ici havuz varsa onu kullan, yoksa bos dondur.
+  return state.items;
 }
 
 const DAILY_POOL_MAX_AGE = 24 * 60 * 60 * 1000;
@@ -298,13 +323,50 @@ export function buildWatchlistPool(watchList, sourceId) {
 }
 
 /**
- * Detayları çekip `append_to_response=images` kullanarak backdrops resimlerini getirir.
- * Zorluğa göre sahne tanınırlığını ayarlar (Part 9):
- *   - easy  : en tanınır kareler (TMDB sıralamasında baştakiler).
+ * Bir yapimin DILSIZ (iso_639_1 = null) gorselleri: sahne kareleri + afisler.
+ * `/images` ucu, eski `/{type}/{id}?append_to_response=images` cagrisinin tum
+ * detay govdesini tasimadan ayni listeyi verir; sahne ve afis oyunu AYNI istegi
+ * paylasir. Sonuc bellekte saklanir (ayni yapim ikinci kez sorulmaz); hata
+ * onbelleklenmez, sonraki denemede yeniden istenir.
+ *
+ * @returns {Promise<{backdrops:Array, posters:Array}|null>} ag hatasinda null
+ */
+export function fetchTitleImages(apiKey, item) {
+  const key = mediaKeyOf(item.type, item.id);
+  const hit = imagesCache.get(key);
+  if (hit) {
+    // LRU: en son kullanilan sona tasinir.
+    imagesCache.delete(key);
+    imagesCache.set(key, hit);
+    return hit;
+  }
+
+  const promise = axios
+    .get(`https://api.themoviedb.org/3/${item.type}/${item.id}/images`, {
+      // Yazisiz (dilsiz) gorseller: ustunde baslik/slogan olmayanlar.
+      params: { include_image_language: "null" },
+      headers: HEADERS(apiKey),
+      timeout: TMDB_TIMEOUT_MS,
+    })
+    .then((res) => distillImages(res.data))
+    .catch(() => {
+      if (imagesCache.get(key) === promise) imagesCache.delete(key);
+      return null;
+    });
+
+  imagesCache.set(key, promise);
+  if (imagesCache.size > IMAGES_CACHE_MAX) {
+    imagesCache.delete(imagesCache.keys().next().value);
+  }
+  return promise;
+}
+
+/**
+ * Sahne karesi. Zorluga gore tanirlik araligi utils/gameSelection#pickSceneImage'da:
+ *   - easy  : en taninir kareler (TMDB siralamasinda bastakiler).
  *   - normal: ana veya ikincil sahne.
  *   - hard  : daha az bilinen, sondaki sahneler.
- * TMDB backdrop listesi kabaca oy/popülerliğe göre sıralı olduğundan index
- * büyüdükçe sahne daha az tanınır olur.
+ * Gorsel listesi alinamazsa yapimin varsayilan arka plani kullanilir.
  */
 export async function getDetailedSceneImage(
   apiKey,
@@ -313,63 +375,44 @@ export async function getDetailedSceneImage(
   difficulty = "normal",
   source = randomSource,
 ) {
-  try {
-    const res = await axios.get(
-      `https://api.themoviedb.org/3/${item.type}/${item.id}`,
-      {
-        params: {
-          append_to_response: "images",
-          include_image_language: "null", // Yazısız orjinal arka planları getirir
-        },
-        headers: HEADERS(apiKey),
-      }
-    );
+  const images = await fetchTitleImages(apiKey, item);
+  const picked = images
+    ? pickSceneImage(
+        images.backdrops,
+        difficulty,
+        source,
+        `image:${mediaKeyOf(item.type, item.id)}`,
+      )
+    : null;
+  return picked || { mainImage: item.backdropPath, hints: [] };
+}
 
-    const backdrops = res.data?.images?.backdrops || [];
+/**
+ * Yazisiz (basliksiz) afis. TMDB'de dilsiz afis her yapimda yoktur; yoksa null.
+ * Eskiden varsayilan afis gosteriliyordu ve ustundeki baslik soruyu bir bakista
+ * cozuyordu.
+ */
+export async function getTextlessPoster(apiKey, item, source = randomSource) {
+  const images = await fetchTitleImages(apiKey, item);
+  if (!images) return null;
+  return pickTextlessPoster(images.posters, source, `poster:${mediaKeyOf(item.type, item.id)}`);
+}
 
-    if (backdrops.length > 0) {
-      // Kalite kontrolü (Part 10.4): yeterli genişlik, yazısız (logo/başlık
-      // içermeyen, iso_639_1 === null) ve ~16:9 en-boy oranı tercih edilir.
-      // Aşırı karanlık/boş görsel tespiti istemcide metadata ile güvenilir
-      // yapılamadığından bu fazda uygulanmadı.
-      const isQuality = (b) =>
-        b.width >= 1280 &&
-        b.iso_639_1 === null &&
-        b.aspect_ratio >= 1.6 &&
-        b.aspect_ratio <= 2.0;
-      const validBackdrops = backdrops.filter(isQuality);
+// Afis sorusunda adaylar sirayla degil GRUPLAR halinde sorulur: yazisiz afisi
+// olmayan yapim cok oldugundan ard arda tek tek denemek soru basina birkac
+// ag turu demekti. Grup icinde sira korunur (ilk uygun, agirlik sirasina gore).
+const POSTER_PROBE_BATCH = 4;
+const POSTER_PROBE_MAX = 20;
 
-      const pool = validBackdrops.length > 0 ? validBackdrops : backdrops;
-
-      // Birden fazla görsel varsa zorluğa göre tanınırlık aralığı seçilir.
-      if (pool.length > 1) {
-        const last = pool.length - 1;
-        let minIndex;
-        let maxIndex;
-        if (difficulty === "easy") {
-          minIndex = 0;
-          maxIndex = Math.min(2, last);
-        } else if (difficulty === "hard") {
-          minIndex = Math.min(3, last);
-          maxIndex = last;
-        } else {
-          minIndex = Math.min(1, last);
-          maxIndex = last;
-        }
-        const randomIndex = source.int(minIndex, maxIndex, `image:${mediaKeyOf(item.type, item.id)}`);
-        const mainImage = pool[randomIndex].file_path;
-        // Diğer resimleri ipucu (hint) olarak ayır
-        const hints = pool.filter((_, idx) => idx !== randomIndex).map(b => b.file_path);
-
-        // Çok fazla resmi sınırla (maks 5 ipucu)
-        return { mainImage, hints: hints.slice(0, 5) };
-      }
-      return { mainImage: pool[0].file_path, hints: [] };
-    }
-  } catch (error) {
-    // API hatası olursa varsayılan backdrop döneriz
+async function findTextlessPosterCandidate(apiKey, ordered, source) {
+  const limitCount = Math.min(ordered.length, POSTER_PROBE_MAX);
+  for (let start = 0; start < limitCount; start += POSTER_PROBE_BATCH) {
+    const batch = ordered.slice(start, Math.min(start + POSTER_PROBE_BATCH, limitCount));
+    const paths = await Promise.all(batch.map((item) => getTextlessPoster(apiKey, item, source)));
+    const index = paths.findIndex(Boolean);
+    if (index >= 0) return { item: batch[index], path: paths[index] };
   }
-  return { mainImage: item.backdropPath, hints: [] };
+  return null;
 }
 
 // ── Akıllı Soru Üretimi ──────────────────────────────────────────────────────
@@ -401,6 +444,23 @@ const franchiseKey = (t) => {
   return words[0] && words[0].length >= 4 ? words[0] : null;
 };
 
+// Havuz nesneleri oyun boyunca ayni kalir; normalizasyon (NFD + 3 regex) her
+// soruda butun havuz icin yeniden calismasin diye nesne basina bir kez hesaplanir.
+const titleMetaCache = new WeakMap();
+const titleMetaOf = (item) => {
+  let meta = titleMetaCache.get(item);
+  if (!meta) {
+    meta = { norm: normalizeTitle(item.title), franchise: franchiseKey(item.title) };
+    titleMetaCache.set(item, meta);
+  }
+  return meta;
+};
+
+// Yanlis siklar dogru cevaptan daha az bilinen olursa "tanidigim tek baslik"
+// ipucu verir; bu yuzden siklar da bilindik olanlara dogru agirliklanir, ama
+// dogru cevaptan daha yumusak.
+const DISTRACTOR_BIAS_FACTOR = 0.6;
+
 /**
  * Zorluğa göre yanlış şıkları seçer (Part 9 + 10.3 sinyalleri):
  *   - Aynı mediaType tercih edilir (film sorusuna film şıkları).
@@ -410,14 +470,23 @@ const franchiseKey = (t) => {
  *   - hard  : aynı tür + yakın yıl + benzer popülerlik bandı (en zorlayıcı).
  * Şıklar benzersiz görünen başlıklara sahip olur; havuz küçükse kural gevşetilir.
  */
-function getSmartOptions(pool, correctItem, count = 3, difficulty = "normal", source = randomSource) {
+function getSmartOptions(
+  pool,
+  correctItem,
+  count = 3,
+  difficulty = "normal",
+  source = randomSource,
+  popularityBias = 0,
+) {
   // Tuz: ayni dogru cevap icin her karistirma bagimsiz, ama stabil kaynakta
   // (gunluk) herkeste ayni olsun.
   const salt = `opt:${mediaKeyOf(correctItem.type, correctItem.id)}`;
-  const shuffle = (list, tag) => source.shuffle(list, `${salt}:${tag}`);
+  // bias 0 → source.shuffle (eski davranis, gunluk degismez); >0 → bilindik
+  // yapimlar daha olasi.
+  const shuffle = (list, tag) =>
+    weightedOrder(list, source, `${salt}:${tag}`, popularityBias * DISTRACTOR_BIAS_FACTOR);
   const correctGenres = new Set(correctItem.genreIds || []);
-  const correctNorm = normalizeTitle(correctItem.title);
-  const correctFranchise = franchiseKey(correctItem.title);
+  const { norm: correctNorm, franchise: correctFranchise } = titleMetaOf(correctItem);
 
   const otherItems = pool.filter(
     (item) => item.id !== correctItem.id || item.type !== correctItem.type,
@@ -425,9 +494,9 @@ function getSmartOptions(pool, correctItem, count = 3, difficulty = "normal", so
 
   // Aynı isim (dil varyantı) ve aynı franchise yapımları doğru cevaba karşı ele.
   const baseAll = otherItems.filter((item) => {
-    const norm = normalizeTitle(item.title);
+    const { norm, franchise } = titleMetaOf(item);
     if (!norm || norm === correctNorm) return false;
-    if (correctFranchise && franchiseKey(item.title) === correctFranchise) return false;
+    if (correctFranchise && franchise === correctFranchise) return false;
     return true;
   });
 
@@ -452,8 +521,14 @@ function getSmartOptions(pool, correctItem, count = 3, difficulty = "normal", so
       const popDiff = Math.abs((Number(item.popularity) || 0) - correctPop) / (correctPop + 1);
       return yearDiff + bandDiff * 4 + popDiff * 6; // küçük = daha benzer = daha zor
     };
+    // Skor aday basina BIR kez hesaplanir (siralama karsilastirmasinda her
+    // seferinde yil ayristirip bant hesaplamaz).
+    const scored = base.map((item) => ({ item, score: closeness(item) }));
     candidates = shuffle(
-      [...base].sort((a, b) => closeness(a) - closeness(b)).slice(0, Math.max(count * 3, count)),
+      scored
+        .sort((a, b) => a.score - b.score)
+        .slice(0, Math.max(count * 3, count))
+        .map((entry) => entry.item),
       "hard",
     );
   } else {
@@ -466,8 +541,7 @@ function getSmartOptions(pool, correctItem, count = 3, difficulty = "normal", so
   const usedFranchises = new Set(correctFranchise ? [correctFranchise] : []);
   const tryAdd = (item) => {
     if (chosen.some((o) => o.id === item.id && o.type === item.type)) return;
-    const norm = normalizeTitle(item.title);
-    const fk = franchiseKey(item.title);
+    const { norm, franchise: fk } = titleMetaOf(item);
     if (usedNorms.has(norm)) return;
     if (fk && usedFranchises.has(fk)) return;
     chosen.push(item);
@@ -519,8 +593,13 @@ function disambiguateOptionTitles(options) {
  * @param {object} [extra.source] Rastgelelik kaynağı (utils/seededRandom).
  *   Varsayılan her oyunda farklıdır; Günlük Meydan Okuma createStableSource
  *   verir ve herkeste aynı soru çıkar.
- * @param {"scene"|"poster"} [extra.kind] "poster": görsel olarak afiş döner
- *   (detay isteği yok, ipucu görseli yok); "scene": TMDB sahne görseli.
+ * @param {"scene"|"poster"} [extra.kind] "poster": görsel olarak YAZISIZ (başlıksız)
+ *   afiş döner, ipucu görseli yoktur; yazısız afişi olmayan yapımlar soru olmaz.
+ *   "scene": TMDB sahne görseli.
+ * @param {number} [extra.popularityBias] 0..1. Doğru cevap ve şıklar bilindik
+ *   yapımlara doğru ağırlıklanır (0 = düz rastgele). Günlük Meydan Okuma ve kişisel
+ *   listeler 0 verir: günlük sorular herkeste aynı kalmalı, kişisel liste zaten
+ *   oyuncunun kendi seçimidir.
  * @returns {Promise<Object|null>} question =
  *   { correctItem, imagePath, hints, options[], correctIndex, kind }
  */
@@ -532,7 +611,7 @@ export async function generateQuestion(
   round = 1,
   optionCount = 4,
   difficulty = "normal",
-  { source = randomSource, kind = "scene" } = {},
+  { source = randomSource, kind = "scene", popularityBias = 0 } = {},
 ) {
   // Şık sayısı kadar (en az 3) başlık gerekir.
   const totalOptions = Math.max(3, Math.min(Number(optionCount) || 4, 4));
@@ -550,14 +629,19 @@ export async function generateQuestion(
 
   // Doğru cevabı seç. Tuz = tur numarası: stabil kaynakta her tur bağımsız ama
   // herkeste aynı kayıt çıkar.
-  const shuffled = source.shuffle(available, `correct:${round}`);
+  // bias > 0: bilindik yapimlar daha olasi (utils/gameSelection#weightedOrder).
+  const shuffled = weightedOrder(available, source, `correct:${round}`, popularityBias);
   let correctItem = null;
   let imagePath = null;
   let hints = [];
 
   if (isPoster) {
-    correctItem = shuffled[0];
-    imagePath = correctItem.posterPath;
+    const found = await findTextlessPosterCandidate(apiKey, shuffled, source);
+    // Yazisiz afisi olan aday yok: baslikli afis gostermek soruyu bir bakista
+    // cozdurdugu icin soru uretilmez.
+    if (!found) return null;
+    correctItem = found.item;
+    imagePath = found.path;
   } else {
     // Uygun bir resim bulana kadar dene (çok beklememek için max 3 deneme)
     for (let i = 0; i < Math.min(3, shuffled.length); i++) {
@@ -581,7 +665,14 @@ export async function generateQuestion(
   }
 
   // Akıllı şıkları getir (zorluğa göre)
-  const wrongOptions = getSmartOptions(pool, correctItem, wrongNeeded, difficulty, source);
+  const wrongOptions = getSmartOptions(
+    pool,
+    correctItem,
+    wrongNeeded,
+    difficulty,
+    source,
+    popularityBias,
+  );
   if (wrongOptions.length < wrongNeeded) return null;
 
   // Şıkları klonla (cache'deki havuz nesnelerini bozmadan başlık ayarlamak için)

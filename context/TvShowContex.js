@@ -12,6 +12,8 @@ import axios from "axios";
 // içeriğini çekiyor); SWR'a çevirmek o isteği ikiye katlardı.
 import { getCachedValue, getSwr, seedList, setCachedValue, TTL } from "../utils/apiCache";
 import { setIfChanged, setListIfChanged } from "../utils/sameData";
+import { adultScoped, dropAdult } from "../utils/homeContentSettings";
+import { useHomeDataSettings } from "../hooks/useHomeContentSettings";
 import { i18nText } from "../utils/i18nText";
 import { getWatchedShowActivityTime } from "../utils/watchState";
 import {
@@ -128,6 +130,12 @@ export const TvShowProvider = ({ children }) => {
 
   const { API_KEY } = useApiSettings();
   const { streamingProviderIds } = useStreamingProviderSettings();
+  // Veriyi değiştiren ayarlar (yetişkin içerik, platform üyelikleri) — ana ekran
+  // listeleri bunlara göre yeniden çekilir (bkz. utils/homeContentSettings.js).
+  const { adultContent, providersKey } = useHomeDataSettings();
+  // `/discover` tabanlı listelerin önbellek anahtarı yetişkin izniyle kapsamlanır.
+  // trending/airing_today/on_the_air ayardan bağımsız; onlar `dropAdult` ile süzülür.
+  const adultKey = (key) => adultScoped(key, adultContent);
   const { language } = useLanguage();
 
   // ── AÇILIŞ TOHUMLARI ──────────────────────────────────────────────────────
@@ -147,7 +155,7 @@ export const TvShowProvider = ({ children }) => {
   );
   const bestSeed = useMemo(
     () =>
-      seedList(`tv_bests_${seedLang}_discover_vote_count_page_1`, {
+      seedList(adultKey(`tv_bests_${seedLang}_discover_vote_count_page_1`), {
         maxAge: TTL.TREND,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -303,7 +311,7 @@ export const TvShowProvider = ({ children }) => {
     const lang = language === "tr" ? "tr-TR" : "en-US";
     const gen = append ? currentGen("best") : beginFreshRequest("best");
     return loadPage({
-      cacheKey: `tv_bests_${lang}_${selectedCategoryBestShow}_${selectedCategoryBest}_page_${page}`,
+      cacheKey: adultKey(`tv_bests_${lang}_${selectedCategoryBestShow}_${selectedCategoryBest}_page_${page}`),
       ttl: TTL.TREND,
       append,
       forceRefresh,
@@ -337,7 +345,7 @@ export const TvShowProvider = ({ children }) => {
     if (!activeSections.best) return;
     setPageBest(1);
     fetchSeriesBest(1, false);
-  }, [activeSections.best, selectedCategoryBest, selectedCategoryBestShow, language]);
+  }, [activeSections.best, selectedCategoryBest, selectedCategoryBestShow, language, adultContent]);
 
   const loadMoreBest = () => {
     if (loadingBest || loadingMoreBest || pageBest >= totalPagesBest) return;
@@ -398,10 +406,24 @@ export const TvShowProvider = ({ children }) => {
   //const [fetchMoviesByProvider, setFetchMoviesByProvider] = useState(false);
 
   // Sağlayıcıları çek
+  // `providersKey`: dizi kimliği değil İÇERİK — aynı küme yeniden yazılınca
+  // kullanıcının elle seçtiği sağlayıcı sıfırlanmasın.
   useEffect(() => {
     if (!activeSections.providers) return;
     fetchProviders();
-  }, [activeSections.providers, language, streamingProviderIds]);
+  }, [activeSections.providers, language, providersKey]);
+
+  // Yetişkin izni değişince sağlayıcı listesi aynı kalır ama seçili sağlayıcının
+  // dizileri (`/discover`) değişir. fetchProviders'ı çağırmak kullanıcının seçimini
+  // "ilk abone olunan sağlayıcı"ya sıfırlardı; yalnız seçili olanı yeniden çekiyoruz.
+  const lastAdultRef = useRef(adultContent);
+  useEffect(() => {
+    if (lastAdultRef.current === adultContent) return;
+    lastAdultRef.current = adultContent;
+    if (activeSections.providers && selectedProvider != null) {
+      fetchMoviesByProvider(selectedProvider);
+    }
+  }, [adultContent]);
 
   const fetchProviders = async () => {
     const cacheKey = `tv_providers_${tmdbLanguage}_${tmdbRegion}`;
@@ -450,7 +472,7 @@ export const TvShowProvider = ({ children }) => {
     }
     const gen = append ? currentGen("provider") : beginFreshRequest("provider");
     return loadPage({
-      cacheKey: `tv_provider_${tmdbLanguage}_${tmdbRegion}_${providerId}_p${page}`,
+      cacheKey: adultKey(`tv_provider_${tmdbLanguage}_${tmdbRegion}_${providerId}_p${page}`),
       ttl: TTL.PROVIDERS,
       append,
       isStale: () => currentGen("provider") !== gen,
@@ -517,7 +539,7 @@ export const TvShowProvider = ({ children }) => {
     const genresKey = [...selectedGenres].sort().join(",");
     const gen = append ? currentGen("genres") : beginFreshRequest("genres");
     return loadPage({
-      cacheKey: `tv_genres_content_${tmdbLanguage}_p${page}_g${genresKey}`,
+      cacheKey: adultKey(`tv_genres_content_${tmdbLanguage}_p${page}_g${genresKey}`),
       ttl: TTL.TREND,
       append,
       forceRefresh,
@@ -542,7 +564,7 @@ export const TvShowProvider = ({ children }) => {
     tvGenres();
     setPageGenres(1);
     fetchTvByGenres(1, false);
-  }, [activeSections.genres, language, selectedGenres]);
+  }, [activeSections.genres, language, selectedGenres, adultContent]);
 
   const loadMoreGenres = () => {
     if (loadingGenres || loadingMoreGenres || pageGenres >= totalPagesGenres) return;
@@ -764,31 +786,43 @@ export const TvShowProvider = ({ children }) => {
     fetchTvShowsEmmyByYear,
   ]);
 
+  // Yetişkin izni yokken ekrandaki listelerden `adult:true` kayıtlar ANINDA elenir:
+  // ayarı kapatınca ağ isteği ya da yeniden yükleme beklenmez. Süzülecek bir şey
+  // yoksa aynı dizi döner, yani kartlar boşuna yeniden çizilmez. `/discover`
+  // dışındaki uçlar (trending vb.) bu sayede ayarı önbellek kapsamı olmadan da
+  // izliyor.
+  const visibleTrend = useMemo(() => dropAdult(seriesTrend, adultContent), [seriesTrend, adultContent]);
+  const visibleBest = useMemo(() => dropAdult(seriesBest, adultContent), [seriesBest, adultContent]);
+  const visibleAiringToday = useMemo(() => dropAdult(moviesAiringToday, adultContent), [moviesAiringToday, adultContent]);
+  const visibleProviders = useMemo(() => dropAdult(moviesProviders, adultContent), [moviesProviders, adultContent]);
+  const visibleGenres = useMemo(() => dropAdult(moviesGenres, adultContent), [moviesGenres, adultContent]);
+  const visibleOnTheAir = useMemo(() => dropAdult(moviesOnTheAir, adultContent), [moviesOnTheAir, adultContent]);
+
   const contextValue = useMemo(() => ({
-    seriesTrend,
-    seriesBest,
+    seriesTrend: visibleTrend,
+    seriesBest: visibleBest,
     loadingTrend,
     loadingBest,
     selectedCategoryTrend,
     selectedCategoryBest,
     totalPagesBest,
     pageBest,
-    moviesAiringToday,
+    moviesAiringToday: visibleAiringToday,
     totalPagesAiringToday,
     loadingAiringToday,
     pageAiringToday,
     providers,
     selectedProvider,
-    moviesProviders,
+    moviesProviders: visibleProviders,
     loadingMoviesByProvider,
     loadingProvider,
     genres,
     selectedGenres,
     pageGenres,
-    moviesGenres,
+    moviesGenres: visibleGenres,
     loadingGenres,
     pageOnTheAir,
-    moviesOnTheAir,
+    moviesOnTheAir: visibleOnTheAir,
     totalPagesOnTheAir,
     loadingOnTheAir,
     categoriesBest,
@@ -860,12 +894,12 @@ export const TvShowProvider = ({ children }) => {
     fetchOnTheAir,
     refreshAllTvShows,
   }), [
-    seriesTrend, seriesBest, loadingTrend, loadingBest, selectedCategoryTrend,
-    selectedCategoryBest, totalPagesBest, pageBest, moviesAiringToday,
+    visibleTrend, visibleBest, loadingTrend, loadingBest, selectedCategoryTrend,
+    selectedCategoryBest, totalPagesBest, pageBest, visibleAiringToday,
     totalPagesAiringToday, loadingAiringToday, pageAiringToday, providers,
-    selectedProvider, moviesProviders, loadingMoviesByProvider, loadingProvider,
-    genres, selectedGenres, pageGenres, moviesGenres, loadingGenres, pageOnTheAir,
-    moviesOnTheAir, totalPagesOnTheAir, loadingOnTheAir, categoriesBest,
+    selectedProvider, visibleProviders, loadingMoviesByProvider, loadingProvider,
+    genres, selectedGenres, pageGenres, visibleGenres, loadingGenres, pageOnTheAir,
+    visibleOnTheAir, totalPagesOnTheAir, loadingOnTheAir, categoriesBest,
     categoriesTrends, refreshing, watchedTvShows, loadingWatchedTv, activateTvSection,
     loadingMoreBest, loadingMoreAiringToday, loadingMoreGenres, totalPagesGenres,
     loadingMoreOnTheAir,
@@ -875,6 +909,9 @@ export const TvShowProvider = ({ children }) => {
     loadingEmmy, loadingEmmyYear, loadingMoreEmmy, hasMoreEmmy, errorEmmy,
     changeEmmyMode, changeEmmyCategory, changeEmmyYear, fetchTvShowsEmmy, loadMoreEmmy, fetchTvShowsEmmyByYear,
     refreshAllTvShows,
+    // Değerdeki yükleyiciler (loadMore*, fetch*) `adultKey`i kapanışla yakalar;
+    // ayar değişince bayat kapanış kalmasın diye açıkça bağımlılık.
+    adultContent,
   ]);
 
   return (

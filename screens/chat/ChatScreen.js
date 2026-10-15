@@ -125,6 +125,7 @@ import GroupInfoModal from "@components/chat/GroupInfoModal";
 import GroupAvatar from "@components/chat/GroupAvatar";
 import ComposerReplyBar from "@components/chat/ComposerReplyBar";
 import { buildReplySnapshot } from "@utils/chatReply";
+import { groupUnreadCount, groupUnreadIncrements } from "@utils/friendsListModel";
 import PinnedMessagesModal from "@components/chat/PinnedMessagesModal";
 import ReportReasonSheet from "@components/moderation/ReportReasonSheet";
 import { useFriends } from "@context/FriendsContext";
@@ -819,6 +820,18 @@ export default function ChatScreen({ route, navigation }) {
     return () => unsub();
   }, [isGroup, isViewing, currentUser.uid, friendUid]);
 
+  // Grup karşılığı: sohbet GÖRÜNÜRKEN benim okunmamış sayacım (groups/{id}
+  // .unread.{uid}) sıfırda tutulur. Grup belgesi zaten dinleniyor (groupData);
+  // yeni bir listener açmak yerine ondan okunur. Yalnız kendi anahtarım yazılır
+  // ve updatedAt'e dokunulmaz — liste sıralaması (updatedAt) okumayla
+  // oynamasın. Yazım başarısız olursa bağımlılıklar değişmediği için döngüye
+  // girmez; bir sonraki snapshot'ta yeniden denenir.
+  const myGroupUnread = isGroup ? groupUnreadCount(groupData, currentUser.uid) : 0;
+  useEffect(() => {
+    if (!isGroup || !isViewing || myGroupUnread === 0) return;
+    updateDoc(chatRef, { [`unread.${currentUser.uid}`]: 0 }).catch(() => {});
+  }, [isGroup, isViewing, myGroupUnread, chatRef, currentUser.uid]);
+
   // Clear processed-message guard when switching chats
   useEffect(() => { processedMsgIds.current.clear(); }, [chatId]);
 
@@ -1188,6 +1201,14 @@ export default function ChatScreen({ route, navigation }) {
   const queueThreadWrites = useCallback(
     (batch, previewText) => {
       if (isGroup) {
+        // Diğer üyelerin okunmamış sayacı mesajla AYNI batch'te artar (1-1'de
+        // alıcının conversations.unreadCount'u gibi): kopma/süreç ölümü mesajı
+        // yazıp sayacı eksik bırakmaz.
+        const unread = groupUnreadIncrements(
+          groupData?.members,
+          currentUser.uid,
+          () => increment(1),
+        );
         batch.set(
           chatRef,
           {
@@ -1199,6 +1220,7 @@ export default function ChatScreen({ route, navigation }) {
               time: serverTimestamp(),
             },
             updatedAt: serverTimestamp(),
+            ...(unread ? { unread } : {}),
           },
           { merge: true },
         );
@@ -1266,6 +1288,7 @@ export default function ChatScreen({ route, navigation }) {
       friendUid,
       friendName,
       friendIdentity,
+      groupData?.members,
     ],
   );
 

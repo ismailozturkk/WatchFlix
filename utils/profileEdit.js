@@ -3,6 +3,8 @@
 // "Profili düzenle" ekranının SAF kararları. Ekran RN/Firebase'e bağlı olduğu
 // için burada test edilebilir tutuluyor (bkz. jest.config.js).
 
+import { favoritesEqual } from "./fourFavorites";
+
 /**
  * Formda kaydedilmemiş bir değişiklik var mı? Kaydet düğmesi buna bakar.
  *
@@ -16,6 +18,8 @@
  * @param {object|null} p.saved  Profilde KAYITLI olan değerler. `username`
  *   normalize edilmiş gelir; `avatarIndex` formun başlangıçta aldığı değerdir.
  * @param {object}  p.draft  Formdaki anlık değerler (`username` normalize).
+ *   `saved.fourFavorites` / `draft.fourFavorites` (isteğe bağlı): dört favori.
+ *   Alan yoksa iki taraf da "boş" sayılır — eski hesaplar kendiliğinden kirlenmez.
  */
 export function isProfileEditDirty({ ready, saved, draft }) {
   if (!ready || !saved || !draft) return false;
@@ -23,6 +27,7 @@ export function isProfileEditDirty({ ready, saved, draft }) {
   if ((draft.username || "") !== (saved.username || "")) return true;
   if ((draft.bio || "").trim() !== (saved.bio || "")) return true;
   if (draft.avatarIndex !== saved.avatarIndex) return true;
+  if (!favoritesEqual(saved.fourFavorites, draft.fourFavorites)) return true;
   // Doğum tarihi bir kez yazılır (firestore.rules → birthDateKept): yalnız
   // henüz kayıtlı değilken girilmesi bir değişikliktir.
   if (!saved.birthDate && !!draft.birthDate) return true;

@@ -11,6 +11,7 @@ import AppIcon from "@components/AppIcon";
 import { useTheme } from "@context/ThemeContext";
 import { useListLayoutSettings } from "@context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
+import { REMINDER_BADGE } from "../../../utils/reminderBadge";
 import { SettingsSubScreen, SectionLabel, buildUiColors } from "./settingsUi";
 
 // Canlı önizleme için tek bir sahte poster karesi.
@@ -433,6 +434,15 @@ const POSTER_BADGE_OPTIONS = [
     color: "#38bdf8",
     label: i18nText("autoI18n.ortak_liste_rozeti", "Ortak"),
     subtitle: i18nText("autoI18n.ortak_liste_rozeti_aciklama", "Ortak listelerdeki posterlerde göster"),
+  },
+  {
+    // Anahtar/simge/renk ListBadges ile ortak kayıttan (utils/reminderBadge.js).
+    key: REMINDER_BADGE.key,
+    group: "status",
+    icon: REMINDER_BADGE.icon,
+    color: REMINDER_BADGE.color,
+    label: i18nText("autoI18n.hatirlatma_rozeti", "Hatırlatma"),
+    subtitle: i18nText("autoI18n.hatirlatma_rozeti_aciklama", "Hatırlatma kurduğun yaklaşan film ve dizilerde göster"),
   },
   {
     key: "rated",

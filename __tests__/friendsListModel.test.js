@@ -2,7 +2,7 @@
 //
 // Bozulursa: arkadaş listesi yanlış sıralanır ("İsmail" sona düşer), süzme
 // kutusu kısa listede çıkar ya da "@ali" araması hiçbir şey bulmaz, sekmedeki
-// okunmamış sayısı yanlış gösterilir.
+// okunmamış sayısı yanlış gösterilir, grup satırı okunmamış mesajı hiç vurgulamaz.
 
 import {
   FILTER_MIN_ITEMS,
@@ -10,11 +10,14 @@ import {
   filterGroups,
   foldForSearch,
   groupPeopleByInitial,
+  groupUnreadCount,
+  groupUnreadIncrements,
   initialOf,
   personMatchesQuery,
   shouldShowFilter,
   sortPeopleByName,
   toEpochMs,
+  totalGroupUnread,
   totalUnread,
 } from "../utils/friendsListModel";
 
@@ -168,5 +171,49 @@ describe("toEpochMs", () => {
     expect(toEpochMs(null)).toBe(0);
     expect(toEpochMs({})).toBe(0);
     expect(toEpochMs(NaN)).toBe(0);
+  });
+});
+
+describe("grup okunmamış sayacı", () => {
+  const group = { id: "g1", members: ["me", "ali"], unread: { me: 3, ali: 7 } };
+
+  test("yalnız BU üyenin sayacını okur", () => {
+    expect(groupUnreadCount(group, "me")).toBe(3);
+    expect(groupUnreadCount(group, "ali")).toBe(7);
+    expect(groupUnreadCount(group, "baskasi")).toBe(0);
+  });
+
+  test("alan yoksa, uid yoksa ya da değer bozuksa 0 döner", () => {
+    expect(groupUnreadCount({ id: "g2" }, "me")).toBe(0);
+    expect(groupUnreadCount(undefined, "me")).toBe(0);
+    expect(groupUnreadCount(group, undefined)).toBe(0);
+    expect(groupUnreadCount({ unread: { me: -2 } }, "me")).toBe(0);
+    expect(groupUnreadCount({ unread: { me: "x" } }, "me")).toBe(0);
+    expect(groupUnreadCount({ unread: { me: 2.9 } }, "me")).toBe(2);
+  });
+
+  test("gruplar arası toplam yalnız bu üyenin sayaçlarını toplar", () => {
+    const groups = [group, { id: "g3", unread: { me: 2 } }, { id: "g4", unread: { ali: 9 } }, { id: "g5" }];
+    expect(totalGroupUnread(groups, "me")).toBe(5);
+    expect(totalGroupUnread(undefined, "me")).toBe(0);
+  });
+});
+
+describe("groupUnreadIncrements", () => {
+  test("gönderen DIŞINDAKİ her üye için artış üretir", () => {
+    let calls = 0;
+    const patch = groupUnreadIncrements(["me", "ali", "veli"], "me", () => ++calls);
+    expect(Object.keys(patch).sort()).toEqual(["ali", "veli"]);
+    expect(calls).toBe(2);
+  });
+
+  test("gönderenden başka üye yoksa null döner (boş map sayaçları silerdi)", () => {
+    expect(groupUnreadIncrements(["me"], "me", () => 1)).toBeNull();
+    expect(groupUnreadIncrements([], "me", () => 1)).toBeNull();
+    expect(groupUnreadIncrements(undefined, "me", () => 1)).toBeNull();
+  });
+
+  test("boş/bozuk uid atlanır", () => {
+    expect(groupUnreadIncrements(["", null, "ali"], "me", () => 1)).toEqual({ ali: 1 });
   });
 });

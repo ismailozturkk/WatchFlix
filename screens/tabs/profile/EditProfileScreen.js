@@ -71,6 +71,16 @@ import {
   ProfileHero,
 } from "../../../components/profile/EditProfileKit";
 import ProfileAvatarPickerModal from "../../../components/profile/ProfileAvatarPickerModal";
+import FavoritesEditor from "../../../components/favorites/FavoritesEditor";
+import { getFavoritesCopy } from "../../../utils/favoritesCopy";
+import {
+  countFavorites,
+  emptyFavorites,
+  favoritesEqual,
+  readProfileFavorites,
+  toProfilePayload,
+} from "../../../utils/fourFavorites";
+import { ANALYTICS_EVENTS, trackEvent } from "../../../services/analytics";
 
 
 const BIO_MAX = 160;
@@ -95,6 +105,10 @@ export default function EditProfileScreen({ navigation }) {
   // kaydetmeyi zorunlu kılmak, yalnızca bio'sunu düzeltmek isteyeni kilitlerdi.
   const [birthDate, setBirthDate] = useState(null);
   const [avatarIndex, setAvatarIndex] = useState(0);
+  // Dört favori (film/dizi/oyuncu, her biri 0–4). Taslak burada; Kaydet ile
+  // Users/{uid}.fourFavorites'e yazılır (utils/fourFavorites.js).
+  const [favorites, setFavorites] = useState(emptyFavorites);
+  const favCopy = getFavoritesCopy(language);
   const [usernameStatus, setUsernameStatus] = useState("idle"); // idle|same|invalid|checking|available|taken
   const [saving, setSaving] = useState(false);
   // Form profilden doldurulana kadar "değişiklik var mı" hesabı yapılmaz.
@@ -142,6 +156,7 @@ export default function EditProfileScreen({ navigation }) {
       setUsername(profile.username || "");
       setBio(profile.bio || "");
       setBirthDate(profile.birthDate || null);
+      setFavorites(readProfileFavorites(profile));
       setAvatarIndex(
         clampAvatarIndex(
           typeof profile.avatarIndex === "number"
@@ -197,9 +212,17 @@ export default function EditProfileScreen({ navigation }) {
             typeof profile.avatarIndex === "number" ? profile.avatarIndex : selectAvatarIndex,
           ),
           birthDate: profile.birthDate || null,
+          fourFavorites: readProfileFavorites(profile),
         }
       : null,
-    draft: { displayName, username: normalizeUsername(username), bio, avatarIndex, birthDate },
+    draft: {
+      displayName,
+      username: normalizeUsername(username),
+      bio,
+      avatarIndex,
+      birthDate,
+      fourFavorites: favorites,
+    },
   });
   const canSave = dirty && !usernameBlocked;
 
@@ -262,7 +285,21 @@ export default function EditProfileScreen({ navigation }) {
       const birthChanged =
         !profile?.birthDate && !!birthDate && birthDate !== (profile?.birthDate || null);
       if (birthChanged) patch.birthDate = birthDate;
+      // Favoriler yalnız değiştiyse yazılır; hepsini kaldırmak da bir değişikliktir
+      // (boş yapı yazılır, alan silinmez — tanıtımdan gelen eski seçimler geri
+      // sızmasın diye "alan var" bilgisi korunur, bkz. adoptPendingFavorites).
+      if (!favoritesEqual(favorites, readProfileFavorites(profile))) {
+        patch.fourFavorites = toProfilePayload(favorites);
+      }
       if (Object.keys(patch).length) await updateField(patch);
+      if (patch.fourFavorites) {
+        trackEvent(ANALYTICS_EVENTS.FOUR_FAVORITES_SAVED, {
+          movies: countFavorites(favorites, "movies"),
+          shows: countFavorites(favorites, "shows"),
+          people: countFavorites(favorites, "people"),
+          total: countFavorites(favorites),
+        });
+      }
 
       // Yaş kısıtını BEKLETMEDEN tazele. Profil dinleyicisi zaten tetiklenecek
       // ama bu yazma yetişkin içerik kapısını doğrudan etkiliyor; kullanıcı
@@ -652,6 +689,20 @@ export default function EditProfileScreen({ navigation }) {
                     inputStyle={styles.bioInput}
                   />
                 </FieldBlock>
+              </FormSection>
+            </Reveal>
+
+            {/* Dört favori: arkadaşların profilinde görünür, önerileri de besler. */}
+            <Reveal delay={100} style={authColumn}>
+              <FormSection
+                theme={theme}
+                icon="heart-circle-outline"
+                title={favCopy.section.title}
+              >
+                <FavoritesEditor value={favorites} onChange={setFavorites} />
+                <FieldHint icon="eye-outline" color={theme.text.muted}>
+                  {favCopy.section.hint}
+                </FieldHint>
               </FormSection>
             </Reveal>
 

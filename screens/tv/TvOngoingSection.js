@@ -31,6 +31,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
+import { useHomeRenderKey } from "../../hooks/useHomeContentSettings";
 import useUpNextQueue from "../../hooks/useUpNextQueue";
 import { i18nText } from "../../utils/i18nText";
 import { alpha } from "../../theme/colors";
@@ -44,6 +45,9 @@ export default function TvOngoingSection({ navigation }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const poster = useRailPosterStyle();
+  // renderItem useCallback ile sabit; poster kalitesi/rozet ayarı değişince
+  // hücreleri yeniden çizdirmek için (bkz. utils/homeContentSettings.js).
+  const renderKey = useHomeRenderKey();
   const { openQuickActions } = useMediaQuickActions();
   const [dateItem, setDateItem] = useState(null);
   const [resolveReady, setResolveReady] = useState(false);
@@ -204,6 +208,7 @@ export default function TvOngoingSection({ navigation }) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.list}
         keyExtractor={(item) => String(item.id)}
+        extraData={renderKey}
         initialNumToRender={3}
         maxToRenderPerBatch={3}
         updateCellsBatchingPeriod={80}

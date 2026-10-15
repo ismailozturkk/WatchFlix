@@ -27,6 +27,12 @@ const TARANAN_DOSYALAR = ["App.js"];
 // "autoI18n." öneki şartı olduğu için yanlış eşleşme pratikte imkânsız.
 const STATIK_DESEN = /i18nText\(\s*(["'])([A-Za-z0-9_.-]+)\1/g;
 const T_FONKSIYON_DESEN = /(?<![\w.])t\(\s*(["'])(autoI18n\.[A-Za-z0-9_.-]+)\1/g;
+// Çağrının DIŞINDA tanımlanan anahtarlar: `{ labelKey: "autoI18n.x" }` gibi tablo
+// satırları, sonra `i18nText(o.labelKey, ...)` ile okunur. Yukarıdaki iki desen bunları
+// göremiyordu (ListPosterInfoControls'taki iki anahtar EN'de böyle sessizce eksik
+// kaldı). `${` ile kurulan dinamik anahtarlar karakter sınıfına uymadığı için
+// buraya girmez; onlar DINAMIK_YERLER'in işi.
+const LITERAL_DESEN = /(["'`])(autoI18n\.[A-Za-z0-9_.-]+)\1/g;
 
 // Anahtarı şablonla kuran dosyalar. Her kayıt, o dosyadaki anahtar TABLOSUNU
 // okuyan desenleri verir — böylece tabloya satır eklenince test onu da korur.
@@ -83,6 +89,7 @@ for (const tamYol of kaynakDosyalari) {
 
   for (const eslesme of kaynak.matchAll(STATIK_DESEN)) ekle(eslesme[2], rel);
   for (const eslesme of kaynak.matchAll(T_FONKSIYON_DESEN)) ekle(eslesme[2], rel);
+  for (const eslesme of kaynak.matchAll(LITERAL_DESEN)) ekle(eslesme[2], rel);
 
   if (/autoI18n\.\$\{/.test(kaynak)) dinamikSablonluDosyalar.add(rel);
 

@@ -27,14 +27,15 @@ function StoryHeaderComponent({ busy, onBack, onOpenDrafts, onSaveDraft }) {
   const iconColor = busy ? theme.text.muted : theme.text.primary;
   return (
     <View style={[styles.header, { paddingTop: topInset + 8 }]}>
+      {/* Ekran artık modal değil sayfa: kapat (X) yerine geri oku. */}
       <GlassIconButton
-        icon="close"
+        icon="chevron-back"
         iconSize={22}
         size={40}
         fallbackRadius={12}
         color={iconColor}
         fallbackStyle={fallbackBox}
-        accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
+        accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
         onPress={onBack}
       />
       <Text

@@ -201,6 +201,20 @@ service cloud.firestore {
       return !('birthDate' in resource.data)
           || request.resource.data.get('birthDate', '') == resource.data.get('birthDate', '');
     }
+    // "Dört favori" (utils/fourFavorites.js): her kategori en fazla 4 giriş.
+    // İstemci alanı zaten normalize edip yazıyor; kural, profil belgesini
+    // şişirebilecek (ve her arkadaşın profil açılışında okunacak) dev bir diziyi
+    // reddeder. Alan hiç yoksa get() null döner → serbest. Alt anahtarlar da
+    // varsayılanlı okunur: eksik kategori hata değil, boş sayılır.
+    function fourFavoritesOk() {
+      let f = request.resource.data.get('fourFavorites', null);
+      return f == null
+          || (f is map
+              && f.keys().hasOnly(['movies', 'shows', 'people'])
+              && f.get('movies', []) is list && f.get('movies', []).size() <= 4
+              && f.get('shows', []) is list && f.get('shows', []).size() <= 4
+              && f.get('people', []) is list && f.get('people', []).size() <= 4);
+    }
     match /Users/{uid} {
       allow read: if isSignedIn();
       // Sunucuya ait alanlar — istemci ne kendi belgesinde ne başkasınınkinde
@@ -211,7 +225,8 @@ service cloud.firestore {
       //     vaadi; bkz. components/badges/badgeCatalog.js). Kural olmadan
       //     herkes kendine "Kurucu" yazabiliyordu.
       allow create: if isOwner(uid)
-                    && !request.resource.data.keys().hasAny(['entitlements', 'badges']);
+                    && !request.resource.data.keys().hasAny(['entitlements', 'badges'])
+                    && fourFavoritesOk();
       // Sahibi her şeyi yazar; diğer signed-in kullanıcılar SADECE
       // counter/timestamp alanlarını günceller (friend req / like / comment
       // akışlarında karşı tarafın dokümanı güncellenir).
@@ -220,7 +235,8 @@ service cloud.firestore {
       allow update: if (isOwner(uid)
                         && !request.resource.data.diff(resource.data)
                           .affectedKeys().hasAny(['entitlements', 'badges'])
-                        && birthDateKept())
+                        && birthDateKept()
+                        && fourFavoritesOk())
                     || (isSignedIn()
                         && onlyUpdating([
                              'friendsCount','followersCount','followingCount',
@@ -748,13 +764,26 @@ service cloud.firestore {
                     && request.auth.uid in request.resource.data.members
                     && request.resource.data.admins is list
                     && request.resource.data.admins.size() == 0;
-      // Sıradan üyeler yalnız mesaj özetini günceller. Üye/grup yönetimi
-      // kurucu veya admins listesindeki kullanıcılarla sınırlıdır.
+      // Sıradan üyeler yalnız mesaj özetini ve okunmamış sayaçlarını günceller.
+      // Üye/grup yönetimi kurucu veya admins listesindeki kullanıcılarla
+      // sınırlıdır.
+      //
+      // `unread` = { uid: okunmamış sayısı }: gönderen mesajla birlikte diğer
+      // üyelerin sayacını artırır, üye kendi sayacını sıfırlar. Kural başkasının
+      // sayacını artırmayı (gönderim) kendininkini sıfırlamaktan ayıramaz;
+      // yalnız anahtarların MEVCUT ÜYELERE ait olmasını şart koşar (üye olmayan
+      // uid ile belgeyi şişirmek yok). Bu, lastMessage'ın zaten taşıdığı güven
+      // düzeyi: aynı gruptaki bir üye zaten özeti de değiştirebiliyor.
       allow update: if isSignedIn()
                     && request.auth.uid in resource.data.members
                     && (
-                      request.resource.data.diff(resource.data).affectedKeys()
-                        .hasOnly(['lastMessage', 'updatedAt'])
+                      (
+                        request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['lastMessage', 'updatedAt', 'unread'])
+                        && request.resource.data.get('unread', {})
+                             .diff(resource.data.get('unread', {}))
+                             .affectedKeys().hasOnly(resource.data.members)
+                      )
                       || (
                         (
                           request.auth.uid == resource.data.createdBy

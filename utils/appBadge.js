@@ -16,7 +16,9 @@
 //
 // Beğeni/yorum bildirimleri bilerek DAHİL DEĞİL: onları temizleyecek bir
 // bildirim ekranı yok, rozete eklenirlerse yine sıfırlanamaz olurlardı. Grup
-// mesajlarında da okunmamış sayacı tutulmuyor, o yüzden sayıma girmiyor.
+// mesajlarının okunmamış sayacı (groups/{id}.unread.{uid}) Mesajlar ekranında
+// gösterilir ama sayıma GİRMİYOR: sunucu push'u rozeti hesaplarken üyenin tüm
+// grup belgelerini de okumak zorunda kalırdı (bkz. functions/appBadge.js).
 //
 // AYNI MANTIK functions/appBadge.js içinde (CommonJS, sunucu push'una `badge`
 // yazar). İkisi birlikte güncellenmeli — iki taraf ayrışırsa uygulama açıkken

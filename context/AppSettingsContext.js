@@ -12,6 +12,7 @@ import Toast from "react-native-toast-message";
 import { buildTmdbUrl } from "../utils/tmdbImageUtils";
 import { i18nText } from "../utils/i18nText";
 import { Keys, get, set, useStored } from "../services/storage";
+import { previewHaptic } from "../services/hapticsService";
 import { usePremiumPlanSnapshot } from "../services/premiumState";
 import { getFeatureLimit } from "../utils/premiumFeatures";
 import { cozumlenmisDil } from "../translations";
@@ -95,6 +96,7 @@ const DEFAULT_POSTER_BADGES = Object.freeze({
   favorite: true,
   other: true,
   shared: true,
+  reminder: true,
   rated: true,
   commented: true,
   tmdbRating: true,
@@ -315,20 +317,25 @@ export const AppSettingsProvider = ({ children }) => {
     [imageQualityLevel],
   );
 
-  // Kar animasyonu ve ikon arka planı Premium'a özel. Plan Free'ye düşünce
-  // (ya da hiç premium olmayan hesapta eski bir bayrak açık kalmışsa) kayıtlı
-  // tercih SİLİNMEZ; yalnız çizilen değer kapalı olur, abonelik yenilenince geri
-  // gelir — özel tema/yazı tipiyle aynı kural. AppSettingsProvider
-  // PremiumProvider'ın ÜSTÜNDE olduğu için plan React dışı store'dan okunur.
+  // Kar animasyonu, ambiyans ve ikon arka planı Premium'a özel. Plan Free'ye
+  // düşünce (ya da hiç premium olmayan hesapta eski bir bayrak açık kalmışsa)
+  // kayıtlı tercih SİLİNMEZ; yalnız çizilen değer kapalı olur, abonelik
+  // yenilenince geri gelir — özel tema/yazı tipiyle aynı kural.
+  // AppSettingsProvider PremiumProvider'ın ÜSTÜNDE olduğu için plan React dışı
+  // store'dan okunur. Yeni bir dekor efekti eklenirse buraya VE
+  // premiumFeatures kaydına girer (bekçi: __tests__/decorScopes.test.js).
   const premiumPlan = usePremiumPlanSnapshot();
   const snowAllowed = Boolean(getFeatureLimit("snow_effect", premiumPlan));
+  const ambientAllowed = Boolean(getFeatureLimit("ambient_background", premiumPlan));
   const iconBackgroundAllowed = Boolean(getFeatureLimit("icon_background", premiumPlan));
   const effectiveShowSnow = showSnow && snowAllowed;
+  const effectiveShowAmbientBackground = showAmbientBackground && ambientAllowed;
   const effectiveShowIconBackground = showIconBackground && iconBackgroundAllowed;
 
-  // Kar ve ikon arka planı Free'de AÇILAMAZ. Ayarlar ekranı anahtarı kilitleyip
-  // yükseltme sayfasına yönlendiriyor; buradaki kontrol ikinci kapı — başka bir
-  // çağrı yeri eklendiğinde kayıtlı bayrak sessizce açılmasın. Kapatmak serbest.
+  // Kar, ambiyans ve ikon arka planı Free'de AÇILAMAZ. Ayarlar ekranı anahtarı
+  // kilitleyip yükseltme sayfasına yönlendiriyor; buradaki kontrol ikinci kapı —
+  // başka bir çağrı yeri (ör. ayar yedeği, yeni bir ekran) eklendiğinde kayıtlı
+  // bayrak sessizce açılmasın. Kapatmak serbest.
   const changeShowSnow = useCallback(
     (newVal) => {
       if (newVal && !snowAllowed) return;
@@ -410,11 +417,15 @@ export const AppSettingsProvider = ({ children }) => {
     [iconBackgroundAllowed],
   );
 
-  const changeShowAmbientBackground = useCallback((newVal) => {
-    const enabled = !!newVal;
-    setShowAmbientBackground(enabled);
-    persist(Keys.showAmbientBackground, enabled, GORUNUM_HATASI);
-  }, []);
+  const changeShowAmbientBackground = useCallback(
+    (newVal) => {
+      const enabled = !!newVal;
+      if (enabled && !ambientAllowed) return;
+      setShowAmbientBackground(enabled);
+      persist(Keys.showAmbientBackground, enabled, GORUNUM_HATASI);
+    },
+    [ambientAllowed],
+  );
 
   const applyDecorHidden = useCallback((next) => {
     decorHiddenRef.current = next;
@@ -470,6 +481,10 @@ export const AppSettingsProvider = ({ children }) => {
     // hapticsService bu anahtara ABONE — ayrıca itmeye gerek yok. Eskiden iki
     // modül aynı anahtarı ayrı ayrı sahipleniyordu (bkz. services/hapticsService.js).
     persist(Keys.haptics, nextValue, i18nText("autoI18n.titresim_ayari_kaydedilemedi", "Titreşim ayarı kaydedilemedi: "));
+    // Açılırken tek bir baskı: kullanıcı çalıştığını hissetsin. iOS'un sistem
+    // anahtarı kendi titreşimini AYNI ANDA verir; çakışıp tek vuruşa karışmasın
+    // diye biraz gecikmeli.
+    if (nextValue) setTimeout(previewHaptic, 220);
   }, []);
 
   const changeNotificationSettings = useCallback((patch) => {
@@ -741,8 +756,13 @@ export const AppSettingsProvider = ({ children }) => {
   );
 
   const ambientBackgroundValue = useMemo(
-    () => ({ showAmbientBackground, changeShowAmbientBackground }),
-    [showAmbientBackground, changeShowAmbientBackground],
+    () => ({
+      showAmbientBackground: effectiveShowAmbientBackground,
+      // Ayarlar ekranı kilit rozetini ve yükseltme akışını buna göre çizer.
+      ambientAllowed,
+      changeShowAmbientBackground,
+    }),
+    [effectiveShowAmbientBackground, ambientAllowed, changeShowAmbientBackground],
   );
 
   const decorScopeValue = useMemo(

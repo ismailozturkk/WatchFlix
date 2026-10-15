@@ -2,13 +2,13 @@
 //
 // Hub sekmesindeki Seelogd Wrapped & Yıllık Arşiv modülü.
 //
-// Üç parça:
+// İki parça:
 //   • Hero kart  — en son yılın toplam izleme süresi (sayaç animasyonu), geçen
-//     yılla kıyas, gerçek aylık dağılım grafiği, izleyici kişiliği + poster
-//     yelpazesi ve "Özetini gör" CTA'sı. Eski sürümdeki sahte (süs) çubuklar
-//     yerine kullanıcının kendi verisi çizilir.
-//   • Yılın rakamları — film / dizi / bölüm / aktif gün / en uzun seri / en
-//     yoğun ay için 3×2 bento ızgarası.
+//     yılla kıyas, gerçek aylık dağılım grafiği, tek satırlık kompakt rakam şeridi
+//     (film / dizi / bölüm / aktif gün / en uzun seri), izleyici kişiliği +
+//     poster yelpazesi ve "Özetini gör" CTA'sı. Eski sürümdeki sahte (süs)
+//     çubuklar yerine kullanıcının kendi verisi çizilir. "En yoğun ay" ayrı bir
+//     kutu değil: grafikteki zirve çubuğu + başlığı zaten onu anlatıyor.
 //   • Yıllık arşiv — geçmiş yıllara giden satır + alt sayfa.
 //
 // Animasyon kuralları:
@@ -378,69 +378,57 @@ const PosterFan = memo(function PosterFan({ paths, getTmdbUrl, active, emoji }) 
   );
 });
 
-// ─── Bento kutusu ────────────────────────────────────────────────────────────
+// ─── Rakam şeridi hücresi ────────────────────────────────────────────────────
 
-const StatTile = memo(function StatTile({
+// Hero kartın (koyu gradyan) içinde durur: renkler kart temasından bağımsız,
+// sabit açık tonlardır.
+const HeroStat = memo(function HeroStat({
   icon,
   color,
   value,
-  text,
   unit,
   label,
   active,
   delay,
-  theme,
   language,
   reduceMotion,
+  first,
 }) {
-  const empty = text == null && !value;
   return (
-    <Reveal active={active} delay={delay} dy={22} style={styles.tileCell}>
-      <View
-        style={[
-          styles.tile,
-          { backgroundColor: theme.secondary, borderColor: theme.border },
-          empty && styles.tileEmpty,
-        ]}
-      >
-        <View pointerEvents="none" style={[styles.tileGlow, { backgroundColor: color }]} />
-        <View style={[styles.tileIcon, { backgroundColor: color + "26" }]}>
-          <Ionicons name={icon} size={14} color={color} />
-        </View>
-        <View style={styles.tileValueRow}>
-          {text != null ? (
-            <Text
-              style={[styles.tileValue, { color: theme.text.primary }]}
-              allowFontScaling={false}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              {text}
-            </Text>
-          ) : (
-            <CountUp
-              value={value}
-              active={active}
-              reduceMotion={reduceMotion}
-              language={language}
-              delay={delay + 200}
-              style={[styles.tileValue, { color: theme.text.primary }]}
-            />
-          )}
+    <Reveal
+      active={active}
+      delay={delay}
+      dy={10}
+      style={[styles.statCell, !first && styles.statCellDivider, !value && styles.statCellEmpty]}
+    >
+      <View style={styles.statValueRow}>
+        <Ionicons name={icon} size={11} color={color} />
+        <View style={styles.statValueBox}>
+          <CountUp
+            value={value}
+            active={active}
+            reduceMotion={reduceMotion}
+            language={language}
+            delay={delay + 160}
+            duration={900}
+            style={styles.statValue}
+          />
           {unit ? (
-            <Text style={[styles.tileUnit, { color: theme.text.muted }]} allowFontScaling={false}>
+            <Text style={styles.statUnit} allowFontScaling={false} numberOfLines={1}>
               {unit}
             </Text>
           ) : null}
         </View>
-        <Text
-          style={[styles.tileLabel, { color: theme.text.muted }]}
-          allowFontScaling={false}
-          numberOfLines={1}
-        >
-          {label}
-        </Text>
       </View>
+      <Text
+        style={styles.statLabel}
+        allowFontScaling={false}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+      >
+        {label}
+      </Text>
     </Reveal>
   );
 });
@@ -680,37 +668,15 @@ export default function HubWrappedModule({ navigation, revealed = true }) {
     .filter((p, i, all) => all.indexOf(p) === i)
     .slice(0, 3);
 
-  const tiles = [
+  // En yoğun ay burada yok: grafikteki altın zirve çubuğu + altındaki başlık
+  // (`peakCaption`) onu zaten gösteriyor.
+  const stats = [
     { key: "movies", icon: "film", color: "#FBBF24", value: recap.totalMovies, label: str.summaryMovies },
     { key: "shows", icon: "tv", color: "#38BDF8", value: recap.totalShows, label: str.summaryShows },
     { key: "eps", icon: "play-circle", color: "#34D399", value: recap.totalEpisodes, label: str.summaryEpisodes },
     { key: "days", icon: "calendar", color: "#F472B6", value: recap.activeDays, unit: str.days, label: str.hubTileActiveDays },
     { key: "streak", icon: "flame", color: "#FB923C", value: recap.longestStreak, unit: str.days, label: str.hubTileStreak },
-    {
-      key: "month",
-      icon: "moon",
-      color: "#A78BFA",
-      text: bm ? cap(monthName(bm.month, language)) : "—",
-      label: str.hubTileBusiestMonth,
-    },
   ];
-
-  const renderTile = (t, i) => (
-    <StatTile
-      key={t.key}
-      icon={t.icon}
-      color={t.color}
-      value={t.value}
-      text={t.text}
-      unit={t.unit}
-      label={t.label}
-      active={active}
-      delay={780 + i * 80}
-      theme={theme}
-      language={language}
-      reduceMotion={reduceMotion}
-    />
-  );
 
   return (
     <View style={styles.container}>
@@ -847,7 +813,24 @@ export default function HubWrappedModule({ navigation, revealed = true }) {
                   </View>
                 </View>
 
-                <View style={styles.divider} />
+                {/* Rakam şeridi: eski "Yılın rakamları" bölümünün kompakt hâli */}
+                <View style={styles.statStrip}>
+                  {stats.map((s, i) => (
+                    <HeroStat
+                      key={s.key}
+                      icon={s.icon}
+                      color={s.color}
+                      value={s.value}
+                      unit={s.unit}
+                      label={s.label}
+                      active={active}
+                      delay={620 + i * 70}
+                      language={language}
+                      reduceMotion={reduceMotion}
+                      first={i === 0}
+                    />
+                  ))}
+                </View>
 
                 {/* Kişilik + posterler */}
                 <View style={styles.personaRow}>
@@ -903,20 +886,6 @@ export default function HubWrappedModule({ navigation, revealed = true }) {
             </Animated.View>
           </Reveal>
 
-          {/* ── YILIN RAKAMLARI ── */}
-          <Reveal active={active} delay={700} dy={14} style={styles.numbersHeader}>
-            <Text style={[styles.numbersTitle, { color: theme.text.muted }]} allowFontScaling={false}>
-              {str.hubNumbersTitle}
-            </Text>
-            <View style={[styles.numbersLine, { backgroundColor: theme.border }]} />
-            <Text style={[styles.numbersYear, { color: theme.text.muted }]} allowFontScaling={false}>
-              {featuredYear}
-            </Text>
-          </Reveal>
-          <View style={styles.tileGrid}>
-            <View style={styles.tileRow}>{tiles.slice(0, 3).map((t, i) => renderTile(t, i))}</View>
-            <View style={styles.tileRow}>{tiles.slice(3).map((t, i) => renderTile(t, i + 3))}</View>
-          </View>
         </>
       ) : null}
 
@@ -1191,11 +1160,60 @@ const styles = StyleSheet.create({
     marginTop: 7,
   },
 
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(255,255,255,0.22)",
+  // Rakam şeridi: koyu cam şerit, 5 eşit hücre + ince ayraçlar.
+  statStrip: {
+    flexDirection: "row",
+    alignItems: "stretch",
     marginTop: 14,
     marginBottom: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.26)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  statCell: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  statCellDivider: {
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: "rgba(255,255,255,0.2)",
+  },
+  statCellEmpty: { opacity: 0.5 },
+  statValueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    maxWidth: "100%",
+  },
+  statValueBox: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 2,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  statValue: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: "900",
+    letterSpacing: -0.4,
+    fontVariant: ["tabular-nums"],
+    flexShrink: 1,
+  },
+  statUnit: { color: "rgba(255,255,255,0.62)", fontSize: 8.5, fontWeight: "800" },
+  statLabel: {
+    color: "rgba(255,255,255,0.62)",
+    fontSize: 8.5,
+    fontWeight: "800",
+    marginTop: 1,
+    maxWidth: "100%",
   },
 
   personaRow: { flexDirection: "row", alignItems: "center", gap: 12 },
@@ -1290,63 +1308,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
-  // Yılın rakamları
-  numbersHeader: {
-    width: "90%",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 4,
-    marginBottom: 10,
-  },
-  numbersTitle: {
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 0.9,
-    textTransform: "uppercase",
-  },
-  numbersLine: { flex: 1, height: StyleSheet.hairlineWidth },
-  numbersYear: { fontSize: 11, fontWeight: "800", letterSpacing: 0.4 },
-  tileGrid: { width: "90%", gap: 8, marginBottom: 12 },
-  tileRow: { flexDirection: "row", gap: 8 },
-  tileCell: { flex: 1 },
-  tile: {
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 11,
-    overflow: "hidden",
-  },
-  tileEmpty: { opacity: 0.55 },
-  tileGlow: {
-    position: "absolute",
-    top: -26,
-    right: -26,
-    width: 74,
-    height: 74,
-    borderRadius: 37,
-    opacity: 0.12,
-  },
-  tileIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tileValueRow: { flexDirection: "row", alignItems: "baseline", gap: 4, marginTop: 10 },
-  tileValue: {
-    fontSize: 22,
-    lineHeight: 26,
-    fontWeight: "900",
-    letterSpacing: -0.6,
-    fontVariant: ["tabular-nums"],
-    flexShrink: 1,
-  },
-  tileUnit: { fontSize: 10, fontWeight: "800" },
-  tileLabel: { fontSize: 10, fontWeight: "700", marginTop: 1 },
 
   // Arşiv satırı
   archiveReveal: { width: "90%", marginBottom: 6 },

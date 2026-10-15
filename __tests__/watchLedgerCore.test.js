@@ -403,3 +403,80 @@ describe("saflik", () => {
     expect(r.yeniRozetler).toEqual(["a", "b"]);
   });
 });
+
+describe("kazanma tarihi (earnedAt, defter v3)", () => {
+  // Defter bir rozetin NE ZAMAN kazanildigini bilmiyordu: detay sayfasi
+  // "Kazanildi" diyebiliyor, hangi gun oldugunu soyleyemiyordu.
+  const tohumlu = () => tohumla(bosLedger(), { badgeIds: ["film_10"], tumIds: ["film_10", "film_50", "film_150"], perde: 3 });
+
+  test("yeni kazanilan rozet bugunun gunuyle damgalanir", () => {
+    const r = birlestir(tohumlu(), { badgeIds: ["film_10", "film_50"], perde: 3, bugun: "2026-10-15" });
+    expect(r.ledger.earnedAt).toEqual({ film_50: "2026-10-15" });
+  });
+
+  test("tohumlanan rozetin tarihi UYDURULMAZ", () => {
+    const l = tohumlu();
+    expect(l.earnedAt).toEqual({});
+    const r = birlestir(l, { badgeIds: ["film_10"], perde: 3, bugun: "2026-10-15" });
+    expect(r.ledger.earnedAt.film_10).toBeUndefined();
+  });
+
+  test("katalog genislemesiyle sessizce emilen rozet tarihsiz kalir", () => {
+    const l = tohumla(bosLedger(), { badgeIds: ["a"], tumIds: ["a", "b"], perde: 3 });
+    const r = birlestir(l, { badgeIds: ["a", "b", "c"], tumIds: ["a", "b", "c"], perde: 3, bugun: "2026-10-15" });
+    expect(r.sessizler).toEqual(["c"]);
+    expect(r.ledger.earnedAt).toEqual({ b: "2026-10-15" });   // c sessiz emildi
+  });
+
+  test("ilk damga kalicidir, sonraki turlar ezmez", () => {
+    const bir = birlestir(tohumlu(), { badgeIds: ["film_50"], perde: 3, bugun: "2026-10-15" });
+    const iki = birlestir(bir.ledger, { badgeIds: ["film_50"], perde: 3, bugun: "2026-11-02" });
+    expect(iki.ledger.earnedAt.film_50).toBe("2026-10-15");
+    expect(iki.degisti).toBe(false);
+  });
+
+  test("bugun verilmezse hicbir sey damgalanmaz (eski cagri bicimi)", () => {
+    const r = birlestir(tohumlu(), { badgeIds: ["film_50"], perde: 3 });
+    expect(r.ledger.earnedAt).toEqual({});
+    expect(r.yeniRozetler).toEqual(["film_50"]);
+  });
+
+  test("gecersiz bugun degeri damga olarak yazilmaz", () => {
+    for (const bozuk of ["bugun", "15.10.2026", "2026-1-5", 20261015, "", null]) {
+      const r = birlestir(tohumlu(), { badgeIds: ["film_50"], perde: 3, bugun: bozuk });
+      expect(r.ledger.earnedAt).toEqual({});
+    }
+  });
+
+  test("rozet dusmez ama tarihi de silinmez: veri silinse bile damga kalir", () => {
+    const bir = birlestir(tohumlu(), { badgeIds: ["film_50"], perde: 3, bugun: "2026-10-15" });
+    const iki = birlestir(bir.ledger, { badgeIds: [], perde: 1, bugun: "2026-12-01" });
+    expect(iki.ledger.earned.badgeIds).toContain("film_50");
+    expect(iki.ledger.earnedAt.film_50).toBe("2026-10-15");
+  });
+
+  test("v2 defteri (earnedAt yok) bos haritaya iner, bozulmaz", () => {
+    const v2 = { v: 2, baseline: null, earned: { badgeIds: ["a"], perdeFloor: 2, makaraFloor: 0 }, seen: ["a"], known: ["a"] };
+    const l = normalizeLedger(v2);
+    expect(l.earnedAt).toEqual({});
+    expect(l.v).toBe(LEDGER_SURUM);
+    expect(l.earned.badgeIds).toEqual(["a"]);
+  });
+
+  test("bozuk earnedAt degerleri ayiklanir", () => {
+    const l = normalizeLedger({
+      earnedAt: { iyi: "2026-01-02", kotu1: "dun", kotu2: 5, kotu3: null, kotu4: "2026-1-2", kotu5: { x: 1 } },
+    });
+    expect(l.earnedAt).toEqual({ iyi: "2026-01-02" });
+    for (const bozuk of [[], "metin", 7, null]) {
+      expect(normalizeLedger({ earnedAt: bozuk }).earnedAt).toEqual({});
+    }
+  });
+
+  test("seen/rekor/aktiflik islemleri earnedAt'i korur", () => {
+    const bir = birlestir(tohumlu(), { badgeIds: ["film_50"], perde: 3, bugun: "2026-10-15" }).ledger;
+    expect(isaretleGorulmus(bir, ["film_50"]).earnedAt).toEqual({ film_50: "2026-10-15" });
+    expect(rekorYukselt(bir, { rekorHafta: 4 }).ledger.earnedAt).toEqual({ film_50: "2026-10-15" });
+    expect(aktifligiGuncelle(bir, { icerikSayisi: 9, bugun: "2026-10-16" }).ledger.earnedAt).toEqual({ film_50: "2026-10-15" });
+  });
+});

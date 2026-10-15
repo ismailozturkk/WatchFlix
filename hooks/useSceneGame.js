@@ -20,7 +20,7 @@ import {
   SCENE_GAME_ID,
 } from "@screens/game/gameConfig";
 import { computeQuestionScore, computeSessionXp } from "@utils/gameScoring";
-import { createStableSource, randomSource } from "@utils/seededRandom";
+import { createStableSource, randomSource, shuffleWith } from "@utils/seededRandom";
 import { dailySeed, dayKeyOf } from "@utils/dailyChallenge";
 import { usePremiumDailyGate } from "@hooks/usePremiumGate";
 import { getDailyUsed } from "@services/premiumUsage";
@@ -32,6 +32,10 @@ const PERSONAL_SOURCES = new Set([
   "watchedMovies",
   "watchedTv",
 ]);
+
+// Kesif kaynaklarinda (popüler/en iyi) dogru cevap ve siklar bilindik yapimlara
+// dogru agirliklanir; tam agirlik. Gunluk ve kisisel liste 0 (bkz. questionOptions).
+const POPULARITY_BIAS = 1;
 
 const questionKey = (question) =>
   question?.correctItem
@@ -133,6 +137,18 @@ export default function useSceneGame({
   const randomSourceRef = useRef(randomSource);
   const questionKindRef = useRef(isPoster ? "poster" : "scene");
   questionKindRef.current = isPoster ? "poster" : "scene";
+  // Dogru cevap ve siklarin bilindik yapimlara dogru agirligi (0..1). Gunluk ve
+  // kisisel liste 0 kalir: gunluk sorular herkeste ayni olmali, kisisel liste
+  // oyuncunun kendi secimi. startGame belirler.
+  const popularityBiasRef = useRef(0);
+  const questionOptions = useCallback(
+    () => ({
+      source: randomSourceRef.current,
+      kind: questionKindRef.current,
+      popularityBias: popularityBiasRef.current,
+    }),
+    [],
+  );
   const roundRef = useRef(0);
   const streakRef = useRef(0);
   const timeLeftRef = useRef(timerTotalSeconds);
@@ -607,7 +623,7 @@ export default function useSceneGame({
         queuedRound,
         difficultyConfigRef.current.optionCount,
         difficultyConfigRef.current.id,
-        { source: randomSourceRef.current, kind: questionKindRef.current },
+        questionOptions(),
       )
         .then((question) => {
           if (generation !== generationRef.current) return null;
@@ -632,7 +648,7 @@ export default function useSceneGame({
 
       queuePrefetchPromiseRef.current = promise;
     },
-    [apiKey, language, prefetchQuestionImage],
+    [apiKey, language, prefetchQuestionImage, questionOptions],
   );
 
   const prepareNextQuestion = useCallback(
@@ -650,7 +666,7 @@ export default function useSceneGame({
         nextRound,
         difficultyConfigRef.current.optionCount,
         difficultyConfigRef.current.id,
-        { source: randomSourceRef.current, kind: questionKindRef.current },
+        questionOptions(),
       )
         .then((question) => {
           if (generation !== generationRef.current) return null;
@@ -687,7 +703,7 @@ export default function useSceneGame({
       prefetchPromiseRef.current = promise;
       return promise;
     },
-    [apiKey, language, prefetchQuestionImage, prepareQueuedQuestion],
+    [apiKey, language, prefetchQuestionImage, prepareQueuedQuestion, questionOptions],
   );
 
   const reserveQuestion = useCallback((question) => {
@@ -774,6 +790,8 @@ export default function useSceneGame({
           ? createStableSource(dailySeed(dailyKeyRef.current || dayKeyOf()))
           : randomSource;
         const historyScope = `${isPoster ? "poster_" : ""}${selectedSource}_${language || "tr"}`;
+        const personal = PERSONAL_SOURCES.has(selectedSource);
+        popularityBiasRef.current = daily || personal ? 0 : POPULARITY_BIAS;
         let historySet = new Set();
         if (userUid && !daily) {
           historySet = new Set(
@@ -784,13 +802,14 @@ export default function useSceneGame({
         let titlePool;
         if (daily) {
           titlePool = await fetchDailyPool(apiKey, language, dailyKeyRef.current || dayKeyOf());
-        } else if (PERSONAL_SOURCES.has(selectedSource)) {
+        } else if (personal) {
           titlePool = buildWatchlistPool(
             getListForSource(allLists, selectedSource),
             selectedSource,
           );
         } else {
-          titlePool = await fetchTitlePool(apiKey, language, selectedSource);
+          // Gecmis verilir: oyuncunun gormedigi yapim azsa havuz yeni sayfalarla buyur.
+          titlePool = await fetchTitlePool(apiKey, language, selectedSource, { seen: historySet });
         }
         // Afis oyununda afisi olmayan yapim soru olamaz; havuz buna gore sayilir.
         if (isPoster && Array.isArray(titlePool)) {
@@ -832,7 +851,7 @@ export default function useSceneGame({
           1,
           optionCount,
           difficultyConfigRef.current.id,
-          { source: randomSourceRef.current, kind: questionKindRef.current },
+          questionOptions(),
         );
         if (generation !== generationRef.current) return;
         if (!firstQuestion || !reserveQuestion(firstQuestion)) {
@@ -867,6 +886,7 @@ export default function useSceneGame({
       isPoster,
       language,
       prepareNextQuestion,
+      questionOptions,
       reserveQuestion,
       resetQuestionTimer,
       setPhase,
@@ -918,7 +938,7 @@ export default function useSceneGame({
         roundRef.current + 1,
         difficultyConfigRef.current.optionCount,
         difficultyConfigRef.current.id,
-        { source: randomSourceRef.current, kind: questionKindRef.current },
+        questionOptions(),
       ).catch(() => null);
     }
 
@@ -967,6 +987,7 @@ export default function useSceneGame({
     language,
     prepareNextQuestion,
     prepareQueuedQuestion,
+    questionOptions,
     reserveQuestion,
     resetQuestionTimer,
     setPhase,
@@ -1062,10 +1083,12 @@ export default function useSceneGame({
     if (jokers <= 0 || eliminatedOptions.length > 0 || !currentQuestion) {
       return false;
     }
-    const wrongIndices = currentQuestion.options
-      .map((_, index) => index)
-      .filter((index) => index !== currentQuestion.correctIndex)
-      .sort(() => Math.random() - 0.5);
+    // Fisher–Yates: `sort(() => Math.random() - 0.5)` carpik dagilim verir.
+    const wrongIndices = shuffleWith(
+      currentQuestion.options
+        .map((_, index) => index)
+        .filter((index) => index !== currentQuestion.correctIndex),
+    );
 
     // 4 sikta 2, 3 sikta 1 yanlis secenek elenir (her zaman 2 secenek kalir).
     const eliminateCount = Math.max(1, currentQuestion.options.length - 2);

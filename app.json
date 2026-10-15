@@ -114,6 +114,13 @@
           ]
         }
       ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Film, dizi ve not hatırlatmalarını telefonunun takvimine eklemek ve oradan kaldırmak için takvimine erişmeye izin ver.",
+          "remindersPermission": false
+        }
+      ],
       "expo-secure-store",
       "expo-localization",
       "expo-sharing"

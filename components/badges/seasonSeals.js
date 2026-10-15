@@ -88,6 +88,33 @@ const donemSayi = (anahtar) => {
 };
 const ILK_DONEM_SAYI = donemSayi(ILK_DONEM);
 
+/**
+ * Dönemin SON GÜNÜ ("YYYY-MM-DD"). Kış yıl anahtarının Şubat'ında biter
+ * (Aralık takip eden yılın kışına sayıldığı için 2027 Kışı = Ara 2026 → Şub 2027).
+ */
+export function donemSonGunu(anahtar) {
+  const [yilStr, donem] = String(anahtar || "").split("-");
+  const yil = Number(yilStr);
+  if (!Number.isInteger(yil) || !DONEM_BY_ID[donem]) return null;
+  // Ayın son günü: bir sonraki ayın 0. günü. Şubat için artık yıl otomatik çözülür.
+  const sonAy = { kis: 2, ilkbahar: 5, yaz: 8, sonbahar: 11 }[donem];
+  const son = new Date(Date.UTC(yil, sonAy, 0)).getUTCDate();
+  return `${yil}-${String(sonAy).padStart(2, "0")}-${String(son).padStart(2, "0")}`;
+}
+
+/**
+ * Dönemin bitmesine kaç gün var? BUGÜN DAHİL DEĞİL: son günün kendisi 0'dır
+ * ("bugün son gün"), dönem bittiyse negatif döner. Cihaz saatiyle LOKAL gün.
+ */
+export function donemKalanGun(anahtar, simdi = Date.now()) {
+  const son = donemSonGunu(anahtar);
+  if (!son) return null;
+  const d = new Date(simdi);
+  const bugunNo = Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+  const [y, m, g] = son.split("-").map(Number);
+  return Math.round(Date.UTC(y, m - 1, g) / 86400000) - bugunNo;
+}
+
 /** Verilen an hangi döneme düşüyor? */
 export function bugunkuDonem(simdi = Date.now()) {
   const d = new Date(simdi);
@@ -153,6 +180,12 @@ export function muhurleriHesapla(aktifGunler, { simdi = Date.now(), kazanilmis =
         donem,
         yil,
         guncelDonem: anahtar === suan,
+        // Mühür KAÇIRILABİLİR tek ödüldür: kalan gün ve eksik gün kartın üstünde
+        // taşınır ki arayüz "yetişir mi?" sorusunu cevaplayabilsin. `yetisir` bugünü
+        // de sayar (son günde 1 gün eksikse hâlâ yetişir).
+        kalanGun: donemKalanGun(anahtar, simdi),
+        eksikGun: Math.max(0, MUHUR_ESIK - gun),
+        yetisir: gun >= MUHUR_ESIK || (donemKalanGun(anahtar, simdi) ?? -1) + 1 >= MUHUR_ESIK - gun,
         ham: gun,
         target: MUHUR_ESIK,
         ilerleme,

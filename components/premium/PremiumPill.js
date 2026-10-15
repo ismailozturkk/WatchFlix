@@ -1,7 +1,7 @@
 // components/premium/PremiumPill.js
 //
 // "Premium" rozeti: bir özelliğin ücretsiz planda kapalı olduğunu söyleyen küçük
-// elmaslı hap. Ayarlar satırlarında (kar, ikon arka planı, pet, simge) ve Hub
+// elmaslı hap. Ayarlar satırlarında (kar, ambiyans, ikon arka planı, pet, simge) ve Hub
 // vitrin kartlarında aynı dili konuşmak için tek bileşen.
 //
 // Yalnız görünüm: dokunma davranışını çağıran taraf verir (satırın kendisi zaten

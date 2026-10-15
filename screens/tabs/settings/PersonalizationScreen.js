@@ -214,7 +214,7 @@ export default function PersonalizationScreen() {
   const { theme } = useTheme();
   const C = buildUiColors(theme);
   const { showSnow, snowAllowed, changeShowSnow } = useSnowSettings();
-  const { showAmbientBackground, changeShowAmbientBackground } =
+  const { showAmbientBackground, ambientAllowed, changeShowAmbientBackground } =
     useAmbientBackgroundSettings();
   const { decorHidden } = useDecorScopeSettings();
   const navigation = useNavigation();
@@ -228,13 +228,15 @@ export default function PersonalizationScreen() {
     changeIconBackgroundOpacity,
   } = useIconBackgroundSettings();
 
-  // Kar ve ikon arka planı Premium'da. Free kullanıcıda anahtar KİLİTLİ ve kapalı
-  // çizilir (bkz. AppSettingsContext: kayıtlı tercih silinmez, yalnız çizilen değer
-  // kapanır); dokununca anahtar oynamaz, yükseltme sayfası gelir (bkz.
-  // SwitchToggle `locked`). Satırın kendisine basmak da aynı yere götürür.
+  // Kar, ambiyans ve ikon arka planı Premium'da. Free kullanıcıda anahtar KİLİTLİ
+  // ve kapalı çizilir (bkz. AppSettingsContext: kayıtlı tercih silinmez, yalnız
+  // çizilen değer kapanır); dokununca anahtar oynamaz, yükseltme sayfası gelir
+  // (bkz. SwitchToggle `locked`). Satırın kendisine basmak da aynı yere götürür.
   const snowGate = usePremiumGate("snow_effect");
+  const ambientGate = usePremiumGate("ambient_background");
   const iconBackgroundGate = usePremiumGate("icon_background");
   const openSnowUpsell = useCallback(() => snowGate.showUpsell(), [snowGate]);
+  const openAmbientUpsell = useCallback(() => ambientGate.showUpsell(), [ambientGate]);
   const openIconBackgroundUpsell = useCallback(
     () => iconBackgroundGate.showUpsell(),
     [iconBackgroundGate],
@@ -456,12 +458,13 @@ export default function PersonalizationScreen() {
             </View>
           }
         />
-        {/* Ambiyans Premium'a bağlı değil: kilit/pill yok, anahtar herkes için
-            açık. Kar gibi KAPALIYKEN satırın zemininde (aynı renklerle) süzülen
-            lekeler görünür; AÇIKKEN ekranın tamamı zaten ambiyans olduğundan
-            önizleme çizilmez. Bulanıklık gerçek blur değil, yumuşak kenarlı
-            degrade — bu yüzden Efektler "Kapalı" modunda da çalışır, yalnız
-            leke sayısı azalır ve hareket yavaşlar. */}
+        {/* Ambiyans da Premium'da (kar ve ikon arka planıyla aynı kural): Free'de
+            anahtar kilitli, satıra basmak yükseltme sayfasını açar. Kar gibi
+            KAPALIYKEN satırın zemininde (aynı renklerle) süzülen lekeler görünür
+            — Free kullanıcı da ne alacağını görür; AÇIKKEN ekranın tamamı zaten
+            ambiyans olduğundan önizleme çizilmez. Bulanıklık gerçek blur değil,
+            yumuşak kenarlı degrade — bu yüzden Efektler "Kapalı" modunda da
+            çalışır, yalnız leke sayısı azalır ve hareket yavaşlar. */}
         <SettingRow
           colors={C}
           iconBg={C.iconPurple}
@@ -469,13 +472,19 @@ export default function PersonalizationScreen() {
           iconName={showAmbientBackground ? "prism" : "prism-outline"}
           title={t.ambientBackground}
           subtitle={t.ambientBackgroundSubtitle}
+          onPress={ambientAllowed ? undefined : openAmbientUpsell}
           background={showAmbientBackground ? null : <AmbientPreview />}
           right={
-            <SwitchToggle
-              value={showAmbientBackground}
-              onValueChange={changeShowAmbientBackground}
-              size={36}
-            />
+            <View style={ps.rowRightGroup}>
+              {ambientAllowed ? null : <PremiumPill />}
+              <SwitchToggle
+                value={showAmbientBackground}
+                onValueChange={changeShowAmbientBackground}
+                locked={!ambientAllowed}
+                onLockedPress={openAmbientUpsell}
+                size={36}
+              />
+            </View>
           }
         />
         {/* Desen önizlemesi hem açık hem kapalıyken durur: statik ve ucuz,

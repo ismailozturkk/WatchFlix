@@ -192,21 +192,18 @@ export default function CineLikedBasketModal({
       Toast.show({ type: "info", text1: copy.basket.needTwoTitle, text2: copy.basket.needTwoBody });
       return;
     }
-    triggerHaptic("impact");
     onSecondRound?.(items);
     onClose();
   };
 
   const handleSaveList = () => {
     if (!items.length) return;
-    triggerHaptic("impact");
     onSaveList?.(items);
     onClose();
   };
 
   const handleAddWatchlist = () => {
     if (!items.length) return;
-    triggerHaptic("notification");
     onAddWatchlist?.(items);
     onClose();
   };

@@ -52,6 +52,40 @@ describe("isProfileEditDirty", () => {
     });
   });
 
+  describe("four favorites", () => {
+    const film = (id) => ({ id, title: `Film ${id}`, image: `/f${id}.jpg` });
+    const favs = (ids) => ({ movies: ids.map(film), shows: [], people: [] });
+
+    it("stays clean when neither side has the field (older accounts)", () => {
+      expect(isProfileEditDirty({ ready: true, saved, draft: same })).toBe(false);
+      expect(
+        isProfileEditDirty({
+          ready: true,
+          saved: { ...saved, fourFavorites: undefined },
+          draft: { ...same, fourFavorites: favs([]) },
+        }),
+      ).toBe(false);
+    });
+
+    it("is dirty after adding, removing or reordering a favourite", () => {
+      const base = { ...saved, fourFavorites: favs([1, 2]) };
+      expect(isProfileEditDirty({ ready: true, saved: base, draft: { ...same, fourFavorites: favs([1, 2]) } })).toBe(false);
+      expect(isProfileEditDirty({ ready: true, saved: base, draft: { ...same, fourFavorites: favs([1, 2, 3]) } })).toBe(true);
+      expect(isProfileEditDirty({ ready: true, saved: base, draft: { ...same, fourFavorites: favs([1]) } })).toBe(true);
+      expect(isProfileEditDirty({ ready: true, saved: base, draft: { ...same, fourFavorites: favs([2, 1]) } })).toBe(true);
+    });
+
+    it("clearing every favourite is a change worth saving", () => {
+      expect(
+        isProfileEditDirty({
+          ready: true,
+          saved: { ...saved, fourFavorites: favs([1]) },
+          draft: { ...same, fourFavorites: favs([]) },
+        }),
+      ).toBe(true);
+    });
+  });
+
   it("tolerates a profile with missing optional fields", () => {
     const sparse = { displayName: undefined, username: undefined, bio: undefined, avatarIndex: 0, birthDate: undefined };
     const draft = { displayName: "", username: "", bio: "", avatarIndex: 0, birthDate: null };

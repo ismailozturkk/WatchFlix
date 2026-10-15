@@ -89,6 +89,39 @@
 >   gök tonuna düşüyor. Ayrıca uygulamada **7 tema var (5 değil)** ve ikisi
 >   (`light`, `green`) açık zeminli — band renklerinin açık/koyu iki tonu oldu.
 
+> **ROZET EKRANI YENİLEMESİ (2026-10-15).** Puan formülüne, eşiklere ve katalogun
+> 81 rozetine DOKUNULMADI; değişen rozetlerin *görünürlüğü ve hafızası*:
+>
+> - **Defter v3 — kazanma tarihi (`earnedAt`).** Defter bir rozetin kazanılıp
+>   kazanılmadığını biliyordu, ne zaman kazanıldığını bilmiyordu. `birlestir` artık
+>   `bugun` ("YYYY-MM-DD", cihaz saati) alır ve **yalnız gerçekten kazanılanlara**
+>   (`yeniRozetler`) damga yazar; ilk damga kalıcıdır, ezilmez. Sessiz tohumlama ve
+>   katalog genişlemesiyle emilen rozetler **tarihsiz kalır** — gerçek kazanma gününü
+>   bilmiyoruz, bugünü damgalamak yalan olurdu; arayüz bunları "Önceden kazanıldı"
+>   diye etiketler. v2 defteri göç gerektirmez (alan yoksa boş harita).
+> - **`components/badges/badgeInsights.js` (saf, testli).** "Sıradaki hedefim ne?"
+>   (`yaklasanlar`), "en son ne kazandım?" (`sonKazanilanlar`), bölüm/nadirlik
+>   özetleri, koleksiyon üyeleri, prestij ilerlemesi, `izgaraSatirlari`. Aynı
+>   "peşinde koşulan hedef" tanımı üç yerde kopyalanmıştı (Perde kartı, ekran sıralaması,
+>   profil rafı); artık tek yerde (`hedefi`). **Bulunan hata:** Gizli bölümünde gizli
+>   rozetler kendi aralarında hedef oranına göre sıralanıyordu → en tepedeki gizli
+>   rozetin hedefe en yakın olan olduğu sızıyordu. Artık katalog sırası korunur.
+> - **Dönem mührü geri sayımı.** Mühür kaçırılabilen tek ödül; kartı artık `kalanGun`,
+>   `eksikGun` ve `yetisir` taşır, detay sayfası "dönem bitimine N gün" ve yetişmiyorsa
+>   uyarı gösterir (`seasonSeals.donemKalanGun`).
+> - **Kutlama uygulama geneli.** Eskiden ProfileScreen'deki bir efektteydi; profil
+>   sekmesi tembel mount edildiği için rozetin bildirimi, kazanıldığı anda değil kullanıcı
+>   profile ilk bakana kadar gelmiyordu. `hooks/useBadgeCelebration.js` artık
+>   `WatchProgressProvider` içinde çalışır; başlıkta en nadir ödül (`baslikOdulu`),
+>   rozetin kendi şekli (`AppToast` `badge` tipi, `odulGorunumu`), dokununca rozet
+>   sayfasını o rozet açık olarak açar (`openId`). Push yok; ilk tohumlamada tetiklenmez.
+> - **Arayüz.** Ekran: Perde kartı → özet (halka + nadirlik sütunları) → Sıradaki
+>   hedefler rafı → Son kazanılanlar rafı → durum + bölüm süzgeci → üç sütunlu ızgara
+>   (`WatchBadgeTile`; eski dört sütun 7,5 px yazıyla okunmuyordu). Detay sayfası
+>   `BottomSheetModal` üzerinde: hero + tarih + ilerleme + türüne özgü blok (kademeli
+>   aile → yol, koleksiyon → üyeler, mühür → geri sayım, tamamlanmış aile → prestij).
+>   Cihazda görülmedi; react-native-web önizlemesinde (görsel) ve jest'te doğrulandı.
+
 **Birim:** 1 puan = 1 **Kare** · **Seviye:** **Perde** (20 + sınırsız *Makara*) · **Rozet:** 46 izleme rozeti
 **Kapsam:** tamamen türetilmiş, tamamen kişisel, sıfır yeni Firestore alanı, sıfır yeni listener.
 

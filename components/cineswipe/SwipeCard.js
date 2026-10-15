@@ -155,7 +155,7 @@ const SwipeCard = forwardRef(function SwipeCard(
         const state = live.current;
         if (!state.isTop || state.disabled || busy.value === 1) return false;
         if (!state.swipesAllowed) {
-          triggerHaptic("notification");
+          triggerHaptic("error");
           shake();
           onBlockedRef.current?.();
           return false;

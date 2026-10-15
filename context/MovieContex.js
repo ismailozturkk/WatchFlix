@@ -18,6 +18,8 @@ import {
   TTL,
 } from "../utils/apiCache";
 import { setIfChanged, setListIfChanged } from "../utils/sameData";
+import { adultScoped, dropAdult } from "../utils/homeContentSettings";
+import { useHomeDataSettings } from "../hooks/useHomeContentSettings";
 import { i18nText } from "../utils/i18nText";
 import {
   getOscarConfig,
@@ -113,6 +115,12 @@ const loadPage = async ({
 export const MovieProvider = ({ children }) => {
   const { API_KEY } = useApiSettings();
   const { streamingProviderIds } = useStreamingProviderSettings();
+  // Veriyi değiştiren ayarlar (yetişkin içerik, platform üyelikleri) — ana ekran
+  // listeleri bunlara göre yeniden çekilir (bkz. utils/homeContentSettings.js).
+  const { adultContent, providersKey } = useHomeDataSettings();
+  // `/discover` tabanlı listelerin önbellek anahtarı yetişkin izniyle kapsamlanır.
+  // trending/now_playing gibi uçlar ayardan bağımsız; onlar `dropAdult` ile süzülür.
+  const adultKey = (key) => adultScoped(key, adultContent);
   const { language, t } = useLanguage();
   const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
   const tmdbRegion = language === "tr" ? "TR" : "US";
@@ -137,7 +145,7 @@ export const MovieProvider = ({ children }) => {
   );
   const bestsSeed = useMemo(
     () =>
-      seedList(`movie_bests_${tmdbLanguage}_vote_count.desc_page_1`, {
+      seedList(adultKey(`movie_bests_${tmdbLanguage}_vote_count.desc_page_1`), {
         maxAge: TTL.TREND,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -185,7 +193,7 @@ export const MovieProvider = ({ children }) => {
     const lang = language === "tr" ? "tr-TR" : "en-US";
     const gen = append ? currentGen("bests") : beginFreshRequest("bests");
     return loadPage({
-      cacheKey: `movie_bests_${lang}_${selectedCategoryBests}_page_${page}`,
+      cacheKey: adultKey(`movie_bests_${lang}_${selectedCategoryBests}_page_${page}`),
       ttl: TTL.TREND,
       append,
       forceRefresh,
@@ -219,7 +227,7 @@ export const MovieProvider = ({ children }) => {
     if (!activeSections.bests) return;
     setPageBest(1);
     fetchMoviesBests(1, false);
-  }, [activeSections.bests, selectedCategoryBests, language]);
+  }, [activeSections.bests, selectedCategoryBests, language, adultContent]);
 
   const loadMoreBests = () => {
     if (loadingBests || loadingMoreBests || pageBest >= totalPagesBest) return;
@@ -594,10 +602,24 @@ export const MovieProvider = ({ children }) => {
   const [pageProvider, setPageProvider] = useState(1);
   const [totalPagesProvider, setTotalPagesProvider] = useState(1);
 
+  // `providersKey`: dizi kimliği değil İÇERİK — aynı küme yeniden yazılınca
+  // kullanıcının elle seçtiği sağlayıcı sıfırlanmasın.
   useEffect(() => {
     if (!activeSections.providers) return;
     fetchProviders();
-  }, [activeSections.providers, language, streamingProviderIds]);
+  }, [activeSections.providers, language, providersKey]);
+
+  // Yetişkin izni değişince sağlayıcı listesi aynı kalır ama seçili sağlayıcının
+  // filmleri (`/discover`) değişir. fetchProviders'ı çağırmak kullanıcının seçimini
+  // "ilk abone olunan sağlayıcı"ya sıfırlardı; yalnız seçili olanı yeniden çekiyoruz.
+  const lastAdultRef = useRef(adultContent);
+  useEffect(() => {
+    if (lastAdultRef.current === adultContent) return;
+    lastAdultRef.current = adultContent;
+    if (activeSections.providers && selectedProvider != null) {
+      fetchMoviesByProvider(selectedProvider);
+    }
+  }, [adultContent]);
 
   const fetchProviders = async () => {
     const cacheKey = `movie_providers_${tmdbLanguage}_${tmdbRegion}`;
@@ -646,7 +668,7 @@ export const MovieProvider = ({ children }) => {
     }
     const gen = append ? currentGen("provider") : beginFreshRequest("provider");
     return loadPage({
-      cacheKey: `movie_provider_${tmdbLanguage}_${tmdbRegion}_${providerId}_p${page}`,
+      cacheKey: adultKey(`movie_provider_${tmdbLanguage}_${tmdbRegion}_${providerId}_p${page}`),
       ttl: TTL.PROVIDERS,
       append,
       isStale: () => currentGen("provider") !== gen,
@@ -752,7 +774,7 @@ export const MovieProvider = ({ children }) => {
     const genresKey = [...selectedGenres].sort().join(",");
     const gen = append ? currentGen("genres") : beginFreshRequest("genres");
     return loadPage({
-      cacheKey: `movie_genres_content_${tmdbLanguage}_p${page}_g${genresKey}`,
+      cacheKey: adultKey(`movie_genres_content_${tmdbLanguage}_p${page}_g${genresKey}`),
       ttl: TTL.TREND,
       append,
       forceRefresh,
@@ -777,7 +799,7 @@ export const MovieProvider = ({ children }) => {
     movieGenres();
     setPageGenres(1);
     fetchMoviesByGenres(1, false);
-  }, [activeSections.genres, language, selectedGenres]);
+  }, [activeSections.genres, language, selectedGenres, adultContent]);
 
   const loadMoreGenres = () => {
     if (loadingGenres || loadingMoreGenres || pageGenres >= totalPagesGenres) return;
@@ -865,7 +887,7 @@ export const MovieProvider = ({ children }) => {
     if (!calculatedDate) return;
     const gen = append ? currentGen("upcoming") : beginFreshRequest("upcoming");
     return loadPage({
-      cacheKey: `movie_upcoming_${tmdbLanguage}_${tmdbRegion}_${calculatedDate}_p${page}`,
+      cacheKey: adultKey(`movie_upcoming_${tmdbLanguage}_${tmdbRegion}_${calculatedDate}_p${page}`),
       ttl: TTL.NOW_PLAYING,
       append,
       forceRefresh,
@@ -894,7 +916,7 @@ export const MovieProvider = ({ children }) => {
     if (!activeSections.upcoming || !calculatedDate) return;
     setPageUpcoming(1);
     fetchMovieUpcoming(1, false);
-  }, [activeSections.upcoming, language, calculatedDate]);
+  }, [activeSections.upcoming, language, calculatedDate, adultContent]);
 
   const loadMoreUpcoming = () => {
     if (loadingUpcoming || loadingMoreUpcoming || pageUpcoming >= totalPagesUpcoming) return;
@@ -944,14 +966,26 @@ export const MovieProvider = ({ children }) => {
     fetchMoviesCollection,
   ]);
 
+  // Yetişkin izni yokken ekrandaki listelerden `adult:true` kayıtlar ANINDA elenir:
+  // ayarı kapatınca ağ isteği ya da yeniden yükleme beklenmez. Süzülecek bir şey
+  // yoksa aynı dizi döner, yani kartlar boşuna yeniden çizilmez. `/discover`
+  // dışındaki uçlar (trending vb.) bu sayede ayarı önbellek kapsamı olmadan da
+  // izliyor.
+  const visibleBests = useMemo(() => dropAdult(movieBests, adultContent), [movieBests, adultContent]);
+  const visibleTrends = useMemo(() => dropAdult(movieTrends, adultContent), [movieTrends, adultContent]);
+  const visibleNowPlaying = useMemo(() => dropAdult(moviesNowPlaying, adultContent), [moviesNowPlaying, adultContent]);
+  const visibleGenres = useMemo(() => dropAdult(moviesGenres, adultContent), [moviesGenres, adultContent]);
+  const visibleUpcoming = useMemo(() => dropAdult(moviesUpcoming, adultContent), [moviesUpcoming, adultContent]);
+  const visibleProvider = useMemo(() => dropAdult(moviesProvider, adultContent), [moviesProvider, adultContent]);
+
   const contextValue = useMemo(() => ({
     pageBest,
     loadingBests,
-    movieBests,
+    movieBests: visibleBests,
     selectedCategoryTrends,
     categoriesTrends,
     categorieBests,
-    movieTrends,
+    movieTrends: visibleTrends,
     loadingTrends,
     selectedCategoryTrendsMovie,
     selectedCategoryBests,
@@ -966,16 +1000,16 @@ export const MovieProvider = ({ children }) => {
     providers,
     loadingProvider,
     loadingMovieProvider,
-    moviesProvider,
-    moviesNowPlaying,
+    moviesProvider: visibleProvider,
+    moviesNowPlaying: visibleNowPlaying,
     loadingNowPlaying,
     genres,
     loadingGenres,
-    moviesGenres,
+    moviesGenres: visibleGenres,
     pageGenres,
     selectedGenres,
     dateData,
-    moviesUpcoming,
+    moviesUpcoming: visibleUpcoming,
     loadingUpcoming,
     pageUpcoming,
     valueUpcoming,
@@ -1044,16 +1078,16 @@ export const MovieProvider = ({ children }) => {
     fetchMoviesByGenres,
     refreshAllMovies,
   }), [
-    pageBest, loadingBests, movieBests, selectedCategoryTrends,
-    categoriesTrends, categorieBests, movieTrends, loadingTrends,
+    pageBest, loadingBests, visibleBests, selectedCategoryTrends,
+    categoriesTrends, categorieBests, visibleTrends, loadingTrends,
     selectedCategoryTrendsMovie, selectedCategoryBests, totalPagesBest,
     oscarMode, selectedOscarCategory, selectedOscarYear, moviesOscar, moviesOscarYear,
     loadingOscar, loadingOscarYear, loadingMoreOscar, hasMoreOscar, errorOscar,
     changeOscarMode, changeOscarCategory, changeOscarYear, fetchMoviesOscar, loadMoreOscar, fetchMoviesOscarByYear,
     selectedProvider, providers,
-    loadingProvider, loadingMovieProvider, moviesProvider, moviesNowPlaying,
-    loadingNowPlaying, genres, loadingGenres, moviesGenres, pageGenres,
-    selectedGenres, dateData, moviesUpcoming, loadingUpcoming,
+    loadingProvider, loadingMovieProvider, visibleProvider, visibleNowPlaying,
+    loadingNowPlaying, genres, loadingGenres, visibleGenres, pageGenres,
+    selectedGenres, dateData, visibleUpcoming, loadingUpcoming,
     pageUpcoming, valueUpcoming, isFocusUpcoming, moviesCollection,
     loadingCollection, errorCollection, activateMovieSection,
     loadingMoreBests, loadingMoreGenres, totalPagesGenres,
@@ -1062,6 +1096,9 @@ export const MovieProvider = ({ children }) => {
     loadingMoreProvider, pageProvider, totalPagesProvider,
     loadingMoreTrends, pageTrends, totalPagesTrends,
     refreshAllMovies,
+    // Değerdeki yükleyiciler (loadMore*, fetch*) `adultKey`i kapanışla yakalar;
+    // ayar değişince bayat kapanış kalmasın diye açıkça bağımlılık.
+    adultContent,
   ]);
 
   return (

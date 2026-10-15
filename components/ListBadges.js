@@ -6,9 +6,12 @@ import { useListLayoutSettings } from "../context/AppSettingsContext";
 import { useSharedLists } from "../context/SharedListsContext";
 import { useListStatus } from "@hooks/useListStatus";
 import { useMediaActivity } from "@hooks/useMediaActivity";
+import useUpcomingReminder from "@hooks/useUpcomingReminder";
+import { REMINDER_BADGE } from "../utils/reminderBadge";
 
 /**
- * Poster üzerinde içeriğin hangi listelerde olduğunu VE kullanıcının o içerikle
+ * Poster üzerinde içeriğin hangi listelerde olduğunu, kullanıcının o içerik için
+ * yaklaşan bir hatırlatma kurup kurmadığını (zil) VE kullanıcının o içerikle
  * ne yaptığını (puanladı / yorum yaptı) gösteren rozetler.
  *
  * Tüm ekranlarda kopyalanan rozet bloğunun tek kaynağıdır. Durum bilgisini
@@ -89,14 +92,22 @@ const ListBadges = memo(function ListBadges({
   const sharedBucket = mediaType === "tv" ? sharedListIndex?.tv : sharedListIndex?.movie;
   const isInSharedLists = mediaId != null && !!sharedBucket?.[String(mediaId)];
 
-  const c = theme?.colors ?? {};
   const isBadgeEnabled = (key) => posterBadges?.[key] !== false && !hide.includes(key);
+  // Rozet kapalıysa (ayar ya da `hide`) abonelik sabit false döner: kapalı rozet
+  // hiçbir hatırlatıcı değişiminde bu posteri yeniden çizdirmez.
+  const hasReminder = useUpcomingReminder(mediaId, mediaType, isBadgeEnabled(REMINDER_BADGE.key));
+
+  const c = theme?.colors ?? {};
   const items = [
     inWatchList && isBadgeEnabled("watchlist") && { key: "watchlist", icon: "bookmark", color: c.blue ?? FALLBACK.blue },
     isWatched && isBadgeEnabled("watched") && { key: "watched", icon: watchedIcon, color: c.green ?? FALLBACK.green },
     inFavorites && isBadgeEnabled("favorite") && { key: "favorite", icon: "heart", color: c.red ?? FALLBACK.red },
     isInOtherLists && isBadgeEnabled("other") && { key: "other", icon: "grid", color: c.orange ?? FALLBACK.orange },
     isInSharedLists && isBadgeEnabled("shared") && { key: "shared", icon: "people", color: c.cyan ?? FALLBACK.cyan },
+    // Liste üyeliklerinden sonra, kişisel etkileşimlerden (puan / yorum) önce:
+    // ayar ekranındaki sırayla aynı. Renk tema'dan değil sabit — pembe, yığındaki
+    // diğer yedi rozetle çakışmayan tek ton (utils/reminderBadge.js).
+    hasReminder && { key: REMINDER_BADGE.key, icon: REMINDER_BADGE.icon, color: REMINDER_BADGE.color },
     hasRating && isBadgeEnabled("rated") && { key: "rated", icon: "star", color: c.yellow ?? FALLBACK.yellow },
     hasComment && isBadgeEnabled("commented") && { key: "commented", icon: "chatbubble", color: c.purple ?? FALLBACK.purple },
   ].filter(Boolean);

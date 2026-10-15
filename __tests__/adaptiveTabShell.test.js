@@ -2,6 +2,7 @@ import React from "react";
 import { act, create } from "react-test-renderer";
 import AdaptiveTabShell from "../components/navigation/AdaptiveTabShell";
 import { TAB_DEFINITIONS } from "../utils/tabBarModel";
+import { TabBarLayoutContext } from "../context/TabBarLayoutContext";
 
 let mockMode = "native-ios";
 const mockKeyboardListeners = new Map();
@@ -25,6 +26,11 @@ jest.mock("../services/tabBarCapabilities", () => ({ tabBarNativeSupport: { Andr
 jest.mock("../services/hapticsService", () => ({ selectionAsync: jest.fn(() => Promise.resolve()) }));
 jest.mock("../hooks/useAppActive", () => ({ __esModule: true, default: () => true }));
 jest.mock("../components/navigation/TabBar", () => ({ __esModule: true, default: "OverlayBar" }));
+// iOS 26 yerel ölçekleme: modül varlığı testte elle belirlenir; sürücü bileşen
+// ana makine öğesi olarak taklit edilir (kendi testi nativeTabBarScale.test.js).
+let mockNativeScale = false;
+jest.mock("../services/tabBarScale", () => ({ get nativeTabBarScaleAvailable() { return mockNativeScale; } }));
+jest.mock("../components/navigation/NativeTabBarScale", () => ({ __esModule: true, default: "NativeScale" }));
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 const theme = { primary: "#111111", accent: "#3388ff", text: { secondary: "#aaaaaa" } };
@@ -39,6 +45,7 @@ let props;
 let warn;
 beforeEach(() => {
   mockMode = "native-ios";
+  mockNativeScale = false;
   Object.keys(mounts).forEach((key) => delete mounts[key]);
   const original = console.error;
   warn = jest.spyOn(console, "error").mockImplementation((message, ...args) => {
@@ -105,6 +112,66 @@ it("hides controls for the keyboard and restores them without remounting screens
   await act(() => mockKeyboardListeners.get("keyboardDidHide")());
   expect(renderer.root.findAllByType("OverlayBar")).toHaveLength(1);
   expect(mounts.profile).toBe(1);
+});
+
+describe("iOS 26 native bar scaling", () => {
+  const minimize = () => renderer.root.findByType("NativeTabs").props.ios.tabBarMinimizeBehavior;
+
+  it("keeps the system minimize exactly as before when the module is not in the binary", async () => {
+    await render();
+    expect(minimize()).toBe("onScrollDown");
+    expect(renderer.root.findAllByType("NativeScale")).toHaveLength(0);
+  });
+
+  it("scales the real bar from the shared scroll progress, and turns the system minimize off so the two don't stack", async () => {
+    mockNativeScale = true;
+    await render();
+    expect(minimize()).toBe("never");
+    const driver = renderer.root.findByType("NativeScale");
+    expect(driver.props.progress.value).toBe(0);
+  });
+
+  it("feeds the driver the SAME progress value the screens write (and the JS bar reads)", async () => {
+    mockNativeScale = true;
+    let layoutContext;
+    const Probe = () => { layoutContext = React.useContext(TabBarLayoutContext); return null; };
+    props = { ...props, renderCompanion: () => <Probe /> };
+    await render();
+    expect(renderer.root.findByType("NativeScale").props.progress).toBe(layoutContext.tabBarCollapse);
+  });
+
+  it("does nothing on the JS-bar modes — there the JS bar shrinks itself", async () => {
+    mockNativeScale = true;
+    mockMode = "legacy-blur";
+    await render();
+    expect(renderer.root.findAllByType("NativeScale")).toHaveLength(0);
+    expect(minimize()).toBe("onScrollDown");
+    expect(renderer.root.findAllByType("OverlayBar")).toHaveLength(1);
+  });
+
+  it("drops the driver (which puts the real bar back to full size) when the mode leaves native-ios", async () => {
+    mockNativeScale = true;
+    await render();
+    expect(renderer.root.findAllByType("NativeScale")).toHaveLength(1);
+    mockMode = "legacy-solid";
+    await update();
+    expect(renderer.root.findAllByType("NativeScale")).toHaveLength(0);
+    mockMode = "native-ios";
+    await update();
+    expect(renderer.root.findAllByType("NativeScale")).toHaveLength(1);
+  });
+
+  it("keeps the same native host and screen state through all of it", async () => {
+    mockNativeScale = true;
+    await render();
+    const host = renderer.root.findByType("NativeTabs");
+    mockMode = "legacy-blur";
+    await update();
+    mockMode = "native-ios";
+    await update();
+    expect(renderer.root.findByType("NativeTabs")).toBe(host);
+    expect(mounts.profile).toBe(1);
+  });
 });
 
 it("registers exactly five native scenes and disables native reselect side effects", async () => {

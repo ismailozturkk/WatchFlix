@@ -16,7 +16,9 @@ import {
   PanResponder,
   Platform,
   ActivityIndicator,
+  BackHandler,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import ViewShot, { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import * as MediaLibrary from "expo-media-library";
@@ -577,12 +579,38 @@ export default function StoryShareScreen({ route, navigation }) {
   };
   const closeSettings = () => {
     dragScaleRef.current = 1;
+    // Sayfa içindeki yazı kutusu odaktayken sayfa kapanırsa klavye açık kalıp
+    // alt eylem çubuğunu örterdi.
+    Keyboard.dismiss();
     Animated.timing(sheetAnim, {
       toValue: 0,
       duration: 220,
       useNativeDriver: true,
     }).start(() => setSettingsOpen(false));
   };
+
+  /* Android geri tuşu: ayar sayfası açıkken önce onu kapatır (ekranı değil).
+     Güncel durum ref'ten okunur; dinleyici odakta bir kez kurulur. */
+  const backStateRef = useRef({ settingsOpen: false, close: closeSettings });
+  backStateRef.current = { settingsOpen, close: closeSettings };
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+        if (!backStateRef.current.settingsOpen) return false;
+        backStateRef.current.close();
+        return true;
+      });
+      return () => sub.remove();
+    }, [])
+  );
+
+  /* Sekme değişince ayar sayfası en üste döner: kısa sekmeye geçişte ScrollView
+     eski kaydırma konumunu kırpıp içeriği sıçratmasın. */
+  const sheetScrollRef = useRef(null);
+  useEffect(() => {
+    sheetScrollRef.current?.scrollTo?.({ y: 0, animated: false });
+  }, [activeTab]);
+
   const canvasScale = sheetAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [1, SHRINK],
@@ -1249,7 +1277,10 @@ export default function StoryShareScreen({ route, navigation }) {
       <StoryHeader
         busy={busy}
         onBack={() => navigation.goBack()}
-        onOpenDrafts={() => navigation.navigate("StoryDraftsScreen")}
+        onOpenDrafts={() => {
+          Keyboard.dismiss();
+          navigation.navigate("StoryDraftsScreen");
+        }}
         onSaveDraft={openSaveModal}
       />
 
@@ -1416,6 +1447,7 @@ export default function StoryShareScreen({ route, navigation }) {
         </View>
 
         <ScrollView
+          ref={sheetScrollRef}
           style={{ flex: 1 }}
           contentContainerStyle={[
             styles.sheetScroll,

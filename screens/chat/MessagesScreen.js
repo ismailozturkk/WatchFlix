@@ -8,6 +8,8 @@
 // Görünüm components/friends/* ortak bileşenlerinden gelir. Okunmamış sohbet:
 // satır vurgu rengiyle aydınlanır, ad kalınlaşır, saat vurgulanır ve sağda
 // okunmamış sayısı rozeti durur (eskiden yalnız çerçeve rengi değişiyordu).
+// Gruplar da AYNI görünümü kullanır; sayaç kaynağı 1-1'de
+// Users/{uid}/conversations/*.unreadCount, grupta groups/{id}.unread.{uid}.
 
 import React, { useEffect, useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
@@ -31,8 +33,10 @@ import { formatBadge } from "@utils/friendsBarModel";
 import {
   filterConversations,
   filterGroups,
+  groupUnreadCount,
   shouldShowFilter,
   toEpochMs,
+  totalGroupUnread,
   totalUnread,
 } from "@utils/friendsListModel";
 import { i18nText } from "@utils/i18nText";
@@ -106,6 +110,10 @@ export default function MessagesScreen({ navigation }) {
     [convs, isBlocked],
   );
   const unreadTotal = useMemo(() => totalUnread(visibleConvs), [visibleConvs]);
+  const groupUnreadTotal = useMemo(
+    () => totalGroupUnread(groups, user?.uid),
+    [groups, user?.uid],
+  );
 
   const baseData = isDm ? visibleConvs : groups;
   const showFilter = shouldShowFilter(baseData.length);
@@ -146,11 +154,14 @@ export default function MessagesScreen({ navigation }) {
     );
   };
 
-  // ── Grup satırı ──
+  // ── Grup satırı ── okunmamış görünümü 1-1 satırıyla AYNI (vurgu, kalın ad,
+  // vurgulu saat, sağda sayaç rozeti); sayaç grup belgesinde üye başına durur.
   const renderGroup = ({ item, index }) => {
     const last = item.lastMessage;
     const lastSenderName =
       item.memberInfo?.[last?.senderId]?.name || last?.senderName || "";
+    const unreadCount = groupUnreadCount(item, user?.uid);
+    const unread = unreadCount > 0;
     return (
       <PersonRow
         avatarNode={
@@ -162,12 +173,17 @@ export default function MessagesScreen({ navigation }) {
           />
         }
         title={item.name}
+        titleStrong={unread}
         subtitle={
           last
             ? (lastSenderName ? lastSenderName + ": " : "") + (last.text || "")
             : i18nText("autoI18n.n_uye", "{{n}} üye", { n: item.members?.length || 0 })
         }
+        subtitleStrong={unread}
         meta={formatTime(last?.time)}
+        metaAccent={unread}
+        highlighted={unread}
+        trailing={unread ? <UnreadPill count={unreadCount} /> : null}
         first={index === 0}
         last={index === data.length - 1}
         onPress={() =>
@@ -187,9 +203,11 @@ export default function MessagesScreen({ navigation }) {
       : visibleConvs.length
         ? i18nText("autoI18n.friends_ui_chats_count", "{{n}} sohbet", { n: visibleConvs.length })
         : undefined
-    : groups.length
-      ? i18nText("autoI18n.friends_ui_groups_count", "{{n}} grup", { n: groups.length })
-      : undefined;
+    : groupUnreadTotal > 0
+      ? i18nText("autoI18n.friends_ui_unread_count", "{{n}} okunmamış mesaj", { n: groupUnreadTotal })
+      : groups.length
+        ? i18nText("autoI18n.friends_ui_groups_count", "{{n}} grup", { n: groups.length })
+        : undefined;
 
   let empty = null;
   if (baseData.length === 0) {
@@ -250,6 +268,8 @@ export default function MessagesScreen({ navigation }) {
             key: "group",
             label: i18nText("autoI18n.gruplar", "Gruplar"),
             icon: "people",
+            badge: groupUnreadTotal,
+            badgeColor: UNREAD_BADGE,
           },
         ]}
       />

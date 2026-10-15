@@ -449,8 +449,16 @@ function AppContent() {
           getComponent={() => require("@screens/story/StoryShareScreen").default}
           options={{
             headerShown: false,
-            presentation: "modal",
-            animation: "slide_from_bottom",
+            // Tam ekran SAYFA (push): `presentation: "modal"` iOS'ta sayfa
+            // sheet'i açıp ekranı kısaltıyor, güvenli alanı değiştiriyor ve
+            // aşağı çekerek kapatma jestini tuvaldeki blok sürüklemeyle ve ayar
+            // sayfasındaki kaydırmalarla çakıştırıyordu.
+            animation: "slide_from_right",
+            // Tuval sürüklemesi ekran kenarına kadar gider; kenardan geri
+            // kaydırma jesti bloğu tutarken ekranı kapatırdı. Geri: başlıktaki
+            // ok / Android geri tuşu (açık ayar sayfasını önce kapatır).
+            gestureEnabled: false,
+            fullScreenGestureEnabled: false,
           }}
         />
         <Stack.Screen
@@ -559,7 +567,12 @@ function AppContent() {
           getComponent={() => require("@screens/wrapped/WrappedScreen").default}
           options={{
             headerShown: false,
-            presentation: "modal",
+            // Tam ekran: `presentation: "modal"` iOS'ta sayfa sheet'i açıp
+            // üstte ~60pt boşluk bırakıyordu; ekran ayrıca kök güvenli alan
+            // (`insets.top`) değerini yine ekleyip içeriği sheet'in kendi
+            // üst kenarından ~70pt aşağı itiyordu. Bu hikâye ekranı bütün
+            // pencereyi kaplar; kapatma sağ üstteki çarpıdan.
+            presentation: "fullScreenModal",
             animation: "slide_from_bottom",
           }}
         />
@@ -686,6 +699,11 @@ function AppContent() {
         <Stack.Screen
           name="BackupSettingsScreen"
           getComponent={() => require("./screens/tabs/settings/BackupSettingsScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="AISettingsScreen"
+          getComponent={() => require("./screens/tabs/settings/AISettingsScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen

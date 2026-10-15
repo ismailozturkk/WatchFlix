@@ -76,6 +76,9 @@ import {
   ProfileNoticeCard,
 } from "../../../components/friends/FriendProfileSections";
 import * as Haptics from "../../../services/hapticsService";
+import FavoritesShowcase from "../../../components/favorites/FavoritesShowcase";
+import { getFavoritesCopy } from "../../../utils/favoritesCopy";
+import { hasAnyFavorites, readProfileFavorites } from "../../../utils/fourFavorites";
 import { i18nText } from "../../../utils/i18nText";
 import { getIdentityBadges } from "../../../components/badges/badgeCatalog";
 import { PREMIUM_PLAN, resolveServerPlan } from "../../../utils/premium";
@@ -625,6 +628,10 @@ export default function FriendProfileScreen({ route, navigation }) {
         : { label: i18nText("autoI18n.arkadas_ekle", "Arkadaş Ekle"), icon: "person-add-outline", color: theme.accent, onPress: () => sendRequest(friendUid) };
 
   const displayName = profile?.displayName || friendName || "";
+  // Dört favori profil belgesinde (Users/{uid}.fourFavorites) — ek okuma yok,
+  // zaten dinlenen belgeden gelir. Görünürlüğü profilin kendisiyle aynı
+  // (canViewProfile): gizli profilde favoriler de gizli.
+  const profileFavorites = useMemo(() => readProfileFavorites(profile), [profile]);
   // Kimlik rozetleri arkadaşın SUNUCU alanlarından: istemci ne
   // entitlements'ı ne badges'ı yazabilir (firestore.rules), yani sahte rozet
   // gösterilemez.
@@ -849,6 +856,14 @@ export default function FriendProfileScreen({ route, navigation }) {
               },
             ]}
           />
+        )}
+
+        {/* ── Favori seçimleri: film / dizi / oyuncu (varsa) ───────────────── */}
+        {canViewProfile && hasAnyFavorites(profileFavorites) && (
+          <>
+            <SectionHeader title={getFavoritesCopy(language).profile.title} />
+            <FavoritesShowcase favorites={profileFavorites} navigation={navigation} />
+          </>
         )}
 
         {/* ── İçerik: gizlilik kilitleri / istatistik + listeler ───────────── */}

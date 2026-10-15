@@ -4,12 +4,22 @@
 // kendi yay animasyonu/haptiği otomatik gelir; iOS 18–25'te klasik iOS anahtarı.
 // Diğer platformlarda (Android) aşağıdaki özel animasyonlu anahtar çizilir.
 //
-// Native anahtar sabit 51×31 pt; çağıranların yerleşimi `size`a göre kurulu
-// (genişlik size×1.61, yükseklik size) olduğundan anahtar o kutuya ölçeklenir.
+// Sistem anahtarının boyu sürüme göre değişir (iOS ≤25: 51×31, iOS 26+: ≈63×28,
+// belirgin biçimde daha geniş). Kutu bu yüzden SABİT `size×1.61` değil, anahtarın
+// gerçek (ölçekli) boyudur: `onLayout` ile okunur, `utils/nativeSwitchLayout` hem
+// yüksekliğe hem genişlik bütçesine (size×1.75) sığacak ölçeği seçer. Çağıranlar
+// anahtarı "kendi genişliğinde bir kardeş" olarak yerleştirir; metin tarafı
+// `flex:1` ile kalan boşluğa sığar (bkz. ProfileLists, SettingRow).
 // Başparmak rengi (`knobColor`) BİLEREK uygulanmaz: renk verilirse sistem cam
 // başparmağı düz renge çevirir.
-import React, { useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Platform, Pressable, StyleSheet, Switch, View } from "react-native";
+import {
+  guessNativeSwitchBox,
+  iosMajorVersion,
+  planNativeSwitch,
+  sameSwitchBox,
+} from "../utils/nativeSwitchLayout";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -31,10 +41,14 @@ const PRESS_SPRING = {
   overshootClamping: false,
 };
 
-// Native UISwitch'in doğal yüksekliği (pt).
-const NATIVE_SWITCH_HEIGHT = 31;
 // `Platform` yoksa (react-native'i kısmen taklit eden testler) özel anahtara düş.
 const USE_NATIVE_SWITCH = Platform?.OS === "ios";
+
+// Sistem anahtarının yerleşim kutusu cihaz başına sabit: ilk ölçüm sonrası tüm
+// anahtarlar (ve sonraki ekranlar) doğru kutuyla İLK karede başlasın diye saklanır.
+let measuredNativeBox = null;
+const initialNativeBox = () =>
+  measuredNativeBox ?? guessNativeSwitchBox(iosMajorVersion(Platform?.Version));
 
 export default function SwitchToggle(props) {
   return USE_NATIVE_SWITCH ? <NativeSwitchToggle {...props} /> : <AnimatedSwitchToggle {...props} />;
@@ -50,21 +64,34 @@ function NativeSwitchToggle({
   locked = false,
   onLockedPress,
 }) {
+  const [nativeBox, setNativeBox] = useState(initialNativeBox);
+  // `onLayout` dönüşümden ÖNCEKİ (ölçeksiz) kutuyu verir: sistemin gerçek boyu.
+  const handleSwitchLayout = useCallback((event) => {
+    const { width, height } = event.nativeEvent.layout;
+    const next = { width, height };
+    measuredNativeBox = next;
+    setNativeBox((prev) => (sameSwitchBox(prev, next) ? prev : next));
+  }, []);
+  const plan = planNativeSwitch({ size, native: nativeBox });
+
   return (
     <View
       style={[
         styles.nativeBox,
         // Kilitli anahtar soluk durur ama basılabilir görünmeye devam eder.
-        { width: size * 1.61, height: size, opacity: locked ? 0.6 : 1 },
+        { width: plan.width, height: plan.boxHeight, opacity: locked ? 0.6 : 1 },
       ]}
     >
       <Switch
         value={!!value}
         onValueChange={onValueChange}
+        onLayout={handleSwitchLayout}
         disabled={disabled}
         trackColor={{ false: offColor, true: onColor }}
         ios_backgroundColor={offColor}
-        style={{ transform: [{ scale: size / NATIVE_SWITCH_HEIGHT }] }}
+        // RN `Switch`e `alignSelf:flex-start` ekler; ölçek anahtarın KENDİ merkezinden
+        // olduğundan sola yaslı bırakmak görüntüyü kutunun soluna kaydırır.
+        style={{ alignSelf: "center", transform: [{ scale: plan.scale }] }}
         accessibilityRole="switch"
         accessibilityState={{ checked: !!value, disabled }}
       />
@@ -204,7 +231,9 @@ function AnimatedSwitchToggle({
 }
 
 const styles = StyleSheet.create({
-  nativeBox: { alignItems: "center", justifyContent: "center" },
+  // `flexShrink:0`: kutu anahtarın gerçek boyudur; sıkışan satırda anahtar
+  // değil metin daralmalı (taşan anahtar kartın kenarına biner).
+  nativeBox: { alignItems: "center", justifyContent: "center", flexShrink: 0 },
   track: {
     justifyContent: "center",
     padding: 0,

@@ -52,7 +52,6 @@ import { useTheme } from "../../context/ThemeContext";
 import { alpha } from "../../theme/colors";
 import { isLightSurface, shiftLightness } from "../../utils/colorUtils";
 import { i18nText } from "../../utils/i18nText";
-import { triggerHaptic } from "../../services/hapticsService";
 import useReduceMotion from "../../hooks/useReduceMotion";
 
 // Bu yükseklikten kısa ekranlarda sahne küçülür (iPhone SE sınıfı).
@@ -208,7 +207,6 @@ export default function NotificationPrimingSheet({ visible, onAllow, onDismiss }
   const isLightTheme = isLightSurface(theme.primary);
 
   const handleAllow = useCallback(() => {
-    triggerHaptic("impact").catch(() => {});
     onAllow?.();
   }, [onAllow]);
 

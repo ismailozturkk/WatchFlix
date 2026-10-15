@@ -19,6 +19,7 @@
 
 import React, { createContext, useContext } from "react";
 import useWatchProgress from "@hooks/useWatchProgress";
+import useBadgeCelebration from "@hooks/useBadgeCelebration";
 
 const WatchProgressContext = createContext(null);
 
@@ -26,6 +27,8 @@ export function WatchProgressProvider({ children }) {
   // Hook'un dönüşü zaten useMemo'lu; ekstra bir sarmalama gereksiz ve
   // tüketicilerdeki React.memo'yu boşa çıkarırdı.
   const deger = useWatchProgress();
+  // Kutlama burada, profil sekmesinden BAĞIMSIZ oynar (hooks/useBadgeCelebration.js).
+  useBadgeCelebration(deger);
   return (
     <WatchProgressContext.Provider value={deger}>
       {children}

@@ -23,6 +23,7 @@ import {
   formatBadgeAralik,
 } from "@components/badges/watchBadgeCatalog";
 import { i18nText } from "@utils/i18nText";
+import { yaklasanlar } from "@components/badges/badgeInsights";
 
 // Ortalama eser değerleri — Perde tablosunun dayandığı sayılar.
 const ORT_FILM = 165;
@@ -31,7 +32,10 @@ const ORT_BOLUM = 37;
 const sayi = (n, lang) =>
   Math.round(Number(n) || 0).toLocaleString(lang === "tr" ? "tr-TR" : "en-US");
 
-function WatchLevelCard({ progress, onPress }) {
+// `showNearest`: kartın alt şeridi (hedefe en yakın iki rozet). Rozet ekranında kendi
+// "Sıradaki hedefler" rafı var; aynı bilgiyi iki kez göstermemek için orada kapatılır.
+// `style`: dış kabuğun üstüne biner (varsayılan genişlik %90, profil kolonuyla hizalı).
+function WatchLevelCard({ progress, onPress, showNearest = true, style }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const tr = language !== "en";
@@ -57,17 +61,13 @@ function WatchLevelCard({ progress, onPress }) {
   // bulunmamasına yol açıyordu (ekran kademeli aileleri tek karta indiriyor ve
   // kimlik olarak ULAŞILAN kademeyi gösteriyor). Kullanıcı profilde gördüğü
   // rozeti aramaya gidip bulamıyordu.
-  const yakinlar = useMemo(() => {
-    if (!kartlar?.length) return [];
-    return kartlar
-      .map((k) => {
-        const hedef = k.sonrakiHedef || (!k.acik ? k : null);
-        return hedef ? { ...k, hedef } : null;
-      })
-      .filter((k) => k && !k.hidden && k.hedef.oran >= 0.5)
-      .sort((a, b) => b.hedef.oran - a.hedef.oran)
-      .slice(0, 2);
-  }, [kartlar]);
+  const yakinlar = useMemo(
+    () =>
+      showNearest
+        ? yaklasanlar(kartlar, { limit: 2, minOran: 0.5 }).map(({ kart, hedef }) => ({ ...kart, hedef }))
+        : [],
+    [kartlar, showNearest]
+  );
 
   // ProfileStatsContext listener'ları useStartupGate(3200) ile ertelendiği için
   // ilk saniyelerde veri yok. "0 Kare / Perde 1" göstermek YANLIŞ BİLGİdir —
@@ -79,6 +79,7 @@ function WatchLevelCard({ progress, onPress }) {
           styles.card,
           styles.skeleton,
           { backgroundColor: theme.secondary, borderColor: theme.border },
+          style,
         ]}
       >
         <View
@@ -149,7 +150,7 @@ function WatchLevelCard({ progress, onPress }) {
             onPress,
           }
         : {})}
-      style={[styles.card, { borderColor: withAlpha(band.color, 0.3) }]}
+      style={[styles.card, { borderColor: withAlpha(band.color, 0.3) }, style]}
     >
       <LinearGradient
         colors={[

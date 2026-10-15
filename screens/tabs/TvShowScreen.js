@@ -4,7 +4,6 @@ import {
   View,
 } from "react-native";
 import Animated from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import TvShowsOnTheAir from "../tv/TvShowsOnTheAir";
@@ -15,7 +14,7 @@ import TvShowsTrends from "../tv/TvShowsTrends";
 import TvShowBests from "../tv/TvShowBests";
 import TvOngoingSection from "../tv/TvOngoingSection";
 import TvShowsEmmy from "../tv/TvShowsEmmy";
-import { useCallback, useMemo, useRef, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { useTvShow } from "../../context/TvShowContex";
 import { DeviceEventEmitter } from "react-native";
 import {
@@ -23,7 +22,7 @@ import {
 } from "../../context/AppSettingsContext";
 import { useLanguage } from "../../context/LanguageContext";
 import ScreenDecor from "../../components/ScreenDecor";
-import DiscoverSearchButton from "../../components/home/DiscoverSearchButton";
+import DiscoverSearchHeader from "../../components/home/DiscoverSearchHeader";
 import usePullToRefresh from "../../hooks/usePullToRefresh";
 import { markTabScroll } from "../../components/navigation/TabScrollMarker";
 import DiscoveryMediaRail from "../../components/DiscoveryMediaRail";
@@ -31,13 +30,11 @@ import { useStreamingProviderSettings } from "../../context/AppSettingsContext";
 import { useDiscoveryPreferenceSettings } from "../../context/AppSettingsContext";
 import { useProfileStats } from "../../context/ProfileStatsContext";
 import { resolveOnboardingGenreIds } from "../../utils/onboardingPreferences";
+import FavoritesRecommendationRail from "../../components/favorites/FavoritesRecommendationRail";
+import { useUserProfile } from "../../context/UserProfileContext";
+import { hasRecommendationSignal, readProfileFavorites } from "../../utils/fourFavorites";
 
 const INITIAL_SECTION_COUNT = 2;
-
-// Arama çubuğunun üst boşluğu: güvenli alanın en az SEARCH_TOP_GAP altında,
-// ama eski değerin (50) hiçbir cihazda üstüne çıkmadan.
-const SEARCH_TOP_PADDING_MIN = 50;
-const SEARCH_TOP_GAP = 16;
 
 // iOS sekme çubuğunun "aşağı kaydırınca küçül" davranışı için listeyi sekme
 // ekranına tanıtır (bkz. components/navigation/TabScrollMarker.js). Modül
@@ -55,31 +52,15 @@ export default function TvShowScreen({ navigation }) {
     [onboardingGenreKeys],
   );
   const { topTvGenres } = useProfileStats();
+  // Dört favoriden (dizi + oyuncu) öneri kaynağı var mı? Boolean: profildeki
+  // ilgisiz değişiklikler bölüm listesini yeniden kurmaz.
+  const { profile } = useUserProfile();
+  const hasFavoriteSignal = useMemo(
+    () => hasRecommendationSignal(readProfileFavorites(profile), "tv"),
+    [profile],
+  );
   const { t } = useLanguage();
   const { loadingTrend, refreshAllTvShows } = useTvShow();
-  // Ekran kenardan kenara; arama çubuğu durum çubuğuna/çentiğe yapışmasın diye
-  // üst boşluk güvenli alana bağlı (eski sabit 50, Dynamic Island'da yetmiyordu).
-  const insets = useSafeAreaInsets();
-  const searchTopPadding = Math.max(SEARCH_TOP_PADDING_MIN, insets.top + SEARCH_TOP_GAP);
-  const searchInputRef = useRef(null);
-  const openSearch = useCallback(() => {
-    const navigateToSearch = (searchOrigin) => {
-      navigation.navigate("UnifiedSearch", {
-        initialType: "tv",
-        autoFocus: true,
-        searchOrigin,
-      });
-    };
-
-    if (searchInputRef.current?.measureInWindow) {
-      searchInputRef.current.measureInWindow((x, y, width, height) => {
-        navigateToSearch({ x, y, width, height });
-      });
-      return;
-    }
-
-    navigateToSearch(undefined);
-  }, [navigation]);
   const { refreshing, animatedSearchStyle, onScroll, handleRefresh } =
     usePullToRefresh(refreshAllTvShows);
 
@@ -96,6 +77,9 @@ export default function TvShowScreen({ navigation }) {
         ? { key: "ongoing", Component: TvOngoingSection }
         : null,
       { key: "best", Component: TvShowBests },
+      ...(hasFavoriteSignal
+        ? [{ key: "fromFavorites", Component: FavoritesRecommendationRail }]
+        : []),
       ...(streamingProviderIds.length > 0
         ? [{ key: "subscriptions", Component: DiscoveryMediaRail, preset: "subscriptions" }]
         : []),
@@ -114,7 +98,7 @@ export default function TvShowScreen({ navigation }) {
     ];
 
     return items.filter(Boolean);
-  }, [onboardingGenreIds, showOngoingTvShows, streamingProviderIds, topTvGenres]);
+  }, [hasFavoriteSignal, onboardingGenreIds, showOngoingTvShows, streamingProviderIds, topTvGenres]);
 
   const [visibleSectionCount, setVisibleSectionCount] = useState(INITIAL_SECTION_COUNT);
 
@@ -139,18 +123,18 @@ export default function TvShowScreen({ navigation }) {
     [navigation],
   );
 
-  const renderHeader = useCallback(
+  // ELEMENT olarak verilir (geri çağrı değil): FlatList fonksiyonu bileşen tipi
+  // sayar, kimliği değişince başlık sökülüp yeniden kurulur ve düğme sıfırlanır.
+  const searchHeader = useMemo(
     () => (
-      <View style={[styles.fakeSearchContainer, { paddingTop: searchTopPadding }]}>
-        <DiscoverSearchButton
-          ref={searchInputRef}
-          onPress={openSearch}
-          placeholder={t.SearchScreen.searchTvShows}
-          animatedStyle={animatedSearchStyle}
-        />
-      </View>
+      <DiscoverSearchHeader
+        navigation={navigation}
+        mediaType="tv"
+        placeholder={t.SearchScreen.searchTvShows}
+        animatedStyle={animatedSearchStyle}
+      />
     ),
-    [animatedSearchStyle, openSearch, searchTopPadding, t.SearchScreen.searchTvShows],
+    [animatedSearchStyle, navigation, t.SearchScreen.searchTvShows],
   );
 
   const revealNextSection = useCallback(() => {
@@ -166,7 +150,7 @@ export default function TvShowScreen({ navigation }) {
         data={visibleSections}
         keyExtractor={(item) => item.key}
         renderItem={renderSection}
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={searchHeader}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.container, { paddingBottom: contentBottom }]}
         initialNumToRender={INITIAL_SECTION_COUNT}
@@ -191,10 +175,5 @@ export default function TvShowScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     paddingBottom: 75,
-  },
-  fakeSearchContainer: {
-    // paddingTop render'da güvenli alana göre verilir (searchTopPadding).
-    paddingHorizontal: 15,
-    zIndex: 10,
   },
 });

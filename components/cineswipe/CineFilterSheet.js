@@ -47,7 +47,6 @@ export default function CineFilterSheet({ visible, onClose, filters, onApply }) 
   const selectCategory = (id) => change(id === "watchlist" ? { category: id, mediaType: "all" } : { category: id });
 
   const handleApply = () => {
-    triggerHaptic("impact");
     onApply(draft);
     onClose();
   };

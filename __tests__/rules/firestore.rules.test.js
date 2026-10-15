@@ -26,6 +26,10 @@ const {
   deleteField,
   runTransaction,
   serverTimestamp,
+  writeBatch,
+  increment,
+  arrayUnion,
+  arrayRemove,
 } = require("firebase/firestore");
 
 const ALICE = "alice";
@@ -635,6 +639,95 @@ describe("birthDate kilidi", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Dört favori: kategori başına en fazla 4 giriş (utils/fourFavorites.js)
+// ─────────────────────────────────────────────────────────────────────────────
+describe("dort favori siniri", () => {
+  const profil = (extra = {}) => ({
+    uid: ALICE,
+    username: "alice",
+    usernameLower: "alice",
+    displayName: "Alice",
+    friendsCount: 0,
+    ...extra,
+  });
+  const giris = (id) => ({ id, title: `Baslik ${id}`, image: `/p${id}.jpg` });
+  const liste = (n) => Array.from({ length: n }, (_, i) => giris(i + 1));
+
+  test("alani olmayan profil yine guncellenebilir (eski hesaplar)", async () => {
+    await seed((db) => setDoc(doc(db, "Users", ALICE), profil()));
+    await assertSucceeds(
+      updateDoc(doc(alice, "Users", ALICE), { displayName: "Alice B" }),
+    );
+  });
+
+  test("her kategoride 4 girise kadar yazilabilir", async () => {
+    await seed((db) => setDoc(doc(db, "Users", ALICE), profil()));
+    await assertSucceeds(
+      updateDoc(doc(alice, "Users", ALICE), {
+        fourFavorites: { movies: liste(4), shows: liste(4), people: liste(4) },
+      }),
+    );
+  });
+
+  test("bos kategoriler ve eksik kategori gecerli (0 favori de serbest)", async () => {
+    await seed((db) => setDoc(doc(db, "Users", ALICE), profil()));
+    await assertSucceeds(
+      updateDoc(doc(alice, "Users", ALICE), {
+        fourFavorites: { movies: [], shows: [], people: [] },
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(alice, "Users", ALICE), { fourFavorites: { movies: liste(1) } }),
+    );
+  });
+
+  test("5. giris reddedilir", async () => {
+    await seed((db) => setDoc(doc(db, "Users", ALICE), profil()));
+    await assertFails(
+      updateDoc(doc(alice, "Users", ALICE), {
+        fourFavorites: { movies: liste(5), shows: [], people: [] },
+      }),
+    );
+  });
+
+  test("bilinmeyen kategori ve dizi olmayan deger reddedilir", async () => {
+    await seed((db) => setDoc(doc(db, "Users", ALICE), profil()));
+    await assertFails(
+      updateDoc(doc(alice, "Users", ALICE), { fourFavorites: { books: liste(1) } }),
+    );
+    await assertFails(
+      updateDoc(doc(alice, "Users", ALICE), { fourFavorites: { movies: "x" } }),
+    );
+    await assertFails(
+      updateDoc(doc(alice, "Users", ALICE), { fourFavorites: "x" }),
+    );
+  });
+
+  test("tohum alan da kural icinde olusturulabilir, sismis olani olusturulamaz", async () => {
+    await assertSucceeds(
+      setDoc(doc(alice, "Users", ALICE), profil({ fourFavorites: { movies: liste(2) } })),
+    );
+    await assertFails(
+      setDoc(doc(alice, "Users", ALICE), profil({ fourFavorites: { movies: liste(9) } })),
+    );
+  });
+
+  test("baskasinin favorilerini yazamaz", async () => {
+    await seed((db) => setDoc(doc(db, "Users", ALICE), profil()));
+    await assertFails(
+      updateDoc(doc(bob, "Users", ALICE), { fourFavorites: { movies: liste(1) } }),
+    );
+  });
+
+  test("favoriler arkadasin profil okumasini bozmaz", async () => {
+    await seed((db) =>
+      setDoc(doc(db, "Users", ALICE), profil({ fourFavorites: { movies: liste(2) } })),
+    );
+    await assertSucceeds(getDoc(doc(bob, "Users", ALICE)));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Premium yetkileri ve kimlik rozetleri yalnız sunucuya ait
 // (functions/index.js revenueCatWebhook + syncPremiumStatus yazar).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -724,5 +817,124 @@ describe("premium ve rozet alanlari", () => {
       }),
     );
     await assertFails(getDoc(doc(bob, "Users", ALICE, "private", "entitlements")));
+  });
+});
+
+// Grup okunmamış sayacı: groups/{id}.unread.{uid}. Gönderen mesajla birlikte
+// diğer üyelerin sayacını artırır (screens/chat/ChatScreen.js → queueThreadWrites),
+// üye sohbeti görünürken kendininkini sıfırlar. Kural yalnız anahtarların MEVCUT
+// ÜYELERE ait olmasını ve yan alanlara (ad, üyelik…) dokunulmamasını şart koşar.
+describe("grup okunmamis sayaci", () => {
+  const GROUP = "grp-1";
+  const groupRef = (db) => doc(db, "groups", GROUP);
+  // seed() değer döndürmez; kuralları atlayarak güncel belgeyi okur.
+  const readGroup = async () => {
+    let data;
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      data = (await getDoc(groupRef(ctx.firestore()))).data();
+    });
+    return data;
+  };
+
+  beforeEach(async () => {
+    await seed((db) =>
+      setDoc(groupRef(db), {
+        name: "Film Gecesi",
+        color: "#6C63FF",
+        avatarIndex: 0,
+        members: [ALICE, BOB],
+        memberInfo: {},
+        admins: [],
+        createdBy: ALICE,
+        lastMessage: null,
+        unread: { [BOB]: 2 },
+      }),
+    );
+  });
+
+  test("uye mesajla birlikte digerlerinin sayacini artirir (ChatScreen batch'i)", async () => {
+    const batch = writeBatch(alice);
+    batch.set(
+      groupRef(alice),
+      {
+        lastMessage: { text: "selam", senderId: ALICE, time: serverTimestamp() },
+        updatedAt: serverTimestamp(),
+        unread: { [BOB]: increment(1) },
+      },
+      { merge: true },
+    );
+    await assertSucceeds(batch.commit());
+    expect((await readGroup()).unread).toEqual({ [BOB]: 3 });
+  });
+
+  test("uye kendi sayacini sifirlar; baskasinin sayaci ve updatedAt oldugu gibi kalir", async () => {
+    await seed((db) => updateDoc(groupRef(db), { "unread.alice": 4 }));
+    await assertSucceeds(updateDoc(groupRef(alice), { "unread.alice": 0 }));
+    expect((await readGroup()).unread).toEqual({ [ALICE]: 0, [BOB]: 2 });
+  });
+
+  test("uye olmayan uid icin sayac anahtari reddedilir", async () => {
+    await assertFails(updateDoc(groupRef(alice), { "unread.mallory": 1 }));
+  });
+
+  test("uye olmayan kullanici sayaca yazamaz", async () => {
+    await assertFails(updateDoc(groupRef(carol), { "unread.bob": 0 }));
+  });
+
+  test("sayac yazimi yan alanlari (ad, uyelik) degistirmeye tasinamaz", async () => {
+    await assertFails(
+      updateDoc(groupRef(bob), { "unread.bob": 0, name: "Ele geçirildi" }),
+    );
+    await assertFails(
+      updateDoc(groupRef(bob), { "unread.bob": 0, members: [ALICE, BOB, CAROL] }),
+    );
+  });
+
+  test("sayaci olmayan eski gruba da ilk artis yazilabilir", async () => {
+    await seed((db) =>
+      setDoc(doc(db, "groups", "grp-legacy"), {
+        name: "Eski",
+        members: [ALICE, BOB],
+        memberInfo: {},
+        admins: [],
+        createdBy: ALICE,
+        lastMessage: null,
+      }),
+    );
+    const batch = writeBatch(alice);
+    batch.set(
+      doc(alice, "groups", "grp-legacy"),
+      { updatedAt: serverTimestamp(), unread: { [BOB]: increment(1) } },
+      { merge: true },
+    );
+    await assertSucceeds(batch.commit());
+  });
+
+  // Kuralın ilk dalını (üye özeti/sayaç) genişlettik; diğer dalların — yönetim,
+  // gruptan ayrılma, özet senkronu — KIRILMADIĞINI burada sabitliyoruz.
+  test("gerileme: kurucu ad degistirip uye ekleyebilir", async () => {
+    await assertSucceeds(
+      updateDoc(groupRef(alice), {
+        name: "Yeni Ad",
+        members: arrayUnion(CAROL),
+        "memberInfo.carol": { name: "Carol", username: "carol", avatarIndex: 1 },
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  test("gerileme: uye gruptan kendini cikarabilir (sayac izi kalsa da)", async () => {
+    await assertSucceeds(
+      updateDoc(groupRef(bob), {
+        members: arrayRemove(BOB),
+        admins: arrayRemove(BOB),
+        "memberInfo.bob": deleteField(),
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  test("gerileme: son mesaj silinince ozet alani temizlenebilir (syncThreadPreview)", async () => {
+    await assertSucceeds(updateDoc(groupRef(bob), { lastMessage: deleteField() }));
   });
 });

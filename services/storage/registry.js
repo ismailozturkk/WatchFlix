@@ -250,6 +250,23 @@ const settingsKeys = {
       Array.isArray(value) ||
       (!!value && typeof value === "object" && Array.isArray(value.movie) && Array.isArray(value.tv)),
   },
+  // Tanıtımda (kayıttan ÖNCE) seçilen "dört favori". Hesap yokken Firestore'a
+  // yazılamaz; kayıt/giriş sonrası ilk profil yüklemesinde Users/{uid}.fourFavorites
+  // alanına aktarılıp silinir (services/fourFavoritesService.adoptPendingFavorites).
+  // Hesaba ait veri olduğu için ayarlar yedeğine GİRMEZ (utils/settingsBackup.js).
+  pendingFourFavorites: {
+    key: "pendingFourFavorites",
+    type: TYPES.json,
+    default: null,
+    validate: (value) => !!value && typeof value === "object" && !Array.isArray(value),
+  },
+  // Profilde "dört favorini seç" davet kartı kapatıldı mı. CİHAZA özel ipucu:
+  // yedeğe girmez, hesaba da yazılmaz (kart zaten favori seçilince kalkıyor).
+  favoritesInviteDismissed: {
+    key: "favoritesInviteDismissed",
+    type: TYPES.boolean,
+    default: false,
+  },
   // Profil/liste görünümü
   // ---- Cihaz düzeyi, çıkışta KORUNUR ------------------------------------
   // Bu ikisi bilinçli olarak `settings` deposunda: `session` deposu çıkışta

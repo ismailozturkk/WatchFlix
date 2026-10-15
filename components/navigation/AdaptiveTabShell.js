@@ -10,7 +10,9 @@ import { TAB_NAMES, createTabState, getTabBarLayout, isTabName, tabStateReducer 
 import { isLightSurface } from "../../utils/colorUtils";
 import { selectionAsync } from "../../services/hapticsService";
 import { TAB_BAR_SCROLL_UNSET, advanceTabBarCollapse } from "../../utils/tabBarCollapse";
+import { nativeTabBarScaleAvailable } from "../../services/tabBarScale";
 import useAppActive from "../../hooks/useAppActive";
+import NativeTabBarScale from "./NativeTabBarScale";
 import TabBar from "./TabBar";
 
 const AndroidBackdrop = tabBarNativeSupport.AndroidBackdrop;
@@ -121,6 +123,12 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
   const onNativeRejected = useCallback(({ nativeEvent }) => dispatch({ type: "native", event: nativeEvent, rejected: true }), []);
   const onGlassFailure = useCallback(() => setRendererFailed(true), []);
   const nativeBarVisible = mode === "native-ios" && !keyboardVisible;
+  // iOS 26+ with the tab-bar-scale module in the binary: the real UIKit bar is
+  // scaled 20% by the shared scroll progress (NativeTabBarScale), so the
+  // system's own minimize is switched off — two shrink effects would stack.
+  // Without the module (older build, Expo Go, iOS < 26) nothing changes:
+  // the system minimize stays on exactly as before.
+  const nativeScaleActive = mode === "native-ios" && nativeTabBarScaleAvailable;
   const useNativeScenes = tabBarNativeSupport.nativeTabsAvailable && !rendererFailed;
   const dark = !isLightSurface(theme.primary);
   const idleColor = theme.text?.secondary || "#888888";
@@ -155,7 +163,7 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
                   rejectStaleNavStateUpdates onTabSelected={onNativeSelect} onTabSelectionRejected={onNativeRejected}
                   tabBarHidden={!nativeBarVisible} colorScheme={dark ? "dark" : "light"}
                   direction={I18nManager.isRTL ? "rtl" : "ltr"} nativeContainerStyle={{ backgroundColor: theme.primary }}
-                  ios={{ tabBarTintColor: theme.accent, tabBarMinimizeBehavior: "onScrollDown", tabBarControllerMode: "tabBar" }}>
+                  ios={{ tabBarTintColor: theme.accent, tabBarMinimizeBehavior: nativeScaleActive ? "never" : "onScrollDown", tabBarControllerMode: "tabBar" }}>
                   {tabs.map((tab) => (
                     <Tabs.Screen key={tab.name} screenKey={tab.name} title={tab.label} tabBarItemAccessibilityLabel={tab.label}
                       tabBarItemTestID={`tab-${tab.name}`} specialEffects={NO_RESELECT_EFFECTS}
@@ -177,6 +185,7 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
         >
           {renderCompanion?.(layout)}
         </View>
+        {nativeScaleActive && <NativeTabBarScale progress={tabBarCollapse} />}
         {!nativeBarVisible && !keyboardVisible && (
           <TabBar
             tabs={tabs}

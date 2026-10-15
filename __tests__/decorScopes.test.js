@@ -335,3 +335,75 @@ describe("kapsam bekçisi", () => {
     expect(ihlaller).toEqual([]);
   });
 });
+// ── Premium kapısı bekçisi ───────────────────────────────────────────────────
+// Ambiyans (14 Eki) kapısız doğdu: kar ve ikon arka planı Premium'du, üçüncü
+// efekt herkese açık kaldı ve ayar ekranı bunu fark etmedi. Bu bölüm "her dekor
+// efektinin bir Premium kaydı ve bir çizim kapısı vardır" kuralını build
+// zamanına çeker; yeni bir efekt (DECOR_EFFECTS) eklenince buradaki iki tablo
+// de güncellenmeden test geçmez.
+
+const {
+  FEATURE_KIND,
+  PREMIUM_FEATURES,
+  isLockedFor,
+} = require("../utils/premiumFeatures");
+
+const EFEKT_KAYDI = Object.freeze({
+  snow: "snow_effect",
+  icon: "icon_background",
+  ambient: "ambient_background",
+});
+const EFEKT_BAYRAGI = Object.freeze({
+  snow: "showSnow",
+  icon: "showIconBackground",
+  ambient: "showAmbientBackground",
+});
+
+describe("Premium kapısı bekçisi", () => {
+  test("her dekor efektinin Premium erişim kaydı var; Free'de kapalı, Premium'da açık", () => {
+    expect(Object.keys(EFEKT_KAYDI).sort()).toEqual([...DECOR_EFFECTS].sort());
+    expect(Object.keys(EFEKT_BAYRAGI).sort()).toEqual([...DECOR_EFFECTS].sort());
+    for (const effect of DECOR_EFFECTS) {
+      const id = EFEKT_KAYDI[effect];
+      expect(PREMIUM_FEATURES[id]?.kind).toBe(FEATURE_KIND.ACCESS);
+      expect(isLockedFor(id, "free")).toBe(true);
+      expect(isLockedFor(id, "premium")).toBe(false);
+      expect(isLockedFor(id, "unlimited")).toBe(false);
+    }
+  });
+
+  test("AppSettingsContext her efektin kapısını okur ve ham bayrağı değil ETKİN değeri sunar", () => {
+    const kaynak = fs.readFileSync(path.join(KOK, "context/AppSettingsContext.js"), "utf8");
+    for (const effect of DECOR_EFFECTS) {
+      expect(kaynak).toContain(`getFeatureLimit("${EFEKT_KAYDI[effect]}"`);
+      const bayrak = EFEKT_BAYRAGI[effect];
+      const etkin = "effective" + bayrak.charAt(0).toUpperCase() + bayrak.slice(1);
+      expect(kaynak).toContain(`${bayrak}: ${etkin}`);
+    }
+  });
+
+  test("ham tercih bayrağı kapıyı atlayarak hiçbir yerde okunmuyor", () => {
+    // Keys.showSnow / showIconBackground / showAmbientBackground yalnız depo
+    // kaydında ve AppSettingsContext'te geçebilir; başka yerde okunursa Free
+    // kullanıcıda (eski bir bayrak açık kalmışsa) efekt kapıyı delip çizilir.
+    const IZINLI = new Set(["context/AppSettingsContext.js", "services/storage/registry.js"]);
+    const klasorler = ["screens", "components", "hooks", "services", "context", "utils"];
+    const dosyalar = [
+      ...klasorler.flatMap((k) => jsDosyalari(path.join(KOK, k))),
+      path.join(KOK, "App.js"),
+    ];
+    const ihlaller = [];
+    for (const dosya of dosyalar) {
+      const goreli = path.relative(KOK, dosya).replace(/\\/g, "/");
+      if (IZINLI.has(goreli)) continue;
+      const satirlar = fs.readFileSync(dosya, "utf8").split(/\r?\n/);
+      satirlar.forEach((satir, i) => {
+        if (/^\s*(\/\/|\*|\/\*|\{\/\*)/.test(satir)) return;
+        for (const bayrak of Object.values(EFEKT_BAYRAGI)) {
+          if (satir.includes(`Keys.${bayrak}`)) ihlaller.push(`${goreli}:${i + 1} Keys.${bayrak}`);
+        }
+      });
+    }
+    expect(ihlaller).toEqual([]);
+  });
+});

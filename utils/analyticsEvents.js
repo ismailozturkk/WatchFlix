@@ -78,6 +78,13 @@ export const ANALYTICS_EVENTS = {
   // geçti) | "dismiss" (vazgeçti). premium_gate_hit ile birlikte kapı başına
   // sayfa dönüşümü, paywall_view.source ile birlikte nihai dönüşüm çıkar.
   PREMIUM_UPSELL_ACTION: "premium_upsell_action",
+  // "Dört favori" (profilde film/dizi/oyuncu vitrini): Profili Düzenle'den
+  // kaydedilen seçim sayıları. Tanıtımdaki benimsenme ayrıca
+  // onboarding_completed.favorites_count'ta.
+  FOUR_FAVORITES_SAVED: "four_favorites_saved",
+  // Film/Dizi sekmesindeki "Favorilerine Göre" rayından bir içeriğin açılması.
+  // Önerilerin işe yarayıp yaramadığını söyleyen tek sinyal.
+  FAVORITES_REC_OPENED: "favorites_rec_opened",
 };
 
 /** Ölçüm hunisinde kullanılan kullanıcı özellikleri. */

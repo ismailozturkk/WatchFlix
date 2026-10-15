@@ -4,8 +4,17 @@
 // animasyonlu RefreshControl hook'u. usePullToSearch'ün yerini alır:
 // aşağı çekme artık arama açmaz, veri çeker.
 //
-// Animasyon: Arama çubuğu ölçeklenip geri döner (eski usePullToSearch efekti
-// korunuyor), ardından veri yenileme tetiklenir.
+// Animasyon: Arama çubuğu çekme boyunca hafifçe büyüyüp geri döner (eski
+// usePullToSearch efekti), ardından veri yenileme tetiklenir.
+//
+// `animatedSearchStyle` DİNLENMEDE KİMLİKTİR (scale 1, opaklık yok): Reanimated 4.5
+// her React render'ında animasyonlu stilin İLK değerini görünümün JS stiline geri
+// yazar ve gerçek değeri yerel kayıttan geri uygular; kayıt geç kalırsa/boşalırsa
+// ekranda kalan şey ilk değerdir. İlk değer kimlik olunca bu yarış zararsızdır
+// (bkz. components/home/DiscoverSearchButton.js).
+//
+// Ölçek EŞİT yönlü: eski scaleX 1.06 / scaleY 1.22 çiftindeki orantısızlık hapın
+// içindeki metni ve ikonları dikeyde eziyordu.
 
 import { useCallback, useState } from "react";
 import {
@@ -20,6 +29,8 @@ import { useTabBarLayout } from "../context/TabBarLayoutContext";
 import { advanceTabBarCollapse } from "../utils/tabBarCollapse";
 
 const PULL_THRESHOLD = 90;
+/** Tam çekilmiş arama çubuğunun ölçeği. */
+export const PULL_MAX_SCALE = 1.035;
 
 /**
  * @param {() => Promise<void>} onRefresh — Context'in refreshAll fonksiyonu.
@@ -57,26 +68,12 @@ export default function usePullToRefresh(onRefresh) {
   });
 
   const animatedSearchStyle = useAnimatedStyle(() => ({
-    borderRadius: interpolate(
-      progress.value,
-      [0, 1],
-      [10, 16],
-      Extrapolation.CLAMP,
-    ),
     transform: [
       {
-        scaleX: interpolate(
+        scale: interpolate(
           progress.value,
           [0, 1],
-          [1, 1.06],
-          Extrapolation.CLAMP,
-        ),
-      },
-      {
-        scaleY: interpolate(
-          progress.value,
-          [0, 1],
-          [1, 1.22],
+          [1, PULL_MAX_SCALE],
           Extrapolation.CLAMP,
         ),
       },

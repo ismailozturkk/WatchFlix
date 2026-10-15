@@ -102,7 +102,7 @@ export default function ImportDataModal({ visible, onClose }) {
     }
 
     if (text.includes("\0")) {
-      triggerHaptic("notification");
+      triggerHaptic("error");
       Toast.show({
         type: "error",
         text1: "Geçersiz Dosya Formatı",
@@ -147,7 +147,7 @@ export default function ImportDataModal({ visible, onClose }) {
         });
       }
     } catch (e) {
-      triggerHaptic("notification");
+      triggerHaptic("error");
       Toast.show({
         type: "error",
         text1: "CSV Doğrulama Hatası",
@@ -299,7 +299,7 @@ export default function ImportDataModal({ visible, onClose }) {
       }
     } catch (err) {
       setIsProcessingFile(false);
-      triggerHaptic("notification");
+      triggerHaptic("error");
       Toast.show({
         type: "error",
         text1: "İçerik Yüklenemedi",
@@ -351,7 +351,6 @@ export default function ImportDataModal({ visible, onClose }) {
     setStep("importing");
     setProgress(0);
     setProgressText("İçerikler TMDB ile eşleştiriliyor...");
-    triggerHaptic("impact");
 
     try {
       // 1. TMDB Eşleme (Concurrency 5 ile paralel çözümleme)

@@ -18,6 +18,7 @@ import {
   sanitizeHistory,
 } from "./geminiService";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
+import { AI_RESPONSE_STYLES, AI_SPOILER_LEVELS } from "../utils/aiPrefs";
 
 export { GeminiError } from "./geminiService";
 
@@ -68,12 +69,62 @@ export const posterKey = (mediaType, title) =>
 // ── JSON çıkarma (kod bloğu / gürültü toleranslı) ─────────────────────────────
 
 /**
- * Gemini çıktısından ilk geçerli JSON nesnesini çıkarır.
- * Önce düz parse, olmazsa süslü parantez eşlemesiyle dengeli blok yakalar.
+ * Yarıda kesilmiş (MAX_TOKENS) bir JSON'u kurtarır: en son TAMAMLANMIŞ iç değerde
+ * keser, açık kalan köşeli/süslü parantezleri kapatır. Yarım kalan son öğe
+ * düşer, öncekiler korunur — ör. 5 önerinin 4'ü gelmişse 4'ü gösterilir.
+ *
+ * Neden önemli: sunucu hakkı yalnız üst akış hatasında iade eder; kesik ama
+ * ayrıştırılamayan bir cevap kullanıcının mesaj hakkını boşuna yakıyordu.
  */
-export function extractJSON(text) {
-  if (text == null) return null;
-  if (typeof text === "object") return text;
+export function repairTruncatedJSON(text) {
+  const s = String(text ?? "");
+  const start = s.indexOf("{");
+  if (start === -1) return null;
+
+  const stack = [];
+  let inStr = false;
+  let esc = false;
+  let cut = -1;
+  let cutStack = null;
+  for (let i = start; i < s.length; i++) {
+    const ch = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === "{" || ch === "[") stack.push(ch);
+    else if (ch === "}" || ch === "]") {
+      stack.pop();
+      if (stack.length === 0) return null; // zaten tam; kurtarma gerekmez
+      cut = i;
+      cutStack = stack.slice();
+    }
+  }
+  if (cut === -1) return null;
+
+  const closers = cutStack
+    .reverse()
+    .map((open) => (open === "{" ? "}" : "]"))
+    .join("");
+  try {
+    return JSON.parse(s.slice(start, cut + 1) + closers);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Gemini çıktısından ilk geçerli JSON nesnesini çıkarır ve kurtarma gerekip
+ * gerekmediğini söyler. Önce düz parse, olmazsa süslü parantez eşlemesiyle
+ * dengeli blok, o da kapanmıyorsa kesik JSON onarımı.
+ * @returns {{ value: object|null, repaired: boolean }}
+ */
+export function extractJSONDetailed(text) {
+  if (text == null) return { value: null, repaired: false };
+  if (typeof text === "object") return { value: text, repaired: false };
 
   let s = String(text).trim();
   // ```json ... ``` veya ``` ... ``` çitlerini soy
@@ -83,13 +134,13 @@ export function extractJSON(text) {
     .trim();
 
   try {
-    return JSON.parse(s);
+    return { value: JSON.parse(s), repaired: false };
   } catch {
     /* parantez eşlemesine düş */
   }
 
   const start = s.indexOf("{");
-  if (start === -1) return null;
+  if (start === -1) return { value: null, repaired: false };
 
   let depth = 0;
   let inStr = false;
@@ -109,14 +160,20 @@ export function extractJSON(text) {
       if (depth === 0) {
         const cand = s.slice(start, i + 1);
         try {
-          return JSON.parse(cand);
+          return { value: JSON.parse(cand), repaired: false };
         } catch {
-          return null;
+          return { value: null, repaired: false };
         }
       }
     }
   }
-  return null;
+  // Blok hiç kapanmadı: cevap yarıda kesilmiş olabilir.
+  const repaired = repairTruncatedJSON(s);
+  return { value: repaired, repaired: repaired != null };
+}
+
+export function extractJSON(text) {
+  return extractJSONDetailed(text).value;
 }
 
 /**
@@ -274,7 +331,53 @@ function formatGenres(genres) {
 }
 
 /**
+ * Cevap stili tercihlerini (Ayarlar > Yapay zeka) talimat cümlelerine çevirir.
+ *
+ * ÇIKTI BÜTÇESİ: sunucu cine modunda 1200 token'da keser (functions/index.js).
+ * Liste üst sınırları bu yüzden stile göre daralır: ayrıntılı üslupta her satır
+ * daha uzun olduğundan toplam öğe sayısı düşük tutulur. Varsayılan (dengeli,
+ * spoilersız, 5 öğe) eski talimatla aynı kuralları üretir.
+ */
+export function resolveStyleRules({ responseStyle, spoilerLevel, maxItems } = {}) {
+  const style = AI_RESPONSE_STYLES.includes(responseStyle) ? responseStyle : "balanced";
+  const spoilers = AI_SPOILER_LEVELS.includes(spoilerLevel) ? spoilerLevel : "none";
+  // Ayar 3/5/8'dir; filtre açıkken ekran yerelde elenecekler için 1-2 öğe fazla ister.
+  const requested = Number(maxItems);
+  const max = Number.isInteger(requested) && requested >= 1 && requested <= 12 ? requested : 5;
+
+  let textRule = "Keep every text field to one short sentence.";
+  if (style === "concise") textRule = "Keep every text field to at most 8 words.";
+  if (style === "detailed") {
+    textRule = "Keep every text field to one or two vivid sentences (tone, pacing or a signature element), never longer.";
+  }
+  const spoilerRule =
+    spoilers === "light"
+      ? "Light setup is fine (first act only), but never reveal twists, deaths, endings or major reveals."
+      : "Zero spoilers: never reveal twists, deaths, endings or major reveals.";
+  // Eski talimatın birebir cümlesi: dengeli + spoilersız
+  const combinedRule =
+    style === "balanced" && spoilers === "none"
+      ? "Keep every text field to one short spoiler-free sentence."
+      : `${textRule} ${spoilerRule}`;
+
+  const recMin = Math.min(3, max);
+  const watchlistCap = style === "detailed" ? 9 : 12;
+  const generalWords = style === "concise" ? 50 : style === "detailed" ? 120 : 80;
+  const sizeRules = [
+    `- comparison metric keys may only be story, acting, visuals, pacing, emotion or rewatch; scores are integers 0–5.`,
+    `- recommendations: ${recMin}–${max} items. watchlist: 1–3 sections with 2–${max} items each, at most ${watchlistCap} items in total. comparison: 3–5 metrics.`,
+    `- general content: at most ${generalWords} words. Never repeat a title in one response.`,
+  ].join("\n");
+
+  return { style, spoilers, maxItems: max, combinedRule, sizeRules };
+}
+
+/**
  * CineMatch Pro sistem talimatı — Gemini'den SADECE JSON ister.
+ *
+ * `contextBlock` / `avoidBlock` hazır metin bloklarıdır (services/aiCineInsights);
+ * `focusMedia` önceki bir mesajda sorulmuş yapımdır (zorlanmaz, yalnız zamirleri
+ * çözer) — `targetMedia` ise o mesajın KENDİSİNİN konusudur ve cevabı kilitler.
  */
 export function buildCineSystemInstruction({
   language = "en",
@@ -284,7 +387,14 @@ export function buildCineSystemInstruction({
   userLibrary = "",
   discoveryPreferences = "",
   targetMedia = null,
+  focusMedia = null,
+  responseStyle = "balanced",
+  spoilerLevel = "none",
+  maxItems = 5,
+  contextBlock = "",
+  avoidBlock = "",
 } = {}) {
+  const rules = resolveStyleRules({ responseStyle, spoilerLevel, maxItems });
   const movieList = formatGenres(movieGenres);
   const tvList = formatGenres(tvGenres);
   const tasteLines = [];
@@ -305,6 +415,14 @@ export function buildCineSystemInstruction({
 - Cast: ${safeArr(targetMedia.cast).map(toStr).filter(Boolean).slice(0, 8).join(", ") || "unknown"}
 The user's title-specific question refers ONLY to this exact TMDB record. Return title_spotlight with its display title and media type.`
     : null;
+  // Önceki mesajdaki yapım: cevabı kilitlemez, yalnız "bunu / onu" gibi zamirleri çözer.
+  const focusBlock =
+    !targetMedia?.title && focusMedia?.title
+      ? `CONVERSATION FOCUS (earlier in this chat the user asked about this exact title; resolve "it", "this", "bu", "onu" to it unless they name another title):
+- TMDB ID: ${toStr(focusMedia.id)}
+- Media type: ${normMediaType(focusMedia.mediaType)}
+- Title: ${toStr(focusMedia.title)}${focusMedia.year ? ` (${toStr(focusMedia.year)})` : ""}`
+      : null;
 
   return [
     `ROLE: You are CineMatch, Seelogd's concise film and TV decision assistant.`,
@@ -314,7 +432,7 @@ The user's title-specific question refers ONLY to this exact TMDB record. Return
 - The JSON MUST have a "type" field set to one of: recommendations | comparison | watch_plan | watchlist | title_spotlight | general.
 - Every referenced title MUST be an object {"title": "Exact Title", "mediaType": "movie" | "tv"}. mediaType is REQUIRED.
 - Never invent TMDB IDs or factual metadata. Seelogd resolves IDs, posters, year, rating, genres, runtime, cast, crew, providers and similar titles from TMDB.
-- Keep every text field to one short spoiler-free sentence. Write human-readable text in ${language}.`,
+- ${rules.combinedRule} Write human-readable text in ${language}.`,
 
     tasteBlock,
 
@@ -322,7 +440,13 @@ The user's title-specific question refers ONLY to this exact TMDB record. Return
 
     targetBlock,
 
+    focusBlock,
+
     userLibrary || null,
+
+    contextBlock || null,
+
+    avoidBlock || null,
 
     `RESPONSE TYPE SELECTION (pick by user intent):
 - comparison      → user compares two titles ("X mi Y mi", "X vs Y", "which is better").
@@ -352,10 +476,7 @@ title_spotlight:
 general:
 {"type":"general","content":"brief answer","items":[{"title":"Exact Title","mediaType":"movie"}]}`,
 
-    `SCORING & SIZE RULES:
-- comparison metric keys may only be story, acting, visuals, pacing, emotion or rewatch; scores are integers 0–5.
-- recommendations: 3–5 items. watchlist: 1–3 sections with 2–5 items. comparison: 3–5 metrics.
-- general content: at most 80 words. Never repeat a title in one response.`,
+    `SCORING & SIZE RULES:\n${rules.sizeRules}`,
 
     `BEHAVIOR:
 - If the user gives no details, confidently pick great titles from their taste profile — never stall.
@@ -395,11 +516,13 @@ export function enforceTargetMediaResponse(response, targetMedia) {
 /** Gemini gövdesini güvenle parse edip JSON nesnesine çevirir. */
 function parseCineResponse(data) {
   const { text } = parseResponse(data); // blok/boş durumlarda GeminiError fırlatır
-  const obj = extractJSON(text);
-  if (!obj) {
+  const { value, repaired } = extractJSONDetailed(text);
+  if (!value) {
     throw new GeminiError("EMPTY", "Model JSON döndürmedi / parse edilemedi");
   }
-  return normalizeResponse(obj);
+  const normalized = normalizeResponse(value);
+  // Kesik cevaptan kurtarılan sonuç: arayüz "kısaltıldı" notu gösterebilsin.
+  return repaired ? { ...normalized, truncated: true } : normalized;
 }
 
 /**
@@ -419,6 +542,12 @@ export async function askCineStructured({
   userLibrary = "",
   discoveryPreferences = "",
   targetMedia = null,
+  focusMedia = null,
+  responseStyle,
+  spoilerLevel,
+  maxItems,
+  contextBlock = "",
+  avoidBlock = "",
   onQuota,
 } = {}) {
   if (!userMessage || userMessage.trim() === "") {
@@ -441,6 +570,12 @@ export async function askCineStructured({
       userLibrary,
       discoveryPreferences,
       targetMedia,
+      focusMedia,
+      responseStyle,
+      spoilerLevel,
+      maxItems,
+      contextBlock,
+      avoidBlock,
     }),
     onQuota,
   });

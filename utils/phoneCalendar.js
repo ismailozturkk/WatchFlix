@@ -32,30 +32,64 @@ export async function loadSavedKeysSet() {
   return new Set(Object.keys(map));
 }
 
-async function getOrCreateCalendarId() {
-  const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
-  const existing = calendars.find((c) => c.title === CALENDAR_NAME);
-  if (existing) return existing.id;
+// expo-calendar 57'de `...Async` fonksiyonları bilerek hata fırlatıyor
+// ("deprecated"); izin/takvim/etkinlik işleri nesne tabanlı API'den yapılır.
+async function hasCalendarPermission() {
+  const res = await Calendar.requestCalendarPermissions();
+  return res?.granted === true || res?.status === "granted";
+}
 
-  let sourceId;
-  let source;
+// Seelogd takvimi oluşturulamazsa (iOS'ta varsayılan kaynak takvim eklemeye
+// izin vermeyebilir) kullanıcının yazılabilir bir takvimine düşülür; etkinlik
+// kimliği saklandığı için kaldırma yine aynı yoldan çalışır.
+function pickFallbackCalendar(calendars) {
   if (Platform.OS === "ios") {
-    const def = await Calendar.getDefaultCalendarAsync();
-    sourceId = def?.source?.id;
-  } else {
-    source = { isLocalAccount: true, name: CALENDAR_NAME };
+    try {
+      const def = Calendar.getDefaultCalendarSync();
+      if (def?.allowsModifications) return def;
+    } catch {
+      // varsayılan takvim yoksa listeden seçilir
+    }
   }
+  const writable = calendars.filter((c) => c.allowsModifications);
+  return writable.find((c) => c.isPrimary) || writable[0] || null;
+}
 
-  return await Calendar.createCalendarAsync({
-    title: CALENDAR_NAME,
-    color: "#138df0",
-    entityType: Calendar.EntityTypes.EVENT,
-    sourceId,
-    source,
-    name: CALENDAR_NAME,
-    ownerAccount: "personal",
-    accessLevel: Calendar.CalendarAccessLevel.OWNER,
-  });
+async function getOrCreateCalendar() {
+  const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
+  const existing = calendars.find(
+    (c) => c.title === CALENDAR_NAME && c.allowsModifications,
+  );
+  if (existing) return existing;
+
+  try {
+    return await Calendar.createCalendar({
+      title: CALENDAR_NAME,
+      name: CALENDAR_NAME,
+      color: "#138df0",
+      entityType: Calendar.EntityTypes.EVENT,
+      // iOS'ta kaynak verilmezse yerel taraf varsayılan takvimin kaynağını kullanır.
+      ...(Platform.OS === "android"
+        ? { source: { isLocalAccount: true, name: CALENDAR_NAME } }
+        : null),
+      ownerAccount: "personal",
+      accessLevel: Calendar.CalendarAccessLevel.OWNER,
+    });
+  } catch (err) {
+    const fallback = pickFallbackCalendar(calendars);
+    if (fallback) return fallback;
+    throw err;
+  }
+}
+
+async function createPhoneEvent(calendar, item) {
+  const event = await calendar.createEvent(buildEventPayload(item));
+  return event.id;
+}
+
+async function deletePhoneEvent(eventId) {
+  const event = await Calendar.ExpoCalendarEvent.get(eventId);
+  await event.delete();
 }
 
 function buildEventPayload(item) {
@@ -88,8 +122,7 @@ function buildEventPayload(item) {
 
 export async function saveEventToPhoneCalendar(item) {
   try {
-    const { status } = await Calendar.requestCalendarPermissionsAsync();
-    if (status !== "granted") {
+    if (!(await hasCalendarPermission())) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.takvim_izni_reddedildi", "Takvim izni reddedildi") });
       return { ok: false };
     }
@@ -104,9 +137,8 @@ export async function saveEventToPhoneCalendar(item) {
       return { ok: false, alreadySaved: true };
     }
 
-    const calendarId = await getOrCreateCalendarId();
-    const payload = buildEventPayload(item);
-    const eventId = await Calendar.createEventAsync(calendarId, payload);
+    const calendar = await getOrCreateCalendar();
+    const eventId = await createPhoneEvent(calendar, item);
 
     map[key] = { eventId, savedAt: Date.now() };
     await setSavedMap(map);
@@ -130,15 +162,14 @@ export async function saveManyEventsToPhoneCalendar(items) {
   }
 
   try {
-    const { status } = await Calendar.requestCalendarPermissionsAsync();
-    if (status !== "granted") {
+    if (!(await hasCalendarPermission())) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.takvim_izni_reddedildi", "Takvim izni reddedildi") });
       return { added: 0, skipped: 0, failed: 0, total: items.length };
     }
 
-    let calendarId;
+    let calendar;
     try {
-      calendarId = await getOrCreateCalendarId();
+      calendar = await getOrCreateCalendar();
     } catch (err) {
       Toast.show({
         type: "error",
@@ -161,8 +192,7 @@ export async function saveManyEventsToPhoneCalendar(items) {
         continue;
       }
       try {
-        const payload = buildEventPayload(item);
-        const eventId = await Calendar.createEventAsync(calendarId, payload);
+        const eventId = await createPhoneEvent(calendar, item);
         map[key] = { eventId, savedAt: Date.now() };
         addedKeys.push(key);
         added++;
@@ -208,7 +238,7 @@ export async function removeEventFromPhoneCalendar(item) {
     const map = await getSavedMap();
     if (!map[key]) return { ok: false };
     try {
-      await Calendar.deleteEventAsync(map[key].eventId);
+      await deletePhoneEvent(map[key].eventId);
     } catch (err) {
       console.warn("Phone calendar delete error:", err);
     }
@@ -228,8 +258,7 @@ export async function removeManyEventsFromPhoneCalendar(items) {
   }
 
   try {
-    const { status } = await Calendar.requestCalendarPermissionsAsync();
-    if (status !== "granted") {
+    if (!(await hasCalendarPermission())) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.takvim_izni_reddedildi", "Takvim izni reddedildi") });
       return { removed: 0, skipped: 0, failed: 0, total: items.length };
     }
@@ -247,7 +276,7 @@ export async function removeManyEventsFromPhoneCalendar(items) {
         continue;
       }
       try {
-        await Calendar.deleteEventAsync(map[key].eventId);
+        await deletePhoneEvent(map[key].eventId);
         delete map[key];
         removedKeys.push(key);
         removed++;

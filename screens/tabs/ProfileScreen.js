@@ -1,10 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-} from "react-native";
+import React, { useCallback, useMemo, useState } from "react";
+import { View, StyleSheet, ScrollView } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import useTabBarScrollSync from "../../hooks/useTabBarScrollSync";
@@ -15,34 +10,27 @@ import ProfileLists from "./profile/ProfileLists";
 import { useAuth } from "../../context/AuthContext";
 import { useFriends } from "../../context/FriendsContext";
 import { useUnreadMessages } from "../../context/UnreadMessagesContext";
-import { AvatarSkeleton } from "../../components/Skeleton";
-import UserAvatar from "../../components/common/UserAvatar";
 import { useProfileStats } from "../../context/ProfileStatsContext";
 import { useProfileUi } from "../../context/ProfileUiContext";
 import NotesCard from "./profile/NotesCard";
 import RemindersPreviewButton from "./profile/RemindersPreviewButton";
 import MyActivityButton from "./profile/MyActivityButton";
 import FriendsActionBar from "../../components/profile/FriendsActionBar";
-import {
-  CircularProgressBase,
-} from "react-native-circular-progress-indicator";
 import ScreenDecor from "../../components/ScreenDecor";
 // BackButton bilinçli olarak yok: profil sekme kökü olarak render edilir
 // (TabScreenNavigator), stack'e push edilmez — buton yalnızca üstteki ekrandan
 // dönerken "hayalet" olarak belirip kalıyordu.
 import StatisticsSection from "./profile/StatisticsSection";
+import OwnFavoritesCard from "../../components/favorites/OwnFavoritesCard";
 import { useUserProfile } from "../../context/UserProfileContext";
 import { propagateProfileChange } from "../../services/profilePropagation";
-import { i18nText } from "../../utils/i18nText";
 import * as Haptics from "../../services/hapticsService";
 import ProfileAvatarPickerModal from "../../components/profile/ProfileAvatarPickerModal";
 import AvatarPreviewModal from "../../components/profile/AvatarPreviewModal";
 import ProfileIdentityBlock from "../../components/profile/ProfileIdentityBlock";
+import ProfileAvatarHalo from "../../components/profile/ProfileAvatarHalo";
 import WatchBadgeStrip from "../../components/profile/WatchBadgeStrip";
 import { useWatchProgressContext } from "../../context/WatchProgressContext";
-import { odulAdi, odulBasligi } from "../../components/badges/badgeMeta";
-import { PERDE_ADLARI } from "../../utils/watchScoring";
-import { toast } from "../../components/AppToast";
 import ProfileStoryModal from "../../components/storyShare/ProfileStoryModal";
 import { getIdentityBadges } from "../../components/badges/badgeCatalog";
 import { usePremium } from "../../context/PremiumContext";
@@ -113,51 +101,11 @@ const ProfileScreen = ({ navigation }) => {
     [navigation]
   );
 
-  // Rozet/Perde kutlaması. Push bildirimi YOK (bir izleme rozeti telefonu
-  // titretmeyi hak etmez) ve ilk tohumlamada hiç tetiklenmez — mevcut kullanıcı
-  // 30 rozetlik bir bildirim yağmuruna tutulmaz (docs §6.1).
-  const { kutlama, kutlamayiKapat } = watchProgress;
-  useEffect(() => {
-    if (!kutlama) return;
-    // Ad çözümü KATALOG DIŞINI da kapsar: koleksiyon, dönem mührü ve prestij
-    // basamakları da defterde normal rozet gibi durur ama WATCH_BADGE_BY_ID'de
-    // yoktur — düz katalog aramasıyla bu üçünün kutlaması hiç oynamıyordu.
-    const lang = language === "en" ? "en" : "tr";
-    const ilkId = kutlama.rozetler?.[0] || null;
-    const ilkAd = ilkId ? odulAdi(ilkId, lang) : null;
-    if (ilkAd) {
-      const ek =
-        kutlama.rozetler.length > 1 ? ` +${kutlama.rozetler.length - 1}` : "";
-      toast.success(odulBasligi(ilkId, lang), ilkAd + ek);
-    } else if (kutlama.perdeAtladi) {
-      toast.success(
-        i18nText(
-          "autoI18n.perde_atlandi",
-          `Perde ${kutlama.yeniPerde}'e yükseldin`,
-          { n: kutlama.yeniPerde }
-        ),
-        PERDE_ADLARI[kutlama.yeniPerde - 1] || ""
-      );
-    } else if (kutlama.makaraAtladi) {
-      // Makara ayrı bildirilir: zirvedeki kullanıcının Perdesi değişmiyor,
-      // "Perde 20'e yükseldin" demek yanlış olurdu.
-      toast.success(
-        i18nText("autoI18n.makara_atlandi", `${kutlama.yeniMakara}. Makara`, {
-          n: kutlama.yeniMakara,
-        }),
-        PERDE_ADLARI[PERDE_ADLARI.length - 1]
-      );
-    }
-    kutlamayiKapat();
-  }, [kutlama, kutlamayiKapat, language]);
+  // Rozet/Perde kutlaması ARTIK burada değil: WatchProgressProvider içinde, profil
+  // sekmesi hiç açılmamış olsa da oynar (hooks/useBadgeCelebration.js).
 
 
 
-  const props = {
-    activeStrokeWidth: 11,
-    inActiveStrokeWidth: 11,
-    inActiveStrokeOpacity: 0.05,
-  };
   // Film + dizi izleme dakikaları TEK bir toplamda birleşiyor — avatarın
   // etrafında artık film/dizi için ayrı iki halka değil, ikisinin toplamına
   // göre dolan TEK bir halka var (bkz. ProfileStatsContext.rankInfo).
@@ -204,6 +152,17 @@ const ProfileScreen = ({ navigation }) => {
     [navigation]
   );
 
+  // Halka bileşeni memo'lu; işleyici referanslarını sabit tutarak ilgisiz
+  // profil render'larında yeniden çizdirmiyoruz.
+  const openAvatarPicker = useCallback(
+    () => setModalVisible(true),
+    [setModalVisible]
+  );
+  const openAvatarPreview = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowAvatarPreview(true);
+  }, []);
+
   const handleAvatarSelect = useCallback(
     async (index) => {
       const changed = index !== selectAvatarIndex;
@@ -236,58 +195,18 @@ const ProfileScreen = ({ navigation }) => {
           style={[styles.container, { backgroundColor: "transparent" }]}
         >
           <View style={styles.images}>
-            <TouchableOpacity
-              onPress={() => {
-                setModalVisible(true);
-              }}
-              onLongPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                setShowAvatarPreview(true);
-              }}
-              delayLongPress={220}
-              activeOpacity={0.85}
-              style={styles.profilImageTouch}
-            >
-              {isloadingAvatar ? (
-                <AvatarSkeleton />
-              ) : (
-                <View style={styles.avatarProgressWrapper}>
-                  <View style={styles.circularProgress}>
-                    {!modalVisible && (
-                      <CircularProgressBase
-                        {...props}
-                        value={safeProgress}
-                        maxValue={100}
-                        radius={78}
-                        inActiveStrokeColor={borderColor2 || "#C25AFF"}
-                        activeStrokeColor={borderColor || "#C25AFF"}
-                        activeStrokeSecondaryColor={borderColor2 || "#C25AFF"}
-                        duration={500}
-                        showProgressValue={false}
-                      />
-                    )}
-                  </View>
-                  <View
-                    style={[
-                      styles.avatarShadowWrapper,
-                      {
-                        backgroundColor: theme.primary,
-                      },
-                    ]}
-                  >
-                    <UserAvatar
-                      source={avatar}
-                      fallbackSource={require("../../assets/avatar/3.png")}
-                      isCustomPhoto={selectAvatarIndex === -1}
-                      size={128}
-                      style={{ backgroundColor: theme.primary }}
-                      priority="high"
-                      cachePolicy="memory-disk"
-                    />
-                  </View>
-                </View>
-              )}
-            </TouchableOpacity>
+            <ProfileAvatarHalo
+              source={avatar}
+              isCustomPhoto={selectAvatarIndex === -1}
+              loading={isloadingAvatar}
+              progress={safeProgress}
+              ringColor={borderColor}
+              ringColor2={borderColor2}
+              ringHidden={modalVisible}
+              backgroundColor={theme.primary}
+              onPress={openAvatarPicker}
+              onLongPress={openAvatarPreview}
+            />
             <ProfileIdentityBlock
               theme={theme}
               language={language}
@@ -348,6 +267,7 @@ const ProfileScreen = ({ navigation }) => {
             onTimeClick={handleTimeClick}
             t={t}
           />
+          <OwnFavoritesCard navigation={navigation} />
           <ProfileLists navigation={navigation} />
           <MyActivityButton navigation={navigation} />
           <RemindersPreviewButton navigation={navigation} />
@@ -392,16 +312,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#000",
   },
-  circularProgress: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: -2,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   editProfileButton: {
     width: 34,
     height: 34,
@@ -424,41 +334,11 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
   },
-  // Halka radius=78 (SVG'de dış çap = radius*2, bkz.
-  // react-native-circular-progress-indicator/progressCircle) → 156x156.
-  // Avatar fotoğrafı 128x128'e büyüdü, aradaki boşluk (156-128)/2 = 14px —
-  // eskisi gibi dar bir boşluk, halka artık avatara çok daha yakın oturuyor.
-  avatarProgressWrapper: {
-    width: 156,
-    height: 156,
-    borderRadius: 78,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarShadowWrapper: {
-    width: 128,
-    height: 128,
-    borderRadius: 64,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
-  },
   avatarInnerContainer: {
     width: 128,
     height: 128,
     borderRadius: 64,
     overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  profilImageTouch: {
-    width: 156,
-    height: 156,
-    borderRadius: 78,
     justifyContent: "center",
     alignItems: "center",
   },

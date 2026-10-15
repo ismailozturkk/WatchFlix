@@ -15,6 +15,7 @@ import { selectionAsync } from "../../services/hapticsService";
 import { alpha } from "../../theme/colors";
 import { isLightSurface } from "../../utils/colorUtils";
 import { surfaceBlurAppearance } from "../../utils/surfaceBlur";
+import { TAB_BAR_COLLAPSE_SCALE_DELTA } from "../../utils/tabBarCollapse";
 import { TAB_NAMES } from "../../utils/tabBarModel";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 
@@ -34,8 +35,14 @@ const DRAG_RELEASE_BOUNCE = { mass: 0.7, damping: 11, stiffness: 210 };
 // bar's padding as headroom without touching its outer rounded edge.
 const DRAG_SCALE_X = 1.24;
 const DRAG_SCALE_Y = 1.22;
-// How much the bar shrinks/rises at full scroll-collapse (progress = 1).
-const COLLAPSE_SCALE_DELTA = 0.15;
+// How much the bar shrinks/rises at full scroll-collapse (progress = 1): 20%
+// smaller (TAB_BAR_COLLAPSE_SCALE_DELTA, shared with the native iOS 26 bar).
+// translateY is applied AFTER the scale (so it is scaled too: 8 * 0.8 = 6.4px),
+// which almost exactly cancels the 6px the centred scale lifts the bottom edge
+// by — the bar shrinks toward its own bottom edge instead of floating up.
+// (Local copy: the worklet below then captures a plain number, not the whole
+// imported module object.)
+const COLLAPSE_SCALE_DELTA = TAB_BAR_COLLAPSE_SCALE_DELTA;
 const COLLAPSE_TRANSLATE_Y = 8;
 
 class GlassBoundary extends React.Component {

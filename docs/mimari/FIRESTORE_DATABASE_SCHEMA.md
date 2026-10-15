@@ -42,6 +42,14 @@ Firestore Root
 │   │   │     watchList: true,
 │   │   │     favorites: true
 │   │   │   }
+│   │   ├── fourFavorites: map = {            // "Dört favori": profil vitrini. Alan YOKSA = hiç seçilmedi
+│   │   │     movies: [ { id: 27205, title: "Inception", image: "/ljsZ...jpg", year: "2010" } ],   // en fazla 4
+│   │   │     shows:  [ { id: 1396,  title: "Breaking Bad", image: "/ggF...jpg", year: "2008" } ], // en fazla 4
+│   │   │     people: [ { id: 2524,  title: "Tom Hardy",    image: "/yVG...jpg" } ]                // en fazla 4 (title = ad)
+│   │   │   }                                  // sıra = seçilme sırası; kural: kategori başına ≤ 4 (firestore.rules → fourFavoritesOk)
+│   │   │                                      // YAZAN: Profili Düzenle (Kaydet) veya tanıtımdan taşıma (services/fourFavoritesService.adoptPendingFavorites)
+│   │   │                                      // OKUYAN: arkadaş profili + kendi profil kartı (privacy.profile'a tabi), Film/Dizi sekmesi "Favorilerine Göre" rayı, AI bağlamı
+│   │   │                                      // Boş yapı ({movies:[],shows:[],people:[]}) "hepsini kaldırdı" demek; alanı SİLME — tanıtım kopyası geri sızar
 │   │   ├── notificationSettings: map = {
 │   │   │     streamingEnabled: true,
 │   │   │     sound: true,
@@ -224,6 +232,10 @@ Firestore Root
 │   │   ├── admins: array<string> = [ "usr_friend456" ]
 │   │   ├── createdBy: string = "usr_abc123"
 │   │   ├── lastMessage: string = "Bu haftanın filmini seçelim:"
+│   │   ├── unread: map<uid, int> = { usr_friend456: 2, usr_caner789: 0 }
+│   │   │     (üye başına okunmamış mesaj sayısı: gönderen, mesajla AYNI batch'te
+│   │   │      diğer üyeler için increment(1) yazar; üye sohbeti görünürken kendi
+│   │   │      anahtarını 0 yapar. 1-1'deki Users/{uid}/conversations.unreadCount'un karşılığı)
 │   │   ├── createdAt: timestamp = 2026-03-01T15:30:00Z
 │   │   └── updatedAt: timestamp = 2026-08-21T02:00:00Z
 │   │

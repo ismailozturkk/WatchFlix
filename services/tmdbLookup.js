@@ -4,8 +4,8 @@
 // arayıp poster kartı verisine çevirir. Sonuçlar bellek içi cache'lenir, böylece
 // aynı başlık tekrar sorulmaz.
 //
-// Card = { key, mediaType, query, found, id?, title?, posterPath?, year?, rating?,
-//          overview?, runtimeMinutes?, genres?, director?, cast?, providers?, similar? }
+// Card = { key, mediaType, query, found, id?, title?, posterPath?, backdropPath?, year?, rating?,
+//          overview?, tagline?, runtimeMinutes?, genres?, director?, cast?, providers?, similar? }
 
 import * as cacheStore from "../utils/cacheStore";
 import { shouldPersistInternetData } from "../utils/dataCacheSettings";
@@ -16,12 +16,14 @@ import {
 } from "../utils/tmdbTitleFallback";
 
 const cache = new Map(); // key -> Card
+// Kart şekli değişince artır: diskteki eski kartlar (ör. backdropPath yok) yeniden çekilir.
+const CARD_VERSION = "v2";
 
 const langOf = (language) => (language === "tr" ? "tr-TR" : "en-US");
 // Yetişkin içerik açıkken anahtara "+adult" ekleniyor: ayar sonradan
 // kapatıldığında önbellekte kalmış yetişkin kart geri dönmesin.
 const cacheKey = (mediaType, language, title, includeDetails = false, includeAdult = false) =>
-  `${mediaType}|${langOf(language)}|${title.toLowerCase().trim()}|${includeDetails ? "details" : "card"}${includeAdult ? "|+adult" : ""}`;
+  `${mediaType}|${langOf(language)}|${title.toLowerCase().trim()}|${includeDetails === "lite" ? "lite" : includeDetails ? "details" : "card"}${includeAdult ? "|+adult" : ""}|${CARD_VERSION}`;
 const regionOf = (language) => (language === "tr" ? "TR" : "US");
 
 function cardFromResult(result, mediaType, query) {
@@ -34,6 +36,7 @@ function cardFromResult(result, mediaType, query) {
     id: result.id,
     title: result.title || result.name || query,
     posterPath: result.poster_path || null,
+    backdropPath: result.backdrop_path || null,
     year: dateStr ? String(dateStr).slice(0, 4) : "",
     rating: typeof result.vote_average === "number" ? result.vote_average : 0,
   };
@@ -53,6 +56,8 @@ function mergeDetails(card, details, language) {
     ...card,
     title: details.title || details.name || card.title,
     posterPath: details.poster_path || card.posterPath,
+    backdropPath: details.backdrop_path || card.backdropPath || null,
+    tagline: details.tagline || "",
     overview: details.overview || "",
     runtimeMinutes: Number(runtime) > 0 ? Number(runtime) : 0,
     genres: (details.genres || []).map((genre) => genre?.name).filter(Boolean),
@@ -72,7 +77,8 @@ function mergeDetails(card, details, language) {
  * @param {"movie"|"tv"} opts.mediaType
  * @param {string} [opts.language]
  * @param {boolean} [opts.includeAdult]
- * @param {boolean} [opts.includeDetails]
+ * @param {boolean|"lite"} [opts.includeDetails]  true = tam (oyuncu, benzer yapım, çeviriler);
+ *   "lite" = süre + tür + platform (öneri satırları için; tek ek istek, benzer yapım çözümü yok)
  * @returns {Promise<Card>}
  */
 export async function lookupTitle({
@@ -149,7 +155,9 @@ export async function lookupTitle({
       try {
         const detailsUrl = `https://api.themoviedb.org/3/${mediaType}/${best.id}` +
           `?language=${langOf(language)}` +
-          "&append_to_response=credits%2Cwatch%2Fproviders%2Crecommendations%2Ctranslations";
+          (includeDetails === "lite"
+            ? "&append_to_response=watch%2Fproviders"
+            : "&append_to_response=credits%2Cwatch%2Fproviders%2Crecommendations%2Ctranslations");
         const detailsRes = await fetch(detailsUrl, { headers: { Authorization: apiKey } });
         if (detailsRes.ok) {
           let details = await detailsRes.json();

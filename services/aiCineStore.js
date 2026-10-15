@@ -28,12 +28,39 @@ export async function loadCineConversations() {
   return [...parsed].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 }
 
-/** Tüm listeyi diske yazar (en yeni en üstte, MAX ile sınırlı). */
-export async function persistCineConversations(list) {
+/** Geçerli bir saklama sınırı ya da varsayılan (Ayarlar > Yapay zeka > Saklanacak sohbet). */
+const limitOf = (limit) => {
+  const n = Math.floor(Number(limit));
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, MAX_CONVERSATIONS) : MAX_CONVERSATIONS;
+};
+
+/** Tüm listeyi diske yazar (en yeni en üstte, `limit` ile sınırlı; en fazla MAX). */
+export async function persistCineConversations(list, limit) {
   const trimmed = [...list]
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-    .slice(0, MAX_CONVERSATIONS);
+    .slice(0, limitOf(limit));
   return set(Keys.aiCineConversations, trimmed) ? trimmed : list;
+}
+
+/** Kayıtlı sohbetleri yeni sınıra indirir (en eskiler silinir). Güncel listeyi döndürür. */
+export function trimCineConversations(limit) {
+  const operation = mutationQueue.then(async () => {
+    const current = await loadCineConversations();
+    if (current.length <= limitOf(limit)) return current;
+    return persistCineConversations(current, limit);
+  });
+  mutationQueue = operation.catch(() => []);
+  return operation;
+}
+
+/** Kayıtlı tüm sohbetleri siler. */
+export function clearCineConversations() {
+  const operation = mutationQueue.then(async () => {
+    set(Keys.aiCineConversations, []);
+    return [];
+  });
+  mutationQueue = operation.catch(() => []);
+  return operation;
 }
 
 /** Bir sohbeti listeye ekler/günceller. */
@@ -44,7 +71,7 @@ export function upsertCineConversation(list, conversation) {
 }
 
 /** Cevabı yeni sohbet olarak ekler; aynı id geldiyse mevcut sohbeti günceller. */
-export function saveCineConversation(conversation) {
+export function saveCineConversation(conversation, { limit } = {}) {
   const operation = mutationQueue.then(async () => {
     if (!conversation?.id) return loadCineConversations();
 
@@ -58,7 +85,7 @@ export function saveCineConversation(conversation) {
       updatedAt: conversation.updatedAt || now,
     };
 
-    return persistCineConversations(upsertCineConversation(current, merged));
+    return persistCineConversations(upsertCineConversation(current, merged), limit);
   });
 
   mutationQueue = operation.catch(() => []);

@@ -36,12 +36,28 @@
 // `known === null` (v1 defteri) = "bu defter bugünkü katalogla yazılmış" demektir;
 // o an hiçbir şey emilmez, alan yalnızca doldurulur. Aksi halde göç anında
 // kullanıcının gerçekten yeni kazandığı bir rozetin kutlaması yutulurdu.
-export const LEDGER_SURUM = 2;
+//
+// v3: `earnedAt` eklendi — KAZANMA TARİHİ.
+//
+// Defter bir rozetin kazanılıp kazanılmadığını biliyordu ama NE ZAMAN kazanıldığını
+// bilmiyordu; bu yüzden detay sayfası "Kazanıldı" diyebiliyor, "12 Mart'ta" diyemiyordu
+// ve "son kazanılanlar" diye bir görünüm kurulamıyordu. Tarih cihaz saatiyle gerçek
+// kazanma ANINDAN yazılır (kullanıcının seçtiği izleme tarihinden değil) ve yalnızca
+// bir kez, ilk yazıldığı gibi kalır.
+//
+// BİLEREK TARİHSİZ KALANLAR: sessiz tohumlama ve katalog genişlemesiyle emilen
+// rozetler. Onları gerçekte ne zaman kazandığını bilmiyoruz; bugünün tarihini
+// damgalamak yalan olurdu. Arayüz bunları "arşivden" diye etiketler.
+//
+// Alan eksikse (v2 defteri) boş haritaya iner — göç gerekmez, v2 defterindeki
+// rozetler tarihsiz sayılır.
+export const LEDGER_SURUM = 3;
 
 export const bosLedger = () => ({
   v: LEDGER_SURUM,
   baseline: null,           // { kare, perde, badgeIds[], seenAt } — tohumlama anı
   earned: { badgeIds: [], perdeFloor: 1, makaraFloor: 0 },   // ASLA küçülmez
+  earnedAt: {},             // id → "YYYY-MM-DD" · yalnız bu defter yazarken görülenler
   seen: [],                 // kutlaması gösterilmiş id'ler
   known: null,              // katalogda GÖRÜLMÜŞ id'ler · null = v1 defteri
   aktiflik: bosAktiflik(),  // gerçek işaretleme anından türeyen seri
@@ -65,6 +81,18 @@ const tamsayi = (v, alt = 1) => {
   return Number.isFinite(n) && n >= alt ? n : alt;
 };
 
+const GUN_ANAHTARI = /^\d{4}-\d{2}-\d{2}$/;
+
+/** id → "YYYY-MM-DD" haritasını güvenli biçime indirger; bozuk girdiyi atar. */
+function tarihHaritasi(v) {
+  const out = {};
+  if (!v || typeof v !== "object" || Array.isArray(v)) return out;
+  for (const [id, gun] of Object.entries(v)) {
+    if (typeof gun === "string" && GUN_ANAHTARI.test(gun)) out[id] = gun;
+  }
+  return out;
+}
+
 /** Bilinmeyen/bozuk JSON'u güvenli biçime indirger. Asla atmaz. */
 export function normalizeLedger(raw) {
   const bos = bosLedger();
@@ -85,6 +113,7 @@ export function normalizeLedger(raw) {
       perdeFloor: tamsayi(raw.earned?.perdeFloor, 1),
       makaraFloor: tamsayi(raw.earned?.makaraFloor, 0),
     },
+    earnedAt: tarihHaritasi(raw.earnedAt),
     seen: dizi(raw.seen),
     // `null` ile `[]` AYRI şeyler: null = v1 defteri (katalog bilgisi hiç
     // yazılmamış), [] = katalog bilgisi yazılmış ama boş. İkisini birleştirmek
@@ -121,6 +150,8 @@ export function tohumla(ledger, {
     v: LEDGER_SURUM,
     baseline: { kare: Math.max(0, Number(kare) || 0), perde: tamsayi(perde, 1), badgeIds: ids, seenAt },
     earned: { badgeIds: ids, perdeFloor: tamsayi(perde, 1), makaraFloor: tamsayi(makara, 0) },
+    // Tohumlanan rozetlerin kazanma günü BİLİNMİYOR; uydurulmaz (v3 notu).
+    earnedAt: {},
     seen: ids,                                    // kutlama tetiklenmesin
     // Katalogun TAMAMI bilinir sayılır — yalnızca açık olanlar değil. Kilitli bir
     // rozeti "bilinmiyor" bırakmak, kullanıcı onu ilk kez hak ettiğinde katalog
@@ -197,7 +228,7 @@ export function rekorYukselt(ledger, { rekorGun = 0, rekorHafta = 0 } = {}) {
  * Yeni hesaplamayı deftere işler. earned MONOTON birleşir, perdeFloor yalnız
  * yükselir. Döndürdüğü `yeniRozetler` kutlanacak olanlardır.
  */
-export function birlestir(ledger, { badgeIds = [], tumIds = null, perde = 1, makara = 0 } = {}) {
+export function birlestir(ledger, { badgeIds = [], tumIds = null, perde = 1, makara = 0, bugun = null } = {}) {
   const l = normalizeLedger(ledger);
   const gelen = [...new Set(dizi(badgeIds))];
   const oncekiSet = new Set(l.earned.badgeIds);
@@ -230,6 +261,16 @@ export function birlestir(ledger, { badgeIds = [], tumIds = null, perde = 1, mak
   const yeniGorulmus = sessizler.filter((id) => !l.seen.includes(id));
   const knownDegisti = katalog ? (l.known === null || known !== l.known) : false;
 
+  // KAZANMA GÜNÜ yalnız GERÇEKTEN kazanılanlara yazılır (`yeniRozetler`); sessizce
+  // emilenler (katalog genişlemesi) tarihsiz kalır. `bugun` verilmezse hiçbir şey
+  // damgalanmaz — eski çağrı biçimi ve testler v2 davranışında kalır. Var olan bir
+  // tarih ASLA ezilmez: ilk damga kalıcıdır.
+  const damgaGunu = typeof bugun === "string" && GUN_ANAHTARI.test(bugun) ? bugun : null;
+  const yeniDamgalar = damgaGunu ? yeniRozetler.filter((id) => !l.earnedAt[id]) : [];
+  const earnedAt = yeniDamgalar.length
+    ? { ...l.earnedAt, ...Object.fromEntries(yeniDamgalar.map((id) => [id, damgaGunu])) }
+    : l.earnedAt;
+
   const oncekiPerde = l.earned.perdeFloor;
   const yeniPerdeFloor = Math.max(oncekiPerde, tamsayi(perde, 1));
   const oncekiMakara = l.earned.makaraFloor;
@@ -244,6 +285,7 @@ export function birlestir(ledger, { badgeIds = [], tumIds = null, perde = 1, mak
       perdeFloor: yeniPerdeFloor,
       makaraFloor: yeniMakaraFloor,
     },
+    earnedAt,
     seen: yeniGorulmus.length ? [...l.seen, ...yeniGorulmus] : l.seen,
     known,
     aktiflik: l.aktiflik,   // bu fonksiyonun konusu değil, ama DÜŞÜRÜLEMEZ

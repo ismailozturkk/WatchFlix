@@ -3,9 +3,8 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import Animated from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MovieOscar from "../movie/MovieOscar";
 import MovieProviders from "../movie/MovieProvders";
 import MovieNowPlaying from "../movie/MovieNowPlaying";
@@ -19,7 +18,7 @@ import MovieCollection from "../movie/MovieCollection";
 import { useLanguage } from "../../context/LanguageContext";
 import { useMovie } from "../../context/MovieContex";
 import ScreenDecor from "../../components/ScreenDecor";
-import DiscoverSearchButton from "../../components/home/DiscoverSearchButton";
+import DiscoverSearchHeader from "../../components/home/DiscoverSearchHeader";
 import usePullToRefresh from "../../hooks/usePullToRefresh";
 import { markTabScroll } from "../../components/navigation/TabScrollMarker";
 import DiscoveryMediaRail from "../../components/DiscoveryMediaRail";
@@ -29,13 +28,11 @@ import {
 } from "../../context/AppSettingsContext";
 import { useProfileStats } from "../../context/ProfileStatsContext";
 import { resolveOnboardingGenreIds } from "../../utils/onboardingPreferences";
+import FavoritesRecommendationRail from "../../components/favorites/FavoritesRecommendationRail";
+import { useUserProfile } from "../../context/UserProfileContext";
+import { hasRecommendationSignal, readProfileFavorites } from "../../utils/fourFavorites";
 
 const INITIAL_SECTION_COUNT = 2;
-
-// Arama çubuğunun üst boşluğu: güvenli alanın en az SEARCH_TOP_GAP altında,
-// ama eski değerin (50) hiçbir cihazda üstüne çıkmadan.
-const SEARCH_TOP_PADDING_MIN = 50;
-const SEARCH_TOP_GAP = 16;
 
 // iOS sekme çubuğunun "aşağı kaydırınca küçül" davranışı için listeyi sekme
 // ekranına tanıtır (bkz. components/navigation/TabScrollMarker.js). Modül
@@ -47,10 +44,6 @@ export default function MovieScreen({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
   const { refreshAllMovies } = useMovie();
-  // Ekran kenardan kenara; arama çubuğu durum çubuğuna/çentiğe yapışmasın diye
-  // üst boşluk güvenli alana bağlı (eski sabit 50, Dynamic Island'da yetmiyordu).
-  const insets = useSafeAreaInsets();
-  const searchTopPadding = Math.max(SEARCH_TOP_PADDING_MIN, insets.top + SEARCH_TOP_GAP);
 
   const { streamingProviderIds } = useStreamingProviderSettings();
   const { onboardingGenreKeys } = useDiscoveryPreferenceSettings();
@@ -59,25 +52,13 @@ export default function MovieScreen({ navigation }) {
     [onboardingGenreKeys],
   );
   const { topMovieGenres } = useProfileStats();
-  const searchInputRef = useRef(null);
-  const openSearch = useCallback(() => {
-    const navigateToSearch = (searchOrigin) => {
-      navigation.navigate("UnifiedSearch", {
-        initialType: "movie",
-        autoFocus: true,
-        searchOrigin,
-      });
-    };
-
-    if (searchInputRef.current?.measureInWindow) {
-      searchInputRef.current.measureInWindow((x, y, width, height) => {
-        navigateToSearch({ x, y, width, height });
-      });
-      return;
-    }
-
-    navigateToSearch(undefined);
-  }, [navigation]);
+  // Dört favoriden (film + oyuncu) öneri kaynağı var mı? Boolean olduğu için
+  // profildeki ilgisiz değişiklikler bölüm listesini yeniden kurmaz.
+  const { profile } = useUserProfile();
+  const hasFavoriteSignal = useMemo(
+    () => hasRecommendationSignal(readProfileFavorites(profile), "movie"),
+    [profile],
+  );
   const { refreshing, animatedSearchStyle, onScroll, handleRefresh } =
     usePullToRefresh(refreshAllMovies);
 
@@ -85,6 +66,10 @@ export default function MovieScreen({ navigation }) {
     () => [
       { key: "trends", Component: MovieTrends },
       { key: "bests", Component: MovieBests },
+      // Kaydırınca yüklenen ilk bölümlerden biri: açılışta ağ isteği yaratmaz.
+      ...(hasFavoriteSignal
+        ? [{ key: "fromFavorites", Component: FavoritesRecommendationRail }]
+        : []),
       ...(streamingProviderIds.length > 0
         ? [{ key: "subscriptions", Component: DiscoveryMediaRail, preset: "subscriptions" }]
         : []),
@@ -102,7 +87,7 @@ export default function MovieScreen({ navigation }) {
       { key: "genres", Component: MovieGenres },
       { key: "upcoming", Component: MovieUpcoming },
     ],
-    [onboardingGenreIds, streamingProviderIds, topMovieGenres],
+    [hasFavoriteSignal, onboardingGenreIds, streamingProviderIds, topMovieGenres],
   );
 
   const [visibleSectionCount, setVisibleSectionCount] = useState(INITIAL_SECTION_COUNT);
@@ -128,18 +113,18 @@ export default function MovieScreen({ navigation }) {
     [navigation],
   );
 
-  const renderHeader = useCallback(
+  // ELEMENT olarak verilir (geri çağrı değil): FlatList fonksiyonu bileşen tipi
+  // sayar, kimliği değişince başlık sökülüp yeniden kurulur ve düğme sıfırlanır.
+  const searchHeader = useMemo(
     () => (
-      <View style={[styles.fakeSearchContainer, { paddingTop: searchTopPadding }]}>
-        <DiscoverSearchButton
-          ref={searchInputRef}
-          onPress={openSearch}
-          placeholder={t.SearchScreen.searchMovies}
-          animatedStyle={animatedSearchStyle}
-        />
-      </View>
+      <DiscoverSearchHeader
+        navigation={navigation}
+        mediaType="movie"
+        placeholder={t.SearchScreen.searchMovies}
+        animatedStyle={animatedSearchStyle}
+      />
     ),
-    [animatedSearchStyle, openSearch, searchTopPadding, t.SearchScreen.searchMovies],
+    [animatedSearchStyle, navigation, t.SearchScreen.searchMovies],
   );
 
   const revealNextSection = useCallback(() => {
@@ -155,7 +140,7 @@ export default function MovieScreen({ navigation }) {
         data={visibleSections}
         keyExtractor={(item) => item.key}
         renderItem={renderSection}
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={searchHeader}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.container, { paddingBottom: contentBottom }]}
         initialNumToRender={INITIAL_SECTION_COUNT}
@@ -180,10 +165,5 @@ export default function MovieScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     paddingBottom: 75,
-  },
-  fakeSearchContainer: {
-    // paddingTop render'da güvenli alana göre verilir (searchTopPadding).
-    paddingHorizontal: 15,
-    zIndex: 10, // Listenin üstünde kalması için
   },
 });

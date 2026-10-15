@@ -1,6 +1,7 @@
 import React, { useCallback, useRef } from "react";
 import { FlatList, View, ActivityIndicator } from "react-native";
 import { useTheme } from "../context/ThemeContext";
+import { useHomeRenderKey } from "../hooks/useHomeContentSettings";
 
 /**
  * Yatay, sonsuz-kaydırmalı poster listesi — tüm bölümlerin (Bests, Genres,
@@ -30,6 +31,12 @@ export default function PaginatedRail({
   ...rest
 }) {
   const { theme } = useTheme();
+  // Poster kalitesi, ray boyutu/köşesi ve rozet ayarları değişince hücreler
+  // yeniden çizilsin: FlatList bir PureComponent ve `data`/`renderItem` kimliği
+  // aynı kalırsa (ör. renderItem useCallback ile sabitlenmişse) satırlara hiç
+  // dokunmaz. Bu anahtar `extraData` olarak ayar değişimini listeye bildirir
+  // (bkz. utils/homeContentSettings.js).
+  const renderKey = useHomeRenderKey();
   // onEndReached'in mount'ta / her render'da gereksiz tetiklenmesini engeller:
   // yalnızca gerçek bir kaydırma jesti (momentum) sonrası bir kez çalışır.
   const canTrigger = useRef(false);
@@ -45,6 +52,7 @@ export default function PaginatedRail({
       data={data}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
+      extraData={renderKey}
       horizontal
       showsHorizontalScrollIndicator={false}
       onMomentumScrollBegin={() => {

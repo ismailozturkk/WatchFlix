@@ -130,6 +130,8 @@ export const BACKUP_EXCLUDED = Object.freeze({
   devPlanOverride: "Yalnız geliştirme build'inde plan simülatörü.",
   selectedAvatar: "Profil görseli hesaba bağlı ve bulutta tutuluyor.",
   hasSeenOnboarding: "Cihaza özel; yedekten dönünce tanıtım yeniden atlanırdı/açılırdı.",
+  pendingFourFavorites: "Hesaba ait veri; kayıt sonrası profile aktarılıp silinen geçici kopya.",
+  favoritesInviteDismissed: "Cihaza özel ipucu bayrağı; yedekten dönünce davet gereksiz yere gizli kalırdı.",
   notificationPrimeShown: "İşletim sistemi bildirim iznine bağlı, cihaza özel.",
   recentUsers: "Hızlı giriş çipleri kullanıcı kimlikleri içerir; dosyada dolaşmamalı.",
   usageStats: "Tanılama sayaçları.",

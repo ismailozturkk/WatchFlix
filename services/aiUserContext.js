@@ -30,7 +30,9 @@ const EMPTY = Object.freeze({
  * Kullanıcı kütüphanesinden prompt bağlamı + yerel eleme indeksi üretir.
  * @param {object} allLists  ListStatusContext.allLists
  * @param {object} options   { watchList, favorites, custom, watched } booleans
- * @param {object} opts      { capPerList }
+ * @param {object} opts      { capPerList, favoritesBlock }
+ *   `favoritesBlock`: "dört favori" için hazır metin (utils/fourFavorites.buildFavoritesPrompt).
+ *   Listelerden ÖNCE gelir — kullanıcının açıkça seçtiği en güçlü zevk işareti.
  */
 export function buildLibraryContext(allLists, options = {}, opts = {}) {
   if (!allLists || typeof allLists !== "object") return EMPTY;
@@ -38,6 +40,9 @@ export function buildLibraryContext(allLists, options = {}, opts = {}) {
 
   const watchedIndex = { movieIds: new Set(), tvIds: new Set(), names: new Set() };
   const blocks = [];
+  if (typeof opts.favoritesBlock === "string" && opts.favoritesBlock.trim()) {
+    blocks.push(opts.favoritesBlock.trim());
+  }
 
   const fmtItems = (arr) =>
     arr

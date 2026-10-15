@@ -36,6 +36,9 @@ import {
 } from "./OnboardingChrome";
 import { CtaSlide, DiscoverSlide, ShowcaseSlide } from "./OnboardingSlides";
 import PreferenceSlide from "./OnboardingPreferences";
+import FavoritesSlide from "./OnboardingFavorites";
+import { readPendingFavorites, writePendingFavorites } from "../../services/pendingFavorites";
+import { countFavorites, emptyFavorites } from "../../utils/fourFavorites";
 import {
   ONBOARDING_STEP_ORDER,
   getOnboardingCopy,
@@ -75,6 +78,10 @@ export default function OnboardingScreen({ navigation }) {
   const [index, setIndex] = useState(0);
   const [selectedGenreKeys, setSelectedGenreKeys] = useState(onboardingGenreKeys);
   const [selectedProviderIds, setSelectedProviderIds] = useState(streamingProviderIds);
+  // Dört favori. Hesap yok → cihaza geçici yazılır, kayıt sonrası profile taşınır
+  // (services/pendingFavorites.js). Önceki oturumdan kalan seçim geri yüklenir.
+  const [favorites, setFavorites] = useState(() => readPendingFavorites() || emptyFavorites());
+  const favoritesRef = useRef(favorites);
 
   const { posters, posterPaths, mediaItems, providerCatalog } = useOnboardingData({
     apiKey: API_KEY,
@@ -153,6 +160,12 @@ export default function OnboardingScreen({ navigation }) {
     [changeStreamingProviderIds],
   );
 
+  const changeFavorites = useCallback((next) => {
+    favoritesRef.current = next;
+    setFavorites(next);
+    writePendingFavorites(next);
+  }, []);
+
   // ── Gezinme ─────────────────────────────────────────────────────────────────
   const goTo = useCallback(
     async (routeName, source) => {
@@ -160,6 +173,8 @@ export default function OnboardingScreen({ navigation }) {
         destination: routeName === "RegisterScreen" ? "register" : "login",
         source: source || "cta",
         duration_seconds: Math.max(1, Math.round((Date.now() - startedAt.current) / 1000)),
+        // Kaç favori seçildi (0 = adım geçildi). Özelliğin tanıtımdaki benimsenmesi.
+        favorites_count: countFavorites(favoritesRef.current),
       });
       set(Keys.hasSeenOnboarding, true);
       navigation.reset({ index: 0, routes: [{ name: routeName }] });
@@ -190,7 +205,6 @@ export default function OnboardingScreen({ navigation }) {
   }, [index, scrollToIndex, count]);
 
   const handleRegister = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     goTo("RegisterScreen", "register_cta");
   }, [goTo]);
 
@@ -258,6 +272,18 @@ export default function OnboardingScreen({ navigation }) {
           cta={copy.cta}
           posters={posters}
           logo={appLogo}
+        />
+      );
+    }
+
+    if (item.type === "preference" && item.kind === "favorites") {
+      return (
+        <FavoritesSlide
+          key={item.kind}
+          {...common}
+          copy={copy}
+          favorites={favorites}
+          onChangeFavorites={changeFavorites}
         />
       );
     }

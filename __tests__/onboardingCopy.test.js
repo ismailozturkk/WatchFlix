@@ -32,6 +32,7 @@ describe("onboarding metinleri", () => {
         ...copy.features,
         copy.genre,
         copy.provider,
+        copy.favorites,
         copy.cta,
       ];
       for (const item of titled) {
@@ -56,8 +57,27 @@ describe("onboarding adım sırası", () => {
       "ai",
       "provider_preferences",
       "profile",
+      "favorites_preferences",
       "account_cta",
     ]);
+  });
+
+  it("favori adımı yalnız sona eklendi: önceki adımların sırası aynı kaldı", () => {
+    const copy = ONBOARDING_COPY.tr;
+    const names = ONBOARDING_STEP_ORDER.map((step) => onboardingStepName(step, copy));
+    expect(names.slice(0, 5)).toEqual([
+      "discover",
+      "genre_preferences",
+      "ai",
+      "provider_preferences",
+      "profile",
+    ]);
+  });
+
+  it("favori sayacı sıfırı ve çoğulu doğru yazıyor", () => {
+    expect(ONBOARDING_COPY.tr.favorites.selected(0)).toBe("Henüz seçmedin");
+    expect(ONBOARDING_COPY.tr.favorites.selected(5)).toBe("5 favori seçildi");
+    expect(ONBOARDING_COPY.en.favorites.selected(0)).toBe("None selected yet");
   });
 
   it("son adım her zaman kayıt/giriş slaytı", () => {

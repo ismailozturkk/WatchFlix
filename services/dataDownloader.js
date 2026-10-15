@@ -29,6 +29,8 @@ import { prefetchImages } from "./imagePrefetch";
 import { buildTmdbUrl } from "../utils/tmdbImageUtils";
 import { i18nText } from "../utils/i18nText";
 import { setCachedValue } from "../utils/apiCache";
+import { adultContentAllowed } from "../utils/ageGate";
+import { adultScoped } from "../utils/homeContentSettings";
 import { cacheKeys } from "../utils/cacheKeys";
 import {
   getAutoDataCacheEnabled,
@@ -342,8 +344,10 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
         const shortLang = language === "tr" ? "tr-TR" : "en-US";
 
         for (const sort of ["vote_count.desc", "popularity.desc"]) {
+          // `/discover` tabanlı listeler yetişkin izniyle kapsamlanır: ekranlar
+          // aynı anahtarı okuyor (bkz. utils/homeContentSettings.js adultScoped).
           count += await cachePagedTmdb(
-            `movie_bests_${shortLang}_${sort}_page_1`,
+            adultScoped(`movie_bests_${shortLang}_${sort}_page_1`, adultContentAllowed()),
             "discover/movie",
             {
               include_null_first_air_dates: "false",
@@ -409,7 +413,7 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
           (data) => data.genres || [],
         );
         count += await cachePagedTmdb(
-          `movie_genres_content_${tmdbLanguage}_p1_g`,
+          adultScoped(`movie_genres_content_${tmdbLanguage}_p1_g`, adultContentAllowed()),
           "discover/movie",
           { language: tmdbLanguage, page: 1 },
           posterPaths,
@@ -441,7 +445,7 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
 
         for (const sort of ["vote_count", "popularity"]) {
           count += await cachePagedTmdb(
-            `tv_bests_${shortLang}_discover_${sort}_page_1`,
+            adultScoped(`tv_bests_${shortLang}_discover_${sort}_page_1`, adultContentAllowed()),
             "discover/tv",
             {
               include_null_first_air_dates: "false",
@@ -479,7 +483,7 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
           (data) => data.genres || [],
         );
         count += await cachePagedTmdb(
-          `tv_genres_content_${tmdbLanguage}_p1_g`,
+          adultScoped(`tv_genres_content_${tmdbLanguage}_p1_g`, adultContentAllowed()),
           "discover/tv",
           { language: tmdbLanguage, page: 1 },
           posterPaths,

@@ -3,75 +3,45 @@
 // CineMatch Pro — yapılandırılmış AI cevaplarının zengin görsel kartları.
 // Her response "type" için ayrı bir kart; ChatBubble type'a göre doğru kartı seçer.
 //
+// Görsellik: poster yelpazeli kart başlığı, backdrop bannerlı yapım detayı,
+// türlü/süreli/platformlu öneri satırları, zevk uyumu rozeti, toplam puanlı
+// karşılaştırma ve süre toplamlı izleme planı. Her yapımın altında tek dokunuşla
+// izleme listesi / favori eylemi (components/ai/AITitleActions) bulunur.
+//
+// Ortak atomlar components/ai/aiCardKit.js'te; kartlar `ctx` nesnesi alır:
+//   { posterMap, getTmdbUrl, theme, t, copy, language, onTitlePress,
+//     tasteGenres, showMatchScore }
 // Tüm renkler tema context'inden gelir; posterler TMDB'den çözülmüş posterMap'ten.
 
-import React, { memo, useState } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-} from "react-native";
+import React, { memo, useMemo, useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import Reanimated, { FadeInUp } from "react-native-reanimated";
 
 import { alpha } from "../theme/colors";
-import { posterKey, safeArr, safeNum, toStr, normMediaType } from "../services/aiCineService";
+import { normMediaType, safeArr, safeNum, toStr } from "../services/aiCineService";
+import { formatDuration, sessionRuntime } from "../services/aiCineInsights";
+import { fillCopy } from "../utils/aiCopy";
 import { i18nText } from "../utils/i18nText";
+import {
+  CardHero,
+  Chip,
+  MatchPill,
+  PosterBox,
+  PosterThumb,
+  Stars,
+  getPoster,
+  matchScoreFor,
+  ratingColor,
+  s as k,
+  unresolvedCard,
+} from "./ai/aiCardKit";
+import AITitleActions from "./ai/AITitleActions";
+import AIResponseFooter from "./ai/AIResponseFooter";
 
 // ── Yardımcılar ───────────────────────────────────────────────────────────────
-
-const ratingColor = (r) => {
-  if (r >= 8) return "#29b864";
-  if (r >= 6) return "#f5c518";
-  if (r >= 4) return "#ff6400";
-  return "#e33";
-};
-
-const getPoster = (posterMap, mediaType, title) =>
-  (posterMap || {})[posterKey(mediaType, title)] || null;
-
-const typeMeta = {
-  recommendations: { icon: "sparkles", key: "recommendations" },
-  comparison: { icon: "git-compare-outline", key: "comparison" },
-  watch_plan: { icon: "calendar-outline", key: "watch_plan" },
-  watchlist: { icon: "list-outline", key: "watchlist" },
-  title_spotlight: { icon: "film-outline", key: "title_spotlight" },
-  general: { icon: "chatbubble-ellipses-outline", key: "general" },
-};
-
-// ── Atomlar ───────────────────────────────────────────────────────────────────
-
-const Stars = memo(({ score, color, size = 12 }) => {
-  const n = Math.round(safeNum(score));
-  return (
-    <View style={{ flexDirection: "row" }}>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <Ionicons
-          key={i}
-          name={i < n ? "star" : "star-outline"}
-          size={size}
-          color={i < n ? color : alpha(color, 0.35)}
-          style={{ marginHorizontal: 0.5 }}
-        />
-      ))}
-    </View>
-  );
-});
-
-const responseTypeLabel = (type, t) => {
-  const fallback = {
-    recommendations: "Sana Özel Öneriler",
-    comparison: "Karşılaştırma",
-    watch_plan: "İzleme Planı",
-    watchlist: "İzleme Listesi",
-    title_spotlight: "Yapım Detayı",
-  };
-  return t?.AICineChat?.responseTypes?.[type] || fallback[type] || "CineMatch";
-};
 
 const metricLabel = (metric, t) => {
   const key = toStr(metric?.key).toLowerCase();
@@ -83,126 +53,83 @@ const sectionLabel = (section, t) => {
   return t?.AICineChat?.sections?.[key] || toStr(section?.name || key);
 };
 
-const formatRuntime = (minutes, t) => {
-  const value = Math.round(safeNum(minutes));
-  return value ? `${value} ${t?.AICineChat?.minutesShort || "dk"}` : "";
-};
+const fanOf = (items, ctx) =>
+  safeArr(items)
+    .map((it) => getPoster(ctx.posterMap, it?.mediaType, toStr(it?.title)))
+    .filter((card) => card?.found && card.posterPath)
+    .map((card) => ctx.getTmdbUrl(card.posterPath, "poster", 154));
 
-const CardHero = memo(({ type, theme, t }) => {
-  const meta = typeMeta[type] || typeMeta.general;
-  return (
-    <LinearGradient
-      colors={[theme.accent, theme.bold]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={s.hero}
-    >
-      <View style={s.heroIcon}>
-        <Ionicons name={meta.icon} size={20} color="#fff" />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={s.heroTitle} numberOfLines={1}>{responseTypeLabel(type, t)}</Text>
-      </View>
-    </LinearGradient>
-  );
-});
-
-/** Poster küçük resmi + başlık; bulunamazsa "ara" çipi. */
-const PosterThumb = memo(
-  ({ item, posterMap, getTmdbUrl, theme, t, onTitlePress, width = 70, showMeta = true }) => {
-    const mediaType = normMediaType(item?.mediaType);
-    const title = toStr(item?.title);
-    const pcard = getPoster(posterMap, mediaType, title);
-    const found = !!pcard?.found;
-    const typeLabel = mediaType === "movie" ? t?.AICineChat?.movie : t?.AICineChat?.series;
-    const typeColor = mediaType === "movie" ? theme.notesColor.blue : theme.notesColor.green;
-    const uri = found && pcard.posterPath ? getTmdbUrl(pcard.posterPath, "poster", 154) : null;
-    const rating = safeNum(pcard?.rating);
-
-    return (
-      <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={() => onTitlePress(pcard || { mediaType, query: title, found: false })}
-        style={{ width }}
-      >
-        <View style={[s.posterWrap, { width, height: width * 1.5, backgroundColor: theme.between }]}>
-          {uri ? (
-            <Image source={{ uri }} style={s.posterImg} contentFit="cover" />
-          ) : (
-            <View style={s.posterFallback}>
-              <Ionicons
-                name={mediaType === "movie" ? "film-outline" : "tv-outline"}
-                size={22}
-                color={theme.text.muted}
-              />
-              {!found && <Ionicons name="search" size={12} color={theme.text.muted} style={{ marginTop: 4 }} />}
-            </View>
-          )}
-          {found && rating > 0 && (
-            <View style={[s.posterBadge, { backgroundColor: alpha(ratingColor(rating), 0.92) }]}>
-              <Text style={s.posterBadgeText}>★ {rating.toFixed(1)}</Text>
-            </View>
-          )}
-          <View style={[s.posterType, { backgroundColor: alpha(theme.primary, 0.8) }]}>
-            <Text style={{ color: typeColor, fontSize: 8, fontWeight: "800" }}>{typeLabel}</Text>
-          </View>
-        </View>
-        <Text numberOfLines={2} style={[s.posterTitle, { color: theme.text.primary }]}>
-          {found ? pcard.title : title}
-        </Text>
-        {showMeta && found && !!pcard.year && (
-          <Text style={[s.posterYear, { color: theme.text.muted }]}>{pcard.year}</Text>
-        )}
-      </TouchableOpacity>
-    );
-  },
-);
+const typeWord = (mediaType, t) =>
+  mediaType === "movie"
+    ? t?.AICineChat?.movie || i18nText("autoI18n.film", "Film")
+    : t?.AICineChat?.series || i18nText("autoI18n.dizi", "Dizi");
 
 // ── 1) Recommendations ────────────────────────────────────────────────────────
 
-const RecommendationsCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress }) => {
-  const items = safeArr(data.items);
+const RecItem = memo(({ item, ctx, last }) => {
+  const { theme, copy, language, posterMap, onTitlePress, t } = ctx;
+  const mediaType = normMediaType(item?.mediaType);
+  const title = toStr(item?.title);
+  const pcard = getPoster(posterMap, mediaType, title);
+  const found = !!pcard?.found;
+  const year = toStr(pcard?.year || item?.year);
+  const runtime = formatDuration(pcard?.runtimeMinutes, language);
+  const genres = safeArr(pcard?.genres).map(toStr).filter(Boolean).slice(0, 3);
+  const providers = safeArr(pcard?.providers).map(toStr).filter(Boolean).slice(0, 2);
+  const reason = toStr(item?.reason || item?.why || item?.hook);
+  const score = matchScoreFor(pcard, ctx);
+  const meta = [typeWord(mediaType, t), year, runtime].filter(Boolean).join(" · ");
+
   return (
-    <View style={[s.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      <CardHero type="recommendations" theme={theme} t={t} />
-      <View style={s.body}>
-        {items.map((it, i) => {
-          const mediaType = normMediaType(it?.mediaType);
-          const pcard = getPoster(posterMap, mediaType, toStr(it?.title));
-          const year = toStr(pcard?.year || it?.year);
-          const rating = safeNum(pcard?.rating || it?.rating);
-          const reason = toStr(it?.reason || it?.why || it?.hook);
-          return (
-            <View
-              key={i}
-              style={[s.recRow, { borderColor: theme.border }, i === items.length - 1 && { borderBottomWidth: 0 }]}
-            >
-              <PosterThumb
-                item={it}
-                posterMap={posterMap}
-                getTmdbUrl={getTmdbUrl}
-                theme={theme}
-                t={t}
-                onTitlePress={onTitlePress}
-                width={62}
-                showMeta={false}
-              />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <View style={s.recMetaRow}>
-                  {!!year && <Text style={[s.metaChipTxt, { color: theme.text.muted }]}>{year}</Text>}
-                  {rating > 0 && (
-                    <Text style={[s.metaChipTxt, { color: ratingColor(rating), fontWeight: "800" }]}>
-                      · ★ {rating.toFixed(1)}
-                    </Text>
-                  )}
-                </View>
-                {!!reason && (
-                  <Text style={[s.recWhy, { color: theme.text.secondary }]}>{reason}</Text>
-                )}
-              </View>
-            </View>
-          );
-        })}
+    <View style={[s.recRow, { borderColor: theme.border }, last && { borderBottomWidth: 0, paddingBottom: 2 }]}>
+      <PosterBox item={item} ctx={ctx} width={84} radius={12} />
+      <View style={s.recMain}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => onTitlePress(pcard || unresolvedCard(mediaType, title))}
+        >
+          <Text style={[s.recTitle, { color: theme.text.primary }]} numberOfLines={2}>
+            {found ? pcard.title : title}
+          </Text>
+        </TouchableOpacity>
+        {!!meta && <Text style={[s.recMeta, { color: theme.text.muted }]} numberOfLines={1}>{meta}</Text>}
+        {score != null && <MatchPill score={score} theme={theme} copy={copy} />}
+        {genres.length > 0 && (
+          <View style={s.chipRow}>
+            {genres.map((genre) => (
+              <Chip key={genre} label={genre} theme={theme} />
+            ))}
+          </View>
+        )}
+        {!!reason && <Text style={[s.recWhy, { color: theme.text.secondary }]}>{reason}</Text>}
+        {providers.length > 0 && (
+          <View style={s.chipRow}>
+            {providers.map((name) => (
+              <Chip key={name} icon="tv-outline" label={name} theme={theme} tint={theme.colors.green} />
+            ))}
+          </View>
+        )}
+        {found && <AITitleActions card={pcard} theme={theme} copy={copy} style={{ marginTop: 10 }} />}
+      </View>
+    </View>
+  );
+});
+
+const RecommendationsCard = ({ data, ctx }) => {
+  const items = safeArr(data.items);
+  const fan = useMemo(() => fanOf(items, ctx), [items, ctx]);
+  return (
+    <View style={[k.card, { backgroundColor: ctx.theme.secondary, borderColor: ctx.theme.border }]}>
+      <CardHero type="recommendations" ctx={ctx} count={items.length} fan={fan} />
+      <View style={k.body}>
+        {items.map((item, i) => (
+          <RecItem
+            key={`${normMediaType(item?.mediaType)}-${toStr(item?.title)}-${i}`}
+            item={item}
+            ctx={ctx}
+            last={i === items.length - 1}
+          />
+        ))}
       </View>
     </View>
   );
@@ -210,7 +137,7 @@ const RecommendationsCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePre
 
 // ── 2) Comparison ─────────────────────────────────────────────────────────────
 
-const ProsCons = ({ title, items, color, icon, theme }) => {
+const ProsCons = ({ items, color, icon, theme }) => {
   const list = safeArr(items).map(toStr).filter(Boolean);
   if (!list.length) return null;
   return (
@@ -225,44 +152,71 @@ const ProsCons = ({ title, items, color, icon, theme }) => {
   );
 };
 
-const ComparisonCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress }) => {
+const CompareHead = ({ item, ctx, winner }) => {
+  const { theme, posterMap, copy } = ctx;
+  const mediaType = normMediaType(item?.mediaType);
+  const title = toStr(item?.title);
+  const pcard = getPoster(posterMap, mediaType, title);
+  const found = !!pcard?.found;
+  return (
+    <View style={s.cmpHead}>
+      <View style={[s.cmpPosterRing, winner && { borderColor: theme.colors.orange }]}>
+        <PosterBox item={item} ctx={ctx} width={92} radius={11} />
+        {winner && (
+          <View style={[s.crown, { backgroundColor: theme.colors.orange }]}>
+            <Ionicons name="trophy" size={11} color="#fff" />
+          </View>
+        )}
+      </View>
+      <Text numberOfLines={2} style={[s.cmpName, { color: theme.text.primary }]}>
+        {found ? pcard.title : title}
+      </Text>
+      {found && !!pcard.year && <Text style={[s.posterYearSm, { color: theme.text.muted }]}>{pcard.year}</Text>}
+      {found && <AITitleActions card={pcard} theme={theme} copy={copy} compact style={{ marginTop: 8 }} />}
+    </View>
+  );
+};
+
+const ComparisonCard = ({ data, ctx }) => {
+  const { theme, t } = ctx;
   const metrics = safeArr(data.metrics);
   const green = theme.colors.green;
   const red = theme.colors.red;
+  const leftTotal = metrics.reduce((sum, m) => sum + safeNum(m?.left ?? m?.leftScore), 0);
+  const rightTotal = metrics.reduce((sum, m) => sum + safeNum(m?.right ?? m?.rightScore), 0);
+  const hasTotals = metrics.length > 0 && leftTotal + rightTotal > 0;
+  const leftWins = hasTotals && leftTotal > rightTotal;
+  const rightWins = hasTotals && rightTotal > leftTotal;
+
   return (
-    <View style={[s.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      <CardHero type="comparison" theme={theme} t={t} />
-      <View style={s.body}>
+    <View style={[k.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+      <CardHero type="comparison" ctx={ctx} fan={fanOf([data.left, data.right], ctx)} />
+      <View style={k.body}>
         {/* İki taraf posterleri */}
         <View style={s.cmpHeads}>
-          <View style={s.cmpHead}>
-            <PosterThumb
-              item={data.left}
-              posterMap={posterMap}
-              getTmdbUrl={getTmdbUrl}
-              theme={theme}
-              t={t}
-              onTitlePress={onTitlePress}
-              width={78}
-              showMeta={false}
-            />
-          </View>
+          <CompareHead item={data.left} ctx={ctx} winner={leftWins} />
           <View style={[s.vsBadge, { backgroundColor: theme.bold }]}>
             <Text style={s.vsText}>VS</Text>
           </View>
-          <View style={s.cmpHead}>
-            <PosterThumb
-              item={data.right}
-              posterMap={posterMap}
-              getTmdbUrl={getTmdbUrl}
-              theme={theme}
-              t={t}
-              onTitlePress={onTitlePress}
-              width={78}
-              showMeta={false}
-            />
-          </View>
+          <CompareHead item={data.right} ctx={ctx} winner={rightWins} />
         </View>
+
+        {/* Toplam puan çubuğu */}
+        {hasTotals && (
+          <View style={s.totalWrap}>
+            <Text style={[s.totalNum, { color: leftWins ? theme.bold : theme.text.muted }]}>{leftTotal}</Text>
+            <View style={[s.totalBar, { backgroundColor: alpha(theme.accent, 0.25) }]}>
+              <View
+                style={{
+                  width: `${Math.round((leftTotal / (leftTotal + rightTotal)) * 100)}%`,
+                  height: "100%",
+                  backgroundColor: theme.bold,
+                }}
+              />
+            </View>
+            <Text style={[s.totalNum, { color: rightWins ? theme.accent : theme.text.muted }]}>{rightTotal}</Text>
+          </View>
+        )}
 
         {/* Metrik tablosu */}
         {metrics.length > 0 && (
@@ -316,40 +270,52 @@ const ComparisonCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress })
 
 // ── 3) Watch plan ─────────────────────────────────────────────────────────────
 
-const PlanSession = ({ session, idx, posterMap, getTmdbUrl, theme, t, onTitlePress }) => {
+const PlanSession = ({ session, idx, ctx }) => {
+  const { theme, copy, language, posterMap } = ctx;
   const [open, setOpen] = useState(idx === 0);
   const items = safeArr(session?.items);
+  const total = useMemo(() => sessionRuntime(session, posterMap), [session, posterMap]);
+  const runtimeParts = [];
+  if (total.minutes > 0) {
+    runtimeParts.push(
+      fillCopy(copy.notes.runtimeMovies, { time: formatDuration(total.minutes, language), n: total.movies }),
+    );
+  }
+  if (total.series > 0) runtimeParts.push(fillCopy(copy.notes.runtimeSeries, { n: total.series }));
+  const runtimeText = runtimeParts.join(" ");
+
   return (
     <View style={[s.session, { borderColor: theme.border, backgroundColor: theme.primary }]}>
       <TouchableOpacity style={s.sessionHead} activeOpacity={0.7} onPress={() => setOpen((o) => !o)}>
         <View style={[s.sessionNum, { backgroundColor: theme.bold }]}>
           <Text style={s.sessionNumText}>{idx + 1}</Text>
         </View>
-        <Text style={[s.sessionLabel, { color: theme.text.primary }]} numberOfLines={2}>
-          {toStr(session?.label)}
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[s.sessionLabel, { color: theme.text.primary }]} numberOfLines={2}>
+            {toStr(session?.label)}
+          </Text>
+          {!!runtimeText && (
+            <View style={s.runtimePill}>
+              <Ionicons name="time-outline" size={11} color={theme.text.muted} />
+              <Text style={[s.runtimeText, { color: theme.text.muted }]}>{runtimeText}</Text>
+            </View>
+          )}
+        </View>
         <Ionicons name={open ? "chevron-up" : "chevron-down"} size={18} color={theme.text.muted} />
       </TouchableOpacity>
       {open && (
         <View style={{ paddingHorizontal: 10, paddingBottom: 10 }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            {items.map((it, i) => (
-              <View key={i} style={{ marginRight: 10, alignItems: "center" }}>
-                <PosterThumb
-                  item={it}
-                  posterMap={posterMap}
-                  getTmdbUrl={getTmdbUrl}
-                  theme={theme}
-                  t={t}
-                  onTitlePress={onTitlePress}
-                  width={64}
-                  showMeta={false}
-                />
-                {!!toStr(it?.runtime) && (
-                  <Text style={[s.runtimeTag, { color: theme.text.muted }]}>{toStr(it.runtime)}</Text>
-                )}
-              </View>
-            ))}
+            {items.map((it, i) => {
+              const pcard = getPoster(posterMap, it?.mediaType, toStr(it?.title));
+              const runtime = formatDuration(pcard?.runtimeMinutes, language) || toStr(it?.runtime);
+              return (
+                <View key={i} style={{ marginRight: 10 }}>
+                  <PosterThumb item={it} ctx={ctx} width={76} showMeta={false} />
+                  {!!runtime && <Text style={[s.runtimeTag, { color: theme.text.muted }]}>{runtime}</Text>}
+                </View>
+              );
+            })}
           </ScrollView>
           {!!toStr(session?.note) && (
             <Text style={[s.sessionNote, { color: theme.text.secondary }]}>{toStr(session.note)}</Text>
@@ -360,99 +326,74 @@ const PlanSession = ({ session, idx, posterMap, getTmdbUrl, theme, t, onTitlePre
   );
 };
 
-const WatchPlanCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress }) => {
+const WatchPlanCard = ({ data, ctx }) => {
   const sessions = safeArr(data.sessions);
+  const everyItem = sessions.flatMap((session) => safeArr(session?.items));
   return (
-    <View style={[s.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      <CardHero type="watch_plan" theme={theme} t={t} />
-      <View style={s.body}>
-        {sessions.map((ses, i) => (
-          <PlanSession
-            key={i}
-            session={ses}
-            idx={i}
-            posterMap={posterMap}
-            getTmdbUrl={getTmdbUrl}
-            theme={theme}
-            t={t}
-            onTitlePress={onTitlePress}
-          />
+    <View style={[k.card, { backgroundColor: ctx.theme.secondary, borderColor: ctx.theme.border }]}>
+      <CardHero type="watch_plan" ctx={ctx} count={sessions.length} fan={fanOf(everyItem, ctx)} />
+      <View style={k.body}>
+        {sessions.map((session, i) => (
+          <PlanSession key={i} session={session} idx={i} ctx={ctx} />
         ))}
       </View>
     </View>
   );
 };
 
-// ── 4) Watchlist (checklist) ──────────────────────────────────────────────────
+// ── 4) Watchlist ──────────────────────────────────────────────────────────────
 
-const WatchlistItem = ({ item, posterMap, getTmdbUrl, theme, t, onTitlePress }) => {
-  const [checked, setChecked] = useState(false);
+const WatchlistItem = memo(({ item, ctx }) => {
+  const { theme, copy, language, posterMap, onTitlePress, t } = ctx;
   const mediaType = normMediaType(item?.mediaType);
   const title = toStr(item?.title);
   const pcard = getPoster(posterMap, mediaType, title);
   const found = !!pcard?.found;
-  const uri = found && pcard.posterPath ? getTmdbUrl(pcard.posterPath, "poster", 92) : null;
+  const meta = [typeWord(mediaType, t), pcard?.year, formatDuration(pcard?.runtimeMinutes, language)]
+    .filter(Boolean)
+    .join(" · ");
+  const note = toStr(item?.reason || item?.note);
 
   return (
     <View style={[s.wlRow, { borderColor: theme.border }]}>
-      <TouchableOpacity onPress={() => setChecked((c) => !c)} hitSlop={8} style={s.checkbox}>
-        <Ionicons
-          name={checked ? "checkbox" : "square-outline"}
-          size={22}
-          color={checked ? theme.colors.green : theme.text.muted}
-        />
-      </TouchableOpacity>
+      <PosterBox item={item} ctx={ctx} width={50} radius={8} badges={false} />
       <TouchableOpacity
         activeOpacity={0.85}
-        onPress={() => onTitlePress(pcard || { mediaType, query: title, found: false })}
+        onPress={() => onTitlePress(pcard || unresolvedCard(mediaType, title))}
         style={s.wlMain}
       >
-        <View style={[s.wlPoster, { backgroundColor: theme.between }]}>
-          {uri ? (
-            <Image source={{ uri }} style={s.posterImg} contentFit="cover" />
-          ) : (
-            <Ionicons
-              name={mediaType === "movie" ? "film-outline" : "tv-outline"}
-              size={16}
-              color={theme.text.muted}
-            />
-          )}
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text
-            numberOfLines={1}
-            style={[
-              s.wlTitle,
-              { color: theme.text.primary },
-              checked && { textDecorationLine: "line-through", color: theme.text.muted },
-            ]}
-          >
+        <View style={s.wlTitleRow}>
+          <Text numberOfLines={2} style={[s.wlTitle, { color: theme.text.primary }]}>
             {found ? pcard.title : title}
           </Text>
-          {!!toStr(item?.reason || item?.note) && (
-            <Text numberOfLines={2} style={[s.wlNote, { color: theme.text.secondary }]}>
-              {toStr(item.reason || item.note)}
-            </Text>
+          {item?.mustWatch && (
+            <View style={[s.mustBadge, { backgroundColor: alpha(theme.colors.orange, 0.2) }]}>
+              <Text style={{ color: theme.colors.orange, fontSize: 9, fontWeight: "800" }}>
+                {t?.AICineChat?.mustWatch || "Mutlaka"}
+              </Text>
+            </View>
           )}
         </View>
-        {item?.mustWatch && (
-          <View style={[s.mustBadge, { backgroundColor: alpha(theme.colors.orange, 0.2) }]}>
-            <Text style={{ color: theme.colors.orange, fontSize: 9, fontWeight: "800" }}>
-              {t?.AICineChat?.mustWatch || "Mutlaka"}
-            </Text>
-          </View>
+        {!!meta && <Text style={[s.wlMeta, { color: theme.text.muted }]} numberOfLines={1}>{meta}</Text>}
+        {!!note && (
+          <Text numberOfLines={3} style={[s.wlNote, { color: theme.text.secondary }]}>
+            {note}
+          </Text>
         )}
       </TouchableOpacity>
+      {found && <AITitleActions card={pcard} theme={theme} copy={copy} compact vertical />}
     </View>
   );
-};
+});
 
-const WatchlistCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress }) => {
+const WatchlistCard = ({ data, ctx }) => {
+  const { theme, t } = ctx;
   const sections = safeArr(data.sections);
+  const everyItem = sections.flatMap((section) => safeArr(section?.items));
   return (
-    <View style={[s.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      <CardHero type="watchlist" theme={theme} t={t} />
-      <View style={s.body}>
+    <View style={[k.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+      <CardHero type="watchlist" ctx={ctx} count={everyItem.length} fan={fanOf(everyItem, ctx)} />
+      <View style={k.body}>
         {sections.map((sec, i) => (
           <View key={i} style={{ marginBottom: 10 }}>
             {!!sectionLabel(sec, t) && (
@@ -462,15 +403,7 @@ const WatchlistCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress }) 
               </View>
             )}
             {safeArr(sec?.items).map((it, j) => (
-              <WatchlistItem
-                key={j}
-                item={it}
-                posterMap={posterMap}
-                getTmdbUrl={getTmdbUrl}
-                theme={theme}
-                t={t}
-                onTitlePress={onTitlePress}
-              />
+              <WatchlistItem key={`${toStr(it?.title)}-${j}`} item={it} ctx={ctx} />
             ))}
           </View>
         ))}
@@ -481,20 +414,14 @@ const WatchlistCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress }) 
 
 // ── 5) Title spotlight ────────────────────────────────────────────────────────
 
-const Chip = ({ icon, label, theme }) => (
-  <View style={[s.chip, { backgroundColor: theme.between, borderColor: theme.border }]}>
-    {!!icon && <Ionicons name={icon} size={12} color={theme.text.between} />}
-    <Text style={[s.chipText, { color: theme.text.secondary }]} numberOfLines={1}>
-      {label}
-    </Text>
-  </View>
-);
-
-const TitleSpotlightCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress }) => {
+const TitleSpotlightCard = ({ data, ctx }) => {
+  const { theme, t, copy, language, posterMap, getTmdbUrl, onTitlePress } = ctx;
+  const [expanded, setExpanded] = useState(false);
   const mediaType = normMediaType(data.mediaType);
   const pcard = getPoster(posterMap, mediaType, toStr(data.title));
   const found = !!pcard?.found;
   const uri = found && pcard.posterPath ? getTmdbUrl(pcard.posterPath, "poster", 185) : null;
+  const backdropUri = found && pcard.backdropPath ? getTmdbUrl(pcard.backdropPath, "backdrop", 780) : null;
   const rating = safeNum(pcard?.rating) || safeNum(data.rating);
   const genres = safeArr(pcard?.genres || data.genres).map(toStr).filter(Boolean);
   const cast = safeArr(pcard?.cast || data.cast).map(toStr).filter(Boolean);
@@ -502,39 +429,64 @@ const TitleSpotlightCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePres
   const similar = safeArr(pcard?.similar || data.similar);
   const displayTitle = toStr(pcard?.title || data.title);
   const displayYear = toStr(pcard?.year || data.year);
-  const runtime = formatRuntime(pcard?.runtimeMinutes, t) || toStr(data.runtime);
-  const summary = toStr(data.take || pcard?.overview || data.summary);
+  const runtime = formatDuration(pcard?.runtimeMinutes, language) || toStr(data.runtime);
+  const take = toStr(data.take || data.summary);
+  const overview = toStr(pcard?.overview);
+  const tagline = toStr(pcard?.tagline);
   const director = toStr(pcard?.director || data.director);
+  const score = matchScoreFor(pcard, ctx);
 
   return (
-    <View style={[s.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      <CardHero type="title_spotlight" theme={theme} t={t} />
-      <View style={s.body}>
+    <View style={[k.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+      {backdropUri ? (
+        <View style={s.banner}>
+          <Image source={{ uri: backdropUri }} style={k.posterImg} contentFit="cover" transition={200} />
+          <LinearGradient
+            colors={["rgba(0,0,0,0.05)", "rgba(0,0,0,0.0)", alpha(theme.secondary, 0.96)]}
+            locations={[0, 0.35, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={s.bannerTag}>
+            <Ionicons name="film-outline" size={12} color="#fff" />
+            <Text style={s.bannerTagText}>{t?.AICineChat?.responseTypes?.title_spotlight || "Yapım Detayı"}</Text>
+          </View>
+        </View>
+      ) : (
+        <CardHero type="title_spotlight" ctx={ctx} />
+      )}
+      <View style={k.body}>
         <View style={s.spotHead}>
           <TouchableOpacity
             activeOpacity={0.85}
-            onPress={() => onTitlePress(pcard || { mediaType, query: toStr(data.title), found: false })}
-            style={[s.spotPoster, { backgroundColor: theme.between, borderColor: theme.secondary }]}
+            onPress={() => onTitlePress(pcard || unresolvedCard(mediaType, toStr(data.title)))}
+            style={[
+              s.spotPoster,
+              backdropUri && s.spotPosterRaised,
+              { backgroundColor: theme.between, borderColor: theme.secondary },
+            ]}
           >
             {uri ? (
-              <Image source={{ uri }} style={s.posterImg} contentFit="cover" />
+              <Image source={{ uri }} style={k.posterImg} contentFit="cover" />
             ) : (
-              <Ionicons
-                name={mediaType === "movie" ? "film-outline" : "tv-outline"}
-                size={28}
-                color={theme.text.muted}
-              />
+              <Ionicons name={mediaType === "movie" ? "film-outline" : "tv-outline"} size={28} color={theme.text.muted} />
             )}
           </TouchableOpacity>
-          <View style={{ flex: 1, paddingTop: 36 }}>
-            <Text style={[s.spotTitle, { color: theme.text.primary }]} numberOfLines={2}>
+          <View style={{ flex: 1, paddingTop: backdropUri ? 6 : 4 }}>
+            <Text style={[s.spotTitle, { color: theme.text.primary }]} numberOfLines={3}>
               {displayTitle}
             </Text>
+            {!!tagline && (
+              <Text style={[s.tagline, { color: theme.text.muted }]} numberOfLines={2}>
+                {tagline}
+              </Text>
+            )}
             <View style={s.spotMetaRow}>
               {!!displayYear && <Chip icon="calendar-outline" label={displayYear} theme={theme} />}
               {!!runtime && <Chip icon="time-outline" label={runtime} theme={theme} />}
               {rating > 0 && (
-                <View style={[s.chip, { backgroundColor: alpha(ratingColor(rating), 0.18), borderColor: alpha(ratingColor(rating), 0.5) }]}>
+                <View
+                  style={[k.chip, { backgroundColor: alpha(ratingColor(rating), 0.18), borderColor: alpha(ratingColor(rating), 0.5) }]}
+                >
                   <Text style={{ color: ratingColor(rating), fontSize: 11, fontWeight: "800" }}>★ {rating.toFixed(1)}</Text>
                 </View>
               )}
@@ -549,8 +501,25 @@ const TitleSpotlightCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePres
           </View>
         </View>
 
-        {!!summary && (
-          <Text style={[s.spotSummary, { color: theme.text.secondary }]}>{summary}</Text>
+        {score != null && (
+          <View style={{ marginTop: 10 }}>
+            <MatchPill score={score} theme={theme} copy={copy} />
+          </View>
+        )}
+
+        {!!take && (
+          <View style={[s.takeBox, { backgroundColor: alpha(theme.accent, 0.1), borderColor: alpha(theme.accent, 0.35) }]}>
+            <Ionicons name="sparkles" size={14} color={theme.bold} style={{ marginTop: 2 }} />
+            <Text style={[s.takeText, { color: theme.text.primary }]}>{take}</Text>
+          </View>
+        )}
+
+        {!!overview && (
+          <TouchableOpacity activeOpacity={0.8} onPress={() => setExpanded((v) => !v)}>
+            <Text numberOfLines={expanded ? undefined : 4} style={[s.spotSummary, { color: theme.text.secondary }]}>
+              {overview}
+            </Text>
+          </TouchableOpacity>
         )}
 
         {!!director && (
@@ -567,33 +536,38 @@ const TitleSpotlightCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePres
         )}
         {where.length > 0 && (
           <View style={[s.spotMetaRow, { marginTop: 8 }]}>
-            <Text style={[s.spotLine, { color: theme.text.muted, marginRight: 4 }]}>
+            <Text style={[s.spotLine, { color: theme.text.muted, marginRight: 4, marginTop: 0 }]}>
               {t?.AICineChat?.whereToWatch || "Nerede izlenir"}:
             </Text>
             {where.map((w, i) => (
-              <Chip key={i} icon="tv-outline" label={w} theme={theme} />
+              <Chip key={i} icon="tv-outline" label={w} theme={theme} tint={theme.colors.green} />
             ))}
           </View>
         )}
 
+        {found && (
+          <View style={s.spotActions}>
+            <AITitleActions card={pcard} theme={theme} copy={copy} />
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => onTitlePress(pcard)}
+              style={[s.detailBtn, { borderColor: alpha(theme.accent, 0.5), backgroundColor: alpha(theme.accent, 0.12) }]}
+            >
+              <Text style={[s.detailBtnText, { color: theme.bold }]}>{copy.actions.detail}</Text>
+              <Ionicons name="chevron-forward" size={14} color={theme.bold} />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {similar.length > 0 && (
-          <View style={{ marginTop: 12 }}>
+          <View style={{ marginTop: 14 }}>
             <Text style={[s.subHead, { color: theme.text.primary }]}>
               {t?.AICineChat?.similar || i18nText("autoI18n.benzer_yapimlar", "Benzer yapımlar")}
             </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {similar.map((it, i) => (
                 <View key={i} style={{ marginRight: 10 }}>
-                  <PosterThumb
-                    item={it}
-                    posterMap={posterMap}
-                    getTmdbUrl={getTmdbUrl}
-                    theme={theme}
-                    t={t}
-                    onTitlePress={onTitlePress}
-                    width={64}
-                    showMeta={false}
-                  />
+                  <PosterThumb item={it} ctx={ctx} width={72} showMeta={false} />
                 </View>
               ))}
             </ScrollView>
@@ -606,15 +580,14 @@ const TitleSpotlightCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePres
 
 // ── 6) General ────────────────────────────────────────────────────────────────
 
-const GeneralCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress }) => {
+const GeneralCard = ({ data, ctx }) => {
+  const { theme } = ctx;
   const items = safeArr(data.items);
   return (
-    <View style={[s.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      <View style={s.body}>
+    <View style={[k.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+      <View style={k.body}>
         {!!toStr(data.content || data.summary) && (
-          <Text style={[s.generalText, { color: theme.text.secondary }]}>
-            {toStr(data.content || data.summary)}
-          </Text>
+          <Text style={[s.generalText, { color: theme.text.secondary }]}>{toStr(data.content || data.summary)}</Text>
         )}
         {items.length > 0 && (
           <ScrollView
@@ -625,16 +598,7 @@ const GeneralCard = ({ data, posterMap, getTmdbUrl, theme, t, onTitlePress }) =>
           >
             {items.map((it, i) => (
               <View key={i} style={{ marginRight: 10 }}>
-                <PosterThumb
-                  item={it}
-                  posterMap={posterMap}
-                  getTmdbUrl={getTmdbUrl}
-                  theme={theme}
-                  t={t}
-                  onTitlePress={onTitlePress}
-                  width={64}
-                  showMeta={false}
-                />
+                <PosterThumb item={it} ctx={ctx} width={72} showMeta={false} />
               </View>
             ))}
           </ScrollView>
@@ -660,7 +624,7 @@ const CARD_BY_TYPE = {
  * attachment: { mediaType, title, year, posterPath, rating, id }
  * Poster/başlık yalnızca baloncukta gösterilir; AI'a giden metne dahil değildir.
  */
-const UserAttachment = memo(({ attachment, theme, t, getTmdbUrl, onTitlePress }) => {
+const UserAttachment = memo(({ attachment, t, getTmdbUrl, onTitlePress }) => {
   const mediaType = normMediaType(attachment?.mediaType);
   const title = toStr(attachment?.title);
   if (!title) return null;
@@ -669,11 +633,7 @@ const UserAttachment = memo(({ attachment, theme, t, getTmdbUrl, onTitlePress })
   const rating = safeNum(attachment?.rating);
   const posterPath = toStr(attachment?.posterPath);
   const uri = posterPath && getTmdbUrl ? getTmdbUrl(posterPath, "poster", 185) : null;
-  const typeLabel =
-    mediaType === "movie"
-      ? t?.AICineChat?.movie || i18nText("autoI18n.film", "Film")
-      : t?.AICineChat?.series || i18nText("autoI18n.dizi", "Dizi");
-  const meta = [typeLabel, year].filter(Boolean).join(" · ");
+  const meta = [typeWord(mediaType, t), year].filter(Boolean).join(" · ");
   const pressable = typeof onTitlePress === "function";
 
   return (
@@ -694,13 +654,9 @@ const UserAttachment = memo(({ attachment, theme, t, getTmdbUrl, onTitlePress })
       <View style={s.attachBar} />
       <View style={s.attachPoster}>
         {uri ? (
-          <Image source={{ uri }} style={s.posterImg} contentFit="cover" />
+          <Image source={{ uri }} style={k.posterImg} contentFit="cover" />
         ) : (
-          <Ionicons
-            name={mediaType === "movie" ? "film-outline" : "tv-outline"}
-            size={18}
-            color="rgba(255,255,255,0.75)"
-          />
+          <Ionicons name={mediaType === "movie" ? "film-outline" : "tv-outline"} size={18} color="rgba(255,255,255,0.75)" />
         )}
       </View>
       <View style={{ flex: 1 }}>
@@ -717,30 +673,16 @@ const UserAttachment = memo(({ attachment, theme, t, getTmdbUrl, onTitlePress })
           )}
         </View>
       </View>
-      {pressable && (
-        <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.7)" />
-      )}
+      {pressable && <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.7)" />}
     </TouchableOpacity>
   );
 });
 
 const UserBubble = memo(({ text, attachment, theme, t, getTmdbUrl, onTitlePress }) => (
   <Reanimated.View entering={FadeInUp.duration(200)} style={[s.row, { justifyContent: "flex-end" }]}>
-    <View
-      style={[
-        s.userBubble,
-        { backgroundColor: theme.accent },
-        attachment?.title && s.userBubbleWithAttachment,
-      ]}
-    >
+    <View style={[s.userBubble, { backgroundColor: theme.accent }, attachment?.title && s.userBubbleWithAttachment]}>
       {!!attachment?.title && (
-        <UserAttachment
-          attachment={attachment}
-          theme={theme}
-          t={t}
-          getTmdbUrl={getTmdbUrl}
-          onTitlePress={onTitlePress}
-        />
+        <UserAttachment attachment={attachment} t={t} getTmdbUrl={getTmdbUrl} onTitlePress={onTitlePress} />
       )}
       {!!text && (
         <Text selectable style={{ color: "#fff", fontSize: 14, lineHeight: 20 }}>
@@ -773,9 +715,7 @@ const ErrorBubble = memo(({ text, retry, upsell, onRetry, onUpgrade, theme, t })
         <Text style={{ color: theme.text.primary, fontSize: 13, flex: 1 }}>{text}</Text>
       </View>
       {!!upsell && (
-        <Text style={{ color: theme.text.secondary, fontSize: 12, marginTop: 6 }}>
-          {upsell.message}
-        </Text>
+        <Text style={{ color: theme.text.secondary, fontSize: 12, marginTop: 6 }}>{upsell.message}</Text>
       )}
       {upsell && onUpgrade ? (
         <TouchableOpacity
@@ -783,9 +723,7 @@ const ErrorBubble = memo(({ text, retry, upsell, onRetry, onUpgrade, theme, t })
           style={[s.retryBtn, { borderColor: alpha(theme.accent, 0.5), backgroundColor: alpha(theme.accent, 0.12) }]}
         >
           <Ionicons name="diamond" size={13} color={theme.accent} />
-          <Text style={{ color: theme.accent, fontSize: 12, fontWeight: "800" }}>
-            {upsell.cta}
-          </Text>
+          <Text style={{ color: theme.accent, fontSize: 12, fontWeight: "800" }}>{upsell.cta}</Text>
         </TouchableOpacity>
       ) : (
         !!retry && (
@@ -803,58 +741,81 @@ const ErrorBubble = memo(({ text, retry, upsell, onRetry, onUpgrade, theme, t })
 
 /**
  * Mesajı role/type'a göre doğru bileşene yönlendirir.
- * msg: { id, role, text?, display?, attachment?, aiResponse?, posterMap?, status?, retry? }
+ * msg: { id, role, text?, display?, attachment?, aiResponse?, posterMap?, notes?, status?, retry? }
+ *
+ * `baseCtx` ekran düzeyindeki ortak bağlam (tema, dil, tıklama işleyicisi…);
+ * mesajın kendi posterMap'i burada eklenir. `isLast` yalnız son cevapta devam
+ * çiplerini ve "yeniden öner"i açar.
  */
-export const ChatBubble = memo(({ msg, theme, t, getTmdbUrl, onTitlePress, onRetry, onUpgrade }) => {
-  if (msg.role === "user") {
-    return (
-      <UserBubble
-        text={msg.display || msg.text}
-        attachment={msg.attachment}
-        theme={theme}
-        t={t}
-        getTmdbUrl={getTmdbUrl}
-        onTitlePress={onTitlePress}
-      />
-    );
-  }
-  if (msg.status === "error") {
-    return (
-      <ErrorBubble
-        text={msg.text}
-        retry={msg.retry}
-        upsell={msg.upsell}
-        onRetry={onRetry}
-        onUpgrade={onUpgrade}
-        theme={theme}
-        t={t}
-      />
-    );
-  }
-  const data = msg.aiResponse;
-  if (!data) return null;
-  const Card = CARD_BY_TYPE[data.type] || GeneralCard;
+export const ChatBubble = memo(
+  ({
+    msg,
+    baseCtx,
+    isLast = false,
+    loading = false,
+    showFollowUps = true,
+    onRetry,
+    onUpgrade,
+    onFollowUp,
+    onRegenerate,
+  }) => {
+    const ctx = useMemo(() => ({ ...baseCtx, posterMap: msg.posterMap }), [baseCtx, msg.posterMap]);
+    const { theme, t, getTmdbUrl, onTitlePress } = baseCtx;
 
-  return (
-    <Reanimated.View entering={FadeInUp.duration(220)} style={[s.row, { justifyContent: "flex-start" }]}>
-      <View style={{ width: "100%" }}>
-        <Card
-          data={data}
-          posterMap={msg.posterMap}
-          getTmdbUrl={getTmdbUrl}
+    if (msg.role === "user") {
+      return (
+        <UserBubble
+          text={msg.display || msg.text}
+          attachment={msg.attachment}
           theme={theme}
           t={t}
+          getTmdbUrl={getTmdbUrl}
           onTitlePress={onTitlePress}
         />
-      </View>
-    </Reanimated.View>
-  );
-});
+      );
+    }
+    if (msg.status === "error") {
+      return (
+        <ErrorBubble
+          text={msg.text}
+          retry={msg.retry}
+          upsell={msg.upsell}
+          onRetry={onRetry}
+          onUpgrade={onUpgrade}
+          theme={theme}
+          t={t}
+        />
+      );
+    }
+    const data = msg.aiResponse;
+    if (!data) return null;
+    const Card = CARD_BY_TYPE[data.type] || GeneralCard;
+
+    return (
+      <Reanimated.View entering={FadeInUp.duration(220)} style={[s.row, { justifyContent: "flex-start" }]}>
+        <View style={{ width: "100%" }}>
+          <Card data={data} ctx={ctx} />
+          <AIResponseFooter
+            response={data}
+            notes={msg.notes}
+            ctx={ctx}
+            isLast={isLast}
+            loading={loading}
+            showFollowUps={showFollowUps}
+            showBulk={data.type !== "title_spotlight"}
+            onFollowUp={onFollowUp}
+            onRegenerate={isLast ? onRegenerate : undefined}
+          />
+        </View>
+      </Reanimated.View>
+    );
+  },
+);
 
 // ── Stiller ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  row: { width: "100%", marginBottom: 12, flexDirection: "row" },
+  row: { width: "100%", marginBottom: 14, flexDirection: "row" },
 
   userBubble: {
     maxWidth: "86%",
@@ -901,54 +862,36 @@ const s = StyleSheet.create({
   },
   attachRatingText: { color: "#fff", fontSize: 10, fontWeight: "800" },
 
-  // Kart kabuğu
-  card: {
-    width: "100%",
-    borderRadius: 18,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: "hidden",
-  },
-  body: { padding: 12 },
-
-  // Hero
-  hero: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
-  heroIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  heroTitle: { color: "#fff", fontSize: 16, fontWeight: "800", letterSpacing: -0.2 },
-
-  // Poster
-  posterWrap: { borderRadius: 10, overflow: "hidden", position: "relative" },
-  posterImg: { width: "100%", height: "100%" },
-  posterFallback: { width: "100%", height: "100%", justifyContent: "center", alignItems: "center" },
-  posterBadge: { position: "absolute", top: 4, right: 4, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 6 },
-  posterBadgeText: { color: "#fff", fontSize: 8, fontWeight: "800" },
-  posterType: { position: "absolute", bottom: 4, left: 4, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 5 },
-  posterTitle: { fontSize: 11, fontWeight: "600", marginTop: 4, lineHeight: 14 },
-  posterYear: { fontSize: 10, marginTop: 1 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 7 },
 
   // Recommendations
-  recRow: { flexDirection: "row", paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
-  recMetaRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 3, marginBottom: 3 },
-  metaChipTxt: { fontSize: 11, fontWeight: "600" },
-  recWhy: { fontSize: 12, lineHeight: 17, marginTop: 2 },
+  recRow: { flexDirection: "row", gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  recMain: { flex: 1 },
+  recTitle: { fontSize: 16, fontWeight: "800", letterSpacing: -0.25, lineHeight: 21 },
+  recMeta: { fontSize: 11.5, fontWeight: "600", marginTop: 2, marginBottom: 6 },
+  recWhy: { fontSize: 12.5, lineHeight: 18, marginTop: 8 },
 
   // Comparison
-  cmpHeads: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  cmpHeads: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
   cmpHead: { flex: 1, alignItems: "center" },
-  vsBadge: { width: 34, height: 34, borderRadius: 17, justifyContent: "center", alignItems: "center", marginHorizontal: 6 },
+  cmpPosterRing: { borderWidth: 2, borderColor: "transparent", borderRadius: 13, padding: 1 },
+  crown: {
+    position: "absolute",
+    top: -6,
+    left: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cmpName: { fontSize: 12.5, fontWeight: "800", textAlign: "center", marginTop: 7, lineHeight: 16 },
+  posterYearSm: { fontSize: 10.5, marginTop: 1 },
+  vsBadge: { width: 34, height: 34, borderRadius: 17, justifyContent: "center", alignItems: "center", marginHorizontal: 6, marginTop: 56 },
   vsText: { color: "#fff", fontWeight: "900", fontSize: 12 },
+  totalWrap: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 14 },
+  totalNum: { fontSize: 17, fontWeight: "900", minWidth: 24, textAlign: "center" },
+  totalBar: { flex: 1, height: 8, borderRadius: 4, overflow: "hidden" },
   metricBox: { marginTop: 12, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, overflow: "hidden" },
   metricRow: {
     flexDirection: "row",
@@ -977,9 +920,11 @@ const s = StyleSheet.create({
   // Watch plan
   session: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, marginBottom: 8, overflow: "hidden" },
   sessionHead: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10 },
-  sessionNum: { width: 24, height: 24, borderRadius: 12, justifyContent: "center", alignItems: "center" },
+  sessionNum: { width: 26, height: 26, borderRadius: 13, justifyContent: "center", alignItems: "center" },
   sessionNumText: { color: "#fff", fontSize: 12, fontWeight: "800" },
-  sessionLabel: { flex: 1, fontSize: 13, fontWeight: "700" },
+  sessionLabel: { fontSize: 13, fontWeight: "700" },
+  runtimePill: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 },
+  runtimeText: { fontSize: 11, fontWeight: "600" },
   runtimeTag: { fontSize: 10, marginTop: 3 },
   sessionNote: { fontSize: 12, lineHeight: 17, marginTop: 8, fontStyle: "italic" },
 
@@ -987,38 +932,64 @@ const s = StyleSheet.create({
   sectionHead: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 6, marginTop: 2 },
   sectionDot: { width: 8, height: 8, borderRadius: 4 },
   sectionName: { fontSize: 13, fontWeight: "800" },
-  wlRow: { flexDirection: "row", alignItems: "center", paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
-  checkbox: { paddingRight: 8 },
-  wlMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
-  wlPoster: { width: 34, height: 50, borderRadius: 6, overflow: "hidden", justifyContent: "center", alignItems: "center" },
-  wlTitle: { fontSize: 13, fontWeight: "700" },
-  wlNote: { fontSize: 11, lineHeight: 15, marginTop: 1 },
-  mustBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 6 },
+  wlRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  wlMain: { flex: 1 },
+  wlTitleRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  wlTitle: { flexShrink: 1, fontSize: 13.5, fontWeight: "800", letterSpacing: -0.15 },
+  wlMeta: { fontSize: 11, marginTop: 2 },
+  wlNote: { fontSize: 11.5, lineHeight: 16, marginTop: 3 },
+  mustBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
 
   // Spotlight
+  banner: { height: 138, width: "100%", backgroundColor: "rgba(0,0,0,0.2)" },
+  bannerTag: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  bannerTagText: { color: "#fff", fontSize: 11, fontWeight: "700" },
   spotHead: { flexDirection: "row", gap: 12 },
-  spotPoster: { width: 86, height: 129, borderRadius: 10, overflow: "hidden", borderWidth: 3, justifyContent: "center", alignItems: "center" },
-  spotTitle: { fontSize: 17, fontWeight: "800", letterSpacing: -0.3 },
+  spotPoster: { width: 90, height: 135, borderRadius: 11, overflow: "hidden", borderWidth: 3, justifyContent: "center", alignItems: "center" },
+  spotPosterRaised: { marginTop: -58 },
+  spotTitle: { fontSize: 18, fontWeight: "800", letterSpacing: -0.3, lineHeight: 23 },
+  tagline: { fontSize: 11.5, fontStyle: "italic", marginTop: 3, lineHeight: 15 },
   spotMetaRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 5, marginTop: 6 },
-  spotSummary: { fontSize: 13, lineHeight: 19, marginTop: 12 },
+  takeBox: { flexDirection: "row", gap: 8, marginTop: 12, padding: 10, borderRadius: 12, borderWidth: 1 },
+  takeText: { flex: 1, fontSize: 13, lineHeight: 19, fontWeight: "600" },
+  spotSummary: { fontSize: 12.5, lineHeight: 19, marginTop: 10 },
   spotLine: { fontSize: 12, lineHeight: 18, marginTop: 6 },
-  subHead: { fontSize: 13, fontWeight: "800", marginBottom: 8 },
-  chip: {
+  spotActions: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 14 },
+  detailBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
   },
-  chipText: { fontSize: 11, fontWeight: "600", maxWidth: 130 },
+  detailBtnText: { fontSize: 12, fontWeight: "800" },
+  subHead: { fontSize: 13, fontWeight: "800", marginBottom: 8 },
 
   // General
   generalText: { fontSize: 14, lineHeight: 21 },
 
   // Error
-  errBubble: { maxWidth: "88%", paddingHorizontal: 12, paddingVertical: 9, borderRadius: 18, borderBottomLeftRadius: 5, borderWidth: StyleSheet.hairlineWidth },
+  errBubble: {
+    maxWidth: "88%",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 18,
+    borderBottomLeftRadius: 5,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   retryBtn: {
     flexDirection: "row",
     alignItems: "center",

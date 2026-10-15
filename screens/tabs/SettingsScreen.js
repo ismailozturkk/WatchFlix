@@ -53,6 +53,9 @@ import TmdbLogo from "../../components/TmdbLogo";
 import JustWatchLogo from "../../components/JustWatchLogo";
 import { getCachedValue, setCachedValue, TTL } from "../../utils/apiCache";
 import PremiumSettingsCard from "@components/settings/PremiumSettingsCard";
+import useAiPrefs from "@hooks/useAiPrefs";
+import { getAiCopy } from "@utils/aiCopy";
+import { countCustomizedPrefs } from "@utils/aiPrefs";
 import DevPlanSimulatorCard from "@components/settings/DevPlanSimulatorCard";
 import {
   DATA_TYPE_COUNT,
@@ -362,6 +365,9 @@ export default function SettingsScreen() {
   const [providerCatalogLoading, setProviderCatalogLoading] = useState(true);
 
   const { t, language, toggleLanguage } = useLanguage();
+  const aiCopy = useMemo(() => getAiCopy(language), [language]);
+  const { prefs: aiPrefs } = useAiPrefs();
+  const aiCustomCount = countCustomizedPrefs(aiPrefs);
   const { theme } = useTheme();
   const { adultContent, chaneAdultContent, ageRestricted } = useContentSettings();
   const { showOngoingTvShows, changeShowOngoingTvShows } =
@@ -713,6 +719,27 @@ export default function SettingsScreen() {
                   <View style={[s.providerCount, { backgroundColor: C.accentDim }]}>
                     <Text style={[s.providerCountText, { color: C.accent }]}>
                       {streamingProviderIds.length}
+                    </Text>
+                  </View>
+                )}
+                <Chevron color={C.muted} />
+              </View>
+            }
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconPurple}
+            iconColor={C.purple}
+            iconName="sparkles-outline"
+            title={aiCopy.settings.rowTitle}
+            subtitle={aiCopy.settings.rowSubtitle}
+            onPress={() => navigation.navigate("AISettingsScreen")}
+            right={
+              <View style={s.providerCountWrap}>
+                {aiCustomCount > 0 && (
+                  <View style={[s.providerCount, { backgroundColor: C.accentDim }]}>
+                    <Text style={[s.providerCountText, { color: C.accent }]}>
+                      {aiCustomCount}
                     </Text>
                   </View>
                 )}

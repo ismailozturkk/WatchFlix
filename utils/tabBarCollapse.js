@@ -11,6 +11,22 @@
 // plain function from a regular JS onScroll callback for screens still on a
 // plain ScrollView/FlatList.
 
+// How much the bar shrinks at full collapse: 20% smaller, nothing else about
+// it changes. ONE number for both bars — the JS bar (Android, iOS fallbacks;
+// components/navigation/TabBar.js) and the real UIKit bar on iOS 26+ (scaled by
+// modules/tab-bar-scale through services/tabBarScale.js).
+export const TAB_BAR_COLLAPSE_SCALE_DELTA = 0.2;
+export const TAB_BAR_MIN_SCALE = 1 - TAB_BAR_COLLAPSE_SCALE_DELTA;
+
+// Rollback switch for the iOS 26 native scaling. `false` puts the system's own
+// minimize-on-scroll back (`tabBarMinimizeBehavior: "onScrollDown"`) and stops
+// touching the UITabBar entirely — no native rebuild needed, just JS.
+export const TAB_BAR_NATIVE_SCALE_ENABLED = true;
+
+// The native bridge is fed every ~1% of collapse progress, not every frame:
+// each push is a UI→JS hop, and a 20% shrink has nothing finer to show.
+export const TAB_BAR_NATIVE_STEP = 0.01;
+
 // Scroll distance (px) needed to fully collapse or fully expand the bar.
 export const TAB_BAR_COLLAPSE_DISTANCE = 70;
 // Below this offset the bar is always fully expanded — collapsing right at
@@ -30,6 +46,17 @@ export const TAB_BAR_COLLAPSE_FLOOR = 24;
 // screen's entire scroll depth in one tick, which instantly snapped the bar
 // to fully collapsed instead of resuming a smooth, incremental response.
 export const TAB_BAR_SCROLL_UNSET = -1;
+
+// Should the native bridge hear about `next`, given the `last` value it was sent
+// (-1 = nothing sent yet)? Always at the two rest positions so the bar can never
+// be left a hair short of full size or full shrink.
+export function shouldForwardCollapse(last, next) {
+  "worklet";
+  if (last < 0) return true;
+  if (next === last) return false;
+  if (next === 0 || next === 1) return true;
+  return Math.abs(next - last) >= TAB_BAR_NATIVE_STEP;
+}
 
 export function advanceTabBarCollapse(collapseProgress, lastScrollY, offsetY) {
   "worklet";

@@ -247,7 +247,6 @@ function ResultsBody({
               busyLabel={copy.results.creating}
               doneLabel={copy.results.sharedDone}
               onPress={() => {
-                triggerHaptic("impact");
                 onSaveAsSharedList?.(matches);
               }}
               colors={colors}
@@ -259,7 +258,6 @@ function ResultsBody({
               busyLabel={copy.results.adding}
               doneLabel={copy.results.watchlistDone}
               onPress={() => {
-                triggerHaptic("notification");
                 onAddAllToWatchlist?.(matches);
               }}
               colors={colors}

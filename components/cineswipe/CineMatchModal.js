@@ -96,7 +96,6 @@ function MatchBody({
   const handleAdd = async () => {
     if (adding || added) return;
     setAdding(true);
-    triggerHaptic("notification");
     try {
       const ok = await onAddToWatchlist?.(media);
       if (ok !== false) setAdded(true);

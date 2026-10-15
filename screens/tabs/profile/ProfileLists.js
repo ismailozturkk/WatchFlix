@@ -571,9 +571,11 @@ export default function ProfileLists({ navigation }) {
                   borderColor: theme.border || "rgba(255,255,255,0.05)"
                 }}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                {/* Sol grup kalan boşluğu alır: uzun çeviride metin daralır, anahtar
+                    (gerçek genişliğinde, küçülmez) kartın dışına taşmaz. */}
+                <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 10, paddingRight: 12 }}>
                   <Ionicons name="crop-outline" size={20} color={theme.text.primary} />
-                  <Text style={{ color: theme.text.primary, fontSize: 14, fontWeight: "600" }}>
+                  <Text style={{ flexShrink: 1, color: theme.text.primary, fontSize: 14, fontWeight: "600" }}>
                     {i18nText("autoI18n.ayri_koseli_afisler", "Ayrı Köşeli Afişler")}
                   </Text>
                 </View>

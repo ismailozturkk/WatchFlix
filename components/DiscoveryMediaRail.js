@@ -24,6 +24,8 @@ import {
   resolveGenreIds,
 } from "../utils/discoveryPersonalization";
 import { sameListIdentity } from "../utils/sameData";
+import { adultScoped, dropAdult } from "../utils/homeContentSettings";
+import { useHomeDataSettings } from "../hooks/useHomeContentSettings";
 
 const EMPTY_GENRES = Object.freeze([]);
 
@@ -47,11 +49,15 @@ const mergeUnique = (current, incoming) => {
   return [...byId.values()];
 };
 
-const DiscoveryCard = memo(function DiscoveryCard({
+// Dışarıya açık: "Favorilerine Göre" rayı (components/favorites) aynı posteri,
+// aynı rozet/uzun basma davranışıyla kullanıyor. `onOpen` açılıştan hemen önce
+// çağrılır (ölçüm için); sağlanmazsa davranış aynı.
+export const DiscoveryCard = memo(function DiscoveryCard({
   item,
   mediaType,
   navigation,
   providerCatalog,
+  onOpen,
 }) {
   const { theme } = useTheme();
   const { posterBadges } = useListLayoutSettings();
@@ -73,11 +79,12 @@ const DiscoveryCard = memo(function DiscoveryCard({
       onPressOut={() =>
         Animated.timing(scale, { toValue: 1, duration: 120, useNativeDriver: true }).start()
       }
-      onPress={() =>
+      onPress={() => {
+        onOpen?.(item);
         navigation.push(mediaType === "movie" ? "MovieDetails" : "TvShowsDetails", {
           id: item.id,
-        })
-      }
+        });
+      }}
       onLongPress={() => openQuickActions({ item, mediaType, navigation })}
       delayLongPress={350}
     >
@@ -160,6 +167,10 @@ export default function DiscoveryMediaRail({
   const { language } = useLanguage();
   const { API_KEY } = useApiSettings();
   const { streamingProviderIds } = useStreamingProviderSettings();
+  // Yetişkin izni: `/discover` sonucunu değiştirir. Önbellek anahtarı kapsamlanır ve
+  // `load` bu değere bağlıdır — ayar değişince ray yeniden yüklenir
+  // (bkz. utils/homeContentSettings.js).
+  const { adultContent } = useHomeDataSettings();
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -167,6 +178,7 @@ export default function DiscoveryMediaRail({
   const [loadingMore, setLoadingMore] = useState(false);
   const [providerCatalog, setProviderCatalog] = useState({});
   const itemsRef = useRef([]);
+  const loadGenRef = useRef(0);
   // Effect bağımlılıklarını dizi referansına değil içeriğine bağla. Context aynı
   // üç türü yeni bir Array olarak yayınladığında bunu tercih değişikliği sanmak,
   // tür çözümünü tekrar başlatıp posterleri sürekli skeleton'a çeviriyordu.
@@ -325,6 +337,13 @@ export default function DiscoveryMediaRail({
 
   const load = useCallback(
     async (requestedPage = 1, append = false) => {
+      // İSTEK JENERASYONU. Ayar (platform, yetişkin izni) hızlı art arda değişince
+      // birkaç yükleme aynı anda uçuşta olur; yavaş gelen ESKİ sonuç, daha yeni
+      // seçimin sonucunun üstüne yazılıyordu. Tazelemeler jenerasyonu artırır,
+      // sayfa ekleme (append) mevcut jenerasyona bağlı kalır; eskimiş sonuç
+      // yalnız önbelleğe (kendi doğru anahtarına) yazılır, ekrana yansımaz.
+      const gen = append ? loadGenRef.current : ++loadGenRef.current;
+      const isCurrent = () => gen === loadGenRef.current;
       if (preset === "subscriptions" && streamingProviderIds.length === 0) {
         itemsRef.current = [];
         setItems([]);
@@ -345,7 +364,10 @@ export default function DiscoveryMediaRail({
         : preset === "topGenres"
           ? resolvedGenreIds.join("-")
           : "all";
-      const cacheKey = `discovery_v2_${mediaType}_${preset}_${language}_${filterKey}_${requestedPage}`;
+      const cacheKey = adultScoped(
+        `discovery_v2_${mediaType}_${preset}_${language}_${filterKey}_${requestedPage}`,
+        adultContent,
+      );
       try {
         const cached = await getCachedValue(cacheKey, TTL.TREND);
         let data = cached;
@@ -375,7 +397,13 @@ export default function DiscoveryMediaRail({
             headers: { accept: "application/json", Authorization: API_KEY },
           })).data;
         }
-        const results = (data.results || []).filter((item) => item.poster_path);
+        // Önbelleğe, isteğin BAŞINDA hesaplanan anahtara yazılır; ekran artık
+        // başka bir ayardaysa bile kayıt kendi kapsamında doğru kalır.
+        if (!cached) setCachedValue(cacheKey, data);
+        if (!isCurrent()) return;
+        const results = dropAdult(data.results || [], adultContent).filter(
+          (item) => item.poster_path,
+        );
         setItems((current) => {
           const next = append ? mergeUnique(current, results) : results;
           if (sameListIdentity(current, next)) {
@@ -387,17 +415,29 @@ export default function DiscoveryMediaRail({
         });
         setPage(requestedPage);
         setTotalPages(Math.min(data.total_pages || 1, 20));
-        if (!cached) setCachedValue(cacheKey, data);
       } catch (error) {
         if (__DEV__) console.error("DiscoveryMediaRail:", error?.message || error);
         // Önceden çizilmiş önerileri geçici ağ hatasında koru. İlk yükleme
         // başarısızsa zaten boş kalır; yenilemede posterler yanıp sönmez.
-        if (!append && itemsRef.current.length === 0) setItems([]);
+        if (isCurrent() && !append && itemsRef.current.length === 0) setItems([]);
       } finally {
-        append ? setLoadingMore(false) : setLoading(false);
+        // Ekleme göstergesi kendi isteğine ait: eskimiş olsa da kapanmalı. Ana
+        // yükleme göstergesini ise yalnız GÜNCEL yükleme kapatır — yoksa daha
+        // yeni bir yükleme sürerken ray boş görünürdü.
+        if (append) setLoadingMore(false);
+        else if (isCurrent()) setLoading(false);
       }
     },
-    [API_KEY, buildParams, resolvedGenreIds, language, mediaType, preset, streamingProviderIds],
+    [
+      API_KEY,
+      adultContent,
+      buildParams,
+      resolvedGenreIds,
+      language,
+      mediaType,
+      preset,
+      streamingProviderIds,
+    ],
   );
 
   useEffect(() => {

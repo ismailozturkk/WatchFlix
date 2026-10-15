@@ -31,6 +31,8 @@ import {
   changeUsername as changeUsernameService,
   DEFAULT_PRIVACY,
 } from "../services/userService";
+import { adoptPendingFavorites } from "../services/fourFavoritesService";
+import { readPendingFavorites } from "../services/pendingFavorites";
 import useStartupGate from "../hooks/useStartupGate";
 import {
   calculateAge,
@@ -170,6 +172,29 @@ export function UserProfileProvider({ children }) {
     if (!profilVar) return;
     syncAgeRestriction(birthDate);
   }, [authLoading, uid, profilVar, birthDate]);
+
+  // ── 4) Tanıtımda seçilen "dört favori"yi hesaba taşı ──────────────────────
+  //
+  // Tanıtım hesap açılmadan ÖNCE gösterilir; orada seçilen favoriler cihazda
+  // bekler (services/pendingFavorites.js). Profil belgesi ilk yüklendiğinde —
+  // yeni kayıt ya da ilk giriş — bir kez Users/{uid}.fourFavorites'e aktarılır.
+  // Hesapta alan zaten varsa ona dokunulmaz (bkz. adoptPendingFavorites).
+  //
+  // Bekleyen kopya yoksa (neredeyse her açılış) efekt tek bir senkron depo
+  // okumasıyla biter. Çevrimdışı düşerse bir sonraki profil anlık görüntüsünde
+  // yeniden denenir.
+  const favoritesAdoptTried = useRef(new Set());
+  useEffect(() => {
+    if (!uid || !profile || profile.uid !== uid) return;
+    if (favoritesAdoptTried.current.has(uid)) return;
+    if (!readPendingFavorites()) return;
+    favoritesAdoptTried.current.add(uid);
+    adoptPendingFavorites(uid)
+      .then((outcome) => {
+        if (outcome === "offline") favoritesAdoptTried.current.delete(uid);
+      })
+      .catch(() => favoritesAdoptTried.current.delete(uid));
+  }, [uid, profile]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
 

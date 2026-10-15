@@ -36,8 +36,18 @@ import { BADGE_SET_IDS, evaluateBadgeSets } from "@components/badges/badgeSets";
 import { muhurIdleri, muhurleriHesapla } from "@components/badges/seasonSeals";
 import { kutlanacaklar, loadLedger, markCelebrated, reconcileLedger } from "@utils/watchBadgeLedger";
 import { serileriHesapla } from "@utils/watchActivity";
+import { kartlariDekorle } from "@components/badges/badgeInsights";
 
 const BOS_ROZETLER = [];
+const BOS_TARIHLER = Object.freeze({});
+
+// Tarih haritası içerik olarak aynıysa ESKİ referansı koru: yeni nesne yazmak, hiçbir
+// şey değişmediği halde kartları yeniden dekore ettirir.
+function ayniHarita(a, b) {
+  const ka = Object.keys(a);
+  if (ka.length !== Object.keys(b).length) return false;
+  return ka.every((k) => a[k] === b[k]);
+}
 
 // Defteri diske yazmadan önce hesabın durulmasını bekleme süresi (ms).
 // Açılışta ve eski format göçü sırasında imza üst üste değişir; yalnızca
@@ -65,6 +75,11 @@ export default function useWatchProgress() {
   const [kazanilmis, setKazanilmis] = useState(BOS_ROZETLER);
   const [oyunSeviye, setOyunSeviye] = useState(0);
   const [defter, setDefter] = useState(null);
+  // KAZANMA TARİHLERİ (defter v3). Ayrı state çünkü `sonuc` memosuna GİRMEMELİ:
+  // o memo 512 film + 3.400 bölümlük tek geçişi koşturuyor ve tarih haritası her
+  // mutabakatta değişebilir. Tarihler yalnızca kartların üstüne ince bir katman
+  // olarak işleniyor (aşağıdaki `kartlar` memosu).
+  const [kazanmaTarihleri, setKazanmaTarihleri] = useState(BOS_TARIHLER);
   // Aktiflik serileri defterden gelir, izleme verisinden DEĞİL: ölçüt cihaz
   // saatiyle gerçek işaretleme anı (utils/watchActivity.js).
   const [seriler, setSeriler] = useState(null);
@@ -111,6 +126,7 @@ export default function useWatchProgress() {
     loadLedger(uid).then((l) => {
       if (iptal) return;
       setDefter(l);
+      setKazanmaTarihleri(l.earnedAt || BOS_TARIHLER);
       setPerdeFloor(l.earned.perdeFloor);
       setMakaraFloor(l.earned.makaraFloor);
       setKazanilmis(l.earned.badgeIds);
@@ -141,6 +157,7 @@ export default function useWatchProgress() {
     setMakaraFloor(0);
     setKazanilmis(BOS_ROZETLER);
     setDefter(null);
+    setKazanmaTarihleri(BOS_TARIHLER);
     setSeriler(null);
     setAktifGunler(BOS_ROZETLER);
     setKutlama(null);
@@ -260,6 +277,7 @@ export default function useWatchProgress() {
         yerlesti = true;
         if (iptal) return;
         setDefter(r.ledger);
+        setKazanmaTarihleri((o) => (ayniHarita(o, r.ledger.earnedAt) ? o : r.ledger.earnedAt));
         setIlkTohum(r.ilkTohum);
         setTohumRozetSayisi(r.tohumRozetSayisi);
         // Rekor yükseldiyse bu, hesabı yeniden koşturur (seriler memo'nun
@@ -346,6 +364,13 @@ export default function useWatchProgress() {
     }
   }, [uid, defter, kutlama]);
 
+  // Kartlar + kazanma tarihi/`yeni` bayrağı. Ağır hesaptan (`sonuc`) AYRI memo:
+  // tarih haritası değişince yalnızca bu ince katman yeniden kurulur.
+  const kartlar = useMemo(
+    () => (sonuc ? kartlariDekorle(sonuc.kartlar, kazanmaTarihleri) : BOS_ROZETLER),
+    [sonuc, kazanmaTarihleri],
+  );
+
   // Dönüş MUTLAKA memoize edilmeli: her render'da yeni bir nesne dönmek,
   // tüketicilerdeki React.memo'yu (WatchLevelCard) tamamen etkisiz kılar —
   // ProfileScreen bir sekme olduğu için sık render alır.
@@ -358,7 +383,8 @@ export default function useWatchProgress() {
     rozetler: sonuc?.rozetler ?? BOS_ROZETLER,
     setler: sonuc?.setler ?? BOS_ROZETLER,
     muhurler: sonuc?.muhurler ?? BOS_ROZETLER,
-    kartlar: sonuc?.kartlar ?? BOS_ROZETLER,
+    kartlar,
+    kazanmaTarihleri,
     tahmini: sonuc?.tahmini ?? false,
     // Sayaç KATALOG rozetlerini sayar; koleksiyon/mühür/prestij dahil edilseydi
     // payda her dönem başında büyür ve kullanıcı hiçbir şey yapmadan "42/95"ten
@@ -373,5 +399,5 @@ export default function useWatchProgress() {
     seriler,
     kutlama,
     kutlamayiKapat,
-  }), [sonuc, ilkTohum, tohumRozetSayisi, seriler, kutlama, kutlamayiKapat]);
+  }), [sonuc, kartlar, kazanmaTarihleri, ilkTohum, tohumRozetSayisi, seriler, kutlama, kutlamayiKapat]);
 }

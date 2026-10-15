@@ -55,7 +55,7 @@ export function shuffleWith(list, rng = Math.random) {
   return copy;
 }
 
-const keyOfItem = (item) => {
+export const keyOfItem = (item) => {
   if (item && typeof item === "object") {
     if (item.mediaKey) return String(item.mediaKey);
     if (item.type !== undefined && item.id !== undefined) return `${item.type}_${item.id}`;
@@ -69,6 +69,8 @@ export const randomSource = Object.freeze({
   stable: false,
   shuffle: (list) => shuffleWith(list),
   int: (min, max) => randomIntWith(Math.random, min, max),
+  // (0, 1) açık aralığında sayı; ağırlıklı seçim (utils/gameSelection) kullanır.
+  float: () => Math.random() || Number.EPSILON,
 });
 
 /**
@@ -92,6 +94,10 @@ export function createStableSource(seed) {
       const span = max - min + 1;
       if (span <= 1) return min;
       return min + (hashString(`${base}|${salt}`) % span);
+    },
+    // (0, 1) açık aralığı: 0 ve 1 hariç olduğundan log() güvenle alınabilir.
+    float(salt = "") {
+      return (hashString(`${base}|${salt}`) + 0.5) / 4294967296;
     },
   };
 }

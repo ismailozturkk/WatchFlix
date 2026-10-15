@@ -1,6 +1,8 @@
 import React from "react";
 import { act, create } from "react-test-renderer";
 import TabBar from "../components/navigation/TabBar";
+import { TAB_BAR_COLLAPSE_SCALE_DELTA } from "../utils/tabBarCollapse";
+import { TabBarLayoutContext } from "../context/TabBarLayoutContext";
 import { TAB_DEFINITIONS, getTabBarLayout } from "../utils/tabBarModel";
 import { withSpring } from "react-native-reanimated";
 
@@ -360,6 +362,49 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
     });
     const root = renderer.root.find((node) => node.props["data-testid"] === "tab-bar-android-glass");
     expect(root).toBeDefined();
+  });
+
+  describe("scroll-driven shrink", () => {
+    // The outer capsule is the only animated view carrying a translateY (the
+    // pill uses translateX, the buttons only a scale).
+    const hasTranslateY = (style) => Boolean(style?.transform?.some?.((t) => "translateY" in t));
+    function capsuleTransform(progress) {
+      let renderer;
+      act(() => {
+        renderer = create(
+          <TabBarLayoutContext.Provider value={{ contentBottom: 110, tabBarCollapse: { value: progress }, tabBarLastScrollY: { value: -1 }, onTabBarScroll: () => {} }}>
+            <TabBar tabs={tabs} activeTab="tvshows" onSelect={jest.fn()} mode="legacy-blur" layout={defaultLayout}
+              theme={darkTheme} blurTarget={{ current: {} }} reduceMotion={false} onGlassFailure={jest.fn()} />
+          </TabBarLayoutContext.Provider>
+        );
+      });
+      const capsule = renderer.root.find((node) => node.type === "div" && Array.isArray(node.props.style) && node.props.style.some(hasTranslateY));
+      const { transform } = capsule.props.style.find(hasTranslateY);
+      return { scale: transform.find((t) => "scale" in t).scale, translateY: transform.find((t) => "translateY" in t).translateY };
+    }
+
+    it("is full size when nothing has been scrolled", () => {
+      expect(capsuleTransform(0)).toEqual({ scale: 1, translateY: 0 });
+    });
+
+    it("shrinks by exactly 20% at full collapse", () => {
+      expect(capsuleTransform(1).scale).toBeCloseTo(0.8, 5);
+      expect(TAB_BAR_COLLAPSE_SCALE_DELTA).toBe(0.2);
+    });
+
+    it("shrinks and grows continuously with scroll progress", () => {
+      const scales = [0, 0.25, 0.5, 0.75, 1].map((p) => capsuleTransform(p).scale);
+      for (let i = 1; i < scales.length; i++) expect(scales[i]).toBeLessThan(scales[i - 1]);
+      expect(capsuleTransform(0.5).scale).toBeCloseTo(0.9, 5);
+    });
+
+    it("keeps the bottom edge essentially planted (within 1px) instead of floating up", () => {
+      const { scale, translateY } = capsuleTransform(1);
+      // Centred scale lifts the bottom edge by (1 - scale) * height / 2; translateY
+      // comes after the scale in the list, so it is itself scaled.
+      const lift = ((1 - scale) * defaultLayout.height) / 2;
+      expect(Math.abs(translateY * scale - lift)).toBeLessThan(1);
+    });
   });
 
   it("previews the drag live but only commits the tab switch on release, snapped to the nearest slot", () => {

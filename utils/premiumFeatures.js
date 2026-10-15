@@ -516,6 +516,23 @@ export const PREMIUM_FEATURES = Object.freeze({
     freeValue: { tr: "Kapalı", en: "Off" },
     paidValue: { tr: "Kar yağışı", en: "Snowfall" },
   }),
+  ambient_background: feature({
+    id: "ambient_background",
+    kind: ACCESS,
+    category: "personal",
+    icon: "prism",
+    minPlan: PREMIUM_PLAN.PREMIUM,
+    title: { tr: "Ambiyans arka planı", en: "Ambient background" },
+    upsell: {
+      title: { tr: "Ambiyans Premium'da", en: "Ambient background is a Premium perk" },
+      message: {
+        tr: "Ekranlarının arkasında bulanık, rengârenk ışıklar süzülsün.",
+        en: "Let soft, colorful lights drift behind your screens.",
+      },
+    },
+    freeValue: { tr: "Kapalı", en: "Off" },
+    paidValue: { tr: "Süzülen ışıklar", en: "Drifting lights" },
+  }),
   icon_background: feature({
     id: "icon_background",
     kind: ACCESS,

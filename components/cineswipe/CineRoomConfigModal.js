@@ -15,7 +15,6 @@ import { describeFilters, typeIcon, typeLabel } from "./filterLabels";
 import { cineColors } from "./cineTheme";
 import useCineCopy from "./useCineCopy";
 import { useTheme } from "../../context/ThemeContext";
-import { triggerHaptic } from "../../services/hapticsService";
 import {
   CARD_COUNT_OPTIONS,
   MEDIA_TYPE_OPTIONS,
@@ -41,7 +40,6 @@ export default function CineRoomConfigModal({ visible, onClose, onConfirmCreate 
   const change = (patch) => setDraft((current) => normalizeFilters({ ...current, ...patch }));
 
   const handleCreate = () => {
-    triggerHaptic("impact");
     onConfirmCreate({ targetCardsCount: count, ...draft });
     onClose();
   };

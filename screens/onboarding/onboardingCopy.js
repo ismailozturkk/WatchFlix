@@ -65,6 +65,14 @@ export const ONBOARDING_COPY = {
       less: "Daha az göster",
       hint: "Ayarlar'dan istediğin zaman değiştirebilirsin.",
     },
+    favorites: {
+      eyebrow: "PROFİLİNİN VİTRİNİ",
+      title: "Seni anlatan favorilerin.",
+      titleAccent: "favorilerin",
+      desc: "Her kategoride en fazla 4 favori seç. Arkadaşların profilinde görür, önerilerin de buna göre şekillenir.",
+      selected: (n) => (n === 0 ? "Henüz seçmedin" : `${n} favori seçildi`),
+      hint: "İstersen atla; Profili Düzenle'den sonra da ekleyebilirsin.",
+    },
     cta: {
       freeBadge: "ÜCRETSİZ BAŞLA",
       title: "İzleme hikâyen şimdi başlıyor.",
@@ -141,6 +149,14 @@ export const ONBOARDING_COPY = {
       less: "Show less",
       hint: "You can change this anytime in Settings.",
     },
+    favorites: {
+      eyebrow: "YOUR PROFILE SHOWCASE",
+      title: "The picks that define you.",
+      titleAccent: "define you",
+      desc: "Choose up to 4 favorites in each category. Friends see them on your profile and your suggestions follow them.",
+      selected: (n) => (n === 0 ? "None selected yet" : `${n} selected`),
+      hint: "Skip it if you like — you can add them later in Edit Profile.",
+    },
     cta: {
       freeBadge: "START FOR FREE",
       title: "Your watching story starts now.",
@@ -164,12 +180,17 @@ export const getOnboardingCopy = (language) =>
 
 // Akışın sırası. `kind` analitik adım adıyla (step_name) birebir bağlıdır:
 // değiştirirsen mevcut huni raporları bozulur.
+//
+// "favorites" CTA'dan hemen önce: mevcut adımların adları ve sıraları aynı kaldı,
+// yalnız kayıt slaytının `step_number`ı 6 → 7 oldu. Ortaya eklenseydi profil
+// tanıtımı ve kayıt adımı birlikte kayardı.
 export const ONBOARDING_STEP_ORDER = Object.freeze([
   { type: "feature", featureIndex: 0 },
   { type: "preference", kind: "genre" },
   { type: "feature", featureIndex: 1 },
   { type: "preference", kind: "provider" },
   { type: "feature", featureIndex: 2 },
+  { type: "preference", kind: "favorites" },
   { type: "cta" },
 ]);
 

@@ -22,6 +22,12 @@ jest.mock("../utils/i18nText", () => ({ i18nText: (_key, fallback) => fallback }
 jest.mock("../components/ScreenDecor", () => ({ __esModule: true, default: "Decor" }));
 jest.mock("../components/auth/BirthDateField", () => ({ __esModule: true, default: "BirthDateField" }));
 jest.mock("../components/profile/ProfileAvatarPickerModal", () => ({ __esModule: true, default: "AvatarSheet" }));
+jest.mock("../components/favorites/FavoritesEditor", () => ({ __esModule: true, default: "FavoritesEditor" }));
+const mockTrack = jest.fn();
+jest.mock("../services/analytics", () => ({
+  ANALYTICS_EVENTS: { FOUR_FAVORITES_SAVED: "four_favorites_saved" },
+  trackEvent: (...args) => mockTrack(...args),
+}));
 jest.mock("../utils/ageGate", () => ({
   MIN_ADULT_AGE: 18,
   calculateAge: (iso) => (iso ? 26 : null),
@@ -236,6 +242,68 @@ describe("EditProfileScreen", () => {
       await flush();
       expect(field("at").props.state).toBe(false);
       expect(header().props.canSave).toBe(false);
+    });
+  });
+
+  describe("four favorites", () => {
+    const film = (id) => ({ id, title: `Film ${id}`, image: `/f${id}.jpg` });
+    const favs = (ids) => ({ movies: ids.map(film), shows: [], people: [] });
+    const editor = () => renderer.root.findByType("FavoritesEditor");
+
+    it("starts empty for an older account and does not make the form dirty", async () => {
+      await render();
+      expect(editor().props.value).toEqual({ movies: [], shows: [], people: [] });
+      expect(header().props.canSave).toBe(false);
+    });
+
+    it("fills the editor from the saved profile", async () => {
+      mockProfileState = { profile: { ...SAVED, fourFavorites: favs([1, 2]) }, loading: false };
+      await render();
+      expect(editor().props.value.movies.map((m) => m.id)).toEqual([1, 2]);
+      expect(header().props.canSave).toBe(false);
+    });
+
+    it("turns Save on after a pick and off again when the pick is undone", async () => {
+      await render();
+      await act(() => editor().props.onChange(favs([7])));
+      expect(header().props.canSave).toBe(true);
+      await act(() => editor().props.onChange({ movies: [], shows: [], people: [] }));
+      expect(header().props.canSave).toBe(false);
+    });
+
+    it("saves the favourites together with other changes, normalized", async () => {
+      await render();
+      await type("person-outline", "Ali V.");
+      await act(() => editor().props.onChange(favs([7, 8])));
+      await act(async () => { await header().props.onSave(); });
+      expect(mockUpdateField).toHaveBeenCalledWith({
+        displayName: "Ali V.",
+        fourFavorites: favs([7, 8]),
+      });
+      expect(mockTrack).toHaveBeenCalledWith(
+        "four_favorites_saved",
+        { movies: 2, shows: 0, people: 0, total: 2 },
+      );
+    });
+
+    it("does not send favourites that did not change", async () => {
+      mockProfileState = { profile: { ...SAVED, fourFavorites: favs([1]) }, loading: false };
+      await render();
+      await type("person-outline", "Ali V.");
+      await act(async () => { await header().props.onSave(); });
+      expect(mockUpdateField).toHaveBeenCalledWith({ displayName: "Ali V." });
+      expect(mockTrack).not.toHaveBeenCalled();
+    });
+
+    it("clearing every favourite is saved as an empty structure, not skipped", async () => {
+      mockProfileState = { profile: { ...SAVED, fourFavorites: favs([1, 2]) }, loading: false };
+      await render();
+      await act(() => editor().props.onChange({ movies: [], shows: [], people: [] }));
+      expect(header().props.canSave).toBe(true);
+      await act(async () => { await header().props.onSave(); });
+      expect(mockUpdateField).toHaveBeenCalledWith({
+        fourFavorites: { movies: [], shows: [], people: [] },
+      });
     });
   });
 

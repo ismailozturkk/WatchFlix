@@ -145,6 +145,14 @@ function WatchBadgeStrip({ progress, onPress, compact = false }) {
                 color={kademeRengi(sekil.kademe, theme)}
                 ornate={sekil.ornate}
               />
+              {/* Son 7 günde kazanılan rozetin köşesinde küçük bir nokta: raf bir
+                  vitrin ama "yeni bir şey var" bilgisi sıfır maliyetle taşınır. */}
+              {b.yeni ? (
+                <View
+                  pointerEvents="none"
+                  style={[styles.yeniNokta, { backgroundColor: theme.accent, borderColor: theme.primary }]}
+                />
+              ) : null}
             </TouchableOpacity>
           );
         })}
@@ -181,6 +189,7 @@ const styles = StyleSheet.create({
   hepsiCountCompact: { minWidth: 30, height: 20, paddingHorizontal: 5, borderRadius: 7 },
   hepsiCountText: { fontSize: 10, fontWeight: "900" },
   hepsiCountTextCompact: { fontSize: 8.5 },
+  yeniNokta: { position: "absolute", top: 0, right: 0, width: 10, height: 10, borderRadius: 5, borderWidth: 2 },
 });
 
 export default memo(WatchBadgeStrip);

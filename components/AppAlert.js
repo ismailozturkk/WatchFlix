@@ -62,13 +62,13 @@ function resolveAlertType(options, buttons) {
   return "info";
 }
 
+// Yalnız SONUÇ bildiren uyarılar titreşir. Onay/uyarı/bilgi kutuları bir soru ya
+// da duyurudur; her açılışta zırlamasın.
 function openHaptic(type) {
   try {
     const N = Haptics.NotificationFeedbackType;
     if (type === "success") Haptics.notificationAsync(N.Success);
     else if (type === "error") Haptics.notificationAsync(N.Error);
-    else if (type === "warning" || type === "confirm") Haptics.notificationAsync(N.Warning);
-    else Haptics.selectionAsync();
   } catch (e) {}
 }
 
@@ -167,13 +167,6 @@ export function AppAlertHost() {
     type === "confirm" ? [theme.accent, theme.accent] : meta.gradient;
 
   const pressButton = (btn) => {
-    try {
-      Haptics.impactAsync(
-        btn.style === "destructive"
-          ? Haptics.ImpactFeedbackStyle.Medium
-          : Haptics.ImpactFeedbackStyle.Light,
-      );
-    } catch (e) {}
     close(btn.onPress);
   };
 

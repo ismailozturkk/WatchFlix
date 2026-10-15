@@ -245,7 +245,7 @@ export default function SearchScreen({ navigation, route }) {
           }),
           borderRadius: expandAnim.interpolate({
             inputRange: [0, 1],
-            outputRange: [18, 0],
+            outputRange: [searchOrigin.radius ?? 18, 0],
           }),
         }
       : StyleSheet.absoluteFill;
